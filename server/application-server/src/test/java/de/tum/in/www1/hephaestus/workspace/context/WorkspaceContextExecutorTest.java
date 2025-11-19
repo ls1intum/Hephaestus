@@ -85,11 +85,12 @@ class WorkspaceContextExecutorTest {
         // Execute in different thread
         ExecutorService executor = Executors.newSingleThreadExecutor();
         Future<String> future = executor.submit(wrapped);
+        String result = future.get();
         executor.shutdown();
         executor.awaitTermination(5, TimeUnit.SECONDS);
 
         // Assert
-        assertEquals("callable-test", future.get());
+        assertEquals("callable-test", result);
     }
 
     @Test

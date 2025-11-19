@@ -321,7 +321,7 @@ public class WorkspaceProvisioningService {
                 logger.info("Synced GitHub user '{}' (id={}) as PAT workspace owner.", accountLogin, user.getId());
                 return user.getId();
             }
-        } catch (Exception e) {
+        } catch (IOException e) {
             logger.warn("Failed to sync GitHub user '{}' for PAT workspace: {}", accountLogin, e.getMessage());
         }
 

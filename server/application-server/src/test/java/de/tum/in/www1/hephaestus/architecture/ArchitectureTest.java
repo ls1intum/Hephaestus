@@ -107,7 +107,7 @@ class ArchitectureTest {
             .and()
             .resideOutsideOfPackage("..workspace.context..")
             .and()
-            .resideOutsideOfPackage("..workspace.")
+            .resideOutsideOfPackage("..workspace..")
             .should()
             .dependOnClassesThat()
             .haveSimpleName("WorkspaceRepository")

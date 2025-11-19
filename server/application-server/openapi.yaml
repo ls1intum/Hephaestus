@@ -21,6 +21,10 @@ tags:
   name: Documents
 - description: Vote on chat messages (upvote/downvote)
   name: Chat Message Voting
+- description: |-
+    Controller for managing workspace memberships and roles.
+     Handles CRUD operations for workspace members and role assignments.
+  name: workspace-membership-controller
 paths:
   /activity/badpractice/{badPracticeId}/feedback:
     post:
@@ -802,6 +806,137 @@ paths:
           description: OK
       tags:
       - workspace
+  /workspaces/{slug}/members:
+    get:
+      description: |-
+        List all members of the workspace with pagination.
+         Accessible to all workspace members (MEMBER role and above).
+      operationId: listMembers
+      parameters:
+      - description: Workspace slug (resolved by filter)
+        in: path
+        name: slug
+        required: true
+        schema:
+          type: string
+      - description: Page number (0-indexed)
+        in: query
+        name: page
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+      - description: "Page size (default 50, max 100)"
+        in: query
+        name: size
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 50
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/WorkspaceMembership"
+          description: List of workspace memberships
+      summary: List all members of the workspace with pagination.
+      tags:
+      - workspace-membership
+  /workspaces/{slug}/members/assign:
+    post:
+      description: |-
+        Assign or update a role for a workspace member.
+         OWNER can assign any role. ADMIN can assign ADMIN or MEMBER roles.
+      operationId: assignRole
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: slug
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AssignRoleRequest"
+        description: Role assignment request
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+          description: Updated membership
+      summary: Assign or update a role for a workspace member.
+      tags:
+      - workspace-membership
+  /workspaces/{slug}/members/{userId}:
+    delete:
+      description: |-
+        Revoke a user's membership (remove them from workspace).
+         OWNER can remove anyone except themselves if they are the last OWNER.
+         ADMIN can remove MEMBER and ADMIN roles.
+      operationId: removeMember
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: slug
+        required: true
+        schema:
+          type: string
+      - description: User ID to remove
+        in: path
+        name: userId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+          description: 204 No Content on success
+      summary: Revoke a user's membership (remove them from workspace).
+      tags:
+      - workspace-membership
+    get:
+      description: |-
+        Get a specific member's details.
+         Accessible to all workspace members.
+      operationId: getMember
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: slug
+        required: true
+        schema:
+          type: string
+      - description: User ID
+        in: path
+        name: userId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+          description: Workspace membership details
+      summary: Get a specific member's details.
+      tags:
+      - workspace-membership
   /workspaces/{slug}/notifications:
     patch:
       operationId: updateNotifications
@@ -1129,6 +1264,22 @@ components:
             $ref: "#/components/schemas/PullRequestWithBadPractices"
       required:
       - pullRequests
+    AssignRoleRequest:
+      type: object
+      description: DTO for assigning or updating a role for a workspace member.
+      properties:
+        role:
+          type: string
+          enum:
+          - OWNER
+          - ADMIN
+          - MEMBER
+        userId:
+          type: integer
+          format: int64
+      required:
+      - role
+      - userId
     BadPracticeFeedback:
       type: object
       properties:
@@ -3276,4 +3427,27 @@ components:
         slug:
           type: string
         status:
+          type: string
+    WorkspaceMembership:
+      type: object
+      description: DTO representing a workspace membership with user information.
+      properties:
+        createdAt:
+          type: string
+          format: date-time
+        leaguePoints:
+          type: integer
+          format: int32
+        role:
+          type: string
+          enum:
+          - OWNER
+          - ADMIN
+          - MEMBER
+        userId:
+          type: integer
+          format: int64
+        userLogin:
+          type: string
+        userName:
           type: string

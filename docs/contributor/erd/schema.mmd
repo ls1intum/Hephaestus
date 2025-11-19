@@ -333,6 +333,7 @@ erDiagram
         VARCHAR(255) type
         BOOLEAN notifications_enabled "NOT NULL"
         BOOLEAN participate_in_research "NOT NULL"
+        INTEGER league_points "NOT NULL"
     }
 
     Workspace {
@@ -361,19 +362,19 @@ erDiagram
         TIMESTAMPTZ updated_at
     }
 
+    WorkspaceMember {
+        BIGINT workspace_id PK,FK
+        BIGINT user_id PK,FK
+        INTEGER league_points "NOT NULL"
+        VARCHAR(32) role "NOT NULL"
+    }
+
     WorkspaceMembership {
         TIMESTAMPTZ created_at "NOT NULL"
         INTEGER league_points "NOT NULL"
         VARCHAR(16) role "NOT NULL"
         BIGINT user_id PK,FK
         BIGINT workspace_id PK,FK
-    }
-
-    WorkspaceMember {
-        BIGINT workspace_id PK,FK
-        BIGINT user_id PK,FK
-        INTEGER league_points "NOT NULL"
-        VARCHAR(32) role "NOT NULL"
     }
 
     %% Relationships

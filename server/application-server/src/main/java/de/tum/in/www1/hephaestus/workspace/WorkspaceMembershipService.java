@@ -39,20 +39,6 @@ public class WorkspaceMembershipService {
         this.entityManager = entityManager;
     }
 
-    public Optional<Workspace> resolveSingleWorkspace(String context) {
-        List<Workspace> all = workspaceRepository.findAll();
-        if (all.isEmpty()) {
-            logger.debug("Skipping workspace resolution for {} because no workspaces are configured.", context);
-            return Optional.empty();
-        }
-        if (all.size() == 1) {
-            return Optional.of(all.get(0));
-        }
-        throw new IllegalStateException(
-            "Multiple workspaces are configured; " + context + " must specify the target workspace explicitly."
-        );
-    }
-
     @Transactional
     public Map<Long, Integer> getLeaguePointsSnapshot(Collection<User> users, Long workspaceId) {
         if (users == null || users.isEmpty()) {
@@ -265,9 +251,63 @@ public class WorkspaceMembershipService {
         membership.setWorkspace(workspace);
         membership.setUser(userReference);
         membership.setRole(role);
+        membership.setLeaguePoints(LeaguePointsCalculationService.POINTS_DEFAULT);
         membership.setId(new WorkspaceMembership.Id(workspace.getId(), userId));
 
         return workspaceMembershipRepository.save(membership);
+    }
+
+    /**
+     * Assign or update a role for a workspace member.
+     * Creates a new membership if the user is not yet a member.
+     *
+     * @param workspaceId Workspace ID
+     * @param userId User ID
+     * @param role Role to assign
+     * @return Updated or created membership
+     */
+    @Transactional
+    public WorkspaceMembership assignRole(Long workspaceId, Long userId, WorkspaceMembership.WorkspaceRole role) {
+        Workspace workspace = workspaceRepository
+            .findById(workspaceId)
+            .orElseThrow(() -> new IllegalArgumentException("Workspace not found"));
+
+        var membershipOpt = workspaceMembershipRepository.findByWorkspace_IdAndUser_Id(workspaceId, userId);
+
+        if (membershipOpt.isPresent()) {
+            // Update existing membership
+            WorkspaceMembership membership = membershipOpt.get();
+            membership.setRole(role);
+            logger.info("Updated role for user {} in workspace {} to {}", userId, workspaceId, role);
+            return workspaceMembershipRepository.save(membership);
+        } else {
+            // Create new membership
+            User user = entityManager.find(User.class, userId);
+            if (user == null) {
+                throw new IllegalArgumentException("User not found with ID: " + userId);
+            }
+
+            WorkspaceMembership membership = createMembershipInternal(workspace, user, role);
+            membership.setLeaguePoints(LeaguePointsCalculationService.POINTS_DEFAULT);
+            logger.info("Created new membership for user {} in workspace {} with role {}", userId, workspaceId, role);
+            return workspaceMembershipRepository.save(membership);
+        }
+    }
+
+    /**
+     * Remove a user's membership from a workspace.
+     *
+     * @param workspaceId Workspace ID
+     * @param userId User ID
+     */
+    @Transactional
+    public void removeMembership(Long workspaceId, Long userId) {
+        var membership = workspaceMembershipRepository
+            .findByWorkspace_IdAndUser_Id(workspaceId, userId)
+            .orElseThrow(() -> new IllegalArgumentException("Workspace membership not found"));
+
+        workspaceMembershipRepository.delete(membership);
+        logger.info("Removed user {} from workspace {}", userId, workspaceId);
     }
 
     private WorkspaceMembership createMembershipInternal(Workspace workspace, User user) {

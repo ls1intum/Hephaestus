@@ -10,6 +10,7 @@ import java.util.Map;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -60,6 +61,7 @@ public class WorkspaceController {
     }
 
     @PostMapping("/{slug}/suspend")
+    @PreAuthorize("isAuthenticated() and @workspaceSecure.isOwner()")
     public ResponseEntity<?> suspendWorkspace(@PathVariable String slug) {
         try {
             Workspace workspace = workspaceLifecycleService.suspendWorkspace(slug);
@@ -72,6 +74,7 @@ public class WorkspaceController {
     }
 
     @PostMapping("/{slug}/resume")
+    @PreAuthorize("isAuthenticated() and @workspaceSecure.isOwner()")
     public ResponseEntity<?> resumeWorkspace(@PathVariable String slug) {
         try {
             Workspace workspace = workspaceLifecycleService.resumeWorkspace(slug);
@@ -84,6 +87,7 @@ public class WorkspaceController {
     }
 
     @DeleteMapping("/{slug}")
+    @PreAuthorize("isAuthenticated() and @workspaceSecure.isOwner()")
     public ResponseEntity<?> purgeWorkspace(@PathVariable String slug) {
         try {
             workspaceLifecycleService.purgeWorkspace(slug);
@@ -96,6 +100,7 @@ public class WorkspaceController {
     }
 
     @PatchMapping("/{slug}/schedule")
+    @PreAuthorize("isAuthenticated() and @workspaceSecure.isAdmin()")
     public ResponseEntity<?> updateSchedule(
         @PathVariable String slug,
         @Valid @RequestBody UpdateWorkspaceScheduleRequestDTO request
@@ -111,6 +116,7 @@ public class WorkspaceController {
     }
 
     @PatchMapping("/{slug}/notifications")
+    @PreAuthorize("isAuthenticated() and @workspaceSecure.isAdmin()")
     public ResponseEntity<?> updateNotifications(
         @PathVariable String slug,
         @Valid @RequestBody UpdateWorkspaceNotificationsRequestDTO request
@@ -131,6 +137,7 @@ public class WorkspaceController {
     }
 
     @PatchMapping("/{slug}/token")
+    @PreAuthorize("isAuthenticated() and @workspaceSecure.isOwner()")
     public ResponseEntity<?> updateToken(
         @PathVariable String slug,
         @Valid @RequestBody UpdateWorkspaceTokenRequestDTO request
@@ -146,6 +153,7 @@ public class WorkspaceController {
     }
 
     @PatchMapping("/{slug}/slack-credentials")
+    @PreAuthorize("isAuthenticated() and @workspaceSecure.isAdmin()")
     public ResponseEntity<?> updateSlackCredentials(
         @PathVariable String slug,
         @Valid @RequestBody UpdateWorkspaceSlackCredentialsRequestDTO request
@@ -165,6 +173,7 @@ public class WorkspaceController {
     }
 
     @PatchMapping("/{slug}/public-visibility")
+    @PreAuthorize("isAuthenticated() and @workspaceSecure.isAdmin()")
     public ResponseEntity<?> updatePublicVisibility(
         @PathVariable String slug,
         @Valid @RequestBody UpdateWorkspacePublicVisibilityRequestDTO request
@@ -184,12 +193,14 @@ public class WorkspaceController {
     // TODO: Add authorization in PR #523 (workspace-based authorization)
 
     @GetMapping("/{slug}/repositories")
+    @PreAuthorize("isAuthenticated() and @workspaceSecure.isMember()")
     public ResponseEntity<List<String>> getRepositories(@PathVariable String slug) {
         var repositories = workspaceService.getRepositoriesToMonitor().stream().sorted().toList();
         return ResponseEntity.ok(repositories);
     }
 
     @PostMapping("/{slug}/repositories/{owner}/{name}")
+    @PreAuthorize("isAuthenticated() and @workspaceSecure.isAdmin()")
     public ResponseEntity<?> addRepository(
         @PathVariable String slug,
         @PathVariable String owner,
@@ -206,6 +217,7 @@ public class WorkspaceController {
     }
 
     @DeleteMapping("/{slug}/repositories/{owner}/{name}")
+    @PreAuthorize("isAuthenticated() and @workspaceSecure.isAdmin()")
     public ResponseEntity<?> removeRepository(
         @PathVariable String slug,
         @PathVariable String owner,
@@ -222,12 +234,14 @@ public class WorkspaceController {
     }
 
     @GetMapping("/{slug}/users")
+    @PreAuthorize("isAuthenticated() and @workspaceSecure.isMember()")
     public ResponseEntity<List<UserTeamsDTO>> getUsers(@PathVariable String slug) {
         var users = workspaceService.getUsersWithTeams();
         return ResponseEntity.ok(users);
     }
 
     @PostMapping("/{slug}/teams/{teamId}/labels/{repositoryId}/{label}")
+    @PreAuthorize("isAuthenticated() and @workspaceSecure.isAdmin()")
     public ResponseEntity<?> addLabelToTeam(
         @PathVariable String slug,
         @PathVariable Long teamId,
@@ -241,6 +255,7 @@ public class WorkspaceController {
     }
 
     @DeleteMapping("/{slug}/teams/{teamId}/labels/{labelId}")
+    @PreAuthorize("isAuthenticated() and @workspaceSecure.isAdmin()")
     public ResponseEntity<?> removeLabelFromTeam(
         @PathVariable String slug,
         @PathVariable Long teamId,
@@ -253,6 +268,7 @@ public class WorkspaceController {
     }
 
     @PutMapping("/{slug}/league/reset")
+    @PreAuthorize("isAuthenticated() and @workspaceSecure.isOwner()")
     public ResponseEntity<?> resetLeague(@PathVariable String slug) {
         try {
             workspaceService.resetAndRecalculateLeagues();
