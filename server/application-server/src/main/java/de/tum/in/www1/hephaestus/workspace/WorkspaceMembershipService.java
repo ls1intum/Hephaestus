@@ -54,7 +54,7 @@ public class WorkspaceMembershipService {
     }
 
     @Transactional
-    public Map<Long, Integer> getLeaguePointsSnapshot(Collection<User> users, String context) {
+    public Map<Long, Integer> getLeaguePointsSnapshot(Collection<User> users, Long workspaceId) {
         if (users == null || users.isEmpty()) {
             return Collections.emptyMap();
         }
@@ -65,29 +65,33 @@ public class WorkspaceMembershipService {
             return Collections.emptyMap();
         }
 
-        Optional<Workspace> workspaceOptional = resolveSingleWorkspace(context);
-        if (workspaceOptional.isEmpty()) {
+        // If no workspace is specified, return default points
+        if (workspaceId == null) {
             return userIds
                 .stream()
                 .collect(Collectors.toMap(id -> id, id -> LeaguePointsCalculationService.POINTS_DEFAULT));
         }
 
-        Workspace workspace = workspaceOptional.get();
         Map<Long, WorkspaceMembership> existing = workspaceMembershipRepository
-            .findAllByWorkspace_IdAndUser_IdIn(workspace.getId(), userIds)
+            .findAllByWorkspace_IdAndUser_IdIn(workspaceId, userIds)
             .stream()
             .collect(Collectors.toMap(member -> member.getUser().getId(), member -> member));
 
+        // For new members, we need to fetch the workspace entity to create memberships
+        Workspace workspace = workspaceId != null ? workspaceRepository.findById(workspaceId).orElse(null) : null;
+
         List<WorkspaceMembership> toPersist = new ArrayList<>();
-        for (User user : users) {
-            Long userId = user.getId();
-            if (userId == null || existing.containsKey(userId)) {
-                continue;
+        if (workspace != null) {
+            for (User user : users) {
+                Long userId = user.getId();
+                if (userId == null || existing.containsKey(userId)) {
+                    continue;
+                }
+                WorkspaceMembership member = createMembershipInternal(workspace, user);
+                member.setLeaguePoints(LeaguePointsCalculationService.POINTS_DEFAULT);
+                existing.put(userId, member);
+                toPersist.add(member);
             }
-            WorkspaceMembership member = createMembershipInternal(workspace, user);
-            member.setLeaguePoints(LeaguePointsCalculationService.POINTS_DEFAULT);
-            existing.put(userId, member);
-            toPersist.add(member);
         }
 
         if (!toPersist.isEmpty()) {
@@ -100,17 +104,23 @@ public class WorkspaceMembershipService {
     }
 
     @Transactional
-    public int getCurrentLeaguePoints(Optional<Workspace> workspaceOptional, User user) {
+    public int getCurrentLeaguePoints(Long workspaceId, User user) {
         if (user == null || user.getId() == null) {
             return LeaguePointsCalculationService.POINTS_DEFAULT;
         }
-        if (workspaceOptional.isEmpty()) {
+        if (workspaceId == null) {
             return LeaguePointsCalculationService.POINTS_DEFAULT;
         }
+
+        Workspace workspace = workspaceRepository.findById(workspaceId).orElse(null);
+        if (workspace == null) {
+            return LeaguePointsCalculationService.POINTS_DEFAULT;
+        }
+
         WorkspaceMembership member = workspaceMembershipRepository
-            .findByWorkspace_IdAndUser_Id(workspaceOptional.get().getId(), user.getId())
+            .findByWorkspace_IdAndUser_Id(workspaceId, user.getId())
             .orElseGet(() -> {
-                WorkspaceMembership created = createMembershipInternal(workspaceOptional.get(), user);
+                WorkspaceMembership created = createMembershipInternal(workspace, user);
                 created.setLeaguePoints(LeaguePointsCalculationService.POINTS_DEFAULT);
                 return workspaceMembershipRepository.save(created);
             });
@@ -118,33 +128,43 @@ public class WorkspaceMembershipService {
     }
 
     @Transactional
-    public void updateLeaguePoints(Optional<Workspace> workspaceOptional, User user, int newPoints) {
+    public void updateLeaguePoints(Long workspaceId, User user, int newPoints) {
         if (user == null || user.getId() == null) {
             return;
         }
-        if (workspaceOptional.isEmpty()) {
+        if (workspaceId == null) {
             logger.debug(
                 "Skipping league point update for user {} because no workspace is configured.",
                 user.getLogin()
             );
             return;
         }
-        Workspace workspace = workspaceOptional.get();
+
+        Workspace workspace = workspaceRepository.findById(workspaceId).orElse(null);
+        if (workspace == null) {
+            logger.debug(
+                "Skipping league point update for user {} because workspace {} not found.",
+                user.getLogin(),
+                workspaceId
+            );
+            return;
+        }
+
         WorkspaceMembership member = workspaceMembershipRepository
-            .findByWorkspace_IdAndUser_Id(workspace.getId(), user.getId())
+            .findByWorkspace_IdAndUser_Id(workspaceId, user.getId())
             .orElseGet(() -> createMembershipInternal(workspace, user));
         member.setLeaguePoints(newPoints);
         workspaceMembershipRepository.save(member);
     }
 
     @Transactional
-    public void resetLeaguePoints(Optional<Workspace> workspaceOptional, int points) {
-        if (workspaceOptional.isEmpty()) {
+    public void resetLeaguePoints(Long workspaceId, int points) {
+        if (workspaceId == null) {
             logger.debug("Skipping league point reset because no workspace is configured.");
             return;
         }
-        Workspace workspace = workspaceOptional.get();
-        List<WorkspaceMembership> members = workspaceMembershipRepository.findByWorkspace_Id(workspace.getId());
+
+        List<WorkspaceMembership> members = workspaceMembershipRepository.findByWorkspace_Id(workspaceId);
         if (members.isEmpty()) {
             return;
         }

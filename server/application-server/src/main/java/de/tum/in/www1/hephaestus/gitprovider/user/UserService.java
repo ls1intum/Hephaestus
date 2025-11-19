@@ -11,8 +11,9 @@ import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryInfoDTO;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.integrations.posthog.PosthogClient;
 import de.tum.in.www1.hephaestus.integrations.posthog.PosthogClientException;
-import de.tum.in.www1.hephaestus.workspace.Workspace;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceMembershipService;
+import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContext;
+import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContextHolder;
 import jakarta.transaction.Transactional;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -70,10 +71,11 @@ public class UserService {
         }
 
         User userEntity = optionalUser.get();
-        Optional<Workspace> workspaceOptional = workspaceMembershipService.resolveSingleWorkspace(
-            "user profile '" + login + "'"
-        );
-        int leaguePoints = workspaceMembershipService.getCurrentLeaguePoints(workspaceOptional, userEntity);
+
+        WorkspaceContext context = WorkspaceContextHolder.getContext();
+        Long workspaceId = context != null ? context.id() : null;
+
+        int leaguePoints = workspaceMembershipService.getCurrentLeaguePoints(workspaceId, userEntity);
         UserInfoDTO user = UserInfoDTO.fromUser(userEntity, leaguePoints);
         var firstContribution = pullRequestRepository.firstContributionByAuthorLogin(login).orElse(null);
         List<PullRequestInfoDTO> openPullRequests = pullRequestRepository

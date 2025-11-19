@@ -14,8 +14,9 @@ import de.tum.in.www1.hephaestus.gitprovider.team.TeamRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserInfoDTO;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
-import de.tum.in.www1.hephaestus.workspace.Workspace;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceMembershipService;
+import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContext;
+import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContextHolder;
 import jakarta.annotation.Nonnull;
 import jakarta.transaction.Transactional;
 import java.time.Instant;
@@ -147,9 +148,12 @@ public class LeaderboardService {
                 });
         }
 
+        WorkspaceContext context = WorkspaceContextHolder.getContext();
+        Long workspaceId = context != null ? context.id() : null;
+
         Map<Long, Integer> leaguePointsByUserId = workspaceMembershipService.getLeaguePointsSnapshot(
             usersById.values(),
-            "leaderboard dataset"
+            workspaceId
         );
 
         Map<Long, List<PullRequestReview>> reviewsByUserId = reviews
@@ -428,10 +432,11 @@ public class LeaderboardService {
         User user = userRepository
             .findByLogin(login)
             .orElseThrow(() -> new IllegalArgumentException("User not found with login: " + login));
-        Optional<Workspace> workspaceOptional = workspaceMembershipService.resolveSingleWorkspace(
-            "league stats for user '" + login + "'"
-        );
-        int currentLeaguePoints = workspaceMembershipService.getCurrentLeaguePoints(workspaceOptional, user);
+
+        WorkspaceContext context = WorkspaceContextHolder.getContext();
+        Long workspaceId = context != null ? context.id() : null;
+
+        int currentLeaguePoints = workspaceMembershipService.getCurrentLeaguePoints(workspaceId, user);
         int projectedNewPoints = leaguePointsCalculationService.calculateNewPoints(user, currentLeaguePoints, entry);
         return new LeagueChangeDTO(user.getLogin(), projectedNewPoints - currentLeaguePoints);
     }

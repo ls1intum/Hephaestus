@@ -470,15 +470,13 @@ public class WorkspaceService {
             logger.info("Resetting league points for all users (no workspace context)");
         }
 
-        Optional<Workspace> workspaceOptional = workspaceMembershipService.resolveSingleWorkspace(
-            "league recalculation"
-        );
-        if (workspaceOptional.isEmpty()) {
+        Long workspaceId = workspaceContext != null ? workspaceContext.id() : null;
+        if (workspaceId == null) {
             logger.warn("Skipping league recalculation because no workspace is configured.");
             return;
         }
 
-        workspaceMembershipService.resetLeaguePoints(workspaceOptional, LeaguePointsCalculationService.POINTS_DEFAULT);
+        workspaceMembershipService.resetLeaguePoints(workspaceId, LeaguePointsCalculationService.POINTS_DEFAULT);
 
         // Get all pull request reviews and issue comments to calculate past leaderboards
         var now = Instant.now();
@@ -504,9 +502,9 @@ public class WorkspaceService {
                     return;
                 }
                 var user = userRepository.findByLoginWithEagerMergedPullRequests(leaderboardUser.login()).orElseThrow();
-                int currentPoints = workspaceMembershipService.getCurrentLeaguePoints(workspaceOptional, user);
+                int currentPoints = workspaceMembershipService.getCurrentLeaguePoints(workspaceId, user);
                 int newPoints = leaguePointsCalculationService.calculateNewPoints(user, currentPoints, entry);
-                workspaceMembershipService.updateLeaguePoints(workspaceOptional, user, newPoints);
+                workspaceMembershipService.updateLeaguePoints(workspaceId, user, newPoints);
             });
 
             // Move time window back one week
