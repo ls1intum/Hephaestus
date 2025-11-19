@@ -2,6 +2,7 @@ package de.tum.in.www1.hephaestus.workspace;
 
 import de.tum.in.www1.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserTeamsDTO;
+import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContextHolder;
 import de.tum.in.www1.hephaestus.workspace.dto.*;
 import de.tum.in.www1.hephaestus.workspace.exception.*;
 import jakarta.validation.Valid;
@@ -183,6 +184,25 @@ public class WorkspaceController {
             return ResponseEntity.ok(WorkspaceDTO.from(workspace));
         } catch (EntityNotFoundException e) {
             return ResponseEntity.notFound().build();
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @PatchMapping("/{slug}/rename")
+    @PreAuthorize("isAuthenticated() and @workspaceSecure.isOwner()")
+    public ResponseEntity<?> renameSlug(
+        @PathVariable String slug,
+        @Valid @RequestBody RenameWorkspaceSlugRequestDTO request
+    ) {
+        try {
+            Long workspaceId = WorkspaceContextHolder.getContext().id();
+            Workspace workspace = workspaceService.renameSlug(workspaceId, request.newSlug());
+            return ResponseEntity.ok(WorkspaceDTO.from(workspace));
+        } catch (EntityNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        } catch (InvalidWorkspaceSlugException | WorkspaceSlugConflictException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", e.getMessage()));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", e.getMessage()));
         }

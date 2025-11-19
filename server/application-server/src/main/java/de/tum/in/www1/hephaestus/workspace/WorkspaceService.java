@@ -105,6 +105,12 @@ public class WorkspaceService {
     @Autowired
     private GitHubAppTokenService gitHubAppTokenService;
 
+    @Autowired
+    private WorkspaceSlugHistoryRepository slugHistoryRepository;
+
+    @Autowired
+    private WorkspaceProperties workspaceProperties;
+
     @Value("${nats.enabled}")
     private boolean isNatsEnabled;
 
@@ -892,5 +898,91 @@ public class WorkspaceService {
                     "Ensure the user exists in the system before creating the workspace."
                 )
             );
+    }
+
+    /**
+     * Rename a workspace slug with validation and redirect history tracking.
+     *
+     * @param workspaceId the workspace ID
+     * @param newSlug the new slug to set
+     * @return the updated workspace
+     * @throws EntityNotFoundException if workspace not found
+     * @throws InvalidWorkspaceSlugException if new slug doesn't match pattern
+     * @throws WorkspaceSlugConflictException if new slug collides with existing workspace or redirect
+     * @throws IllegalArgumentException if new slug is the same as current slug
+     */
+    @Transactional
+    public Workspace renameSlug(Long workspaceId, String newSlug) {
+        // 1. Validate new slug pattern
+        validateSlug(newSlug);
+
+        // 2. Find workspace
+        Workspace workspace = workspaceRepository
+            .findById(workspaceId)
+            .orElseThrow(() -> new EntityNotFoundException("Workspace", workspaceId));
+
+        String currentSlug = workspace.getSlug();
+
+        // 3. Check if it's a no-op
+        if (currentSlug.equals(newSlug)) {
+            logger.info(
+                "Workspace id={} rename to '{}' is no-op (already current slug)",
+                workspaceId,
+                LoggingUtils.sanitizeForLog(newSlug)
+            );
+            return workspace;
+        }
+
+        // 4. Check for collision with active workspace
+        if (workspaceRepository.existsBySlug(newSlug)) {
+            throw new WorkspaceSlugConflictException(newSlug, "active workspace");
+        }
+
+        // 5. Check for collision with non-expired redirects
+        if (slugHistoryRepository.existsByOldSlugNonExpired(newSlug, Instant.now())) {
+            throw new WorkspaceSlugConflictException(newSlug, "non-expired redirect");
+        }
+
+        // 6. Calculate TTL for redirect
+        Instant redirectExpiresAt = calculateRedirectExpiration();
+
+        // 7. Create history entry
+        WorkspaceSlugHistory history = new WorkspaceSlugHistory();
+        history.setWorkspace(workspace);
+        history.setOldSlug(currentSlug);
+        history.setNewSlug(newSlug);
+        history.setChangedAt(Instant.now());
+        history.setRedirectExpiresAt(redirectExpiresAt);
+        slugHistoryRepository.save(history);
+
+        // 8. Update workspace slug
+        workspace.setSlug(newSlug);
+        Workspace saved = workspaceRepository.save(workspace);
+
+        logger.info(
+            "Workspace id={} renamed from '{}' to '{}' (redirect expires: {})",
+            workspaceId,
+            LoggingUtils.sanitizeForLog(currentSlug),
+            LoggingUtils.sanitizeForLog(newSlug),
+            redirectExpiresAt != null ? redirectExpiresAt.toString() : "never"
+        );
+
+        // TODO: Emit audit event workspace_slug_renamed
+        // TODO: Increment metric workspace_slug_renames_total
+
+        return saved;
+    }
+
+    /**
+     * Calculate redirect expiration based on configured TTL.
+     *
+     * @return expiration instant, or null if redirects are disabled (TTL=0)
+     */
+    private Instant calculateRedirectExpiration() {
+        int ttlDays = workspaceProperties.getSlug().getRedirect().getTtlDays();
+        if (ttlDays <= 0) {
+            return null; // No redirect (history stored but redirect disabled)
+        }
+        return Instant.now().plus(ttlDays, ChronoUnit.DAYS);
     }
 }

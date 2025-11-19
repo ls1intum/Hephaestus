@@ -85,6 +85,10 @@ hephaestus:
             repositories-to-monitor:
                 - ls1intum/Hephaestus
                 - ls1intum/Artemis
+        slug:
+            redirect:
+                # TTL for slug redirects in days (0 disables redirect history)
+                ttl-days: 30
     
     intelligence-service:
         url: http://localhost:8000

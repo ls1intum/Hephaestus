@@ -7,4 +7,8 @@ public class WorkspaceSlugConflictException extends RuntimeException {
     public WorkspaceSlugConflictException(String slug) {
         super("Workspace slug already exists: " + slug);
     }
+
+    public WorkspaceSlugConflictException(String slug, String reason) {
+        super("Workspace slug '" + slug + "' conflicts with " + reason);
+    }
 }

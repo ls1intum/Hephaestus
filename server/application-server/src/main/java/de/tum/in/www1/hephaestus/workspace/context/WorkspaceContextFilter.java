@@ -6,6 +6,7 @@ import de.tum.in.www1.hephaestus.workspace.Workspace.WorkspaceStatus;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceMembership.WorkspaceRole;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceMembershipRepository;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceRepository;
+import de.tum.in.www1.hephaestus.workspace.WorkspaceSlugHistoryRepository;
 import jakarta.servlet.Filter;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -14,6 +15,7 @@ import jakarta.servlet.ServletResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.time.Instant;
 import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
@@ -43,17 +45,20 @@ public class WorkspaceContextFilter implements Filter {
     private final WorkspaceRepository workspaceRepository;
     private final WorkspaceMembershipRepository workspaceMembershipRepository;
     private final UserRepository userRepository;
+    private final WorkspaceSlugHistoryRepository slugHistoryRepository;
     private final ObjectMapper objectMapper;
 
     public WorkspaceContextFilter(
         WorkspaceRepository workspaceRepository,
         WorkspaceMembershipRepository workspaceMembershipRepository,
         UserRepository userRepository,
+        WorkspaceSlugHistoryRepository slugHistoryRepository,
         ObjectMapper objectMapper
     ) {
         this.workspaceRepository = workspaceRepository;
         this.workspaceMembershipRepository = workspaceMembershipRepository;
         this.userRepository = userRepository;
+        this.slugHistoryRepository = slugHistoryRepository;
         this.objectMapper = objectMapper;
     }
 
@@ -92,7 +97,8 @@ public class WorkspaceContextFilter implements Filter {
             var workspaceOpt = workspaceRepository.findBySlug(slug);
 
             if (workspaceOpt.isEmpty()) {
-                sendWorkspaceNotFoundError(httpResponse, slug);
+                // Slug not found in active workspaces - check redirect history
+                handleSlugRedirect(httpResponse, slug);
                 return;
             }
 
@@ -176,5 +182,80 @@ public class WorkspaceContextFilter implements Filter {
         var errorBody = Map.of("error", "WORKSPACE_NOT_FOUND", "message", "Workspace not found: " + slug);
 
         response.getWriter().write(objectMapper.writeValueAsString(errorBody));
+    }
+
+    /**
+     * Handle slug redirect lookup. Checks history for valid or expired redirects.
+     * Returns 301 with new slug location for valid redirects, 410 for expired redirects, or 404 if no redirect found.
+     *
+     * @param response HTTP response
+     * @param oldSlug The slug that was not found in active workspaces
+     */
+    private void handleSlugRedirect(HttpServletResponse response, String oldSlug) throws IOException {
+        var historyOpt = slugHistoryRepository.findValidRedirectByOldSlug(oldSlug, Instant.now());
+
+        if (historyOpt.isPresent()) {
+            // Valid redirect found - return 301 with new slug reference
+            var history = historyOpt.get();
+            String newSlug = history.getNewSlug();
+
+            log.info(
+                "Workspace slug redirect: '{}' → '{}' (expires: {})",
+                oldSlug,
+                newSlug,
+                history.getRedirectExpiresAt()
+            );
+
+            response.setStatus(HttpServletResponse.SC_MOVED_PERMANENTLY); // 301
+            response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+
+            var redirectBody = Map.of(
+                "error",
+                "WORKSPACE_SLUG_MOVED",
+                "message",
+                "Workspace slug has been renamed",
+                "oldSlug",
+                oldSlug,
+                "newSlug",
+                newSlug,
+                "redirectExpiresAt",
+                history.getRedirectExpiresAt() != null ? history.getRedirectExpiresAt().toString() : null
+            );
+
+            response.getWriter().write(objectMapper.writeValueAsString(redirectBody));
+
+            // TODO: Increment metric workspace_slug_redirect_hits_total
+            return;
+        }
+
+        // Check if expired redirect exists
+        var expiredOpt = slugHistoryRepository.findFirstByOldSlugOrderByChangedAtDesc(oldSlug);
+
+        if (expiredOpt.isPresent() && expiredOpt.get().isRedirectExpired()) {
+            // Expired redirect - return 410 Gone
+            log.info("Workspace slug redirect expired: '{}' → '{}'", oldSlug, expiredOpt.get().getNewSlug());
+
+            response.setStatus(HttpServletResponse.SC_GONE); // 410
+            response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+
+            var errorBody = Map.of(
+                "error",
+                "WORKSPACE_SLUG_REDIRECT_EXPIRED",
+                "message",
+                "Workspace slug redirect has expired",
+                "oldSlug",
+                oldSlug,
+                "newSlug",
+                expiredOpt.get().getNewSlug(),
+                "redirectExpiredAt",
+                expiredOpt.get().getRedirectExpiresAt().toString()
+            );
+
+            response.getWriter().write(objectMapper.writeValueAsString(errorBody));
+            return;
+        }
+
+        // No redirect found - standard 404
+        sendWorkspaceNotFoundError(response, oldSlug);
     }
 }
