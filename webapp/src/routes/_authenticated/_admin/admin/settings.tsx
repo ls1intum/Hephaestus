@@ -7,6 +7,7 @@ import {
 	resetAndRecalculateLeaguesMutation,
 } from "@/api/@tanstack/react-query.gen";
 import { AdminSettingsPage } from "@/components/admin/AdminSettingsPage";
+import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 
 export const Route = createFileRoute("/_authenticated/_admin/admin/settings")({
 	component: AdminSettings,
@@ -22,22 +23,34 @@ type RepositoryItem = {
  */
 function AdminSettings() {
 	const queryClient = useQueryClient();
+	const {
+		slug,
+		isLoading: isWorkspaceLoading,
+		error: workspaceError,
+	} = useActiveWorkspaceSlug();
 
 	// Repositories query
+	const repositoriesQueryOptions = getRepositoriesToMonitorOptions({
+		path: { slug: slug ?? "" },
+	});
 	const {
 		data: repositories,
 		isLoading: isLoadingRepositories,
 		error: repositoriesError,
 	} = useQuery({
-		...getRepositoriesToMonitorOptions({}),
+		...repositoriesQueryOptions,
+		enabled: Boolean(slug) && (repositoriesQueryOptions.enabled ?? true),
 	});
 
 	// Add repository mutation
 	const addRepository = useMutation({
 		...addRepositoryToMonitorMutation(),
 		onSuccess: () => {
+			if (!slug) {
+				return;
+			}
 			queryClient.invalidateQueries({
-				queryKey: getRepositoriesToMonitorOptions({}).queryKey,
+				queryKey: repositoriesQueryOptions.queryKey,
 			});
 		},
 	});
@@ -46,8 +59,11 @@ function AdminSettings() {
 	const removeRepository = useMutation({
 		...removeRepositoryToMonitorMutation(),
 		onSuccess: () => {
+			if (!slug) {
+				return;
+			}
 			queryClient.invalidateQueries({
-				queryKey: getRepositoriesToMonitorOptions({}).queryKey,
+				queryKey: repositoriesQueryOptions.queryKey,
 			});
 		},
 	});
@@ -63,9 +79,13 @@ function AdminSettings() {
 
 	// Handle add repository
 	const handleAddRepository = (nameWithOwner: string) => {
+		if (!slug) {
+			return;
+		}
 		const [owner, name] = nameWithOwner.split("/");
 		addRepository.mutate({
 			path: {
+				slug,
 				owner,
 				name,
 			},
@@ -74,9 +94,13 @@ function AdminSettings() {
 
 	// Handle remove repository
 	const handleRemoveRepository = (nameWithOwner: string) => {
+		if (!slug) {
+			return;
+		}
 		const [owner, name] = nameWithOwner.split("/");
 		removeRepository.mutate({
 			path: {
+				slug,
 				owner,
 				name,
 			},
@@ -93,15 +117,24 @@ function AdminSettings() {
 	return (
 		<AdminSettingsPage
 			repositories={formattedRepositories}
-			isLoadingRepositories={isLoadingRepositories}
-			repositoriesError={repositoriesError as Error | null}
+			isLoadingRepositories={
+				isWorkspaceLoading || isLoadingRepositories || !slug
+			}
+			repositoriesError={
+				(workspaceError as Error | null) ?? (repositoriesError as Error | null)
+			}
 			addRepositoryError={addRepository.error as Error | null}
 			isAddingRepository={addRepository.isPending}
 			isRemovingRepository={removeRepository.isPending}
 			isResettingLeagues={resetLeagues.isPending}
 			onAddRepository={handleAddRepository}
 			onRemoveRepository={handleRemoveRepository}
-			onResetLeagues={() => resetLeagues.mutate({})}
+			onResetLeagues={() => {
+				if (!slug) {
+					return;
+				}
+				resetLeagues.mutate({ path: { slug } });
+			}}
 		/>
 	);
 }

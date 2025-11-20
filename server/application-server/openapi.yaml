@@ -749,17 +749,29 @@ paths:
           description: OK
       tags:
       - workspace
-  /workspaces/league/reset:
+  /workspaces/{slug}/league/reset:
     put:
       operationId: resetAndRecalculateLeagues
+      parameters:
+      - in: path
+        name: slug
+        required: true
+        schema:
+          type: string
       responses:
         "200":
           description: OK
       tags:
       - workspace
-  /workspaces/repositories:
+  /workspaces/{slug}/repositories:
     get:
       operationId: getRepositoriesToMonitor
+      parameters:
+      - in: path
+        name: slug
+        required: true
+        schema:
+          type: string
       responses:
         "200":
           content:
@@ -771,10 +783,15 @@ paths:
           description: OK
       tags:
       - workspace
-  /workspaces/repositories/{owner}/{name}:
+  /workspaces/{slug}/repositories/{owner}/{name}:
     delete:
       operationId: removeRepositoryToMonitor
       parameters:
+      - in: path
+        name: slug
+        required: true
+        schema:
+          type: string
       - in: path
         name: owner
         required: true
@@ -794,6 +811,11 @@ paths:
       operationId: addRepositoryToMonitor
       parameters:
       - in: path
+        name: slug
+        required: true
+        schema:
+          type: string
+      - in: path
         name: owner
         required: true
         schema:
@@ -808,10 +830,15 @@ paths:
           description: OK
       tags:
       - workspace
-  /workspaces/team/{teamId}/label/{labelId}:
+  /workspaces/{slug}/teams/{teamId}/labels/{labelId}:
     delete:
       operationId: removeLabelFromTeam
       parameters:
+      - in: path
+        name: slug
+        required: true
+        schema:
+          type: string
       - in: path
         name: teamId
         required: true
@@ -833,10 +860,15 @@ paths:
           description: OK
       tags:
       - workspace
-  /workspaces/team/{teamId}/label/{repositoryId}/{label}:
+  /workspaces/{slug}/teams/{teamId}/labels/{repositoryId}/{label}:
     post:
       operationId: addLabelToTeam
       parameters:
+      - in: path
+        name: slug
+        required: true
+        schema:
+          type: string
       - in: path
         name: teamId
         required: true
@@ -863,9 +895,15 @@ paths:
           description: OK
       tags:
       - workspace
-  /workspaces/users:
+  /workspaces/{slug}/users:
     get:
       operationId: getUsersWithTeams
+      parameters:
+      - in: path
+        name: slug
+        required: true
+        schema:
+          type: string
       responses:
         "200":
           content:

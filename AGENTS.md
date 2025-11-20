@@ -85,6 +85,7 @@ Regeneration is destructive; stash local edits before running these commands. Ch
 - Keep Liquibase changelog IDs monotonic and descriptive. Align entity annotations with the generated change sets.
 - Annotate record components in DTOs with `@NonNull` whenever the API should require them so the generated OpenAPI schema matches the backend contract.
 - When integrating with the intelligence-service client, always regenerate (`npm run generate:api:intelligence-service:client`) after touching the spec and commit the updated Java files.
+- Controller-level integration tests should extend `AbstractWorkspaceIntegrationTest` (or an equivalent domain-specific base), exercise access control through `WebTestClient` + `TestAuthUtils`, and follow the contributor testing guide’s checklist. This keeps authentication, validation, and persistence assertions consistent across new endpoints.
 
 ## 8. Python services expectations
 

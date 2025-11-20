@@ -180,16 +180,24 @@ public class WorkspaceController {
         }
     }
 
-    @GetMapping("/repositories")
-    public ResponseEntity<List<String>> getRepositoriesToMonitor() {
-        var repositories = workspaceService.getRepositoriesToMonitor().stream().sorted().toList();
-        return ResponseEntity.ok(repositories);
+    @GetMapping("/{slug}/repositories")
+    public ResponseEntity<List<String>> getRepositoriesToMonitor(@PathVariable String slug) {
+        try {
+            var repositories = workspaceService.getRepositoriesToMonitor(slug).stream().sorted().toList();
+            return ResponseEntity.ok(repositories);
+        } catch (EntityNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        }
     }
 
-    @PostMapping("/repositories/{owner}/{name}")
-    public ResponseEntity<Void> addRepositoryToMonitor(@PathVariable String owner, @PathVariable String name) {
+    @PostMapping("/{slug}/repositories/{owner}/{name}")
+    public ResponseEntity<Void> addRepositoryToMonitor(
+        @PathVariable String slug,
+        @PathVariable String owner,
+        @PathVariable String name
+    ) {
         try {
-            workspaceService.addRepositoryToMonitor(owner + '/' + name);
+            workspaceService.addRepositoryToMonitor(slug, owner + '/' + name);
             return ResponseEntity.ok().build();
         } catch (EntityNotFoundException e) {
             return ResponseEntity.notFound().build();
@@ -198,45 +206,58 @@ public class WorkspaceController {
         }
     }
 
-    @DeleteMapping("/repositories/{owner}/{name}")
-    public ResponseEntity<Void> removeRepositoryToMonitor(@PathVariable String owner, @PathVariable String name) {
+    @DeleteMapping("/{slug}/repositories/{owner}/{name}")
+    public ResponseEntity<Void> removeRepositoryToMonitor(
+        @PathVariable String slug,
+        @PathVariable String owner,
+        @PathVariable String name
+    ) {
         try {
-            workspaceService.removeRepositoryToMonitor(owner + '/' + name);
+            workspaceService.removeRepositoryToMonitor(slug, owner + '/' + name);
             return ResponseEntity.ok().build();
         } catch (EntityNotFoundException e) {
             return ResponseEntity.notFound().build();
         }
     }
 
-    @GetMapping("/users")
-    public ResponseEntity<List<UserTeamsDTO>> getUsersWithTeams() {
-        return ResponseEntity.ok(workspaceService.getUsersWithTeams());
+    @GetMapping("/{slug}/users")
+    public ResponseEntity<List<UserTeamsDTO>> getUsersWithTeams(@PathVariable String slug) {
+        try {
+            return ResponseEntity.ok(workspaceService.getUsersWithTeams(slug));
+        } catch (EntityNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        }
     }
 
-    @PostMapping("/team/{teamId}/label/{repositoryId}/{label}")
+    @PostMapping("/{slug}/teams/{teamId}/labels/{repositoryId}/{label}")
     public ResponseEntity<TeamInfoDTO> addLabelToTeam(
+        @PathVariable String slug,
         @PathVariable Long teamId,
         @PathVariable Long repositoryId,
         @PathVariable String label
     ) {
         return workspaceService
-            .addLabelToTeam(teamId, repositoryId, label)
+            .addLabelToTeam(slug, teamId, repositoryId, label)
             .map(ResponseEntity::ok)
             .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
-    @DeleteMapping("/team/{teamId}/label/{labelId}")
-    public ResponseEntity<TeamInfoDTO> removeLabelFromTeam(@PathVariable Long teamId, @PathVariable Long labelId) {
+    @DeleteMapping("/{slug}/teams/{teamId}/labels/{labelId}")
+    public ResponseEntity<TeamInfoDTO> removeLabelFromTeam(
+        @PathVariable String slug,
+        @PathVariable Long teamId,
+        @PathVariable Long labelId
+    ) {
         return workspaceService
-            .removeLabelFromTeam(teamId, labelId)
+            .removeLabelFromTeam(slug, teamId, labelId)
             .map(ResponseEntity::ok)
             .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
-    @PutMapping("/league/reset")
-    public ResponseEntity<Void> resetAndRecalculateLeagues() {
+    @PutMapping("/{slug}/league/reset")
+    public ResponseEntity<Void> resetAndRecalculateLeagues(@PathVariable String slug) {
         try {
-            workspaceService.resetAndRecalculateLeagues();
+            workspaceService.resetAndRecalculateLeagues(slug);
             return ResponseEntity.ok().build();
         } catch (Exception e) {
             return ResponseEntity.badRequest().build();

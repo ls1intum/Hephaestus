@@ -15,6 +15,7 @@ import type {
 	UpdateTeamVisibilityData,
 } from "@/api/types.gen";
 import { AdminTeamsTable } from "@/components/admin/AdminTeamsTable";
+import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 
 export const Route = createFileRoute("/_authenticated/_admin/admin/teams")({
 	component: AdminTeamsContainer,
@@ -22,6 +23,7 @@ export const Route = createFileRoute("/_authenticated/_admin/admin/teams")({
 
 function AdminTeamsContainer() {
 	const queryClient = useQueryClient();
+	const { slug, isLoading: isWorkspaceLoading } = useActiveWorkspaceSlug();
 
 	// Query for teams data
 	const teamsQuery = useQuery(getAllTeamsOptions({}));
@@ -125,14 +127,20 @@ function AdminTeamsContainer() {
 		repositoryId: number,
 		label: string,
 	) => {
+		if (!slug) {
+			return;
+		}
 		await addLabelToTeam.mutateAsync({
-			path: { teamId, repositoryId, label },
+			path: { slug, teamId, repositoryId, label },
 		});
 	};
 
 	const handleRemoveLabelFromTeam = async (teamId: number, labelId: number) => {
+		if (!slug) {
+			return;
+		}
 		await removeLabelFromTeam.mutateAsync({
-			path: { teamId, labelId },
+			path: { slug, teamId, labelId },
 		});
 	};
 
@@ -151,7 +159,7 @@ function AdminTeamsContainer() {
 	return (
 		<AdminTeamsTable
 			teams={teamsQuery.data || []}
-			isLoading={teamsQuery.isLoading}
+			isLoading={isWorkspaceLoading || teamsQuery.isLoading || !slug}
 			onHideTeam={handleHideTeam}
 			onToggleRepositoryVisibility={handleToggleRepositoryVisibility}
 			onAddLabelToTeam={handleAddLabelToTeam}

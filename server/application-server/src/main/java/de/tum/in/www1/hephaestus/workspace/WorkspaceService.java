@@ -213,21 +213,24 @@ public class WorkspaceService {
         return workspaceRepository.findAll();
     }
 
-    public List<String> getRepositoriesToMonitor() {
-        logger.info("Getting repositories to monitor from all workspaces");
-        return workspaceRepository
-            .findAll()
-            .stream()
-            .flatMap(ws -> ws.getRepositoriesToMonitor().stream())
-            .map(RepositoryToMonitor::getNameWithOwner)
-            .distinct()
-            .toList();
+    public List<String> getRepositoriesToMonitor(String slug) {
+        Workspace workspace = requireWorkspace(slug);
+        logger.info(
+            "Getting repositories to monitor for workspace id={} (slug={})",
+            workspace.getId(),
+            LoggingUtils.sanitizeForLog(slug)
+        );
+        return workspace.getRepositoriesToMonitor().stream().map(RepositoryToMonitor::getNameWithOwner).toList();
     }
 
-    public void addRepositoryToMonitor(String nameWithOwner)
+    public void addRepositoryToMonitor(String slug, String nameWithOwner)
         throws RepositoryAlreadyMonitoredException, EntityNotFoundException {
-        logger.info("Adding repository to monitor: {}", LoggingUtils.sanitizeForLog(nameWithOwner));
-        Workspace workspace = resolveWorkspaceForRepo(nameWithOwner);
+        Workspace workspace = requireWorkspace(slug);
+        logger.info(
+            "Adding repository to monitor: {} for workspace id={}",
+            LoggingUtils.sanitizeForLog(nameWithOwner),
+            workspace.getId()
+        );
 
         if (workspace.getRepositoriesToMonitor().stream().anyMatch(r -> r.getNameWithOwner().equals(nameWithOwner))) {
             logger.info("Repository is already being monitored");
@@ -257,9 +260,13 @@ public class WorkspaceService {
         gitHubDataSyncService.syncRepositoryToMonitorAsync(repositoryToMonitor);
     }
 
-    public void removeRepositoryToMonitor(String nameWithOwner) throws EntityNotFoundException {
-        logger.info("Removing repository from monitor: {}", LoggingUtils.sanitizeForLog(nameWithOwner));
-        Workspace workspace = getWorkspaceByRepositoryOwner(nameWithOwner);
+    public void removeRepositoryToMonitor(String slug, String nameWithOwner) throws EntityNotFoundException {
+        Workspace workspace = requireWorkspace(slug);
+        logger.info(
+            "Removing repository from monitor: {} for workspace id={}",
+            LoggingUtils.sanitizeForLog(nameWithOwner),
+            workspace.getId()
+        );
 
         RepositoryToMonitor repositoryToMonitor = workspace
             .getRepositoriesToMonitor()
@@ -291,17 +298,24 @@ public class WorkspaceService {
         }
     }
 
-    public List<UserTeamsDTO> getUsersWithTeams() {
-        logger.info("Getting all users with their teams");
+    public List<UserTeamsDTO> getUsersWithTeams(String slug) {
+        Workspace workspace = requireWorkspace(slug);
+        logger.info(
+            "Getting users with teams for workspace id={} (slug={})",
+            workspace.getId(),
+            LoggingUtils.sanitizeForLog(slug)
+        );
         return userRepository.findAllHuman().stream().map(UserTeamsDTO::fromUser).toList();
     }
 
-    public Optional<TeamInfoDTO> addLabelToTeam(Long teamId, Long repositoryId, String label) {
+    public Optional<TeamInfoDTO> addLabelToTeam(String slug, Long teamId, Long repositoryId, String label) {
+        Workspace workspace = requireWorkspace(slug);
         logger.info(
-            "Adding label '{}' of repository with ID: {} to team with ID: {}",
+            "Adding label '{}' of repository with ID: {} to team with ID: {} (workspace id={})",
             LoggingUtils.sanitizeForLog(label),
             repositoryId,
-            teamId
+            teamId,
+            workspace.getId()
         );
         Optional<Team> optionalTeam = teamRepository.findById(teamId);
         if (optionalTeam.isEmpty()) {
@@ -317,8 +331,14 @@ public class WorkspaceService {
         return Optional.ofNullable(teamInfoDTOConverter.convert(team));
     }
 
-    public Optional<TeamInfoDTO> removeLabelFromTeam(Long teamId, Long labelId) {
-        logger.info("Removing label with ID: {} from team with ID: {}", labelId, teamId);
+    public Optional<TeamInfoDTO> removeLabelFromTeam(String slug, Long teamId, Long labelId) {
+        Workspace workspace = requireWorkspace(slug);
+        logger.info(
+            "Removing label with ID: {} from team with ID: {} (workspace id={})",
+            labelId,
+            teamId,
+            workspace.getId()
+        );
         Optional<Team> optionalTeam = teamRepository.findById(teamId);
         if (optionalTeam.isEmpty()) {
             return Optional.empty();
@@ -364,7 +384,16 @@ public class WorkspaceService {
      * Reset and recalculate league points for all users until 01/01/2024
      */
     @Transactional
-    public void resetAndRecalculateLeagues() {
+    public void resetAndRecalculateLeagues(String slug) {
+        Workspace workspace = requireWorkspace(slug);
+        logger.info(
+            "Resetting and recalculating league points for all users (requested by workspace id={})",
+            workspace.getId()
+        );
+        resetAndRecalculateLeaguesInternal();
+    }
+
+    private void resetAndRecalculateLeaguesInternal() {
         logger.info("Resetting and recalculating league points for all users");
 
         // Reset all users to default points (1000)
@@ -578,28 +607,6 @@ public class WorkspaceService {
         return value == null || value.isBlank();
     }
 
-    private Workspace resolveWorkspaceForRepo(String nameWithOwner) {
-        int i = nameWithOwner.indexOf('/');
-        if (i < 1) {
-            throw new IllegalArgumentException("Expected 'owner/name', got: " + nameWithOwner);
-        }
-        String owner = nameWithOwner.substring(0, i);
-
-        return workspaceRepository
-            .findByOrganization_Login(owner)
-            .or(() -> workspaceRepository.findByAccountLoginIgnoreCase(owner))
-            .or(() -> workspaceRepository.findByRepositoriesToMonitor_NameWithOwner(nameWithOwner))
-            .or(() -> resolveFallbackWorkspace("login '" + owner + "'"))
-            .orElseThrow(() ->
-                new IllegalStateException(
-                    "No workspace linked to organization/login '" +
-                    owner +
-                    "'. " +
-                    "Ensure a PAT workspace exists or the GitHub App installation was reconciled."
-                )
-            );
-    }
-
     @Transactional
     public Workspace createWorkspace(
         String rawSlug,
@@ -631,6 +638,13 @@ public class WorkspaceService {
 
     public Optional<Workspace> getWorkspaceBySlug(String slug) {
         return workspaceRepository.findBySlug(slug);
+    }
+
+    private Workspace requireWorkspace(String slug) {
+        if (isBlank(slug)) {
+            throw new IllegalArgumentException("Workspace slug must not be blank.");
+        }
+        return workspaceRepository.findBySlug(slug).orElseThrow(() -> new EntityNotFoundException("Workspace", slug));
     }
 
     @Transactional

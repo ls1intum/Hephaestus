@@ -7,18 +7,31 @@ import {
 } from "@/api/@tanstack/react-query.gen";
 import { AdminMembersPage } from "@/components/admin/AdminMembersPage";
 import { adaptApiUserTeams } from "@/components/admin/types";
+import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 
 export const Route = createFileRoute("/_authenticated/_admin/admin/members")({
 	component: AdminMembersContainer,
 });
 
 function AdminMembersContainer() {
+	const {
+		slug,
+		isLoading: isWorkspaceLoading,
+		error: workspaceError,
+	} = useActiveWorkspaceSlug();
+
 	// Fetch users with teams
+	const usersQueryOptions = getUsersWithTeamsOptions({
+		path: { slug: slug ?? "" },
+	});
 	const {
 		data: usersData,
 		isLoading: usersLoading,
 		error: usersError,
-	} = useQuery(getUsersWithTeamsOptions());
+	} = useQuery({
+		...usersQueryOptions,
+		enabled: Boolean(slug) && (usersQueryOptions.enabled ?? true),
+	});
 
 	// Fetch teams
 	const {
@@ -39,14 +52,22 @@ function AdminMembersContainer() {
 	const teams = [...(teamsData || [])].sort((a, b) =>
 		a.name.localeCompare(b.name),
 	);
-	const isLoading = usersLoading || teamsLoading;
+	const isLoading = isWorkspaceLoading || usersLoading || teamsLoading;
 
 	// Show error state if needed
-	if (usersError || teamsError) {
+	if (workspaceError || usersError || teamsError) {
 		const errorMessage =
-			(usersError as Error)?.message || (teamsError as Error)?.message;
+			(workspaceError as Error)?.message ||
+			(usersError as Error)?.message ||
+			(teamsError as Error)?.message;
 		toast.error(`Failed to load data: ${errorMessage}`);
 	}
 
-	return <AdminMembersPage users={users} teams={teams} isLoading={isLoading} />;
+	return (
+		<AdminMembersPage
+			users={users}
+			teams={teams}
+			isLoading={isLoading || !slug}
+		/>
+	);
 }
