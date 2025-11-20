@@ -108,9 +108,6 @@ public class WorkspaceService {
     @Autowired
     private WorkspaceSlugHistoryRepository slugHistoryRepository;
 
-    @Autowired
-    private WorkspaceProperties workspaceProperties;
-
     @Value("${nats.enabled}")
     private boolean isNatsEnabled;
 
@@ -938,51 +935,30 @@ public class WorkspaceService {
             throw new WorkspaceSlugConflictException(newSlug, "active workspace");
         }
 
-        // 5. Check for collision with non-expired redirects
-        if (slugHistoryRepository.existsByOldSlugNonExpired(newSlug, Instant.now())) {
-            throw new WorkspaceSlugConflictException(newSlug, "non-expired redirect");
+        // 5. Check for collision with existing redirects
+        if (slugHistoryRepository.existsByOldSlug(newSlug)) {
+            throw new WorkspaceSlugConflictException(newSlug, "existing redirect");
         }
 
-        // 6. Calculate TTL for redirect
-        Instant redirectExpiresAt = calculateRedirectExpiration();
-
-        // 7. Create history entry
+        // 6. Create history entry
         WorkspaceSlugHistory history = new WorkspaceSlugHistory();
         history.setWorkspace(workspace);
         history.setOldSlug(currentSlug);
         history.setNewSlug(newSlug);
         history.setChangedAt(Instant.now());
-        history.setRedirectExpiresAt(redirectExpiresAt);
         slugHistoryRepository.save(history);
 
-        // 8. Update workspace slug
+        // 7. Update workspace slug
         workspace.setSlug(newSlug);
         Workspace saved = workspaceRepository.save(workspace);
 
         logger.info(
-            "Workspace id={} renamed from '{}' to '{}' (redirect expires: {})",
+            "Workspace id={} renamed from '{}' to '{}' (permanent redirect created)",
             workspaceId,
             LoggingUtils.sanitizeForLog(currentSlug),
-            LoggingUtils.sanitizeForLog(newSlug),
-            redirectExpiresAt != null ? redirectExpiresAt.toString() : "never"
+            LoggingUtils.sanitizeForLog(newSlug)
         );
 
-        // TODO: Emit audit event workspace_slug_renamed
-        // TODO: Increment metric workspace_slug_renames_total
-
         return saved;
-    }
-
-    /**
-     * Calculate redirect expiration based on configured TTL.
-     *
-     * @return expiration instant, or null if redirects are disabled (TTL=0)
-     */
-    private Instant calculateRedirectExpiration() {
-        int ttlDays = workspaceProperties.getSlug().getRedirect().getTtlDays();
-        if (ttlDays <= 0) {
-            return null; // No redirect (history stored but redirect disabled)
-        }
-        return Instant.now().plus(ttlDays, ChronoUnit.DAYS);
     }
 }

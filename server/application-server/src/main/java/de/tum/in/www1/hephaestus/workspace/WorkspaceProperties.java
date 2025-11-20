@@ -12,7 +12,6 @@ public class WorkspaceProperties {
 
     private boolean initDefault = true;
     private final DefaultWorkspace defaultWorkspace = new DefaultWorkspace();
-    private final Slug slug = new Slug();
 
     public boolean isInitDefault() {
         return initDefault;
@@ -31,32 +30,6 @@ public class WorkspaceProperties {
      */
     public DefaultWorkspace getDefault() {
         return defaultWorkspace;
-    }
-
-    public Slug getSlug() {
-        return slug;
-    }
-
-    public static class Slug {
-
-        private final Redirect redirect = new Redirect();
-
-        public Redirect getRedirect() {
-            return redirect;
-        }
-
-        public static class Redirect {
-
-            private int ttlDays = 30;
-
-            public int getTtlDays() {
-                return ttlDays;
-            }
-
-            public void setTtlDays(int ttlDays) {
-                this.ttlDays = ttlDays;
-            }
-        }
     }
 
     public static class DefaultWorkspace {

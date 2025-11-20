@@ -29,10 +29,6 @@
             <column name="changed_at" type="TIMESTAMP WITHOUT TIME ZONE">
                 <constraints nullable="false"/>
             </column>
-            
-            <column name="redirect_expires_at" type="TIMESTAMP WITHOUT TIME ZONE">
-                <constraints nullable="true"/>
-            </column>
         </createTable>
         
         <addForeignKeyConstraint 
@@ -50,10 +46,4 @@
         <createIndex indexName="idx_workspace_slug_history_workspace_id" tableName="workspace_slug_history">
             <column name="workspace_id"/>
         </createIndex>
-        
-        <createIndex indexName="idx_workspace_slug_history_redirect_expires_at" tableName="workspace_slug_history">
-            <column name="redirect_expires_at"/>
-        </createIndex>
-    </changeSet>
-
-</databaseChangeLog>
+    </changeSet></databaseChangeLog>

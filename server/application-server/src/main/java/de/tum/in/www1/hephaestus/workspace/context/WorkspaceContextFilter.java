@@ -15,7 +15,6 @@ import jakarta.servlet.ServletResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.time.Instant;
 import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
@@ -185,26 +184,21 @@ public class WorkspaceContextFilter implements Filter {
     }
 
     /**
-     * Handle slug redirect lookup. Checks history for valid or expired redirects.
-     * Returns 301 with new slug location for valid redirects, 410 for expired redirects, or 404 if no redirect found.
+     * Handle slug redirect lookup. Checks history for redirects.
+     * Returns 301 with new slug location for redirects, or 404 if no redirect found.
      *
      * @param response HTTP response
      * @param oldSlug The slug that was not found in active workspaces
      */
     private void handleSlugRedirect(HttpServletResponse response, String oldSlug) throws IOException {
-        var historyOpt = slugHistoryRepository.findValidRedirectByOldSlug(oldSlug, Instant.now());
+        var historyOpt = slugHistoryRepository.findFirstByOldSlugOrderByChangedAtDesc(oldSlug);
 
         if (historyOpt.isPresent()) {
-            // Valid redirect found - return 301 with new slug reference
+            // Redirect found - return 301 with new slug reference
             var history = historyOpt.get();
             String newSlug = history.getNewSlug();
 
-            log.info(
-                "Workspace slug redirect: '{}' → '{}' (expires: {})",
-                oldSlug,
-                newSlug,
-                history.getRedirectExpiresAt()
-            );
+            log.info("Workspace slug redirect: '{}' → '{}'", oldSlug, newSlug);
 
             response.setStatus(HttpServletResponse.SC_MOVED_PERMANENTLY); // 301
             response.setContentType(MediaType.APPLICATION_JSON_VALUE);
@@ -217,41 +211,10 @@ public class WorkspaceContextFilter implements Filter {
                 "oldSlug",
                 oldSlug,
                 "newSlug",
-                newSlug,
-                "redirectExpiresAt",
-                history.getRedirectExpiresAt() != null ? history.getRedirectExpiresAt().toString() : null
+                newSlug
             );
 
             response.getWriter().write(objectMapper.writeValueAsString(redirectBody));
-
-            // TODO: Increment metric workspace_slug_redirect_hits_total
-            return;
-        }
-
-        // Check if expired redirect exists
-        var expiredOpt = slugHistoryRepository.findFirstByOldSlugOrderByChangedAtDesc(oldSlug);
-
-        if (expiredOpt.isPresent() && expiredOpt.get().isRedirectExpired()) {
-            // Expired redirect - return 410 Gone
-            log.info("Workspace slug redirect expired: '{}' → '{}'", oldSlug, expiredOpt.get().getNewSlug());
-
-            response.setStatus(HttpServletResponse.SC_GONE); // 410
-            response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-
-            var errorBody = Map.of(
-                "error",
-                "WORKSPACE_SLUG_REDIRECT_EXPIRED",
-                "message",
-                "Workspace slug redirect has expired",
-                "oldSlug",
-                oldSlug,
-                "newSlug",
-                expiredOpt.get().getNewSlug(),
-                "redirectExpiredAt",
-                expiredOpt.get().getRedirectExpiresAt().toString()
-            );
-
-            response.getWriter().write(objectMapper.writeValueAsString(errorBody));
             return;
         }
 

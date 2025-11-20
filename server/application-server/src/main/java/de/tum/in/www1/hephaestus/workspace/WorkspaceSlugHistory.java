@@ -20,7 +20,6 @@ import lombok.ToString;
 
 /**
  * Tracks workspace slug rename history for redirect support.
- * Enables temporary redirects from old slugs to new slugs with configurable TTL.
  */
 @Entity
 @Table(name = "workspace_slug_history")
@@ -55,25 +54,4 @@ public class WorkspaceSlugHistory {
     @Column(name = "changed_at", nullable = false)
     @NotNull(message = "Changed at timestamp is required")
     private Instant changedAt;
-
-    @Column(name = "redirect_expires_at")
-    private Instant redirectExpiresAt;
-
-    /**
-     * Check if this redirect is still valid (not expired).
-     *
-     * @return true if redirect_expires_at is null or in the future
-     */
-    public boolean isRedirectValid() {
-        return redirectExpiresAt == null || redirectExpiresAt.isAfter(Instant.now());
-    }
-
-    /**
-     * Check if this redirect has expired.
-     *
-     * @return true if redirect_expires_at is set and in the past
-     */
-    public boolean isRedirectExpired() {
-        return redirectExpiresAt != null && redirectExpiresAt.isBefore(Instant.now());
-    }
 }

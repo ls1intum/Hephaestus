@@ -7,8 +7,6 @@ import static org.mockito.Mockito.*;
 import de.tum.in.www1.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.in.www1.hephaestus.workspace.exception.InvalidWorkspaceSlugException;
 import de.tum.in.www1.hephaestus.workspace.exception.WorkspaceSlugConflictException;
-import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -31,15 +29,10 @@ class WorkspaceSlugRenameTest {
     @Mock
     private WorkspaceSlugHistoryRepository slugHistoryRepository;
 
-    @Mock
-    private WorkspaceProperties workspaceProperties;
-
     @InjectMocks
     private WorkspaceService workspaceService;
 
     private Workspace testWorkspace;
-    private WorkspaceProperties.Slug mockSlugConfig;
-    private WorkspaceProperties.Slug.Redirect mockRedirectConfig;
 
     @BeforeEach
     void setUp() {
@@ -50,13 +43,6 @@ class WorkspaceSlugRenameTest {
         testWorkspace.setAccountLogin("test-account");
         testWorkspace.setAccountType(AccountType.USER);
         testWorkspace.setStatus(Workspace.WorkspaceStatus.ACTIVE);
-
-        // Mock configuration - use lenient() for common setup
-        mockRedirectConfig = mock(WorkspaceProperties.Slug.Redirect.class);
-        mockSlugConfig = mock(WorkspaceProperties.Slug.class);
-        lenient().when(workspaceProperties.getSlug()).thenReturn(mockSlugConfig);
-        lenient().when(mockSlugConfig.getRedirect()).thenReturn(mockRedirectConfig);
-        lenient().when(mockRedirectConfig.getTtlDays()).thenReturn(30); // Default TTL
     }
 
     @Test
@@ -66,7 +52,7 @@ class WorkspaceSlugRenameTest {
         String newSlug = "new-slug";
         when(workspaceRepository.findById(1L)).thenReturn(Optional.of(testWorkspace));
         when(workspaceRepository.existsBySlug(newSlug)).thenReturn(false);
-        when(slugHistoryRepository.existsByOldSlugNonExpired(eq(newSlug), any(Instant.class))).thenReturn(false);
+        when(slugHistoryRepository.existsByOldSlug(newSlug)).thenReturn(false);
         when(workspaceRepository.save(any(Workspace.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         // Act
@@ -83,9 +69,6 @@ class WorkspaceSlugRenameTest {
         assertThat(history.getOldSlug()).isEqualTo("old-slug");
         assertThat(history.getNewSlug()).isEqualTo(newSlug);
         assertThat(history.getChangedAt()).isNotNull();
-        assertThat(history.getRedirectExpiresAt())
-            .isAfter(Instant.now())
-            .isBefore(Instant.now().plus(31, ChronoUnit.DAYS));
     }
 
     @Test
@@ -158,64 +141,17 @@ class WorkspaceSlugRenameTest {
     }
 
     @Test
-    @DisplayName("Should throw WorkspaceSlugConflictException when slug exists in non-expired redirect")
-    void shouldRejectConflictWithNonExpiredRedirect() {
+    @DisplayName("Should throw WorkspaceSlugConflictException when slug exists in redirect history")
+    void shouldRejectConflictWithExistingRedirect() {
         // Arrange
         when(workspaceRepository.findById(1L)).thenReturn(Optional.of(testWorkspace));
         when(workspaceRepository.existsBySlug("redirected-slug")).thenReturn(false);
-        when(slugHistoryRepository.existsByOldSlugNonExpired(eq("redirected-slug"), any(Instant.class))).thenReturn(
-            true
-        );
+        when(slugHistoryRepository.existsByOldSlug("redirected-slug")).thenReturn(true);
 
         // Act & Assert
         assertThatThrownBy(() -> workspaceService.renameSlug(1L, "redirected-slug"))
             .isInstanceOf(WorkspaceSlugConflictException.class)
             .hasMessageContaining("redirected-slug")
-            .hasMessageContaining("non-expired redirect");
-    }
-
-    @Test
-    @DisplayName("Should set redirect expiration to null when TTL is 0")
-    void shouldDisableRedirectWhenTtlIsZero() {
-        // Arrange
-        when(mockRedirectConfig.getTtlDays()).thenReturn(0); // Disabled
-        when(workspaceRepository.findById(1L)).thenReturn(Optional.of(testWorkspace));
-        when(workspaceRepository.existsBySlug("new-slug")).thenReturn(false);
-        when(slugHistoryRepository.existsByOldSlugNonExpired(eq("new-slug"), any(Instant.class))).thenReturn(false);
-        when(workspaceRepository.save(any(Workspace.class))).thenAnswer(invocation -> invocation.getArgument(0));
-
-        // Act
-        workspaceService.renameSlug(1L, "new-slug");
-
-        // Assert
-        ArgumentCaptor<WorkspaceSlugHistory> historyCaptor = ArgumentCaptor.forClass(WorkspaceSlugHistory.class);
-        verify(slugHistoryRepository).save(historyCaptor.capture());
-
-        WorkspaceSlugHistory history = historyCaptor.getValue();
-        assertThat(history.getRedirectExpiresAt()).isNull();
-    }
-
-    @Test
-    @DisplayName("WorkspaceSlugHistory should correctly identify valid redirects")
-    void shouldIdentifyValidRedirects() {
-        // Arrange
-        WorkspaceSlugHistory validRedirect = new WorkspaceSlugHistory();
-        validRedirect.setRedirectExpiresAt(Instant.now().plus(10, ChronoUnit.DAYS));
-
-        WorkspaceSlugHistory noExpiration = new WorkspaceSlugHistory();
-        noExpiration.setRedirectExpiresAt(null);
-
-        WorkspaceSlugHistory expiredRedirect = new WorkspaceSlugHistory();
-        expiredRedirect.setRedirectExpiresAt(Instant.now().minus(1, ChronoUnit.DAYS));
-
-        // Assert
-        assertThat(validRedirect.isRedirectValid()).isTrue();
-        assertThat(validRedirect.isRedirectExpired()).isFalse();
-
-        assertThat(noExpiration.isRedirectValid()).isTrue();
-        assertThat(noExpiration.isRedirectExpired()).isFalse();
-
-        assertThat(expiredRedirect.isRedirectValid()).isFalse();
-        assertThat(expiredRedirect.isRedirectExpired()).isTrue();
+            .hasMessageContaining("existing redirect");
     }
 }
