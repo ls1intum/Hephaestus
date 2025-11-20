@@ -749,6 +749,41 @@ paths:
           description: OK
       tags:
       - workspace
+  /workspaces/{slug}:
+    delete:
+      operationId: purgeWorkspace
+      parameters:
+      - in: path
+        name: slug
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+          description: OK
+      tags:
+      - workspace
+    get:
+      operationId: getWorkspace
+      parameters:
+      - in: path
+        name: slug
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+          description: OK
+      tags:
+      - workspace
   /workspaces/{slug}/league/reset:
     put:
       operationId: resetAndRecalculateLeagues
@@ -760,6 +795,54 @@ paths:
           type: string
       responses:
         "200":
+          description: OK
+      tags:
+      - workspace
+  /workspaces/{slug}/notifications:
+    patch:
+      operationId: updateNotifications
+      parameters:
+      - in: path
+        name: slug
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateWorkspaceNotificationsRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+          description: OK
+      tags:
+      - workspace
+  /workspaces/{slug}/public-visibility:
+    patch:
+      operationId: updatePublicVisibility
+      parameters:
+      - in: path
+        name: slug
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateWorkspacePublicVisibilityRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
           description: OK
       tags:
       - workspace
@@ -827,174 +910,6 @@ paths:
           type: string
       responses:
         "200":
-          description: OK
-      tags:
-      - workspace
-  /workspaces/{slug}/teams/{teamId}/labels/{labelId}:
-    delete:
-      operationId: removeLabelFromTeam
-      parameters:
-      - in: path
-        name: slug
-        required: true
-        schema:
-          type: string
-      - in: path
-        name: teamId
-        required: true
-        schema:
-          type: integer
-          format: int64
-      - in: path
-        name: labelId
-        required: true
-        schema:
-          type: integer
-          format: int64
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/TeamInfo"
-          description: OK
-      tags:
-      - workspace
-  /workspaces/{slug}/teams/{teamId}/labels/{repositoryId}/{label}:
-    post:
-      operationId: addLabelToTeam
-      parameters:
-      - in: path
-        name: slug
-        required: true
-        schema:
-          type: string
-      - in: path
-        name: teamId
-        required: true
-        schema:
-          type: integer
-          format: int64
-      - in: path
-        name: repositoryId
-        required: true
-        schema:
-          type: integer
-          format: int64
-      - in: path
-        name: label
-        required: true
-        schema:
-          type: string
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/TeamInfo"
-          description: OK
-      tags:
-      - workspace
-  /workspaces/{slug}/users:
-    get:
-      operationId: getUsersWithTeams
-      parameters:
-      - in: path
-        name: slug
-        required: true
-        schema:
-          type: string
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/UserTeams"
-          description: OK
-      tags:
-      - workspace
-  /workspaces/{slug}:
-    delete:
-      operationId: purgeWorkspace
-      parameters:
-      - in: path
-        name: slug
-        required: true
-        schema:
-          type: string
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                type: object
-          description: OK
-      tags:
-      - workspace
-    get:
-      operationId: getWorkspace
-      parameters:
-      - in: path
-        name: slug
-        required: true
-        schema:
-          type: string
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                type: object
-          description: OK
-      tags:
-      - workspace
-  /workspaces/{slug}/notifications:
-    patch:
-      operationId: updateNotifications
-      parameters:
-      - in: path
-        name: slug
-        required: true
-        schema:
-          type: string
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/UpdateWorkspaceNotificationsRequest"
-        required: true
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                type: object
-          description: OK
-      tags:
-      - workspace
-  /workspaces/{slug}/public-visibility:
-    patch:
-      operationId: updatePublicVisibility
-      parameters:
-      - in: path
-        name: slug
-        required: true
-        schema:
-          type: string
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/UpdateWorkspacePublicVisibilityRequest"
-        required: true
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                type: object
           description: OK
       tags:
       - workspace
@@ -1082,6 +997,71 @@ paths:
           description: OK
       tags:
       - workspace
+  /workspaces/{slug}/teams/{teamId}/labels/{labelId}:
+    delete:
+      operationId: removeLabelFromTeam
+      parameters:
+      - in: path
+        name: slug
+        required: true
+        schema:
+          type: string
+      - in: path
+        name: teamId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      - in: path
+        name: labelId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeamInfo"
+          description: OK
+      tags:
+      - workspace
+  /workspaces/{slug}/teams/{teamId}/labels/{repositoryId}/{label}:
+    post:
+      operationId: addLabelToTeam
+      parameters:
+      - in: path
+        name: slug
+        required: true
+        schema:
+          type: string
+      - in: path
+        name: teamId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      - in: path
+        name: repositoryId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      - in: path
+        name: label
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeamInfo"
+          description: OK
+      tags:
+      - workspace
   /workspaces/{slug}/token:
     patch:
       operationId: updateToken
@@ -1103,6 +1083,26 @@ paths:
             application/json:
               schema:
                 type: object
+          description: OK
+      tags:
+      - workspace
+  /workspaces/{slug}/users:
+    get:
+      operationId: getUsersWithTeams
+      parameters:
+      - in: path
+        name: slug
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/UserTeams"
           description: OK
       tags:
       - workspace
