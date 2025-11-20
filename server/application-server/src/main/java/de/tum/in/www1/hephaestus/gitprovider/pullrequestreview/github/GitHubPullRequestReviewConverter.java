@@ -19,7 +19,7 @@ public class GitHubPullRequestReviewConverter implements Converter<GHPullRequest
 
     public PullRequestReview update(@NonNull GHPullRequestReview source, @NonNull PullRequestReview review) {
         review.setId(source.getId());
-        review.setBody(source.getBody());
+        review.setBody(sanitizeText(source.getBody()));
 
         if (review.getState() == null || source.getState() != GHPullRequestReviewState.DISMISSED) {
             review.setState(convertState(source.getState()));
@@ -35,6 +35,13 @@ public class GitHubPullRequestReviewConverter implements Converter<GHPullRequest
         }
         review.setCommitId(source.getCommitId());
         return review;
+    }
+
+    private String sanitizeText(String input) {
+        if (input == null) {
+            return null;
+        }
+        return input.replace("\u0000", "");
     }
 
     private PullRequestReview.State convertState(org.kohsuke.github.GHPullRequestReviewState state) {
