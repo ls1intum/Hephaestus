@@ -16,6 +16,19 @@ public abstract class BaseGitServiceEntityConverter<S extends GHObject, T extend
 
     public abstract T update(@NonNull S source, @NonNull T target);
 
+    /**
+     * Sanitizes a string by removing null bytes (0x00) which are not allowed in PostgreSQL text fields.
+     *
+     * @param input the string to sanitize
+     * @return the sanitized string, or null if input was null
+     */
+    protected String sanitizeText(String input) {
+        if (input == null) {
+            return null;
+        }
+        return input.replace("\u0000", "");
+    }
+
     protected void convertBaseFields(S source, T target) {
         if (source == null || target == null) {
             throw new IllegalArgumentException("Source and target must not be null");

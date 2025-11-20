@@ -24,7 +24,7 @@ public class GitHubUserConverter extends BaseGitServiceEntityConverter<GHUser, U
         convertBaseFields(source, user);
         user.setLogin(source.getLogin());
         user.setAvatarUrl(source.getAvatarUrl());
-        user.setDescription(source.getBio());
+        user.setDescription(sanitizeText(source.getBio()));
         user.setHtmlUrl(source.getHtmlUrl().toString());
         try {
             user.setName(source.getName() != null ? source.getName() : source.getLogin());
