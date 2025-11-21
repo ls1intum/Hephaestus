@@ -20,7 +20,7 @@ class WorkspaceContextTest {
         // Arrange
         Workspace workspace = new Workspace();
         workspace.setId(42L);
-        workspace.setSlug("test-workspace");
+        workspace.setWorkspaceSlug("test-workspace");
         workspace.setDisplayName("Test Workspace");
         workspace.setAccountType(AccountType.ORG);
         workspace.setInstallationId(123L);
@@ -47,7 +47,7 @@ class WorkspaceContextTest {
         // Arrange
         Workspace workspace = new Workspace();
         workspace.setId(1L);
-        workspace.setSlug("test");
+        workspace.setWorkspaceSlug("test");
         workspace.setDisplayName("Test");
         workspace.setAccountType(AccountType.USER);
 
@@ -105,7 +105,7 @@ class WorkspaceContextTest {
         // Arrange
         Workspace workspace = new Workspace();
         workspace.setId(1L);
-        workspace.setSlug("test");
+        workspace.setWorkspaceSlug("test");
         workspace.setDisplayName("Test");
         workspace.setAccountType(AccountType.USER);
         workspace.setInstallationId(null);

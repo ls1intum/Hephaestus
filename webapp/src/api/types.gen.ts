@@ -155,7 +155,7 @@ export type CreateWorkspaceRequest = {
     accountType: 'ORG' | 'USER';
     displayName: string;
     ownerUserId: number;
-    slug: string;
+    workspaceSlug: string;
 };
 
 /**
@@ -1431,6 +1431,13 @@ export type UpdateWorkspaceSlackCredentialsRequest = {
 };
 
 /**
+ * DTO for updating a workspace lifecycle status.
+ */
+export type UpdateWorkspaceStatusRequest = {
+    status: 'ACTIVE' | 'SUSPENDED' | 'PURGED';
+};
+
+/**
  * DTO for updating workspace Personal Access Token (PAT).
  */
 export type UpdateWorkspaceTokenRequest = {
@@ -1576,13 +1583,34 @@ export type WeatherHourlyUnits = {
     time?: string | null;
 };
 
+export type Workspace = {
+    accountLogin: string;
+    createdAt: Date;
+    displayName: string;
+    gitProviderMode?: string;
+    hasSlackSigningSecret: boolean;
+    hasSlackToken: boolean;
+    id: number;
+    installationId?: number;
+    installationLinkedAt?: Date;
+    isPubliclyViewable: boolean;
+    leaderboardNotificationChannelId?: string;
+    leaderboardNotificationEnabled?: boolean;
+    leaderboardNotificationTeam?: string;
+    leaderboardScheduleDay?: number;
+    leaderboardScheduleTime?: string;
+    status: string;
+    updatedAt: Date;
+    workspaceSlug: string;
+};
+
 export type WorkspaceListItem = {
-    accountLogin?: string;
-    createdAt?: Date;
-    displayName?: string;
-    id?: number;
-    slug?: string;
-    status?: string;
+    accountLogin: string;
+    createdAt: Date;
+    displayName: string;
+    id: number;
+    status: string;
+    workspaceSlug: string;
 };
 
 export type ProvideFeedbackForBadPracticeData = {
@@ -2211,7 +2239,7 @@ export type ListWorkspacesData = {
 
 export type ListWorkspacesResponses = {
     /**
-     * OK
+     * Workspace list
      */
     200: Array<WorkspaceListItem>;
 };
@@ -2227,11 +2255,9 @@ export type CreateWorkspaceData = {
 
 export type CreateWorkspaceResponses = {
     /**
-     * OK
+     * Workspace created
      */
-    200: {
-        [key: string]: unknown;
-    };
+    201: Workspace;
 };
 
 export type CreateWorkspaceResponse = CreateWorkspaceResponses[keyof CreateWorkspaceResponses];
@@ -2239,19 +2265,17 @@ export type CreateWorkspaceResponse = CreateWorkspaceResponses[keyof CreateWorks
 export type PurgeWorkspaceData = {
     body?: never;
     path: {
-        slug: string;
+        workspaceSlug: string;
     };
     query?: never;
-    url: '/workspaces/{slug}';
+    url: '/workspaces/{workspaceSlug}';
 };
 
 export type PurgeWorkspaceResponses = {
     /**
-     * OK
+     * Workspace purged
      */
-    200: {
-        [key: string]: unknown;
-    };
+    204: void;
 };
 
 export type PurgeWorkspaceResponse = PurgeWorkspaceResponses[keyof PurgeWorkspaceResponses];
@@ -2259,59 +2283,51 @@ export type PurgeWorkspaceResponse = PurgeWorkspaceResponses[keyof PurgeWorkspac
 export type GetWorkspaceData = {
     body?: never;
     path: {
-        slug: string;
+        workspaceSlug: string;
     };
     query?: never;
-    url: '/workspaces/{slug}';
+    url: '/workspaces/{workspaceSlug}';
 };
 
 export type GetWorkspaceResponses = {
     /**
-     * OK
+     * Workspace returned
      */
-    200: {
-        [key: string]: unknown;
-    };
+    200: Workspace;
 };
 
 export type GetWorkspaceResponse = GetWorkspaceResponses[keyof GetWorkspaceResponses];
 
-export type ResetLeagueData = {
+export type ResetAndRecalculateLeaguesData = {
     body?: never;
     path: {
-        slug: string;
+        workspaceSlug: string;
     };
     query?: never;
-    url: '/workspaces/{slug}/league/reset';
+    url: '/workspaces/{workspaceSlug}/league/reset';
 };
 
-export type ResetLeagueResponses = {
+export type ResetAndRecalculateLeaguesResponses = {
     /**
      * OK
      */
-    200: {
-        [key: string]: unknown;
-    };
+    200: unknown;
 };
-
-export type ResetLeagueResponse = ResetLeagueResponses[keyof ResetLeagueResponses];
 
 export type UpdateNotificationsData = {
     body: UpdateWorkspaceNotificationsRequest;
     path: {
-        slug: string;
+        workspaceSlug: string;
     };
     query?: never;
-    url: '/workspaces/{slug}/notifications';
+    url: '/workspaces/{workspaceSlug}/notifications';
 };
 
 export type UpdateNotificationsResponses = {
     /**
-     * OK
+     * Workspace updated
      */
-    200: {
-        [key: string]: unknown;
-    };
+    200: Workspace;
 };
 
 export type UpdateNotificationsResponse = UpdateNotificationsResponses[keyof UpdateNotificationsResponses];
@@ -2319,121 +2335,89 @@ export type UpdateNotificationsResponse = UpdateNotificationsResponses[keyof Upd
 export type UpdatePublicVisibilityData = {
     body: UpdateWorkspacePublicVisibilityRequest;
     path: {
-        slug: string;
+        workspaceSlug: string;
     };
     query?: never;
-    url: '/workspaces/{slug}/public-visibility';
+    url: '/workspaces/{workspaceSlug}/public-visibility';
 };
 
 export type UpdatePublicVisibilityResponses = {
     /**
-     * OK
+     * Workspace updated
      */
-    200: {
-        [key: string]: unknown;
-    };
+    200: Workspace;
 };
 
 export type UpdatePublicVisibilityResponse = UpdatePublicVisibilityResponses[keyof UpdatePublicVisibilityResponses];
 
-export type GetRepositoriesData = {
+export type GetRepositoriesToMonitorData = {
     body?: never;
     path: {
-        slug: string;
+        workspaceSlug: string;
     };
     query?: never;
-    url: '/workspaces/{slug}/repositories';
+    url: '/workspaces/{workspaceSlug}/repositories';
 };
 
-export type GetRepositoriesResponses = {
+export type GetRepositoriesToMonitorResponses = {
     /**
-     * OK
+     * Repository list
      */
     200: Array<string>;
 };
 
-export type GetRepositoriesResponse = GetRepositoriesResponses[keyof GetRepositoriesResponses];
+export type GetRepositoriesToMonitorResponse = GetRepositoriesToMonitorResponses[keyof GetRepositoriesToMonitorResponses];
 
-export type RemoveRepositoryData = {
+export type RemoveRepositoryToMonitorData = {
     body?: never;
     path: {
-        slug: string;
+        workspaceSlug: string;
         owner: string;
         name: string;
     };
     query?: never;
-    url: '/workspaces/{slug}/repositories/{owner}/{name}';
+    url: '/workspaces/{workspaceSlug}/repositories/{owner}/{name}';
 };
 
-export type RemoveRepositoryResponses = {
+export type RemoveRepositoryToMonitorResponses = {
     /**
      * OK
      */
-    200: {
-        [key: string]: unknown;
-    };
+    200: unknown;
 };
 
-export type RemoveRepositoryResponse = RemoveRepositoryResponses[keyof RemoveRepositoryResponses];
-
-export type AddRepositoryData = {
+export type AddRepositoryToMonitorData = {
     body?: never;
     path: {
-        slug: string;
+        workspaceSlug: string;
         owner: string;
         name: string;
     };
     query?: never;
-    url: '/workspaces/{slug}/repositories/{owner}/{name}';
+    url: '/workspaces/{workspaceSlug}/repositories/{owner}/{name}';
 };
 
-export type AddRepositoryResponses = {
+export type AddRepositoryToMonitorResponses = {
     /**
      * OK
      */
-    200: {
-        [key: string]: unknown;
-    };
+    200: unknown;
 };
-
-export type AddRepositoryResponse = AddRepositoryResponses[keyof AddRepositoryResponses];
-
-export type ResumeWorkspaceData = {
-    body?: never;
-    path: {
-        slug: string;
-    };
-    query?: never;
-    url: '/workspaces/{slug}/resume';
-};
-
-export type ResumeWorkspaceResponses = {
-    /**
-     * OK
-     */
-    200: {
-        [key: string]: unknown;
-    };
-};
-
-export type ResumeWorkspaceResponse = ResumeWorkspaceResponses[keyof ResumeWorkspaceResponses];
 
 export type UpdateScheduleData = {
     body: UpdateWorkspaceScheduleRequest;
     path: {
-        slug: string;
+        workspaceSlug: string;
     };
     query?: never;
-    url: '/workspaces/{slug}/schedule';
+    url: '/workspaces/{workspaceSlug}/schedule';
 };
 
 export type UpdateScheduleResponses = {
     /**
-     * OK
+     * Workspace updated
      */
-    200: {
-        [key: string]: unknown;
-    };
+    200: Workspace;
 };
 
 export type UpdateScheduleResponse = UpdateScheduleResponses[keyof UpdateScheduleResponses];
@@ -2441,61 +2425,55 @@ export type UpdateScheduleResponse = UpdateScheduleResponses[keyof UpdateSchedul
 export type UpdateSlackCredentialsData = {
     body: UpdateWorkspaceSlackCredentialsRequest;
     path: {
-        slug: string;
+        workspaceSlug: string;
     };
     query?: never;
-    url: '/workspaces/{slug}/slack-credentials';
+    url: '/workspaces/{workspaceSlug}/slack-credentials';
 };
 
 export type UpdateSlackCredentialsResponses = {
     /**
-     * OK
+     * Workspace updated
      */
-    200: {
-        [key: string]: unknown;
-    };
+    200: Workspace;
 };
 
 export type UpdateSlackCredentialsResponse = UpdateSlackCredentialsResponses[keyof UpdateSlackCredentialsResponses];
 
-export type SuspendWorkspaceData = {
-    body?: never;
+export type UpdateStatusData = {
+    body: UpdateWorkspaceStatusRequest;
     path: {
-        slug: string;
+        workspaceSlug: string;
     };
     query?: never;
-    url: '/workspaces/{slug}/suspend';
+    url: '/workspaces/{workspaceSlug}/status';
 };
 
-export type SuspendWorkspaceResponses = {
+export type UpdateStatusResponses = {
     /**
-     * OK
+     * Workspace updated
      */
-    200: {
-        [key: string]: unknown;
-    };
+    200: Workspace;
 };
 
-export type SuspendWorkspaceResponse = SuspendWorkspaceResponses[keyof SuspendWorkspaceResponses];
+export type UpdateStatusResponse = UpdateStatusResponses[keyof UpdateStatusResponses];
 
 export type RemoveLabelFromTeamData = {
     body?: never;
     path: {
-        slug: string;
+        workspaceSlug: string;
         teamId: number;
         labelId: number;
     };
     query?: never;
-    url: '/workspaces/{slug}/teams/{teamId}/labels/{labelId}';
+    url: '/workspaces/{workspaceSlug}/teams/{teamId}/labels/{labelId}';
 };
 
 export type RemoveLabelFromTeamResponses = {
     /**
      * OK
      */
-    200: {
-        [key: string]: unknown;
-    };
+    200: TeamInfo;
 };
 
 export type RemoveLabelFromTeamResponse = RemoveLabelFromTeamResponses[keyof RemoveLabelFromTeamResponses];
@@ -2503,22 +2481,20 @@ export type RemoveLabelFromTeamResponse = RemoveLabelFromTeamResponses[keyof Rem
 export type AddLabelToTeamData = {
     body?: never;
     path: {
-        slug: string;
+        workspaceSlug: string;
         teamId: number;
         repositoryId: number;
         label: string;
     };
     query?: never;
-    url: '/workspaces/{slug}/teams/{teamId}/labels/{repositoryId}/{label}';
+    url: '/workspaces/{workspaceSlug}/teams/{teamId}/labels/{repositoryId}/{label}';
 };
 
 export type AddLabelToTeamResponses = {
     /**
      * OK
      */
-    200: {
-        [key: string]: unknown;
-    };
+    200: TeamInfo;
 };
 
 export type AddLabelToTeamResponse = AddLabelToTeamResponses[keyof AddLabelToTeamResponses];
@@ -2526,40 +2502,38 @@ export type AddLabelToTeamResponse = AddLabelToTeamResponses[keyof AddLabelToTea
 export type UpdateTokenData = {
     body: UpdateWorkspaceTokenRequest;
     path: {
-        slug: string;
+        workspaceSlug: string;
     };
     query?: never;
-    url: '/workspaces/{slug}/token';
+    url: '/workspaces/{workspaceSlug}/token';
 };
 
 export type UpdateTokenResponses = {
     /**
-     * OK
+     * Workspace updated
      */
-    200: {
-        [key: string]: unknown;
-    };
+    200: Workspace;
 };
 
 export type UpdateTokenResponse = UpdateTokenResponses[keyof UpdateTokenResponses];
 
-export type GetUsersData = {
+export type GetUsersWithTeamsData = {
     body?: never;
     path: {
-        slug: string;
+        workspaceSlug: string;
     };
     query?: never;
-    url: '/workspaces/{slug}/users';
+    url: '/workspaces/{workspaceSlug}/users';
 };
 
-export type GetUsersResponses = {
+export type GetUsersWithTeamsResponses = {
     /**
      * OK
      */
     200: Array<UserTeams>;
 };
 
-export type GetUsersResponse = GetUsersResponses[keyof GetUsersResponses];
+export type GetUsersWithTeamsResponse = GetUsersWithTeamsResponses[keyof GetUsersWithTeamsResponses];
 
 export type ClientOptions = {
     baseUrl: `${string}://${string}` | (string & {});

@@ -56,7 +56,7 @@ public class GitHubDataSyncScheduler {
                 logger.info(
                     "Syncing workspace {} (slug={}, login={})",
                     workspace.getId(),
-                    workspace.getSlug(),
+                    workspace.getWorkspaceSlug(),
                     workspace.getAccountLogin()
                 );
 
@@ -73,7 +73,7 @@ public class GitHubDataSyncScheduler {
                 logger.error(
                     "Error syncing workspace {} (slug={}): {}",
                     workspace.getId(),
-                    workspace.getSlug(),
+                    workspace.getWorkspaceSlug(),
                     e.getMessage(),
                     e
                 );

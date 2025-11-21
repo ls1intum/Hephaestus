@@ -9,12 +9,12 @@ import jakarta.validation.constraints.Pattern;
  * DTO for creating a new workspace.
  */
 public record CreateWorkspaceRequestDTO(
-    @NotBlank(message = "Slug is required")
+    @NotBlank(message = "Workspace slug is required")
     @Pattern(
         regexp = "^[a-z0-9][a-z0-9-]{2,50}$",
         message = "Slug must be 3-51 characters, start with a lowercase letter or digit, and contain only lowercase letters, digits, or hyphens"
     )
-    String slug,
+    String workspaceSlug,
 
     @NotBlank(message = "Display name is required") String displayName,
 

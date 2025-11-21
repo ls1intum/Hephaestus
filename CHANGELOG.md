@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.10.0-rc.22](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.21...v0.10.0-rc.22) (2025-11-21)
+
+### 🚀 Features
+
+* **application-server:** implement workspace entity extensions and CRUD API ([#408](https://github.com/ls1intum/Hephaestus/issues/408), [#416](https://github.com/ls1intum/Hephaestus/issues/416)) ([#541](https://github.com/ls1intum/Hephaestus/issues/541)) ([93d0c7d](https://github.com/ls1intum/Hephaestus/commit/93d0c7d99a85f63baa27d3815754d9a42fb8f684))
+
 ## [0.10.0-rc.21](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.20...v0.10.0-rc.21) (2025-11-09)
 
 ## [0.10.0-rc.20](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.19...v0.10.0-rc.20) (2025-11-07)

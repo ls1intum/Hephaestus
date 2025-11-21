@@ -18,6 +18,7 @@ import de.tum.in.www1.hephaestus.gitprovider.team.permission.TeamRepositoryPermi
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import java.io.IOException;
 import java.util.Set;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assumptions;
@@ -123,50 +124,56 @@ class GitHubRepositorySyncIntegrationTest extends AbstractGitHubSyncIntegrationT
         var storedRepository = repositoryRepository.findById(ghRepository.getId()).orElseThrow();
         assertThat(storedRepository.getNameWithOwner()).isEqualTo(ghRepository.getFullName());
 
-        var storedIssue = issueRepository.findById(createdIssue.issueId()).orElseThrow();
+        var storedIssue = awaitAndFetch("issue persisted", () -> issueRepository.findById(createdIssue.issueId()));
         assertThat(storedIssue.getNumber()).isEqualTo(createdIssue.issueNumber());
         assertThat(storedIssue.getTitle()).isEqualTo(createdIssue.issueTitle());
         assertThat(storedIssue.getBody()).isEqualTo(createdIssue.issueBody());
-        assertThat(issueCommentRepository.findById(createdIssue.commentId())).isPresent();
-        var storedIssueComment = issueCommentRepository.findById(createdIssue.commentId()).orElseThrow();
+        var storedIssueComment = awaitAndFetch("issue comment persisted", () ->
+            issueCommentRepository.findById(createdIssue.commentId())
+        );
         assertThat(storedIssueComment.getBody()).isEqualTo(createdIssue.commentBody());
         assertThat(storedIssueComment.getIssue().getId()).isEqualTo(createdIssue.issueId());
 
-        var storedPullRequest = pullRequestRepository.findById(pullRequestArtifacts.pullRequestId()).orElseThrow();
+        var storedPullRequest = awaitAndFetch("pull request persisted", () ->
+            pullRequestRepository.findById(pullRequestArtifacts.pullRequestId())
+        );
         assertThat(storedPullRequest.getNumber()).isEqualTo(pullRequestArtifacts.pullRequestNumber());
         assertThat(storedPullRequest.getTitle()).isEqualTo(pullRequestArtifacts.pullRequestTitle());
 
-        var storedReview = pullRequestReviewRepository.findById(pullRequestArtifacts.reviewId()).orElseThrow();
+        var storedReview = awaitAndFetch("pull request review persisted", () ->
+            pullRequestReviewRepository.findById(pullRequestArtifacts.reviewId())
+        );
         assertThat(storedReview.getState()).isEqualTo(PullRequestReview.State.COMMENTED);
         assertThat(storedReview.getBody()).isEqualTo(pullRequestArtifacts.reviewBody());
 
-        var storedReviewComment = pullRequestReviewCommentRepository
-            .findById(pullRequestArtifacts.reviewCommentId())
-            .orElseThrow();
+        var storedReviewComment = awaitAndFetch("pull request review comment persisted", () ->
+            pullRequestReviewCommentRepository.findById(pullRequestArtifacts.reviewCommentId())
+        );
         assertThat(storedReviewComment.getBody()).isEqualTo(pullRequestArtifacts.reviewCommentBody());
         assertThat(storedReviewComment.getReview()).isNotNull();
         assertThat(storedReviewComment.getPath()).isEqualTo(pullRequestArtifacts.reviewCommentPath());
         assertThat(storedReviewComment.getLine()).isEqualTo(pullRequestArtifacts.reviewCommentLine());
         assertThat(storedReviewComment.getCommitId()).isEqualTo(pullRequestArtifacts.commitSha());
 
-        var storedLabel = labelRepository
-            .findByRepositoryIdAndName(ghRepository.getId(), integrationLabelName)
-            .orElseThrow();
+        var storedLabel = awaitAndFetch("label persisted", () ->
+            labelRepository.findByRepositoryIdAndName(ghRepository.getId(), integrationLabelName)
+        );
         assertThat(storedLabel.getColor()).isEqualTo("0077ff");
         assertThat(storedLabel.getDescription()).isEqualTo("Integration label coverage");
 
-        var storedMilestone = milestoneRepository
-            .findAll()
-            .stream()
-            .filter(candidate -> candidate.getRepository().getId().equals(ghRepository.getId()))
-            .findFirst()
-            .orElseThrow();
+        var storedMilestone = awaitAndFetch("milestone persisted", () ->
+            milestoneRepository
+                .findAll()
+                .stream()
+                .filter(candidate -> candidate.getRepository().getId().equals(ghRepository.getId()))
+                .findFirst()
+        );
         assertThat(storedMilestone.getTitle()).isEqualTo(integrationMilestoneTitle);
         assertThat(storedMilestone.getState()).isEqualTo(Milestone.State.OPEN);
 
-        var storedCollaborator = repositoryCollaboratorRepository
-            .findByRepositoryIdAndUserId(ghRepository.getId(), collaboratorUserId)
-            .orElseThrow();
+        var storedCollaborator = awaitAndFetch("collaborator persisted", () ->
+            repositoryCollaboratorRepository.findByRepositoryIdAndUserId(ghRepository.getId(), collaboratorUserId)
+        );
         assertThat(storedCollaborator.getPermission()).isEqualTo(
             de.tum.in.www1.hephaestus.gitprovider.repository.collaborator.RepositoryCollaborator.Permission.ADMIN
         );
@@ -214,18 +221,22 @@ class GitHubRepositorySyncIntegrationTest extends AbstractGitHubSyncIntegrationT
             .toList();
         assertThat(teamMembers).contains(createdTeam.maintainerLogin().toLowerCase());
         assertThat(
-            teamRepositoryPermissionRepository.findByTeam_IdAndRepository_Id(createdTeam.id(), ghRepository.getId())
-        )
-            .isPresent()
-            .get()
-            .satisfies(permission -> {
-                assertThat(permission.getPermission())
-                    .as("team repository permission level")
-                    .isIn(
-                        de.tum.in.www1.hephaestus.gitprovider.team.permission.TeamRepositoryPermission.PermissionLevel.MAINTAIN,
-                        de.tum.in.www1.hephaestus.gitprovider.team.permission.TeamRepositoryPermission.PermissionLevel.WRITE
-                    );
-                assertThat(permission.isHiddenFromContributions()).isFalse();
-            });
+            awaitAndFetch("team permission persisted", () ->
+                teamRepositoryPermissionRepository.findByTeam_IdAndRepository_Id(createdTeam.id(), ghRepository.getId())
+            )
+        ).satisfies(permission -> {
+            assertThat(permission.getPermission())
+                .as("team repository permission level")
+                .isIn(
+                    de.tum.in.www1.hephaestus.gitprovider.team.permission.TeamRepositoryPermission.PermissionLevel.MAINTAIN,
+                    de.tum.in.www1.hephaestus.gitprovider.team.permission.TeamRepositoryPermission.PermissionLevel.WRITE
+                );
+            assertThat(permission.isHiddenFromContributions()).isFalse();
+        });
+    }
+
+    private <T> T awaitAndFetch(String description, Supplier<java.util.Optional<T>> supplier) throws Exception {
+        awaitCondition(description, () -> supplier.get().isPresent());
+        return supplier.get().orElseThrow();
     }
 }

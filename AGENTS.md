@@ -83,8 +83,11 @@ Regeneration is destructive; stash local edits before running these commands. Ch
 - Reuse existing DTO converters/mappers instead of duplicating mapping logic. Look at `gitprovider.team` for established patterns.
 - Security: new endpoints must enforce permissions using the existing security utilities (`EnsureAdminUser`, etc.).
 - Keep Liquibase changelog IDs monotonic and descriptive. Align entity annotations with the generated change sets.
-- Annotate record components in DTOs with `@NonNull` whenever the API should require them so the generated OpenAPI schema matches the backend contract.
+- Annotate record components in DTOs with `org.springframework.lang.NonNull` when the API requires a value; leave optional fields bare so the OpenAPI spec stays minimal without extra schema annotations.
+- Prefer resource-oriented workspace endpoints: express lifecycle transitions via HTTP methods (for example `PATCH /workspaces/{workspaceSlug}/status`) instead of RPC-style verbs and return consistent `ProblemDetail` payloads for errors.
+- When adding or changing REST endpoints, follow the centralized exception-handling rules in `docs/contributor/api-error-handling.md` so every controller returns RFC-7807 `ProblemDetail` responses via `@RestControllerAdvice`.
 - When integrating with the intelligence-service client, always regenerate (`npm run generate:api:intelligence-service:client`) after touching the spec and commit the updated Java files.
+- Controller-level integration tests should extend `AbstractWorkspaceIntegrationTest` (or an equivalent domain-specific base), exercise access control through `WebTestClient` + `TestAuthUtils`, and follow the contributor testing guide’s checklist. This keeps authentication, validation, and persistence assertions consistent across new endpoints.
 
 ## 8. Python services expectations
 

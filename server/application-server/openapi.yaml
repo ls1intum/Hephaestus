@@ -8,7 +8,7 @@ info:
     name: MIT License
     url: https://github.com/ls1intum/Hephaestus/blob/develop/LICENSE
   title: Hephaestus API
-  version: 0.10.0-rc.21
+  version: 0.10.0-rc.22
 servers:
 - description: Default Server URL
   url: /
@@ -729,7 +729,8 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/WorkspaceListItem"
-          description: OK
+          description: Workspace list
+      summary: List all workspaces
       tags:
       - workspace
     post:
@@ -741,37 +742,35 @@ paths:
               $ref: "#/components/schemas/CreateWorkspaceRequest"
         required: true
       responses:
-        "200":
+        "201":
           content:
             application/json:
               schema:
-                type: object
-          description: OK
+                $ref: "#/components/schemas/Workspace"
+          description: Workspace created
+      summary: Create a new workspace
       tags:
       - workspace
-  /workspaces/{slug}:
+  /workspaces/{workspaceSlug}:
     delete:
       operationId: purgeWorkspace
       parameters:
       - in: path
-        name: slug
+        name: workspaceSlug
         required: true
         schema:
           type: string
       responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                type: object
-          description: OK
+        "204":
+          description: Workspace purged
+      summary: Purge (soft delete) a workspace
       tags:
       - workspace
     get:
       operationId: getWorkspace
       parameters:
       - in: path
-        name: slug
+        name: workspaceSlug
         required: true
         schema:
           type: string
@@ -780,34 +779,32 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-          description: OK
+                $ref: "#/components/schemas/Workspace"
+          description: Workspace returned
+      summary: Fetch a workspace by slug
       tags:
       - workspace
-  /workspaces/{slug}/league/reset:
+  /workspaces/{workspaceSlug}/league/reset:
     put:
-      operationId: resetLeague
+      operationId: resetAndRecalculateLeagues
       parameters:
       - in: path
-        name: slug
+        name: workspaceSlug
         required: true
         schema:
           type: string
       responses:
         "200":
-          content:
-            application/json:
-              schema:
-                type: object
           description: OK
+      summary: Reset and recalculate workspace leagues
       tags:
       - workspace
-  /workspaces/{slug}/notifications:
+  /workspaces/{workspaceSlug}/notifications:
     patch:
       operationId: updateNotifications
       parameters:
       - in: path
-        name: slug
+        name: workspaceSlug
         required: true
         schema:
           type: string
@@ -822,16 +819,17 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-          description: OK
+                $ref: "#/components/schemas/Workspace"
+          description: Workspace updated
+      summary: Update leaderboard notification preferences
       tags:
       - workspace
-  /workspaces/{slug}/public-visibility:
+  /workspaces/{workspaceSlug}/public-visibility:
     patch:
       operationId: updatePublicVisibility
       parameters:
       - in: path
-        name: slug
+        name: workspaceSlug
         required: true
         schema:
           type: string
@@ -846,16 +844,17 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-          description: OK
+                $ref: "#/components/schemas/Workspace"
+          description: Workspace updated
+      summary: Toggle public visibility for a workspace
       tags:
       - workspace
-  /workspaces/{slug}/repositories:
+  /workspaces/{workspaceSlug}/repositories:
     get:
-      operationId: getRepositories
+      operationId: getRepositoriesToMonitor
       parameters:
       - in: path
-        name: slug
+        name: workspaceSlug
         required: true
         schema:
           type: string
@@ -867,15 +866,16 @@ paths:
                 type: array
                 items:
                   type: string
-          description: OK
+          description: Repository list
+      summary: List repositories monitored by a workspace
       tags:
       - workspace
-  /workspaces/{slug}/repositories/{owner}/{name}:
+  /workspaces/{workspaceSlug}/repositories/{owner}/{name}:
     delete:
-      operationId: removeRepository
+      operationId: removeRepositoryToMonitor
       parameters:
       - in: path
-        name: slug
+        name: workspaceSlug
         required: true
         schema:
           type: string
@@ -891,18 +891,15 @@ paths:
           type: string
       responses:
         "200":
-          content:
-            application/json:
-              schema:
-                type: object
           description: OK
+      summary: Remove a repository from a workspace monitor list
       tags:
       - workspace
     post:
-      operationId: addRepository
+      operationId: addRepositoryToMonitor
       parameters:
       - in: path
-        name: slug
+        name: workspaceSlug
         required: true
         schema:
           type: string
@@ -918,37 +915,16 @@ paths:
           type: string
       responses:
         "200":
-          content:
-            application/json:
-              schema:
-                type: object
           description: OK
+      summary: Add a repository to a workspace monitor list
       tags:
       - workspace
-  /workspaces/{slug}/resume:
-    post:
-      operationId: resumeWorkspace
-      parameters:
-      - in: path
-        name: slug
-        required: true
-        schema:
-          type: string
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                type: object
-          description: OK
-      tags:
-      - workspace
-  /workspaces/{slug}/schedule:
+  /workspaces/{workspaceSlug}/schedule:
     patch:
       operationId: updateSchedule
       parameters:
       - in: path
-        name: slug
+        name: workspaceSlug
         required: true
         schema:
           type: string
@@ -963,16 +939,17 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-          description: OK
+                $ref: "#/components/schemas/Workspace"
+          description: Workspace updated
+      summary: Update leaderboard schedule configuration
       tags:
       - workspace
-  /workspaces/{slug}/slack-credentials:
+  /workspaces/{workspaceSlug}/slack-credentials:
     patch:
       operationId: updateSlackCredentials
       parameters:
       - in: path
-        name: slug
+        name: workspaceSlug
         required: true
         schema:
           type: string
@@ -987,34 +964,42 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-          description: OK
+                $ref: "#/components/schemas/Workspace"
+          description: Workspace updated
+      summary: Update Slack credentials for a workspace
       tags:
       - workspace
-  /workspaces/{slug}/suspend:
-    post:
-      operationId: suspendWorkspace
+  /workspaces/{workspaceSlug}/status:
+    patch:
+      operationId: updateStatus
       parameters:
       - in: path
-        name: slug
+        name: workspaceSlug
         required: true
         schema:
           type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateWorkspaceStatusRequest"
+        required: true
       responses:
         "200":
           content:
             application/json:
               schema:
-                type: object
-          description: OK
+                $ref: "#/components/schemas/Workspace"
+          description: Workspace updated
+      summary: Update workspace lifecycle status
       tags:
       - workspace
-  /workspaces/{slug}/teams/{teamId}/labels/{labelId}:
+  /workspaces/{workspaceSlug}/teams/{teamId}/labels/{labelId}:
     delete:
       operationId: removeLabelFromTeam
       parameters:
       - in: path
-        name: slug
+        name: workspaceSlug
         required: true
         schema:
           type: string
@@ -1035,16 +1020,17 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: "#/components/schemas/TeamInfo"
           description: OK
+      summary: Remove a repository label from a team
       tags:
       - workspace
-  /workspaces/{slug}/teams/{teamId}/labels/{repositoryId}/{label}:
+  /workspaces/{workspaceSlug}/teams/{teamId}/labels/{repositoryId}/{label}:
     post:
       operationId: addLabelToTeam
       parameters:
       - in: path
-        name: slug
+        name: workspaceSlug
         required: true
         schema:
           type: string
@@ -1070,16 +1056,17 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: "#/components/schemas/TeamInfo"
           description: OK
+      summary: Add a repository label to a team
       tags:
       - workspace
-  /workspaces/{slug}/token:
+  /workspaces/{workspaceSlug}/token:
     patch:
       operationId: updateToken
       parameters:
       - in: path
-        name: slug
+        name: workspaceSlug
         required: true
         schema:
           type: string
@@ -1094,16 +1081,17 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-          description: OK
+                $ref: "#/components/schemas/Workspace"
+          description: Workspace updated
+      summary: Update workspace Personal Access Token
       tags:
       - workspace
-  /workspaces/{slug}/users:
+  /workspaces/{workspaceSlug}/users:
     get:
-      operationId: getUsers
+      operationId: getUsersWithTeams
       parameters:
       - in: path
-        name: slug
+        name: workspaceSlug
         required: true
         schema:
           type: string
@@ -1116,6 +1104,7 @@ paths:
                 items:
                   $ref: "#/components/schemas/UserTeams"
           description: OK
+      summary: List workspace users and the teams they belong to
       tags:
       - workspace
 components:
@@ -1334,7 +1323,7 @@ components:
         ownerUserId:
           type: integer
           format: int64
-        slug:
+        workspaceSlug:
           type: string
           pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
       required:
@@ -1342,7 +1331,7 @@ components:
       - accountType
       - displayName
       - ownerUserId
-      - slug
+      - workspaceSlug
     DataUIPart:
       type: object
       description: |-
@@ -3044,6 +3033,18 @@ components:
       required:
       - slackSigningSecret
       - slackToken
+    UpdateWorkspaceStatusRequest:
+      type: object
+      description: DTO for updating a workspace lifecycle status.
+      properties:
+        status:
+          type: string
+          enum:
+          - ACTIVE
+          - SUSPENDED
+          - PURGED
+      required:
+      - status
     UpdateWorkspaceTokenRequest:
       type: object
       description: DTO for updating workspace Personal Access Token (PAT).
@@ -3151,19 +3152,16 @@ components:
           anyOf:
           - type: integer
           - type: "null"
-          default: null
           title: Interval
         temperature_2m:
           anyOf:
           - type: number
           - type: "null"
-          default: null
           title: Temperature 2M
         time:
           anyOf:
           - type: string
           - type: "null"
-          default: null
           title: Time
       title: WeatherCurrent
     WeatherCurrentUnits:
@@ -3173,13 +3171,11 @@ components:
           anyOf:
           - type: string
           - type: "null"
-          default: null
           title: Interval
         temperature_2m:
           anyOf:
           - type: string
           - type: "null"
-          default: null
           title: Temperature 2M
         time:
           anyOf:
@@ -3216,13 +3212,11 @@ components:
           anyOf:
           - type: string
           - type: "null"
-          default: null
           title: Sunrise
         sunset:
           anyOf:
           - type: string
           - type: "null"
-          default: null
           title: Sunset
         time:
           anyOf:
@@ -3260,6 +3254,62 @@ components:
           - type: "null"
           title: Time
       title: WeatherHourlyUnits
+    Workspace:
+      type: object
+      properties:
+        accountLogin:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        displayName:
+          type: string
+        gitProviderMode:
+          type: string
+        hasSlackSigningSecret:
+          type: boolean
+        hasSlackToken:
+          type: boolean
+        id:
+          type: integer
+          format: int64
+        installationId:
+          type: integer
+          format: int64
+        installationLinkedAt:
+          type: string
+          format: date-time
+        isPubliclyViewable:
+          type: boolean
+        leaderboardNotificationChannelId:
+          type: string
+        leaderboardNotificationEnabled:
+          type: boolean
+        leaderboardNotificationTeam:
+          type: string
+        leaderboardScheduleDay:
+          type: integer
+          format: int32
+        leaderboardScheduleTime:
+          type: string
+        status:
+          type: string
+        updatedAt:
+          type: string
+          format: date-time
+        workspaceSlug:
+          type: string
+      required:
+      - accountLogin
+      - createdAt
+      - displayName
+      - hasSlackSigningSecret
+      - hasSlackToken
+      - id
+      - isPubliclyViewable
+      - status
+      - updatedAt
+      - workspaceSlug
     WorkspaceListItem:
       type: object
       properties:
@@ -3273,7 +3323,14 @@ components:
         id:
           type: integer
           format: int64
-        slug:
-          type: string
         status:
           type: string
+        workspaceSlug:
+          type: string
+      required:
+      - accountLogin
+      - createdAt
+      - displayName
+      - id
+      - status
+      - workspaceSlug

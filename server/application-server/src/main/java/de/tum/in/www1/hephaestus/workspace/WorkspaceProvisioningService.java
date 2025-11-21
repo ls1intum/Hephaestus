@@ -277,7 +277,7 @@ public class WorkspaceProvisioningService {
                     int repositoriesAdded = 0;
                     for (GHRepository repo : context.ghOrganization().listRepositories().withPageSize(100)) {
                         try {
-                            workspaceService.addRepositoryToMonitor(repo.getFullName());
+                            workspaceService.addRepositoryToMonitor(workspace.getWorkspaceSlug(), repo.getFullName());
                             repositoriesAdded++;
                         } catch (RepositoryAlreadyMonitoredException ignore) {
                             // already present

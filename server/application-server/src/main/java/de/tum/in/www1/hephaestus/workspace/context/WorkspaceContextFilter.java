@@ -14,13 +14,14 @@ import jakarta.servlet.ServletResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.annotation.Order;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.ProblemDetail;
 import org.springframework.stereotype.Component;
 
 /**
@@ -86,10 +87,13 @@ public class WorkspaceContextFilter implements Filter {
         }
 
         String slug = matcher.group(1);
+        String remainingPath = matcher.group(2) != null ? matcher.group(2) : "";
+        boolean isBasePath = remainingPath.isBlank() || "/".equals(remainingPath);
+        boolean isStatusPath = remainingPath.startsWith("/status");
 
         try {
             // Look up workspace by slug
-            var workspaceOpt = workspaceRepository.findBySlug(slug);
+            var workspaceOpt = workspaceRepository.findByWorkspaceSlug(slug);
 
             if (workspaceOpt.isEmpty()) {
                 sendWorkspaceNotFoundError(httpResponse, slug);
@@ -99,7 +103,9 @@ public class WorkspaceContextFilter implements Filter {
             var workspace = workspaceOpt.get();
 
             // Check workspace status - only ACTIVE workspaces are accessible
-            if (workspace.getStatus() != WorkspaceStatus.ACTIVE) {
+            boolean allowNonActive = isStatusPath || (isBasePath && "GET".equalsIgnoreCase(httpRequest.getMethod()));
+
+            if (workspace.getStatus() != WorkspaceStatus.ACTIVE && !allowNonActive) {
                 log.debug("Workspace {} has non-ACTIVE status: {}. Returning 404.", slug, workspace.getStatus());
                 sendWorkspaceNotFoundError(httpResponse, slug);
                 return;
@@ -170,11 +176,11 @@ public class WorkspaceContextFilter implements Filter {
      * @param slug Workspace slug
      */
     private void sendWorkspaceNotFoundError(HttpServletResponse response, String slug) throws IOException {
+        ProblemDetail problem = ProblemDetail.forStatus(HttpStatus.NOT_FOUND);
+        problem.setTitle("Resource not found");
+        problem.setDetail("Workspace not found: " + slug);
         response.setStatus(HttpServletResponse.SC_NOT_FOUND);
-        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-
-        var errorBody = Map.of("error", "WORKSPACE_NOT_FOUND", "message", "Workspace not found: " + slug);
-
-        response.getWriter().write(objectMapper.writeValueAsString(errorBody));
+        response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
+        response.getWriter().write(objectMapper.writeValueAsString(problem));
     }
 }

@@ -4,6 +4,7 @@ import static de.tum.in.www1.hephaestus.workspace.Workspace.WorkspaceStatus;
 
 import de.tum.in.www1.hephaestus.core.LoggingUtils;
 import de.tum.in.www1.hephaestus.core.exception.EntityNotFoundException;
+import de.tum.in.www1.hephaestus.workspace.exception.WorkspaceLifecycleViolationException;
 import jakarta.transaction.Transactional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -29,22 +30,22 @@ public class WorkspaceLifecycleService {
      * @param slug the workspace slug
      * @return the suspended workspace
      * @throws EntityNotFoundException if workspace does not exist
-     * @throws IllegalStateException if workspace is already purged
+     * @throws WorkspaceLifecycleViolationException if workspace is already purged
      */
     @Transactional
-    public Workspace suspendWorkspace(String slug) {
+    public Workspace suspendWorkspace(String workspaceSlug) {
         Workspace workspace = workspaceRepository
-            .findBySlug(slug)
-            .orElseThrow(() -> new EntityNotFoundException("Workspace", slug));
+            .findByWorkspaceSlug(workspaceSlug)
+            .orElseThrow(() -> new EntityNotFoundException("Workspace", workspaceSlug));
 
         if (workspace.getStatus() == WorkspaceStatus.PURGED) {
-            throw new IllegalStateException("Cannot suspend a purged workspace: " + slug);
+            throw new WorkspaceLifecycleViolationException("Cannot suspend a purged workspace: " + workspaceSlug);
         }
 
         if (workspace.getStatus() != WorkspaceStatus.SUSPENDED) {
             workspace.setStatus(WorkspaceStatus.SUSPENDED);
             workspace = workspaceRepository.save(workspace);
-            logger.info("Workspace '{}' has been suspended.", LoggingUtils.sanitizeForLog(slug));
+            logger.info("Workspace '{}' has been suspended.", LoggingUtils.sanitizeForLog(workspaceSlug));
             // TODO: Stop NATS consumers and signal schedulers
         }
 
@@ -58,22 +59,22 @@ public class WorkspaceLifecycleService {
      * @param slug the workspace slug
      * @return the resumed workspace
      * @throws EntityNotFoundException if workspace does not exist
-     * @throws IllegalStateException if workspace is purged (cannot resume purged)
+     * @throws WorkspaceLifecycleViolationException if workspace is purged (cannot resume purged)
      */
     @Transactional
-    public Workspace resumeWorkspace(String slug) {
+    public Workspace resumeWorkspace(String workspaceSlug) {
         Workspace workspace = workspaceRepository
-            .findBySlug(slug)
-            .orElseThrow(() -> new EntityNotFoundException("Workspace", slug));
+            .findByWorkspaceSlug(workspaceSlug)
+            .orElseThrow(() -> new EntityNotFoundException("Workspace", workspaceSlug));
 
         if (workspace.getStatus() == WorkspaceStatus.PURGED) {
-            throw new IllegalStateException("Cannot resume a purged workspace: " + slug);
+            throw new WorkspaceLifecycleViolationException("Cannot resume a purged workspace: " + workspaceSlug);
         }
 
         if (workspace.getStatus() != WorkspaceStatus.ACTIVE) {
             workspace.setStatus(WorkspaceStatus.ACTIVE);
             workspace = workspaceRepository.save(workspace);
-            logger.info("Workspace '{}' has been resumed.", LoggingUtils.sanitizeForLog(slug));
+            logger.info("Workspace '{}' has been resumed.", LoggingUtils.sanitizeForLog(workspaceSlug));
             // TODO: Restart NATS consumers and re-enable schedulers
         }
 
@@ -88,21 +89,22 @@ public class WorkspaceLifecycleService {
      * @throws EntityNotFoundException if workspace does not exist
      */
     @Transactional
-    public void purgeWorkspace(String slug) {
+    public Workspace purgeWorkspace(String workspaceSlug) {
         Workspace workspace = workspaceRepository
-            .findBySlug(slug)
-            .orElseThrow(() -> new EntityNotFoundException("Workspace", slug));
+            .findByWorkspaceSlug(workspaceSlug)
+            .orElseThrow(() -> new EntityNotFoundException("Workspace", workspaceSlug));
 
         if (workspace.getStatus() == WorkspaceStatus.PURGED) {
-            logger.info("Workspace '{}' is already purged. Skipping.", LoggingUtils.sanitizeForLog(slug));
-            return;
+            logger.info("Workspace '{}' is already purged. Skipping.", LoggingUtils.sanitizeForLog(workspaceSlug));
+            return workspace;
         }
 
         // TODO: Implement hard delete with batch cascade strategy
 
         workspace.setStatus(WorkspaceStatus.PURGED);
-        workspaceRepository.save(workspace);
-        logger.info("Workspace '{}' has been purged (soft deleted).", LoggingUtils.sanitizeForLog(slug));
+        workspace = workspaceRepository.save(workspace);
+        logger.info("Workspace '{}' has been purged (soft deleted).", LoggingUtils.sanitizeForLog(workspaceSlug));
+        return workspace;
     }
 
     /**
@@ -112,10 +114,22 @@ public class WorkspaceLifecycleService {
      * @return the workspace status
      * @throws EntityNotFoundException if workspace does not exist
      */
-    public WorkspaceStatus getWorkspaceStatus(String slug) {
+    public WorkspaceStatus getWorkspaceStatus(String workspaceSlug) {
         Workspace workspace = workspaceRepository
-            .findBySlug(slug)
-            .orElseThrow(() -> new EntityNotFoundException("Workspace", slug));
+            .findByWorkspaceSlug(workspaceSlug)
+            .orElseThrow(() -> new EntityNotFoundException("Workspace", workspaceSlug));
         return workspace.getStatus();
+    }
+
+    /**
+     * Update the lifecycle status for the workspace using the canonical transition helpers.
+     */
+    @Transactional
+    public Workspace updateStatus(String workspaceSlug, WorkspaceStatus targetStatus) {
+        return switch (targetStatus) {
+            case ACTIVE -> resumeWorkspace(workspaceSlug);
+            case SUSPENDED -> suspendWorkspace(workspaceSlug);
+            case PURGED -> purgeWorkspace(workspaceSlug);
+        };
     }
 }

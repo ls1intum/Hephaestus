@@ -34,7 +34,7 @@ public record WorkspaceContext(
     public static WorkspaceContext fromWorkspace(Workspace workspace, Set<WorkspaceRole> roles) {
         return new WorkspaceContext(
             workspace.getId(),
-            workspace.getSlug(),
+            workspace.getWorkspaceSlug(),
             workspace.getDisplayName(),
             workspace.getAccountType(),
             workspace.getInstallationId(),
