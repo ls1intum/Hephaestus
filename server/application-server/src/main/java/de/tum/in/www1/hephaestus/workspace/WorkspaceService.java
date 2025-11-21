@@ -99,6 +99,9 @@ public class WorkspaceService {
     private WorkspaceMembershipService workspaceMembershipService;
 
     @Autowired
+    private WorkspaceMembershipRepository workspaceMembershipRepository;
+
+    @Autowired
     private GitHubUserSyncService gitHubUserSyncService;
 
     @Autowired
@@ -305,7 +308,8 @@ public class WorkspaceService {
             workspace.getId(),
             LoggingUtils.sanitizeForLog(slug)
         );
-        return userRepository.findAllHuman().stream().map(UserTeamsDTO::fromUser).toList();
+        List<User> users = workspaceMembershipRepository.findHumanUsersWithTeamsByWorkspaceId(workspace.getId());
+        return users.stream().map(UserTeamsDTO::fromUser).toList();
     }
 
     public Optional<TeamInfoDTO> addLabelToTeam(String slug, Long teamId, Long repositoryId, String label) {
@@ -474,7 +478,7 @@ public class WorkspaceService {
             workspace = createWorkspace(accountLogin, accountLogin, accountLogin, AccountType.ORG, ownerUserId);
             logger.info(
                 "Created new workspace '{}' for installation {} with owner userId={}.",
-                LoggingUtils.sanitizeForLog(workspace.getSlug()),
+                LoggingUtils.sanitizeForLog(workspace.getWorkspaceSlug()),
                 installationId,
                 ownerUserId
             );
@@ -619,7 +623,7 @@ public class WorkspaceService {
         validateSlug(slug);
 
         Workspace workspace = new Workspace();
-        workspace.setSlug(slug);
+        workspace.setWorkspaceSlug(slug);
         workspace.setDisplayName(displayName);
         workspace.setIsPubliclyViewable(DEFAULT_PUBLIC_VISIBILITY);
         workspace.setAccountLogin(accountLogin);
@@ -637,20 +641,22 @@ public class WorkspaceService {
     }
 
     public Optional<Workspace> getWorkspaceBySlug(String slug) {
-        return workspaceRepository.findBySlug(slug);
+        return workspaceRepository.findByWorkspaceSlug(slug);
     }
 
     private Workspace requireWorkspace(String slug) {
         if (isBlank(slug)) {
             throw new IllegalArgumentException("Workspace slug must not be blank.");
         }
-        return workspaceRepository.findBySlug(slug).orElseThrow(() -> new EntityNotFoundException("Workspace", slug));
+        return workspaceRepository
+            .findByWorkspaceSlug(slug)
+            .orElseThrow(() -> new EntityNotFoundException("Workspace", slug));
     }
 
     @Transactional
     public Workspace updateSchedule(String slug, Integer day, String time) {
         Workspace workspace = workspaceRepository
-            .findBySlug(slug)
+            .findByWorkspaceSlug(slug)
             .orElseThrow(() -> new EntityNotFoundException("Workspace", slug));
 
         if (day != null) {
@@ -675,7 +681,7 @@ public class WorkspaceService {
     @Transactional
     public Workspace updateNotifications(String slug, Boolean enabled, String team, String channelId) {
         Workspace workspace = workspaceRepository
-            .findBySlug(slug)
+            .findByWorkspaceSlug(slug)
             .orElseThrow(() -> new EntityNotFoundException("Workspace", slug));
 
         if (enabled != null) {
@@ -703,7 +709,7 @@ public class WorkspaceService {
     @Transactional
     public Workspace updateToken(String slug, String personalAccessToken) {
         Workspace workspace = workspaceRepository
-            .findBySlug(slug)
+            .findByWorkspaceSlug(slug)
             .orElseThrow(() -> new EntityNotFoundException("Workspace", slug));
 
         // TODO: Validate token with GitHub API before storing
@@ -717,7 +723,7 @@ public class WorkspaceService {
     @Transactional
     public Workspace updateSlackCredentials(String slug, String slackToken, String slackSigningSecret) {
         Workspace workspace = workspaceRepository
-            .findBySlug(slug)
+            .findByWorkspaceSlug(slug)
             .orElseThrow(() -> new EntityNotFoundException("Workspace", slug));
 
         // TODO: Validate Slack token by calling Slack API (auth.test)
@@ -730,7 +736,7 @@ public class WorkspaceService {
     @Transactional
     public Workspace updatePublicVisibility(String slug, Boolean isPubliclyViewable) {
         Workspace workspace = workspaceRepository
-            .findBySlug(slug)
+            .findByWorkspaceSlug(slug)
             .orElseThrow(() -> new EntityNotFoundException("Workspace", slug));
 
         workspace.setIsPubliclyViewable(isPubliclyViewable);

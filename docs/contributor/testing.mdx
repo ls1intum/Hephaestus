@@ -107,7 +107,7 @@ class FooControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
         webTestClient
             .get()
-            .uri("/workspaces/{slug}", workspace.getSlug())
+            .uri("/workspaces/{workspaceSlug}", workspace.getWorkspaceSlug())
             .headers(TestAuthUtils.withCurrentUser())
             .exchange()
             .expectStatus()

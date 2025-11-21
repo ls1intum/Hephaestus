@@ -7,9 +7,10 @@ import { listWorkspacesOptions } from "@/api/@tanstack/react-query.gen";
  */
 export function useActiveWorkspaceSlug() {
 	const query = useQuery(listWorkspacesOptions());
+	const workspaceSlug = query.data?.[0]?.workspaceSlug;
 
 	return {
-		slug: query.data?.[0]?.slug,
+		workspaceSlug,
 		workspaces: query.data,
 		isLoading: query.isLoading,
 		error: query.error as Error | null,

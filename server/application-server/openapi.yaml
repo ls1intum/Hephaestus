@@ -13,10 +13,6 @@ servers:
 - description: Default Server URL
   url: /
 tags:
-- description: |-
-    REST controller for the chat functionality.
-     Handles streaming chat responses, message persistence, and thread management.
-  name: chat-controller
 - description: Document management with versioning support
   name: Documents
 - description: Vote on chat messages (upvote/downvote)
@@ -729,7 +725,8 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/WorkspaceListItem"
-          description: OK
+          description: Workspace list
+      summary: List all workspaces
       tags:
       - workspace
     post:
@@ -741,37 +738,35 @@ paths:
               $ref: "#/components/schemas/CreateWorkspaceRequest"
         required: true
       responses:
-        "200":
+        "201":
           content:
             application/json:
               schema:
-                type: object
-          description: OK
+                $ref: "#/components/schemas/Workspace"
+          description: Workspace created
+      summary: Create a new workspace
       tags:
       - workspace
-  /workspaces/{slug}:
+  /workspaces/{workspaceSlug}:
     delete:
       operationId: purgeWorkspace
       parameters:
       - in: path
-        name: slug
+        name: workspaceSlug
         required: true
         schema:
           type: string
       responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                type: object
-          description: OK
+        "204":
+          description: Workspace purged
+      summary: Purge (soft delete) a workspace
       tags:
       - workspace
     get:
       operationId: getWorkspace
       parameters:
       - in: path
-        name: slug
+        name: workspaceSlug
         required: true
         schema:
           type: string
@@ -780,30 +775,32 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-          description: OK
+                $ref: "#/components/schemas/Workspace"
+          description: Workspace returned
+      summary: Fetch a workspace by slug
       tags:
       - workspace
-  /workspaces/{slug}/league/reset:
+  /workspaces/{workspaceSlug}/league/reset:
     put:
       operationId: resetAndRecalculateLeagues
       parameters:
       - in: path
-        name: slug
+        name: workspaceSlug
         required: true
         schema:
           type: string
       responses:
         "200":
           description: OK
+      summary: Reset and recalculate workspace leagues
       tags:
       - workspace
-  /workspaces/{slug}/notifications:
+  /workspaces/{workspaceSlug}/notifications:
     patch:
       operationId: updateNotifications
       parameters:
       - in: path
-        name: slug
+        name: workspaceSlug
         required: true
         schema:
           type: string
@@ -818,16 +815,17 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-          description: OK
+                $ref: "#/components/schemas/Workspace"
+          description: Workspace updated
+      summary: Update leaderboard notification preferences
       tags:
       - workspace
-  /workspaces/{slug}/public-visibility:
+  /workspaces/{workspaceSlug}/public-visibility:
     patch:
       operationId: updatePublicVisibility
       parameters:
       - in: path
-        name: slug
+        name: workspaceSlug
         required: true
         schema:
           type: string
@@ -842,16 +840,17 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-          description: OK
+                $ref: "#/components/schemas/Workspace"
+          description: Workspace updated
+      summary: Toggle public visibility for a workspace
       tags:
       - workspace
-  /workspaces/{slug}/repositories:
+  /workspaces/{workspaceSlug}/repositories:
     get:
       operationId: getRepositoriesToMonitor
       parameters:
       - in: path
-        name: slug
+        name: workspaceSlug
         required: true
         schema:
           type: string
@@ -863,15 +862,16 @@ paths:
                 type: array
                 items:
                   type: string
-          description: OK
+          description: Repository list
+      summary: List repositories monitored by a workspace
       tags:
       - workspace
-  /workspaces/{slug}/repositories/{owner}/{name}:
+  /workspaces/{workspaceSlug}/repositories/{owner}/{name}:
     delete:
       operationId: removeRepositoryToMonitor
       parameters:
       - in: path
-        name: slug
+        name: workspaceSlug
         required: true
         schema:
           type: string
@@ -888,13 +888,14 @@ paths:
       responses:
         "200":
           description: OK
+      summary: Remove a repository from a workspace monitor list
       tags:
       - workspace
     post:
       operationId: addRepositoryToMonitor
       parameters:
       - in: path
-        name: slug
+        name: workspaceSlug
         required: true
         schema:
           type: string
@@ -911,32 +912,15 @@ paths:
       responses:
         "200":
           description: OK
+      summary: Add a repository to a workspace monitor list
       tags:
       - workspace
-  /workspaces/{slug}/resume:
-    post:
-      operationId: resumeWorkspace
-      parameters:
-      - in: path
-        name: slug
-        required: true
-        schema:
-          type: string
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                type: object
-          description: OK
-      tags:
-      - workspace
-  /workspaces/{slug}/schedule:
+  /workspaces/{workspaceSlug}/schedule:
     patch:
       operationId: updateSchedule
       parameters:
       - in: path
-        name: slug
+        name: workspaceSlug
         required: true
         schema:
           type: string
@@ -951,16 +935,17 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-          description: OK
+                $ref: "#/components/schemas/Workspace"
+          description: Workspace updated
+      summary: Update leaderboard schedule configuration
       tags:
       - workspace
-  /workspaces/{slug}/slack-credentials:
+  /workspaces/{workspaceSlug}/slack-credentials:
     patch:
       operationId: updateSlackCredentials
       parameters:
       - in: path
-        name: slug
+        name: workspaceSlug
         required: true
         schema:
           type: string
@@ -975,34 +960,42 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-          description: OK
+                $ref: "#/components/schemas/Workspace"
+          description: Workspace updated
+      summary: Update Slack credentials for a workspace
       tags:
       - workspace
-  /workspaces/{slug}/suspend:
-    post:
-      operationId: suspendWorkspace
+  /workspaces/{workspaceSlug}/status:
+    patch:
+      operationId: updateStatus
       parameters:
       - in: path
-        name: slug
+        name: workspaceSlug
         required: true
         schema:
           type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateWorkspaceStatusRequest"
+        required: true
       responses:
         "200":
           content:
             application/json:
               schema:
-                type: object
-          description: OK
+                $ref: "#/components/schemas/Workspace"
+          description: Workspace updated
+      summary: Update workspace lifecycle status
       tags:
       - workspace
-  /workspaces/{slug}/teams/{teamId}/labels/{labelId}:
+  /workspaces/{workspaceSlug}/teams/{teamId}/labels/{labelId}:
     delete:
       operationId: removeLabelFromTeam
       parameters:
       - in: path
-        name: slug
+        name: workspaceSlug
         required: true
         schema:
           type: string
@@ -1025,14 +1018,15 @@ paths:
               schema:
                 $ref: "#/components/schemas/TeamInfo"
           description: OK
+      summary: Remove a repository label from a team
       tags:
       - workspace
-  /workspaces/{slug}/teams/{teamId}/labels/{repositoryId}/{label}:
+  /workspaces/{workspaceSlug}/teams/{teamId}/labels/{repositoryId}/{label}:
     post:
       operationId: addLabelToTeam
       parameters:
       - in: path
-        name: slug
+        name: workspaceSlug
         required: true
         schema:
           type: string
@@ -1060,14 +1054,15 @@ paths:
               schema:
                 $ref: "#/components/schemas/TeamInfo"
           description: OK
+      summary: Add a repository label to a team
       tags:
       - workspace
-  /workspaces/{slug}/token:
+  /workspaces/{workspaceSlug}/token:
     patch:
       operationId: updateToken
       parameters:
       - in: path
-        name: slug
+        name: workspaceSlug
         required: true
         schema:
           type: string
@@ -1082,16 +1077,17 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-          description: OK
+                $ref: "#/components/schemas/Workspace"
+          description: Workspace updated
+      summary: Update workspace Personal Access Token
       tags:
       - workspace
-  /workspaces/{slug}/users:
+  /workspaces/{workspaceSlug}/users:
     get:
       operationId: getUsersWithTeams
       parameters:
       - in: path
-        name: slug
+        name: workspaceSlug
         required: true
         schema:
           type: string
@@ -1104,6 +1100,7 @@ paths:
                 items:
                   $ref: "#/components/schemas/UserTeams"
           description: OK
+      summary: List workspace users and the teams they belong to
       tags:
       - workspace
 components:
@@ -1129,7 +1126,6 @@ components:
       - type
     ChatMessageVote:
       type: object
-      description: DTO for returning vote information.
       properties:
         createdAt:
           type: string
@@ -1144,51 +1140,33 @@ components:
           format: date-time
     ChatThreadDetail:
       type: object
-      description: |-
-        DTO for chat thread with full message content.
-         Used for initializing useChat in the frontend.
       properties:
         createdAt:
           type: string
           format: date-time
-          description: When the thread was created
         id:
           type: string
           format: uuid
-          description: Unique identifier for the thread
         messages:
           type: array
-          description: |-
-            All messages in the conversation path (as JSON objects for useChat initialization)
-             As exception, we do not use a DTO here since we included those intelligece-service models in the OpenAPI spec.
           items:
             $ref: "#/components/schemas/UIMessage"
         selectedLeafMessageId:
           type: string
           format: uuid
-          description: ID of the currently selected leaf message (end of active conversation
-            path)
         title:
           type: string
-          description: Thread title (may be null for untitled threads)
         votes:
           type: array
-          description: Votes for messages in this thread
           items:
             $ref: "#/components/schemas/ChatMessageVote"
     ChatThreadGroup:
       type: object
-      description: |-
-        DTO for grouped chat threads.
-         Used for organizing threads by time periods (today, yesterday, etc.).
       properties:
         groupName:
           type: string
-          description: "Group name (e.g., \"Today\", \"Yesterday\", \"Last 7 Days\"\
-            , \"Last 30 Days\")"
         threads:
           type: array
-          description: List of thread summaries in this group
           items:
             $ref: "#/components/schemas/ChatThreadSummary"
       required:
@@ -1196,21 +1174,15 @@ components:
       - threads
     ChatThreadSummary:
       type: object
-      description: |-
-        DTO for chat thread summary information.
-         Used for listing threads without loading full message content.
       properties:
         createdAt:
           type: string
           format: date-time
-          description: When the thread was created
         id:
           type: string
           format: uuid
-          description: Unique identifier for the thread
         title:
           type: string
-          description: Thread title (may be null for untitled threads)
       required:
       - createdAt
       - id
@@ -1288,9 +1260,6 @@ components:
       title: CreateDocumentOutput
     CreateDocumentRequest:
       type: object
-      description: |-
-        DTO for creating a new document.
-         Server generates UUID and timestamps.
       properties:
         content:
           type: string
@@ -1322,7 +1291,7 @@ components:
         ownerUserId:
           type: integer
           format: int64
-        slug:
+        workspaceSlug:
           type: string
           pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
       required:
@@ -1330,7 +1299,7 @@ components:
       - accountType
       - displayName
       - ownerUserId
-      - slug
+      - workspaceSlug
     DataUIPart:
       type: object
       description: |-
@@ -1355,9 +1324,6 @@ components:
       title: DataUIPart
     Document:
       type: object
-      description: |-
-        DTO for complete document responses.
-         Used when returning full document details (includes content).
       properties:
         content:
           type: string
@@ -1444,9 +1410,6 @@ components:
       title: DocumentFinishData
     DocumentSummary:
       type: object
-      description: |-
-        DTO for document summary in list views.
-         Excludes content for performance - only metadata.
       properties:
         createdAt:
           type: string
@@ -2964,9 +2927,6 @@ components:
       title: UpdateDocumentOutput
     UpdateDocumentRequest:
       type: object
-      description: |-
-        DTO for updating an existing document.
-         Creates a new version with the updated content.
       properties:
         content:
           type: string
@@ -2984,7 +2944,6 @@ components:
       - title
     UpdateWorkspaceNotificationsRequest:
       type: object
-      description: DTO for updating workspace leaderboard notification preferences.
       properties:
         channelId:
           type: string
@@ -2995,7 +2954,6 @@ components:
           type: string
     UpdateWorkspacePublicVisibilityRequest:
       type: object
-      description: DTO for updating workspace public visibility.
       properties:
         isPubliclyViewable:
           type: boolean
@@ -3003,10 +2961,6 @@ components:
       - isPubliclyViewable
     UpdateWorkspaceScheduleRequest:
       type: object
-      description: |-
-        DTO for updating workspace leaderboard schedule configuration.
-         Day: 1=Monday, 2=Tuesday, ..., 7=Sunday
-         Time: Format "HH:mm" (24-hour format)
       properties:
         day:
           type: integer
@@ -3021,9 +2975,6 @@ components:
       - time
     UpdateWorkspaceSlackCredentialsRequest:
       type: object
-      description: |-
-        Request DTO for updating Slack credentials (token and signing secret) for a workspace.
-         These credentials are used for Slack API integration and webhook signature verification.
       properties:
         slackSigningSecret:
           type: string
@@ -3032,9 +2983,19 @@ components:
       required:
       - slackSigningSecret
       - slackToken
+    UpdateWorkspaceStatusRequest:
+      type: object
+      properties:
+        status:
+          type: string
+          enum:
+          - ACTIVE
+          - SUSPENDED
+          - PURGED
+      required:
+      - status
     UpdateWorkspaceTokenRequest:
       type: object
-      description: DTO for updating workspace Personal Access Token (PAT).
       properties:
         personalAccessToken:
           type: string
@@ -3126,7 +3087,6 @@ components:
       - url
     VoteMessageRequest:
       type: object
-      description: Request DTO for voting on a message.
       properties:
         isUpvoted:
           type: boolean
@@ -3241,6 +3201,62 @@ components:
           - type: "null"
           title: Time
       title: WeatherHourlyUnits
+    Workspace:
+      type: object
+      properties:
+        accountLogin:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        displayName:
+          type: string
+        gitProviderMode:
+          type: string
+        hasSlackSigningSecret:
+          type: boolean
+        hasSlackToken:
+          type: boolean
+        id:
+          type: integer
+          format: int64
+        installationId:
+          type: integer
+          format: int64
+        installationLinkedAt:
+          type: string
+          format: date-time
+        isPubliclyViewable:
+          type: boolean
+        leaderboardNotificationChannelId:
+          type: string
+        leaderboardNotificationEnabled:
+          type: boolean
+        leaderboardNotificationTeam:
+          type: string
+        leaderboardScheduleDay:
+          type: integer
+          format: int32
+        leaderboardScheduleTime:
+          type: string
+        status:
+          type: string
+        updatedAt:
+          type: string
+          format: date-time
+        workspaceSlug:
+          type: string
+      required:
+      - accountLogin
+      - createdAt
+      - displayName
+      - hasSlackSigningSecret
+      - hasSlackToken
+      - id
+      - isPubliclyViewable
+      - status
+      - updatedAt
+      - workspaceSlug
     WorkspaceListItem:
       type: object
       properties:
@@ -3254,7 +3270,14 @@ components:
         id:
           type: integer
           format: int64
-        slug:
-          type: string
         status:
           type: string
+        workspaceSlug:
+          type: string
+      required:
+      - accountLogin
+      - createdAt
+      - displayName
+      - id
+      - status
+      - workspaceSlug

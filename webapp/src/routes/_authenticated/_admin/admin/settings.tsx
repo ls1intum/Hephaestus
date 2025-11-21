@@ -24,14 +24,14 @@ type RepositoryItem = {
 function AdminSettings() {
 	const queryClient = useQueryClient();
 	const {
-		slug,
+		workspaceSlug,
 		isLoading: isWorkspaceLoading,
 		error: workspaceError,
 	} = useActiveWorkspaceSlug();
 
 	// Repositories query
 	const repositoriesQueryOptions = getRepositoriesToMonitorOptions({
-		path: { slug: slug ?? "" },
+		path: { workspaceSlug: workspaceSlug ?? "" },
 	});
 	const {
 		data: repositories,
@@ -39,14 +39,15 @@ function AdminSettings() {
 		error: repositoriesError,
 	} = useQuery({
 		...repositoriesQueryOptions,
-		enabled: Boolean(slug) && (repositoriesQueryOptions.enabled ?? true),
+		enabled:
+			Boolean(workspaceSlug) && (repositoriesQueryOptions.enabled ?? true),
 	});
 
 	// Add repository mutation
 	const addRepository = useMutation({
 		...addRepositoryToMonitorMutation(),
 		onSuccess: () => {
-			if (!slug) {
+			if (!workspaceSlug) {
 				return;
 			}
 			queryClient.invalidateQueries({
@@ -59,7 +60,7 @@ function AdminSettings() {
 	const removeRepository = useMutation({
 		...removeRepositoryToMonitorMutation(),
 		onSuccess: () => {
-			if (!slug) {
+			if (!workspaceSlug) {
 				return;
 			}
 			queryClient.invalidateQueries({
@@ -79,13 +80,13 @@ function AdminSettings() {
 
 	// Handle add repository
 	const handleAddRepository = (nameWithOwner: string) => {
-		if (!slug) {
+		if (!workspaceSlug) {
 			return;
 		}
 		const [owner, name] = nameWithOwner.split("/");
 		addRepository.mutate({
 			path: {
-				slug,
+				workspaceSlug,
 				owner,
 				name,
 			},
@@ -94,13 +95,13 @@ function AdminSettings() {
 
 	// Handle remove repository
 	const handleRemoveRepository = (nameWithOwner: string) => {
-		if (!slug) {
+		if (!workspaceSlug) {
 			return;
 		}
 		const [owner, name] = nameWithOwner.split("/");
 		removeRepository.mutate({
 			path: {
-				slug,
+				workspaceSlug,
 				owner,
 				name,
 			},
@@ -118,7 +119,7 @@ function AdminSettings() {
 		<AdminSettingsPage
 			repositories={formattedRepositories}
 			isLoadingRepositories={
-				isWorkspaceLoading || isLoadingRepositories || !slug
+				isWorkspaceLoading || isLoadingRepositories || !workspaceSlug
 			}
 			repositoriesError={
 				(workspaceError as Error | null) ?? (repositoriesError as Error | null)
@@ -130,10 +131,10 @@ function AdminSettings() {
 			onAddRepository={handleAddRepository}
 			onRemoveRepository={handleRemoveRepository}
 			onResetLeagues={() => {
-				if (!slug) {
+				if (!workspaceSlug) {
 					return;
 				}
-				resetLeagues.mutate({ path: { slug } });
+				resetLeagues.mutate({ path: { workspaceSlug } });
 			}}
 		/>
 	);

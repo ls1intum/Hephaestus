@@ -44,9 +44,9 @@ public class Workspace {
     private Instant usersSyncedAt;
 
     @Column(name = "slug", unique = true, nullable = false, length = 64)
-    @NotBlank(message = "Slug is required")
+    @NotBlank(message = "Workspace slug is required")
     @Pattern(regexp = "^[a-z0-9][a-z0-9-]{2,50}$")
-    private String slug;
+    private String workspaceSlug;
 
     @Column(name = "display_name", nullable = false, length = 120)
     @NotBlank(message = "Display name is required")

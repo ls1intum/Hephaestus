@@ -9,9 +9,6 @@ export type BadPracticeFeedback = {
     type: string;
 };
 
-/**
- * DTO for returning vote information.
- */
 export type ChatMessageVote = {
     createdAt?: Date;
     isUpvoted?: boolean;
@@ -19,69 +16,23 @@ export type ChatMessageVote = {
     updatedAt?: Date;
 };
 
-/**
- * DTO for chat thread with full message content.
- * Used for initializing useChat in the frontend.
- */
 export type ChatThreadDetail = {
-    /**
-     * When the thread was created
-     */
     createdAt?: Date;
-    /**
-     * Unique identifier for the thread
-     */
     id?: string;
-    /**
-     * All messages in the conversation path (as JSON objects for useChat initialization)
-     * As exception, we do not use a DTO here since we included those intelligece-service models in the OpenAPI spec.
-     */
     messages?: Array<UiMessage>;
-    /**
-     * ID of the currently selected leaf message (end of active conversation path)
-     */
     selectedLeafMessageId?: string;
-    /**
-     * Thread title (may be null for untitled threads)
-     */
     title?: string;
-    /**
-     * Votes for messages in this thread
-     */
     votes?: Array<ChatMessageVote>;
 };
 
-/**
- * DTO for grouped chat threads.
- * Used for organizing threads by time periods (today, yesterday, etc.).
- */
 export type ChatThreadGroup = {
-    /**
-     * Group name (e.g., "Today", "Yesterday", "Last 7 Days", "Last 30 Days")
-     */
     groupName: string;
-    /**
-     * List of thread summaries in this group
-     */
     threads: Array<ChatThreadSummary>;
 };
 
-/**
- * DTO for chat thread summary information.
- * Used for listing threads without loading full message content.
- */
 export type ChatThreadSummary = {
-    /**
-     * When the thread was created
-     */
     createdAt: Date;
-    /**
-     * Unique identifier for the thread
-     */
     id: string;
-    /**
-     * Thread title (may be null for untitled threads)
-     */
     title: string;
 };
 
@@ -137,10 +88,6 @@ export type CreateDocumentOutput = {
     title: string;
 };
 
-/**
- * DTO for creating a new document.
- * Server generates UUID and timestamps.
- */
 export type CreateDocumentRequest = {
     content: string;
     kind: 'TEXT';
@@ -155,7 +102,7 @@ export type CreateWorkspaceRequest = {
     accountType: 'ORG' | 'USER';
     displayName: string;
     ownerUserId: number;
-    slug: string;
+    workspaceSlug: string;
 };
 
 /**
@@ -179,10 +126,6 @@ export type DataUiPart = {
     type: string;
 };
 
-/**
- * DTO for complete document responses.
- * Used when returning full document details (includes content).
- */
 export type Document = {
     content: string;
     createdAt: Date;
@@ -243,10 +186,6 @@ export type DocumentFinishData = {
     kind: 'text';
 };
 
-/**
- * DTO for document summary in list views.
- * Excludes content for performance - only metadata.
- */
 export type DocumentSummary = {
     createdAt: Date;
     id: string;
@@ -1385,54 +1324,36 @@ export type UpdateDocumentOutput = {
     title: string;
 };
 
-/**
- * DTO for updating an existing document.
- * Creates a new version with the updated content.
- */
 export type UpdateDocumentRequest = {
     content: string;
     kind: 'TEXT';
     title: string;
 };
 
-/**
- * DTO for updating workspace leaderboard notification preferences.
- */
 export type UpdateWorkspaceNotificationsRequest = {
     channelId?: string;
     enabled?: boolean;
     team?: string;
 };
 
-/**
- * DTO for updating workspace public visibility.
- */
 export type UpdateWorkspacePublicVisibilityRequest = {
     isPubliclyViewable: boolean;
 };
 
-/**
- * DTO for updating workspace leaderboard schedule configuration.
- * Day: 1=Monday, 2=Tuesday, ..., 7=Sunday
- * Time: Format "HH:mm" (24-hour format)
- */
 export type UpdateWorkspaceScheduleRequest = {
     day: number;
     time: string;
 };
 
-/**
- * Request DTO for updating Slack credentials (token and signing secret) for a workspace.
- * These credentials are used for Slack API integration and webhook signature verification.
- */
 export type UpdateWorkspaceSlackCredentialsRequest = {
     slackSigningSecret: string;
     slackToken: string;
 };
 
-/**
- * DTO for updating workspace Personal Access Token (PAT).
- */
+export type UpdateWorkspaceStatusRequest = {
+    status: 'ACTIVE' | 'SUSPENDED' | 'PURGED';
+};
+
 export type UpdateWorkspaceTokenRequest = {
     personalAccessToken: string;
 };
@@ -1469,9 +1390,6 @@ export type UserTeams = {
     url: string;
 };
 
-/**
- * Request DTO for voting on a message.
- */
 export type VoteMessageRequest = {
     isUpvoted: boolean;
 };
@@ -1576,13 +1494,34 @@ export type WeatherHourlyUnits = {
     time?: string | null;
 };
 
+export type Workspace = {
+    accountLogin: string;
+    createdAt: Date;
+    displayName: string;
+    gitProviderMode?: string;
+    hasSlackSigningSecret: boolean;
+    hasSlackToken: boolean;
+    id: number;
+    installationId?: number;
+    installationLinkedAt?: Date;
+    isPubliclyViewable: boolean;
+    leaderboardNotificationChannelId?: string;
+    leaderboardNotificationEnabled?: boolean;
+    leaderboardNotificationTeam?: string;
+    leaderboardScheduleDay?: number;
+    leaderboardScheduleTime?: string;
+    status: string;
+    updatedAt: Date;
+    workspaceSlug: string;
+};
+
 export type WorkspaceListItem = {
-    accountLogin?: string;
-    createdAt?: Date;
-    displayName?: string;
-    id?: number;
-    slug?: string;
-    status?: string;
+    accountLogin: string;
+    createdAt: Date;
+    displayName: string;
+    id: number;
+    status: string;
+    workspaceSlug: string;
 };
 
 export type ProvideFeedbackForBadPracticeData = {
@@ -2211,7 +2150,7 @@ export type ListWorkspacesData = {
 
 export type ListWorkspacesResponses = {
     /**
-     * OK
+     * Workspace list
      */
     200: Array<WorkspaceListItem>;
 };
@@ -2227,11 +2166,9 @@ export type CreateWorkspaceData = {
 
 export type CreateWorkspaceResponses = {
     /**
-     * OK
+     * Workspace created
      */
-    200: {
-        [key: string]: unknown;
-    };
+    201: Workspace;
 };
 
 export type CreateWorkspaceResponse = CreateWorkspaceResponses[keyof CreateWorkspaceResponses];
@@ -2239,19 +2176,17 @@ export type CreateWorkspaceResponse = CreateWorkspaceResponses[keyof CreateWorks
 export type PurgeWorkspaceData = {
     body?: never;
     path: {
-        slug: string;
+        workspaceSlug: string;
     };
     query?: never;
-    url: '/workspaces/{slug}';
+    url: '/workspaces/{workspaceSlug}';
 };
 
 export type PurgeWorkspaceResponses = {
     /**
-     * OK
+     * Workspace purged
      */
-    200: {
-        [key: string]: unknown;
-    };
+    204: void;
 };
 
 export type PurgeWorkspaceResponse = PurgeWorkspaceResponses[keyof PurgeWorkspaceResponses];
@@ -2259,19 +2194,17 @@ export type PurgeWorkspaceResponse = PurgeWorkspaceResponses[keyof PurgeWorkspac
 export type GetWorkspaceData = {
     body?: never;
     path: {
-        slug: string;
+        workspaceSlug: string;
     };
     query?: never;
-    url: '/workspaces/{slug}';
+    url: '/workspaces/{workspaceSlug}';
 };
 
 export type GetWorkspaceResponses = {
     /**
-     * OK
+     * Workspace returned
      */
-    200: {
-        [key: string]: unknown;
-    };
+    200: Workspace;
 };
 
 export type GetWorkspaceResponse = GetWorkspaceResponses[keyof GetWorkspaceResponses];
@@ -2279,10 +2212,10 @@ export type GetWorkspaceResponse = GetWorkspaceResponses[keyof GetWorkspaceRespo
 export type ResetAndRecalculateLeaguesData = {
     body?: never;
     path: {
-        slug: string;
+        workspaceSlug: string;
     };
     query?: never;
-    url: '/workspaces/{slug}/league/reset';
+    url: '/workspaces/{workspaceSlug}/league/reset';
 };
 
 export type ResetAndRecalculateLeaguesResponses = {
@@ -2295,19 +2228,17 @@ export type ResetAndRecalculateLeaguesResponses = {
 export type UpdateNotificationsData = {
     body: UpdateWorkspaceNotificationsRequest;
     path: {
-        slug: string;
+        workspaceSlug: string;
     };
     query?: never;
-    url: '/workspaces/{slug}/notifications';
+    url: '/workspaces/{workspaceSlug}/notifications';
 };
 
 export type UpdateNotificationsResponses = {
     /**
-     * OK
+     * Workspace updated
      */
-    200: {
-        [key: string]: unknown;
-    };
+    200: Workspace;
 };
 
 export type UpdateNotificationsResponse = UpdateNotificationsResponses[keyof UpdateNotificationsResponses];
@@ -2315,19 +2246,17 @@ export type UpdateNotificationsResponse = UpdateNotificationsResponses[keyof Upd
 export type UpdatePublicVisibilityData = {
     body: UpdateWorkspacePublicVisibilityRequest;
     path: {
-        slug: string;
+        workspaceSlug: string;
     };
     query?: never;
-    url: '/workspaces/{slug}/public-visibility';
+    url: '/workspaces/{workspaceSlug}/public-visibility';
 };
 
 export type UpdatePublicVisibilityResponses = {
     /**
-     * OK
+     * Workspace updated
      */
-    200: {
-        [key: string]: unknown;
-    };
+    200: Workspace;
 };
 
 export type UpdatePublicVisibilityResponse = UpdatePublicVisibilityResponses[keyof UpdatePublicVisibilityResponses];
@@ -2335,15 +2264,15 @@ export type UpdatePublicVisibilityResponse = UpdatePublicVisibilityResponses[key
 export type GetRepositoriesToMonitorData = {
     body?: never;
     path: {
-        slug: string;
+        workspaceSlug: string;
     };
     query?: never;
-    url: '/workspaces/{slug}/repositories';
+    url: '/workspaces/{workspaceSlug}/repositories';
 };
 
 export type GetRepositoriesToMonitorResponses = {
     /**
-     * OK
+     * Repository list
      */
     200: Array<string>;
 };
@@ -2353,12 +2282,12 @@ export type GetRepositoriesToMonitorResponse = GetRepositoriesToMonitorResponses
 export type RemoveRepositoryToMonitorData = {
     body?: never;
     path: {
-        slug: string;
+        workspaceSlug: string;
         owner: string;
         name: string;
     };
     query?: never;
-    url: '/workspaces/{slug}/repositories/{owner}/{name}';
+    url: '/workspaces/{workspaceSlug}/repositories/{owner}/{name}';
 };
 
 export type RemoveRepositoryToMonitorResponses = {
@@ -2371,12 +2300,12 @@ export type RemoveRepositoryToMonitorResponses = {
 export type AddRepositoryToMonitorData = {
     body?: never;
     path: {
-        slug: string;
+        workspaceSlug: string;
         owner: string;
         name: string;
     };
     query?: never;
-    url: '/workspaces/{slug}/repositories/{owner}/{name}';
+    url: '/workspaces/{workspaceSlug}/repositories/{owner}/{name}';
 };
 
 export type AddRepositoryToMonitorResponses = {
@@ -2386,42 +2315,20 @@ export type AddRepositoryToMonitorResponses = {
     200: unknown;
 };
 
-export type ResumeWorkspaceData = {
-    body?: never;
-    path: {
-        slug: string;
-    };
-    query?: never;
-    url: '/workspaces/{slug}/resume';
-};
-
-export type ResumeWorkspaceResponses = {
-    /**
-     * OK
-     */
-    200: {
-        [key: string]: unknown;
-    };
-};
-
-export type ResumeWorkspaceResponse = ResumeWorkspaceResponses[keyof ResumeWorkspaceResponses];
-
 export type UpdateScheduleData = {
     body: UpdateWorkspaceScheduleRequest;
     path: {
-        slug: string;
+        workspaceSlug: string;
     };
     query?: never;
-    url: '/workspaces/{slug}/schedule';
+    url: '/workspaces/{workspaceSlug}/schedule';
 };
 
 export type UpdateScheduleResponses = {
     /**
-     * OK
+     * Workspace updated
      */
-    200: {
-        [key: string]: unknown;
-    };
+    200: Workspace;
 };
 
 export type UpdateScheduleResponse = UpdateScheduleResponses[keyof UpdateScheduleResponses];
@@ -2429,52 +2336,48 @@ export type UpdateScheduleResponse = UpdateScheduleResponses[keyof UpdateSchedul
 export type UpdateSlackCredentialsData = {
     body: UpdateWorkspaceSlackCredentialsRequest;
     path: {
-        slug: string;
+        workspaceSlug: string;
     };
     query?: never;
-    url: '/workspaces/{slug}/slack-credentials';
+    url: '/workspaces/{workspaceSlug}/slack-credentials';
 };
 
 export type UpdateSlackCredentialsResponses = {
     /**
-     * OK
+     * Workspace updated
      */
-    200: {
-        [key: string]: unknown;
-    };
+    200: Workspace;
 };
 
 export type UpdateSlackCredentialsResponse = UpdateSlackCredentialsResponses[keyof UpdateSlackCredentialsResponses];
 
-export type SuspendWorkspaceData = {
-    body?: never;
+export type UpdateStatusData = {
+    body: UpdateWorkspaceStatusRequest;
     path: {
-        slug: string;
+        workspaceSlug: string;
     };
     query?: never;
-    url: '/workspaces/{slug}/suspend';
+    url: '/workspaces/{workspaceSlug}/status';
 };
 
-export type SuspendWorkspaceResponses = {
+export type UpdateStatusResponses = {
     /**
-     * OK
+     * Workspace updated
      */
-    200: {
-        [key: string]: unknown;
-    };
+    200: Workspace;
 };
 
-export type SuspendWorkspaceResponse = SuspendWorkspaceResponses[keyof SuspendWorkspaceResponses];
+export type UpdateStatusResponse = UpdateStatusResponses[keyof UpdateStatusResponses];
 
 export type RemoveLabelFromTeamData = {
     body?: never;
     path: {
-        slug: string;
+        workspaceSlug: string;
         teamId: number;
         labelId: number;
     };
     query?: never;
-    url: '/workspaces/{slug}/teams/{teamId}/labels/{labelId}';
+    url: '/workspaces/{workspaceSlug}/teams/{teamId}/labels/{labelId}';
 };
 
 export type RemoveLabelFromTeamResponses = {
@@ -2489,13 +2392,13 @@ export type RemoveLabelFromTeamResponse = RemoveLabelFromTeamResponses[keyof Rem
 export type AddLabelToTeamData = {
     body?: never;
     path: {
-        slug: string;
+        workspaceSlug: string;
         teamId: number;
         repositoryId: number;
         label: string;
     };
     query?: never;
-    url: '/workspaces/{slug}/teams/{teamId}/labels/{repositoryId}/{label}';
+    url: '/workspaces/{workspaceSlug}/teams/{teamId}/labels/{repositoryId}/{label}';
 };
 
 export type AddLabelToTeamResponses = {
@@ -2510,19 +2413,17 @@ export type AddLabelToTeamResponse = AddLabelToTeamResponses[keyof AddLabelToTea
 export type UpdateTokenData = {
     body: UpdateWorkspaceTokenRequest;
     path: {
-        slug: string;
+        workspaceSlug: string;
     };
     query?: never;
-    url: '/workspaces/{slug}/token';
+    url: '/workspaces/{workspaceSlug}/token';
 };
 
 export type UpdateTokenResponses = {
     /**
-     * OK
+     * Workspace updated
      */
-    200: {
-        [key: string]: unknown;
-    };
+    200: Workspace;
 };
 
 export type UpdateTokenResponse = UpdateTokenResponses[keyof UpdateTokenResponses];
@@ -2530,10 +2431,10 @@ export type UpdateTokenResponse = UpdateTokenResponses[keyof UpdateTokenResponse
 export type GetUsersWithTeamsData = {
     body?: never;
     path: {
-        slug: string;
+        workspaceSlug: string;
     };
     query?: never;
-    url: '/workspaces/{slug}/users';
+    url: '/workspaces/{workspaceSlug}/users';
 };
 
 export type GetUsersWithTeamsResponses = {

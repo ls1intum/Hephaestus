@@ -92,7 +92,7 @@ abstract class AbstractGitHubSyncIntegrationTest extends BaseGitHubIntegrationTe
         var ws = new Workspace();
         ws.setGitProviderMode(Workspace.GitProviderMode.GITHUB_APP_INSTALLATION);
         ws.setInstallationId(githubInstallationId());
-        ws.setSlug(generateWorkspaceSlug());
+        ws.setWorkspaceSlug(generateWorkspaceSlug());
         ws.setDisplayName(githubOrganization());
         ws.setAccountLogin(githubOrganization());
         ws.setAccountType(AccountType.ORG);

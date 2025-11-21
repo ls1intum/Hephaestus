@@ -15,14 +15,14 @@ export const Route = createFileRoute("/_authenticated/_admin/admin/members")({
 
 function AdminMembersContainer() {
 	const {
-		slug,
+		workspaceSlug,
 		isLoading: isWorkspaceLoading,
 		error: workspaceError,
 	} = useActiveWorkspaceSlug();
 
 	// Fetch users with teams
 	const usersQueryOptions = getUsersWithTeamsOptions({
-		path: { slug: slug ?? "" },
+		path: { workspaceSlug: workspaceSlug ?? "" },
 	});
 	const {
 		data: usersData,
@@ -30,7 +30,7 @@ function AdminMembersContainer() {
 		error: usersError,
 	} = useQuery({
 		...usersQueryOptions,
-		enabled: Boolean(slug) && (usersQueryOptions.enabled ?? true),
+		enabled: Boolean(workspaceSlug) && (usersQueryOptions.enabled ?? true),
 	});
 
 	// Fetch teams
@@ -67,7 +67,7 @@ function AdminMembersContainer() {
 		<AdminMembersPage
 			users={users}
 			teams={teams}
-			isLoading={isLoading || !slug}
+			isLoading={isLoading || !workspaceSlug}
 		/>
 	);
 }

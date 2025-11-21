@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
+import de.tum.in.www1.hephaestus.workspace.exception.WorkspaceLifecycleViolationException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -27,7 +28,7 @@ class WorkspaceServiceIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
         Workspace workspace = createWorkspace("Acme Org", "Acme Org", "acme", AccountType.ORG, owner);
 
-        assertThat(workspace.getSlug()).isEqualTo("acme-org");
+        assertThat(workspace.getWorkspaceSlug()).isEqualTo("acme-org");
         assertThat(workspace.getStatus()).isEqualTo(Workspace.WorkspaceStatus.ACTIVE);
         assertThat(workspace.getAccountType()).isEqualTo(AccountType.ORG);
 
@@ -49,14 +50,16 @@ class WorkspaceServiceIntegrationTest extends AbstractWorkspaceIntegrationTest {
             owner
         );
 
-        workspaceService.updateNotifications(workspace.getSlug(), true, "core-team", "C12345678");
+        workspaceService.updateNotifications(workspace.getWorkspaceSlug(), true, "core-team", "C12345678");
 
         Workspace updated = workspaceRepository.findById(workspace.getId()).orElseThrow();
         assertThat(updated.getLeaderboardNotificationEnabled()).isTrue();
         assertThat(updated.getLeaderboardNotificationTeam()).isEqualTo("core-team");
         assertThat(updated.getLeaderboardNotificationChannelId()).isEqualTo("C12345678");
 
-        assertThatThrownBy(() -> workspaceService.updateNotifications(workspace.getSlug(), true, null, "invalid"))
+        assertThatThrownBy(() ->
+            workspaceService.updateNotifications(workspace.getWorkspaceSlug(), true, null, "invalid")
+        )
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("Slack channel ID");
     }
@@ -67,20 +70,24 @@ class WorkspaceServiceIntegrationTest extends AbstractWorkspaceIntegrationTest {
         User owner = persistUser("lifecycle-owner");
         Workspace workspace = createWorkspace("Lifecycle", "Lifecycle", "lifecycle", AccountType.ORG, owner);
 
-        workspaceLifecycleService.suspendWorkspace(workspace.getSlug());
+        workspaceLifecycleService.suspendWorkspace(workspace.getWorkspaceSlug());
         Workspace suspended = workspaceRepository.findById(workspace.getId()).orElseThrow();
         assertThat(suspended.getStatus()).isEqualTo(Workspace.WorkspaceStatus.SUSPENDED);
 
-        workspaceLifecycleService.resumeWorkspace(workspace.getSlug());
+        workspaceLifecycleService.resumeWorkspace(workspace.getWorkspaceSlug());
         Workspace resumed = workspaceRepository.findById(workspace.getId()).orElseThrow();
         assertThat(resumed.getStatus()).isEqualTo(Workspace.WorkspaceStatus.ACTIVE);
 
-        workspaceLifecycleService.purgeWorkspace(workspace.getSlug());
+        workspaceLifecycleService.updateStatus(workspace.getWorkspaceSlug(), Workspace.WorkspaceStatus.SUSPENDED);
+        Workspace patched = workspaceRepository.findById(workspace.getId()).orElseThrow();
+        assertThat(patched.getStatus()).isEqualTo(Workspace.WorkspaceStatus.SUSPENDED);
+
+        workspaceLifecycleService.purgeWorkspace(workspace.getWorkspaceSlug());
         Workspace purged = workspaceRepository.findById(workspace.getId()).orElseThrow();
         assertThat(purged.getStatus()).isEqualTo(Workspace.WorkspaceStatus.PURGED);
 
-        assertThatThrownBy(() -> workspaceLifecycleService.resumeWorkspace(workspace.getSlug()))
-            .isInstanceOf(IllegalStateException.class)
+        assertThatThrownBy(() -> workspaceLifecycleService.resumeWorkspace(workspace.getWorkspaceSlug()))
+            .isInstanceOf(WorkspaceLifecycleViolationException.class)
             .hasMessageContaining("purged");
     }
 }
