@@ -9,6 +9,9 @@ export type BadPracticeFeedback = {
     type: string;
 };
 
+/**
+ * DTO for returning vote information.
+ */
 export type ChatMessageVote = {
     createdAt?: Date;
     isUpvoted?: boolean;
@@ -48,14 +51,37 @@ export type ChatThreadDetail = {
     votes?: Array<ChatMessageVote>;
 };
 
+/**
+ * DTO for grouped chat threads.
+ * Used for organizing threads by time periods (today, yesterday, etc.).
+ */
 export type ChatThreadGroup = {
+    /**
+     * Group name (e.g., "Today", "Yesterday", "Last 7 Days", "Last 30 Days")
+     */
     groupName: string;
+    /**
+     * List of thread summaries in this group
+     */
     threads: Array<ChatThreadSummary>;
 };
 
+/**
+ * DTO for chat thread summary information.
+ * Used for listing threads without loading full message content.
+ */
 export type ChatThreadSummary = {
+    /**
+     * When the thread was created
+     */
     createdAt: Date;
+    /**
+     * Unique identifier for the thread
+     */
     id: string;
+    /**
+     * Thread title (may be null for untitled threads)
+     */
     title: string;
 };
 
@@ -111,6 +137,10 @@ export type CreateDocumentOutput = {
     title: string;
 };
 
+/**
+ * DTO for creating a new document.
+ * Server generates UUID and timestamps.
+ */
 export type CreateDocumentRequest = {
     content: string;
     kind: 'TEXT';
@@ -149,6 +179,10 @@ export type DataUiPart = {
     type: string;
 };
 
+/**
+ * DTO for complete document responses.
+ * Used when returning full document details (includes content).
+ */
 export type Document = {
     content: string;
     createdAt: Date;
@@ -209,6 +243,10 @@ export type DocumentFinishData = {
     kind: 'text';
 };
 
+/**
+ * DTO for document summary in list views.
+ * Excludes content for performance - only metadata.
+ */
 export type DocumentSummary = {
     createdAt: Date;
     id: string;
@@ -1347,36 +1385,61 @@ export type UpdateDocumentOutput = {
     title: string;
 };
 
+/**
+ * DTO for updating an existing document.
+ * Creates a new version with the updated content.
+ */
 export type UpdateDocumentRequest = {
     content: string;
     kind: 'TEXT';
     title: string;
 };
 
+/**
+ * DTO for updating workspace leaderboard notification preferences.
+ */
 export type UpdateWorkspaceNotificationsRequest = {
     channelId?: string;
     enabled?: boolean;
     team?: string;
 };
 
+/**
+ * DTO for updating workspace public visibility.
+ */
 export type UpdateWorkspacePublicVisibilityRequest = {
     isPubliclyViewable: boolean;
 };
 
+/**
+ * DTO for updating workspace leaderboard schedule configuration.
+ * Day: 1=Monday, 2=Tuesday, ..., 7=Sunday
+ * Time: Format "HH:mm" (24-hour format)
+ */
 export type UpdateWorkspaceScheduleRequest = {
     day: number;
     time: string;
 };
 
+/**
+ * Request DTO for updating Slack credentials (token and signing secret) for a workspace.
+ * These credentials are used for Slack API integration and webhook signature verification.
+ */
 export type UpdateWorkspaceSlackCredentialsRequest = {
     slackSigningSecret: string;
     slackToken: string;
 };
 
+/**
+ * DTO for updating a workspace lifecycle status.
+ */
 export type UpdateWorkspaceStatusRequest = {
     status: 'ACTIVE' | 'SUSPENDED' | 'PURGED';
 };
 
+/**
+ * DTO for updating workspace Personal Access Token (PAT).
+ */
 export type UpdateWorkspaceTokenRequest = {
     personalAccessToken: string;
 };
@@ -1413,6 +1476,9 @@ export type UserTeams = {
     url: string;
 };
 
+/**
+ * Request DTO for voting on a message.
+ */
 export type VoteMessageRequest = {
     isUpvoted: boolean;
 };
