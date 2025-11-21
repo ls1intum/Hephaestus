@@ -245,9 +245,9 @@ public class GitHubPullRequestReviewCommentSyncService {
         PullRequestReviewComment comment,
         GHPullRequestReviewComment ghPullRequestReviewComment
     ) {
-        if (!thread.getComments().contains(comment)) {
-            thread.getComments().add(comment);
-        }
+        comment.setThread(thread);
+        thread.getComments().removeIf(existing -> existing.getId() != null && existing.getId().equals(comment.getId()));
+        thread.getComments().add(comment);
 
         if (ghPullRequestReviewComment.getInReplyToId() <= 0L) {
             thread.setRootComment(comment);
@@ -283,26 +283,36 @@ public class GitHubPullRequestReviewCommentSyncService {
         pullRequestReviewCommentRepository
             .findById(commentId)
             .ifPresent(comment -> {
-                var thread = comment.getThread();
-                boolean isRootComment =
-                    thread != null &&
-                    thread.getRootComment() != null &&
-                    thread.getRootComment().getId().equals(commentId);
+                PullRequestReviewThread thread = null;
+                if (comment.getThread() != null) {
+                    thread = pullRequestReviewThreadRepository
+                        .findWithCommentsById(comment.getThread().getId())
+                        .orElse(null);
+                }
 
-                if (isRootComment) {
-                    pullRequestReviewThreadRepository.delete(thread);
-                    pullRequestReviewThreadRepository.flush();
-                } else {
-                    if (thread != null) {
-                        thread.getComments().remove(comment);
+                if (thread != null) {
+                    var wasRootComment =
+                        thread.getRootComment() != null && thread.getRootComment().getId().equals(commentId);
+                    if (wasRootComment) {
+                        thread.setRootComment(null);
                     }
-                    comment.setThread(null);
-                    pullRequestReviewCommentRepository.delete(comment);
-                    pullRequestReviewCommentRepository.flush();
-                    if (thread != null && pullRequestReviewCommentRepository.countByThreadId(thread.getId()) == 0) {
-                        pullRequestReviewThreadRepository.delete(thread);
+
+                    boolean commentRemoved = thread
+                        .getComments()
+                        .removeIf(existing -> existing.getId() != null && existing.getId().equals(commentId));
+
+                    if (wasRootComment || commentRemoved) {
+                        pullRequestReviewThreadRepository.save(thread);
                         pullRequestReviewThreadRepository.flush();
                     }
+                }
+
+                pullRequestReviewCommentRepository.delete(comment);
+                pullRequestReviewCommentRepository.flush();
+
+                if (thread != null && pullRequestReviewCommentRepository.countByThreadId(thread.getId()) == 0) {
+                    pullRequestReviewThreadRepository.delete(thread);
+                    pullRequestReviewThreadRepository.flush();
                 }
             });
     }

@@ -3,6 +3,7 @@
 
 # Idea files
 .idea/
+*.iml
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -172,6 +173,9 @@ application-local.yml
 server/application-server/postgres-data/
 server/application-server/postgres-data-temp/
 server/application-server/postgres-data-local/
+
+# Private keys
+*.pem
 
 # Java-Client creation temporary
 tmp
