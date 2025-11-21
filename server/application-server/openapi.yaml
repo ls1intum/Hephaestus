@@ -13,6 +13,10 @@ servers:
 - description: Default Server URL
   url: /
 tags:
+- description: |-
+    REST controller for the chat functionality.
+     Handles streaming chat responses, message persistence, and thread management.
+  name: chat-controller
 - description: Document management with versioning support
   name: Documents
 - description: Vote on chat messages (upvote/downvote)
@@ -1140,24 +1144,36 @@ components:
           format: date-time
     ChatThreadDetail:
       type: object
+      description: |-
+        DTO for chat thread with full message content.
+         Used for initializing useChat in the frontend.
       properties:
         createdAt:
           type: string
           format: date-time
+          description: When the thread was created
         id:
           type: string
           format: uuid
+          description: Unique identifier for the thread
         messages:
           type: array
+          description: |-
+            All messages in the conversation path (as JSON objects for useChat initialization)
+             As exception, we do not use a DTO here since we included those intelligece-service models in the OpenAPI spec.
           items:
             $ref: "#/components/schemas/UIMessage"
         selectedLeafMessageId:
           type: string
           format: uuid
+          description: ID of the currently selected leaf message (end of active conversation
+            path)
         title:
           type: string
+          description: Thread title (may be null for untitled threads)
         votes:
           type: array
+          description: Votes for messages in this thread
           items:
             $ref: "#/components/schemas/ChatMessageVote"
     ChatThreadGroup:

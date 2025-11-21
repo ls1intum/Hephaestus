@@ -16,12 +16,35 @@ export type ChatMessageVote = {
     updatedAt?: Date;
 };
 
+/**
+ * DTO for chat thread with full message content.
+ * Used for initializing useChat in the frontend.
+ */
 export type ChatThreadDetail = {
+    /**
+     * When the thread was created
+     */
     createdAt?: Date;
+    /**
+     * Unique identifier for the thread
+     */
     id?: string;
+    /**
+     * All messages in the conversation path (as JSON objects for useChat initialization)
+     * As exception, we do not use a DTO here since we included those intelligece-service models in the OpenAPI spec.
+     */
     messages?: Array<UiMessage>;
+    /**
+     * ID of the currently selected leaf message (end of active conversation path)
+     */
     selectedLeafMessageId?: string;
+    /**
+     * Thread title (may be null for untitled threads)
+     */
     title?: string;
+    /**
+     * Votes for messages in this thread
+     */
     votes?: Array<ChatMessageVote>;
 };
 
