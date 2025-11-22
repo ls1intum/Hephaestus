@@ -30,6 +30,7 @@ import {
 	SidebarTrigger,
 } from "@/components/ui/sidebar";
 import environment from "@/environment";
+import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 import { useMentorChat } from "@/hooks/useMentorChat";
 import { type AuthContextType, useAuth } from "@/integrations/auth/AuthContext";
 import { isPosthogEnabled } from "@/integrations/posthog/config";
@@ -234,6 +235,8 @@ function HeaderContainer() {
 function AppSidebarContainer() {
 	const { pathname } = useLocation();
 	const { isAuthenticated, username, hasRole } = useAuth();
+	const { workspaceSlug } = useActiveWorkspaceSlug();
+	const hasWorkspace = Boolean(workspaceSlug);
 
 	const sidebarContext: SidebarContext = pathname.startsWith("/mentor")
 		? "mentor"
@@ -245,8 +248,10 @@ function AppSidebarContainer() {
 		isLoading: mentorThreadsLoading,
 		error: mentorThreadsError,
 	} = useQuery({
-		...getGroupedThreadsOptions(),
-		enabled: sidebarContext === "mentor" && isAuthenticated,
+		...getGroupedThreadsOptions({
+			path: { workspaceSlug: workspaceSlug ?? "" },
+		}),
+		enabled: sidebarContext === "mentor" && isAuthenticated && hasWorkspace,
 	});
 
 	if (pathname === "/landing" || !isAuthenticated || username === undefined) {

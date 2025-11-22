@@ -17,8 +17,15 @@ public class GitHubLabelConverter implements Converter<GHLabel, Label> {
     public Label update(@NonNull GHLabel source, @NonNull Label label) {
         label.setId(source.getId());
         label.setName(source.getName());
-        label.setDescription(source.getDescription());
+        label.setDescription(sanitizeText(source.getDescription()));
         label.setColor(source.getColor());
         return label;
+    }
+
+    private String sanitizeText(String input) {
+        if (input == null) {
+            return null;
+        }
+        return input.replace("\u0000", "");
     }
 }

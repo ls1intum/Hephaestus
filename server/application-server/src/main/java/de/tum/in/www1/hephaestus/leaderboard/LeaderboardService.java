@@ -14,6 +14,9 @@ import de.tum.in.www1.hephaestus.gitprovider.team.TeamRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserInfoDTO;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
+import de.tum.in.www1.hephaestus.workspace.WorkspaceMembershipService;
+import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContext;
+import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContextHolder;
 import jakarta.annotation.Nonnull;
 import jakarta.transaction.Transactional;
 import java.time.Instant;
@@ -34,6 +37,7 @@ public class LeaderboardService {
     private final ScoringService scoringService;
     private final TeamRepository teamRepository;
     private final LeaguePointsCalculationService leaguePointsCalculationService;
+    private final WorkspaceMembershipService workspaceMembershipService;
 
     public LeaderboardService(
         UserRepository userRepository,
@@ -41,7 +45,8 @@ public class LeaderboardService {
         IssueCommentRepository issueCommentRepository,
         ScoringService scoringService,
         TeamRepository teamRepository,
-        LeaguePointsCalculationService leaguePointsCalculationService
+        LeaguePointsCalculationService leaguePointsCalculationService,
+        WorkspaceMembershipService workspaceMembershipService
     ) {
         this.userRepository = userRepository;
         this.pullRequestReviewRepository = pullRequestReviewRepository;
@@ -49,6 +54,7 @@ public class LeaderboardService {
         this.scoringService = scoringService;
         this.teamRepository = teamRepository;
         this.leaguePointsCalculationService = leaguePointsCalculationService;
+        this.workspaceMembershipService = workspaceMembershipService;
     }
 
     @Transactional
@@ -142,6 +148,14 @@ public class LeaderboardService {
                 });
         }
 
+        WorkspaceContext context = WorkspaceContextHolder.getContext();
+        Long workspaceId = context != null ? context.id() : null;
+
+        Map<Long, Integer> leaguePointsByUserId = workspaceMembershipService.getLeaguePointsSnapshot(
+            usersById.values(),
+            workspaceId
+        );
+
         Map<Long, List<PullRequestReview>> reviewsByUserId = reviews
             .stream()
             .filter(r -> r.getAuthor() != null && r.getAuthor().getId() != null)
@@ -170,7 +184,7 @@ public class LeaderboardService {
         List<Long> ranking = scoresByUserId
             .entrySet()
             .stream()
-            .sorted(comparatorFor(sort, usersById, reviewsByUserId, issueCommentsByUserId))
+            .sorted(comparatorFor(sort, usersById, reviewsByUserId, issueCommentsByUserId, leaguePointsByUserId))
             .map(Map.Entry::getKey)
             .toList();
 
@@ -178,7 +192,14 @@ public class LeaderboardService {
         for (int index = 0; index < ranking.size(); index++) {
             Long userId = ranking.get(index);
             int score = scoresByUserId.getOrDefault(userId, 0);
-            UserInfoDTO userDto = Optional.ofNullable(usersById.get(userId)).map(UserInfoDTO::fromUser).orElse(null);
+            UserInfoDTO userDto = Optional.ofNullable(usersById.get(userId))
+                .map(user ->
+                    UserInfoDTO.fromUser(
+                        user,
+                        leaguePointsByUserId.getOrDefault(userId, LeaguePointsCalculationService.POINTS_DEFAULT)
+                    )
+                )
+                .orElse(null);
             List<PullRequestReview> userReviews = reviewsByUserId.getOrDefault(userId, Collections.emptyList());
             List<IssueComment> userIssueComments = issueCommentsByUserId.getOrDefault(userId, Collections.emptyList());
 
@@ -318,10 +339,11 @@ public class LeaderboardService {
         LeaderboardSortType sortType,
         Map<Long, User> usersById,
         Map<Long, List<PullRequestReview>> reviewsByUserId,
-        Map<Long, List<IssueComment>> issueCommentsByUserId
+        Map<Long, List<IssueComment>> issueCommentsByUserId,
+        Map<Long, Integer> leaguePointsByUserId
     ) {
         if (sortType == LeaderboardSortType.LEAGUE_POINTS) {
-            return compareByLeaguePoints(usersById, reviewsByUserId, issueCommentsByUserId);
+            return compareByLeaguePoints(usersById, reviewsByUserId, issueCommentsByUserId, leaguePointsByUserId);
         } else {
             return compareByScore(reviewsByUserId, issueCommentsByUserId);
         }
@@ -330,11 +352,18 @@ public class LeaderboardService {
     private Comparator<Map.Entry<Long, Integer>> compareByLeaguePoints(
         Map<Long, User> usersById,
         Map<Long, List<PullRequestReview>> reviewsByUserId,
-        Map<Long, List<IssueComment>> issueCommentsByUserId
+        Map<Long, List<IssueComment>> issueCommentsByUserId,
+        Map<Long, Integer> leaguePointsByUserId
     ) {
         return (e1, e2) -> {
-            int e1LeaguePoints = Optional.ofNullable(usersById.get(e1.getKey())).map(User::getLeaguePoints).orElse(0);
-            int e2LeaguePoints = Optional.ofNullable(usersById.get(e2.getKey())).map(User::getLeaguePoints).orElse(0);
+            int e1LeaguePoints = leaguePointsByUserId.getOrDefault(
+                e1.getKey(),
+                LeaguePointsCalculationService.POINTS_DEFAULT
+            );
+            int e2LeaguePoints = leaguePointsByUserId.getOrDefault(
+                e2.getKey(),
+                LeaguePointsCalculationService.POINTS_DEFAULT
+            );
             int leagueCompare = Integer.compare(e2LeaguePoints, e1LeaguePoints);
             if (leagueCompare != 0) {
                 return leagueCompare;
@@ -403,8 +432,12 @@ public class LeaderboardService {
         User user = userRepository
             .findByLogin(login)
             .orElseThrow(() -> new IllegalArgumentException("User not found with login: " + login));
-        int currentLeaguePoints = user.getLeaguePoints();
-        int projectedNewPoints = leaguePointsCalculationService.calculateNewPoints(user, entry);
+
+        WorkspaceContext context = WorkspaceContextHolder.getContext();
+        Long workspaceId = context != null ? context.id() : null;
+
+        int currentLeaguePoints = workspaceMembershipService.getCurrentLeaguePoints(workspaceId, user);
+        int projectedNewPoints = leaguePointsCalculationService.calculateNewPoints(user, currentLeaguePoints, entry);
         return new LeagueChangeDTO(user.getLogin(), projectedNewPoints - currentLeaguePoints);
     }
 

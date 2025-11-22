@@ -3,6 +3,7 @@ package de.tum.in.www1.hephaestus.workspace;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.testconfig.BaseIntegrationTest;
+import de.tum.in.www1.hephaestus.testconfig.TestUserFactory;
 import java.time.Instant;
 import java.util.concurrent.atomic.AtomicLong;
 import org.junit.jupiter.api.BeforeEach;
@@ -18,6 +19,12 @@ abstract class AbstractWorkspaceIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     protected WorkspaceService workspaceService;
+
+    @Autowired
+    protected WorkspaceMembershipService workspaceMembershipService;
+
+    @Autowired
+    protected WorkspaceMembershipRepository workspaceMembershipRepository;
 
     private final AtomicLong userIdGenerator = new AtomicLong(50_000);
 
@@ -50,5 +57,20 @@ abstract class AbstractWorkspaceIntegrationTest extends BaseIntegrationTest {
             throw new IllegalArgumentException("Owner user must be persisted before creating a workspace");
         }
         return workspaceService.createWorkspace(slug, displayName, accountLogin, accountType, owner.getId());
+    }
+
+    protected WorkspaceMembership ensureWorkspaceMembership(
+        Workspace workspace,
+        User user,
+        WorkspaceMembership.WorkspaceRole role
+    ) {
+        return workspaceMembershipRepository
+            .findByWorkspace_IdAndUser_Id(workspace.getId(), user.getId())
+            .orElseGet(() -> workspaceMembershipService.createMembership(workspace, user.getId(), role));
+    }
+
+    protected WorkspaceMembership ensureAdminMembership(Workspace workspace) {
+        User adminUser = TestUserFactory.ensureUser(userRepository, "admin", 3L);
+        return ensureWorkspaceMembership(workspace, adminUser, WorkspaceMembership.WorkspaceRole.ADMIN);
     }
 }

@@ -10,6 +10,7 @@ import type { ChatThreadGroup, ChatThreadSummary } from "@/api/types.gen";
 import type { ChatProps } from "@/components/mentor/Chat";
 import { Chat } from "@/components/mentor/Chat";
 import { defaultPartRenderers } from "@/components/mentor/renderers";
+import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 import type { ChatMessage } from "@/lib/types";
 
 export const Route = createFileRoute("/_authenticated/mentor/")({
@@ -19,18 +20,21 @@ export const Route = createFileRoute("/_authenticated/mentor/")({
 function MentorContainer() {
 	const queryClient = useQueryClient();
 	const navigate = useNavigate();
+	const { workspaceSlug } = useActiveWorkspaceSlug();
+	const slug = workspaceSlug ?? "";
 
 	const handleMessageSubmit = ({ text }: { text: string }) => {
 		const initialMessage = text.trim();
-		if (!initialMessage) return;
+		if (!initialMessage || !workspaceSlug) return;
+
 		const threadId = uuidv4();
-		// Optimistically seed the thread cache so the thread route doesn't show loading
-		queryClient.setQueryData(getThreadQueryKey({ path: { threadId } }), {
-			messages: [],
-		});
+		queryClient.setQueryData(
+			getThreadQueryKey({ path: { workspaceSlug: slug, threadId } }),
+			{ messages: [] },
+		);
 
 		queryClient.setQueryData<Array<ChatThreadGroup>>(
-			getGroupedThreadsQueryKey(),
+			getGroupedThreadsQueryKey({ path: { workspaceSlug: slug } }),
 			(prev) => {
 				const threadGroups = prev ?? [];
 				const newSummary: ChatThreadSummary = {
@@ -55,20 +59,16 @@ function MentorContainer() {
 						...threadGroups.slice(idx + 1),
 					];
 				}
-				// No Today group yet
 				return [{ groupName: "Today", threads: [newSummary] }, ...threadGroups];
 			},
 		);
 
-		// Navigate with initial message state; thread route will send it immediately
 		navigate({
 			to: "/mentor/$threadId",
 			params: { threadId },
 			state: { initialMessage },
 		});
 	};
-
-	// Index route acts as a thin redirector; editing/voting/copy are not used here
 
 	return (
 		<div className="flex flex-col flex-1 min-h-0">

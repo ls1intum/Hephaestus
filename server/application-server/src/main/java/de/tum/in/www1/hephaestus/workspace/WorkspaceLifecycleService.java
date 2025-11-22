@@ -4,6 +4,7 @@ import static de.tum.in.www1.hephaestus.workspace.Workspace.WorkspaceStatus;
 
 import de.tum.in.www1.hephaestus.core.LoggingUtils;
 import de.tum.in.www1.hephaestus.core.exception.EntityNotFoundException;
+import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.in.www1.hephaestus.workspace.exception.WorkspaceLifecycleViolationException;
 import jakarta.transaction.Transactional;
 import org.slf4j.Logger;
@@ -52,6 +53,10 @@ public class WorkspaceLifecycleService {
         return workspace;
     }
 
+    public Workspace suspendWorkspace(WorkspaceContext workspaceContext) {
+        return suspendWorkspace(requireSlug(workspaceContext));
+    }
+
     /**
      * Resume a suspended workspace, making it active again.
      * Idempotent: calling resume on an already active workspace is a no-op.
@@ -81,6 +86,10 @@ public class WorkspaceLifecycleService {
         return workspace;
     }
 
+    public Workspace resumeWorkspace(WorkspaceContext workspaceContext) {
+        return resumeWorkspace(requireSlug(workspaceContext));
+    }
+
     /**
      * Purge (soft delete) a workspace immediately.
      * Idempotent: calling purge on an already purged workspace is a no-op.
@@ -107,6 +116,10 @@ public class WorkspaceLifecycleService {
         return workspace;
     }
 
+    public Workspace purgeWorkspace(WorkspaceContext workspaceContext) {
+        return purgeWorkspace(requireSlug(workspaceContext));
+    }
+
     /**
      * Get the current status of a workspace.
      *
@@ -121,6 +134,10 @@ public class WorkspaceLifecycleService {
         return workspace.getStatus();
     }
 
+    public WorkspaceStatus getWorkspaceStatus(WorkspaceContext workspaceContext) {
+        return getWorkspaceStatus(requireSlug(workspaceContext));
+    }
+
     /**
      * Update the lifecycle status for the workspace using the canonical transition helpers.
      */
@@ -131,5 +148,22 @@ public class WorkspaceLifecycleService {
             case SUSPENDED -> suspendWorkspace(workspaceSlug);
             case PURGED -> purgeWorkspace(workspaceSlug);
         };
+    }
+
+    public Workspace updateStatus(WorkspaceContext workspaceContext, WorkspaceStatus targetStatus) {
+        return updateStatus(requireSlug(workspaceContext), targetStatus);
+    }
+
+    private String requireSlug(WorkspaceContext workspaceContext) {
+        if (workspaceContext == null) {
+            throw new EntityNotFoundException("Workspace", "context");
+        }
+
+        String slug = workspaceContext.slug();
+        if (slug == null || slug.isBlank()) {
+            throw new EntityNotFoundException("Workspace", "context");
+        }
+
+        return slug;
     }
 }

@@ -372,7 +372,6 @@ class User(Base):
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     followers: Mapped[int] = mapped_column(Integer)
     following: Mapped[int] = mapped_column(Integer)
-    league_points: Mapped[int] = mapped_column(Integer, server_default=text("0"))
     notifications_enabled: Mapped[bool] = mapped_column(
         Boolean, server_default=text("true")
     )

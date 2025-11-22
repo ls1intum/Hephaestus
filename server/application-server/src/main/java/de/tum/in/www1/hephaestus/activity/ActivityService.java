@@ -9,6 +9,7 @@ import de.tum.in.www1.hephaestus.activity.model.*;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
+import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContext;
 import jakarta.transaction.Transactional;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -55,8 +56,8 @@ public class ActivityService {
     private String tracingSecretKey;
 
     @Transactional
-    public ActivityDTO getActivity(String login) {
-        logger.info("Getting activity for user with login: {}", login);
+    public ActivityDTO getActivity(WorkspaceContext workspaceContext, String login) {
+        logger.info("Getting activity for user with login: {} in workspace {}", login, workspaceContext.slug());
 
         List<PullRequest> pullRequests = pullRequestRepository.findAssignedByLoginAndStates(
             login,
@@ -95,8 +96,8 @@ public class ActivityService {
     }
 
     @Transactional
-    public DetectionResult detectBadPracticesForUser(String login) {
-        logger.info("Detecting bad practices for user with login: {}", login);
+    public DetectionResult detectBadPracticesForUser(WorkspaceContext workspaceContext, String login) {
+        logger.info("Detecting bad practices for user with login: {} in workspace {}", login, workspaceContext.slug());
 
         List<PullRequest> pullRequests = pullRequestRepository.findAssignedByLoginAndStates(
             login,
@@ -119,21 +120,37 @@ public class ActivityService {
     }
 
     @Transactional
-    public DetectionResult detectBadPracticesForPullRequest(PullRequest pullRequest) {
-        logger.info("Detecting bad practices for PR: {}", pullRequest.getId());
+    public DetectionResult detectBadPracticesForPullRequest(
+        WorkspaceContext workspaceContext,
+        PullRequest pullRequest
+    ) {
+        logger.info("Detecting bad practices for PR: {} in workspace {}", pullRequest.getId(), workspaceContext.slug());
 
         return pullRequestBadPracticeDetector.detectAndSyncBadPractices(pullRequest);
     }
 
-    public void resolveBadPractice(PullRequestBadPractice badPractice, PullRequestBadPracticeState state) {
-        logger.info("Resolving bad practice {} with state {}", badPractice.getId(), state);
+    public void resolveBadPractice(
+        WorkspaceContext workspaceContext,
+        PullRequestBadPractice badPractice,
+        PullRequestBadPracticeState state
+    ) {
+        logger.info(
+            "Resolving bad practice {} with state {} in workspace {}",
+            badPractice.getId(),
+            state,
+            workspaceContext.slug()
+        );
 
         badPractice.setUserState(state);
         pullRequestBadPracticeRepository.save(badPractice);
     }
 
-    public void provideFeedbackForBadPractice(PullRequestBadPractice badPractice, BadPracticeFeedbackDTO feedback) {
-        logger.info("Marking bad practice with id: {}", badPractice.getId());
+    public void provideFeedbackForBadPractice(
+        WorkspaceContext workspaceContext,
+        PullRequestBadPractice badPractice,
+        BadPracticeFeedbackDTO feedback
+    ) {
+        logger.info("Marking bad practice with id: {} in workspace {}", badPractice.getId(), workspaceContext.slug());
 
         BadPracticeFeedback badPracticeFeedback = new BadPracticeFeedback();
         badPracticeFeedback.setPullRequestBadPractice(badPractice);

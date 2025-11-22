@@ -25,57 +25,62 @@ function AdminTeamsContainer() {
 	const queryClient = useQueryClient();
 	const { workspaceSlug, isLoading: isWorkspaceLoading } =
 		useActiveWorkspaceSlug();
+	const slug = workspaceSlug ?? "";
+	const hasWorkspace = Boolean(workspaceSlug);
 
 	// Query for teams data
-	const teamsQuery = useQuery(getAllTeamsOptions({}));
+	const teamsQueryKey = getAllTeamsQueryKey({
+		path: { workspaceSlug: slug },
+	});
+	const teamsQuery = useQuery({
+		...getAllTeamsOptions({ path: { workspaceSlug: slug } }),
+		enabled: hasWorkspace,
+	});
 
 	// Mutations
 	const updateTeamVisibility = useMutation({
 		...updateTeamVisibilityMutation(),
 		onMutate: async (vars: Options<UpdateTeamVisibilityData>) => {
-			await queryClient.cancelQueries({ queryKey: getAllTeamsQueryKey() });
-			const key = getAllTeamsQueryKey();
-			const prev = queryClient.getQueryData<TeamInfo[]>(key);
+			await queryClient.cancelQueries({ queryKey: teamsQueryKey });
+			const prev = queryClient.getQueryData<TeamInfo[]>(teamsQueryKey);
 			const teamId = vars.path?.id;
 			const hidden =
 				typeof vars.body === "boolean" ? vars.body : vars.query?.hidden;
 			if (prev && typeof teamId === "number" && typeof hidden === "boolean") {
 				const next = prev.map((t) => (t.id === teamId ? { ...t, hidden } : t));
-				queryClient.setQueryData(key, next);
+				queryClient.setQueryData(teamsQueryKey, next);
 			}
 			return { prev } as { prev: TeamInfo[] | undefined };
 		},
 		onError: (_err, _vars, ctx) => {
-			const key = getAllTeamsQueryKey();
 			if (ctx?.prev) {
-				queryClient.setQueryData(key, ctx.prev);
+				queryClient.setQueryData(teamsQueryKey, ctx.prev);
 			}
 		},
 		onSettled: () => {
-			queryClient.invalidateQueries({ queryKey: getAllTeamsQueryKey() });
+			queryClient.invalidateQueries({ queryKey: teamsQueryKey });
 		},
 	});
 
 	const addLabelToTeam = useMutation({
 		...addLabelToTeamMutation(),
 		onSettled: () => {
-			queryClient.invalidateQueries({ queryKey: getAllTeamsQueryKey() });
+			queryClient.invalidateQueries({ queryKey: teamsQueryKey });
 		},
 	});
 
 	const removeLabelFromTeam = useMutation({
 		...removeLabelFromTeamMutation(),
 		onSettled: () => {
-			queryClient.invalidateQueries({ queryKey: getAllTeamsQueryKey() });
+			queryClient.invalidateQueries({ queryKey: teamsQueryKey });
 		},
 	});
 
 	const updateRepositoryVisibility = useMutation({
 		...updateRepositoryVisibilityMutation(),
 		onMutate: async (vars: Options<UpdateRepositoryVisibilityData>) => {
-			await queryClient.cancelQueries({ queryKey: getAllTeamsQueryKey() });
-			const key = getAllTeamsQueryKey();
-			const prev = queryClient.getQueryData<TeamInfo[]>(key);
+			await queryClient.cancelQueries({ queryKey: teamsQueryKey });
+			const prev = queryClient.getQueryData<TeamInfo[]>(teamsQueryKey);
 			const teamId = vars.path?.teamId;
 			const repositoryId = vars.path?.repositoryId;
 			const hidden =
@@ -99,25 +104,27 @@ function AdminTeamsContainer() {
 						),
 					};
 				});
-				queryClient.setQueryData(key, next);
+				queryClient.setQueryData(teamsQueryKey, next);
 			}
 			return { prev } as { prev: TeamInfo[] | undefined };
 		},
 		onError: (_err, _vars, ctx) => {
-			const key = getAllTeamsQueryKey();
 			if (ctx?.prev) {
-				queryClient.setQueryData(key, ctx.prev);
+				queryClient.setQueryData(teamsQueryKey, ctx.prev);
 			}
 		},
 		onSettled: () => {
-			queryClient.invalidateQueries({ queryKey: getAllTeamsQueryKey() });
+			queryClient.invalidateQueries({ queryKey: teamsQueryKey });
 		},
 	});
 
 	// Handler functions
 	const handleHideTeam = async (teamId: number, hidden: boolean) => {
+		if (!hasWorkspace) {
+			return;
+		}
 		await updateTeamVisibility.mutateAsync({
-			path: { id: teamId },
+			path: { workspaceSlug: slug, id: teamId },
 			body: hidden,
 			query: { hidden },
 		});
@@ -128,20 +135,20 @@ function AdminTeamsContainer() {
 		repositoryId: number,
 		label: string,
 	) => {
-		if (!workspaceSlug) {
+		if (!hasWorkspace) {
 			return;
 		}
 		await addLabelToTeam.mutateAsync({
-			path: { workspaceSlug, teamId, repositoryId, label },
+			path: { workspaceSlug: slug, teamId, repositoryId, label },
 		});
 	};
 
 	const handleRemoveLabelFromTeam = async (teamId: number, labelId: number) => {
-		if (!workspaceSlug) {
+		if (!hasWorkspace) {
 			return;
 		}
 		await removeLabelFromTeam.mutateAsync({
-			path: { workspaceSlug, teamId, labelId },
+			path: { workspaceSlug: slug, teamId, labelId },
 		});
 	};
 
@@ -150,8 +157,11 @@ function AdminTeamsContainer() {
 		repositoryId: number,
 		hidden: boolean,
 	) => {
+		if (!hasWorkspace) {
+			return;
+		}
 		await updateRepositoryVisibility.mutateAsync({
-			path: { teamId, repositoryId },
+			path: { workspaceSlug: slug, teamId, repositoryId },
 			body: hidden,
 			query: { hiddenFromContributions: hidden },
 		});

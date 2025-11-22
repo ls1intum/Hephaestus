@@ -1,5 +1,7 @@
 package de.tum.in.www1.hephaestus.leaderboard;
 
+import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContext;
+import de.tum.in.www1.hephaestus.workspace.context.WorkspaceScopedController;
 import io.swagger.v3.oas.annotations.Parameter;
 import jakarta.validation.constraints.NotBlank;
 import java.time.Instant;
@@ -10,7 +12,7 @@ import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-@RestController
+@WorkspaceScopedController
 @RequestMapping("/leaderboard")
 public class LeaderboardController {
 
@@ -24,6 +26,7 @@ public class LeaderboardController {
 
     @GetMapping
     public ResponseEntity<List<LeaderboardEntryDTO>> getLeaderboard(
+        WorkspaceContext workspaceContext,
         @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant after,
         @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant before,
         @Parameter(
@@ -34,14 +37,17 @@ public class LeaderboardController {
         ) @RequestParam LeaderboardSortType sort,
         @RequestParam LeaderboardMode mode
     ) {
+        logger.info("Generating {} leaderboard for workspace {}", mode, workspaceContext.slug());
         return ResponseEntity.ok(leaderboardService.createLeaderboard(after, before, team, sort, mode));
     }
 
     @PostMapping
     public ResponseEntity<LeagueChangeDTO> getUserLeagueStats(
+        WorkspaceContext workspaceContext,
         @RequestParam String login,
         @RequestBody LeaderboardEntryDTO entry
     ) {
+        logger.info("Calculating league stats for user {} in workspace {}", login, workspaceContext.slug());
         return ResponseEntity.ok(leaderboardService.getUserLeagueStats(login, entry));
     }
 }

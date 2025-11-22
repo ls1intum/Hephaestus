@@ -9,6 +9,7 @@ import de.tum.in.www1.hephaestus.mentor.document.Document;
 import de.tum.in.www1.hephaestus.mentor.document.DocumentKind;
 import de.tum.in.www1.hephaestus.mentor.document.DocumentRepository;
 import de.tum.in.www1.hephaestus.testconfig.BaseIntegrationTest;
+import de.tum.in.www1.hephaestus.testconfig.TestUserFactory;
 import de.tum.in.www1.hephaestus.testconfig.WithMentorUser;
 import java.time.Instant;
 import java.util.List;
@@ -43,7 +44,7 @@ public class ChatPersistenceServiceIT extends BaseIntegrationTest {
 
     @BeforeEach
     void setup() {
-        mentorUser = userRepository.findByLogin("mentor").orElseThrow();
+        mentorUser = TestUserFactory.ensureUser(userRepository, "mentor", 2L);
     }
 
     @Test

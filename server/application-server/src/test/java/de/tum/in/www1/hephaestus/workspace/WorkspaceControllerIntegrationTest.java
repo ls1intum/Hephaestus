@@ -153,6 +153,9 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
         assertThat(workspace.workspaceSlug()).isEqualTo("controller-space");
         assertThat(workspace.status()).isEqualTo(Workspace.WorkspaceStatus.ACTIVE.name());
 
+        Workspace persistedWorkspace = workspaceRepository.findById(workspace.id()).orElseThrow();
+        ensureAdminMembership(persistedWorkspace);
+
         WorkspaceDTO fetched = webTestClient
             .get()
             .uri("/workspaces/{workspaceSlug}", workspace.workspaceSlug())
@@ -193,6 +196,9 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
 
         Workspace workspaceAlpha = createWorkspace("alpha-space", "Alpha", "alpha", AccountType.ORG, ownerAlpha);
         Workspace workspaceBeta = createWorkspace("beta-space", "Beta", "beta", AccountType.ORG, ownerBeta);
+
+        ensureAdminMembership(workspaceAlpha);
+        ensureAdminMembership(workspaceBeta);
 
         RepositoryToMonitor repository = new RepositoryToMonitor();
         repository.setNameWithOwner("acme/demo-repo");
@@ -267,6 +273,7 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
         userRepository.save(user);
 
         Workspace workspace = createWorkspace("league-space", "League", "league", AccountType.ORG, user);
+        ensureAdminMembership(workspace);
 
         ProblemDetail missingWorkspace = webTestClient
             .put()
@@ -291,8 +298,10 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
             .expectStatus()
             .isOk();
 
-        User refreshed = userRepository.findById(user.getId()).orElseThrow();
-        assertThat(refreshed.getLeaguePoints()).isEqualTo(LeaguePointsCalculationService.POINTS_DEFAULT);
+        var membership = workspaceMembershipRepository
+            .findByWorkspace_IdAndUser_Id(workspace.getId(), user.getId())
+            .orElseThrow();
+        assertThat(membership.getLeaguePoints()).isEqualTo(LeaguePointsCalculationService.POINTS_DEFAULT);
     }
 
     @Test
@@ -306,6 +315,7 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
             AccountType.ORG,
             owner
         );
+        ensureAdminMembership(workspace);
 
         webTestClient
             .patch()
@@ -348,6 +358,7 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
     void updateScheduleEndpointValidatesPayloadAndPersistsConfiguration() {
         User owner = persistUser("schedule-owner");
         Workspace workspace = createWorkspace("schedule-space", "Schedule", "schedule", AccountType.ORG, owner);
+        ensureAdminMembership(workspace);
 
         ProblemDetail invalid = webTestClient
             .patch()
@@ -462,6 +473,9 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
         );
         Workspace workspaceBeta = createWorkspace("beta-users", "Beta Users", "beta-users", AccountType.ORG, ownerBeta);
 
+        ensureAdminMembership(workspaceAlpha);
+        ensureAdminMembership(workspaceBeta);
+
         workspaceMembershipService.createMembership(
             workspaceAlpha,
             contributor.getId(),
@@ -478,10 +492,13 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
             .expectBodyList(UserTeamsDTO.class)
             .returnResult()
             .getResponseBody();
-        assertThat(alphaUsers)
-            .isNotNull()
-            .extracting(UserTeamsDTO::login)
-            .containsExactlyInAnyOrder(ownerAlpha.getLogin(), contributor.getLogin());
+        assertThat(alphaUsers).isNotNull();
+        List<String> alphaLogins = alphaUsers
+            .stream()
+            .map(UserTeamsDTO::login)
+            .filter(login -> !"admin".equals(login))
+            .toList();
+        assertThat(alphaLogins).containsExactlyInAnyOrder(ownerAlpha.getLogin(), contributor.getLogin());
 
         List<UserTeamsDTO> betaUsers = webTestClient
             .get()
@@ -493,7 +510,13 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
             .expectBodyList(UserTeamsDTO.class)
             .returnResult()
             .getResponseBody();
-        assertThat(betaUsers).isNotNull().extracting(UserTeamsDTO::login).containsExactly(ownerBeta.getLogin());
+        assertThat(betaUsers).isNotNull();
+        List<String> betaLogins = betaUsers
+            .stream()
+            .map(UserTeamsDTO::login)
+            .filter(login -> !"admin".equals(login))
+            .toList();
+        assertThat(betaLogins).containsExactly(ownerBeta.getLogin());
     }
 
     @Test
@@ -507,6 +530,7 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
             AccountType.ORG,
             owner
         );
+        ensureAdminMembership(workspace);
 
         RepositoryToMonitor repository = new RepositoryToMonitor();
         repository.setNameWithOwner("acme/test-repo");
@@ -543,6 +567,7 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
     void patchingStatusOnPurgedWorkspaceReturnsConflictProblemDetail() {
         User owner = persistUser("purged-owner");
         Workspace workspace = createWorkspace("purged-space", "Purged", "purged", AccountType.ORG, owner);
+        ensureAdminMembership(workspace);
         workspaceLifecycleService.purgeWorkspace(workspace.getWorkspaceSlug());
 
         ProblemDetail problem = webTestClient
@@ -570,6 +595,7 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
     void updateStatusEndpointTransitionsWorkspaceLifecycle() {
         User owner = persistUser("status-owner");
         Workspace workspace = createWorkspace("status-space", "Status", "status", AccountType.ORG, owner);
+        ensureAdminMembership(workspace);
 
         WorkspaceDTO suspended = webTestClient
             .patch()
@@ -615,6 +641,7 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
     void suspendedWorkspaceIsHiddenFromScopedRoutesButAllowsStatusUpdates() {
         User owner = persistUser("suspended-owner");
         Workspace workspace = createWorkspace("suspended-space", "Suspended", "suspended", AccountType.ORG, owner);
+        ensureAdminMembership(workspace);
         workspaceLifecycleService.suspendWorkspace(workspace.getWorkspaceSlug());
 
         ProblemDetail hidden = webTestClient
@@ -667,6 +694,32 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
 
     @Test
     @WithAdminUser
+    void suspendedWorkspaceCanBePurgedViaDeleteEndpoint() {
+        User owner = persistUser("purge-suspended-owner");
+        Workspace workspace = createWorkspace(
+            "purge-suspended",
+            "Purge Suspended",
+            "purge-suspended",
+            AccountType.ORG,
+            owner
+        );
+        ensureAdminMembership(workspace);
+        workspaceLifecycleService.suspendWorkspace(workspace.getWorkspaceSlug());
+
+        webTestClient
+            .delete()
+            .uri("/workspaces/{workspaceSlug}", workspace.getWorkspaceSlug())
+            .headers(TestAuthUtils.withCurrentUser())
+            .exchange()
+            .expectStatus()
+            .isNoContent();
+
+        Workspace purged = workspaceRepository.findById(workspace.getId()).orElseThrow();
+        assertThat(purged.getStatus()).isEqualTo(Workspace.WorkspaceStatus.PURGED);
+    }
+
+    @Test
+    @WithAdminUser
     void invalidWorkspaceSlugPathVariableReturnsConstraintViolationProblemDetail() {
         ProblemDetail problem = webTestClient
             .get()
@@ -686,5 +739,26 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
         assertThat(problem.getProperties().get("errors"))
             .asInstanceOf(InstanceOfAssertFactories.map(String.class, Object.class))
             .containsKey("workspaceSlug");
+    }
+
+    @Test
+    @WithAdminUser
+    void listWorkspacesEndpointAcceptsTrailingSlash() {
+        User owner = persistUser("trailing-owner");
+        createWorkspace("trailing-space", "Trailing", "trailing", AccountType.ORG, owner);
+
+        List<WorkspaceListItemDTO> workspaces = webTestClient
+            .get()
+            .uri("/workspaces/")
+            .headers(TestAuthUtils.withCurrentUser())
+            .exchange()
+            .expectStatus()
+            .isOk()
+            .expectBodyList(WorkspaceListItemDTO.class)
+            .returnResult()
+            .getResponseBody();
+
+        assertThat(workspaces).isNotNull();
+        assertThat(workspaces).isNotEmpty();
     }
 }

@@ -11,6 +11,9 @@ import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryInfoDTO;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.integrations.posthog.PosthogClient;
 import de.tum.in.www1.hephaestus.integrations.posthog.PosthogClientException;
+import de.tum.in.www1.hephaestus.workspace.WorkspaceMembershipService;
+import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContext;
+import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContextHolder;
 import jakarta.transaction.Transactional;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -53,18 +56,27 @@ public class UserService {
     private PullRequestReviewInfoDTOConverter pullRequestReviewInfoDTOConverter;
 
     @Autowired
+    private WorkspaceMembershipService workspaceMembershipService;
+
+    @Autowired
     private PosthogClient posthogClient;
 
     @Transactional
     public Optional<UserProfileDTO> getUserProfile(String login) {
         logger.info("Getting user profile with login: " + login);
 
-        Optional<UserInfoDTO> optionalUser = userRepository.findByLogin(login).map(UserInfoDTO::fromUser);
+        Optional<User> optionalUser = userRepository.findByLogin(login);
         if (optionalUser.isEmpty()) {
             return Optional.empty();
         }
 
-        UserInfoDTO user = optionalUser.get();
+        User userEntity = optionalUser.get();
+
+        WorkspaceContext context = WorkspaceContextHolder.getContext();
+        Long workspaceId = context != null ? context.id() : null;
+
+        int leaguePoints = workspaceMembershipService.getCurrentLeaguePoints(workspaceId, userEntity);
+        UserInfoDTO user = UserInfoDTO.fromUser(userEntity, leaguePoints);
         var firstContribution = pullRequestRepository.firstContributionByAuthorLogin(login).orElse(null);
         List<PullRequestInfoDTO> openPullRequests = pullRequestRepository
             .findAssignedByLoginAndStates(login, Set.of(Issue.State.OPEN))

@@ -6,6 +6,8 @@ import de.tum.in.www1.hephaestus.intelligenceservice.model.ChatRequest;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.StreamErrorPart;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.StreamFinishPart;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.UIMessage;
+import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContext;
+import de.tum.in.www1.hephaestus.workspace.context.WorkspaceScopedController;
 import io.swagger.v3.oas.annotations.Hidden;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -16,9 +18,9 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -30,28 +32,22 @@ import reactor.core.publisher.Flux;
  * REST controller for the chat functionality.
  * Handles streaming chat responses, message persistence, and thread management.
  */
-@RestController
+@WorkspaceScopedController
 @RequestMapping("/mentor")
+@RequiredArgsConstructor
 public class ChatController {
 
     private static final Logger logger = LoggerFactory.getLogger(ChatController.class);
 
-    @Autowired
-    private UserRepository userRepository;
-
-    @Autowired
-    private IntelligenceServiceWebClient intelligenceServiceWebClient;
-
-    @Autowired
-    private ChatPersistenceService chatPersistenceService;
-
-    @Autowired
-    private ChatThreadService chatThreadService;
+    private final UserRepository userRepository;
+    private final IntelligenceServiceWebClient intelligenceServiceWebClient;
+    private final ChatPersistenceService chatPersistenceService;
+    private final ChatThreadService chatThreadService;
 
     @Hidden
     @PostMapping(value = "/chat", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public Flux<String> chat(@RequestBody ChatRequestDTO chatRequest) {
-        logger.info("Processing chat request");
+    public Flux<String> chat(WorkspaceContext workspaceContext, @RequestBody ChatRequestDTO chatRequest) {
+        logger.info("Processing chat request in workspace {}", workspaceContext.slug());
 
         // Validate message size and content
         try {
@@ -199,8 +195,8 @@ public class ChatController {
         }
     )
     @GetMapping("/threads")
-    public ResponseEntity<List<ChatThreadSummaryDTO>> getThreads() {
-        logger.debug("Getting threads for authenticated user");
+    public ResponseEntity<List<ChatThreadSummaryDTO>> getThreads(WorkspaceContext workspaceContext) {
+        logger.debug("Getting threads for authenticated user in workspace {}", workspaceContext.slug());
 
         var currentUserLogin = SecurityUtils.getCurrentUserLoginOrThrow();
         var userOptional = userRepository.findByLogin(currentUserLogin);
@@ -234,8 +230,8 @@ public class ChatController {
         }
     )
     @GetMapping("/threads/grouped")
-    public ResponseEntity<List<ChatThreadGroupDTO>> getGroupedThreads() {
-        logger.debug("Getting grouped threads for authenticated user");
+    public ResponseEntity<List<ChatThreadGroupDTO>> getGroupedThreads(WorkspaceContext workspaceContext) {
+        logger.debug("Getting grouped threads for authenticated user in workspace {}", workspaceContext.slug());
 
         var currentUserLogin = SecurityUtils.getCurrentUserLoginOrThrow();
         var userOptional = userRepository.findByLogin(currentUserLogin);
@@ -269,9 +265,10 @@ public class ChatController {
     )
     @GetMapping("/thread/{threadId}")
     public ResponseEntity<ChatThreadDetailDTO> getThread(
+        WorkspaceContext workspaceContext,
         @Parameter(description = "Thread ID", required = true) @PathVariable UUID threadId
     ) {
-        logger.debug("Getting thread detail for threadId: {}", threadId);
+        logger.debug("Getting thread detail for threadId: {} in workspace {}", threadId, workspaceContext.slug());
 
         var currentUserLogin = SecurityUtils.getCurrentUserLoginOrThrow();
         var userOptional = userRepository.findByLogin(currentUserLogin);

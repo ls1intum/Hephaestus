@@ -1,18 +1,26 @@
 package de.tum.in.www1.hephaestus.meta;
 
-import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubClientProvider;
+import de.tum.in.www1.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.in.www1.hephaestus.gitprovider.team.TeamInfoDTOConverter;
 import de.tum.in.www1.hephaestus.gitprovider.team.TeamRepository;
+import de.tum.in.www1.hephaestus.workspace.RepositoryToMonitor;
 import de.tum.in.www1.hephaestus.workspace.Workspace;
-import de.tum.in.www1.hephaestus.workspace.WorkspaceService;
+import de.tum.in.www1.hephaestus.workspace.WorkspaceGitHubAccess;
+import de.tum.in.www1.hephaestus.workspace.WorkspaceRepository;
+import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContext;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import lombok.RequiredArgsConstructor;
+import org.kohsuke.github.GHRepository.Contributor;
 import org.kohsuke.github.GitHub;
 import org.kohsuke.github.GitHubBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
@@ -20,15 +28,15 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 @Service
+@RequiredArgsConstructor
 public class MetaService {
 
     private static final Logger logger = LoggerFactory.getLogger(MetaService.class);
 
-    @Autowired
-    private TeamRepository teamRepository;
-
-    @Autowired
-    private TeamInfoDTOConverter teamInfoDTOConverter;
+    private final TeamRepository teamRepository;
+    private final TeamInfoDTOConverter teamInfoDTOConverter;
+    private final WorkspaceRepository workspaceRepository;
+    private final WorkspaceGitHubAccess workspaceGitHubAccess;
 
     @Value("${hephaestus.leaderboard.schedule.day}")
     private String scheduledDay;
@@ -36,48 +44,79 @@ public class MetaService {
     @Value("${hephaestus.leaderboard.schedule.time}")
     private String scheduledTime;
 
-    @Autowired
-    private WorkspaceService workspaceService;
-
-    @Autowired
-    private GitHubClientProvider gitHubClientProvider;
-
     @Value("${github.meta.auth-token:}")
     private String metaAuthToken;
 
-    public MetaDataDTO getMetaData() {
-        logger.info("Getting meta data...");
-        var teams = teamRepository.findAll().stream().map(teamInfoDTOConverter::convert).toList();
-        return new MetaDataDTO(
-            teams.stream().sorted((a, b) -> a.name().compareTo(b.name())).toList(),
-            scheduledDay,
-            scheduledTime
-        );
+    public MetaDataDTO getWorkspaceMetaData(WorkspaceContext workspaceContext) {
+        Workspace workspace = loadWorkspace(workspaceContext);
+        logger.info("Getting meta data for workspace id={}.", workspace.getId());
+
+        var teams = teamRepository
+            .findAllByOrganizationIgnoreCase(workspace.getAccountLogin())
+            .stream()
+            .map(teamInfoDTOConverter::convert)
+            .filter(Objects::nonNull)
+            .sorted((a, b) -> a.name().compareToIgnoreCase(b.name()))
+            .toList();
+
+        String resolvedDay = workspace.getLeaderboardScheduleDay() != null
+            ? workspace.getLeaderboardScheduleDay().toString()
+            : scheduledDay;
+        String resolvedTime = workspace.getLeaderboardScheduleTime() != null &&
+            !workspace.getLeaderboardScheduleTime().isBlank()
+            ? workspace.getLeaderboardScheduleTime()
+            : scheduledTime;
+
+        return new MetaDataDTO(teams, resolvedDay, resolvedTime);
     }
 
-    @Cacheable(value = "contributors", key = "'all'")
-    public List<ContributorDTO> getContributors() {
-        GitHub githubClient = resolveGitHubForContributors();
-        if (githubClient == null) {
-            logger.warn("Skipping contributor sync because no GitHub credentials are available.");
+    public List<ContributorDTO> getWorkspaceContributors(WorkspaceContext workspaceContext) {
+        Workspace workspace = loadWorkspace(workspaceContext);
+        var repositories = workspace.getRepositoriesToMonitor();
+        if (repositories == null || repositories.isEmpty()) {
+            logger.info("Workspace {} has no repositories to inspect for contributors.", workspace.getId());
+            return List.of();
+        }
+
+        GitHub gitHub = workspaceGitHubAccess
+            .resolve(workspace)
+            .map(WorkspaceGitHubAccess.Context::gitHub)
+            .orElse(null);
+
+        if (gitHub == null) {
+            logger.warn(
+                "Skipping contributor sync for workspace id={} because no GitHub credentials are available.",
+                workspace.getId()
+            );
+            return List.of();
+        }
+
+        Map<Long, ContributorDTO> uniqueContributors = new LinkedHashMap<>();
+        repositories
+            .stream()
+            .map(RepositoryToMonitor::getNameWithOwner)
+            .filter(name -> name != null && !name.isBlank())
+            .forEach(repositoryName -> collectContributorsForRepository(gitHub, repositoryName, uniqueContributors));
+
+        return sortContributors(uniqueContributors);
+    }
+
+    @Cacheable(value = "contributors", key = "'global'")
+    public List<ContributorDTO> getGlobalContributors() {
+        logger.info("Getting global contributors for anonymous clients.");
+
+        if (metaAuthToken == null || metaAuthToken.isBlank()) {
+            logger.warn("Global contributor endpoint requires github.meta.auth-token to be configured.");
             return new ArrayList<>();
         }
 
         try {
-            var contributors = githubClient.getRepository("ls1intum/Hephaestus").listContributors().toList();
-            List<ContributorDTO> contributorDTOs = new ArrayList<>();
-            contributors
-                .stream()
-                .forEach(contributor -> {
-                    try {
-                        contributorDTOs.add(ContributorDTO.fromContributor(contributor));
-                    } catch (IOException e) {
-                        logger.error("Error converting contributor to DTO: {}", e.getMessage());
-                    }
-                });
-            return contributorDTOs;
+            GitHub gitHub = new GitHubBuilder().withOAuthToken(metaAuthToken).build();
+            Map<Long, ContributorDTO> uniqueContributors = new LinkedHashMap<>();
+            collectContributorsForRepository(gitHub, "ls1intum/Hephaestus", uniqueContributors);
+            return sortContributors(uniqueContributors);
         } catch (IOException e) {
-            logger.error("Error getting contributors: {}", e.getMessage());
+            logger.error("Error getting global contributors: {}", e.getMessage());
             return new ArrayList<>();
         }
     }
@@ -86,24 +125,59 @@ public class MetaService {
     @Scheduled(fixedRateString = "${hephaestus.cache.contributors.evict-rate:3600000}")
     public void evictContributorsCache() {}
 
-    private GitHub resolveGitHubForContributors() {
-        for (Workspace workspace : workspaceService.listAllWorkspaces()) {
-            try {
-                return gitHubClientProvider.forWorkspace(workspace.getId());
-            } catch (IOException e) {
-                logger.warn("Failed to prepare GitHub client for workspace {}: {}", workspace.getId(), e.getMessage());
-            }
+    private Workspace loadWorkspace(WorkspaceContext workspaceContext) {
+        if (workspaceContext == null) {
+            throw new EntityNotFoundException("Workspace", "<unbound>");
         }
 
-        if (metaAuthToken != null && !metaAuthToken.isBlank()) {
-            try {
-                return new GitHubBuilder().withOAuthToken(metaAuthToken).build();
-            } catch (IOException e) {
-                logger.warn("Failed to build fallback GitHub client for contributors: {}", e.getMessage());
-            }
+        if (workspaceContext.id() != null) {
+            return workspaceRepository
+                .findById(workspaceContext.id())
+                .orElseThrow(() -> new EntityNotFoundException("Workspace", workspaceContext.id()));
         }
 
-        logger.warn("Unable to resolve a GitHub client for contributors; no accessible workspaces configured.");
-        return null;
+        if (workspaceContext.slug() != null && !workspaceContext.slug().isBlank()) {
+            return workspaceRepository
+                .findByWorkspaceSlug(workspaceContext.slug())
+                .orElseThrow(() -> new EntityNotFoundException("Workspace", workspaceContext.slug()));
+        }
+
+        throw new EntityNotFoundException("Workspace", "<unresolved>");
+    }
+
+    private void collectContributorsForRepository(
+        GitHub gitHub,
+        String repositoryName,
+        Map<Long, ContributorDTO> accumulator
+    ) {
+        try {
+            gitHub
+                .getRepository(repositoryName)
+                .listContributors()
+                .forEach(contributor -> safelyAddContributor(contributor, accumulator));
+        } catch (IOException e) {
+            logger.warn("Failed to fetch contributors for repository {}: {}", repositoryName, e.getMessage());
+        }
+    }
+
+    private void safelyAddContributor(Contributor contributor, Map<Long, ContributorDTO> accumulator) {
+        try {
+            ContributorDTO dto = ContributorDTO.fromContributor(contributor);
+            accumulator.putIfAbsent(dto.id(), dto);
+        } catch (IOException e) {
+            logger.error("Error converting contributor to DTO: {}", e.getMessage());
+        }
+    }
+
+    private List<ContributorDTO> sortContributors(Map<Long, ContributorDTO> uniqueContributors) {
+        if (uniqueContributors.isEmpty()) {
+            return List.of();
+        }
+
+        return uniqueContributors
+            .values()
+            .stream()
+            .sorted(Comparator.comparingInt(ContributorDTO::contributions).reversed())
+            .toList();
     }
 }

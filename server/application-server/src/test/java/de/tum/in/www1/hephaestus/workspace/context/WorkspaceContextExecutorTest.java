@@ -40,7 +40,8 @@ class WorkspaceContextExecutorTest {
         AtomicReference<WorkspaceContext> capturedContext = new AtomicReference<>();
 
         // Act
-        Runnable wrapped = WorkspaceContextExecutor.wrap(() -> capturedContext.set(WorkspaceContextHolder.getContext()));
+        Runnable wrapped = WorkspaceContextExecutor.wrap(() -> capturedContext.set(WorkspaceContextHolder.getContext())
+        );
 
         // Clear context in main thread to simulate async boundary
         WorkspaceContextHolder.clearContext();
@@ -62,7 +63,14 @@ class WorkspaceContextExecutorTest {
     @DisplayName("Should propagate context to wrapped Callable")
     void shouldPropagateContextToCallable() throws Exception {
         // Arrange
-        WorkspaceContext workspaceContext = new WorkspaceContext(42L, "callable-test", "Test", AccountType.USER, null, Set.of());
+        WorkspaceContext workspaceContext = new WorkspaceContext(
+            42L,
+            "callable-test",
+            "Test",
+            AccountType.USER,
+            null,
+            Set.of()
+        );
         WorkspaceContextHolder.setContext(workspaceContext);
 
         // Act
@@ -77,11 +85,12 @@ class WorkspaceContextExecutorTest {
         // Execute in different thread
         ExecutorService executor = Executors.newSingleThreadExecutor();
         Future<String> future = executor.submit(wrapped);
+        String result = future.get();
         executor.shutdown();
         executor.awaitTermination(5, TimeUnit.SECONDS);
 
         // Assert
-        assertEquals("callable-test", future.get());
+        assertEquals("callable-test", result);
     }
 
     @Test
@@ -214,5 +223,55 @@ class WorkspaceContextExecutorTest {
         // Assert - Each should capture its own context
         assertEquals("ws1", capturedSlug1.get());
         assertEquals("ws2", capturedSlug2.get());
+    }
+
+    @Test
+    @DisplayName("Should restore previous context and MDC state after execution")
+    void shouldRestorePreviousContextAndMdcAfterExecution() throws Exception {
+        WorkspaceContext previousContext = new WorkspaceContext(10L, "base", "Base", AccountType.ORG, null, Set.of());
+        WorkspaceContext wrappedContext = new WorkspaceContext(
+            11L,
+            "wrapped",
+            "Wrapped",
+            AccountType.USER,
+            null,
+            Set.of()
+        );
+
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+        CountDownLatch latch = new CountDownLatch(1);
+        AtomicReference<WorkspaceContext> contextAfter = new AtomicReference<>();
+        AtomicReference<String> preservedValue = new AtomicReference<>();
+        AtomicReference<String> wrappedOnlyValue = new AtomicReference<>();
+
+        executor.submit(() -> {
+            WorkspaceContextHolder.setContext(previousContext);
+            MDC.put("request-id", "abc-123");
+        });
+
+        WorkspaceContextHolder.setContext(wrappedContext);
+        Runnable wrapped = WorkspaceContextExecutor.wrap(() -> {
+            assertEquals("wrapped", WorkspaceContextHolder.getContext().slug());
+            MDC.put("wrapped-only", "temp");
+        });
+        WorkspaceContextHolder.clearContext();
+
+        executor.submit(wrapped);
+
+        executor.submit(() -> {
+            contextAfter.set(WorkspaceContextHolder.getContext());
+            preservedValue.set(MDC.get("request-id"));
+            wrappedOnlyValue.set(MDC.get("wrapped-only"));
+            latch.countDown();
+        });
+
+        assertTrue(latch.await(5, TimeUnit.SECONDS));
+        executor.shutdown();
+
+        WorkspaceContext restored = contextAfter.get();
+        assertNotNull(restored);
+        assertEquals("base", restored.slug());
+        assertEquals("abc-123", preservedValue.get());
+        assertNull(wrappedOnlyValue.get());
     }
 }

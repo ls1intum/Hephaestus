@@ -191,25 +191,32 @@ public class WorkspaceService {
                 .toArray(CompletableFuture[]::new);
             CompletableFuture<Void> reposDone = CompletableFuture.allOf(repoFutures);
 
-        CompletableFuture<Void> usersFuture = reposDone
-            .thenRunAsync(() -> {
-                logger.info("All repositories synced, now syncing users for workspace id={}", workspace.getId());
-                gitHubDataSyncService.syncUsers(workspace);
-            })
-            .exceptionally(ex -> {
-                logger.error("Error during syncUsers: {}", LoggingUtils.sanitizeForLog(ex.getMessage()), ex);
-                return null;
-            });
+            CompletableFuture<Void> usersFuture = reposDone
+                .thenRunAsync(
+                    WorkspaceContextExecutor.wrap(() -> {
+                        logger.info(
+                            "All repositories synced, now syncing users for workspace id={}",
+                            workspace.getId()
+                        );
+                        gitHubDataSyncService.syncUsers(workspace);
+                    })
+                )
+                .exceptionally(ex -> {
+                    logger.error("Error during syncUsers: {}", LoggingUtils.sanitizeForLog(ex.getMessage()), ex);
+                    return null;
+                });
 
-        CompletableFuture<Void> teamsFuture = usersFuture
-            .thenRunAsync(() -> {
-                logger.info("Users synced, now syncing teams for workspace id={}", workspace.getId());
-                gitHubDataSyncService.syncTeams(workspace);
-            })
-            .exceptionally(ex -> {
-                logger.error("Error during syncTeams: {}", LoggingUtils.sanitizeForLog(ex.getMessage()), ex);
-                return null;
-            });
+            CompletableFuture<Void> teamsFuture = usersFuture
+                .thenRunAsync(
+                    WorkspaceContextExecutor.wrap(() -> {
+                        logger.info("Users synced, now syncing teams for workspace id={}", workspace.getId());
+                        gitHubDataSyncService.syncTeams(workspace);
+                    })
+                )
+                .exceptionally(ex -> {
+                    logger.error("Error during syncTeams: {}", LoggingUtils.sanitizeForLog(ex.getMessage()), ex);
+                    return null;
+                });
 
             CompletableFuture.allOf(teamsFuture).thenRun(() ->
                 logger.info("Finished running monitoring on startup for workspace id={}", workspace.getId())
@@ -239,6 +246,10 @@ public class WorkspaceService {
             LoggingUtils.sanitizeForLog(slug)
         );
         return workspace.getRepositoriesToMonitor().stream().map(RepositoryToMonitor::getNameWithOwner).toList();
+    }
+
+    public List<String> getRepositoriesToMonitor(WorkspaceContext workspaceContext) {
+        return getRepositoriesToMonitor(requireSlug(workspaceContext));
     }
 
     public void addRepositoryToMonitor(String slug, String nameWithOwner)
@@ -277,6 +288,11 @@ public class WorkspaceService {
             natsConsumerService.startConsumingRepositoryToMonitorAsync(repositoryToMonitor);
         }
         gitHubDataSyncService.syncRepositoryToMonitorAsync(repositoryToMonitor);
+    }
+
+    public void addRepositoryToMonitor(WorkspaceContext workspaceContext, String nameWithOwner)
+        throws RepositoryAlreadyMonitoredException, EntityNotFoundException {
+        addRepositoryToMonitor(requireSlug(workspaceContext), nameWithOwner);
     }
 
     public void removeRepositoryToMonitor(String slug, String nameWithOwner) throws EntityNotFoundException {
@@ -318,6 +334,11 @@ public class WorkspaceService {
         }
     }
 
+    public void removeRepositoryToMonitor(WorkspaceContext workspaceContext, String nameWithOwner)
+        throws EntityNotFoundException {
+        removeRepositoryToMonitor(requireSlug(workspaceContext), nameWithOwner);
+    }
+
     public List<UserTeamsDTO> getUsersWithTeams(String slug) {
         Workspace workspace = requireWorkspace(slug);
         logger.info(
@@ -327,6 +348,10 @@ public class WorkspaceService {
         );
         List<User> users = workspaceMembershipRepository.findHumanUsersWithTeamsByWorkspaceId(workspace.getId());
         return users.stream().map(UserTeamsDTO::fromUser).toList();
+    }
+
+    public List<UserTeamsDTO> getUsersWithTeams(WorkspaceContext workspaceContext) {
+        return getUsersWithTeams(requireSlug(workspaceContext));
     }
 
     public Optional<TeamInfoDTO> addLabelToTeam(String slug, Long teamId, Long repositoryId, String label) {
@@ -352,6 +377,15 @@ public class WorkspaceService {
         return Optional.ofNullable(teamInfoDTOConverter.convert(team));
     }
 
+    public Optional<TeamInfoDTO> addLabelToTeam(
+        WorkspaceContext workspaceContext,
+        Long teamId,
+        Long repositoryId,
+        String label
+    ) {
+        return addLabelToTeam(requireSlug(workspaceContext), teamId, repositoryId, label);
+    }
+
     public Optional<TeamInfoDTO> removeLabelFromTeam(String slug, Long teamId, Long labelId) {
         Workspace workspace = requireWorkspace(slug);
         logger.info(
@@ -372,6 +406,10 @@ public class WorkspaceService {
         team.removeLabel(labelEntity.get());
         teamRepository.save(team);
         return Optional.ofNullable(teamInfoDTOConverter.convert(team));
+    }
+
+    public Optional<TeamInfoDTO> removeLabelFromTeam(WorkspaceContext workspaceContext, Long teamId, Long labelId) {
+        return removeLabelFromTeam(requireSlug(workspaceContext), teamId, labelId);
     }
 
     //TODO: Method never used
@@ -409,23 +447,27 @@ public class WorkspaceService {
     public void resetAndRecalculateLeagues(String slug) {
         Workspace workspace = requireWorkspace(slug);
         logger.info(
-            "Resetting and recalculating league points for all users (requested by workspace id={})",
-            workspace.getId()
+            "Resetting and recalculating league points for workspace id={}, slug={}",
+            workspace.getId(),
+            workspace.getWorkspaceSlug()
         );
-        resetAndRecalculateLeaguesInternal();
+        resetAndRecalculateLeaguesInternal(workspace.getId());
     }
 
-    private void resetAndRecalculateLeaguesInternal() {
-        logger.info("Resetting and recalculating league points for all users");
+    public void resetAndRecalculateLeagues(WorkspaceContext workspaceContext) {
+        Workspace workspace = requireWorkspace(requireSlug(workspaceContext));
+        resetAndRecalculateLeaguesInternal(workspace.getId());
+    }
 
-        // Reset all users to default points (1000)
-        // TODO: In the future, could scope this to workspace members when context is available
-        userRepository
-            .findAll()
-            .forEach(user -> {
-                user.setLeaguePoints(LeaguePointsCalculationService.POINTS_DEFAULT);
-                userRepository.save(user);
-            });
+    private void resetAndRecalculateLeaguesInternal(Long workspaceId) {
+        logger.info("Resetting and recalculating league points for workspace id={}", workspaceId);
+
+        if (workspaceId == null) {
+            logger.warn("Skipping league recalculation because no workspace is configured.");
+            return;
+        }
+
+        workspaceMembershipService.resetLeaguePoints(workspaceId, LeaguePointsCalculationService.POINTS_DEFAULT);
 
         // Get all pull request reviews and issue comments to calculate past leaderboards
         var now = Instant.now();
@@ -451,9 +493,9 @@ public class WorkspaceService {
                     return;
                 }
                 var user = userRepository.findByLoginWithEagerMergedPullRequests(leaderboardUser.login()).orElseThrow();
-                int newPoints = leaguePointsCalculationService.calculateNewPoints(user, entry);
-                user.setLeaguePoints(newPoints);
-                userRepository.save(user);
+                int currentPoints = workspaceMembershipService.getCurrentLeaguePoints(workspaceId, user);
+                int newPoints = leaguePointsCalculationService.calculateNewPoints(user, currentPoints, entry);
+                workspaceMembershipService.updateLeaguePoints(workspaceId, user, newPoints);
             });
 
             // Move time window back one week
@@ -672,6 +714,15 @@ public class WorkspaceService {
             .orElseThrow(() -> new EntityNotFoundException("Workspace", slug));
     }
 
+    private String requireSlug(WorkspaceContext workspaceContext) {
+        Objects.requireNonNull(workspaceContext, "WorkspaceContext must not be null");
+        String slug = workspaceContext.slug();
+        if (isBlank(slug)) {
+            throw new IllegalArgumentException("Workspace context slug must not be blank.");
+        }
+        return slug;
+    }
+
     @Transactional
     public Workspace updateSchedule(String slug, Integer day, String time) {
         Workspace workspace = workspaceRepository
@@ -695,6 +746,10 @@ public class WorkspaceService {
         }
 
         return workspaceRepository.save(workspace);
+    }
+
+    public Workspace updateSchedule(WorkspaceContext workspaceContext, Integer day, String time) {
+        return updateSchedule(requireSlug(workspaceContext), day, time);
     }
 
     @Transactional
@@ -725,6 +780,15 @@ public class WorkspaceService {
         return workspaceRepository.save(workspace);
     }
 
+    public Workspace updateNotifications(
+        WorkspaceContext workspaceContext,
+        Boolean enabled,
+        String team,
+        String channelId
+    ) {
+        return updateNotifications(requireSlug(workspaceContext), enabled, team, channelId);
+    }
+
     @Transactional
     public Workspace updateToken(String slug, String personalAccessToken) {
         Workspace workspace = workspaceRepository
@@ -737,6 +801,10 @@ public class WorkspaceService {
         workspace.setPersonalAccessToken(personalAccessToken);
 
         return workspaceRepository.save(workspace);
+    }
+
+    public Workspace updateToken(WorkspaceContext workspaceContext, String personalAccessToken) {
+        return updateToken(requireSlug(workspaceContext), personalAccessToken);
     }
 
     @Transactional
@@ -752,6 +820,14 @@ public class WorkspaceService {
         return workspaceRepository.save(workspace);
     }
 
+    public Workspace updateSlackCredentials(
+        WorkspaceContext workspaceContext,
+        String slackToken,
+        String slackSigningSecret
+    ) {
+        return updateSlackCredentials(requireSlug(workspaceContext), slackToken, slackSigningSecret);
+    }
+
     @Transactional
     public Workspace updatePublicVisibility(String slug, Boolean isPubliclyViewable) {
         Workspace workspace = workspaceRepository
@@ -761,6 +837,10 @@ public class WorkspaceService {
         workspace.setIsPubliclyViewable(isPubliclyViewable);
 
         return workspaceRepository.save(workspace);
+    }
+
+    public Workspace updatePublicVisibility(WorkspaceContext workspaceContext, Boolean isPubliclyViewable) {
+        return updatePublicVisibility(requireSlug(workspaceContext), isPubliclyViewable);
     }
 
     private void createOwnerRole(Workspace workspace, Long ownerUserId) {
@@ -831,5 +911,4 @@ public class WorkspaceService {
                 )
             );
     }
-
 }

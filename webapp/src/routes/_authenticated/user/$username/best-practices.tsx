@@ -12,6 +12,7 @@ import {
 } from "@/api/@tanstack/react-query.gen";
 import type { BadPracticeFeedback } from "@/api/types.gen";
 import { PracticesPage } from "@/components/practices/PracticesPage";
+import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 import { useAuth } from "@/integrations/auth/AuthContext";
 
 export const Route = createFileRoute(
@@ -24,6 +25,9 @@ export function BestPracticesContainer() {
 	const { username } = Route.useParams();
 	const { isCurrentUser } = useAuth();
 	const queryClient = useQueryClient();
+	const { workspaceSlug } = useActiveWorkspaceSlug();
+	const slug = workspaceSlug ?? "";
+	const hasWorkspace = Boolean(workspaceSlug);
 
 	// Check if current user is the dashboard user
 	const currUserIsDashboardUser = isCurrentUser(username);
@@ -31,9 +35,9 @@ export function BestPracticesContainer() {
 	// Query for activity data
 	const activityQuery = useQuery({
 		...getActivityByUserOptions({
-			path: { login: username },
+			path: { workspaceSlug: slug, login: username },
 		}),
-		enabled: Boolean(username),
+		enabled: hasWorkspace && Boolean(username),
 	});
 
 	// Query for user profile data to get display name
@@ -50,7 +54,7 @@ export function BestPracticesContainer() {
 		onSuccess: () => {
 			queryClient.invalidateQueries({
 				queryKey: getActivityByUserQueryKey({
-					path: { login: username },
+					path: { workspaceSlug: slug, login: username },
 				}),
 			});
 		},
@@ -67,7 +71,7 @@ export function BestPracticesContainer() {
 		onSuccess: () => {
 			queryClient.invalidateQueries({
 				queryKey: getActivityByUserQueryKey({
-					path: { login: username },
+					path: { workspaceSlug: slug, login: username },
 				}),
 			});
 		},
@@ -82,7 +86,7 @@ export function BestPracticesContainer() {
 		onSuccess: () => {
 			queryClient.invalidateQueries({
 				queryKey: getActivityByUserQueryKey({
-					path: { login: username },
+					path: { workspaceSlug: slug, login: username },
 				}),
 			});
 			toast.success("Feedback submitted successfully");
@@ -98,7 +102,7 @@ export function BestPracticesContainer() {
 		onSuccess: () => {
 			queryClient.invalidateQueries({
 				queryKey: getActivityByUserQueryKey({
-					path: { login: username },
+					path: { workspaceSlug: slug, login: username },
 				}),
 			});
 		},
@@ -113,34 +117,49 @@ export function BestPracticesContainer() {
 	const displayName = profileQuery.data?.userInfo?.name;
 
 	const onDetectBadPractices = () => {
+		if (!hasWorkspace) {
+			return;
+		}
 		detect.mutate({
-			path: { login: username },
+			path: { workspaceSlug: slug, login: username },
 		});
 	};
 
 	const onDetectBadPracticesForPullRequest = (pullRequestId: number) => {
+		if (!hasWorkspace) {
+			return;
+		}
 		detectBadPracticesForPullRequest.mutate({
-			path: { pullRequestId },
+			path: { workspaceSlug: slug, pullRequestId },
 		});
 	};
 
 	const onResolveBadPracticeAsFixed = (badPracticeId: number) => {
+		if (!hasWorkspace) {
+			return;
+		}
 		resolveBadPractice.mutate({
-			path: { badPracticeId },
+			path: { workspaceSlug: slug, badPracticeId },
 			query: { state: "FIXED" },
 		});
 	};
 
 	const onResolveBadPracticeAsWontFix = (badPracticeId: number) => {
+		if (!hasWorkspace) {
+			return;
+		}
 		resolveBadPractice.mutate({
-			path: { badPracticeId },
+			path: { workspaceSlug: slug, badPracticeId },
 			query: { state: "WONT_FIX" },
 		});
 	};
 
 	const onResolveBadPracticeAsWrong = (badPracticeId: number) => {
+		if (!hasWorkspace) {
+			return;
+		}
 		resolveBadPractice.mutate({
-			path: { badPracticeId },
+			path: { workspaceSlug: slug, badPracticeId },
 			query: { state: "WRONG" },
 		});
 	};
@@ -149,8 +168,11 @@ export function BestPracticesContainer() {
 		badPracticeId: number,
 		feedback: BadPracticeFeedback,
 	) => {
+		if (!hasWorkspace) {
+			return;
+		}
 		provideFeedbackForBadPractice.mutate({
-			path: { badPracticeId },
+			path: { workspaceSlug: slug, badPracticeId },
 			body: feedback,
 		});
 	};

@@ -3,6 +3,11 @@ package de.tum.in.www1.hephaestus.leaderboard.tasks;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserInfoDTO;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.leaderboard.*;
+import de.tum.in.www1.hephaestus.workspace.Workspace;
+import de.tum.in.www1.hephaestus.workspace.WorkspaceMembershipService;
+import de.tum.in.www1.hephaestus.workspace.WorkspaceRepository;
+import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContext;
+import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContextHolder;
 import jakarta.transaction.Transactional;
 import java.time.DayOfWeek;
 import java.time.Instant;
@@ -10,13 +15,18 @@ import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.temporal.TemporalAdjusters;
 import java.util.List;
+import java.util.Set;
 import java.util.function.Consumer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 @Component
 public class LeaguePointsUpdateTask implements Runnable {
+
+    private static final Logger logger = LoggerFactory.getLogger(LeaguePointsUpdateTask.class);
 
     @Value("${hephaestus.leaderboard.schedule.day}")
     private String scheduledDay;
@@ -33,11 +43,58 @@ public class LeaguePointsUpdateTask implements Runnable {
     @Autowired
     private LeaguePointsCalculationService leaguePointsCalculationService;
 
+    @Autowired
+    private WorkspaceMembershipService workspaceMembershipService;
+
+    @Autowired
+    private WorkspaceRepository workspaceRepository;
+
     @Override
     @Transactional
     public void run() {
+        List<Workspace> workspaces = workspaceRepository.findAll();
+
+        if (workspaces.isEmpty()) {
+            logger.debug("Skipping league points update because no workspaces are configured.");
+            return;
+        }
+
+        logger.info("Starting scheduled league points update for {} workspace(s).", workspaces.size());
+
+        for (Workspace workspace : workspaces) {
+            WorkspaceContext context = WorkspaceContext.fromWorkspace(workspace, Set.of());
+            WorkspaceContextHolder.setContext(context);
+
+            try {
+                updateLeaguePointsForWorkspace(workspace.getId());
+            } catch (Exception e) {
+                logger.error(
+                    "Failed to update league points for workspace '{}' (id={}): {}",
+                    workspace.getWorkspaceSlug(),
+                    workspace.getId(),
+                    e.getMessage(),
+                    e
+                );
+            } finally {
+                WorkspaceContextHolder.clearContext();
+            }
+        }
+
+        logger.info("Completed scheduled league points update for {} workspace(s).", workspaces.size());
+    }
+
+    /**
+     * Updates league points for all members of a specific workspace based on the latest leaderboard.
+     *
+     * @param workspaceId the workspace ID for which to update league points
+     */
+    private void updateLeaguePointsForWorkspace(Long workspaceId) {
+        logger.debug("Updating league points for workspace id={}.", workspaceId);
+
         List<LeaderboardEntryDTO> leaderboard = getLatestLeaderboard();
-        leaderboard.forEach(updateLeaderboardEntry());
+        leaderboard.forEach(updateLeaderboardEntry(workspaceId));
+
+        logger.debug("Updated league points for {} users in workspace id={}.", leaderboard.size(), workspaceId);
     }
 
     /**
@@ -45,16 +102,16 @@ public class LeaguePointsUpdateTask implements Runnable {
      *
      * @return {@code Consumer} that updates {@code leaguePoints} based on its leaderboard entry.
      */
-    private Consumer<? super LeaderboardEntryDTO> updateLeaderboardEntry() {
+    private Consumer<? super LeaderboardEntryDTO> updateLeaderboardEntry(Long workspaceId) {
         return entry -> {
             UserInfoDTO leaderboardUser = entry.user();
             if (leaderboardUser == null) {
                 return;
             }
             var user = userRepository.findByLoginWithEagerMergedPullRequests(leaderboardUser.login()).orElseThrow();
-            int newPoints = leaguePointsCalculationService.calculateNewPoints(user, entry);
-            user.setLeaguePoints(newPoints);
-            userRepository.save(user);
+            int currentPoints = workspaceMembershipService.getCurrentLeaguePoints(workspaceId, user);
+            int newPoints = leaguePointsCalculationService.calculateNewPoints(user, currentPoints, entry);
+            workspaceMembershipService.updateLeaguePoints(workspaceId, user, newPoints);
         };
     }
 

@@ -30,10 +30,11 @@ public final class WorkspaceContextHolder {
      * @param context WorkspaceContext to set
      */
     public static void setContext(WorkspaceContext context) {
-        if (contextHolder.get() != null) {
+        WorkspaceContext existing = contextHolder.get();
+        if (existing != null && !existing.equals(context)) {
             log.warn(
                 "Overwriting existing WorkspaceContext. Potential context leak. " + "existing={}, new={}",
-                contextHolder.get().slug(),
+                existing.slug(),
                 context != null ? context.slug() : "null"
             );
         }

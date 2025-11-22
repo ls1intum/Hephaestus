@@ -10,7 +10,7 @@ const sidebars: SidebarsConfig = {
     {
       type: 'category',
       label: 'Development Workflow',
-      items: ['local-development', 'testing', 'coding-guidelines', 'dockerless-postgres'],
+      items: ['local-development', 'testing', 'coding-guidelines', 'workspace-context', 'dockerless-postgres'],
     },
     {
       type: 'category',

@@ -1,0 +1,35 @@
+---
+id: workspace-context
+sidebar_position: 5
+title: Workspace Context Guide
+description: Scope controllers, services, and async work to a workspace-safe execution context.
+---
+
+The workspace context infrastructure keeps every `/workspaces/{workspaceSlug}/…` request isolated to a single tenant. A servlet filter resolves the slug, loads the workspace, checks that it is accessible (active or explicitly allowed), enriches the logged-in user with their roles, and stores the result in a request-scoped `WorkspaceContext`. `@WorkspaceScopedController` adds the workspace prefix to your controller routes automatically, handler methods receive the `WorkspaceContext` parameter directly via the argument resolver, and `WorkspaceContextExecutor` copies the context into async runnables so background work inherits the same visibility. `WorkspaceContextAccessor` still exists when you cannot reach a method parameter (for example deep infrastructure helpers), but controller code should prefer direct injection.
+
+## How it works
+- **Filter**: `WorkspaceContextFilter` matches `/workspaces/{slug}` routes, loads the workspace + membership, rejects missing/inactive slugs, and populates `WorkspaceContextHolder`.
+- **Handler mapping**: Controllers annotated with `@WorkspaceScopedController` automatically receive the `/workspaces/{workspaceSlug}` prefix at runtime (via `WorkspaceScopedWebMvcConfiguration`). Route declarations stay clean (`@RequestMapping("/mentor")`) while every request path includes the slug. Keep global `/workspaces` routes (creation/listing) inside a plain `@RestController` such as `WorkspaceRegistryController` so the scoped controllers stay purely tenant-aware.
+- **Context access**: Prefer declaring `WorkspaceContext workspaceContext` as a method parameter. The resolver injects it automatically, while `WorkspaceContextAccessor` remains a fallback for code that cannot accept method parameters (for example async callbacks assembled in infrastructure components).
+- **Async propagation**: Use `WorkspaceContextExecutor.wrap(...)` for any `Runnable`/`Callable` you hand to `CompletableFuture`, schedulers, or executors so MDC, authorization checks, and logging stay tied to the originating workspace.
+
+## Controller expectations
+- Annotate new workspace-aware controllers with `@WorkspaceScopedController` and declare routes relative to the controller (for example `@RequestMapping("/api/documents")`). The handler mapping adds `/workspaces/{workspaceSlug}` ahead of time.
+- Always resolve the context near the top of the controller by injecting a `WorkspaceContext workspaceContext` parameter. Throw fast if the context is missing to avoid leaking data outside the slug scope.
+- Pass the context (or the workspace ID/slug extracted from it) down to services, schedulers, and background helpers instead of re-reading request parameters.
+- Use the roles exposed on the context when you need to apply workspace-level authorization (`workspaceContext.hasRole(WorkspaceRole.OWNER)`).
+- Keep the legacy `/workspace/**` (singular) routes deprecated—new endpoints should always live under `/workspaces/{workspaceSlug}` to benefit from automatic scoping.
+
+## Async and background work
+- Wrap any asynchronous callbacks with `WorkspaceContextExecutor.wrap` immediately after capturing the context to avoid context loss once you cross thread boundaries.
+- Clear the context after scheduling async work if you manually set it; the executor already restores/clears around the callback body, mirroring what the filter does per request.
+
+## Testing
+- `WorkspaceContextFilterIntegrationTest` exercises the filter + resolver stack end-to-end. Add new scenarios there whenever a controller relies on additional context metadata or when you extend the filter rules.
+- Unit tests that interact with services can fabricate a context via `WorkspaceContext.fromWorkspace(workspace, roles)` and pass it into the new overloads instead of hard-coding slugs.
+- Integration tests that hit controllers should create a workspace up front (the `WorkspaceTestFactory` helper builds active workspaces) and persist a `WorkspaceMembership` for the acting user so the security filter grants access.
+
+## Common pitfalls
+- Forgetting to annotate controllers with `@WorkspaceScopedController` leaves them at the old `/mentor/**` paths and bypasses the filter entirely.
+- Do not mutate the context; treat it as immutable metadata. If you need extra fields, extend `WorkspaceContext` and populate them in the filter.
+- Avoid touching `WorkspaceContextHolder` directly outside infrastructure code; prefer method parameters or (if absolutely needed) `WorkspaceContextAccessor`, plus the executor helpers.

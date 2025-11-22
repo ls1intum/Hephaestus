@@ -2,15 +2,23 @@ import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { getAllTeamsOptions } from "@/api/@tanstack/react-query.gen";
 import { TeamsPage } from "@/components/teams/TeamsPage";
+import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 
 export const Route = createFileRoute("/_authenticated/teams")({
 	component: TeamsContainer,
 });
 
 function TeamsContainer() {
-	const teamsQuery = useQuery(getAllTeamsOptions({}));
+	const { workspaceSlug } = useActiveWorkspaceSlug();
+	const teamsQuery = useQuery({
+		...getAllTeamsOptions({ path: { workspaceSlug: workspaceSlug ?? "" } }),
+		enabled: Boolean(workspaceSlug),
+	});
 
 	return (
-		<TeamsPage teams={teamsQuery.data || []} isLoading={teamsQuery.isLoading} />
+		<TeamsPage
+			teams={teamsQuery.data || []}
+			isLoading={teamsQuery.isLoading || !workspaceSlug}
+		/>
 	);
 }

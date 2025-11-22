@@ -14,6 +14,10 @@ public record UserInfoDTO(
     int leaguePoints
 ) {
     public static UserInfoDTO fromUser(User user) {
+        return fromUser(user, 0);
+    }
+
+    public static UserInfoDTO fromUser(User user, int leaguePoints) {
         return new UserInfoDTO(
             user.getId(),
             user.getLogin(),
@@ -21,7 +25,7 @@ public record UserInfoDTO(
             user.getAvatarUrl(),
             user.getName(),
             user.getHtmlUrl(),
-            user.getLeaguePoints()
+            leaguePoints
         );
     }
 }

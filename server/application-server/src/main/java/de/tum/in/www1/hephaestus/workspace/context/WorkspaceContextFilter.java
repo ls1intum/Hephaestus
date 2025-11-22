@@ -1,6 +1,7 @@
 package de.tum.in.www1.hephaestus.workspace.context;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.workspace.Workspace.WorkspaceStatus;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceMembership.WorkspaceRole;
@@ -14,6 +15,8 @@ import jakarta.servlet.ServletResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.regex.Pattern;
 import org.slf4j.Logger;
@@ -78,15 +81,27 @@ public class WorkspaceContextFilter implements Filter {
             return;
         }
 
-        var matcher = WORKSPACE_PATH_PATTERN.matcher(path);
-
-        if (!matcher.matches()) {
-            // Not a workspace-scoped path, continue without context
+        // Allow registry endpoints that include a trailing slash ("/workspaces/")
+        if ("/workspaces/".equals(path)) {
             chain.doFilter(request, response);
             return;
         }
 
+        if (!path.startsWith("/workspaces/")) {
+            // Not a workspace-scoped path, continue without context (allows /workspaces root endpoints)
+            chain.doFilter(request, response);
+            return;
+        }
+
+        var matcher = WORKSPACE_PATH_PATTERN.matcher(path);
+
+        if (!matcher.matches()) {
+            sendWorkspaceSlugValidationError(httpResponse, extractInvalidSlug(path));
+            return;
+        }
+
         String slug = matcher.group(1);
+        String method = httpRequest.getMethod();
         String remainingPath = matcher.group(2) != null ? matcher.group(2) : "";
         boolean isBasePath = remainingPath.isBlank() || "/".equals(remainingPath);
         boolean isStatusPath = remainingPath.startsWith("/status");
@@ -103,7 +118,9 @@ public class WorkspaceContextFilter implements Filter {
             var workspace = workspaceOpt.get();
 
             // Check workspace status - only ACTIVE workspaces are accessible
-            boolean allowNonActive = isStatusPath || (isBasePath && "GET".equalsIgnoreCase(httpRequest.getMethod()));
+            boolean isReadRequest = "GET".equalsIgnoreCase(method) || "HEAD".equalsIgnoreCase(method);
+            boolean allowLifecycleDelete = isBasePath && "DELETE".equalsIgnoreCase(method);
+            boolean allowNonActive = isStatusPath || (isBasePath && isReadRequest) || allowLifecycleDelete;
 
             if (workspace.getStatus() != WorkspaceStatus.ACTIVE && !allowNonActive) {
                 log.debug("Workspace {} has non-ACTIVE status: {}. Returning 404.", slug, workspace.getStatus());
@@ -112,7 +129,14 @@ public class WorkspaceContextFilter implements Filter {
             }
 
             // Fetch user roles
-            Set<WorkspaceRole> roles = fetchUserRoles(workspace.getId());
+            var currentUser = userRepository.getCurrentUser();
+            Set<WorkspaceRole> roles = fetchUserRoles(workspace.getId(), currentUser);
+
+            if (roles.isEmpty()) {
+                log.debug("User is not a member of workspace {}. Returning 403.", slug);
+                sendWorkspaceMembershipForbiddenError(httpResponse, slug);
+                return;
+            }
 
             // Create and set context
             WorkspaceContext context = WorkspaceContext.fromWorkspace(workspace, roles);
@@ -143,9 +167,8 @@ public class WorkspaceContextFilter implements Filter {
      * @param workspaceId Workspace ID
      * @return Set of workspace roles (empty if user has no membership or not authenticated)
      */
-    private Set<WorkspaceRole> fetchUserRoles(Long workspaceId) {
+    private Set<WorkspaceRole> fetchUserRoles(Long workspaceId, Optional<User> userOpt) {
         try {
-            var userOpt = userRepository.getCurrentUser();
             if (userOpt.isEmpty()) {
                 log.debug("No authenticated user found, returning empty roles");
                 return Set.of();
@@ -182,5 +205,36 @@ public class WorkspaceContextFilter implements Filter {
         response.setStatus(HttpServletResponse.SC_NOT_FOUND);
         response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
         response.getWriter().write(objectMapper.writeValueAsString(problem));
+    }
+
+    private void sendWorkspaceSlugValidationError(HttpServletResponse response, String slug) throws IOException {
+        ProblemDetail problem = ProblemDetail.forStatus(HttpStatus.BAD_REQUEST);
+        problem.setTitle("Validation failed");
+        problem.setDetail("Invalid workspace slug: " + slug);
+        problem.setProperty(
+            "errors",
+            Map.of("workspaceSlug", "Slug must be 3-51 lowercase characters or digits and may include single hyphens")
+        );
+        response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+        response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
+        response.getWriter().write(objectMapper.writeValueAsString(problem));
+    }
+
+    private void sendWorkspaceMembershipForbiddenError(HttpServletResponse response, String slug) throws IOException {
+        ProblemDetail problem = ProblemDetail.forStatus(HttpStatus.FORBIDDEN);
+        problem.setTitle("Membership required");
+        problem.setDetail("You must be a member of workspace " + slug + " to access this resource.");
+        response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+        response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
+        response.getWriter().write(objectMapper.writeValueAsString(problem));
+    }
+
+    private String extractInvalidSlug(String path) {
+        String remainder = path.substring("/workspaces/".length());
+        int slashIndex = remainder.indexOf('/');
+        if (slashIndex >= 0) {
+            remainder = remainder.substring(0, slashIndex);
+        }
+        return remainder;
     }
 }

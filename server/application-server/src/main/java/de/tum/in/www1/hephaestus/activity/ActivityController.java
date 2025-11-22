@@ -4,35 +4,37 @@ import de.tum.in.www1.hephaestus.activity.model.*;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
+import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContext;
+import de.tum.in.www1.hephaestus.workspace.context.WorkspaceScopedController;
 import java.util.Optional;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-@RestController
+@WorkspaceScopedController
 @RequestMapping("/activity")
+@RequiredArgsConstructor
 public class ActivityController {
 
-    @Autowired
-    private ActivityService activityService;
-
-    @Autowired
-    private UserRepository userRepository;
-
-    @Autowired
-    private PullRequestRepository pullRequestRepository;
-
-    @Autowired
-    private PullRequestBadPracticeRepository pullRequestBadPracticeRepository;
+    private final ActivityService activityService;
+    private final UserRepository userRepository;
+    private final PullRequestRepository pullRequestRepository;
+    private final PullRequestBadPracticeRepository pullRequestBadPracticeRepository;
 
     @GetMapping("/{login}")
-    public ResponseEntity<ActivityDTO> getActivityByUser(@PathVariable String login) {
-        ActivityDTO activity = activityService.getActivity(login);
+    public ResponseEntity<ActivityDTO> getActivityByUser(
+        WorkspaceContext workspaceContext,
+        @PathVariable String login
+    ) {
+        ActivityDTO activity = activityService.getActivity(workspaceContext, login);
         return ResponseEntity.ok(activity);
     }
 
     @PostMapping("/user/{login}/badpractices")
-    public ResponseEntity<Void> detectBadPracticesByUser(@PathVariable String login) {
+    public ResponseEntity<Void> detectBadPracticesByUser(
+        WorkspaceContext workspaceContext,
+        @PathVariable String login
+    ) {
         var user = userRepository.getCurrentUser();
 
         if (user.isEmpty()) {
@@ -41,7 +43,7 @@ public class ActivityController {
             return ResponseEntity.status(403).build();
         }
 
-        DetectionResult detectionResult = activityService.detectBadPracticesForUser(login);
+        DetectionResult detectionResult = activityService.detectBadPracticesForUser(workspaceContext, login);
         if (detectionResult == DetectionResult.ERROR_NO_UPDATE_ON_PULLREQUEST) {
             return ResponseEntity.badRequest().build();
         }
@@ -49,7 +51,10 @@ public class ActivityController {
     }
 
     @PostMapping("/pullrequest/{pullRequestId}/badpractices")
-    public ResponseEntity<Void> detectBadPracticesForPullRequest(@PathVariable Long pullRequestId) {
+    public ResponseEntity<Void> detectBadPracticesForPullRequest(
+        WorkspaceContext workspaceContext,
+        @PathVariable Long pullRequestId
+    ) {
         var user = userRepository.getCurrentUser();
         PullRequest pullRequest = pullRequestRepository.findById(pullRequestId).orElse(null);
 
@@ -61,7 +66,10 @@ public class ActivityController {
             return ResponseEntity.status(403).build();
         }
 
-        DetectionResult detectionResult = activityService.detectBadPracticesForPullRequest(pullRequest);
+        DetectionResult detectionResult = activityService.detectBadPracticesForPullRequest(
+            workspaceContext,
+            pullRequest
+        );
         if (detectionResult == DetectionResult.ERROR_NO_UPDATE_ON_PULLREQUEST) {
             return ResponseEntity.badRequest().build();
         }
@@ -70,6 +78,7 @@ public class ActivityController {
 
     @PostMapping("/badpractice/{badPracticeId}/resolve")
     public ResponseEntity<Void> resolveBadPractice(
+        WorkspaceContext workspaceContext,
         @PathVariable Long badPracticeId,
         @RequestParam("state") PullRequestBadPracticeState state
     ) {
@@ -90,12 +99,13 @@ public class ActivityController {
             return ResponseEntity.badRequest().build();
         }
 
-        activityService.resolveBadPractice(badPractice.get(), state);
+        activityService.resolveBadPractice(workspaceContext, badPractice.get(), state);
         return ResponseEntity.ok().build();
     }
 
     @PostMapping("/badpractice/{badPracticeId}/feedback")
     public ResponseEntity<Void> provideFeedbackForBadPractice(
+        WorkspaceContext workspaceContext,
         @PathVariable Long badPracticeId,
         @RequestBody BadPracticeFeedbackDTO feedback
     ) {
@@ -105,7 +115,7 @@ public class ActivityController {
             return ResponseEntity.notFound().build();
         }
 
-        activityService.provideFeedbackForBadPractice(badPractice.get(), feedback);
+        activityService.provideFeedbackForBadPractice(workspaceContext, badPractice.get(), feedback);
         return ResponseEntity.ok().build();
     }
 }

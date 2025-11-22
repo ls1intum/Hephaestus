@@ -10,12 +10,13 @@ import { useEffect } from "react";
 import { z } from "zod";
 import {
 	getLeaderboardOptions,
-	getMetaDataOptions,
 	getUserLeagueStatsOptions,
 	getUserProfileOptions,
+	getWorkspaceMetaOptions,
 } from "@/api/@tanstack/react-query.gen";
 import { LeaderboardPage } from "@/components/leaderboard/LeaderboardPage";
 import type { LeaderboardSortType } from "@/components/leaderboard/SortFilter";
+import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 import { useAuth } from "@/integrations/auth/AuthContext";
 
 // Calculate default date range with ISO 8601 format including timezone
@@ -49,6 +50,10 @@ export const Route = createFileRoute("/_authenticated/")({
 function LeaderboardContainer() {
 	// Get the current user from auth context
 	const { username } = useAuth();
+	const { workspaceSlug, isLoading: isWorkspaceLoading } =
+		useActiveWorkspaceSlug();
+	const slug = workspaceSlug ?? "";
+	const hasWorkspace = Boolean(workspaceSlug);
 
 	// Access properly validated search params with correct types
 	const { team, sort, after, before, mode } = Route.useSearch();
@@ -56,12 +61,16 @@ function LeaderboardContainer() {
 
 	// Query for metadata (teams, schedule info)
 	const metaQuery = useQuery({
-		...getMetaDataOptions({}),
+		...getWorkspaceMetaOptions({
+			path: { workspaceSlug: slug },
+		}),
+		enabled: hasWorkspace,
 	});
 
 	// Query for leaderboard data based on filters
 	const leaderboardQuery = useQuery({
 		...getLeaderboardOptions({
+			path: { workspaceSlug: slug },
 			query: {
 				after: new Date(after || startOfCurrentWeek),
 				before: new Date(before || endOfCurrentWeek),
@@ -70,7 +79,7 @@ function LeaderboardContainer() {
 				mode,
 			},
 		}),
-		enabled: Boolean(after && before && metaQuery.data),
+		enabled: hasWorkspace && Boolean(after && before && metaQuery.data),
 	});
 
 	// Query for user profile data
@@ -189,6 +198,7 @@ function LeaderboardContainer() {
 	// Query for league points change data if we have a current user entry
 	const leagueStatsQuery = useQuery({
 		...getUserLeagueStatsOptions({
+			path: { workspaceSlug: slug },
 			query: {
 				login: username || "",
 			},
@@ -211,7 +221,7 @@ function LeaderboardContainer() {
 				numberOfCodeComments: 0,
 			},
 		}),
-		enabled: Boolean(username && currentUserEntry),
+		enabled: hasWorkspace && Boolean(username && currentUserEntry),
 	});
 
 	// Handle team filter changes
@@ -278,7 +288,9 @@ function LeaderboardContainer() {
 	return (
 		<LeaderboardPage
 			leaderboard={leaderboardQuery.data || []}
-			isLoading={leaderboardQuery.isPending || metaQuery.isPending}
+			isLoading={
+				isWorkspaceLoading || leaderboardQuery.isPending || metaQuery.isPending
+			}
 			currentUser={userProfileQuery.data?.userInfo}
 			currentUserEntry={currentUserEntry}
 			leaguePoints={userProfileQuery.data?.userInfo?.leaguePoints}

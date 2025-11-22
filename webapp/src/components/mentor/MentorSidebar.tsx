@@ -4,6 +4,7 @@ import { MessageSquare, Plus } from "lucide-react";
 import { getGroupedThreadsOptions } from "@/api/@tanstack/react-query.gen";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 import { cn } from "@/lib/utils";
 
 interface MentorSidebarProps {
@@ -12,9 +13,15 @@ interface MentorSidebarProps {
 
 export function MentorSidebar({ className }: MentorSidebarProps) {
 	const { threadId } = useParams({ strict: false });
-	const { data: groupedThreads, isLoading } = useQuery(
-		getGroupedThreadsOptions(),
-	);
+	const { workspaceSlug, isLoading: isWorkspaceLoading } =
+		useActiveWorkspaceSlug();
+	const { data: groupedThreads, isLoading: isThreadsLoading } = useQuery({
+		...getGroupedThreadsOptions({
+			path: { workspaceSlug: workspaceSlug ?? "" },
+		}),
+		enabled: Boolean(workspaceSlug),
+	});
+	const isLoading = isWorkspaceLoading || isThreadsLoading;
 
 	const formatDate = (dateString: string) => {
 		const date = new Date(dateString);

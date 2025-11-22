@@ -8,11 +8,18 @@ import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.*;
 import de.tum.in.www1.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.in.www1.hephaestus.testconfig.TestAuthUtils;
+import de.tum.in.www1.hephaestus.testconfig.TestUserFactory;
 import de.tum.in.www1.hephaestus.testconfig.WithMentorUser;
+import de.tum.in.www1.hephaestus.testconfig.WorkspaceTestFactory;
+import de.tum.in.www1.hephaestus.workspace.Workspace;
+import de.tum.in.www1.hephaestus.workspace.WorkspaceMembership;
+import de.tum.in.www1.hephaestus.workspace.WorkspaceMembershipRepository;
+import de.tum.in.www1.hephaestus.workspace.WorkspaceRepository;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -43,6 +50,41 @@ public class ChatControllerIT extends BaseIntegrationTest {
 
     @Autowired
     private ObjectMapper objectMapper;
+
+    @Autowired
+    private WorkspaceRepository workspaceRepository;
+
+    @Autowired
+    private WorkspaceMembershipRepository workspaceMembershipRepository;
+
+    private Workspace workspace;
+    private static final String WORKSPACE_SLUG = "mentor-chat";
+
+    @BeforeEach
+    void ensureWorkspaceContext() {
+        workspace = workspaceRepository
+            .findByWorkspaceSlug(WORKSPACE_SLUG)
+            .orElseGet(() -> workspaceRepository.save(WorkspaceTestFactory.activeWorkspace(WORKSPACE_SLUG)));
+        var mentorUser = TestUserFactory.ensureUser(userRepository, "mentor", 2L);
+        ensureWorkspaceMembership(workspace, mentorUser);
+    }
+
+    private void ensureWorkspaceMembership(Workspace targetWorkspace, User user) {
+        workspaceMembershipRepository
+            .findByWorkspace_IdAndUser_Id(targetWorkspace.getId(), user.getId())
+            .orElseGet(() -> {
+                WorkspaceMembership membership = new WorkspaceMembership();
+                membership.setId(new WorkspaceMembership.Id(targetWorkspace.getId(), user.getId()));
+                membership.setWorkspace(targetWorkspace);
+                membership.setUser(user);
+                membership.setRole(WorkspaceMembership.WorkspaceRole.MEMBER);
+                return workspaceMembershipRepository.save(membership);
+            });
+    }
+
+    private String mentorPath(String suffix) {
+        return "/workspaces/" + workspace.getWorkspaceSlug() + "/mentor" + suffix;
+    }
 
     /**
      * Helper method to create text streaming parts in AI SDK v5 format.
@@ -205,7 +247,7 @@ public class ChatControllerIT extends BaseIntegrationTest {
         // When & Then - unauthenticated request should be rejected
         webTestClient
             .post()
-            .uri("/mentor/chat")
+            .uri(mentorPath("/chat"))
             .headers(TestAuthUtils.withCurrentUserOrNone()) // No auth header
             .contentType(MediaType.APPLICATION_JSON)
             .bodyValue(request)
@@ -869,7 +911,7 @@ public class ChatControllerIT extends BaseIntegrationTest {
         // Then: The request is rejected with an appropriate error message
         webTestClient
             .post()
-            .uri("/mentor/chat")
+            .uri(mentorPath("/chat"))
             .headers(TestAuthUtils.withCurrentUser())
             .contentType(MediaType.APPLICATION_JSON)
             .bodyValue(request)
@@ -902,7 +944,7 @@ public class ChatControllerIT extends BaseIntegrationTest {
         // Then: The system does not persist the message and returns an appropriate error response
         webTestClient
             .post()
-            .uri("/mentor/chat")
+            .uri(mentorPath("/chat"))
             .headers(TestAuthUtils.withCurrentUser())
             .contentType(MediaType.APPLICATION_JSON)
             .bodyValue(request)
@@ -1337,9 +1379,7 @@ public class ChatControllerIT extends BaseIntegrationTest {
     // Helper methods
     private User createTestUser() {
         // Fetch the "mentor" user that was seeded by TestUserConfig
-        return userRepository
-            .findByLogin("mentor")
-            .orElseThrow(() -> new IllegalStateException("Test mentor user not found in database"));
+        return TestUserFactory.ensureUser(userRepository, "mentor", 2L);
     }
 
     private ChatMessage createMessageInThread(
@@ -1382,7 +1422,7 @@ public class ChatControllerIT extends BaseIntegrationTest {
         // This will return the response Flux for assertions
         return webTestClient
             .post()
-            .uri("/mentor/chat")
+            .uri(mentorPath("/chat"))
             .headers(TestAuthUtils.withCurrentUser())
             .contentType(MediaType.APPLICATION_JSON)
             .bodyValue(request)

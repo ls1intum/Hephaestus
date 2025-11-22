@@ -34,11 +34,17 @@ function AdminMembersContainer() {
 	});
 
 	// Fetch teams
+	const teamsQueryOptions = getAllTeamsOptions({
+		path: { workspaceSlug: workspaceSlug ?? "" },
+	});
 	const {
 		data: teamsData,
 		isLoading: teamsLoading,
 		error: teamsError,
-	} = useQuery(getAllTeamsOptions({}));
+	} = useQuery({
+		...teamsQueryOptions,
+		enabled: Boolean(workspaceSlug) && (teamsQueryOptions.enabled ?? true),
+	});
 
 	// Transform API data for the component and sort alphabetically
 	const users = (usersData?.map(adaptApiUserTeams) || [])

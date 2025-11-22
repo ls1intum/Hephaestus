@@ -3,6 +3,8 @@ package de.tum.in.www1.hephaestus.mentor.document;
 import de.tum.in.www1.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
+import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContext;
+import de.tum.in.www1.hephaestus.workspace.context.WorkspaceScopedController;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -20,7 +22,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-@RestController
+@WorkspaceScopedController
 @RequestMapping("/api/documents")
 @Tag(name = "Documents", description = "Document management with versioning support")
 public class DocumentController {
@@ -39,8 +41,11 @@ public class DocumentController {
     @Operation(summary = "Create a new document")
     @ApiResponse(responseCode = "201", description = "Document created successfully")
     @ApiResponse(responseCode = "400", description = "Invalid request data")
-    public ResponseEntity<DocumentDTO> createDocument(@Valid @RequestBody CreateDocumentRequestDTO request) {
-        logger.info("Creating new document: {}", request.title());
+    public ResponseEntity<DocumentDTO> createDocument(
+        WorkspaceContext workspaceContext,
+        @Valid @RequestBody CreateDocumentRequestDTO request
+    ) {
+        logger.info("Creating new document: {} in workspace {}", request.title(), workspaceContext.slug());
 
         User user = userRepository.getCurrentUserElseThrow();
         DocumentDTO response = documentService.createDocument(request, user);
@@ -52,8 +57,8 @@ public class DocumentController {
     @Operation(summary = "Get latest version of a document")
     @ApiResponse(responseCode = "200", description = "Document retrieved successfully")
     @ApiResponse(responseCode = "404", description = "Document not found")
-    public ResponseEntity<DocumentDTO> getDocument(@PathVariable UUID id) {
-        logger.debug("Fetching document: {}", id);
+    public ResponseEntity<DocumentDTO> getDocument(WorkspaceContext workspaceContext, @PathVariable UUID id) {
+        logger.debug("Fetching document: {} in workspace {}", id, workspaceContext.slug());
 
         User user = userRepository.getCurrentUserElseThrow();
         try {
@@ -71,10 +76,11 @@ public class DocumentController {
     @ApiResponse(responseCode = "404", description = "Document not found")
     @ApiResponse(responseCode = "400", description = "Invalid request data")
     public ResponseEntity<DocumentDTO> updateDocument(
+        WorkspaceContext workspaceContext,
         @PathVariable UUID id,
         @Valid @RequestBody UpdateDocumentRequestDTO request
     ) {
-        logger.info("Updating document: {}", id);
+        logger.info("Updating document: {} in workspace {}", id, workspaceContext.slug());
 
         User user = userRepository.getCurrentUserElseThrow();
         try {
@@ -90,8 +96,8 @@ public class DocumentController {
     @Operation(summary = "Delete a document and all its versions")
     @ApiResponse(responseCode = "204", description = "Document deleted successfully")
     @ApiResponse(responseCode = "404", description = "Document not found")
-    public ResponseEntity<Void> deleteDocument(@PathVariable UUID id) {
-        logger.info("Deleting document: {}", id);
+    public ResponseEntity<Void> deleteDocument(WorkspaceContext workspaceContext, @PathVariable UUID id) {
+        logger.info("Deleting document: {} in workspace {}", id, workspaceContext.slug());
 
         User user = userRepository.getCurrentUserElseThrow();
         try {
@@ -107,12 +113,18 @@ public class DocumentController {
     @Operation(summary = "Get all user documents (latest versions only)")
     @ApiResponse(responseCode = "200", description = "Documents retrieved successfully")
     public ResponseEntity<Page<DocumentSummaryDTO>> getUserDocuments(
+        WorkspaceContext workspaceContext,
         @RequestParam(defaultValue = "0") int page,
         @RequestParam(defaultValue = "20") int size,
         @RequestParam(defaultValue = "createdAt") String sortBy,
         @RequestParam(defaultValue = "desc") String sortDir
     ) {
-        logger.debug("Fetching user documents - page: {}, size: {}", page, size);
+        logger.debug(
+            "Fetching user documents - page: {}, size: {} in workspace {}",
+            page,
+            size,
+            workspaceContext.slug()
+        );
 
         User user = userRepository.getCurrentUserElseThrow();
 
@@ -130,11 +142,12 @@ public class DocumentController {
     @ApiResponse(responseCode = "200", description = "Document versions retrieved successfully")
     @ApiResponse(responseCode = "404", description = "Document not found")
     public ResponseEntity<Page<DocumentDTO>> getDocumentVersions(
+        WorkspaceContext workspaceContext,
         @PathVariable UUID id,
         @RequestParam(defaultValue = "0") int page,
         @RequestParam(defaultValue = "20") int size
     ) {
-        logger.debug("Fetching versions for document: {}", id);
+        logger.debug("Fetching versions for document: {} in workspace {}", id, workspaceContext.slug());
 
         User user = userRepository.getCurrentUserElseThrow();
         try {
@@ -152,8 +165,12 @@ public class DocumentController {
     @Operation(summary = "Get specific version of a document by version number")
     @ApiResponse(responseCode = "200", description = "Document version retrieved successfully")
     @ApiResponse(responseCode = "404", description = "Document version not found")
-    public ResponseEntity<DocumentDTO> getDocumentVersion(@PathVariable UUID id, @PathVariable Integer versionNumber) {
-        logger.debug("Fetching document version: {} #{}", id, versionNumber);
+    public ResponseEntity<DocumentDTO> getDocumentVersion(
+        WorkspaceContext workspaceContext,
+        @PathVariable UUID id,
+        @PathVariable Integer versionNumber
+    ) {
+        logger.debug("Fetching document version: {} #{} in workspace {}", id, versionNumber, workspaceContext.slug());
 
         User user = userRepository.getCurrentUserElseThrow();
         try {
@@ -171,10 +188,16 @@ public class DocumentController {
     @ApiResponse(responseCode = "404", description = "Document not found")
     @ApiResponse(responseCode = "400", description = "Invalid timestamp parameter")
     public ResponseEntity<List<DocumentDTO>> deleteVersionsAfterTimestamp(
+        WorkspaceContext workspaceContext,
         @PathVariable UUID id,
         @RequestParam Instant after
     ) {
-        logger.info("Deleting versions of document {} after timestamp: {}", id, after);
+        logger.info(
+            "Deleting versions of document {} after timestamp: {} in workspace {}",
+            id,
+            after,
+            workspaceContext.slug()
+        );
 
         User user = userRepository.getCurrentUserElseThrow();
         try {

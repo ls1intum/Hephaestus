@@ -2,6 +2,8 @@ package de.tum.in.www1.hephaestus.mentor.vote;
 
 import de.tum.in.www1.hephaestus.SecurityUtils;
 import de.tum.in.www1.hephaestus.mentor.ChatMessageRepository;
+import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContext;
+import de.tum.in.www1.hephaestus.workspace.context.WorkspaceScopedController;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -18,7 +20,7 @@ import org.springframework.web.bind.annotation.*;
 /**
  * REST controller for chat message voting.
  */
-@RestController
+@WorkspaceScopedController
 @RequestMapping("/api/chat/messages")
 @Tag(name = "Chat Message Voting", description = "Vote on chat messages (upvote/downvote)")
 public class ChatMessageVoteController {
@@ -41,12 +43,18 @@ public class ChatMessageVoteController {
             @ApiResponse(responseCode = "404", description = "Message not found"),
         }
     )
-    @PostMapping("/{messageId}/vote")
+    @PatchMapping("/{messageId}/vote")
     public ResponseEntity<ChatMessageVoteDTO> voteMessage(
+        WorkspaceContext workspaceContext,
         @Parameter(description = "Message ID to vote on") @PathVariable UUID messageId,
         @Valid @RequestBody VoteMessageRequestDTO request
     ) {
-        logger.debug("Vote request for message: {} with vote: {}", messageId, request.isUpvoted());
+        logger.debug(
+            "Vote request for message: {} with vote: {} in workspace {}",
+            messageId,
+            request.isUpvoted(),
+            workspaceContext.slug()
+        );
 
         // Check if message exists
         var messageOptional = messageRepository.findById(messageId);

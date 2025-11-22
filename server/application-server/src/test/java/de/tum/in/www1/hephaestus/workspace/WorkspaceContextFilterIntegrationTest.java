@@ -1,0 +1,130 @@
+package de.tum.in.www1.hephaestus.workspace;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import de.tum.in.www1.hephaestus.gitprovider.user.User;
+import de.tum.in.www1.hephaestus.testconfig.TestAuthUtils;
+import de.tum.in.www1.hephaestus.testconfig.WithAdminUser;
+import de.tum.in.www1.hephaestus.testconfig.WithMentorUser;
+import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContext;
+import java.util.List;
+import java.util.Objects;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.reactive.AutoConfigureWebTestClient;
+import org.springframework.context.annotation.Import;
+import org.springframework.http.ResponseEntity;
+import org.springframework.test.web.reactive.server.WebTestClient;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+@AutoConfigureWebTestClient
+@Import(WorkspaceContextFilterIntegrationTest.WorkspaceContextEchoController.class)
+class WorkspaceContextFilterIntegrationTest extends AbstractWorkspaceIntegrationTest {
+
+    @Autowired
+    private WebTestClient webTestClient;
+
+    @Test
+    @WithAdminUser
+    void workspaceContextIsInjectedForMembers() {
+        User owner = persistUser("admin");
+        Workspace workspace = createWorkspace("alpha-space", "Alpha", "alpha", AccountType.ORG, owner);
+        ensureAdminMembership(workspace);
+
+        WorkspaceContextSnapshot response = requestContextEcho(workspace.getWorkspaceSlug());
+
+        assertThat(response.contextSlug()).isEqualTo(workspace.getWorkspaceSlug());
+        assertThat(response.contextId()).isEqualTo(workspace.getId());
+        assertThat(response.roles()).containsExactly("OWNER");
+    }
+
+    @Test
+    @WithMentorUser
+    void nonMembersAreForbiddenFromAccessingWorkspace() {
+        persistUser("mentor");
+        User workspaceOwner = persistUser("workspace-owner");
+        Workspace workspace = createWorkspace("beta-space", "Beta", "beta", AccountType.ORG, workspaceOwner);
+
+        webTestClient
+            .get()
+            .uri("/workspaces/{workspaceSlug}/context-echo", workspace.getWorkspaceSlug())
+            .headers(TestAuthUtils.withCurrentUser())
+            .exchange()
+            .expectStatus()
+            .isForbidden();
+    }
+
+    @Test
+    @WithAdminUser
+    void adminWithoutMembershipIsAlsoForbidden() {
+        User workspaceOwner = persistUser("admin-workspace-owner");
+        Workspace workspace = createWorkspace("gamma-space", "Gamma", "gamma", AccountType.ORG, workspaceOwner);
+
+        webTestClient
+            .get()
+            .uri("/workspaces/{workspaceSlug}/context-echo", workspace.getWorkspaceSlug())
+            .headers(TestAuthUtils.withCurrentUser())
+            .exchange()
+            .expectStatus()
+            .isForbidden();
+    }
+
+    @Test
+    @WithAdminUser
+    void workspaceContextDoesNotLeakBetweenRequests() {
+        User owner = persistUser("admin");
+        Workspace first = createWorkspace("gamma-space", "Gamma", "gamma", AccountType.ORG, owner);
+        Workspace second = createWorkspace("delta-space", "Delta", "delta", AccountType.ORG, owner);
+
+        WorkspaceContextSnapshot firstResponse = requestContextEcho(first.getWorkspaceSlug());
+        WorkspaceContextSnapshot secondResponse = requestContextEcho(second.getWorkspaceSlug());
+
+        assertThat(firstResponse.contextSlug()).isEqualTo(first.getWorkspaceSlug());
+        assertThat(secondResponse.contextSlug()).isEqualTo(second.getWorkspaceSlug());
+        assertThat(secondResponse.contextSlug()).isNotEqualTo(firstResponse.contextSlug());
+    }
+
+    private WorkspaceContextSnapshot requestContextEcho(String slug) {
+        WorkspaceContextSnapshot response = webTestClient
+            .get()
+            .uri("/workspaces/{workspaceSlug}/context-echo", slug)
+            .headers(TestAuthUtils.withCurrentUser())
+            .exchange()
+            .expectStatus()
+            .isOk()
+            .expectBody(WorkspaceContextSnapshot.class)
+            .returnResult()
+            .getResponseBody();
+
+        return Objects.requireNonNull(response, "Expected workspace context payload");
+    }
+
+    record WorkspaceContextSnapshot(String pathSlug, String contextSlug, Long contextId, List<String> roles) {}
+
+    @RestController
+    @RequestMapping("/workspaces/{workspaceSlug}/context-echo")
+    static class WorkspaceContextEchoController {
+
+        @GetMapping
+        ResponseEntity<WorkspaceContextSnapshot> echo(
+            @PathVariable String workspaceSlug,
+            WorkspaceContext workspaceContext
+        ) {
+            WorkspaceContextSnapshot snapshot;
+            if (workspaceContext == null) {
+                snapshot = new WorkspaceContextSnapshot(workspaceSlug, null, null, List.of());
+            } else {
+                snapshot = new WorkspaceContextSnapshot(
+                    workspaceSlug,
+                    workspaceContext.slug(),
+                    workspaceContext.id(),
+                    workspaceContext.roles().stream().map(Enum::name).toList()
+                );
+            }
+            return ResponseEntity.ok(snapshot);
+        }
+    }
+}

@@ -19,569 +19,21 @@ tags:
   name: chat-controller
 - description: Document management with versioning support
   name: Documents
+- description: |-
+    Workspace registry endpoints that operate outside of a specific workspace slug.
+     These routes stay under the classic /workspaces base path while slugged routes
+     live in {@link WorkspaceController WorkspaceController} via <code>@WorkspaceScopedController</code>.
+  name: workspace-registry-controller
 - description: Vote on chat messages (upvote/downvote)
   name: Chat Message Voting
+- description: |-
+    Controller for managing workspace memberships and roles.
+     Handles CRUD operations for workspace members and role assignments.
+  name: workspace-membership-controller
 paths:
-  /activity/badpractice/{badPracticeId}/feedback:
-    post:
-      operationId: provideFeedbackForBadPractice
-      parameters:
-      - in: path
-        name: badPracticeId
-        required: true
-        schema:
-          type: integer
-          format: int64
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/BadPracticeFeedback"
-        required: true
-      responses:
-        "200":
-          description: OK
-      tags:
-      - activity
-  /activity/badpractice/{badPracticeId}/resolve:
-    post:
-      operationId: resolveBadPractice
-      parameters:
-      - in: path
-        name: badPracticeId
-        required: true
-        schema:
-          type: integer
-          format: int64
-      - in: query
-        name: state
-        required: true
-        schema:
-          type: string
-          enum:
-          - GOOD_PRACTICE
-          - FIXED
-          - CRITICAL_ISSUE
-          - NORMAL_ISSUE
-          - MINOR_ISSUE
-          - WONT_FIX
-          - WRONG
-      responses:
-        "200":
-          description: OK
-      tags:
-      - activity
-  /activity/pullrequest/{pullRequestId}/badpractices:
-    post:
-      operationId: detectBadPracticesForPullRequest
-      parameters:
-      - in: path
-        name: pullRequestId
-        required: true
-        schema:
-          type: integer
-          format: int64
-      responses:
-        "200":
-          description: OK
-      tags:
-      - activity
-  /activity/user/{login}/badpractices:
-    post:
-      operationId: detectBadPracticesByUser
-      parameters:
-      - in: path
-        name: login
-        required: true
-        schema:
-          type: string
-      responses:
-        "200":
-          description: OK
-      tags:
-      - activity
-  /activity/{login}:
+  /contributors:
     get:
-      operationId: getActivityByUser
-      parameters:
-      - in: path
-        name: login
-        required: true
-        schema:
-          type: string
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Activity"
-          description: OK
-      tags:
-      - activity
-  /api/chat/messages/{messageId}/vote:
-    post:
-      description: Cast an upvote or downvote on a chat message
-      operationId: voteMessage
-      parameters:
-      - description: Message ID to vote on
-        in: path
-        name: messageId
-        required: true
-        schema:
-          type: string
-          format: uuid
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/VoteMessageRequest"
-        required: true
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ChatMessageVote"
-          description: Vote successfully recorded
-        "400":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ChatMessageVote"
-          description: Invalid vote type or message not found
-        "404":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ChatMessageVote"
-          description: Message not found
-      summary: Vote on a message
-      tags:
-      - Chat Mes
-  /api/documents:
-    get:
-      operationId: getUserDocuments
-      parameters:
-      - in: query
-        name: page
-        required: false
-        schema:
-          type: integer
-          format: int32
-          default: 0
-      - in: query
-        name: size
-        required: false
-        schema:
-          type: integer
-          format: int32
-          default: 20
-      - in: query
-        name: sortBy
-        required: false
-        schema:
-          type: string
-          default: createdAt
-      - in: query
-        name: sortDir
-        required: false
-        schema:
-          type: string
-          default: desc
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/PageDocumentSummary"
-          description: Documents retrieved successfully
-      summary: Get all user documents (latest versions only)
-      tags: []
-    post:
-      operationId: createDocument
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/CreateDocumentRequest"
-        required: true
-      responses:
-        "201":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Document"
-          description: Document created successfully
-        "400":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Document"
-          description: Invalid request data
-      summary: Create a new document
-      tags: []
-  /api/documents/{id}:
-    delete:
-      operationId: deleteDocument
-      parameters:
-      - in: path
-        name: id
-        required: true
-        schema:
-          type: string
-          format: uuid
-      responses:
-        "204":
-          description: Document deleted successfully
-        "404":
-          description: Document not found
-      summary: Delete a document and all its versions
-      tags: []
-    get:
-      operationId: getDocument
-      parameters:
-      - in: path
-        name: id
-        required: true
-        schema:
-          type: string
-          format: uuid
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Document"
-          description: Document retrieved successfully
-        "404":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Document"
-          description: Document not found
-      summary: Get latest version of a document
-      tags: []
-    put:
-      operationId: updateDocument
-      parameters:
-      - in: path
-        name: id
-        required: true
-        schema:
-          type: string
-          format: uuid
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/UpdateDocumentRequest"
-        required: true
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Document"
-          description: Document updated successfully
-        "400":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Document"
-          description: Invalid request data
-        "404":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Document"
-          description: Document not found
-      summary: Update a document (creates new version)
-      tags: []
-  /api/documents/{id}/versions:
-    delete:
-      operationId: deleteVersionsAfterTimestamp
-      parameters:
-      - in: path
-        name: id
-        required: true
-        schema:
-          type: string
-          format: uuid
-      - in: query
-        name: after
-        required: true
-        schema:
-          type: string
-          format: date-time
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/Document"
-          description: Document versions deleted successfully
-        "400":
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/Document"
-          description: Invalid timestamp parameter
-        "404":
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/Document"
-          description: Document not found
-      summary: Delete document versions after specified timestamp
-      tags: []
-    get:
-      operationId: getDocumentVersions
-      parameters:
-      - in: path
-        name: id
-        required: true
-        schema:
-          type: string
-          format: uuid
-      - in: query
-        name: page
-        required: false
-        schema:
-          type: integer
-          format: int32
-          default: 0
-      - in: query
-        name: size
-        required: false
-        schema:
-          type: integer
-          format: int32
-          default: 20
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/PageDocument"
-          description: Document versions retrieved successfully
-        "404":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/PageDocument"
-          description: Document not found
-      summary: Get all versions of a document
-      tags: []
-  /api/documents/{id}/versions/{versionNumber}:
-    get:
-      operationId: getDocumentVersion
-      parameters:
-      - in: path
-        name: id
-        required: true
-        schema:
-          type: string
-          format: uuid
-      - in: path
-        name: versionNumber
-        required: true
-        schema:
-          type: integer
-          format: int32
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Document"
-          description: Document version retrieved successfully
-        "404":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Document"
-          description: Document version not found
-      summary: Get specific version of a document by version number
-      tags: []
-  /leaderboard:
-    get:
-      operationId: getLeaderboard
-      parameters:
-      - in: query
-        name: after
-        required: true
-        schema:
-          type: string
-          format: date-time
-      - in: query
-        name: before
-        required: true
-        schema:
-          type: string
-          format: date-time
-      - description: Team filter to apply in INDIVIDUAL mode; ignored when mode is
-          TEAM.
-        in: query
-        name: team
-        required: true
-        schema:
-          type: string
-      - description: Determines the ranking metric. In TEAM mode SCORE uses summed
-          contribution scores; LEAGUE_POINTS uses total league points.
-        in: query
-        name: sort
-        required: true
-        schema:
-          type: string
-          enum:
-          - SCORE
-          - LEAGUE_POINTS
-      - in: query
-        name: mode
-        required: true
-        schema:
-          type: string
-          enum:
-          - INDIVIDUAL
-          - TEAM
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/LeaderboardEntry"
-          description: OK
-      tags:
-      - leaderboard
-    post:
-      operationId: getUserLeagueStats
-      parameters:
-      - in: query
-        name: login
-        required: true
-        schema:
-          type: string
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/LeaderboardEntry"
-        required: true
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/LeagueChange"
-          description: OK
-      tags:
-      - leaderboard
-  /mentor/thread/{threadId}:
-    get:
-      description: Retrieve a specific chat thread with all messages
-      operationId: getThread
-      parameters:
-      - description: Thread ID
-        in: path
-        name: threadId
-        required: true
-        schema:
-          type: string
-          format: uuid
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ChatThreadDetail"
-          description: Successfully retrieved thread
-        "401":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ChatThreadDetail"
-          description: User not authenticated
-        "404":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ChatThreadDetail"
-          description: Thread not found or not owned by user
-      summary: Get chat thread detail
-      tags:
-      - chat
-  /mentor/threads:
-    get:
-      description: Retrieve all chat threads for the authenticated user
-      operationId: getThreads
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/ChatThreadSummary"
-          description: Successfully retrieved threads
-        "401":
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/ChatThreadSummary"
-          description: User not authenticated
-      summary: Get user's chat threads
-      tags:
-      - chat
-  /mentor/threads/grouped:
-    get:
-      description: Retrieve all chat threads for the authenticated user grouped by
-        time periods
-      operationId: getGroupedThreads
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/ChatThreadGroup"
-          description: Successfully retrieved grouped threads
-        "401":
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/ChatThreadGroup"
-          description: User not authenticated
-      summary: Get user's grouped chat threads
-      tags:
-      - chat
-  /meta:
-    get:
-      operationId: getMetaData
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/MetaData"
-          description: OK
-      tags:
-      - meta
-  /meta/contributors:
-    get:
-      operationId: getContributors
+      operationId: listGlobalContributors
       responses:
         "200":
           content:
@@ -592,77 +44,7 @@ paths:
                   $ref: "#/components/schemas/Contributor"
           description: OK
       tags:
-      - meta
-  /team:
-    get:
-      operationId: getAllTeams
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/TeamInfo"
-          description: OK
-      tags:
-      - team
-  /team/{id}/visibility:
-    post:
-      operationId: updateTeamVisibility
-      parameters:
-      - in: path
-        name: id
-        required: true
-        schema:
-          type: integer
-          format: int64
-      - in: query
-        name: hidden
-        required: false
-        schema:
-          type: boolean
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: boolean
-      responses:
-        "200":
-          description: OK
-      tags:
-      - team
-  /team/{teamId}/repositories/{repositoryId}/visibility:
-    post:
-      operationId: updateRepositoryVisibility
-      parameters:
-      - in: path
-        name: teamId
-        required: true
-        schema:
-          type: integer
-          format: int64
-      - in: path
-        name: repositoryId
-        required: true
-        schema:
-          type: integer
-          format: int64
-      - in: query
-        name: hiddenFromContributions
-        required: false
-        schema:
-          type: boolean
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: boolean
-      responses:
-        "200":
-          description: OK
-      tags:
-      - team
+      - contributor
   /user:
     delete:
       operationId: deleteUser
@@ -720,6 +102,39 @@ paths:
       - user
   /workspaces:
     get:
+      operationId: listWorkspaces_1
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/WorkspaceListItem"
+          description: Workspace list
+      summary: List all workspaces
+      tags:
+      - workspace-registry
+    post:
+      operationId: createWorkspace_1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateWorkspaceRequest"
+        required: true
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Workspace"
+          description: Workspace created
+      summary: Create a new workspace
+      tags:
+      - workspace-registry
+  /workspaces/:
+    get:
       operationId: listWorkspaces
       responses:
         "200":
@@ -732,7 +147,7 @@ paths:
           description: Workspace list
       summary: List all workspaces
       tags:
-      - workspace
+      - workspace-registry
     post:
       operationId: createWorkspace
       requestBody:
@@ -750,16 +165,149 @@ paths:
           description: Workspace created
       summary: Create a new workspace
       tags:
-      - workspace
+      - workspace-registry
+  /workspaces/{slug}/members:
+    get:
+      description: |-
+        List all members of the workspace with pagination.
+         Accessible to all workspace members (MEMBER role and above).
+      operationId: listMembers
+      parameters:
+      - description: Workspace slug (resolved by filter)
+        in: path
+        name: slug
+        required: true
+        schema:
+          type: string
+      - description: Page number (0-indexed)
+        in: query
+        name: page
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+      - description: "Page size (default 50, max 100)"
+        in: query
+        name: size
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 50
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/WorkspaceMembership"
+          description: List of workspace memberships
+      summary: List all members of the workspace with pagination.
+      tags:
+      - workspace-membership
+  /workspaces/{slug}/members/assign:
+    post:
+      description: |-
+        Assign or update a role for a workspace member.
+         OWNER can assign any role. ADMIN can assign ADMIN or MEMBER roles.
+      operationId: assignRole
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: slug
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AssignRoleRequest"
+        description: Role assignment request
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+          description: Updated membership
+      summary: Assign or update a role for a workspace member.
+      tags:
+      - workspace-membership
+  /workspaces/{slug}/members/{userId}:
+    delete:
+      description: |-
+        Revoke a user's membership (remove them from workspace).
+         OWNER can remove anyone except themselves if they are the last OWNER.
+         ADMIN can remove MEMBER and ADMIN roles.
+      operationId: removeMember
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: slug
+        required: true
+        schema:
+          type: string
+      - description: User ID to remove
+        in: path
+        name: userId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+          description: 204 No Content on success
+      summary: Revoke a user's membership (remove them from workspace).
+      tags:
+      - workspace-membership
+    get:
+      description: |-
+        Get a specific member's details.
+         Accessible to all workspace members.
+      operationId: getMember
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: slug
+        required: true
+        schema:
+          type: string
+      - description: User ID
+        in: path
+        name: userId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+          description: Workspace membership details
+      summary: Get a specific member's details.
+      tags:
+      - workspace-membership
   /workspaces/{workspaceSlug}:
     delete:
       operationId: purgeWorkspace
       parameters:
-      - in: path
+      - description: Workspace slug
+        in: path
         name: workspaceSlug
         required: true
         schema:
           type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
       responses:
         "204":
           description: Workspace purged
@@ -769,11 +317,13 @@ paths:
     get:
       operationId: getWorkspace
       parameters:
-      - in: path
+      - description: Workspace slug
+        in: path
         name: workspaceSlug
         required: true
         schema:
           type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
       responses:
         "200":
           content:
@@ -784,30 +334,757 @@ paths:
       summary: Fetch a workspace by slug
       tags:
       - workspace
-  /workspaces/{workspaceSlug}/league/reset:
-    put:
-      operationId: resetAndRecalculateLeagues
+  /workspaces/{workspaceSlug}/activity/badpractice/{badPracticeId}/feedback:
+    post:
+      operationId: provideFeedbackForBadPractice
       parameters:
-      - in: path
+      - description: Workspace slug
+        in: path
         name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: badPracticeId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BadPracticeFeedback"
+        required: true
+      responses:
+        "200":
+          description: OK
+      tags:
+      - activity
+  /workspaces/{workspaceSlug}/activity/badpractice/{badPracticeId}/resolve:
+    post:
+      operationId: resolveBadPractice
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: badPracticeId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      - in: query
+        name: state
+        required: true
+        schema:
+          type: string
+          enum:
+          - GOOD_PRACTICE
+          - FIXED
+          - CRITICAL_ISSUE
+          - NORMAL_ISSUE
+          - MINOR_ISSUE
+          - WONT_FIX
+          - WRONG
+      responses:
+        "200":
+          description: OK
+      tags:
+      - activity
+  /workspaces/{workspaceSlug}/activity/pullrequest/{pullRequestId}/badpractices:
+    post:
+      operationId: detectBadPracticesForPullRequest
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: pullRequestId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          description: OK
+      tags:
+      - activity
+  /workspaces/{workspaceSlug}/activity/user/{login}/badpractices:
+    post:
+      operationId: detectBadPracticesByUser
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: login
         required: true
         schema:
           type: string
       responses:
         "200":
           description: OK
-      summary: Reset and recalculate workspace leagues
       tags:
-      - workspace
-  /workspaces/{workspaceSlug}/notifications:
-    patch:
-      operationId: updateNotifications
+      - activity
+  /workspaces/{workspaceSlug}/activity/{login}:
+    get:
+      operationId: getActivityByUser
       parameters:
-      - in: path
+      - description: Workspace slug
+        in: path
         name: workspaceSlug
         required: true
         schema:
           type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: login
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Activity"
+          description: OK
+      tags:
+      - activity
+  /workspaces/{workspaceSlug}/api/chat/messages/{messageId}/vote:
+    patch:
+      description: Cast an upvote or downvote on a chat message
+      operationId: voteMessage
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - description: Message ID to vote on
+        in: path
+        name: messageId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VoteMessageRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatMessageVote"
+          description: Vote successfully recorded
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatMessageVote"
+          description: Invalid vote type or message not found
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatMessageVote"
+          description: Message not found
+      summary: Vote on a message
+      tags:
+      - Chat Mes
+  /workspaces/{workspaceSlug}/api/documents:
+    get:
+      operationId: getUserDocuments
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: query
+        name: page
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+      - in: query
+        name: size
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 20
+      - in: query
+        name: sortBy
+        required: false
+        schema:
+          type: string
+          default: createdAt
+      - in: query
+        name: sortDir
+        required: false
+        schema:
+          type: string
+          default: desc
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PageDocumentSummary"
+          description: Documents retrieved successfully
+      summary: Get all user documents (latest versions only)
+      tags: []
+    post:
+      operationId: createDocument
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateDocumentRequest"
+        required: true
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Document"
+          description: Document created successfully
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Document"
+          description: Invalid request data
+      summary: Create a new document
+      tags: []
+  /workspaces/{workspaceSlug}/api/documents/{id}:
+    delete:
+      operationId: deleteDocument
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "204":
+          description: Document deleted successfully
+        "404":
+          description: Document not found
+      summary: Delete a document and all its versions
+      tags: []
+    get:
+      operationId: getDocument
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Document"
+          description: Document retrieved successfully
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Document"
+          description: Document not found
+      summary: Get latest version of a document
+      tags: []
+    put:
+      operationId: updateDocument
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateDocumentRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Document"
+          description: Document updated successfully
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Document"
+          description: Invalid request data
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Document"
+          description: Document not found
+      summary: Update a document (creates new version)
+      tags: []
+  /workspaces/{workspaceSlug}/api/documents/{id}/versions:
+    delete:
+      operationId: deleteVersionsAfterTimestamp
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - in: query
+        name: after
+        required: true
+        schema:
+          type: string
+          format: date-time
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Document"
+          description: Document versions deleted successfully
+        "400":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Document"
+          description: Invalid timestamp parameter
+        "404":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Document"
+          description: Document not found
+      summary: Delete document versions after specified timestamp
+      tags: []
+    get:
+      operationId: getDocumentVersions
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - in: query
+        name: page
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+      - in: query
+        name: size
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 20
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PageDocument"
+          description: Document versions retrieved successfully
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PageDocument"
+          description: Document not found
+      summary: Get all versions of a document
+      tags: []
+  /workspaces/{workspaceSlug}/api/documents/{id}/versions/{versionNumber}:
+    get:
+      operationId: getDocumentVersion
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - in: path
+        name: versionNumber
+        required: true
+        schema:
+          type: integer
+          format: int32
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Document"
+          description: Document version retrieved successfully
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Document"
+          description: Document version not found
+      summary: Get specific version of a document by version number
+      tags: []
+  /workspaces/{workspaceSlug}/leaderboard:
+    get:
+      operationId: getLeaderboard
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: query
+        name: after
+        required: true
+        schema:
+          type: string
+          format: date-time
+      - in: query
+        name: before
+        required: true
+        schema:
+          type: string
+          format: date-time
+      - description: Team filter to apply in INDIVIDUAL mode; ignored when mode is
+          TEAM.
+        in: query
+        name: team
+        required: true
+        schema:
+          type: string
+      - description: Determines the ranking metric. In TEAM mode SCORE uses summed
+          contribution scores; LEAGUE_POINTS uses total league points.
+        in: query
+        name: sort
+        required: true
+        schema:
+          type: string
+          enum:
+          - SCORE
+          - LEAGUE_POINTS
+      - in: query
+        name: mode
+        required: true
+        schema:
+          type: string
+          enum:
+          - INDIVIDUAL
+          - TEAM
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LeaderboardEntry"
+          description: OK
+      tags:
+      - leaderboard
+    post:
+      operationId: getUserLeagueStats
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: query
+        name: login
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LeaderboardEntry"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LeagueChange"
+          description: OK
+      tags:
+      - leaderboard
+  /workspaces/{workspaceSlug}/league/reset:
+    put:
+      operationId: resetAndRecalculateLeagues
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      responses:
+        "200":
+          description: OK
+      summary: Reset and recalculate workspace leagues
+      tags:
+      - workspace
+  /workspaces/{workspaceSlug}/mentor/thread/{threadId}:
+    get:
+      description: Retrieve a specific chat thread with all messages
+      operationId: getThread
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - description: Thread ID
+        in: path
+        name: threadId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatThreadDetail"
+          description: Successfully retrieved thread
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatThreadDetail"
+          description: User not authenticated
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatThreadDetail"
+          description: Thread not found or not owned by user
+      summary: Get chat thread detail
+      tags:
+      - chat
+  /workspaces/{workspaceSlug}/mentor/threads:
+    get:
+      description: Retrieve all chat threads for the authenticated user
+      operationId: getThreads
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ChatThreadSummary"
+          description: Successfully retrieved threads
+        "401":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ChatThreadSummary"
+          description: User not authenticated
+      summary: Get user's chat threads
+      tags:
+      - chat
+  /workspaces/{workspaceSlug}/mentor/threads/grouped:
+    get:
+      description: Retrieve all chat threads for the authenticated user grouped by
+        time periods
+      operationId: getGroupedThreads
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ChatThreadGroup"
+          description: Successfully retrieved grouped threads
+        "401":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ChatThreadGroup"
+          description: User not authenticated
+      summary: Get user's grouped chat threads
+      tags:
+      - chat
+  /workspaces/{workspaceSlug}/meta:
+    get:
+      operationId: getWorkspaceMeta
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MetaData"
+          description: OK
+      tags:
+      - workspace-meta
+  /workspaces/{workspaceSlug}/meta/contributors:
+    get:
+      operationId: listWorkspaceContributors
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Contributor"
+          description: OK
+      tags:
+      - workspace-meta
+  /workspaces/{workspaceSlug}/notifications:
+    patch:
+      operationId: updateNotifications
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
       requestBody:
         content:
           application/json:
@@ -828,11 +1105,13 @@ paths:
     patch:
       operationId: updatePublicVisibility
       parameters:
-      - in: path
+      - description: Workspace slug
+        in: path
         name: workspaceSlug
         required: true
         schema:
           type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
       requestBody:
         content:
           application/json:
@@ -853,11 +1132,13 @@ paths:
     get:
       operationId: getRepositoriesToMonitor
       parameters:
-      - in: path
+      - description: Workspace slug
+        in: path
         name: workspaceSlug
         required: true
         schema:
           type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
       responses:
         "200":
           content:
@@ -874,11 +1155,13 @@ paths:
     delete:
       operationId: removeRepositoryToMonitor
       parameters:
-      - in: path
+      - description: Workspace slug
+        in: path
         name: workspaceSlug
         required: true
         schema:
           type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
       - in: path
         name: owner
         required: true
@@ -898,11 +1181,13 @@ paths:
     post:
       operationId: addRepositoryToMonitor
       parameters:
-      - in: path
+      - description: Workspace slug
+        in: path
         name: workspaceSlug
         required: true
         schema:
           type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
       - in: path
         name: owner
         required: true
@@ -923,11 +1208,13 @@ paths:
     patch:
       operationId: updateSchedule
       parameters:
-      - in: path
+      - description: Workspace slug
+        in: path
         name: workspaceSlug
         required: true
         schema:
           type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
       requestBody:
         content:
           application/json:
@@ -948,11 +1235,13 @@ paths:
     patch:
       operationId: updateSlackCredentials
       parameters:
-      - in: path
+      - description: Workspace slug
+        in: path
         name: workspaceSlug
         required: true
         schema:
           type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
       requestBody:
         content:
           application/json:
@@ -973,11 +1262,13 @@ paths:
     patch:
       operationId: updateStatus
       parameters:
-      - in: path
+      - description: Workspace slug
+        in: path
         name: workspaceSlug
         required: true
         schema:
           type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
       requestBody:
         content:
           application/json:
@@ -994,15 +1285,109 @@ paths:
       summary: Update workspace lifecycle status
       tags:
       - workspace
-  /workspaces/{workspaceSlug}/teams/{teamId}/labels/{labelId}:
-    delete:
-      operationId: removeLabelFromTeam
+  /workspaces/{workspaceSlug}/team:
+    get:
+      operationId: getAllTeams
       parameters:
-      - in: path
+      - description: Workspace slug
+        in: path
         name: workspaceSlug
         required: true
         schema:
           type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TeamInfo"
+          description: OK
+      tags:
+      - team
+  /workspaces/{workspaceSlug}/team/{id}/visibility:
+    post:
+      operationId: updateTeamVisibility
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+          format: int64
+      - in: query
+        name: hidden
+        required: false
+        schema:
+          type: boolean
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: boolean
+      responses:
+        "200":
+          description: OK
+      tags:
+      - team
+  /workspaces/{workspaceSlug}/team/{teamId}/repositories/{repositoryId}/visibility:
+    post:
+      operationId: updateRepositoryVisibility
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: teamId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      - in: path
+        name: repositoryId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      - in: query
+        name: hiddenFromContributions
+        required: false
+        schema:
+          type: boolean
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: boolean
+      responses:
+        "200":
+          description: OK
+      tags:
+      - team
+  /workspaces/{workspaceSlug}/teams/{teamId}/labels/{labelId}:
+    delete:
+      operationId: removeLabelFromTeam
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
       - in: path
         name: teamId
         required: true
@@ -1029,11 +1414,13 @@ paths:
     post:
       operationId: addLabelToTeam
       parameters:
-      - in: path
+      - description: Workspace slug
+        in: path
         name: workspaceSlug
         required: true
         schema:
           type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
       - in: path
         name: teamId
         required: true
@@ -1065,11 +1452,13 @@ paths:
     patch:
       operationId: updateToken
       parameters:
-      - in: path
+      - description: Workspace slug
+        in: path
         name: workspaceSlug
         required: true
         schema:
           type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
       requestBody:
         content:
           application/json:
@@ -1090,11 +1479,13 @@ paths:
     get:
       operationId: getUsersWithTeams
       parameters:
-      - in: path
+      - description: Workspace slug
+        in: path
         name: workspaceSlug
         required: true
         schema:
           type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
       responses:
         "200":
           content:
@@ -1118,6 +1509,22 @@ components:
             $ref: "#/components/schemas/PullRequestWithBadPractices"
       required:
       - pullRequests
+    AssignRoleRequest:
+      type: object
+      description: DTO for assigning or updating a role for a workspace member.
+      properties:
+        role:
+          type: string
+          enum:
+          - OWNER
+          - ADMIN
+          - MEMBER
+        userId:
+          type: integer
+          format: int64
+      required:
+      - role
+      - userId
     BadPracticeFeedback:
       type: object
       properties:
@@ -3334,3 +3741,26 @@ components:
       - id
       - status
       - workspaceSlug
+    WorkspaceMembership:
+      type: object
+      description: DTO representing a workspace membership with user information.
+      properties:
+        createdAt:
+          type: string
+          format: date-time
+        leaguePoints:
+          type: integer
+          format: int32
+        role:
+          type: string
+          enum:
+          - OWNER
+          - ADMIN
+          - MEMBER
+        userId:
+          type: integer
+          format: int64
+        userLogin:
+          type: string
+        userName:
+          type: string

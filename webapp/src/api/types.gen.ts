@@ -4,6 +4,14 @@ export type Activity = {
     pullRequests: Array<PullRequestWithBadPractices>;
 };
 
+/**
+ * DTO for assigning or updating a role for a workspace member.
+ */
+export type AssignRoleRequest = {
+    role: 'OWNER' | 'ADMIN' | 'MEMBER';
+    userId: number;
+};
+
 export type BadPracticeFeedback = {
     explanation: string;
     type: string;
@@ -1613,558 +1621,33 @@ export type WorkspaceListItem = {
     workspaceSlug: string;
 };
 
-export type ProvideFeedbackForBadPracticeData = {
-    body: BadPracticeFeedback;
-    path: {
-        badPracticeId: number;
-    };
-    query?: never;
-    url: '/activity/badpractice/{badPracticeId}/feedback';
+/**
+ * DTO representing a workspace membership with user information.
+ */
+export type WorkspaceMembership = {
+    createdAt?: Date;
+    leaguePoints?: number;
+    role?: 'OWNER' | 'ADMIN' | 'MEMBER';
+    userId?: number;
+    userLogin?: string;
+    userName?: string;
 };
 
-export type ProvideFeedbackForBadPracticeResponses = {
-    /**
-     * OK
-     */
-    200: unknown;
-};
-
-export type ResolveBadPracticeData = {
-    body?: never;
-    path: {
-        badPracticeId: number;
-    };
-    query: {
-        state: 'GOOD_PRACTICE' | 'FIXED' | 'CRITICAL_ISSUE' | 'NORMAL_ISSUE' | 'MINOR_ISSUE' | 'WONT_FIX' | 'WRONG';
-    };
-    url: '/activity/badpractice/{badPracticeId}/resolve';
-};
-
-export type ResolveBadPracticeResponses = {
-    /**
-     * OK
-     */
-    200: unknown;
-};
-
-export type DetectBadPracticesForPullRequestData = {
-    body?: never;
-    path: {
-        pullRequestId: number;
-    };
-    query?: never;
-    url: '/activity/pullrequest/{pullRequestId}/badpractices';
-};
-
-export type DetectBadPracticesForPullRequestResponses = {
-    /**
-     * OK
-     */
-    200: unknown;
-};
-
-export type DetectBadPracticesByUserData = {
-    body?: never;
-    path: {
-        login: string;
-    };
-    query?: never;
-    url: '/activity/user/{login}/badpractices';
-};
-
-export type DetectBadPracticesByUserResponses = {
-    /**
-     * OK
-     */
-    200: unknown;
-};
-
-export type GetActivityByUserData = {
-    body?: never;
-    path: {
-        login: string;
-    };
-    query?: never;
-    url: '/activity/{login}';
-};
-
-export type GetActivityByUserResponses = {
-    /**
-     * OK
-     */
-    200: Activity;
-};
-
-export type GetActivityByUserResponse = GetActivityByUserResponses[keyof GetActivityByUserResponses];
-
-export type VoteMessageData = {
-    body: VoteMessageRequest;
-    path: {
-        /**
-         * Message ID to vote on
-         */
-        messageId: string;
-    };
-    query?: never;
-    url: '/api/chat/messages/{messageId}/vote';
-};
-
-export type VoteMessageErrors = {
-    /**
-     * Invalid vote type or message not found
-     */
-    400: ChatMessageVote;
-    /**
-     * Message not found
-     */
-    404: ChatMessageVote;
-};
-
-export type VoteMessageError = VoteMessageErrors[keyof VoteMessageErrors];
-
-export type VoteMessageResponses = {
-    /**
-     * Vote successfully recorded
-     */
-    200: ChatMessageVote;
-};
-
-export type VoteMessageResponse = VoteMessageResponses[keyof VoteMessageResponses];
-
-export type GetUserDocumentsData = {
-    body?: never;
-    path?: never;
-    query?: {
-        page?: number;
-        size?: number;
-        sortBy?: string;
-        sortDir?: string;
-    };
-    url: '/api/documents';
-};
-
-export type GetUserDocumentsResponses = {
-    /**
-     * Documents retrieved successfully
-     */
-    200: PageDocumentSummary;
-};
-
-export type GetUserDocumentsResponse = GetUserDocumentsResponses[keyof GetUserDocumentsResponses];
-
-export type CreateDocumentData = {
-    body: CreateDocumentRequest;
-    path?: never;
-    query?: never;
-    url: '/api/documents';
-};
-
-export type CreateDocumentErrors = {
-    /**
-     * Invalid request data
-     */
-    400: Document;
-};
-
-export type CreateDocumentError = CreateDocumentErrors[keyof CreateDocumentErrors];
-
-export type CreateDocumentResponses = {
-    /**
-     * Document created successfully
-     */
-    201: Document;
-};
-
-export type CreateDocumentResponse = CreateDocumentResponses[keyof CreateDocumentResponses];
-
-export type DeleteDocumentData = {
-    body?: never;
-    path: {
-        id: string;
-    };
-    query?: never;
-    url: '/api/documents/{id}';
-};
-
-export type DeleteDocumentErrors = {
-    /**
-     * Document not found
-     */
-    404: unknown;
-};
-
-export type DeleteDocumentResponses = {
-    /**
-     * Document deleted successfully
-     */
-    204: void;
-};
-
-export type DeleteDocumentResponse = DeleteDocumentResponses[keyof DeleteDocumentResponses];
-
-export type GetDocumentData = {
-    body?: never;
-    path: {
-        id: string;
-    };
-    query?: never;
-    url: '/api/documents/{id}';
-};
-
-export type GetDocumentErrors = {
-    /**
-     * Document not found
-     */
-    404: Document;
-};
-
-export type GetDocumentError = GetDocumentErrors[keyof GetDocumentErrors];
-
-export type GetDocumentResponses = {
-    /**
-     * Document retrieved successfully
-     */
-    200: Document;
-};
-
-export type GetDocumentResponse = GetDocumentResponses[keyof GetDocumentResponses];
-
-export type UpdateDocumentData = {
-    body: UpdateDocumentRequest;
-    path: {
-        id: string;
-    };
-    query?: never;
-    url: '/api/documents/{id}';
-};
-
-export type UpdateDocumentErrors = {
-    /**
-     * Invalid request data
-     */
-    400: Document;
-    /**
-     * Document not found
-     */
-    404: Document;
-};
-
-export type UpdateDocumentError = UpdateDocumentErrors[keyof UpdateDocumentErrors];
-
-export type UpdateDocumentResponses = {
-    /**
-     * Document updated successfully
-     */
-    200: Document;
-};
-
-export type UpdateDocumentResponse = UpdateDocumentResponses[keyof UpdateDocumentResponses];
-
-export type DeleteVersionsAfterTimestampData = {
-    body?: never;
-    path: {
-        id: string;
-    };
-    query: {
-        after: Date;
-    };
-    url: '/api/documents/{id}/versions';
-};
-
-export type DeleteVersionsAfterTimestampErrors = {
-    /**
-     * Invalid timestamp parameter
-     */
-    400: Array<Document>;
-    /**
-     * Document not found
-     */
-    404: Array<Document>;
-};
-
-export type DeleteVersionsAfterTimestampError = DeleteVersionsAfterTimestampErrors[keyof DeleteVersionsAfterTimestampErrors];
-
-export type DeleteVersionsAfterTimestampResponses = {
-    /**
-     * Document versions deleted successfully
-     */
-    200: Array<Document>;
-};
-
-export type DeleteVersionsAfterTimestampResponse = DeleteVersionsAfterTimestampResponses[keyof DeleteVersionsAfterTimestampResponses];
-
-export type GetDocumentVersionsData = {
-    body?: never;
-    path: {
-        id: string;
-    };
-    query?: {
-        page?: number;
-        size?: number;
-    };
-    url: '/api/documents/{id}/versions';
-};
-
-export type GetDocumentVersionsErrors = {
-    /**
-     * Document not found
-     */
-    404: PageDocument;
-};
-
-export type GetDocumentVersionsError = GetDocumentVersionsErrors[keyof GetDocumentVersionsErrors];
-
-export type GetDocumentVersionsResponses = {
-    /**
-     * Document versions retrieved successfully
-     */
-    200: PageDocument;
-};
-
-export type GetDocumentVersionsResponse = GetDocumentVersionsResponses[keyof GetDocumentVersionsResponses];
-
-export type GetDocumentVersionData = {
-    body?: never;
-    path: {
-        id: string;
-        versionNumber: number;
-    };
-    query?: never;
-    url: '/api/documents/{id}/versions/{versionNumber}';
-};
-
-export type GetDocumentVersionErrors = {
-    /**
-     * Document version not found
-     */
-    404: Document;
-};
-
-export type GetDocumentVersionError = GetDocumentVersionErrors[keyof GetDocumentVersionErrors];
-
-export type GetDocumentVersionResponses = {
-    /**
-     * Document version retrieved successfully
-     */
-    200: Document;
-};
-
-export type GetDocumentVersionResponse = GetDocumentVersionResponses[keyof GetDocumentVersionResponses];
-
-export type GetLeaderboardData = {
-    body?: never;
-    path?: never;
-    query: {
-        after: Date;
-        before: Date;
-        /**
-         * Team filter to apply in INDIVIDUAL mode; ignored when mode is TEAM.
-         */
-        team: string;
-        /**
-         * Determines the ranking metric. In TEAM mode SCORE uses summed contribution scores; LEAGUE_POINTS uses total league points.
-         */
-        sort: 'SCORE' | 'LEAGUE_POINTS';
-        mode: 'INDIVIDUAL' | 'TEAM';
-    };
-    url: '/leaderboard';
-};
-
-export type GetLeaderboardResponses = {
-    /**
-     * OK
-     */
-    200: Array<LeaderboardEntry>;
-};
-
-export type GetLeaderboardResponse = GetLeaderboardResponses[keyof GetLeaderboardResponses];
-
-export type GetUserLeagueStatsData = {
-    body: LeaderboardEntry;
-    path?: never;
-    query: {
-        login: string;
-    };
-    url: '/leaderboard';
-};
-
-export type GetUserLeagueStatsResponses = {
-    /**
-     * OK
-     */
-    200: LeagueChange;
-};
-
-export type GetUserLeagueStatsResponse = GetUserLeagueStatsResponses[keyof GetUserLeagueStatsResponses];
-
-export type GetThreadData = {
-    body?: never;
-    path: {
-        /**
-         * Thread ID
-         */
-        threadId: string;
-    };
-    query?: never;
-    url: '/mentor/thread/{threadId}';
-};
-
-export type GetThreadErrors = {
-    /**
-     * User not authenticated
-     */
-    401: ChatThreadDetail;
-    /**
-     * Thread not found or not owned by user
-     */
-    404: ChatThreadDetail;
-};
-
-export type GetThreadError = GetThreadErrors[keyof GetThreadErrors];
-
-export type GetThreadResponses = {
-    /**
-     * Successfully retrieved thread
-     */
-    200: ChatThreadDetail;
-};
-
-export type GetThreadResponse = GetThreadResponses[keyof GetThreadResponses];
-
-export type GetThreadsData = {
+export type ListGlobalContributorsData = {
     body?: never;
     path?: never;
     query?: never;
-    url: '/mentor/threads';
+    url: '/contributors';
 };
 
-export type GetThreadsErrors = {
-    /**
-     * User not authenticated
-     */
-    401: Array<ChatThreadSummary>;
-};
-
-export type GetThreadsError = GetThreadsErrors[keyof GetThreadsErrors];
-
-export type GetThreadsResponses = {
-    /**
-     * Successfully retrieved threads
-     */
-    200: Array<ChatThreadSummary>;
-};
-
-export type GetThreadsResponse = GetThreadsResponses[keyof GetThreadsResponses];
-
-export type GetGroupedThreadsData = {
-    body?: never;
-    path?: never;
-    query?: never;
-    url: '/mentor/threads/grouped';
-};
-
-export type GetGroupedThreadsErrors = {
-    /**
-     * User not authenticated
-     */
-    401: Array<ChatThreadGroup>;
-};
-
-export type GetGroupedThreadsError = GetGroupedThreadsErrors[keyof GetGroupedThreadsErrors];
-
-export type GetGroupedThreadsResponses = {
-    /**
-     * Successfully retrieved grouped threads
-     */
-    200: Array<ChatThreadGroup>;
-};
-
-export type GetGroupedThreadsResponse = GetGroupedThreadsResponses[keyof GetGroupedThreadsResponses];
-
-export type GetMetaDataData = {
-    body?: never;
-    path?: never;
-    query?: never;
-    url: '/meta';
-};
-
-export type GetMetaDataResponses = {
-    /**
-     * OK
-     */
-    200: MetaData;
-};
-
-export type GetMetaDataResponse = GetMetaDataResponses[keyof GetMetaDataResponses];
-
-export type GetContributorsData = {
-    body?: never;
-    path?: never;
-    query?: never;
-    url: '/meta/contributors';
-};
-
-export type GetContributorsResponses = {
+export type ListGlobalContributorsResponses = {
     /**
      * OK
      */
     200: Array<Contributor>;
 };
 
-export type GetContributorsResponse = GetContributorsResponses[keyof GetContributorsResponses];
-
-export type GetAllTeamsData = {
-    body?: never;
-    path?: never;
-    query?: never;
-    url: '/team';
-};
-
-export type GetAllTeamsResponses = {
-    /**
-     * OK
-     */
-    200: Array<TeamInfo>;
-};
-
-export type GetAllTeamsResponse = GetAllTeamsResponses[keyof GetAllTeamsResponses];
-
-export type UpdateTeamVisibilityData = {
-    body?: boolean;
-    path: {
-        id: number;
-    };
-    query?: {
-        hidden?: boolean;
-    };
-    url: '/team/{id}/visibility';
-};
-
-export type UpdateTeamVisibilityResponses = {
-    /**
-     * OK
-     */
-    200: unknown;
-};
-
-export type UpdateRepositoryVisibilityData = {
-    body?: boolean;
-    path: {
-        teamId: number;
-        repositoryId: number;
-    };
-    query?: {
-        hiddenFromContributions?: boolean;
-    };
-    url: '/team/{teamId}/repositories/{repositoryId}/visibility';
-};
-
-export type UpdateRepositoryVisibilityResponses = {
-    /**
-     * OK
-     */
-    200: unknown;
-};
+export type ListGlobalContributorsResponse = ListGlobalContributorsResponses[keyof ListGlobalContributorsResponses];
 
 export type DeleteUserData = {
     body?: never;
@@ -2230,11 +1713,43 @@ export type GetUserProfileResponses = {
 
 export type GetUserProfileResponse = GetUserProfileResponses[keyof GetUserProfileResponses];
 
-export type ListWorkspacesData = {
+export type ListWorkspaces1Data = {
     body?: never;
     path?: never;
     query?: never;
     url: '/workspaces';
+};
+
+export type ListWorkspaces1Responses = {
+    /**
+     * Workspace list
+     */
+    200: Array<WorkspaceListItem>;
+};
+
+export type ListWorkspaces1Response = ListWorkspaces1Responses[keyof ListWorkspaces1Responses];
+
+export type CreateWorkspace1Data = {
+    body: CreateWorkspaceRequest;
+    path?: never;
+    query?: never;
+    url: '/workspaces';
+};
+
+export type CreateWorkspace1Responses = {
+    /**
+     * Workspace created
+     */
+    201: Workspace;
+};
+
+export type CreateWorkspace1Response = CreateWorkspace1Responses[keyof CreateWorkspace1Responses];
+
+export type ListWorkspacesData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/workspaces/';
 };
 
 export type ListWorkspacesResponses = {
@@ -2250,7 +1765,7 @@ export type CreateWorkspaceData = {
     body: CreateWorkspaceRequest;
     path?: never;
     query?: never;
-    url: '/workspaces';
+    url: '/workspaces/';
 };
 
 export type CreateWorkspaceResponses = {
@@ -2262,9 +1777,122 @@ export type CreateWorkspaceResponses = {
 
 export type CreateWorkspaceResponse = CreateWorkspaceResponses[keyof CreateWorkspaceResponses];
 
+export type ListMembersData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug (resolved by filter)
+         */
+        slug: string;
+    };
+    query?: {
+        /**
+         * Page number (0-indexed)
+         */
+        page?: number;
+        /**
+         * Page size (default 50, max 100)
+         */
+        size?: number;
+    };
+    url: '/workspaces/{slug}/members';
+};
+
+export type ListMembersResponses = {
+    /**
+     * List of workspace memberships
+     */
+    200: Array<WorkspaceMembership>;
+};
+
+export type ListMembersResponse = ListMembersResponses[keyof ListMembersResponses];
+
+export type AssignRoleData = {
+    /**
+     * Role assignment request
+     */
+    body: AssignRoleRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        slug: string;
+    };
+    query?: never;
+    url: '/workspaces/{slug}/members/assign';
+};
+
+export type AssignRoleResponses = {
+    /**
+     * Updated membership
+     */
+    200: {
+        [key: string]: unknown;
+    };
+};
+
+export type AssignRoleResponse = AssignRoleResponses[keyof AssignRoleResponses];
+
+export type RemoveMemberData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        slug: string;
+        /**
+         * User ID to remove
+         */
+        userId: number;
+    };
+    query?: never;
+    url: '/workspaces/{slug}/members/{userId}';
+};
+
+export type RemoveMemberResponses = {
+    /**
+     * 204 No Content on success
+     */
+    200: {
+        [key: string]: unknown;
+    };
+};
+
+export type RemoveMemberResponse = RemoveMemberResponses[keyof RemoveMemberResponses];
+
+export type GetMemberData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        slug: string;
+        /**
+         * User ID
+         */
+        userId: number;
+    };
+    query?: never;
+    url: '/workspaces/{slug}/members/{userId}';
+};
+
+export type GetMemberResponses = {
+    /**
+     * Workspace membership details
+     */
+    200: {
+        [key: string]: unknown;
+    };
+};
+
+export type GetMemberResponse = GetMemberResponses[keyof GetMemberResponses];
+
 export type PurgeWorkspaceData = {
     body?: never;
     path: {
+        /**
+         * Workspace slug
+         */
         workspaceSlug: string;
     };
     query?: never;
@@ -2283,6 +1911,9 @@ export type PurgeWorkspaceResponse = PurgeWorkspaceResponses[keyof PurgeWorkspac
 export type GetWorkspaceData = {
     body?: never;
     path: {
+        /**
+         * Workspace slug
+         */
         workspaceSlug: string;
     };
     query?: never;
@@ -2298,9 +1929,464 @@ export type GetWorkspaceResponses = {
 
 export type GetWorkspaceResponse = GetWorkspaceResponses[keyof GetWorkspaceResponses];
 
+export type ProvideFeedbackForBadPracticeData = {
+    body: BadPracticeFeedback;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        badPracticeId: number;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/activity/badpractice/{badPracticeId}/feedback';
+};
+
+export type ProvideFeedbackForBadPracticeResponses = {
+    /**
+     * OK
+     */
+    200: unknown;
+};
+
+export type ResolveBadPracticeData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        badPracticeId: number;
+    };
+    query: {
+        state: 'GOOD_PRACTICE' | 'FIXED' | 'CRITICAL_ISSUE' | 'NORMAL_ISSUE' | 'MINOR_ISSUE' | 'WONT_FIX' | 'WRONG';
+    };
+    url: '/workspaces/{workspaceSlug}/activity/badpractice/{badPracticeId}/resolve';
+};
+
+export type ResolveBadPracticeResponses = {
+    /**
+     * OK
+     */
+    200: unknown;
+};
+
+export type DetectBadPracticesForPullRequestData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        pullRequestId: number;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/activity/pullrequest/{pullRequestId}/badpractices';
+};
+
+export type DetectBadPracticesForPullRequestResponses = {
+    /**
+     * OK
+     */
+    200: unknown;
+};
+
+export type DetectBadPracticesByUserData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        login: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/activity/user/{login}/badpractices';
+};
+
+export type DetectBadPracticesByUserResponses = {
+    /**
+     * OK
+     */
+    200: unknown;
+};
+
+export type GetActivityByUserData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        login: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/activity/{login}';
+};
+
+export type GetActivityByUserResponses = {
+    /**
+     * OK
+     */
+    200: Activity;
+};
+
+export type GetActivityByUserResponse = GetActivityByUserResponses[keyof GetActivityByUserResponses];
+
+export type VoteMessageData = {
+    body: VoteMessageRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        /**
+         * Message ID to vote on
+         */
+        messageId: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/api/chat/messages/{messageId}/vote';
+};
+
+export type VoteMessageErrors = {
+    /**
+     * Invalid vote type or message not found
+     */
+    400: ChatMessageVote;
+    /**
+     * Message not found
+     */
+    404: ChatMessageVote;
+};
+
+export type VoteMessageError = VoteMessageErrors[keyof VoteMessageErrors];
+
+export type VoteMessageResponses = {
+    /**
+     * Vote successfully recorded
+     */
+    200: ChatMessageVote;
+};
+
+export type VoteMessageResponse = VoteMessageResponses[keyof VoteMessageResponses];
+
+export type GetUserDocumentsData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: {
+        page?: number;
+        size?: number;
+        sortBy?: string;
+        sortDir?: string;
+    };
+    url: '/workspaces/{workspaceSlug}/api/documents';
+};
+
+export type GetUserDocumentsResponses = {
+    /**
+     * Documents retrieved successfully
+     */
+    200: PageDocumentSummary;
+};
+
+export type GetUserDocumentsResponse = GetUserDocumentsResponses[keyof GetUserDocumentsResponses];
+
+export type CreateDocumentData = {
+    body: CreateDocumentRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/api/documents';
+};
+
+export type CreateDocumentErrors = {
+    /**
+     * Invalid request data
+     */
+    400: Document;
+};
+
+export type CreateDocumentError = CreateDocumentErrors[keyof CreateDocumentErrors];
+
+export type CreateDocumentResponses = {
+    /**
+     * Document created successfully
+     */
+    201: Document;
+};
+
+export type CreateDocumentResponse = CreateDocumentResponses[keyof CreateDocumentResponses];
+
+export type DeleteDocumentData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        id: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/api/documents/{id}';
+};
+
+export type DeleteDocumentErrors = {
+    /**
+     * Document not found
+     */
+    404: unknown;
+};
+
+export type DeleteDocumentResponses = {
+    /**
+     * Document deleted successfully
+     */
+    204: void;
+};
+
+export type DeleteDocumentResponse = DeleteDocumentResponses[keyof DeleteDocumentResponses];
+
+export type GetDocumentData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        id: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/api/documents/{id}';
+};
+
+export type GetDocumentErrors = {
+    /**
+     * Document not found
+     */
+    404: Document;
+};
+
+export type GetDocumentError = GetDocumentErrors[keyof GetDocumentErrors];
+
+export type GetDocumentResponses = {
+    /**
+     * Document retrieved successfully
+     */
+    200: Document;
+};
+
+export type GetDocumentResponse = GetDocumentResponses[keyof GetDocumentResponses];
+
+export type UpdateDocumentData = {
+    body: UpdateDocumentRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        id: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/api/documents/{id}';
+};
+
+export type UpdateDocumentErrors = {
+    /**
+     * Invalid request data
+     */
+    400: Document;
+    /**
+     * Document not found
+     */
+    404: Document;
+};
+
+export type UpdateDocumentError = UpdateDocumentErrors[keyof UpdateDocumentErrors];
+
+export type UpdateDocumentResponses = {
+    /**
+     * Document updated successfully
+     */
+    200: Document;
+};
+
+export type UpdateDocumentResponse = UpdateDocumentResponses[keyof UpdateDocumentResponses];
+
+export type DeleteVersionsAfterTimestampData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        id: string;
+    };
+    query: {
+        after: Date;
+    };
+    url: '/workspaces/{workspaceSlug}/api/documents/{id}/versions';
+};
+
+export type DeleteVersionsAfterTimestampErrors = {
+    /**
+     * Invalid timestamp parameter
+     */
+    400: Array<Document>;
+    /**
+     * Document not found
+     */
+    404: Array<Document>;
+};
+
+export type DeleteVersionsAfterTimestampError = DeleteVersionsAfterTimestampErrors[keyof DeleteVersionsAfterTimestampErrors];
+
+export type DeleteVersionsAfterTimestampResponses = {
+    /**
+     * Document versions deleted successfully
+     */
+    200: Array<Document>;
+};
+
+export type DeleteVersionsAfterTimestampResponse = DeleteVersionsAfterTimestampResponses[keyof DeleteVersionsAfterTimestampResponses];
+
+export type GetDocumentVersionsData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        id: string;
+    };
+    query?: {
+        page?: number;
+        size?: number;
+    };
+    url: '/workspaces/{workspaceSlug}/api/documents/{id}/versions';
+};
+
+export type GetDocumentVersionsErrors = {
+    /**
+     * Document not found
+     */
+    404: PageDocument;
+};
+
+export type GetDocumentVersionsError = GetDocumentVersionsErrors[keyof GetDocumentVersionsErrors];
+
+export type GetDocumentVersionsResponses = {
+    /**
+     * Document versions retrieved successfully
+     */
+    200: PageDocument;
+};
+
+export type GetDocumentVersionsResponse = GetDocumentVersionsResponses[keyof GetDocumentVersionsResponses];
+
+export type GetDocumentVersionData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        id: string;
+        versionNumber: number;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/api/documents/{id}/versions/{versionNumber}';
+};
+
+export type GetDocumentVersionErrors = {
+    /**
+     * Document version not found
+     */
+    404: Document;
+};
+
+export type GetDocumentVersionError = GetDocumentVersionErrors[keyof GetDocumentVersionErrors];
+
+export type GetDocumentVersionResponses = {
+    /**
+     * Document version retrieved successfully
+     */
+    200: Document;
+};
+
+export type GetDocumentVersionResponse = GetDocumentVersionResponses[keyof GetDocumentVersionResponses];
+
+export type GetLeaderboardData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query: {
+        after: Date;
+        before: Date;
+        /**
+         * Team filter to apply in INDIVIDUAL mode; ignored when mode is TEAM.
+         */
+        team: string;
+        /**
+         * Determines the ranking metric. In TEAM mode SCORE uses summed contribution scores; LEAGUE_POINTS uses total league points.
+         */
+        sort: 'SCORE' | 'LEAGUE_POINTS';
+        mode: 'INDIVIDUAL' | 'TEAM';
+    };
+    url: '/workspaces/{workspaceSlug}/leaderboard';
+};
+
+export type GetLeaderboardResponses = {
+    /**
+     * OK
+     */
+    200: Array<LeaderboardEntry>;
+};
+
+export type GetLeaderboardResponse = GetLeaderboardResponses[keyof GetLeaderboardResponses];
+
+export type GetUserLeagueStatsData = {
+    body: LeaderboardEntry;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query: {
+        login: string;
+    };
+    url: '/workspaces/{workspaceSlug}/leaderboard';
+};
+
+export type GetUserLeagueStatsResponses = {
+    /**
+     * OK
+     */
+    200: LeagueChange;
+};
+
+export type GetUserLeagueStatsResponse = GetUserLeagueStatsResponses[keyof GetUserLeagueStatsResponses];
+
 export type ResetAndRecalculateLeaguesData = {
     body?: never;
     path: {
+        /**
+         * Workspace slug
+         */
         workspaceSlug: string;
     };
     query?: never;
@@ -2314,9 +2400,152 @@ export type ResetAndRecalculateLeaguesResponses = {
     200: unknown;
 };
 
+export type GetThreadData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        /**
+         * Thread ID
+         */
+        threadId: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/mentor/thread/{threadId}';
+};
+
+export type GetThreadErrors = {
+    /**
+     * User not authenticated
+     */
+    401: ChatThreadDetail;
+    /**
+     * Thread not found or not owned by user
+     */
+    404: ChatThreadDetail;
+};
+
+export type GetThreadError = GetThreadErrors[keyof GetThreadErrors];
+
+export type GetThreadResponses = {
+    /**
+     * Successfully retrieved thread
+     */
+    200: ChatThreadDetail;
+};
+
+export type GetThreadResponse = GetThreadResponses[keyof GetThreadResponses];
+
+export type GetThreadsData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/mentor/threads';
+};
+
+export type GetThreadsErrors = {
+    /**
+     * User not authenticated
+     */
+    401: Array<ChatThreadSummary>;
+};
+
+export type GetThreadsError = GetThreadsErrors[keyof GetThreadsErrors];
+
+export type GetThreadsResponses = {
+    /**
+     * Successfully retrieved threads
+     */
+    200: Array<ChatThreadSummary>;
+};
+
+export type GetThreadsResponse = GetThreadsResponses[keyof GetThreadsResponses];
+
+export type GetGroupedThreadsData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/mentor/threads/grouped';
+};
+
+export type GetGroupedThreadsErrors = {
+    /**
+     * User not authenticated
+     */
+    401: Array<ChatThreadGroup>;
+};
+
+export type GetGroupedThreadsError = GetGroupedThreadsErrors[keyof GetGroupedThreadsErrors];
+
+export type GetGroupedThreadsResponses = {
+    /**
+     * Successfully retrieved grouped threads
+     */
+    200: Array<ChatThreadGroup>;
+};
+
+export type GetGroupedThreadsResponse = GetGroupedThreadsResponses[keyof GetGroupedThreadsResponses];
+
+export type GetWorkspaceMetaData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/meta';
+};
+
+export type GetWorkspaceMetaResponses = {
+    /**
+     * OK
+     */
+    200: MetaData;
+};
+
+export type GetWorkspaceMetaResponse = GetWorkspaceMetaResponses[keyof GetWorkspaceMetaResponses];
+
+export type ListWorkspaceContributorsData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/meta/contributors';
+};
+
+export type ListWorkspaceContributorsResponses = {
+    /**
+     * OK
+     */
+    200: Array<Contributor>;
+};
+
+export type ListWorkspaceContributorsResponse = ListWorkspaceContributorsResponses[keyof ListWorkspaceContributorsResponses];
+
 export type UpdateNotificationsData = {
     body: UpdateWorkspaceNotificationsRequest;
     path: {
+        /**
+         * Workspace slug
+         */
         workspaceSlug: string;
     };
     query?: never;
@@ -2335,6 +2564,9 @@ export type UpdateNotificationsResponse = UpdateNotificationsResponses[keyof Upd
 export type UpdatePublicVisibilityData = {
     body: UpdateWorkspacePublicVisibilityRequest;
     path: {
+        /**
+         * Workspace slug
+         */
         workspaceSlug: string;
     };
     query?: never;
@@ -2353,6 +2585,9 @@ export type UpdatePublicVisibilityResponse = UpdatePublicVisibilityResponses[key
 export type GetRepositoriesToMonitorData = {
     body?: never;
     path: {
+        /**
+         * Workspace slug
+         */
         workspaceSlug: string;
     };
     query?: never;
@@ -2371,6 +2606,9 @@ export type GetRepositoriesToMonitorResponse = GetRepositoriesToMonitorResponses
 export type RemoveRepositoryToMonitorData = {
     body?: never;
     path: {
+        /**
+         * Workspace slug
+         */
         workspaceSlug: string;
         owner: string;
         name: string;
@@ -2389,6 +2627,9 @@ export type RemoveRepositoryToMonitorResponses = {
 export type AddRepositoryToMonitorData = {
     body?: never;
     path: {
+        /**
+         * Workspace slug
+         */
         workspaceSlug: string;
         owner: string;
         name: string;
@@ -2407,6 +2648,9 @@ export type AddRepositoryToMonitorResponses = {
 export type UpdateScheduleData = {
     body: UpdateWorkspaceScheduleRequest;
     path: {
+        /**
+         * Workspace slug
+         */
         workspaceSlug: string;
     };
     query?: never;
@@ -2425,6 +2669,9 @@ export type UpdateScheduleResponse = UpdateScheduleResponses[keyof UpdateSchedul
 export type UpdateSlackCredentialsData = {
     body: UpdateWorkspaceSlackCredentialsRequest;
     path: {
+        /**
+         * Workspace slug
+         */
         workspaceSlug: string;
     };
     query?: never;
@@ -2443,6 +2690,9 @@ export type UpdateSlackCredentialsResponse = UpdateSlackCredentialsResponses[key
 export type UpdateStatusData = {
     body: UpdateWorkspaceStatusRequest;
     path: {
+        /**
+         * Workspace slug
+         */
         workspaceSlug: string;
     };
     query?: never;
@@ -2458,9 +2708,78 @@ export type UpdateStatusResponses = {
 
 export type UpdateStatusResponse = UpdateStatusResponses[keyof UpdateStatusResponses];
 
+export type GetAllTeamsData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/team';
+};
+
+export type GetAllTeamsResponses = {
+    /**
+     * OK
+     */
+    200: Array<TeamInfo>;
+};
+
+export type GetAllTeamsResponse = GetAllTeamsResponses[keyof GetAllTeamsResponses];
+
+export type UpdateTeamVisibilityData = {
+    body?: boolean;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        id: number;
+    };
+    query?: {
+        hidden?: boolean;
+    };
+    url: '/workspaces/{workspaceSlug}/team/{id}/visibility';
+};
+
+export type UpdateTeamVisibilityResponses = {
+    /**
+     * OK
+     */
+    200: unknown;
+};
+
+export type UpdateRepositoryVisibilityData = {
+    body?: boolean;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        teamId: number;
+        repositoryId: number;
+    };
+    query?: {
+        hiddenFromContributions?: boolean;
+    };
+    url: '/workspaces/{workspaceSlug}/team/{teamId}/repositories/{repositoryId}/visibility';
+};
+
+export type UpdateRepositoryVisibilityResponses = {
+    /**
+     * OK
+     */
+    200: unknown;
+};
+
 export type RemoveLabelFromTeamData = {
     body?: never;
     path: {
+        /**
+         * Workspace slug
+         */
         workspaceSlug: string;
         teamId: number;
         labelId: number;
@@ -2481,6 +2800,9 @@ export type RemoveLabelFromTeamResponse = RemoveLabelFromTeamResponses[keyof Rem
 export type AddLabelToTeamData = {
     body?: never;
     path: {
+        /**
+         * Workspace slug
+         */
         workspaceSlug: string;
         teamId: number;
         repositoryId: number;
@@ -2502,6 +2824,9 @@ export type AddLabelToTeamResponse = AddLabelToTeamResponses[keyof AddLabelToTea
 export type UpdateTokenData = {
     body: UpdateWorkspaceTokenRequest;
     path: {
+        /**
+         * Workspace slug
+         */
         workspaceSlug: string;
     };
     query?: never;
@@ -2520,6 +2845,9 @@ export type UpdateTokenResponse = UpdateTokenResponses[keyof UpdateTokenResponse
 export type GetUsersWithTeamsData = {
     body?: never;
     path: {
+        /**
+         * Workspace slug
+         */
         workspaceSlug: string;
     };
     query?: never;

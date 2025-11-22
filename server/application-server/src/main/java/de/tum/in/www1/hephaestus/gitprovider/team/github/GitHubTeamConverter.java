@@ -22,7 +22,7 @@ public class GitHubTeamConverter extends BaseGitServiceEntityConverter<GHTeam, T
     public Team update(@NonNull GHTeam source, @NonNull Team team) {
         convertBaseFields(source, team);
         team.setName(source.getName());
-        team.setDescription(source.getDescription());
+        team.setDescription(sanitizeText(source.getDescription()));
         team.setPrivacy(source.getPrivacy() == null ? null : Team.Privacy.valueOf(source.getPrivacy().name()));
         team.setHtmlUrl(source.getHtmlUrl().toString());
         team.setLastSyncedAt(Instant.now());

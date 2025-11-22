@@ -37,7 +37,7 @@ public class GitHubPullRequestReviewCommentConverter
         comment.setPath(source.getPath());
         comment.setCommitId(source.getCommitId());
         comment.setOriginalCommitId(source.getOriginalCommitId());
-        comment.setBody(source.getBody());
+        comment.setBody(sanitizeText(source.getBody()));
         comment.setHtmlUrl(source.getHtmlUrl().toString());
         comment.setAuthorAssociation(authorAssociationConverter.convert(source.getAuthorAssociation()));
         comment.setStartLine(nullIfZero(source.getStartLine()));
