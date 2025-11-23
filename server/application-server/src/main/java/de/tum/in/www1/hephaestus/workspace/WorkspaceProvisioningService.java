@@ -92,7 +92,9 @@ public class WorkspaceProvisioningService {
         }
 
         if (workspaceRepository.count() > 0) {
-            logger.debug("Skipping PAT workspace creation because workspaces already exist. Ensuring admin membership.");
+            logger.debug(
+                "Skipping PAT workspace creation because workspaces already exist. Ensuring admin membership."
+            );
             ensureDefaultAdminMembershipIfPresent();
             return;
         }
@@ -141,7 +143,9 @@ public class WorkspaceProvisioningService {
             savedWorkspace.getId()
         );
 
-        config.getRepositoriesToMonitor().stream()
+        config
+            .getRepositoriesToMonitor()
+            .stream()
             .map(repo -> repo == null ? null : repo.trim())
             .filter(nameWithOwner -> !isBlank(nameWithOwner))
             .forEach(nameWithOwner -> {
@@ -190,10 +194,7 @@ public class WorkspaceProvisioningService {
                 }
                 try {
                     workspaceMembershipService.createMembership(workspace, adminUser.getId(), WorkspaceRole.ADMIN);
-                    logger.info(
-                        "Added default admin user to workspace {} as ADMIN",
-                        workspace.getWorkspaceSlug()
-                    );
+                    logger.info("Added default admin user to workspace {} as ADMIN", workspace.getWorkspaceSlug());
                 } catch (IllegalArgumentException ex) {
                     logger.debug(
                         "Could not add default admin to workspace {}: {}",

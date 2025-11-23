@@ -340,11 +340,7 @@ public class GitHubDataSyncService {
             monitor.setIssuesAndPullRequestsSyncedAt(Instant.now());
             repositoryToMonitorRepository.save(monitor);
         } catch (IOException e) {
-            logger.warn(
-                "Fallback PR sync failed for {}: {}",
-                repository.getFullName(),
-                e.getMessage()
-            );
+            logger.warn("Fallback PR sync failed for {}: {}", repository.getFullName(), e.getMessage());
         }
     }
 

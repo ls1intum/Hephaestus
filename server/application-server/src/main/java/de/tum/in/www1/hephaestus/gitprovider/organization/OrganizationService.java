@@ -42,9 +42,7 @@ public class OrganizationService {
             return organizations.saveAndFlush(organization);
         } catch (DataIntegrityViolationException ex) {
             // Another thread saved the same org in parallel; reuse the persisted row
-            return organizations
-                .findByGithubId(githubId)
-                .orElseThrow(() -> ex); // rethrow if genuinely unavailable
+            return organizations.findByGithubId(githubId).orElseThrow(() -> ex); // rethrow if genuinely unavailable
         }
     }
 

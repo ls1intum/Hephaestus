@@ -14,7 +14,7 @@ export function useWorkspaceAccess() {
 
 	const membershipQuery = useQuery({
 		...getCurrentUserMembershipOptions({
-			path: { slug: workspaceSlug ?? "" },
+			path: { workspaceSlug: workspaceSlug ?? "" },
 		}),
 		enabled: Boolean(workspaceSlug) && isAuthenticated && !authLoading,
 	});

@@ -1,11 +1,11 @@
 package de.tum.in.www1.hephaestus.gitprovider.organization;
 
+import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationService;
 import de.tum.in.www1.hephaestus.gitprovider.organization.github.GitHubOrganizationConverter;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserConverter;
 import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserSyncService;
-import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationService;
 import de.tum.in.www1.hephaestus.workspace.Workspace;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceGitHubAccess;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceGitHubAccess.Context;
@@ -31,8 +31,8 @@ import org.kohsuke.github.GHOrganization;
 import org.kohsuke.github.GHUser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.stereotype.Service;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.stereotype.Service;
 
 @Service
 public class OrganizationSyncService {
@@ -137,13 +137,13 @@ public class OrganizationSyncService {
 
         // Build role map per login using GitHub's membership endpoint (authoritative for role)
         Map<String, String> desiredRoleByLoginLower = new HashMap<>();
-        Set<String> adminLogins = admins.stream().map(u -> u.getLogin().toLowerCase(Locale.ROOT)).collect(Collectors.toSet());
+        Set<String> adminLogins = admins
+            .stream()
+            .map(u -> u.getLogin().toLowerCase(Locale.ROOT))
+            .collect(Collectors.toSet());
 
-        for (GHUser user : Stream.concat(admins.stream(), members.stream()).collect(Collectors.toMap(
-                GHUser::getLogin,
-                Function.identity(),
-                (existing, ignore) -> existing
-            ))
+        for (GHUser user : Stream.concat(admins.stream(), members.stream())
+            .collect(Collectors.toMap(GHUser::getLogin, Function.identity(), (existing, ignore) -> existing))
             .values()) {
             String loginLower = user.getLogin().toLowerCase(Locale.ROOT);
             String role = "MEMBER";

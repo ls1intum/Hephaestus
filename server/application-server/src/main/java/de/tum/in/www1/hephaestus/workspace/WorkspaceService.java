@@ -213,7 +213,10 @@ public class WorkspaceService {
             CompletableFuture<Void> membersFuture = usersFuture
                 .thenRunAsync(
                     WorkspaceContextExecutor.wrap(() -> {
-                        logger.info("Users synced, now syncing org + workspace members for workspace id={}", workspace.getId());
+                        logger.info(
+                            "Users synced, now syncing org + workspace members for workspace id={}",
+                            workspace.getId()
+                        );
                         organizationSyncService.syncMembers(workspace);
                     })
                 )

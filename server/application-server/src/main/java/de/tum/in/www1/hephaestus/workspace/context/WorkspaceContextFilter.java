@@ -6,8 +6,8 @@ import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.workspace.Workspace.WorkspaceStatus;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceMembership.WorkspaceRole;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceMembershipRepository;
-import de.tum.in.www1.hephaestus.workspace.WorkspaceRepository;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceMembershipService;
+import de.tum.in.www1.hephaestus.workspace.WorkspaceRepository;
 import jakarta.servlet.Filter;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -171,7 +171,10 @@ public class WorkspaceContextFilter implements Filter {
      * @param workspaceId Workspace ID
      * @return Set of workspace roles (empty if user has no membership or not authenticated)
      */
-    private Set<WorkspaceRole> fetchUserRoles(de.tum.in.www1.hephaestus.workspace.Workspace workspace, Optional<User> userOpt) {
+    private Set<WorkspaceRole> fetchUserRoles(
+        de.tum.in.www1.hephaestus.workspace.Workspace workspace,
+        Optional<User> userOpt
+    ) {
         try {
             if (userOpt.isEmpty()) {
                 log.debug("No authenticated user found, returning empty roles");

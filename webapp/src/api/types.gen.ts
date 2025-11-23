@@ -1745,134 +1745,6 @@ export type CreateWorkspaceResponses = {
 
 export type CreateWorkspaceResponse = CreateWorkspaceResponses[keyof CreateWorkspaceResponses];
 
-export type ListMembersData = {
-    body?: never;
-    path: {
-        /**
-         * Workspace slug (resolved by filter)
-         */
-        slug: string;
-    };
-    query?: {
-        /**
-         * Page number (0-indexed)
-         */
-        page?: number;
-        /**
-         * Page size (default 50, max 100)
-         */
-        size?: number;
-    };
-    url: '/workspaces/{slug}/members';
-};
-
-export type ListMembersResponses = {
-    /**
-     * List of workspace memberships
-     */
-    200: Array<WorkspaceMembership>;
-};
-
-export type ListMembersResponse = ListMembersResponses[keyof ListMembersResponses];
-
-export type AssignRoleData = {
-    /**
-     * Role assignment request
-     */
-    body: AssignRoleRequest;
-    path: {
-        /**
-         * Workspace slug
-         */
-        slug: string;
-    };
-    query?: never;
-    url: '/workspaces/{slug}/members/assign';
-};
-
-export type AssignRoleResponses = {
-    /**
-     * Updated membership
-     */
-    200: {
-        [key: string]: unknown;
-    };
-};
-
-export type AssignRoleResponse = AssignRoleResponses[keyof AssignRoleResponses];
-
-export type GetCurrentUserMembershipData = {
-    body?: never;
-    path: {
-        slug: string;
-    };
-    query?: never;
-    url: '/workspaces/{slug}/members/me';
-};
-
-export type GetCurrentUserMembershipResponses = {
-    /**
-     * OK
-     */
-    200: WorkspaceMembership;
-};
-
-export type GetCurrentUserMembershipResponse = GetCurrentUserMembershipResponses[keyof GetCurrentUserMembershipResponses];
-
-export type RemoveMemberData = {
-    body?: never;
-    path: {
-        /**
-         * Workspace slug
-         */
-        slug: string;
-        /**
-         * User ID to remove
-         */
-        userId: number;
-    };
-    query?: never;
-    url: '/workspaces/{slug}/members/{userId}';
-};
-
-export type RemoveMemberResponses = {
-    /**
-     * 204 No Content on success
-     */
-    200: {
-        [key: string]: unknown;
-    };
-};
-
-export type RemoveMemberResponse = RemoveMemberResponses[keyof RemoveMemberResponses];
-
-export type GetMemberData = {
-    body?: never;
-    path: {
-        /**
-         * Workspace slug
-         */
-        slug: string;
-        /**
-         * User ID
-         */
-        userId: number;
-    };
-    query?: never;
-    url: '/workspaces/{slug}/members/{userId}';
-};
-
-export type GetMemberResponses = {
-    /**
-     * Workspace membership details
-     */
-    200: {
-        [key: string]: unknown;
-    };
-};
-
-export type GetMemberResponse = GetMemberResponses[keyof GetMemberResponses];
-
 export type PurgeWorkspaceData = {
     body?: never;
     path: {
@@ -2385,6 +2257,137 @@ export type ResetAndRecalculateLeaguesResponses = {
      */
     200: unknown;
 };
+
+export type ListMembersData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: {
+        /**
+         * Page number (0-indexed)
+         */
+        page?: number;
+        /**
+         * Page size (default 50, max 100)
+         */
+        size?: number;
+    };
+    url: '/workspaces/{workspaceSlug}/members';
+};
+
+export type ListMembersResponses = {
+    /**
+     * List of workspace memberships
+     */
+    200: Array<WorkspaceMembership>;
+};
+
+export type ListMembersResponse = ListMembersResponses[keyof ListMembersResponses];
+
+export type AssignRoleData = {
+    /**
+     * Role assignment request
+     */
+    body: AssignRoleRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/members/assign';
+};
+
+export type AssignRoleResponses = {
+    /**
+     * Updated membership
+     */
+    200: {
+        [key: string]: unknown;
+    };
+};
+
+export type AssignRoleResponse = AssignRoleResponses[keyof AssignRoleResponses];
+
+export type GetCurrentUserMembershipData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/members/me';
+};
+
+export type GetCurrentUserMembershipResponses = {
+    /**
+     * OK
+     */
+    200: WorkspaceMembership;
+};
+
+export type GetCurrentUserMembershipResponse = GetCurrentUserMembershipResponses[keyof GetCurrentUserMembershipResponses];
+
+export type RemoveMemberData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        /**
+         * User ID to remove
+         */
+        userId: number;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/members/{userId}';
+};
+
+export type RemoveMemberResponses = {
+    /**
+     * 204 No Content on success
+     */
+    200: {
+        [key: string]: unknown;
+    };
+};
+
+export type RemoveMemberResponse = RemoveMemberResponses[keyof RemoveMemberResponses];
+
+export type GetMemberData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        /**
+         * User ID
+         */
+        userId: number;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/members/{userId}';
+};
+
+export type GetMemberResponses = {
+    /**
+     * Workspace membership details
+     */
+    200: {
+        [key: string]: unknown;
+    };
+};
+
+export type GetMemberResponse = GetMemberResponses[keyof GetMemberResponses];
 
 export type GetThreadData = {
     body?: never;

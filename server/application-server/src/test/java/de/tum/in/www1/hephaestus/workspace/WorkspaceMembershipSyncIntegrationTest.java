@@ -48,14 +48,13 @@ class WorkspaceMembershipSyncIntegrationTest extends BaseIntegrationTest {
                     workspace.getId()
                 );
 
-                assertThat(orgMembers)
-                    .as("organization members should be present")
-                    .isNotEmpty();
+                assertThat(orgMembers).as("organization members should be present").isNotEmpty();
                 assertThat(workspaceMembers)
                     .as("workspace members should mirror organization members")
                     .hasSize(orgMembers.size());
-                assertThat(workspaceMembers.stream().map(WorkspaceMembership::getUser).map(User::getId).toList())
-                    .containsAll(orgMembers);
+                assertThat(
+                    workspaceMembers.stream().map(WorkspaceMembership::getUser).map(User::getId).toList()
+                ).containsAll(orgMembers);
             });
     }
 }

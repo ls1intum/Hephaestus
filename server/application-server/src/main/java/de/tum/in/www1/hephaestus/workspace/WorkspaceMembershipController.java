@@ -1,6 +1,7 @@
 package de.tum.in.www1.hephaestus.workspace;
 
 import de.tum.in.www1.hephaestus.core.exception.EntityNotFoundException;
+import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceMembership.WorkspaceRole;
 import de.tum.in.www1.hephaestus.workspace.authorization.RequireAtLeastWorkspaceAdmin;
 import de.tum.in.www1.hephaestus.workspace.authorization.WorkspaceAccessEvaluator;
@@ -11,7 +12,6 @@ import de.tum.in.www1.hephaestus.workspace.dto.WorkspaceMembershipDTO;
 import de.tum.in.www1.hephaestus.workspace.exception.InsufficientWorkspacePermissionsException;
 import jakarta.validation.Valid;
 import java.util.List;
-import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import java.util.Map;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
