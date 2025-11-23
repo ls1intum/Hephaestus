@@ -59,6 +59,10 @@ const meta = {
 			action: "add workspace clicked",
 			description: "Callback fired when the add workspace button is clicked",
 		},
+		isAdmin: {
+			control: "boolean",
+			description: "Whether the user has administrative privileges",
+		},
 	},
 	decorators: [
 		(Story) => (
@@ -138,18 +142,36 @@ export const MultipleWorkspaces: Story = {
 };
 
 /**
- * Empty state when the user is not a member of any workspace.
+ * Empty state when the user is not a member of any workspace (Regular User).
  */
-export const NoWorkspaces: Story = {
+export const NoWorkspacesRegular: Story = {
 	args: {
 		workspaces: [],
 		activeWorkspace: undefined,
+		isAdmin: false,
 	},
 	parameters: {
 		docs: {
 			description: {
-				story:
-					"Displays the empty headline and subtitle to prompt users to get added to a workspace.",
+				story: "Displays a disabled 'No Workspace' button for regular users.",
+			},
+		},
+	},
+};
+
+/**
+ * Empty state when the user is not a member of any workspace (Admin User).
+ */
+export const NoWorkspacesAdmin: Story = {
+	args: {
+		workspaces: [],
+		activeWorkspace: undefined,
+		isAdmin: true,
+	},
+	parameters: {
+		docs: {
+			description: {
+				story: "Displays a 'Create Workspace' button for admin users.",
 			},
 		},
 	},

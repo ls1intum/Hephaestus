@@ -612,7 +612,10 @@ function SidebarMenuSkeleton({
 		<div
 			data-slot="sidebar-menu-skeleton"
 			data-sidebar="menu-skeleton"
-			className={cn("flex h-8 items-center gap-2 rounded-md px-2", className)}
+			className={cn(
+				"flex h-8 items-center gap-2 rounded-md px-2 group-data-[collapsible=icon]:w-8 group-data-[collapsible=icon]:px-2 group-data-[collapsible=icon]:justify-center",
+				className,
+			)}
 			{...props}
 		>
 			{showIcon && (
@@ -622,7 +625,7 @@ function SidebarMenuSkeleton({
 				/>
 			)}
 			<Skeleton
-				className="h-4 max-w-(--skeleton-width) flex-1"
+				className="h-4 max-w-(--skeleton-width) flex-1 group-data-[collapsible=icon]:hidden"
 				data-sidebar="menu-skeleton-text"
 				style={
 					{

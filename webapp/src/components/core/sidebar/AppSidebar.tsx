@@ -2,15 +2,19 @@ import { Link } from "@tanstack/react-router";
 import { SquarePen } from "lucide-react";
 import type { ReactNode } from "react";
 import type { ChatThreadGroup, WorkspaceListItem } from "@/api/types.gen";
-import { Empty } from "@/components/ui/empty";
 import {
 	Sidebar,
 	SidebarContent,
 	SidebarFooter,
+	SidebarGroup,
 	SidebarHeader,
+	SidebarMenu,
 	SidebarMenuButton,
+	SidebarMenuItem,
+	SidebarMenuSkeleton,
 	SidebarRail,
 } from "@/components/ui/sidebar";
+import { NoWorkspace } from "@/components/workspace/NoWorkspace";
 import { NavAdmin } from "./NavAdmin";
 import { NavContextHeader } from "./NavContextHeader";
 import { NavDashboards } from "./NavDashboards";
@@ -29,6 +33,7 @@ export interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
 	workspaces: WorkspaceListItem[];
 	activeWorkspace?: WorkspaceListItem;
 	onWorkspaceChange?: (workspace: WorkspaceListItem) => void;
+	onAddWorkspace?: () => void;
 	workspacesLoading?: boolean;
 	// Optional mentor thread data - using API types directly
 	mentorThreadGroups?: ChatThreadGroup[];
@@ -44,6 +49,7 @@ export function AppSidebar({
 	workspaces,
 	activeWorkspace,
 	onWorkspaceChange,
+	onAddWorkspace,
 	workspacesLoading = false,
 	mentorThreadGroups,
 	mentorThreadsLoading,
@@ -55,19 +61,20 @@ export function AppSidebar({
 
 	if (workspacesLoading) {
 		sidebarContent = (
-			<div className="p-4 space-y-3">
-				<div className="h-3 w-28 rounded bg-muted animate-pulse" />
-				<div className="h-3 w-20 rounded bg-muted animate-pulse" />
-				<div className="h-3 w-24 rounded bg-muted animate-pulse" />
-			</div>
+			<SidebarGroup>
+				<SidebarMenu>
+					{Array.from({ length: 5 }).map((_, index) => (
+						<SidebarMenuItem key={index}>
+							<SidebarMenuSkeleton showIcon />
+						</SidebarMenuItem>
+					))}
+				</SidebarMenu>
+			</SidebarGroup>
 		);
 	} else if (!activeWorkspace) {
 		sidebarContent = (
-			<div className="p-4">
-				<Empty
-					title="No workspace"
-					description="You’re not a member of any workspace yet. Ask an admin to add you."
-				/>
+			<div className="group-data-[collapsible=icon]:hidden">
+				<NoWorkspace />
 			</div>
 		);
 	} else if (context === "mentor") {
@@ -118,6 +125,8 @@ export function AppSidebar({
 					workspaces={workspaces}
 					activeWorkspace={activeWorkspace}
 					onWorkspaceChange={onWorkspaceChange}
+					onAddWorkspace={onAddWorkspace}
+					isAdmin={isAdmin}
 				/>
 				{contextHeader}
 			</SidebarHeader>

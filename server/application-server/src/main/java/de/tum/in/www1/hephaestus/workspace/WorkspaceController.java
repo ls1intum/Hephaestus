@@ -3,6 +3,8 @@ package de.tum.in.www1.hephaestus.workspace;
 import de.tum.in.www1.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.in.www1.hephaestus.gitprovider.team.TeamInfoDTO;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserTeamsDTO;
+import de.tum.in.www1.hephaestus.workspace.authorization.RequireAtLeastWorkspaceAdmin;
+import de.tum.in.www1.hephaestus.workspace.authorization.RequireWorkspaceOwner;
 import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.in.www1.hephaestus.workspace.context.WorkspaceScopedController;
 import de.tum.in.www1.hephaestus.workspace.dto.*;
@@ -16,7 +18,6 @@ import java.net.URI;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -42,7 +43,6 @@ public class WorkspaceController {
         description = "Workspace returned",
         content = @Content(schema = @Schema(implementation = WorkspaceDTO.class))
     )
-    @PreAuthorize("isAuthenticated() and @workspaceSecure.isMember()")
     public ResponseEntity<WorkspaceDTO> getWorkspace(WorkspaceContext workspaceContext) {
         Workspace workspace = workspaceService
             .getWorkspaceBySlug(workspaceContext.slug())
@@ -57,7 +57,7 @@ public class WorkspaceController {
         description = "Workspace updated",
         content = @Content(schema = @Schema(implementation = WorkspaceDTO.class))
     )
-    @PreAuthorize("isAuthenticated() and @workspaceSecure.isAdmin()")
+    @RequireAtLeastWorkspaceAdmin
     public ResponseEntity<WorkspaceDTO> updateStatus(
         WorkspaceContext workspaceContext,
         @Valid @RequestBody UpdateWorkspaceStatusRequestDTO request
@@ -69,6 +69,7 @@ public class WorkspaceController {
     @DeleteMapping
     @Operation(summary = "Purge (soft delete) a workspace")
     @ApiResponse(responseCode = "204", description = "Workspace purged")
+    @RequireWorkspaceOwner
     public ResponseEntity<Void> purgeWorkspace(WorkspaceContext workspaceContext) {
         workspaceLifecycleService.purgeWorkspace(workspaceContext);
         return ResponseEntity.noContent().build();
@@ -81,7 +82,7 @@ public class WorkspaceController {
         description = "Workspace updated",
         content = @Content(schema = @Schema(implementation = WorkspaceDTO.class))
     )
-    @PreAuthorize("isAuthenticated() and @workspaceSecure.isAdmin()")
+    @RequireAtLeastWorkspaceAdmin
     public ResponseEntity<WorkspaceDTO> updateSchedule(
         WorkspaceContext workspaceContext,
         @Valid @RequestBody UpdateWorkspaceScheduleRequestDTO request
@@ -97,7 +98,7 @@ public class WorkspaceController {
         description = "Workspace updated",
         content = @Content(schema = @Schema(implementation = WorkspaceDTO.class))
     )
-    @PreAuthorize("isAuthenticated() and @workspaceSecure.isAdmin()")
+    @RequireAtLeastWorkspaceAdmin
     public ResponseEntity<WorkspaceDTO> updateNotifications(
         WorkspaceContext workspaceContext,
         @Valid @RequestBody UpdateWorkspaceNotificationsRequestDTO request
@@ -118,7 +119,7 @@ public class WorkspaceController {
         description = "Workspace updated",
         content = @Content(schema = @Schema(implementation = WorkspaceDTO.class))
     )
-    @PreAuthorize("isAuthenticated() and @workspaceSecure.isOwner()")
+    @RequireAtLeastWorkspaceAdmin
     public ResponseEntity<WorkspaceDTO> updateToken(
         WorkspaceContext workspaceContext,
         @Valid @RequestBody UpdateWorkspaceTokenRequestDTO request
@@ -134,7 +135,7 @@ public class WorkspaceController {
         description = "Workspace updated",
         content = @Content(schema = @Schema(implementation = WorkspaceDTO.class))
     )
-    @PreAuthorize("isAuthenticated() and @workspaceSecure.isAdmin()")
+    @RequireAtLeastWorkspaceAdmin
     public ResponseEntity<WorkspaceDTO> updateSlackCredentials(
         WorkspaceContext workspaceContext,
         @Valid @RequestBody UpdateWorkspaceSlackCredentialsRequestDTO request
@@ -154,7 +155,7 @@ public class WorkspaceController {
         description = "Workspace updated",
         content = @Content(schema = @Schema(implementation = WorkspaceDTO.class))
     )
-    @PreAuthorize("isAuthenticated() and @workspaceSecure.isAdmin()")
+    @RequireAtLeastWorkspaceAdmin
     public ResponseEntity<WorkspaceDTO> updatePublicVisibility(
         WorkspaceContext workspaceContext,
         @Valid @RequestBody UpdateWorkspacePublicVisibilityRequestDTO request
@@ -170,7 +171,6 @@ public class WorkspaceController {
         description = "Repository list",
         content = @Content(array = @ArraySchema(schema = @Schema(implementation = String.class)))
     )
-    @PreAuthorize("isAuthenticated() and @workspaceSecure.isMember()")
     public ResponseEntity<List<String>> getRepositoriesToMonitor(WorkspaceContext workspaceContext) {
         var repositories = workspaceService.getRepositoriesToMonitor(workspaceContext).stream().sorted().toList();
         return ResponseEntity.ok(repositories);
@@ -178,7 +178,7 @@ public class WorkspaceController {
 
     @PostMapping("/repositories/{owner}/{name}")
     @Operation(summary = "Add a repository to a workspace monitor list")
-    @PreAuthorize("isAuthenticated() and @workspaceSecure.isAdmin()")
+    @RequireAtLeastWorkspaceAdmin
     public ResponseEntity<Void> addRepositoryToMonitor(
         WorkspaceContext workspaceContext,
         @PathVariable String owner,
@@ -191,7 +191,7 @@ public class WorkspaceController {
 
     @DeleteMapping("/repositories/{owner}/{name}")
     @Operation(summary = "Remove a repository from a workspace monitor list")
-    @PreAuthorize("isAuthenticated() and @workspaceSecure.isAdmin()")
+    @RequireAtLeastWorkspaceAdmin
     public ResponseEntity<Void> removeRepositoryToMonitor(
         WorkspaceContext workspaceContext,
         @PathVariable String owner,
@@ -203,14 +203,13 @@ public class WorkspaceController {
 
     @GetMapping("/users")
     @Operation(summary = "List workspace users and the teams they belong to")
-    @PreAuthorize("isAuthenticated() and @workspaceSecure.isMember()")
     public ResponseEntity<List<UserTeamsDTO>> getUsersWithTeams(WorkspaceContext workspaceContext) {
         return ResponseEntity.ok(workspaceService.getUsersWithTeams(workspaceContext));
     }
 
     @PostMapping("/teams/{teamId}/labels/{repositoryId}/{label}")
     @Operation(summary = "Add a repository label to a team")
-    @PreAuthorize("isAuthenticated() and @workspaceSecure.isAdmin()")
+    @RequireAtLeastWorkspaceAdmin
     public ResponseEntity<TeamInfoDTO> addLabelToTeam(
         WorkspaceContext workspaceContext,
         @PathVariable Long teamId,
@@ -225,7 +224,7 @@ public class WorkspaceController {
 
     @DeleteMapping("/teams/{teamId}/labels/{labelId}")
     @Operation(summary = "Remove a repository label from a team")
-    @PreAuthorize("isAuthenticated() and @workspaceSecure.isAdmin()")
+    @RequireAtLeastWorkspaceAdmin
     public ResponseEntity<TeamInfoDTO> removeLabelFromTeam(
         WorkspaceContext workspaceContext,
         @PathVariable Long teamId,
@@ -239,7 +238,7 @@ public class WorkspaceController {
 
     @PutMapping("/league/reset")
     @Operation(summary = "Reset and recalculate workspace leagues")
-    @PreAuthorize("isAuthenticated() and @workspaceSecure.isAdmin()")
+    @RequireAtLeastWorkspaceAdmin
     public ResponseEntity<Void> resetAndRecalculateLeagues(WorkspaceContext workspaceContext) {
         workspaceService.resetAndRecalculateLeagues(workspaceContext);
         return ResponseEntity.ok().build();

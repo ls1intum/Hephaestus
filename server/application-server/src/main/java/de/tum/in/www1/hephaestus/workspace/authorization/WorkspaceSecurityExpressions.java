@@ -17,18 +17,8 @@ public class WorkspaceSecurityExpressions {
     }
 
     /**
-     * Check if user is authenticated and has MEMBER role or higher in the workspace.
-     * Use: @PreAuthorize("isAuthenticated() and @workspaceSecure.isMember()")
-     *
-     * @return true if user is a member
-     */
-    public boolean isMember() {
-        return accessEvaluator.isMember();
-    }
-
-    /**
      * Check if user is authenticated and has ADMIN role or higher in the workspace.
-     * Use: @PreAuthorize("isAuthenticated() and @workspaceSecure.isAdmin()")
+     * Use: @RequireAtLeastWorkspaceAdmin
      *
      * @return true if user is an admin or owner
      */
@@ -38,7 +28,7 @@ public class WorkspaceSecurityExpressions {
 
     /**
      * Check if user is authenticated and has OWNER role in the workspace.
-     * Use: @PreAuthorize("isAuthenticated() and @workspaceSecure.isOwner()")
+     * Use: @RequireWorkspaceOwner
      *
      * @return true if user is the owner
      */
@@ -49,7 +39,7 @@ public class WorkspaceSecurityExpressions {
     /**
      * Check if user has permission to manage the specified role.
      * OWNER can manage all roles, ADMIN can manage ADMIN and MEMBER.
-     * Use: @PreAuthorize("isAuthenticated() and @workspaceSecure.canManageRole(#role)")
+     * Can be used in SpEL: @PreAuthorize("@workspaceSecure.canManageRole(#role)")
      *
      * @param role Role to manage
      * @return true if user can manage this role

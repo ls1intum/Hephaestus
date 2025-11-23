@@ -5,6 +5,11 @@ import { LandingContainer } from "./landing";
 
 // This route will be a parent for all routes that require authentication
 export const Route = createFileRoute("/_authenticated")({
+	pendingComponent: () => (
+		<div className="flex items-center justify-center h-96">
+			<Spinner size="lg" />
+		</div>
+	),
 	component: AuthenticatedLayout,
 });
 

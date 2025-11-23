@@ -27,7 +27,7 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
  * live in {@link WorkspaceController} via {@code @WorkspaceScopedController}.
  */
 @RestController
-@RequestMapping({ "/workspaces", "/workspaces/" })
+@RequestMapping("/workspaces")
 @RequiredArgsConstructor
 @Validated
 public class WorkspaceRegistryController {

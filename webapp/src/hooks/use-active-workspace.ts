@@ -1,7 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "@tanstack/react-router";
 import { useEffect, useMemo } from "react";
-import { listWorkspaces1Options } from "@/api/@tanstack/react-query.gen";
+import { listWorkspacesOptions } from "@/api/@tanstack/react-query.gen";
+import { useAuth } from "@/integrations/auth/AuthContext";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 
 /**
@@ -10,7 +11,11 @@ import { useWorkspaceStore } from "@/stores/workspace-store";
  */
 export function useActiveWorkspaceSlug() {
 	const { selectedSlug, setSelectedSlug } = useWorkspaceStore();
-	const query = useQuery(listWorkspaces1Options());
+	const { isAuthenticated, isLoading: authLoading } = useAuth();
+	const query = useQuery({
+		...listWorkspacesOptions(),
+		enabled: isAuthenticated && !authLoading,
+	});
 	const workspaces = query.data ?? [];
 	const location = useLocation();
 

@@ -24,12 +24,14 @@ export function WorkspaceSwitcher({
 	onWorkspaceChange,
 	onAddWorkspace,
 	isLoading = false,
+	isAdmin = false,
 }: {
 	workspaces: WorkspaceListItem[];
 	activeWorkspace?: WorkspaceListItem;
 	onWorkspaceChange?: (workspace: WorkspaceListItem) => void;
 	onAddWorkspace?: () => void;
 	isLoading?: boolean;
+	isAdmin?: boolean;
 }) {
 	const { isMobile } = useSidebar();
 	const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -62,14 +64,48 @@ export function WorkspaceSwitcher({
 		return (
 			<SidebarMenu>
 				<SidebarMenuItem>
-					<div className="flex items-center gap-3 px-2 py-1.5">
-						<div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary/60" />
-						<div className="flex-1 space-y-1">
-							<div className="h-3 w-28 rounded bg-muted animate-pulse" />
-							<div className="h-2.5 w-20 rounded bg-muted animate-pulse" />
+					<SidebarMenuButton size="lg" className="pointer-events-none">
+						<div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary/10 animate-pulse" />
+						<div className="grid flex-1 text-left text-sm leading-tight gap-1 group-data-[collapsible=icon]:hidden">
+							<div className="h-3 w-20 rounded bg-sidebar-primary/10 animate-pulse" />
+							<div className="h-2.5 w-12 rounded bg-sidebar-primary/10 animate-pulse" />
 						</div>
-						<ChevronsUpDown className="ml-auto text-muted-foreground/60" />
-					</div>
+						<ChevronsUpDown className="ml-auto size-4 opacity-50 group-data-[collapsible=icon]:hidden" />
+					</SidebarMenuButton>
+				</SidebarMenuItem>
+			</SidebarMenu>
+		);
+	}
+
+	if (workspaces.length === 0) {
+		if (isAdmin) {
+			return (
+				<SidebarMenu>
+					<SidebarMenuItem>
+						<SidebarMenuButton onClick={onAddWorkspace} size="lg">
+							<div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
+								<Plus className="size-4" />
+							</div>
+							<div className="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
+								<span className="truncate font-semibold">Create Workspace</span>
+							</div>
+						</SidebarMenuButton>
+					</SidebarMenuItem>
+				</SidebarMenu>
+			);
+		}
+
+		return (
+			<SidebarMenu>
+				<SidebarMenuItem>
+					<SidebarMenuButton disabled size="lg">
+						<div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+							<ChevronsUpDown className="size-4" />
+						</div>
+						<div className="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
+							<span className="truncate font-semibold">No Workspace</span>
+						</div>
+					</SidebarMenuButton>
 				</SidebarMenuItem>
 			</SidebarMenu>
 		);
@@ -84,7 +120,7 @@ export function WorkspaceSwitcher({
 							size="lg"
 							className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
 						>
-							<div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground overflow-clip">
+							<div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
 								<Avatar className="size-8 rounded-lg">
 									<AvatarImage
 										src={
@@ -94,16 +130,18 @@ export function WorkspaceSwitcher({
 										}
 										alt={activeWorkspace?.displayName}
 									/>
-									<AvatarFallback className="rounded-lg">
-										{activeWorkspace?.displayName?.slice(0, 2).toUpperCase() ??
-											activeWorkspace?.workspaceSlug
-												?.slice(0, 2)
-												.toUpperCase() ??
-											"WS"}
+									<AvatarFallback className="rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
+										{(
+											activeWorkspace?.displayName ||
+											activeWorkspace?.workspaceSlug ||
+											"WS"
+										)
+											.slice(0, 2)
+											.toUpperCase()}
 									</AvatarFallback>
 								</Avatar>
 							</div>
-							<div className="grid flex-1 text-left text-sm leading-tight">
+							<div className="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
 								<span className="truncate font-semibold">
 									{activeWorkspace?.displayName ?? "No workspace"}
 								</span>
@@ -111,7 +149,7 @@ export function WorkspaceSwitcher({
 									{activeWorkspace?.accountLogin ?? "Select a workspace"}
 								</span>
 							</div>
-							<ChevronsUpDown className="ml-auto" />
+							<ChevronsUpDown className="ml-auto group-data-[collapsible=icon]:hidden" />
 						</SidebarMenuButton>
 					</DropdownMenuTrigger>
 					<DropdownMenuContent
@@ -129,14 +167,16 @@ export function WorkspaceSwitcher({
 								onClick={() => onWorkspaceChange?.(workspace)}
 								className="gap-2 p-2"
 							>
-								<div className="flex size-6 items-center justify-center rounded-sm border overflow-clip">
+								<div className="flex size-6 items-center justify-center rounded-sm overflow-clip">
 									<Avatar className="size-6 rounded-sm">
 										<AvatarImage
 											src={`https://github.com/${workspace.accountLogin}.png`}
 											alt={workspace.displayName}
 										/>
-										<AvatarFallback className="rounded-sm text-[10px]">
-											{workspace.displayName.slice(0, 2).toUpperCase()}
+										<AvatarFallback className="rounded-sm text-xs bg-sidebar-primary text-sidebar-primary-foreground">
+											{(workspace.displayName || workspace.workspaceSlug)
+												.slice(0, 2)
+												.toUpperCase()}
 										</AvatarFallback>
 									</Avatar>
 								</div>

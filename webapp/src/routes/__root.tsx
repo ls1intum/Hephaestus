@@ -32,6 +32,7 @@ import {
 } from "@/components/ui/sidebar";
 import environment from "@/environment";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
+import { useWorkspaceAccess } from "@/hooks/use-workspace-access";
 import { useMentorChat } from "@/hooks/useMentorChat";
 import { type AuthContextType, useAuth } from "@/integrations/auth/AuthContext";
 import { isPosthogEnabled } from "@/integrations/posthog/config";
@@ -243,12 +244,8 @@ function AppSidebarContainer() {
 	const { pathname } = useLocation();
 	const { isAuthenticated, username, hasRole } = useAuth();
 	const navigate = useNavigate();
-	const {
-		workspaceSlug,
-		workspaces,
-		selectWorkspace,
-		isLoading: workspacesLoading,
-	} = useActiveWorkspaceSlug();
+	const workspaceAccess = useWorkspaceAccess();
+	const { workspaceSlug, workspaces, selectWorkspace } = workspaceAccess;
 	const hasWorkspace = Boolean(workspaceSlug);
 	const activeWorkspace = workspaces.find(
 		(ws) => ws.workspaceSlug === workspaceSlug,
@@ -283,16 +280,24 @@ function AppSidebarContainer() {
 		navigate({ to: target as never, replace: true });
 	};
 
+	const handleAddWorkspace = () => {
+		// TODO: Replace with actual GitHub App installation URL or a proper dialog
+		alert(
+			"To create a workspace, please install the Hephaestus GitHub App on your repository. Contact your administrator for the installation URL.",
+		);
+	};
+
 	return (
 		<AppSidebar
 			username={username}
-			isAdmin={hasRole("admin")}
+			isAdmin={workspaceAccess.isAdmin}
 			hasMentorAccess={hasRole("mentor_access")}
 			context={sidebarContext}
 			workspaces={workspaces}
 			activeWorkspace={activeWorkspace}
 			onWorkspaceChange={handleWorkspaceChange}
-			workspacesLoading={workspacesLoading}
+			onAddWorkspace={handleAddWorkspace}
+			workspacesLoading={workspaceAccess.isLoading}
 			mentorThreadGroups={
 				sidebarContext === "mentor" ? threadGroups : undefined
 			}

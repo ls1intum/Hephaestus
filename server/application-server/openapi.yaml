@@ -102,39 +102,6 @@ paths:
       - user
   /workspaces:
     get:
-      operationId: listWorkspaces_1
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/WorkspaceListItem"
-          description: Workspace list
-      summary: List all workspaces
-      tags:
-      - workspace-registry
-    post:
-      operationId: createWorkspace_1
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/CreateWorkspaceRequest"
-        required: true
-      responses:
-        "201":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Workspace"
-          description: Workspace created
-      summary: Create a new workspace
-      tags:
-      - workspace-registry
-  /workspaces/:
-    get:
       operationId: listWorkspaces
       responses:
         "200":
@@ -235,6 +202,26 @@ paths:
                 type: object
           description: Updated membership
       summary: Assign or update a role for a workspace member.
+      tags:
+      - workspace-membership
+  /workspaces/{slug}/members/me:
+    get:
+      description: Get the current user's membership in this workspace.
+      operationId: getCurrentUserMembership
+      parameters:
+      - in: path
+        name: slug
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkspaceMembership"
+          description: OK
+      summary: Get the current user's membership in this workspace.
       tags:
       - workspace-membership
   /workspaces/{slug}/members/{userId}:
