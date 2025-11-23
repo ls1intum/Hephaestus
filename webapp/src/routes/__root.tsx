@@ -5,6 +5,7 @@ import {
 	Link,
 	Outlet,
 	useLocation,
+	useNavigate,
 	useRouter,
 } from "@tanstack/react-router";
 import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
@@ -57,7 +58,8 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 			isPosthogEnabled &&
 			!userSettingsError &&
 			(userSettings?.participateInResearch ?? true);
-		const isMentorRoute = pathname.startsWith("/mentor");
+		const isMentorRoute =
+			pathname === "/mentor" || /^\/w\/[^/]+\/mentor/.test(pathname);
 
 		// Exclude routes where Copilot should not appear
 		const isExcludedRoute =
@@ -128,6 +130,7 @@ function GlobalCopilot() {
 
 	const router = useRouter();
 	const { isAuthenticated, hasRole, isLoading } = useAuth();
+	const { workspaceSlug } = useActiveWorkspaceSlug();
 
 	const handleMessageSubmit = ({ text }: { text: string }) => {
 		if (!text.trim()) return;
@@ -167,8 +170,11 @@ function GlobalCopilot() {
 			}}
 			onOpenFullChat={() => {
 				const threadId = mentorChat.currentThreadId || mentorChat.id;
-				if (threadId) {
-					router.navigate({ to: "/mentor/$threadId", params: { threadId } });
+				if (threadId && workspaceSlug) {
+					router.navigate({
+						to: "/w/$workspaceSlug/mentor/$threadId",
+						params: { threadId, workspaceSlug },
+					});
 				}
 			}}
 		>
@@ -214,6 +220,7 @@ function HeaderContainer() {
 	const { pathname } = useLocation();
 	const { isAuthenticated, isLoading, username, userProfile, login, logout } =
 		useAuth();
+
 	return (
 		<Header
 			sidebarTrigger={
@@ -235,12 +242,22 @@ function HeaderContainer() {
 function AppSidebarContainer() {
 	const { pathname } = useLocation();
 	const { isAuthenticated, username, hasRole } = useAuth();
-	const { workspaceSlug } = useActiveWorkspaceSlug();
+	const navigate = useNavigate();
+	const {
+		workspaceSlug,
+		workspaces,
+		selectWorkspace,
+		isLoading: workspacesLoading,
+	} = useActiveWorkspaceSlug();
 	const hasWorkspace = Boolean(workspaceSlug);
+	const activeWorkspace = workspaces.find(
+		(ws) => ws.workspaceSlug === workspaceSlug,
+	);
 
-	const sidebarContext: SidebarContext = pathname.startsWith("/mentor")
-		? "mentor"
-		: "main";
+	const sidebarContext: SidebarContext =
+		pathname === "/mentor" || /^\/w\/[^/]+\/mentor/.test(pathname)
+			? "mentor"
+			: "main";
 
 	// Always call useQuery but only enable when in mentor context and authenticated
 	const {
@@ -258,12 +275,24 @@ function AppSidebarContainer() {
 		return null;
 	}
 
+	const handleWorkspaceChange = (ws: typeof activeWorkspace) => {
+		if (!ws) return;
+		selectWorkspace(ws.workspaceSlug);
+		const remainder = pathname.replace(/^\/w\/[^/]+/, "");
+		const target = `/w/${ws.workspaceSlug}${remainder || "/"}`;
+		navigate({ to: target as never, replace: true });
+	};
+
 	return (
 		<AppSidebar
 			username={username}
 			isAdmin={hasRole("admin")}
 			hasMentorAccess={hasRole("mentor_access")}
 			context={sidebarContext}
+			workspaces={workspaces}
+			activeWorkspace={activeWorkspace}
+			onWorkspaceChange={handleWorkspaceChange}
+			workspacesLoading={workspacesLoading}
 			mentorThreadGroups={
 				sidebarContext === "mentor" ? threadGroups : undefined
 			}

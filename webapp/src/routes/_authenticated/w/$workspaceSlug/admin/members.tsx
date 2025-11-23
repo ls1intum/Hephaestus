@@ -7,9 +7,12 @@ import {
 } from "@/api/@tanstack/react-query.gen";
 import { AdminMembersPage } from "@/components/admin/AdminMembersPage";
 import { adaptApiUserTeams } from "@/components/admin/types";
+import { NoWorkspace } from "@/components/workspace/NoWorkspace";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 
-export const Route = createFileRoute("/_authenticated/_admin/admin/members")({
+export const Route = createFileRoute(
+	"/_authenticated/w/$workspaceSlug/admin/members",
+)({
 	component: AdminMembersContainer,
 });
 
@@ -59,6 +62,10 @@ function AdminMembersContainer() {
 		a.name.localeCompare(b.name),
 	);
 	const isLoading = isWorkspaceLoading || usersLoading || teamsLoading;
+
+	if (!workspaceSlug && !isWorkspaceLoading) {
+		return <NoWorkspace />;
+	}
 
 	// Show error state if needed
 	if (workspaceError || usersError || teamsError) {

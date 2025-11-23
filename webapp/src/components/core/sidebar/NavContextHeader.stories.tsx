@@ -35,6 +35,7 @@ type Story = StoryObj<typeof meta>;
 export const Default: Story = {
 	args: {
 		title: "Mentor",
+		workspaceSlug: "ls1intum",
 	},
 };
 
@@ -44,5 +45,6 @@ export const Default: Story = {
 export const WithContext: Story = {
 	args: {
 		title: "Mentor",
+		workspaceSlug: "ls1intum",
 	},
 };

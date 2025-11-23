@@ -1,5 +1,7 @@
 import { ChevronsUpDown, Plus } from "lucide-react";
 import { useEffect, useState } from "react";
+import type { WorkspaceListItem } from "@/api/types.gen";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
 	DropdownMenu,
 	DropdownMenuContent,
@@ -16,21 +18,18 @@ import {
 	useSidebar,
 } from "@/components/ui/sidebar";
 
-interface Workspace {
-	name: string;
-	logoUrl: string;
-}
-
 export function WorkspaceSwitcher({
 	workspaces,
 	activeWorkspace,
 	onWorkspaceChange,
 	onAddWorkspace,
+	isLoading = false,
 }: {
-	workspaces: Workspace[];
-	activeWorkspace: Workspace;
-	onWorkspaceChange?: (workspace: Workspace) => void;
+	workspaces: WorkspaceListItem[];
+	activeWorkspace?: WorkspaceListItem;
+	onWorkspaceChange?: (workspace: WorkspaceListItem) => void;
 	onAddWorkspace?: () => void;
+	isLoading?: boolean;
 }) {
 	const { isMobile } = useSidebar();
 	const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -59,6 +58,23 @@ export function WorkspaceSwitcher({
 		};
 	}, [workspaces, onWorkspaceChange]);
 
+	if (isLoading) {
+		return (
+			<SidebarMenu>
+				<SidebarMenuItem>
+					<div className="flex items-center gap-3 px-2 py-1.5">
+						<div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary/60" />
+						<div className="flex-1 space-y-1">
+							<div className="h-3 w-28 rounded bg-muted animate-pulse" />
+							<div className="h-2.5 w-20 rounded bg-muted animate-pulse" />
+						</div>
+						<ChevronsUpDown className="ml-auto text-muted-foreground/60" />
+					</div>
+				</SidebarMenuItem>
+			</SidebarMenu>
+		);
+	}
+
 	return (
 		<SidebarMenu>
 			<SidebarMenuItem>
@@ -69,14 +85,30 @@ export function WorkspaceSwitcher({
 							className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
 						>
 							<div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground overflow-clip">
-								<img
-									src={activeWorkspace.logoUrl}
-									alt={`Workspace logo for ${activeWorkspace.name}`}
-								/>
+								<Avatar className="size-8 rounded-lg">
+									<AvatarImage
+										src={
+											activeWorkspace
+												? `https://github.com/${activeWorkspace.accountLogin}.png`
+												: undefined
+										}
+										alt={activeWorkspace?.displayName}
+									/>
+									<AvatarFallback className="rounded-lg">
+										{activeWorkspace?.displayName?.slice(0, 2).toUpperCase() ??
+											activeWorkspace?.workspaceSlug
+												?.slice(0, 2)
+												.toUpperCase() ??
+											"WS"}
+									</AvatarFallback>
+								</Avatar>
 							</div>
 							<div className="grid flex-1 text-left text-sm leading-tight">
 								<span className="truncate font-semibold">
-									{activeWorkspace.name}
+									{activeWorkspace?.displayName ?? "No workspace"}
+								</span>
+								<span className="truncate text-xs text-muted-foreground">
+									{activeWorkspace?.accountLogin ?? "Select a workspace"}
 								</span>
 							</div>
 							<ChevronsUpDown className="ml-auto" />
@@ -93,19 +125,33 @@ export function WorkspaceSwitcher({
 						</DropdownMenuLabel>
 						{workspaces.map((workspace, index) => (
 							<DropdownMenuItem
-								key={workspace.name}
+								key={workspace.workspaceSlug}
 								onClick={() => onWorkspaceChange?.(workspace)}
 								className="gap-2 p-2"
 							>
 								<div className="flex size-6 items-center justify-center rounded-sm border overflow-clip">
-									<img
-										src={workspace.logoUrl}
-										alt={`Workspace logo for ${workspace.name}`}
-										className="shrink-0"
-									/>
+									<Avatar className="size-6 rounded-sm">
+										<AvatarImage
+											src={`https://github.com/${workspace.accountLogin}.png`}
+											alt={workspace.displayName}
+										/>
+										<AvatarFallback className="rounded-sm text-[10px]">
+											{workspace.displayName.slice(0, 2).toUpperCase()}
+										</AvatarFallback>
+									</Avatar>
 								</div>
-								{workspace.name}
-								<DropdownMenuShortcut>⌘{index + 1}</DropdownMenuShortcut>
+								<div className="flex flex-col leading-tight">
+									<span className="font-medium">{workspace.displayName}</span>
+									<span className="text-[11px] text-muted-foreground">
+										{workspace.accountLogin}
+									</span>
+								</div>
+								<DropdownMenuShortcut>
+									{navigator.platform.toLowerCase().includes("mac")
+										? "⌘"
+										: "Ctrl"}
+									{index + 1}
+								</DropdownMenuShortcut>
 							</DropdownMenuItem>
 						))}
 						<DropdownMenuSeparator />

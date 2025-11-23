@@ -7,6 +7,7 @@ import de.tum.in.www1.hephaestus.workspace.Workspace.WorkspaceStatus;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceMembership.WorkspaceRole;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceMembershipRepository;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceRepository;
+import de.tum.in.www1.hephaestus.workspace.WorkspaceMembershipService;
 import jakarta.servlet.Filter;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -47,17 +48,20 @@ public class WorkspaceContextFilter implements Filter {
     private final WorkspaceRepository workspaceRepository;
     private final WorkspaceMembershipRepository workspaceMembershipRepository;
     private final UserRepository userRepository;
+    private final WorkspaceMembershipService workspaceMembershipService;
     private final ObjectMapper objectMapper;
 
     public WorkspaceContextFilter(
         WorkspaceRepository workspaceRepository,
         WorkspaceMembershipRepository workspaceMembershipRepository,
         UserRepository userRepository,
+        WorkspaceMembershipService workspaceMembershipService,
         ObjectMapper objectMapper
     ) {
         this.workspaceRepository = workspaceRepository;
         this.workspaceMembershipRepository = workspaceMembershipRepository;
         this.userRepository = userRepository;
+        this.workspaceMembershipService = workspaceMembershipService;
         this.objectMapper = objectMapper;
     }
 
@@ -130,7 +134,7 @@ public class WorkspaceContextFilter implements Filter {
 
             // Fetch user roles
             var currentUser = userRepository.getCurrentUser();
-            Set<WorkspaceRole> roles = fetchUserRoles(workspace.getId(), currentUser);
+            Set<WorkspaceRole> roles = fetchUserRoles(workspace, currentUser);
 
             if (roles.isEmpty()) {
                 log.debug("User is not a member of workspace {}. Returning 403.", slug);
@@ -167,7 +171,7 @@ public class WorkspaceContextFilter implements Filter {
      * @param workspaceId Workspace ID
      * @return Set of workspace roles (empty if user has no membership or not authenticated)
      */
-    private Set<WorkspaceRole> fetchUserRoles(Long workspaceId, Optional<User> userOpt) {
+    private Set<WorkspaceRole> fetchUserRoles(de.tum.in.www1.hephaestus.workspace.Workspace workspace, Optional<User> userOpt) {
         try {
             if (userOpt.isEmpty()) {
                 log.debug("No authenticated user found, returning empty roles");
@@ -175,7 +179,7 @@ public class WorkspaceContextFilter implements Filter {
             }
 
             var membershipOpt = workspaceMembershipRepository.findByWorkspace_IdAndUser_Id(
-                workspaceId,
+                workspace.getId(),
                 userOpt.get().getId()
             );
 
@@ -184,10 +188,35 @@ public class WorkspaceContextFilter implements Filter {
                 return Set.of(membershipOpt.get().getRole());
             }
 
-            log.debug("User has no membership in workspace {}", workspaceId);
+            // Auto-heal only when workspace has zero memberships (fresh dev DB)
+            if (workspaceMembershipRepository.findByWorkspace_Id(workspace.getId()).isEmpty()) {
+                try {
+                    var created = workspaceMembershipService.createMembership(
+                        workspace,
+                        userOpt.get().getId(),
+                        WorkspaceRole.ADMIN
+                    );
+                    log.info(
+                        "Auto-added user {} to workspace {} as {} (bootstrap fallback)",
+                        userOpt.get().getLogin(),
+                        workspace.getWorkspaceSlug(),
+                        created.getRole()
+                    );
+                    return Set.of(created.getRole());
+                } catch (IllegalArgumentException ex) {
+                    log.debug(
+                        "Membership auto-add skipped for user {} in workspace {}: {}",
+                        userOpt.get().getLogin(),
+                        workspace.getWorkspaceSlug(),
+                        ex.getMessage()
+                    );
+                }
+            }
+
+            log.debug("User has no membership in workspace {}", workspace.getId());
             return Set.of();
         } catch (Exception e) {
-            log.warn("Failed to fetch user roles for workspace {}: {}", workspaceId, e.getMessage());
+            log.warn("Failed to fetch user roles for workspace {}: {}", workspace.getId(), e.getMessage());
             return Set.of();
         }
     }

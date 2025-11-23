@@ -15,9 +15,12 @@ import type {
 	UpdateTeamVisibilityData,
 } from "@/api/types.gen";
 import { AdminTeamsTable } from "@/components/admin/AdminTeamsTable";
+import { NoWorkspace } from "@/components/workspace/NoWorkspace";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 
-export const Route = createFileRoute("/_authenticated/_admin/admin/teams")({
+export const Route = createFileRoute(
+	"/_authenticated/w/$workspaceSlug/admin/teams",
+)({
 	component: AdminTeamsContainer,
 });
 
@@ -166,6 +169,10 @@ function AdminTeamsContainer() {
 			query: { hiddenFromContributions: hidden },
 		});
 	};
+
+	if (!hasWorkspace && !isWorkspaceLoading) {
+		return <NoWorkspace />;
+	}
 
 	return (
 		<AdminTeamsTable

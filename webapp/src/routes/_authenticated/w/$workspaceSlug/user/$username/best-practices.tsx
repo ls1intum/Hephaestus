@@ -12,11 +12,12 @@ import {
 } from "@/api/@tanstack/react-query.gen";
 import type { BadPracticeFeedback } from "@/api/types.gen";
 import { PracticesPage } from "@/components/practices/PracticesPage";
+import { NoWorkspace } from "@/components/workspace/NoWorkspace";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 import { useAuth } from "@/integrations/auth/AuthContext";
 
 export const Route = createFileRoute(
-	"/_authenticated/user/$username/best-practices",
+	"/_authenticated/w/$workspaceSlug/user/$username/best-practices",
 )({
 	component: BestPracticesContainer,
 });
@@ -28,6 +29,7 @@ export function BestPracticesContainer() {
 	const { workspaceSlug } = useActiveWorkspaceSlug();
 	const slug = workspaceSlug ?? "";
 	const hasWorkspace = Boolean(workspaceSlug);
+	const showNoWorkspace = !hasWorkspace;
 
 	// Check if current user is the dashboard user
 	const currUserIsDashboardUser = isCurrentUser(username);
@@ -112,6 +114,10 @@ export function BestPracticesContainer() {
 			);
 		},
 	});
+
+	if (showNoWorkspace) {
+		return <NoWorkspace />;
+	}
 
 	// Get user's display name from profile data
 	const displayName = profileQuery.data?.userInfo?.name;

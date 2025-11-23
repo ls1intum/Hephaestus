@@ -6,6 +6,7 @@ import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationSyncServic
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserSyncService;
+import de.tum.in.www1.hephaestus.workspace.WorkspaceMembership.WorkspaceRole;
 import de.tum.in.www1.hephaestus.workspace.exception.RepositoryAlreadyMonitoredException;
 import java.io.IOException;
 import java.util.List;
@@ -48,7 +49,9 @@ public class WorkspaceProvisioningService {
     private final UserRepository userRepository;
     private final OrganizationSyncService organizationSyncService;
     private final WorkspaceGitHubAccess workspaceGitHubAccess;
+    private final WorkspaceMembershipRepository workspaceMembershipRepository;
     private final boolean natsEnabled;
+    private final WorkspaceMembershipService workspaceMembershipService;
 
     public WorkspaceProvisioningService(
         WorkspaceProperties workspaceProperties,
@@ -60,6 +63,8 @@ public class WorkspaceProvisioningService {
         UserRepository userRepository,
         OrganizationSyncService organizationSyncService,
         WorkspaceGitHubAccess workspaceGitHubAccess,
+        WorkspaceMembershipRepository workspaceMembershipRepository,
+        WorkspaceMembershipService workspaceMembershipService,
         @Value("${nats.enabled}") boolean natsEnabled
     ) {
         this.workspaceProperties = workspaceProperties;
@@ -71,6 +76,8 @@ public class WorkspaceProvisioningService {
         this.userRepository = userRepository;
         this.organizationSyncService = organizationSyncService;
         this.workspaceGitHubAccess = workspaceGitHubAccess;
+        this.workspaceMembershipRepository = workspaceMembershipRepository;
+        this.workspaceMembershipService = workspaceMembershipService;
         this.natsEnabled = natsEnabled;
     }
 
@@ -85,7 +92,8 @@ public class WorkspaceProvisioningService {
         }
 
         if (workspaceRepository.count() > 0) {
-            logger.debug("Skipping default PAT workspace bootstrap because workspaces already exist.");
+            logger.debug("Skipping PAT workspace creation because workspaces already exist. Ensuring admin membership.");
+            ensureDefaultAdminMembershipIfPresent();
             return;
         }
 
@@ -133,9 +141,7 @@ public class WorkspaceProvisioningService {
             savedWorkspace.getId()
         );
 
-        config
-            .getRepositoriesToMonitor()
-            .stream()
+        config.getRepositoriesToMonitor().stream()
             .map(repo -> repo == null ? null : repo.trim())
             .filter(nameWithOwner -> !isBlank(nameWithOwner))
             .forEach(nameWithOwner -> {
@@ -149,6 +155,53 @@ public class WorkspaceProvisioningService {
 
         workspaceRepository.save(savedWorkspace);
         logger.info("PAT workspace provisioning complete. Repositories will be synced by startup monitoring.");
+
+        ensureAdminMembership(savedWorkspace);
+    }
+
+    private void ensureDefaultAdminMembershipIfPresent() {
+        String defaultSlug = workspaceProperties.getDefaultWorkspace().getLogin();
+        Workspace target = null;
+        if (!isBlank(defaultSlug)) {
+            target = workspaceRepository.findByWorkspaceSlug(defaultSlug.trim()).orElse(null);
+        }
+        if (target == null) {
+            target = workspaceRepository.findAll().stream().findFirst().orElse(null);
+        }
+        if (target != null) {
+            ensureAdminMembership(target);
+        }
+    }
+
+    private void ensureAdminMembership(Workspace workspace) {
+        userRepository
+            .findByLogin("admin")
+            .ifPresent(adminUser -> {
+                boolean alreadyMember = workspaceMembershipRepository
+                    .findByWorkspace_IdAndUser_Id(workspace.getId(), adminUser.getId())
+                    .isPresent();
+                if (alreadyMember) {
+                    logger.debug(
+                        "Default admin already member of workspace {} (id={})",
+                        workspace.getWorkspaceSlug(),
+                        workspace.getId()
+                    );
+                    return;
+                }
+                try {
+                    workspaceMembershipService.createMembership(workspace, adminUser.getId(), WorkspaceRole.ADMIN);
+                    logger.info(
+                        "Added default admin user to workspace {} as ADMIN",
+                        workspace.getWorkspaceSlug()
+                    );
+                } catch (IllegalArgumentException ex) {
+                    logger.debug(
+                        "Could not add default admin to workspace {}: {}",
+                        workspace.getWorkspaceSlug(),
+                        ex.getMessage()
+                    );
+                }
+            });
     }
 
     /**

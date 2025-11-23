@@ -4,12 +4,14 @@ import { getUserProfileOptions } from "@/api/@tanstack/react-query.gen";
 import { ProfilePage } from "@/components/profile/ProfilePage";
 import { useAuth } from "@/integrations/auth/AuthContext";
 
-export const Route = createFileRoute("/_authenticated/user/$username/")({
+export const Route = createFileRoute(
+	"/_authenticated/w/$workspaceSlug/user/$username/",
+)({
 	component: UserProfile,
 });
 
 function UserProfile() {
-	const { username } = Route.useParams();
+	const { username, workspaceSlug } = Route.useParams();
 	const { isCurrentUser } = useAuth();
 
 	// Check if current user is the dashboard user
@@ -30,6 +32,7 @@ function UserProfile() {
 			error={profileQuery.isError}
 			username={username}
 			currUserIsDashboardUser={currUserIsDashboardUser}
+			workspaceSlug={workspaceSlug}
 		/>
 	);
 }

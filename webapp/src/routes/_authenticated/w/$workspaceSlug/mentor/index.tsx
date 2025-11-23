@@ -10,18 +10,25 @@ import type { ChatThreadGroup, ChatThreadSummary } from "@/api/types.gen";
 import type { ChatProps } from "@/components/mentor/Chat";
 import { Chat } from "@/components/mentor/Chat";
 import { defaultPartRenderers } from "@/components/mentor/renderers";
+import { NoWorkspace } from "@/components/workspace/NoWorkspace";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 import type { ChatMessage } from "@/lib/types";
 
-export const Route = createFileRoute("/_authenticated/mentor/")({
+export const Route = createFileRoute(
+	"/_authenticated/w/$workspaceSlug/mentor/",
+)({
 	component: MentorContainer,
 });
 
 function MentorContainer() {
 	const queryClient = useQueryClient();
-	const navigate = useNavigate();
+	const navigate = useNavigate({ from: Route.fullPath });
 	const { workspaceSlug } = useActiveWorkspaceSlug();
 	const slug = workspaceSlug ?? "";
+
+	if (!workspaceSlug) {
+		return <NoWorkspace />;
+	}
 
 	const handleMessageSubmit = ({ text }: { text: string }) => {
 		const initialMessage = text.trim();
@@ -64,8 +71,8 @@ function MentorContainer() {
 		);
 
 		navigate({
-			to: "/mentor/$threadId",
-			params: { threadId },
+			to: "/w/$workspaceSlug/mentor/$threadId",
+			params: { workspaceSlug: slug, threadId },
 			state: { initialMessage },
 		});
 	};

@@ -10,14 +10,16 @@ import { defaultPartRenderers } from "@/components/mentor/renderers";
 import { useMentorChat } from "@/hooks/useMentorChat";
 import type { ChatMessage } from "@/lib/types";
 
-export const Route = createFileRoute("/_authenticated/mentor/$threadId")({
+export const Route = createFileRoute(
+	"/_authenticated/w/$workspaceSlug/mentor/$threadId",
+)({
 	component: ThreadContainer,
 });
 
 function ThreadContainer() {
-	const { threadId } = Route.useParams();
+	const { workspaceSlug, threadId } = Route.useParams();
 	const { state } = useLocation();
-	const navigate = useNavigate();
+	const navigate = useNavigate({ from: Route.fullPath });
 
 	// Initialize mentor chat hook for existing thread
 	const mentorChat = useMentorChat({
@@ -46,13 +48,18 @@ function ThreadContainer() {
 			// Clear navigation state to avoid re-sending on back/forward
 			navigate({
 				to: Route.fullPath,
-				params: { threadId },
+				params: { workspaceSlug, threadId },
 				replace: true,
 				state: undefined,
 			});
 		}
-		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [initialMessage, mentorChat.sendMessage, threadId, navigate]);
+	}, [
+		initialMessage,
+		mentorChat.sendMessage,
+		threadId,
+		navigate,
+		workspaceSlug,
+	]);
 	const handleMessageSubmit = ({ text }: { text: string }) => {
 		if (!text.trim()) return;
 		mentorChat.sendMessage(text);

@@ -1,7 +1,8 @@
 import { Link } from "@tanstack/react-router";
 import { SquarePen } from "lucide-react";
-import type { JSX } from "react";
-import type { ChatThreadGroup } from "@/api/types.gen";
+import type { ReactNode } from "react";
+import type { ChatThreadGroup, WorkspaceListItem } from "@/api/types.gen";
+import { Empty } from "@/components/ui/empty";
 import {
 	Sidebar,
 	SidebarContent,
@@ -18,15 +19,6 @@ import { NavMentor } from "./NavMentor";
 import { NavMentorThreads } from "./NavMentorThreads";
 import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
 
-const data = {
-	workspaces: [
-		{
-			name: "AET",
-			logoUrl: "https://avatars.githubusercontent.com/u/11064260?s=200&v=4",
-		},
-	],
-};
-
 export type SidebarContext = "main" | "mentor";
 
 export interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
@@ -34,6 +26,10 @@ export interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
 	isAdmin: boolean;
 	hasMentorAccess: boolean;
 	context: SidebarContext;
+	workspaces: WorkspaceListItem[];
+	activeWorkspace?: WorkspaceListItem;
+	onWorkspaceChange?: (workspace: WorkspaceListItem) => void;
+	workspacesLoading?: boolean;
 	// Optional mentor thread data - using API types directly
 	mentorThreadGroups?: ChatThreadGroup[];
 	mentorThreadsLoading?: boolean;
@@ -45,19 +41,46 @@ export function AppSidebar({
 	isAdmin,
 	hasMentorAccess,
 	context,
+	workspaces,
+	activeWorkspace,
+	onWorkspaceChange,
+	workspacesLoading = false,
 	mentorThreadGroups,
 	mentorThreadsLoading,
 	mentorThreadsError,
 	...props
 }: AppSidebarProps) {
-	let contextHeader: JSX.Element | undefined;
-	let sidebarContent: JSX.Element;
+	let contextHeader: ReactNode = null;
+	let sidebarContent: ReactNode = null;
 
-	if (context === "mentor") {
+	if (workspacesLoading) {
+		sidebarContent = (
+			<div className="p-4 space-y-3">
+				<div className="h-3 w-28 rounded bg-muted animate-pulse" />
+				<div className="h-3 w-20 rounded bg-muted animate-pulse" />
+				<div className="h-3 w-24 rounded bg-muted animate-pulse" />
+			</div>
+		);
+	} else if (!activeWorkspace) {
+		sidebarContent = (
+			<div className="p-4">
+				<Empty
+					title="No workspace"
+					description="You’re not a member of any workspace yet. Ask an admin to add you."
+				/>
+			</div>
+		);
+	} else if (context === "mentor") {
 		contextHeader = (
-			<NavContextHeader title="Mentor">
+			<NavContextHeader
+				title="Mentor"
+				workspaceSlug={activeWorkspace.workspaceSlug}
+			>
 				<SidebarMenuButton asChild>
-					<Link to="/mentor">
+					<Link
+						to="/w/$workspaceSlug/mentor"
+						params={{ workspaceSlug: activeWorkspace.workspaceSlug }}
+					>
 						<SquarePen />
 						New chat
 					</Link>
@@ -66,18 +89,23 @@ export function AppSidebar({
 		);
 		sidebarContent = (
 			<NavMentorThreads
+				workspaceSlug={activeWorkspace.workspaceSlug}
 				threadGroups={mentorThreadGroups ?? []}
 				isLoading={mentorThreadsLoading}
 				error={mentorThreadsError}
 			/>
 		);
 	} else {
-		contextHeader = undefined;
 		sidebarContent = (
 			<>
-				<NavDashboards username={username} />
-				{hasMentorAccess && <NavMentor />}
-				{isAdmin && <NavAdmin />}
+				<NavDashboards
+					username={username}
+					workspaceSlug={activeWorkspace.workspaceSlug}
+				/>
+				{hasMentorAccess && (
+					<NavMentor workspaceSlug={activeWorkspace.workspaceSlug} />
+				)}
+				{isAdmin && <NavAdmin workspaceSlug={activeWorkspace.workspaceSlug} />}
 			</>
 		);
 	}
@@ -86,8 +114,10 @@ export function AppSidebar({
 		<Sidebar collapsible={context === "main" ? "icon" : "offcanvas"} {...props}>
 			<SidebarHeader>
 				<WorkspaceSwitcher
-					workspaces={data.workspaces}
-					activeWorkspace={data.workspaces[0]}
+					isLoading={workspacesLoading}
+					workspaces={workspaces}
+					activeWorkspace={activeWorkspace}
+					onWorkspaceChange={onWorkspaceChange}
 				/>
 				{contextHeader}
 			</SidebarHeader>

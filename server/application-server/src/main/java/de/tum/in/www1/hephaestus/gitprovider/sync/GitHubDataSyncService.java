@@ -283,9 +283,14 @@ public class GitHubDataSyncService {
         PagedIterator<GHIssue> issuesIterator = issueSyncService.getIssuesIterator(repository, cutoffDate);
         while (issuesIterator.hasNext()) {
             var syncedUpToTime = syncRepositoryRecentIssuesAndPullRequestsNextPage(repository, issuesIterator);
-            repositoryToMonitor.setIssuesAndPullRequestsSyncedAt(syncedUpToTime);
-            repositoryToMonitorRepository.save(repositoryToMonitor);
+            if (syncedUpToTime != null) {
+                repositoryToMonitor.setIssuesAndPullRequestsSyncedAt(syncedUpToTime);
+                repositoryToMonitorRepository.save(repositoryToMonitor);
+            }
         }
+
+        // Fallback: ensure we don't miss freshly created pull requests when the issues iterator returns empty
+        fallbackPullRequestSync(repository, repositoryToMonitor);
     }
 
     /**
@@ -301,6 +306,9 @@ public class GitHubDataSyncService {
     ) {
         var currentTime = Instant.now();
         var ghIssues = issuesIterator.nextPage();
+        if (ghIssues.isEmpty()) {
+            return null; // nothing fetched; avoid moving the sync cursor forward
+        }
         var issues = ghIssues.stream().map(issueSyncService::processIssue).toList();
         issueCommentSyncService.syncIssueCommentsOfAllIssues(ghIssues);
         issues.forEach(issue -> issue.setLastSyncAt(currentTime));
@@ -317,6 +325,26 @@ public class GitHubDataSyncService {
             return issues.getLast().getUpdatedAt();
         } catch (NoSuchElementException e) {
             return currentTime;
+        }
+    }
+
+    private void fallbackPullRequestSync(GHRepository repository, RepositoryToMonitor monitor) {
+        try {
+            var ghPullRequests = repository.getPullRequests(org.kohsuke.github.GHIssueState.ALL);
+            if (ghPullRequests == null || ghPullRequests.isEmpty()) {
+                return;
+            }
+            ghPullRequests.forEach(pullRequestSyncService::processPullRequest);
+            pullRequestReviewSyncService.syncReviewsOfAllPullRequests(ghPullRequests);
+            pullRequestReviewCommentSyncService.syncReviewCommentsOfAllPullRequests(ghPullRequests);
+            monitor.setIssuesAndPullRequestsSyncedAt(Instant.now());
+            repositoryToMonitorRepository.save(monitor);
+        } catch (IOException e) {
+            logger.warn(
+                "Fallback PR sync failed for {}: {}",
+                repository.getFullName(),
+                e.getMessage()
+            );
         }
     }
 

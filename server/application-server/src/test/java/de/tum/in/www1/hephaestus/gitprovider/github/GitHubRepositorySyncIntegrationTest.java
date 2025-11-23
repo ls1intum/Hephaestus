@@ -110,6 +110,16 @@ class GitHubRepositorySyncIntegrationTest extends AbstractGitHubSyncIntegrationT
         var createdIssue = createIssueWithComment(ghRepository);
         var pullRequestArtifacts = createPullRequestWithReview(ghRepository);
 
+        awaitCondition("issues/PRs visible via GitHub API", () ->
+            ghRepository
+                .queryIssues()
+                .state(org.kohsuke.github.GHIssueState.ALL)
+                .since(java.time.Instant.now().minus(java.time.Duration.ofHours(2)))
+                .list()
+                .iterator()
+                .hasNext()
+        );
+
         var repositoryToMonitor = registerRepositoryToMonitor(ghRepository);
         dataSyncService.syncRepositoryToMonitor(repositoryToMonitor);
         dataSyncService.syncUsers(workspace);

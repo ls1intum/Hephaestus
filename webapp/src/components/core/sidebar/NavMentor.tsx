@@ -10,14 +10,18 @@ import {
 	SidebarMenuItem,
 } from "@/components/ui/sidebar";
 
-export function NavMentor() {
+export function NavMentor({ workspaceSlug }: { workspaceSlug: string }) {
 	return (
 		<SidebarGroup>
 			<SidebarGroupLabel>Mentor</SidebarGroupLabel>
 			<SidebarMenu>
 				<SidebarMenuItem>
 					<SidebarMenuButton asChild tooltip="Heph - AI Mentor">
-						<Link to="/mentor" className="group/mentor items-center gap-2">
+						<Link
+							to="/w/$workspaceSlug/mentor"
+							params={{ workspaceSlug }}
+							className="group/mentor items-center gap-2"
+						>
 							<MentorIcon
 								className="-mx-1.5"
 								size={30}

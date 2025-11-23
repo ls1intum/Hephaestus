@@ -49,6 +49,10 @@ const meta = {
 				type: { summary: "object" },
 			},
 		},
+		workspaceSlug: {
+			description: "Active workspace slug for routing",
+			control: "text",
+		},
 	},
 	tags: ["autodocs"],
 } satisfies Meta<typeof ProfilePage>;
@@ -65,6 +69,7 @@ export const Default: Story = {
 		error: false,
 		username: "johndoe",
 		currUserIsDashboardUser: true,
+		workspaceSlug: "aet",
 		profileData: {
 			userInfo: {
 				id: 1,
@@ -234,6 +239,7 @@ export const Loading: Story = {
 		username: "johndoe",
 		profileData: undefined,
 		currUserIsDashboardUser: true,
+		workspaceSlug: "aet",
 	},
 };
 
@@ -247,6 +253,7 @@ export const ErrorState: Story = {
 		username: "johndoe",
 		profileData: undefined,
 		currUserIsDashboardUser: true,
+		workspaceSlug: "aet",
 	},
 };
 
@@ -259,6 +266,7 @@ export const Empty: Story = {
 		error: false,
 		username: "emptydoe",
 		currUserIsDashboardUser: true,
+		workspaceSlug: "aet",
 		profileData: {
 			userInfo: {
 				id: 3,

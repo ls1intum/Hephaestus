@@ -23,13 +23,21 @@ const meta = {
 	args: {
 		workspaces: [
 			{
-				name: "AET",
-				logoUrl: "https://avatars.githubusercontent.com/u/11064260?s=200&v=4",
+				displayName: "AET",
+				accountLogin: "aet-org",
+				workspaceSlug: "aet",
+				id: 1,
+				status: "ACTIVE",
+				createdAt: new Date(),
 			},
 		],
 		activeWorkspace: {
-			name: "AET",
-			logoUrl: "https://avatars.githubusercontent.com/u/11064260?s=200&v=4",
+			displayName: "AET",
+			accountLogin: "aet-org",
+			workspaceSlug: "aet",
+			id: 1,
+			status: "ACTIVE",
+			createdAt: new Date(),
 		},
 		onWorkspaceChange: fn(),
 		onAddWorkspace: fn(),
@@ -86,21 +94,37 @@ export const MultipleWorkspaces: Story = {
 	args: {
 		workspaces: [
 			{
-				name: "AET",
-				logoUrl: "https://avatars.githubusercontent.com/u/11064260?s=200&v=4",
+				displayName: "AET",
+				accountLogin: "aet-org",
+				workspaceSlug: "aet",
+				id: 1,
+				status: "ACTIVE",
+				createdAt: new Date(),
 			},
 			{
-				name: "Personal",
-				logoUrl: "https://github.com/identicons/example.png",
+				displayName: "Personal",
+				accountLogin: "personal",
+				workspaceSlug: "personal",
+				id: 2,
+				status: "ACTIVE",
+				createdAt: new Date(),
 			},
 			{
-				name: "Team B",
-				logoUrl: "https://github.com/identicons/team-b.png",
+				displayName: "Team B",
+				accountLogin: "team-b",
+				workspaceSlug: "team-b",
+				id: 3,
+				status: "ACTIVE",
+				createdAt: new Date(),
 			},
 		],
 		activeWorkspace: {
-			name: "AET",
-			logoUrl: "https://avatars.githubusercontent.com/u/11064260?s=200&v=4",
+			displayName: "AET",
+			accountLogin: "aet-org",
+			workspaceSlug: "aet",
+			id: 1,
+			status: "ACTIVE",
+			createdAt: new Date(),
 		},
 	},
 	parameters: {
@@ -108,6 +132,43 @@ export const MultipleWorkspaces: Story = {
 			description: {
 				story:
 					"Multiple workspaces with cross-platform keyboard shortcuts (⌘1-3 on Mac, Ctrl+1-3 on Windows/Linux) to quickly switch between them.",
+			},
+		},
+	},
+};
+
+/**
+ * Empty state when the user is not a member of any workspace.
+ */
+export const NoWorkspaces: Story = {
+	args: {
+		workspaces: [],
+		activeWorkspace: undefined,
+	},
+	parameters: {
+		docs: {
+			description: {
+				story:
+					"Displays the empty headline and subtitle to prompt users to get added to a workspace.",
+			},
+		},
+	},
+};
+
+/**
+ * Loading skeleton while workspaces are being fetched.
+ */
+export const Loading: Story = {
+	args: {
+		workspaces: [],
+		activeWorkspace: undefined,
+		isLoading: true,
+	},
+	parameters: {
+		docs: {
+			description: {
+				story:
+					"Skeleton placeholder avoids a brief flash of the empty state while workspace data loads.",
 			},
 		},
 	},

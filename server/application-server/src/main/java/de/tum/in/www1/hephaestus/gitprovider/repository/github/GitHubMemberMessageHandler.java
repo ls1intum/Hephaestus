@@ -17,6 +17,7 @@ import org.kohsuke.github.GHUser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
+import org.springframework.dao.DataIntegrityViolationException;
 
 @Component
 public class GitHubMemberMessageHandler extends GitHubMessageHandler<GHEventPayload.Member> {
@@ -96,10 +97,15 @@ public class GitHubMemberMessageHandler extends GitHubMessageHandler<GHEventPayl
     }
 
     private User upsertUser(GHUser ghUser) {
-        User user = userRepository.findById(ghUser.getId()).orElseGet(User::new);
-        user.setId(ghUser.getId());
+        long userId = ghUser.getId();
+        User user = userRepository.findById(userId).orElseGet(User::new);
+        user.setId(userId);
         user = userConverter.update(ghUser, user);
-        return userRepository.save(user);
+        try {
+            return userRepository.saveAndFlush(user);
+        } catch (DataIntegrityViolationException ex) {
+            return userRepository.findById(userId).orElseThrow(() -> ex);
+        }
     }
 
     private RepositoryCollaborator.Permission resolvePermission(

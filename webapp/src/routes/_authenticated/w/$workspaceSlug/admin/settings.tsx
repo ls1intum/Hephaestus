@@ -7,9 +7,12 @@ import {
 	resetAndRecalculateLeaguesMutation,
 } from "@/api/@tanstack/react-query.gen";
 import { AdminSettingsPage } from "@/components/admin/AdminSettingsPage";
+import { NoWorkspace } from "@/components/workspace/NoWorkspace";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 
-export const Route = createFileRoute("/_authenticated/_admin/admin/settings")({
+export const Route = createFileRoute(
+	"/_authenticated/w/$workspaceSlug/admin/settings",
+)({
 	component: AdminSettings,
 });
 
@@ -77,6 +80,10 @@ function AdminSettings() {
 			queryClient.invalidateQueries({ queryKey: ["workspace"] });
 		},
 	});
+
+	if (!workspaceSlug && !isWorkspaceLoading) {
+		return <NoWorkspace />;
+	}
 
 	// Handle add repository
 	const handleAddRepository = (nameWithOwner: string) => {

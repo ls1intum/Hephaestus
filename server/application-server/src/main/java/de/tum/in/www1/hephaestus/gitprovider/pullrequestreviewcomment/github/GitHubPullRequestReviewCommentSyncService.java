@@ -60,6 +60,7 @@ public class GitHubPullRequestReviewCommentSyncService {
      * @param pullRequests the list of GitHub pull requests to sync review comments
      *                     for
      */
+    @Transactional
     public void syncReviewCommentsOfAllPullRequests(List<GHPullRequest> pullRequests) {
         pullRequests.stream().forEach(this::syncReviewCommentsOfPullRequest);
     }
@@ -69,6 +70,7 @@ public class GitHubPullRequestReviewCommentSyncService {
      *
      * @param pullRequest the GitHub pull request to sync review comments for
      */
+    @Transactional
     public void syncReviewCommentsOfPullRequest(GHPullRequest pullRequest) {
         pullRequest
             .listReviewComments()

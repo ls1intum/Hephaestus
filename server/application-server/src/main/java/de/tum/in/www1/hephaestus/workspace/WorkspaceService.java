@@ -7,6 +7,7 @@ import de.tum.in.www1.hephaestus.gitprovider.label.Label;
 import de.tum.in.www1.hephaestus.gitprovider.label.LabelRepository;
 import de.tum.in.www1.hephaestus.gitprovider.organization.Organization;
 import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationService;
+import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.github.GitHubRepositorySyncService;
 import de.tum.in.www1.hephaestus.gitprovider.sync.GitHubDataSyncService;
@@ -110,6 +111,9 @@ public class WorkspaceService {
     @Autowired
     private GitHubAppTokenService gitHubAppTokenService;
 
+    @Autowired
+    private OrganizationSyncService organizationSyncService;
+
     @Value("${nats.enabled}")
     private boolean isNatsEnabled;
 
@@ -206,7 +210,19 @@ public class WorkspaceService {
                     return null;
                 });
 
-            CompletableFuture<Void> teamsFuture = usersFuture
+            CompletableFuture<Void> membersFuture = usersFuture
+                .thenRunAsync(
+                    WorkspaceContextExecutor.wrap(() -> {
+                        logger.info("Users synced, now syncing org + workspace members for workspace id={}", workspace.getId());
+                        organizationSyncService.syncMembers(workspace);
+                    })
+                )
+                .exceptionally(ex -> {
+                    logger.error("Error during syncMembers: {}", LoggingUtils.sanitizeForLog(ex.getMessage()), ex);
+                    return null;
+                });
+
+            CompletableFuture<Void> teamsFuture = membersFuture
                 .thenRunAsync(
                     WorkspaceContextExecutor.wrap(() -> {
                         logger.info("Users synced, now syncing teams for workspace id={}", workspace.getId());
