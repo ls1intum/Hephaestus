@@ -11,6 +11,9 @@ import de.tum.in.www1.hephaestus.mentor.document.DocumentRepository;
 import de.tum.in.www1.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.in.www1.hephaestus.testconfig.TestUserFactory;
 import de.tum.in.www1.hephaestus.testconfig.WithMentorUser;
+import de.tum.in.www1.hephaestus.testconfig.WorkspaceTestFactory;
+import de.tum.in.www1.hephaestus.workspace.Workspace;
+import de.tum.in.www1.hephaestus.workspace.WorkspaceRepository;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -41,10 +44,17 @@ public class ChatPersistenceServiceIT extends BaseIntegrationTest {
     private ChatMessageRepository chatMessageRepository;
 
     private User mentorUser;
+    private Workspace workspace;
+
+    @Autowired
+    private WorkspaceRepository workspaceRepository;
 
     @BeforeEach
     void setup() {
         mentorUser = TestUserFactory.ensureUser(userRepository, "mentor", 2L);
+        workspace = workspaceRepository
+            .findByWorkspaceSlug("mentor-chat-persistence")
+            .orElseGet(() -> workspaceRepository.save(WorkspaceTestFactory.activeWorkspace("mentor-chat-persistence")));
     }
 
     @Test
@@ -55,6 +65,7 @@ public class ChatPersistenceServiceIT extends BaseIntegrationTest {
         ChatThread thread = new ChatThread();
         thread.setId(UUID.randomUUID());
         thread.setUser(mentorUser);
+        thread.setWorkspace(workspace);
 
         // Persist thread and simulate a parent message (user prompt)
         ChatMessage parent = new ChatMessage();
@@ -144,7 +155,8 @@ public class ChatPersistenceServiceIT extends BaseIntegrationTest {
         );
 
         // Assert: one version exists with expected content prefix and metadata
-        List<Document> versionsAfterCreate = documentRepository.findByIdAndUserOrderByVersionNumberDesc(
+        List<Document> versionsAfterCreate = documentRepository.findByWorkspaceAndUserAndIdOrderByVersionNumberDesc(
+            thread.getWorkspace(),
             docId,
             mentorUser
         );
@@ -198,7 +210,8 @@ public class ChatPersistenceServiceIT extends BaseIntegrationTest {
         );
 
         // Assert: two versions exist, latest content reflects update
-        List<Document> versionsAfterUpdate = documentRepository.findByIdAndUserOrderByVersionNumberDesc(
+        List<Document> versionsAfterUpdate = documentRepository.findByWorkspaceAndUserAndIdOrderByVersionNumberDesc(
+            thread.getWorkspace(),
             docId,
             mentorUser
         );

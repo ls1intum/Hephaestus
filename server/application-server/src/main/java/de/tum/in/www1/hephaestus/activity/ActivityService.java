@@ -9,7 +9,7 @@ import de.tum.in.www1.hephaestus.activity.model.*;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
-import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContext;
+import de.tum.in.www1.hephaestus.workspace.Workspace;
 import jakarta.transaction.Transactional;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -56,12 +56,13 @@ public class ActivityService {
     private String tracingSecretKey;
 
     @Transactional
-    public ActivityDTO getActivity(WorkspaceContext workspaceContext, String login) {
-        logger.info("Getting activity for user with login: {} in workspace {}", login, workspaceContext.slug());
+    public ActivityDTO getActivity(Workspace workspace, String login) {
+        logger.info("Getting activity for user with login: {} in workspace {}", login, workspace.getWorkspaceSlug());
 
         List<PullRequest> pullRequests = pullRequestRepository.findAssignedByLoginAndStates(
             login,
-            Set.of(Issue.State.OPEN)
+            Set.of(Issue.State.OPEN),
+            workspace.getId()
         );
 
         List<PullRequestWithBadPracticesDTO> openPullRequestsWithBadPractices = pullRequests
@@ -96,12 +97,17 @@ public class ActivityService {
     }
 
     @Transactional
-    public DetectionResult detectBadPracticesForUser(WorkspaceContext workspaceContext, String login) {
-        logger.info("Detecting bad practices for user with login: {} in workspace {}", login, workspaceContext.slug());
+    public DetectionResult detectBadPracticesForUser(Workspace workspace, String login) {
+        logger.info(
+            "Detecting bad practices for user with login: {} in workspace {}",
+            login,
+            workspace.getWorkspaceSlug()
+        );
 
         List<PullRequest> pullRequests = pullRequestRepository.findAssignedByLoginAndStates(
             login,
-            Set.of(Issue.State.OPEN)
+            Set.of(Issue.State.OPEN),
+            workspace.getId()
         );
 
         List<DetectionResult> detectedBadPractices = new ArrayList<>();
@@ -120,25 +126,28 @@ public class ActivityService {
     }
 
     @Transactional
-    public DetectionResult detectBadPracticesForPullRequest(
-        WorkspaceContext workspaceContext,
-        PullRequest pullRequest
-    ) {
-        logger.info("Detecting bad practices for PR: {} in workspace {}", pullRequest.getId(), workspaceContext.slug());
+    public DetectionResult detectBadPracticesForPullRequest(Workspace workspace, PullRequest pullRequest) {
+        ensurePullRequestInWorkspace(pullRequest, workspace);
+        logger.info(
+            "Detecting bad practices for PR: {} in workspace {}",
+            pullRequest.getId(),
+            workspace.getWorkspaceSlug()
+        );
 
         return pullRequestBadPracticeDetector.detectAndSyncBadPractices(pullRequest);
     }
 
     public void resolveBadPractice(
-        WorkspaceContext workspaceContext,
+        Workspace workspace,
         PullRequestBadPractice badPractice,
         PullRequestBadPracticeState state
     ) {
+        ensurePullRequestInWorkspace(badPractice.getPullrequest(), workspace);
         logger.info(
             "Resolving bad practice {} with state {} in workspace {}",
             badPractice.getId(),
             state,
-            workspaceContext.slug()
+            workspace.getWorkspaceSlug()
         );
 
         badPractice.setUserState(state);
@@ -146,11 +155,16 @@ public class ActivityService {
     }
 
     public void provideFeedbackForBadPractice(
-        WorkspaceContext workspaceContext,
+        Workspace workspace,
         PullRequestBadPractice badPractice,
         BadPracticeFeedbackDTO feedback
     ) {
-        logger.info("Marking bad practice with id: {} in workspace {}", badPractice.getId(), workspaceContext.slug());
+        ensurePullRequestInWorkspace(badPractice.getPullrequest(), workspace);
+        logger.info(
+            "Marking bad practice with id: {} in workspace {}",
+            badPractice.getId(),
+            workspace.getWorkspaceSlug()
+        );
 
         BadPracticeFeedback badPracticeFeedback = new BadPracticeFeedback();
         badPracticeFeedback.setPullRequestBadPractice(badPractice);
@@ -186,6 +200,22 @@ public class ActivityService {
             logger.info("Feedback sent to Langfuse: {}", response.toString());
         } catch (Exception e) {
             logger.error("Failed to send feedback to Langfuse: {}", e.getMessage());
+        }
+    }
+
+    private void ensurePullRequestInWorkspace(PullRequest pullRequest, Workspace workspace) {
+        if (
+            pullRequest == null ||
+            pullRequest.getRepository() == null ||
+            pullRequest.getRepository().getOrganization() == null ||
+            pullRequest.getRepository().getOrganization().getWorkspace() == null ||
+            !pullRequest.getRepository().getOrganization().getWorkspace().getId().equals(workspace.getId())
+        ) {
+            throw new IllegalArgumentException(
+                "Pull request " +
+                (pullRequest != null ? pullRequest.getId() : "<null>") +
+                " is outside the workspace context"
+            );
         }
     }
 }

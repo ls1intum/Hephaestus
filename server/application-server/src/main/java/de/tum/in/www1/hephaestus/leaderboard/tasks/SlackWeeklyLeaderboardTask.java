@@ -9,6 +9,8 @@ import com.slack.api.model.User;
 import com.slack.api.model.block.LayoutBlock;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserInfoDTO;
 import de.tum.in.www1.hephaestus.leaderboard.*;
+import de.tum.in.www1.hephaestus.workspace.Workspace;
+import de.tum.in.www1.hephaestus.workspace.WorkspaceRepository;
 import java.io.IOException;
 import java.time.DayOfWeek;
 import java.time.Instant;
@@ -61,6 +63,9 @@ public class SlackWeeklyLeaderboardTask implements Runnable {
     @Autowired
     private LeaderboardService leaderboardService;
 
+    @Autowired
+    private WorkspaceRepository workspaceRepository;
+
     /**
      * Test the Slack connection.
      *
@@ -75,8 +80,18 @@ public class SlackWeeklyLeaderboardTask implements Runnable {
      *
      * @return
      */
-    private List<User> getTop3SlackReviewers(Instant after, Instant before, Optional<String> team) {
+    private List<User> getTop3SlackReviewers(
+        Workspace workspace,
+        Instant after,
+        Instant before,
+        Optional<String> team
+    ) {
+        if (workspace == null || workspace.getId() == null) {
+            return List.of();
+        }
+
         var leaderboard = leaderboardService.createLeaderboard(
+            workspace,
             after,
             before,
             team.orElse("all"),
@@ -85,7 +100,8 @@ public class SlackWeeklyLeaderboardTask implements Runnable {
         );
         var top3 = leaderboard.subList(0, Math.min(3, leaderboard.size()));
         logger.debug(
-            "Top 3 Users of the last week: {}",
+            "Top 3 Users of the last week for workspace {}: {}",
+            workspace.getWorkspaceSlug(),
             top3.stream().map(entry -> entry.user() != null ? entry.user().name() : "<team>").toList()
         );
 
@@ -136,10 +152,18 @@ public class SlackWeeklyLeaderboardTask implements Runnable {
 
     @Override
     public void run() {
-        // get date in unix seconds for Slack date formatting
-        long currentDate = Instant.now().getEpochSecond();
+        if (slackMessageService == null) {
+            logger.warn("SlackMessageService not available; skipping message send.");
+            return;
+        }
 
-        // Calculate the last leaderboard schedule in system default zone, then convert to Instants
+        List<Workspace> workspaces = workspaceRepository.findAll();
+        if (workspaces.isEmpty()) {
+            logger.info("No workspaces configured for Slack notifications; skipping message.");
+            return;
+        }
+
+        long currentDate = Instant.now().getEpochSecond();
         String[] timeParts = scheduledTime.split(":");
         ZonedDateTime zonedNow = ZonedDateTime.now(ZoneId.systemDefault());
         ZonedDateTime zonedBefore = zonedNow
@@ -151,11 +175,42 @@ public class SlackWeeklyLeaderboardTask implements Runnable {
         Instant before = zonedBefore.toInstant();
         Instant after = zonedBefore.minusWeeks(1).toInstant();
 
-        var top3reviewers = getTop3SlackReviewers(after, before, Optional.of(team));
+        for (Workspace workspace : workspaces) {
+            var topReviewers = getTop3SlackReviewers(workspace, after, before, Optional.ofNullable(team));
+            if (topReviewers.isEmpty()) {
+                logger.info(
+                    "Skipping Slack notification for workspace {} because no reviewers qualified.",
+                    workspace.getWorkspaceSlug()
+                );
+                continue;
+            }
 
-        logger.info("Sending scheduled message to Slack channel...");
+            List<LayoutBlock> blocks = buildBlocks(workspace, topReviewers, currentDate, after, before);
+            try {
+                slackMessageService.sendMessage(
+                    channelId,
+                    blocks,
+                    "Reviews of the last week (" + workspace.getWorkspaceSlug() + ")"
+                );
+            } catch (IOException | SlackApiException e) {
+                logger.error(
+                    "Failed to send scheduled message for workspace {}: {}",
+                    workspace.getWorkspaceSlug(),
+                    e.getMessage()
+                );
+            }
+        }
+    }
 
-        List<LayoutBlock> blocks = asBlocks(
+    private List<LayoutBlock> buildBlocks(
+        Workspace workspace,
+        List<User> topReviewers,
+        long currentDate,
+        Instant after,
+        Instant before
+    ) {
+        String teamFilter = team == null ? "all" : team;
+        return asBlocks(
             header(header -> header.text(plainText(pt -> pt.text(":newspaper: Reviews of the last week :newspaper:")))),
             context(context ->
                 context.elements(
@@ -170,14 +225,16 @@ public class SlackWeeklyLeaderboardTask implements Runnable {
             section(section ->
                 section.text(
                     markdownText(
-                        "Another *review leaderboard* has concluded. You can check out your placement <" +
+                        "Workspace *" +
+                        workspace.getWorkspaceSlug() +
+                        "*: Another review leaderboard has concluded. You can check out your placement <" +
                         hephaestusUrl +
                         "?after=" +
                         formatDateForURL(after) +
                         "&before=" +
                         formatDateForURL(before) +
                         "&team=" +
-                        team +
+                        teamFilter +
                         "|here>."
                     )
                 )
@@ -186,8 +243,8 @@ public class SlackWeeklyLeaderboardTask implements Runnable {
             section(section ->
                 section.text(
                     markdownText(
-                        IntStream.range(0, top3reviewers.size())
-                            .mapToObj(i -> ((i + 1) + ". <@" + top3reviewers.get(i).getId() + ">"))
+                        IntStream.range(0, topReviewers.size())
+                            .mapToObj(i -> ((i + 1) + ". <@" + topReviewers.get(i).getId() + ">"))
                             .reduce((a, b) -> a + "\n" + b)
                             .orElse("")
                     )
@@ -195,14 +252,5 @@ public class SlackWeeklyLeaderboardTask implements Runnable {
             ),
             section(section -> section.text(markdownText("Happy coding and reviewing! :rocket:")))
         );
-        if (slackMessageService != null) {
-            try {
-                slackMessageService.sendMessage(channelId, blocks, "Reviews of the last week");
-            } catch (IOException | SlackApiException e) {
-                logger.error("Failed to send scheduled message to Slack channel: " + e.getMessage());
-            }
-        } else {
-            logger.warn("SlackMessageService not available; skipping message send.");
-        }
     }
 }

@@ -486,6 +486,12 @@ public class WorkspaceService {
             return;
         }
 
+        Workspace workspace = workspaceRepository.findById(workspaceId).orElse(null);
+        if (workspace == null) {
+            logger.warn("Workspace {} no longer exists; skipping recalculation", workspaceId);
+            return;
+        }
+
         workspaceMembershipService.resetLeaguePoints(workspaceId, LeaguePointsCalculationService.POINTS_DEFAULT);
 
         // Get all pull request reviews and issue comments to calculate past leaderboards
@@ -495,6 +501,7 @@ public class WorkspaceService {
         // While we still have reviews in the past, calculate leaderboard and update points
         do {
             var leaderboard = leaderboardService.createLeaderboard(
+                workspace,
                 weekAgo,
                 now,
                 "all",

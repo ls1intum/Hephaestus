@@ -1,6 +1,7 @@
 package de.tum.in.www1.hephaestus.mentor;
 
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
+import de.tum.in.www1.hephaestus.workspace.Workspace;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -12,29 +13,38 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface ChatThreadRepository extends JpaRepository<ChatThread, UUID> {
-    Optional<ChatThread> findFirstByUserOrderByCreatedAtDesc(User user);
+    Optional<ChatThread> findFirstByUserAndWorkspaceOrderByCreatedAtDesc(User user, Workspace workspace);
 
     /**
      * Find all threads for a user ordered by creation date (newest first)
      */
-    List<ChatThread> findByUserOrderByCreatedAtDesc(User user);
+    List<ChatThread> findByUserAndWorkspaceOrderByCreatedAtDesc(User user, Workspace workspace);
 
     /**
      * Find a thread by ID and user (security check)
      */
-    Optional<ChatThread> findByIdAndUser(UUID id, User user);
+    Optional<ChatThread> findByIdAndUserAndWorkspace(UUID id, User user, Workspace workspace);
 
     /**
      * Find all threads for a user by user ID ordered by creation date (newest first)
      */
-    @Query("SELECT t FROM ChatThread t WHERE t.user.id = :userId ORDER BY t.createdAt DESC")
-    List<ChatThread> findByUserIdOrderByCreatedAtDesc(@Param("userId") Long userId);
+    @Query(
+        "SELECT t FROM ChatThread t WHERE t.user.id = :userId AND t.workspace = :workspace ORDER BY t.createdAt DESC"
+    )
+    List<ChatThread> findByUserIdAndWorkspaceOrderByCreatedAtDesc(
+        @Param("userId") Long userId,
+        @Param("workspace") Workspace workspace
+    );
 
     /**
      * Find a thread by ID and user ID
      */
-    @Query("SELECT t FROM ChatThread t WHERE t.id = :id AND t.user.id = :userId")
-    Optional<ChatThread> findByIdAndUserId(@Param("id") UUID id, @Param("userId") Long userId);
+    @Query("SELECT t FROM ChatThread t WHERE t.id = :id AND t.user.id = :userId AND t.workspace = :workspace")
+    Optional<ChatThread> findByIdAndUserIdAndWorkspace(
+        @Param("id") UUID id,
+        @Param("userId") Long userId,
+        @Param("workspace") Workspace workspace
+    );
 
     /**
      * Find a thread with its messages eagerly fetched
@@ -42,9 +52,13 @@ public interface ChatThreadRepository extends JpaRepository<ChatThread, UUID> {
     @Query(
         "SELECT DISTINCT t FROM ChatThread t " +
         "LEFT JOIN FETCH t.allMessages " +
-        "WHERE t.id = :id AND t.user = :user"
+        "WHERE t.id = :id AND t.user = :user AND t.workspace = :workspace"
     )
-    Optional<ChatThread> findByIdAndUserWithMessages(@Param("id") UUID id, @Param("user") User user);
+    Optional<ChatThread> findByIdAndUserAndWorkspaceWithMessages(
+        @Param("id") UUID id,
+        @Param("user") User user,
+        @Param("workspace") Workspace workspace
+    );
 
     @Override
     @EntityGraph(attributePaths = { "user", "allMessages", "allMessages.parts", "selectedLeafMessage" })

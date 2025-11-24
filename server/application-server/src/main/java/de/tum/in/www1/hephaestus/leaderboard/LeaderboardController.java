@@ -1,6 +1,8 @@
 package de.tum.in.www1.hephaestus.leaderboard;
 
+import de.tum.in.www1.hephaestus.workspace.Workspace;
 import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContext;
+import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContextResolver;
 import de.tum.in.www1.hephaestus.workspace.context.WorkspaceScopedController;
 import io.swagger.v3.oas.annotations.Parameter;
 import jakarta.validation.constraints.NotBlank;
@@ -19,9 +21,11 @@ public class LeaderboardController {
     private static final Logger logger = LoggerFactory.getLogger(LeaderboardController.class);
 
     private final LeaderboardService leaderboardService;
+    private final WorkspaceContextResolver workspaceResolver;
 
-    public LeaderboardController(LeaderboardService leaderboardService) {
+    public LeaderboardController(LeaderboardService leaderboardService, WorkspaceContextResolver workspaceResolver) {
         this.leaderboardService = leaderboardService;
+        this.workspaceResolver = workspaceResolver;
     }
 
     @GetMapping
@@ -38,7 +42,8 @@ public class LeaderboardController {
         @RequestParam LeaderboardMode mode
     ) {
         logger.info("Generating {} leaderboard for workspace {}", mode, workspaceContext.slug());
-        return ResponseEntity.ok(leaderboardService.createLeaderboard(after, before, team, sort, mode));
+        Workspace workspace = workspaceResolver.requireWorkspace(workspaceContext);
+        return ResponseEntity.ok(leaderboardService.createLeaderboard(workspace, after, before, team, sort, mode));
     }
 
     @PostMapping
@@ -48,6 +53,7 @@ public class LeaderboardController {
         @RequestBody LeaderboardEntryDTO entry
     ) {
         logger.info("Calculating league stats for user {} in workspace {}", login, workspaceContext.slug());
-        return ResponseEntity.ok(leaderboardService.getUserLeagueStats(login, entry));
+        Workspace workspace = workspaceResolver.requireWorkspace(workspaceContext);
+        return ResponseEntity.ok(leaderboardService.getUserLeagueStats(workspace, login, entry));
     }
 }

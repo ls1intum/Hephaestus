@@ -345,6 +345,7 @@ public class ChatControllerIT extends BaseIntegrationTest {
         var existingThread = new ChatThread();
         existingThread.setId(UUID.randomUUID());
         existingThread.setUser(createTestUser());
+        existingThread.setWorkspace(workspace);
         existingThread.setTitle("Existing chat");
         existingThread = chatThreadRepository.save(existingThread);
 

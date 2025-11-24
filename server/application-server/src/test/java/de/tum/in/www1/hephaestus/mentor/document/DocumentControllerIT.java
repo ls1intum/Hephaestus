@@ -124,6 +124,35 @@ public class DocumentControllerIT extends BaseIntegrationTest {
 
     @Test
     @WithMentorUser
+    void shouldNotExposeDocumentsAcrossWorkspaces() {
+        // Arrange: persist document in the primary workspace
+        UUID documentId = createTestDocument("Scoped Document", "Scoped content");
+        Workspace otherWorkspace = workspaceRepository
+            .findByWorkspaceSlug("mentor-docs-isolation")
+            .orElseGet(() -> workspaceRepository.save(WorkspaceTestFactory.activeWorkspace("mentor-docs-isolation")));
+        ensureWorkspaceMembership(otherWorkspace, testUser);
+
+        // Act & Assert: the same user cannot fetch the document via a different workspace slug
+        webTestClient
+            .get()
+            .uri("/workspaces/" + otherWorkspace.getWorkspaceSlug() + "/api/documents/{id}", documentId)
+            .headers(TestAuthUtils.withCurrentUser())
+            .exchange()
+            .expectStatus()
+            .isNotFound();
+
+        // Verify the document remains accessible through its original workspace
+        webTestClient
+            .get()
+            .uri(documentsPath() + "/{id}", documentId)
+            .headers(TestAuthUtils.withCurrentUser())
+            .exchange()
+            .expectStatus()
+            .isOk();
+    }
+
+    @Test
+    @WithMentorUser
     void shouldUpdateDocumentSuccessfully() {
         // Arrange - Create document first
         UUID documentId = createTestDocument("Original Title", "Original content");
@@ -149,7 +178,11 @@ public class DocumentControllerIT extends BaseIntegrationTest {
             });
 
         // Assert - Should have created new version
-        var allVersions = documentRepository.findByIdAndUserOrderByVersionNumberDesc(documentId, testUser);
+        var allVersions = documentRepository.findByWorkspaceAndUserAndIdOrderByVersionNumberDesc(
+            workspace,
+            documentId,
+            testUser
+        );
         assertThat(allVersions).hasSize(2);
         assertThat(allVersions.get(0).getTitle()).isEqualTo("Updated Title"); // Latest first
         assertThat(allVersions.get(1).getTitle()).isEqualTo("Original Title");
@@ -171,7 +204,7 @@ public class DocumentControllerIT extends BaseIntegrationTest {
             .isNoContent(); // 204 for successful deletion
 
         // Assert - Document should be gone
-        var documents = documentRepository.findByIdAndUser(documentId, testUser);
+        var documents = documentRepository.findByWorkspaceAndUserAndId(workspace, testUser, documentId);
         assertThat(documents).isEmpty();
     }
 
@@ -248,7 +281,9 @@ public class DocumentControllerIT extends BaseIntegrationTest {
     void shouldGetSpecificDocumentVersionSuccessfully() {
         // Arrange - Create document with multiple versions
         UUID documentId = createTestDocument("Version 1", "Content 1");
-        var firstVersion = documentRepository.findFirstByIdAndUserOrderByVersionNumberDesc(documentId, testUser).get();
+        var firstVersion = documentRepository
+            .findFirstByWorkspaceAndUserAndIdOrderByVersionNumberDesc(workspace, testUser, documentId)
+            .get();
 
         updateTestDocument(documentId, "Version 2", "Content 2");
 
@@ -274,7 +309,7 @@ public class DocumentControllerIT extends BaseIntegrationTest {
         // Arrange - Create multiple versions
         UUID documentId = createTestDocument("Version 1", "Content 1");
         var firstVersionTime = documentRepository
-            .findFirstByIdAndUserOrderByVersionNumberDesc(documentId, testUser)
+            .findFirstByWorkspaceAndUserAndIdOrderByVersionNumberDesc(workspace, testUser, documentId)
             .get()
             .getCreatedAt();
 
@@ -302,7 +337,11 @@ public class DocumentControllerIT extends BaseIntegrationTest {
             });
 
         // Assert - Only first version should remain
-        var remainingVersions = documentRepository.findByIdAndUserOrderByVersionNumberDesc(documentId, testUser);
+        var remainingVersions = documentRepository.findByWorkspaceAndUserAndIdOrderByVersionNumberDesc(
+            workspace,
+            documentId,
+            testUser
+        );
         assertThat(remainingVersions).hasSize(1);
         assertThat(remainingVersions.get(0).getTitle()).isEqualTo("Version 1");
     }

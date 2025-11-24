@@ -275,6 +275,28 @@ public class ChatMessageVoteControllerIT extends BaseIntegrationTest {
         assertThat(voteRepository.findById(messageId)).isEmpty();
     }
 
+    @Test
+    @WithMentorUser
+    void voteMessage_DifferentWorkspace_ReturnsNotFound() {
+        UUID messageId = createTestAssistantMessage();
+        Workspace otherWorkspace = workspaceRepository
+            .findByWorkspaceSlug("mentor-votes-iso")
+            .orElseGet(() -> workspaceRepository.save(WorkspaceTestFactory.activeWorkspace("mentor-votes-iso")));
+        ensureWorkspaceMembership(otherWorkspace, testUser);
+
+        var request = new VoteMessageRequestDTO(true);
+
+        webTestClient
+            .patch()
+            .uri("/workspaces/" + otherWorkspace.getWorkspaceSlug() + "/api/chat/messages/{messageId}/vote", messageId)
+            .headers(TestAuthUtils.withCurrentUser())
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue(request)
+            .exchange()
+            .expectStatus()
+            .isNotFound();
+    }
+
     // ==================== Helper Methods ====================
 
     private UUID createTestAssistantMessage() {
@@ -284,6 +306,7 @@ public class ChatMessageVoteControllerIT extends BaseIntegrationTest {
         thread.setCreatedAt(Instant.now());
         thread.setTitle("Test Thread");
         thread.setUser(testUser); // Properly set the user
+        thread.setWorkspace(workspace);
         var savedThread = threadRepository.save(thread);
 
         var message = new ChatMessage();

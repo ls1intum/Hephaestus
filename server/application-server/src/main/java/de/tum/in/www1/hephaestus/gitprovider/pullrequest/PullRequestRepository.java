@@ -30,13 +30,16 @@ public interface PullRequestRepository extends JpaRepository<PullRequest, Long> 
         JOIN FETCH p.author
         LEFT JOIN FETCH p.assignees
         LEFT JOIN FETCH p.repository
-        WHERE (p.author.login ILIKE :assigneeLogin OR LOWER(:assigneeLogin) IN (SELECT LOWER(u.login) FROM p.assignees u)) AND p.state IN :states
+        WHERE (p.author.login ILIKE :assigneeLogin OR LOWER(:assigneeLogin) IN (SELECT LOWER(u.login) FROM p.assignees u))
+            AND p.state IN :states
+            AND p.repository.organization.workspace.id = :workspaceId
         ORDER BY p.createdAt DESC
         """
     )
     List<PullRequest> findAssignedByLoginAndStates(
         @Param("assigneeLogin") String assigneeLogin,
-        @Param("states") Set<PullRequest.State> states
+        @Param("states") Set<PullRequest.State> states,
+        @Param("workspaceId") Long workspaceId
     );
 
     @Query(
@@ -47,14 +50,18 @@ public interface PullRequestRepository extends JpaRepository<PullRequest, Long> 
         JOIN FETCH p.author
         LEFT JOIN FETCH p.assignees
         LEFT JOIN FETCH p.repository
-        WHERE (p.author.login ILIKE :assigneeLogin OR LOWER(:assigneeLogin) IN (SELECT LOWER(u.login) FROM p.assignees u)) AND p.state IN :states AND p.updatedAt >= :activitySince
+        WHERE (p.author.login ILIKE :assigneeLogin OR LOWER(:assigneeLogin) IN (SELECT LOWER(u.login) FROM p.assignees u))
+            AND p.state IN :states
+            AND p.updatedAt >= :activitySince
+            AND p.repository.organization.workspace.id = :workspaceId
         ORDER BY p.createdAt DESC
         """
     )
     List<PullRequest> findAssignedByLoginAndStatesUpdatedSince(
         @Param("assigneeLogin") String assigneeLogin,
         @Param("states") Set<PullRequest.State> states,
-        @Param("activitySince") Instant activitySince
+        @Param("activitySince") Instant activitySince,
+        @Param("workspaceId") Long workspaceId
     );
 
     @Query(

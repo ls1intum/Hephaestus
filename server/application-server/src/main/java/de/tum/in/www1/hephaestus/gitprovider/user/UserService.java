@@ -1,9 +1,11 @@
 package de.tum.in.www1.hephaestus.gitprovider.user;
 
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
+import de.tum.in.www1.hephaestus.gitprovider.issuecomment.IssueComment;
 import de.tum.in.www1.hephaestus.gitprovider.issuecomment.IssueCommentRepository;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestInfoDTO;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReview;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReviewInfoDTO;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReviewInfoDTOConverter;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReviewRepository;
@@ -78,11 +80,13 @@ public class UserService {
         int leaguePoints = workspaceMembershipService.getCurrentLeaguePoints(workspaceId, userEntity);
         UserInfoDTO user = UserInfoDTO.fromUser(userEntity, leaguePoints);
         var firstContribution = pullRequestRepository.firstContributionByAuthorLogin(login).orElse(null);
-        List<PullRequestInfoDTO> openPullRequests = pullRequestRepository
-            .findAssignedByLoginAndStates(login, Set.of(Issue.State.OPEN))
-            .stream()
-            .map(PullRequestInfoDTO::fromPullRequest)
-            .toList();
+        List<PullRequestInfoDTO> openPullRequests = workspaceId == null
+            ? List.of()
+            : pullRequestRepository
+                .findAssignedByLoginAndStates(login, Set.of(Issue.State.OPEN), workspaceId)
+                .stream()
+                .map(PullRequestInfoDTO::fromPullRequest)
+                .toList();
         List<RepositoryInfoDTO> contributedRepositories = repositoryRepository
             .findContributedByLogin(login)
             .stream()
@@ -91,15 +95,25 @@ public class UserService {
             .toList();
 
         // Review activity includes both pull request reviews and issue comments
-        List<PullRequestReviewInfoDTO> reviewActivity = pullRequestReviewRepository
-            .findAllByAuthorLoginSince(login, Instant.now().minusSeconds(7L * 24 * 60 * 60))
-            .stream()
-            .map(pullRequestReviewInfoDTOConverter::convert)
-            .collect(Collectors.toCollection(ArrayList::new));
+        List<PullRequestReviewInfoDTO> reviewActivity =
+            (workspaceId == null
+                    ? List.<PullRequestReview>of()
+                    : pullRequestReviewRepository.findAllByAuthorLoginSince(
+                        login,
+                        Instant.now().minusSeconds(7L * 24 * 60 * 60),
+                        workspaceId
+                    )).stream()
+                .map(pullRequestReviewInfoDTOConverter::convert)
+                .collect(Collectors.toCollection(ArrayList::new));
         reviewActivity.addAll(
-            issueCommentRepository
-                .findAllByAuthorLoginSince(login, Instant.now().minusSeconds(7L * 24 * 60 * 60), true)
-                .stream()
+            (workspaceId == null
+                    ? List.<IssueComment>of()
+                    : issueCommentRepository.findAllByAuthorLoginSince(
+                        login,
+                        Instant.now().minusSeconds(7L * 24 * 60 * 60),
+                        true,
+                        workspaceId
+                    )).stream()
                 .map(pullRequestReviewInfoDTOConverter::convert)
                 .toList()
         );

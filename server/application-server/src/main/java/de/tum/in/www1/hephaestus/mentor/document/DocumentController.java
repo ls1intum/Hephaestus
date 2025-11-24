@@ -3,7 +3,9 @@ package de.tum.in.www1.hephaestus.mentor.document;
 import de.tum.in.www1.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
+import de.tum.in.www1.hephaestus.workspace.Workspace;
 import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContext;
+import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContextResolver;
 import de.tum.in.www1.hephaestus.workspace.context.WorkspaceScopedController;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -31,10 +33,16 @@ public class DocumentController {
 
     private final DocumentService documentService;
     private final UserRepository userRepository;
+    private final WorkspaceContextResolver workspaceResolver;
 
-    public DocumentController(DocumentService documentService, UserRepository userRepository) {
+    public DocumentController(
+        DocumentService documentService,
+        UserRepository userRepository,
+        WorkspaceContextResolver workspaceResolver
+    ) {
         this.documentService = documentService;
         this.userRepository = userRepository;
+        this.workspaceResolver = workspaceResolver;
     }
 
     @PostMapping
@@ -48,7 +56,8 @@ public class DocumentController {
         logger.info("Creating new document: {} in workspace {}", request.title(), workspaceContext.slug());
 
         User user = userRepository.getCurrentUserElseThrow();
-        DocumentDTO response = documentService.createDocument(request, user);
+        Workspace workspace = workspaceResolver.requireWorkspace(workspaceContext);
+        DocumentDTO response = documentService.createDocument(request, user, workspace);
 
         return ResponseEntity.status(HttpStatus.CREATED).body(response); // 201 for creation
     }
@@ -61,8 +70,9 @@ public class DocumentController {
         logger.debug("Fetching document: {} in workspace {}", id, workspaceContext.slug());
 
         User user = userRepository.getCurrentUserElseThrow();
+        Workspace workspace = workspaceResolver.requireWorkspace(workspaceContext);
         try {
-            DocumentDTO response = documentService.getLatestDocument(id, user);
+            DocumentDTO response = documentService.getLatestDocument(id, user, workspace);
             return ResponseEntity.ok(response);
         } catch (EntityNotFoundException e) {
             logger.debug("Document not found: {}", id);
@@ -83,8 +93,9 @@ public class DocumentController {
         logger.info("Updating document: {} in workspace {}", id, workspaceContext.slug());
 
         User user = userRepository.getCurrentUserElseThrow();
+        Workspace workspace = workspaceResolver.requireWorkspace(workspaceContext);
         try {
-            DocumentDTO response = documentService.updateDocument(id, request, user);
+            DocumentDTO response = documentService.updateDocument(id, request, user, workspace);
             return ResponseEntity.ok(response);
         } catch (EntityNotFoundException e) {
             logger.debug("Document not found for update: {}", id);
@@ -101,7 +112,8 @@ public class DocumentController {
 
         User user = userRepository.getCurrentUserElseThrow();
         try {
-            documentService.deleteDocument(id, user);
+            Workspace workspace = workspaceResolver.requireWorkspace(workspaceContext);
+            documentService.deleteDocument(id, user, workspace);
             return ResponseEntity.noContent().build(); // 204 for successful deletion
         } catch (EntityNotFoundException e) {
             logger.debug("Document not found for deletion: {}", id);
@@ -127,12 +139,13 @@ public class DocumentController {
         );
 
         User user = userRepository.getCurrentUserElseThrow();
+        Workspace workspace = workspaceResolver.requireWorkspace(workspaceContext);
 
         // Create sort
         Sort sort = Sort.by(sortDir.equalsIgnoreCase("desc") ? Sort.Direction.DESC : Sort.Direction.ASC, sortBy);
 
         Pageable pageable = PageRequest.of(page, size, sort);
-        Page<DocumentSummaryDTO> documents = documentService.getDocumentsByUser(user, pageable);
+        Page<DocumentSummaryDTO> documents = documentService.getDocumentsByUser(user, workspace, pageable);
 
         return ResponseEntity.ok(documents);
     }
@@ -150,10 +163,11 @@ public class DocumentController {
         logger.debug("Fetching versions for document: {} in workspace {}", id, workspaceContext.slug());
 
         User user = userRepository.getCurrentUserElseThrow();
+        Workspace workspace = workspaceResolver.requireWorkspace(workspaceContext);
         try {
             // Sort versions by versionNumber DESC (latest first)
             Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "versionNumber"));
-            Page<DocumentDTO> versions = documentService.getDocumentVersions(id, user, pageable);
+            Page<DocumentDTO> versions = documentService.getDocumentVersions(id, user, workspace, pageable);
             return ResponseEntity.ok(versions);
         } catch (EntityNotFoundException e) {
             logger.debug("Document not found: {}", id);
@@ -173,8 +187,9 @@ public class DocumentController {
         logger.debug("Fetching document version: {} #{} in workspace {}", id, versionNumber, workspaceContext.slug());
 
         User user = userRepository.getCurrentUserElseThrow();
+        Workspace workspace = workspaceResolver.requireWorkspace(workspaceContext);
         try {
-            DocumentDTO response = documentService.getDocumentVersion(id, versionNumber, user);
+            DocumentDTO response = documentService.getDocumentVersion(id, versionNumber, user, workspace);
             return ResponseEntity.ok(response);
         } catch (EntityNotFoundException e) {
             logger.debug("Document version not found: {} #{}", id, versionNumber);
@@ -200,8 +215,14 @@ public class DocumentController {
         );
 
         User user = userRepository.getCurrentUserElseThrow();
+        Workspace workspace = workspaceResolver.requireWorkspace(workspaceContext);
         try {
-            List<DocumentDTO> deletedVersions = documentService.deleteDocumentsAfterTimestamp(id, after, user);
+            List<DocumentDTO> deletedVersions = documentService.deleteDocumentsAfterTimestamp(
+                id,
+                after,
+                user,
+                workspace
+            );
             return ResponseEntity.ok(deletedVersions);
         } catch (EntityNotFoundException e) {
             logger.debug("Document not found: {}", id);

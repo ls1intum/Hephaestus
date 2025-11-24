@@ -11,4 +11,6 @@ public interface TeamRepository extends JpaRepository<Team, Long> {
     List<Team> findAllByHiddenFalse();
 
     List<Team> findAllByOrganizationIgnoreCase(String organization);
+
+    List<Team> findAllByOrganizationIgnoreCaseAndHiddenFalse(String organization);
 }

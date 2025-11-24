@@ -2,7 +2,9 @@ package de.tum.in.www1.hephaestus.mentor.vote;
 
 import de.tum.in.www1.hephaestus.SecurityUtils;
 import de.tum.in.www1.hephaestus.mentor.ChatMessageRepository;
+import de.tum.in.www1.hephaestus.workspace.Workspace;
 import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContext;
+import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContextResolver;
 import de.tum.in.www1.hephaestus.workspace.context.WorkspaceScopedController;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -29,10 +31,16 @@ public class ChatMessageVoteController {
 
     private final ChatMessageVoteService voteService;
     private final ChatMessageRepository messageRepository;
+    private final WorkspaceContextResolver workspaceResolver;
 
-    public ChatMessageVoteController(ChatMessageVoteService voteService, ChatMessageRepository messageRepository) {
+    public ChatMessageVoteController(
+        ChatMessageVoteService voteService,
+        ChatMessageRepository messageRepository,
+        WorkspaceContextResolver workspaceResolver
+    ) {
         this.voteService = voteService;
         this.messageRepository = messageRepository;
+        this.workspaceResolver = workspaceResolver;
     }
 
     @Operation(summary = "Vote on a message", description = "Cast an upvote or downvote on a chat message")
@@ -63,10 +71,20 @@ public class ChatMessageVoteController {
             return ResponseEntity.notFound().build();
         }
 
+        Workspace workspace = workspaceResolver.requireWorkspace(workspaceContext);
+        var message = messageOptional.get();
+        if (
+            message.getThread() == null ||
+            message.getThread().getWorkspace() == null ||
+            !workspace.getId().equals(message.getThread().getWorkspace().getId())
+        ) {
+            logger.warn("Message {} does not belong to workspace {}", messageId, workspaceContext.slug());
+            return ResponseEntity.notFound().build();
+        }
+
         // Authorization: only the owner of the thread may vote on their messages
         try {
             var currentUserLogin = SecurityUtils.getCurrentUserLoginOrThrow();
-            var message = messageOptional.get();
             var ownerLogin = message.getThread() != null && message.getThread().getUser() != null
                 ? message.getThread().getUser().getLogin().toLowerCase()
                 : null;

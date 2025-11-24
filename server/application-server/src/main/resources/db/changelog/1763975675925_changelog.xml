@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.8.xsd">
+
+    <changeSet id="1763975675925-1" author="FelixTJDietrich">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <columnExists tableName="chat_thread" columnName="workspace_id"/>
+            </not>
+        </preConditions>
+        <addColumn tableName="chat_thread">
+            <column name="workspace_id" type="BIGINT" remarks="Workspace that owns the thread"/>
+        </addColumn>
+        <addForeignKeyConstraint
+            baseTableName="chat_thread"
+            baseColumnNames="workspace_id"
+            referencedTableName="workspace"
+            referencedColumnNames="id"
+            constraintName="fk_chat_thread_workspace"
+            deferrable="false"
+            initiallyDeferred="false"
+            onDelete="SET NULL"/>
+        <createIndex tableName="chat_thread" indexName="idx_chat_thread_workspace_id">
+            <column name="workspace_id"/>
+        </createIndex>
+        <sql>
+            WITH membership AS (
+                SELECT DISTINCT ON (wm.user_id) wm.user_id, wm.workspace_id
+                FROM workspace_membership wm
+                ORDER BY wm.user_id, wm.created_at DESC
+            )
+            UPDATE chat_thread ct
+            SET workspace_id = membership.workspace_id
+            FROM membership
+            WHERE ct.workspace_id IS NULL
+              AND ct.user_id = membership.user_id;
+        </sql>
+        <sql splitStatements="false">
+            DO $$
+            BEGIN
+                IF EXISTS (SELECT 1 FROM chat_thread WHERE workspace_id IS NULL) THEN
+                    RAISE EXCEPTION 'chat_thread rows missing workspace_id after migration';
+                END IF;
+            END $$;
+        </sql>
+        <addNotNullConstraint tableName="chat_thread" columnName="workspace_id"/>
+    </changeSet>
+
+    <changeSet id="1763975675925-2" author="FelixTJDietrich">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <columnExists tableName="document" columnName="workspace_id"/>
+            </not>
+        </preConditions>
+        <addColumn tableName="document">
+            <column name="workspace_id" type="BIGINT" remarks="Workspace that owns the document"/>
+        </addColumn>
+        <addForeignKeyConstraint
+            baseTableName="document"
+            baseColumnNames="workspace_id"
+            referencedTableName="workspace"
+            referencedColumnNames="id"
+            constraintName="fk_document_workspace"
+            deferrable="false"
+            initiallyDeferred="false"
+            onDelete="SET NULL"/>
+        <createIndex tableName="document" indexName="idx_document_workspace_id">
+            <column name="workspace_id"/>
+        </createIndex>
+        <sql>
+            WITH membership AS (
+                SELECT DISTINCT ON (wm.user_id) wm.user_id, wm.workspace_id
+                FROM workspace_membership wm
+                ORDER BY wm.user_id, wm.created_at DESC
+            )
+            UPDATE document d
+            SET workspace_id = membership.workspace_id
+            FROM membership
+            WHERE d.workspace_id IS NULL
+              AND d.user_id = membership.user_id;
+        </sql>
+        <sql splitStatements="false">
+            DO $$
+            BEGIN
+                IF EXISTS (SELECT 1 FROM document WHERE workspace_id IS NULL) THEN
+                    RAISE EXCEPTION 'document rows missing workspace_id after migration';
+                END IF;
+            END $$;
+        </sql>
+        <addNotNullConstraint tableName="document" columnName="workspace_id"/>
+    </changeSet>
+
+</databaseChangeLog>

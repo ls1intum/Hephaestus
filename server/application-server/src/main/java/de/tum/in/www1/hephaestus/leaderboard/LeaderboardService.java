@@ -14,9 +14,8 @@ import de.tum.in.www1.hephaestus.gitprovider.team.TeamRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserInfoDTO;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
+import de.tum.in.www1.hephaestus.workspace.Workspace;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceMembershipService;
-import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContext;
-import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContextHolder;
 import jakarta.annotation.Nonnull;
 import jakarta.transaction.Transactional;
 import java.time.Instant;
@@ -59,6 +58,7 @@ public class LeaderboardService {
 
     @Transactional
     public List<LeaderboardEntryDTO> createLeaderboard(
+        Workspace workspace,
         Instant after,
         Instant before,
         String team,
@@ -66,43 +66,53 @@ public class LeaderboardService {
         LeaderboardMode mode
     ) {
         if (mode == LeaderboardMode.INDIVIDUAL) {
-            Optional<Team> resolvedTeam = "all".equals(team) ? Optional.empty() : resolveTeamByPath(team);
-            return createIndividualLeaderboard(after, before, resolvedTeam, sort);
+            Optional<Team> resolvedTeam = "all".equals(team) ? Optional.empty() : resolveTeamByPath(workspace, team);
+            return createIndividualLeaderboard(workspace, after, before, resolvedTeam, sort);
         }
 
         // Team mode aggregates across all visible teams; the team filter is ignored on purpose (documented in OpenAPI).
-        return createTeamLeaderboard(after, before, sort);
+        return createTeamLeaderboard(workspace, after, before, sort);
     }
 
     private List<LeaderboardEntryDTO> createIndividualLeaderboard(
+        Workspace workspace,
         Instant after,
         Instant before,
         Optional<Team> team,
         LeaderboardSortType sort
     ) {
-        return createIndividualLeaderboard(after, before, team, sort, null);
+        return createIndividualLeaderboard(workspace, after, before, team, sort, null);
     }
 
     private List<LeaderboardEntryDTO> createIndividualLeaderboard(
+        Workspace workspace,
         Instant after,
         Instant before,
         Optional<Team> team,
         LeaderboardSortType sort,
         Map<Long, List<Team>> teamHierarchy
     ) {
+        if (workspace == null || workspace.getId() == null) {
+            logger.warn("Skipping leaderboard dataset creation because workspace id is missing.");
+            return Collections.emptyList();
+        }
+
         logger.info(
-            "Creating leaderboard dataset with timeframe: {} - {} and team: {}",
+            "Creating leaderboard dataset with timeframe: {} - {} and team: {} for workspace {}",
             after,
             before,
-            team.isEmpty() ? "all" : team.get().getName()
+            team.isEmpty() ? "all" : team.get().getName(),
+            workspace.getWorkspaceSlug()
         );
+
+        Long workspaceId = workspace.getId();
 
         Set<Long> teamIds;
         teamIds = team
             .map(teamName ->
                 collectTeamAndDescendantIds(
                     teamName,
-                    Objects.requireNonNullElseGet(teamHierarchy, this::buildTeamHierarchy)
+                    Objects.requireNonNullElseGet(teamHierarchy, () -> buildTeamHierarchy(workspace))
                 )
             )
             .orElse(Collections.emptySet());
@@ -111,11 +121,11 @@ public class LeaderboardService {
         List<IssueComment> issueComments;
 
         if (team.isPresent()) {
-            reviews = pullRequestReviewRepository.findAllInTimeframeOfTeams(after, before, teamIds);
-            issueComments = issueCommentRepository.findAllInTimeframeOfTeams(after, before, teamIds, true);
+            reviews = pullRequestReviewRepository.findAllInTimeframeOfTeams(after, before, teamIds, workspaceId);
+            issueComments = issueCommentRepository.findAllInTimeframeOfTeams(after, before, teamIds, true, workspaceId);
         } else {
-            reviews = pullRequestReviewRepository.findAllInTimeframe(after, before);
-            issueComments = issueCommentRepository.findAllInTimeframe(after, before, true);
+            reviews = pullRequestReviewRepository.findAllInTimeframe(after, before, workspaceId);
+            issueComments = issueCommentRepository.findAllInTimeframe(after, before, true, workspaceId);
         }
 
         Map<Long, User> usersById = reviews
@@ -138,18 +148,15 @@ public class LeaderboardService {
                         usersById.putIfAbsent(u.getId(), u);
                     }
                 });
-        } else {
+        } else if (workspace.getAccountLogin() != null) {
             userRepository
-                .findAllHumanInTeams()
+                .findAllHumanInTeamsOfOrganization(workspace.getAccountLogin())
                 .forEach(u -> {
                     if (u.getId() != null) {
                         usersById.putIfAbsent(u.getId(), u);
                     }
                 });
         }
-
-        WorkspaceContext context = WorkspaceContextHolder.getContext();
-        Long workspaceId = context != null ? context.id() : null;
 
         Map<Long, Integer> leaguePointsByUserId = workspaceMembershipService.getLeaguePointsSnapshot(
             usersById.values(),
@@ -269,11 +276,23 @@ public class LeaderboardService {
         return result;
     }
 
-    private List<LeaderboardEntryDTO> createTeamLeaderboard(Instant after, Instant before, LeaderboardSortType sort) {
-        logger.info("Creating team leaderboard dataset with timeframe: {} - {}", after, before);
+    private List<LeaderboardEntryDTO> createTeamLeaderboard(
+        Workspace workspace,
+        Instant after,
+        Instant before,
+        LeaderboardSortType sort
+    ) {
+        logger.info(
+            "Creating team leaderboard dataset with timeframe: {} - {} in workspace {}",
+            after,
+            before,
+            workspace.getWorkspaceSlug()
+        );
 
-        HashMap<Long, List<Team>> teamHierarchy = buildTeamHierarchy();
-        List<Team> targetTeams = teamRepository.findAllByHiddenFalse();
+        HashMap<Long, List<Team>> teamHierarchy = buildTeamHierarchy(workspace);
+        List<Team> targetTeams = workspace.getAccountLogin() == null
+            ? List.of()
+            : teamRepository.findAllByOrganizationIgnoreCaseAndHiddenFalse(workspace.getAccountLogin());
 
         if (targetTeams.isEmpty()) {
             logger.info("❌ No teams found for team leaderboard");
@@ -285,6 +304,7 @@ public class LeaderboardService {
             .collect(
                 Collectors.toMap(identity(), teamEntity -> {
                     List<LeaderboardEntryDTO> entries = createIndividualLeaderboard(
+                        workspace,
                         after,
                         before,
                         Optional.of(teamEntity),
@@ -428,27 +448,34 @@ public class LeaderboardService {
     }
 
     @Transactional
-    public LeagueChangeDTO getUserLeagueStats(String login, LeaderboardEntryDTO entry) {
+    public LeagueChangeDTO getUserLeagueStats(Workspace workspace, String login, LeaderboardEntryDTO entry) {
         User user = userRepository
             .findByLogin(login)
             .orElseThrow(() -> new IllegalArgumentException("User not found with login: " + login));
 
-        WorkspaceContext context = WorkspaceContextHolder.getContext();
-        Long workspaceId = context != null ? context.id() : null;
+        if (workspace == null || workspace.getId() == null) {
+            throw new IllegalStateException("Workspace context is required to compute league stats");
+        }
+
+        Long workspaceId = workspace.getId();
 
         int currentLeaguePoints = workspaceMembershipService.getCurrentLeaguePoints(workspaceId, user);
         int projectedNewPoints = leaguePointsCalculationService.calculateNewPoints(user, currentLeaguePoints, entry);
         return new LeagueChangeDTO(user.getLogin(), projectedNewPoints - currentLeaguePoints);
     }
 
-    private Optional<Team> resolveTeamByPath(@Nonnull String path) {
-        if (path.isBlank()) {
+    private Optional<Team> resolveTeamByPath(Workspace workspace, @Nonnull String path) {
+        if (workspace == null || workspace.getAccountLogin() == null || path.isBlank()) {
             return Optional.empty();
         }
 
         String[] parts = path.split(" / ");
         String leaf = parts[parts.length - 1];
-        List<Team> candidates = teamRepository.findAllByName(leaf);
+        List<Team> candidates = teamRepository
+            .findAllByName(leaf)
+            .stream()
+            .filter(team -> belongsToWorkspace(team, workspace))
+            .toList();
         if (candidates.isEmpty()) {
             return Optional.empty();
         }
@@ -518,7 +545,7 @@ public class LeaderboardService {
                         .findAllById(missingIds)
                         .forEach(parent -> {
                             Long parentId = parent.getId();
-                            if (parentId != null) {
+                            if (parentId != null && belongsToWorkspace(parent, workspace)) {
                                 cache.putIfAbsent(parentId, parent);
                             }
                         });
@@ -530,7 +557,11 @@ public class LeaderboardService {
             for (Map.Entry<Long, Team> e : currentByCandidate.entrySet()) {
                 Long candidateId = e.getKey();
                 Team nextVisible = nextVisibleByCandidate.get(candidateId);
-                if (nextVisible != null && expected.equals(nextVisible.getName())) {
+                if (
+                    nextVisible != null &&
+                    expected.equals(nextVisible.getName()) &&
+                    belongsToWorkspace(nextVisible, workspace)
+                ) {
                     filtered.put(candidateId, nextVisible);
                     if (nextVisible.getId() != null) {
                         cache.putIfAbsent(nextVisible.getId(), nextVisible);
@@ -554,12 +585,16 @@ public class LeaderboardService {
             preloadAncestors(currentByCandidate.values(), cache);
             for (Long candidateId : currentByCandidate.keySet()) {
                 Team candidate = cache.get(candidateId);
-                if (candidate != null && equalsVisiblePath(candidate, parts, cache)) {
+                if (
+                    candidate != null &&
+                    belongsToWorkspace(candidate, workspace) &&
+                    equalsVisiblePath(candidate, parts, cache)
+                ) {
                     return Optional.of(candidate);
                 }
             }
             logger.warn(
-                "Ambiguous team path '{}' resolved to multiple candidates; picking first.",
+                "Ambiguous team path '{}' resolved to multiple workspace candidates; picking first.",
                 sanitizeForLog(path)
             );
         }
@@ -582,10 +617,6 @@ public class LeaderboardService {
             current = parentId == null ? null : cache.get(parentId);
         }
         return index < 0;
-    }
-
-    private boolean equalsVisiblePath(Team team, List<String> partsList, Map<Long, Team> cache) {
-        return equalsVisiblePath(team, partsList.toArray(new String[0]), cache);
     }
 
     private void preloadAncestors(Collection<Team> teams, Map<Long, Team> cache) {
@@ -615,6 +646,15 @@ public class LeaderboardService {
                 });
             pending = nextRound;
         }
+    }
+
+    private boolean belongsToWorkspace(Team team, Workspace workspace) {
+        if (team == null || workspace == null) {
+            return false;
+        }
+        String org = team.getOrganization();
+        String workspaceLogin = workspace.getAccountLogin();
+        return org != null && workspaceLogin != null && org.equalsIgnoreCase(workspaceLogin);
     }
 
     private String sanitizeForLog(String input) {
@@ -652,8 +692,11 @@ public class LeaderboardService {
         );
     }
 
-    private HashMap<Long, List<Team>> buildTeamHierarchy() {
-        List<Team> all = teamRepository.findAll();
+    private HashMap<Long, List<Team>> buildTeamHierarchy(Workspace workspace) {
+        if (workspace == null || workspace.getAccountLogin() == null) {
+            return new HashMap<>();
+        }
+        List<Team> all = teamRepository.findAllByOrganizationIgnoreCase(workspace.getAccountLogin());
         return all
             .stream()
             .collect(
