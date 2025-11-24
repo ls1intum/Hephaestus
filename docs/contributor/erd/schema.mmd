@@ -55,6 +55,7 @@ erDiagram
         TEXT title
         UUID selected_leaf_message_id FK,UK
         BIGINT user_id FK
+        BIGINT workspace_id FK "NOT NULL"
     }
 
     Document {
@@ -65,6 +66,7 @@ erDiagram
         VARCHAR(255) kind "NOT NULL"
         VARCHAR(255) title "NOT NULL"
         BIGINT user_id FK "NOT NULL"
+        BIGINT workspace_id FK "NOT NULL"
     }
 
     Issue {
@@ -331,9 +333,9 @@ erDiagram
         VARCHAR(255) login
         VARCHAR(255) name
         VARCHAR(255) type
+        INTEGER league_points "NOT NULL"
         BOOLEAN notifications_enabled "NOT NULL"
         BOOLEAN participate_in_research "NOT NULL"
-        INTEGER league_points "NOT NULL"
     }
 
     Workspace {
@@ -362,13 +364,6 @@ erDiagram
         TIMESTAMPTZ updated_at
     }
 
-    WorkspaceMember {
-        BIGINT workspace_id PK,FK
-        BIGINT user_id PK,FK
-        INTEGER league_points "NOT NULL"
-        VARCHAR(32) role "NOT NULL"
-    }
-
     WorkspaceMembership {
         TIMESTAMPTZ created_at "NOT NULL"
         INTEGER league_points "NOT NULL"
@@ -392,7 +387,9 @@ erDiagram
     ChatMessage ||--o{ ChatMessage : references
     ChatThread ||--o{ ChatMessage : has
     User ||--o{ ChatThread : has
+    Workspace ||--o{ ChatThread : has
     User ||--o{ Document : has
+    Workspace ||--o{ Document : has
     User ||--o{ Issue : authored_by
     User ||--o{ Issue : merged_by
     Milestone ||--o{ Issue : has
@@ -431,8 +428,6 @@ erDiagram
     User }o--o{ TeamMembership : belongs_to
     Repository }o--o{ TeamRepositoryPermission : has
     Team }o--o{ TeamRepositoryPermission : has
-    User }o--o{ WorkspaceMember : belongs_to
-    Workspace }o--o{ WorkspaceMember : belongs_to
 
     %% Styling
     classDef primaryEntity fill:#e1f5fe,stroke:#01579b,stroke-width:2px
