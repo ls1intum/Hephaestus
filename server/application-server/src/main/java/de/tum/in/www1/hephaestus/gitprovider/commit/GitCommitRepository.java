@@ -20,10 +20,12 @@ public interface GitCommitRepository extends JpaRepository<GitCommit, String> {
 
     @Query(
         """
-            SELECT c.sha
+            SELECT DISTINCT c.sha
             FROM GitCommit c
+            LEFT JOIN c.fileChanges fc
             WHERE c.repository.id = :repositoryId AND (
                 c.additions IS NULL OR c.deletions IS NULL OR c.totalChanges IS NULL OR c.fileChanges IS EMPTY
+                OR fc.additions IS NULL
             )
             ORDER BY c.committedAt DESC
         """
@@ -32,10 +34,12 @@ public interface GitCommitRepository extends JpaRepository<GitCommit, String> {
 
     @Query(
         """
-            SELECT c.sha
+            SELECT DISTINCT c.sha
             FROM GitCommit c
+            LEFT JOIN c.fileChanges fc
             WHERE c.repository.id = :repositoryId AND c.sha IN :shas AND (
                 c.additions IS NULL OR c.deletions IS NULL OR c.totalChanges IS NULL OR c.fileChanges IS EMPTY
+                OR fc.additions IS NULL
             )
         """
     )

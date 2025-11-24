@@ -164,6 +164,7 @@
             constraintName="fk_discussion_answer_comment"
             referencedColumnNames="id"
             referencedTableName="discussion_comment"
+            onDelete="SET NULL"
         />
         <addUniqueConstraint
             columnNames="answer_comment_id"

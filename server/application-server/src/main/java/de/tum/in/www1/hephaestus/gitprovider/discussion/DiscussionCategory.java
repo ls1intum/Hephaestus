@@ -1,7 +1,6 @@
 package de.tum.in.www1.hephaestus.gitprovider.discussion;
 
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
-import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -55,7 +54,7 @@ public class DiscussionCategory {
     @ToString.Exclude
     private Repository repository;
 
-    @OneToMany(mappedBy = "category", cascade = CascadeType.REMOVE, orphanRemoval = true)
+    @OneToMany(mappedBy = "category")
     @ToString.Exclude
     private Set<Discussion> discussions = new HashSet<>();
 }

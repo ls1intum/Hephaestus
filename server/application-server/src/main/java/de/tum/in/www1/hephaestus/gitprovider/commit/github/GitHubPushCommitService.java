@@ -15,6 +15,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Consumer;
 import java.util.stream.Stream;
 import org.kohsuke.github.GHEventPayload;
 import org.kohsuke.github.GitUser;
@@ -83,44 +84,44 @@ public class GitHubPushCommitService {
         applyGitUser(commit, pushCommit.getAuthor(), true);
         applyGitUser(commit, pushCommit.getCommitter(), false);
         commit.setRepository(repository);
-        commit.replaceFileChanges(buildFileChanges(pushCommit));
+        
+        // Only overwrite file changes if the commit hasn't been fully enriched yet (indicated by missing stats).
+        // The push payload lacks addition/deletion stats per file, so we prefer existing enriched data.
+        if (commit.getTotalChanges() == null) {
+            commit.replaceFileChanges(buildFileChanges(pushCommit));
+        }
+        
         commit.setLastSyncAt(Instant.now());
         commitRepository.save(commit);
     }
 
     private void applyGitUser(GitCommit commit, GitUser gitUser, boolean isAuthor) {
         if (gitUser == null) {
-            if (isAuthor) {
-                commit.setAuthorName(null);
-                commit.setAuthorEmail(null);
-                commit.setAuthorLogin(null);
-                commit.setAuthor(null);
-            } else {
-                commit.setCommitterName(null);
-                commit.setCommitterEmail(null);
-                commit.setCommitterLogin(null);
-                commit.setCommitter(null);
-            }
             return;
         }
 
+        var login = normalize(gitUser.getUsername());
         if (isAuthor) {
-            commit.setAuthorName(gitUser.getName());
-            commit.setAuthorEmail(gitUser.getEmail());
-            commit.setAuthorLogin(gitUser.getUsername());
-            commit.setAuthor(findExistingUser(gitUser));
-            if ((commit.getAuthorLogin() == null || commit.getAuthorLogin().isBlank()) && commit.getAuthor() != null) {
+            setIfHasText(gitUser.getName(), commit::setAuthorName);
+            setIfHasText(gitUser.getEmail(), commit::setAuthorEmail);
+            if (login != null) {
+                commit.setAuthorLogin(login);
+                commit.setAuthor(findExistingUser(login));
+            } else if (
+                (commit.getAuthorLogin() == null || commit.getAuthorLogin().isBlank()) && commit.getAuthor() != null
+            ) {
                 commit.setAuthorLogin(commit.getAuthor().getLogin());
             }
             if (commit.getAuthoredAt() == null) {
                 commit.setAuthoredAt(readGitUserDate(gitUser));
             }
         } else {
-            commit.setCommitterName(gitUser.getName());
-            commit.setCommitterEmail(gitUser.getEmail());
-            commit.setCommitterLogin(gitUser.getUsername());
-            commit.setCommitter(findExistingUser(gitUser));
-            if (
+            setIfHasText(gitUser.getName(), commit::setCommitterName);
+            setIfHasText(gitUser.getEmail(), commit::setCommitterEmail);
+            if (login != null) {
+                commit.setCommitterLogin(login);
+                commit.setCommitter(findExistingUser(login));
+            } else if (
                 (commit.getCommitterLogin() == null || commit.getCommitterLogin().isBlank()) &&
                 commit.getCommitter() != null
             ) {
@@ -129,15 +130,21 @@ public class GitHubPushCommitService {
         }
     }
 
-    private User findExistingUser(GitUser gitUser) {
-        if (gitUser == null) {
-            return null;
-        }
-        var login = gitUser.getUsername();
-        if (login == null || login.isBlank()) {
+    private User findExistingUser(String login) {
+        if (login == null) {
             return null;
         }
         return userRepository.findByLogin(login).orElse(null);
+    }
+
+    private String normalize(String login) {
+        return login != null && !login.isBlank() ? login : null;
+    }
+
+    private void setIfHasText(String value, Consumer<String> setter) {
+        if (value != null && !value.isBlank()) {
+            setter.accept(value);
+        }
     }
 
     private Instant readGitUserDate(GitUser gitUser) {

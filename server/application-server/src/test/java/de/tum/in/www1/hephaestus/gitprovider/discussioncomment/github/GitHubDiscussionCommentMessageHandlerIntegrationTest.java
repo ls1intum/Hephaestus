@@ -79,6 +79,10 @@ class GitHubDiscussionCommentMessageHandlerIntegrationTest extends BaseIntegrati
         handler.handleEvent(deleted);
 
         assertThat(commentRepository.findById(deleted.getComment().getId())).isEmpty();
+        var discussion = discussionRepository.findById(deleted.getDiscussion().getId()).orElseThrow();
+        assertThat(discussion.getAnswerComment()).isNull();
+        assertThat(discussion.getAnswerChosenAt()).isNull();
+        assertThat(discussion.getAnswerChosenBy()).isNull();
     }
 
     private DiscussionComment getComment(GHRepositoryDiscussionComment ghComment) {
@@ -96,7 +100,6 @@ class GitHubDiscussionCommentMessageHandlerIntegrationTest extends BaseIntegrati
         parent.setCreatedAt(Instant.now());
         parent.setUpdatedAt(Instant.now());
         discussionRepository.save(parent);
-
         DiscussionComment comment = new DiscussionComment();
         comment.setId(payload.getComment().getId());
         comment.setBody(payload.getComment().getBody() != null ? payload.getComment().getBody() : "placeholder");
@@ -105,5 +108,9 @@ class GitHubDiscussionCommentMessageHandlerIntegrationTest extends BaseIntegrati
         comment.setCreatedAt(Instant.now());
         comment.setUpdatedAt(Instant.now());
         commentRepository.save(comment);
+
+        parent.setAnswerComment(comment);
+        parent.setAnswerChosenAt(Instant.now());
+        discussionRepository.save(parent);
     }
 }
