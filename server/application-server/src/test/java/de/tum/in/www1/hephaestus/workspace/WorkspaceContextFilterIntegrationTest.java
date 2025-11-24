@@ -6,13 +6,16 @@ import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.testconfig.TestAuthUtils;
 import de.tum.in.www1.hephaestus.testconfig.WithAdminUser;
 import de.tum.in.www1.hephaestus.testconfig.WithMentorUser;
+import de.tum.in.www1.hephaestus.workspace.Workspace.WorkspaceStatus;
 import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContext;
+import de.tum.in.www1.hephaestus.workspace.dto.WorkspaceDTO;
 import java.util.List;
 import java.util.Objects;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.reactive.AutoConfigureWebTestClient;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -27,6 +30,9 @@ class WorkspaceContextFilterIntegrationTest extends AbstractWorkspaceIntegration
     @Autowired
     private WebTestClient webTestClient;
 
+    @Autowired
+    private WorkspaceRepository workspaceRepository;
+
     @Test
     @WithAdminUser
     void workspaceContextIsInjectedForMembers() {
@@ -39,6 +45,26 @@ class WorkspaceContextFilterIntegrationTest extends AbstractWorkspaceIntegration
         assertThat(response.contextSlug()).isEqualTo(workspace.getWorkspaceSlug());
         assertThat(response.contextId()).isEqualTo(workspace.getId());
         assertThat(response.roles()).containsExactly("OWNER");
+    }
+
+    @Test
+    @WithAdminUser
+    void invalidSlugReturnsBadRequestProblem() {
+        persistUser("admin");
+
+        ProblemDetail problem = webTestClient
+            .get()
+            .uri("/workspaces/{workspaceSlug}/context-echo", "INVALID-SLUG")
+            .headers(TestAuthUtils.withCurrentUser())
+            .exchange()
+            .expectStatus()
+            .isBadRequest()
+            .expectBody(ProblemDetail.class)
+            .returnResult()
+            .getResponseBody();
+
+        assertThat(problem).isNotNull();
+        assertThat(problem.getDetail()).contains("Invalid workspace slug");
     }
 
     @Test
@@ -85,6 +111,50 @@ class WorkspaceContextFilterIntegrationTest extends AbstractWorkspaceIntegration
         assertThat(firstResponse.contextSlug()).isEqualTo(first.getWorkspaceSlug());
         assertThat(secondResponse.contextSlug()).isEqualTo(second.getWorkspaceSlug());
         assertThat(secondResponse.contextSlug()).isNotEqualTo(firstResponse.contextSlug());
+    }
+
+    @Test
+    @WithAdminUser
+    void suspendedWorkspaceBlocksScopedChildRoutes() {
+        User owner = persistUser("admin");
+        Workspace workspace = createWorkspace("omega-space", "Omega", "omega", AccountType.ORG, owner);
+        ensureAdminMembership(workspace);
+
+        workspace.setStatus(WorkspaceStatus.SUSPENDED);
+        workspaceRepository.save(workspace);
+
+        webTestClient
+            .get()
+            .uri("/workspaces/{workspaceSlug}/context-echo", workspace.getWorkspaceSlug())
+            .headers(TestAuthUtils.withCurrentUser())
+            .exchange()
+            .expectStatus()
+            .isNotFound();
+    }
+
+    @Test
+    @WithAdminUser
+    void suspendedWorkspaceAllowsBaseReadRequests() {
+        User owner = persistUser("admin");
+        Workspace workspace = createWorkspace("zeta-space", "Zeta", "zeta", AccountType.ORG, owner);
+        ensureAdminMembership(workspace);
+
+        workspace.setStatus(WorkspaceStatus.SUSPENDED);
+        workspaceRepository.save(workspace);
+
+        WorkspaceDTO response = webTestClient
+            .get()
+            .uri("/workspaces/{workspaceSlug}", workspace.getWorkspaceSlug())
+            .headers(TestAuthUtils.withCurrentUser())
+            .exchange()
+            .expectStatus()
+            .isOk()
+            .expectBody(WorkspaceDTO.class)
+            .returnResult()
+            .getResponseBody();
+
+        assertThat(response).isNotNull();
+        assertThat(response.workspaceSlug()).isEqualTo(workspace.getWorkspaceSlug());
     }
 
     private WorkspaceContextSnapshot requestContextEcho(String slug) {
