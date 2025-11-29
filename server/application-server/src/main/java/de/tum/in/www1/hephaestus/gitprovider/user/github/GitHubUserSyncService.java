@@ -18,8 +18,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Service for synchronizing GitHub users with the local database.
- * <p>
- * With sequential processing within a workspace, concurrent insert race conditions are avoided.
  */
 @Service
 public class GitHubUserSyncService {

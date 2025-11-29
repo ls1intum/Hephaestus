@@ -23,9 +23,6 @@
 		{
 			"name": "docs",
 			"path": "./docs"
-		},
-		{
-			"path": "../github-api"
 		}
 	],
 	"settings": {

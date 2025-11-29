@@ -140,8 +140,6 @@ public class GitHubRepositorySyncService {
      * Processes a single GitHub repository by updating or creating it in the local
      * repository.
      * <p>
-     * With sequential processing within a workspace, race conditions are avoided.
-     *
      * @param ghRepository The GitHub repository data to process.
      * @return The updated or newly created Repository entity, or {@code null} if an
      *         error occurred during update.

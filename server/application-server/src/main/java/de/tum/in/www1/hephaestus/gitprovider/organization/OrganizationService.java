@@ -15,8 +15,6 @@ public class OrganizationService {
 
     /**
      * Ensure an organization row exists (by stable GitHub org id) and keep its login up to date (rename-safe).
-     * <p>
-     * With sequential processing within a workspace, concurrent insert race conditions are avoided.
      */
     @Transactional
     public Organization upsertIdentity(long githubId, String login) {

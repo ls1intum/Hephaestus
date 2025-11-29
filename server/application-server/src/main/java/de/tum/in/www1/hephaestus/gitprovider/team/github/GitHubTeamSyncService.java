@@ -9,15 +9,11 @@ import de.tum.in.www1.hephaestus.gitprovider.team.permission.TeamRepositoryPermi
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 import java.util.stream.Collectors;
 import org.kohsuke.github.GHOrganization;
 import org.kohsuke.github.GHRepository;
@@ -59,44 +55,17 @@ public class GitHubTeamSyncService {
         GHOrganization org = gitHub.getOrganization(orgName);
         List<GHTeam> teams = org.listTeams().withPageSize(100).toList();
 
-        // Use virtual threads for I/O-bound GitHub API calls instead of ForkJoinPool.commonPool
-        try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
-            // Process all teams in parallel using virtual threads
-            List<Future<?>> teamFutures = new ArrayList<>();
-            for (GHTeam ghTeam : teams) {
-                teamFutures.add(
-                    executor.submit(() -> {
-                        Team saved = self.processTeam(ghTeam);
-                        if (saved == null) {
-                            log.warn("Skipped team {} with id {} due to an error", ghTeam.getName(), ghTeam.getId());
-                        }
-                    })
-                );
-            }
-
-            // Wait for all team processing to complete
-            for (Future<?> future : teamFutures) {
-                try {
-                    future.get();
-                } catch (Exception e) {
-                    log.error("Error processing team: {}", e.getMessage());
+        teams
+            .parallelStream()
+            .forEach(ghTeam -> {
+                // must call via the proxy (self) to trigger @Transactional on processTeam()
+                Team saved = self.processTeam(ghTeam);
+                if (saved == null) {
+                    log.warn("Skipped team {} with id {} due to an error", ghTeam.getName(), ghTeam.getId());
                 }
-            }
-
-            // Apply parent relationships in parallel
-            List<Future<?>> parentFutures = new ArrayList<>();
-            for (GHTeam ghTeam : teams) {
-                parentFutures.add(executor.submit(() -> applyParentLinks(ghTeam)));
-            }
-
-            for (Future<?> future : parentFutures) {
-                try {
-                    future.get();
-                } catch (Exception e) {
-                    log.error("Error applying parent links: {}", e.getMessage());
-                }
-            }
-        }
+            });
+        // parent relationships
+        teams.parallelStream().forEach(this::applyParentLinks);
     }
 
     @Transactional

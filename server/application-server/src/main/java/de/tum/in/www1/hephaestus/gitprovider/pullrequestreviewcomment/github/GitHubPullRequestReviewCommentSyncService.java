@@ -21,9 +21,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Service for synchronizing GitHub pull request review comments with the local database.
- * <p>
- * With sequential processing within a workspace, race conditions are avoided.
- * If a review is not found when processing a comment, it will be linked on the next sync.
  */
 @Service
 public class GitHubPullRequestReviewCommentSyncService {

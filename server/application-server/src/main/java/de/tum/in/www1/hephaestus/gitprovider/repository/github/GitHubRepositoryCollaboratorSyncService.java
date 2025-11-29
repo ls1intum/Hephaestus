@@ -7,20 +7,19 @@ import de.tum.in.www1.hephaestus.gitprovider.repository.collaborator.RepositoryC
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserConverter;
-import jakarta.transaction.Transactional;
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
-import org.kohsuke.github.GHException;
 import org.kohsuke.github.GHPermissionType;
 import org.kohsuke.github.GHRepository;
 import org.kohsuke.github.GHUser;
-import org.kohsuke.github.HttpException;
-import org.kohsuke.github.PagedIterable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class GitHubRepositoryCollaboratorSyncService {
@@ -57,60 +56,55 @@ public class GitHubRepositoryCollaboratorSyncService {
             return;
         }
 
+        List<RepositoryCollaborator> existingCollaborators = collaboratorRepository.findByRepository_Id(repositoryId);
+        Map<Long, RepositoryCollaborator> existingByUserId = new HashMap<>(existingCollaborators.size());
+        existingCollaborators.forEach(collaborator -> existingByUserId.put(collaborator.getUser().getId(), collaborator)
+        );
+
         Set<Long> seenUserIds = new HashSet<>();
 
-        PagedIterable<GHUser> collaborators = ghRepository.listCollaborators().withPageSize(100);
-
-        try {
-            for (GHUser ghUser : collaborators) {
-                if (ghUser == null) {
-                    continue;
-                }
-                User user = upsertUser(ghUser);
-                GHPermissionType permissionType;
-                try {
-                    permissionType = ghRepository.getPermission(ghUser);
-                } catch (IOException permissionError) {
-                    logger.warn(
-                        "Failed to resolve permission for repositoryId={} userId={}: {}",
-                        repositoryId,
-                        ghUser.getId(),
-                        permissionError.getMessage()
-                    );
-                    continue;
-                }
-
-                RepositoryCollaborator.Permission permission = mapPermission(permissionType);
-                if (permission == RepositoryCollaborator.Permission.UNKNOWN) {
-                    logger.debug(
-                        "Hub4j reported permission={} for repositoryId={} userId={} – stored as UNKNOWN",
-                        permissionType,
-                        repositoryId,
-                        user.getId()
-                    );
-                }
-
-                // Use atomic upsert to avoid race conditions with concurrent syncs
-                // Note: upsert() clears the persistence context (clearAutomatically=true)
-                collaboratorRepository.upsert(repositoryId, user.getId(), permission.name());
-                seenUserIds.add(user.getId());
+        for (GHUser ghUser : ghRepository.listCollaborators()) {
+            if (ghUser == null) {
+                continue;
             }
-        } catch (GHException ghException) {
-            handleCollaboratorListingFailure(repositoryId, ghException);
-            return;
+            User user = upsertUser(ghUser);
+            GHPermissionType permissionType;
+            try {
+                permissionType = ghRepository.getPermission(ghUser);
+            } catch (IOException permissionError) {
+                logger.warn(
+                    "Failed to resolve permission for repositoryId={} userId={}: {}",
+                    repositoryId,
+                    ghUser.getId(),
+                    permissionError.getMessage()
+                );
+                continue;
+            }
+
+            RepositoryCollaborator.Permission permission = mapPermission(permissionType);
+            if (permission == RepositoryCollaborator.Permission.UNKNOWN) {
+                logger.debug(
+                    "Hub4j reported permission={} for repositoryId={} userId={} – stored as UNKNOWN",
+                    permissionType,
+                    repositoryId,
+                    user.getId()
+                );
+            }
+
+            RepositoryCollaborator collaborator = existingByUserId.remove(user.getId());
+            if (collaborator == null) {
+                collaborator = new RepositoryCollaborator(repository, user, permission);
+            } else {
+                collaborator.updatePermission(permission);
+            }
+            collaboratorRepository.save(collaborator);
+            seenUserIds.add(user.getId());
         }
 
-        // Re-fetch existing collaborators AFTER all upserts complete
-        // This is necessary because upsert() uses clearAutomatically=true which evicts entities
-        List<RepositoryCollaborator> currentCollaborators = collaboratorRepository.findByRepository_Id(repositoryId);
-
-        // Remove collaborators that are no longer in the GitHub list
         int removedCount = 0;
-        for (RepositoryCollaborator existing : currentCollaborators) {
-            if (!seenUserIds.contains(existing.getUser().getId())) {
-                collaboratorRepository.delete(existing);
-                removedCount++;
-            }
+        for (RepositoryCollaborator stale : existingByUserId.values()) {
+            collaboratorRepository.delete(stale);
+            removedCount++;
         }
 
         logger.info(
@@ -138,50 +132,5 @@ public class GitHubRepositoryCollaboratorSyncService {
             case READ -> RepositoryCollaborator.Permission.READ;
             default -> RepositoryCollaborator.Permission.UNKNOWN;
         };
-    }
-
-    private void handleCollaboratorListingFailure(long repositoryId, GHException exception) {
-        HttpException httpException = unwrapHttpException(exception);
-        if (httpException != null) {
-            int responseCode = httpException.getResponseCode();
-            if (responseCode == 401) {
-                logger.warn(
-                    "Skipping collaborator sync for repositoryId={} due to invalid/expired credentials (HTTP 401).",
-                    repositoryId
-                );
-                return;
-            }
-            if (responseCode == 403) {
-                logger.warn(
-                    "Skipping collaborator sync for repositoryId={} due to insufficient GitHub App permissions.",
-                    repositoryId
-                );
-                return;
-            }
-            if (responseCode == 404) {
-                logger.warn("Repository {} no longer exists while syncing collaborators.", repositoryId);
-                return;
-            }
-            logger.warn(
-                "Failed to list collaborators for repositoryId={} (HTTP {}): {}",
-                repositoryId,
-                responseCode,
-                httpException.getMessage()
-            );
-            return;
-        }
-
-        logger.warn("Failed to list collaborators for repositoryId={}: {}", repositoryId, exception.getMessage());
-    }
-
-    private HttpException unwrapHttpException(Throwable throwable) {
-        Throwable current = throwable;
-        while (current != null) {
-            if (current instanceof HttpException httpException) {
-                return httpException;
-            }
-            current = current.getCause();
-        }
-        return null;
     }
 }
