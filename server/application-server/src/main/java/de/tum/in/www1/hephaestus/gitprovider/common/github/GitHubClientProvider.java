@@ -3,6 +3,7 @@ package de.tum.in.www1.hephaestus.gitprovider.common.github;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.app.GitHubAppTokenService;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.app.GitHubAppTokenService.InstallationToken;
 import de.tum.in.www1.hephaestus.workspace.Workspace;
 import de.tum.in.www1.hephaestus.workspace.Workspace.GitProviderMode;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceRepository;
@@ -10,6 +11,7 @@ import jakarta.annotation.PreDestroy;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.time.Duration;
+import java.time.Instant;
 import org.kohsuke.github.GitHub;
 import org.kohsuke.github.GitHubBuilder;
 import org.springframework.stereotype.Component;
@@ -20,8 +22,8 @@ public class GitHubClientProvider {
     private final WorkspaceRepository workspaceRepository;
     private final GitHubAppTokenService appTokens;
 
-    private final Cache<Long, GitHub> workspaceClients = Caffeine.newBuilder()
-        .expireAfterWrite(Duration.ofMinutes(50))
+    private final Cache<Long, GitHubClientHolder> workspaceClients = Caffeine.newBuilder()
+        .expireAfterAccess(Duration.ofMinutes(50))
         .maximumSize(10_000)
         .build();
 
@@ -39,7 +41,17 @@ public class GitHubClientProvider {
      */
     public GitHub forWorkspace(Long workspaceId) throws IOException {
         try {
-            return workspaceClients.get(workspaceId, this::createClientForWorkspace);
+            GitHubClientHolder holder = workspaceClients.get(workspaceId, this::createClientForWorkspace);
+            if (holder == null) {
+                throw new IllegalStateException("Workspace client missing for " + workspaceId);
+            }
+
+            if (holder.needsRefresh()) {
+                workspaceClients.invalidate(workspaceId);
+                holder = workspaceClients.get(workspaceId, this::createClientForWorkspace);
+            }
+
+            return holder.client();
         } catch (UncheckedIOException e) {
             throw e.getCause();
         }
@@ -73,7 +85,7 @@ public class GitHubClientProvider {
         workspaceClients.invalidateAll();
     }
 
-    private GitHub createClientForWorkspace(Long workspaceId) {
+    private GitHubClientHolder createClientForWorkspace(Long workspaceId) {
         try {
             Workspace workspace = workspaceRepository
                 .findById(workspaceId)
@@ -84,7 +96,13 @@ public class GitHubClientProvider {
                 if (installationId == null) {
                     throw new IllegalStateException("Workspace " + workspaceId + " has no installation id.");
                 }
-                return appTokens.clientForInstallation(installationId);
+                InstallationToken token = appTokens.getInstallationTokenDetails(installationId);
+                Instant refreshAt = token.expiresAt().minus(Duration.ofMinutes(2));
+                if (refreshAt.isBefore(Instant.now())) {
+                    refreshAt = Instant.now();
+                }
+                GitHub client = new GitHubBuilder().withOAuthToken(token.token()).build();
+                return new GitHubClientHolder(client, refreshAt);
             }
 
             String token = workspace.getPersonalAccessToken();
@@ -94,9 +112,16 @@ public class GitHubClientProvider {
                 );
             }
 
-            return new GitHubBuilder().withOAuthToken(token).build();
+            GitHub client = new GitHubBuilder().withOAuthToken(token).build();
+            return new GitHubClientHolder(client, null);
         } catch (IOException e) {
             throw new UncheckedIOException(e);
+        }
+    }
+
+    private record GitHubClientHolder(GitHub client, Instant refreshAt) {
+        boolean needsRefresh() {
+            return refreshAt != null && Instant.now().isAfter(refreshAt);
         }
     }
 }
