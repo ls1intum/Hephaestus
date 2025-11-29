@@ -35,18 +35,7 @@ JetBrains alternatives such as IntelliJ (Java), WebStorm (React), and PyCharm (P
 
 We ship three Maven profiles: `local` (default), `prod`, and `spec`. For development stick to the `local` profile.
 
-Create `application-server/src/main/resources/application-local.yml` to override defaults:
-
-```yaml
-nats:
-  enabled: true
-  timeframe: 1
-
-monitoring:
-  run-on-startup: true
-  timeframe: 1
-  sync-cooldown-in-minutes: 60
-```
+Create `application-server/src/main/resources/application-local.yml` to override defaults. This file is gitignored.
 
 :::caution Keep it local
 Never commit `application-local.yml`. It may contain secrets and machine-specific configuration.
@@ -65,50 +54,76 @@ Never commit `application-local.yml`. It may contain secrets and machine-specifi
 
 ### GitHub configuration
 
-Hephaestus can connect to GitHub using either a **Personal Access Token (PAT)** or a **GitHub App**. For local development, using a PAT is simpler and recommended.
+Hephaestus supports two GitHub authentication modes. Pick the one that fits your workflow:
 
-#### Using a Personal Access Token (recommended for development)
+| Mode | Best for | Workspace creation | Repository monitors |
+|------|----------|-------------------|---------------------|
+| **PAT** | Quick local development | Manual (from config) | Manual (you list them) |
+| **GitHub App** | Testing webhooks, production | Automatic (from installations) | Automatic (from installation events) |
 
-1. [Create a Personal Access Token](https://github.com/settings/tokens) with the following scopes:
-   - `repo` (full control of private repositories)
-   - `read:org` (read organization membership)
-   - `read:user` (read user profile data)
+#### Option A: Personal Access Token (simpler)
 
-2. Configure your workspace through the UI after signing in, or set up a default workspace in `application-local.yml`:
+1. [Create a Personal Access Token](https://github.com/settings/tokens) with scopes: `repo`, `read:org`, `read:user`.
+
+2. Create `application-local.yml`:
 
    ```yaml
    hephaestus:
      workspace:
        init-default: true
        default:
-         login: your-github-org
-         token: ghp_your_personal_access_token
+         login: your-github-org      # e.g., "ls1intum" or "HephaestusTest"
+         token: ghp_your_token
+         repositories-to-monitor:
+           - your-github-org/repo1
+           - your-github-org/repo2
    ```
 
-:::caution Security
-Never commit actual tokens to version control. Use `application-local.yml` (which is in `.gitignore`) or environment variables to store tokens securely. The example above shows placeholder values only.
-:::
+3. Leave `github.app.id` unset or set to `0`.
 
-:::tip
-The GitHub App configuration (`github.app.id`, `github.app.privateKey`) is optional and defaults to disabled. The application will work perfectly with just a Personal Access Token for local development.
-:::
+#### Option B: GitHub App
 
-#### Using a GitHub App (optional)
+1. [Create a GitHub App](https://docs.github.com/en/apps/creating-github-apps) with appropriate permissions.
 
-If you need to test GitHub App functionality:
-
-1. [Create a GitHub App](https://docs.github.com/en/apps/creating-github-apps/registering-a-github-app/registering-a-github-app) with appropriate permissions.
-2. Set the following in `application-local.yml`:
+2. Create `application-local.yml`:
 
    ```yaml
    github:
      app:
-       id: your-app-id
+       id: 12345
        privateKey: |
          -----BEGIN RSA PRIVATE KEY-----
-         your-private-key-content
+         ...
          -----END RSA PRIVATE KEY-----
+
+   hephaestus:
+     workspace:
+       init-default: false   # Workspaces created from installations
    ```
+
+3. Install the app on your organization. Workspaces and monitors are created automatically.
+
+### Limiting sync scope (development filters)
+
+When using GitHub App mode, your app might have access to hundreds of repositories. Use filters to focus on specific orgs/repos during development:
+
+```yaml
+monitoring:
+  filters:
+    allowed-organizations:
+      - ls1intum
+      - HephaestusTest
+    allowed-repositories:
+      - ls1intum/Hephaestus
+      - ls1intum/Artemis
+      - HephaestusTest/demo-repository
+```
+
+Empty lists = no filtering (production behavior). Non-empty = only sync matching items.
+
+:::tip
+Filters don't delete data—they just skip sync operations. Workspace and organization metadata is still created for all installations.
+:::
 
 ### Keycloak integration
 

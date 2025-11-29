@@ -4,9 +4,12 @@ import de.tum.in.www1.hephaestus.gitprovider.label.Label;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.notification.MailService;
+import jakarta.ws.rs.NotAuthorizedException;
+import jakarta.ws.rs.ProcessingException;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.keycloak.admin.client.Keycloak;
 import org.keycloak.representations.idm.RoleRepresentation;
 import org.keycloak.representations.idm.UserRepresentation;
@@ -48,6 +51,7 @@ public class BadPracticeDetectorScheduler {
     private String realm;
 
     private final Map<Long, List<ScheduledFuture<?>>> scheduledTasks = new HashMap<>();
+    private final AtomicBoolean keycloakRoleChecksHealthy = new AtomicBoolean(true);
 
     public void detectBadPracticeForPrWhenOpenedOrReadyForReviewEvent(PullRequest pullRequest) {
         Instant timeInOneHour = Instant.now().plusSeconds(3600);
@@ -98,6 +102,14 @@ public class BadPracticeDetectorScheduler {
             return;
         }
 
+        if (!keycloakRoleChecksHealthy.get()) {
+            logger.debug(
+                "Skipping Keycloak role check for PR {} because the Keycloak client is marked unhealthy",
+                pullRequest.getId()
+            );
+            return;
+        }
+
         try {
             UserRepresentation keyCloakUser = keycloak
                 .realm(realm)
@@ -124,6 +136,16 @@ public class BadPracticeDetectorScheduler {
             } else {
                 logger.info("User {} has the run_automatic_detection role. Scheduling detection.", assignee.getLogin());
                 scheduleDetectionAtTime(pullRequest, scheduledTime, sendBadPracticeDetectionEmail);
+            }
+        } catch (ProcessingException | NotAuthorizedException e) {
+            if (keycloakRoleChecksHealthy.compareAndSet(true, false)) {
+                logger.error(
+                    "Disabling automatic detection role checks after Keycloak responded with {}. " +
+                    "Set KEYCLOAK credentials or restart the server to re-enable.",
+                    e.getMessage()
+                );
+            } else {
+                logger.debug("Keycloak role check skipped due to previous authorization failure: {}", e.getMessage());
             }
         } catch (Exception e) {
             logger.error("Error while checking user role: {}", e.toString());

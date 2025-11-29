@@ -33,11 +33,11 @@ public class GitHubPullRequestReviewCommentConverter
         @NonNull PullRequestReviewComment comment
     ) {
         convertBaseFields(source, comment);
-        comment.setDiffHunk(source.getDiffHunk());
+        comment.setDiffHunk(sanitizeForPostgres(source.getDiffHunk()));
         comment.setPath(source.getPath());
         comment.setCommitId(source.getCommitId());
         comment.setOriginalCommitId(source.getOriginalCommitId());
-        comment.setBody(source.getBody());
+        comment.setBody(sanitizeForPostgres(source.getBody()));
         comment.setHtmlUrl(source.getHtmlUrl().toString());
         comment.setAuthorAssociation(authorAssociationConverter.convert(source.getAuthorAssociation()));
         comment.setStartLine(nullIfZero(source.getStartLine()));
