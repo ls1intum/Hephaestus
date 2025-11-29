@@ -14,9 +14,26 @@ import org.springframework.data.repository.query.Param;
 public interface WorkspaceMembershipRepository extends JpaRepository<WorkspaceMembership, WorkspaceMembership.Id> {
     List<WorkspaceMembership> findByWorkspace_Id(Long workspaceId);
 
-    Page<WorkspaceMembership> findAllByWorkspace_Id(Long workspaceId, Pageable pageable);
+    @Query(
+        """
+            SELECT wm FROM WorkspaceMembership wm
+            JOIN FETCH wm.user
+            WHERE wm.workspace.id = :workspaceId
+        """
+    )
+    Page<WorkspaceMembership> findAllByWorkspace_Id(@Param("workspaceId") Long workspaceId, Pageable pageable);
 
-    Optional<WorkspaceMembership> findByWorkspace_IdAndUser_Id(Long workspaceId, Long userId);
+    @Query(
+        """
+            SELECT wm FROM WorkspaceMembership wm
+            JOIN FETCH wm.user
+            WHERE wm.workspace.id = :workspaceId AND wm.user.id = :userId
+        """
+    )
+    Optional<WorkspaceMembership> findByWorkspace_IdAndUser_Id(
+        @Param("workspaceId") Long workspaceId,
+        @Param("userId") Long userId
+    );
 
     List<WorkspaceMembership> findAllByWorkspace_IdAndUser_IdIn(Long workspaceId, Collection<Long> userIds);
 

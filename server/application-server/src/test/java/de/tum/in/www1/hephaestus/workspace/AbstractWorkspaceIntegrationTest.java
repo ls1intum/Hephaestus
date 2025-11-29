@@ -73,4 +73,9 @@ abstract class AbstractWorkspaceIntegrationTest extends BaseIntegrationTest {
         User adminUser = TestUserFactory.ensureUser(userRepository, "admin", 3L);
         return ensureWorkspaceMembership(workspace, adminUser, WorkspaceMembership.WorkspaceRole.ADMIN);
     }
+
+    protected WorkspaceMembership ensureOwnerMembership(Workspace workspace) {
+        User adminUser = TestUserFactory.ensureUser(userRepository, "admin", 3L);
+        return ensureWorkspaceMembership(workspace, adminUser, WorkspaceMembership.WorkspaceRole.OWNER);
+    }
 }

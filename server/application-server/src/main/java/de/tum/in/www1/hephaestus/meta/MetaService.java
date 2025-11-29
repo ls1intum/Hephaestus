@@ -52,7 +52,7 @@ public class MetaService {
         logger.info("Getting meta data for workspace id={}.", workspace.getId());
 
         var teams = teamRepository
-            .findAllByOrganizationIgnoreCase(workspace.getAccountLogin())
+            .findWithCollectionsByOrganizationIgnoreCase(workspace.getAccountLogin())
             .stream()
             .map(teamInfoDTOConverter::convert)
             .filter(Objects::nonNull)

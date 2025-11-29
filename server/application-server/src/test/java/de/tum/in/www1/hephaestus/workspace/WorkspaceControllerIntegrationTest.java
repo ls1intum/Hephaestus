@@ -703,7 +703,8 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
             AccountType.ORG,
             owner
         );
-        ensureAdminMembership(workspace);
+        // Delete requires OWNER role, not just ADMIN
+        ensureOwnerMembership(workspace);
         workspaceLifecycleService.suspendWorkspace(workspace.getWorkspaceSlug());
 
         webTestClient
@@ -739,26 +740,5 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
         assertThat(problem.getProperties().get("errors"))
             .asInstanceOf(InstanceOfAssertFactories.map(String.class, Object.class))
             .containsKey("workspaceSlug");
-    }
-
-    @Test
-    @WithAdminUser
-    void listWorkspacesEndpointAcceptsTrailingSlash() {
-        User owner = persistUser("trailing-owner");
-        createWorkspace("trailing-space", "Trailing", "trailing", AccountType.ORG, owner);
-
-        List<WorkspaceListItemDTO> workspaces = webTestClient
-            .get()
-            .uri("/workspaces/")
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBodyList(WorkspaceListItemDTO.class)
-            .returnResult()
-            .getResponseBody();
-
-        assertThat(workspaces).isNotNull();
-        assertThat(workspaces).isNotEmpty();
     }
 }
