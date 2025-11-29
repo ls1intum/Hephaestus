@@ -5,6 +5,7 @@ import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import org.kohsuke.github.GHFileNotFoundException;
@@ -109,11 +110,13 @@ public class GitHubUserSyncService {
      * Uses only the basic fields available in webhook payloads (id, login, avatar_url, type).
      * For full user data sync, use {@link #processUser(GHUser)} instead.
      *
-     * @param ghUser The GitHub user from a webhook payload or API response.
+     * @param ghUser The GitHub user from a webhook payload or API response (must not be null).
      * @return The existing or newly created User entity.
+     * @throws NullPointerException if ghUser is null
      */
     @Transactional
     public User getOrCreateUser(GHUser ghUser) {
+        Objects.requireNonNull(ghUser, "ghUser must not be null");
         return userRepository
             .findById(ghUser.getId())
             .orElseGet(() -> userRepository.save(userConverter.convert(ghUser)));

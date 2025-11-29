@@ -59,6 +59,7 @@ public class GHEventPayloadInstallationTarget extends GHEventPayload {
      *
      * @return the installation
      */
+    @Override
     public GHAppInstallation getInstallation() {
         return installation;
     }

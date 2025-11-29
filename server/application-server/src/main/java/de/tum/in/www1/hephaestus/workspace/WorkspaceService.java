@@ -194,7 +194,11 @@ public class WorkspaceService {
             return;
         }
 
-        Set<RepositoryToMonitor> repositoriesToMonitor = workspace.getRepositoriesToMonitor();
+        // Load fresh RepositoryToMonitor entities from database to ensure sync timestamps
+        // are up-to-date. This is critical for respecting cooldown periods across restarts.
+        List<RepositoryToMonitor> repositoriesToMonitor = repositoryToMonitorRepository.findByWorkspaceId(
+            workspace.getId()
+        );
         var eligibleRepositories = repositoriesToMonitor
             .stream()
             .filter(monitoringScopeFilter::isRepositoryAllowed)

@@ -492,7 +492,7 @@ class Repository(Base):
     created_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime(True))
     updated_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime(True))
     default_branch: Mapped[Optional[str]] = mapped_column(String(255))
-    description: Mapped[Optional[str]] = mapped_column(Text)
+    description: Mapped[Optional[str]] = mapped_column(String(255))
     homepage: Mapped[Optional[str]] = mapped_column(String(1024))
     html_url: Mapped[Optional[str]] = mapped_column(String(512))
     name: Mapped[Optional[str]] = mapped_column(String(255))

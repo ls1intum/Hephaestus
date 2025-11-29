@@ -225,8 +225,6 @@ public class GitHubDataSyncService {
             return;
         }
 
-        logger.info(repositoryToMonitor.getNameWithOwner() + " - Syncing data...");
-
         var cooldownTime = Instant.now().minusSeconds(syncCooldownInMinutes * 60L);
 
         boolean shouldSyncRepository =
@@ -254,11 +252,18 @@ public class GitHubDataSyncService {
 
         // Nothing to sync
         if (!shouldSyncRepository) {
-            logger.info(repositoryToMonitor.getNameWithOwner() + " - No data to sync.");
+            logger.debug(
+                "{} - Skipping sync (cooldown active). Last sync timestamps - repo: {}, labels: {}, milestones: {}, issues: {}",
+                repositoryToMonitor.getNameWithOwner(),
+                repositoryToMonitor.getRepositorySyncedAt(),
+                repositoryToMonitor.getLabelsSyncedAt(),
+                repositoryToMonitor.getMilestonesSyncedAt(),
+                repositoryToMonitor.getIssuesAndPullRequestsSyncedAt()
+            );
             return;
         }
 
-        logger.info(repositoryToMonitor.getNameWithOwner() + " - Syncing repository data...");
+        logger.info("{} - Syncing data...", repositoryToMonitor.getNameWithOwner());
         var ghRepository = syncRepository(repositoryToMonitor).orElse(null);
         if (ghRepository == null) {
             logger.warn(
@@ -269,25 +274,25 @@ public class GitHubDataSyncService {
         }
 
         if (shouldSyncLabels) {
-            logger.info(repositoryToMonitor.getNameWithOwner() + " - Syncing labels...");
+            logger.info("{} - Syncing labels...", repositoryToMonitor.getNameWithOwner());
             syncRepositoryLabels(ghRepository, repositoryToMonitor);
         }
         if (shouldSyncMilestones) {
-            logger.info(repositoryToMonitor.getNameWithOwner() + " - Syncing milestones...");
+            logger.info("{} - Syncing milestones...", repositoryToMonitor.getNameWithOwner());
             syncRepositoryMilestones(ghRepository, repositoryToMonitor);
         }
         if (shouldSyncIssuesAndPullRequests) {
-            logger.info(repositoryToMonitor.getNameWithOwner() + " - Syncing recent issues and pull requests...");
+            logger.info("{} - Syncing recent issues and pull requests...", repositoryToMonitor.getNameWithOwner());
             syncRepositoryRecentIssuesAndPullRequests(ghRepository, repositoryToMonitor);
         }
 
         // TODO: Re-enable once it works without exceptions
         //
         // if (shouldSyncAllPastIssuesAndPullRequests(repositoryToMonitor)) {
-        //     logger.info(repositoryToMonitor.getNameWithOwner() + " - Syncing all past issues and pull requests...");
+        //     logger.info("{} - Syncing all past issues and pull requests...", repositoryToMonitor.getNameWithOwner());
         //     syncAllPastIssuesAndPullRequests(ghRepository, repositoryToMonitor);
         // }
-        logger.info(repositoryToMonitor.getNameWithOwner() + " - Data sync completed.");
+        logger.info("{} - Data sync completed.", repositoryToMonitor.getNameWithOwner());
     }
 
     private Optional<GHRepository> syncRepository(RepositoryToMonitor repositoryToMonitor) {
@@ -429,8 +434,20 @@ public class GitHubDataSyncService {
         }
 
         PagedIterator<GHIssue> issuesIterator = issueSyncService.getIssuesIterator(repository, cutoffDate);
+        Instant syncedUpToTime = Instant.now();
+
         while (issuesIterator.hasNext()) {
-            var syncedUpToTime = syncRepositoryRecentIssuesAndPullRequestsNextPage(repository, issuesIterator);
+            syncedUpToTime = syncRepositoryRecentIssuesAndPullRequestsNextPage(repository, issuesIterator);
+            repositoryToMonitor.setIssuesAndPullRequestsSyncedAt(syncedUpToTime);
+            repositoryToMonitorRepository.save(repositoryToMonitor);
+        }
+
+        // Always update the timestamp, even if no issues were processed.
+        // This ensures cooldown is respected when there are no new issues.
+        if (
+            repositoryToMonitor.getIssuesAndPullRequestsSyncedAt() == null ||
+            repositoryToMonitor.getIssuesAndPullRequestsSyncedAt().isBefore(syncedUpToTime)
+        ) {
             repositoryToMonitor.setIssuesAndPullRequestsSyncedAt(syncedUpToTime);
             repositoryToMonitorRepository.save(repositoryToMonitor);
         }

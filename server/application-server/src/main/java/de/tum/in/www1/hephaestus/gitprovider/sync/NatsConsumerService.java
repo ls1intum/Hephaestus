@@ -552,7 +552,9 @@ public class NatsConsumerService {
         logger.info("NATS consumer shutdown complete.");
     }
 
-    private class JetStreamErrorListener implements ErrorListener {
+    private static class JetStreamErrorListener implements ErrorListener {
+
+        private static final Logger logger = LoggerFactory.getLogger(JetStreamErrorListener.class);
 
         @Override
         public void errorOccurred(Connection conn, String error) {
