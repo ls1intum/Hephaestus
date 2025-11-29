@@ -9,7 +9,6 @@ import de.tum.in.www1.hephaestus.testconfig.DatabaseTestUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.kohsuke.github.GHAppInstallation;
 import org.springframework.beans.factory.annotation.Autowired;
 
 /**
@@ -35,12 +34,10 @@ class GitHubInstallationRepositorySelectionIntegrationTest extends BaseGitHubInt
     @DisplayName("List repositories for installation (ALL selection) and upsert minimal snapshot")
     void shouldListRepositoriesForInstallationWithAllSelection() throws Exception {
         long installationId = githubInstallationId();
-        GHAppInstallation installation = gitHubAppTokenService
-            .clientAsApp()
-            .getApp()
-            .getInstallationById(installationId);
-
-        var repositories = installation.listRepositories().withPageSize(10).toList();
+        // Use the installation client (with installation token) to list repositories.
+        // The App JWT alone cannot list installation repositories - you need the installation token.
+        var installationClient = gitHubAppTokenService.clientForInstallation(installationId);
+        var repositories = installationClient.getInstallation().listRepositories().withPageSize(10).toList();
 
         assertThat(repositories).isNotEmpty();
 

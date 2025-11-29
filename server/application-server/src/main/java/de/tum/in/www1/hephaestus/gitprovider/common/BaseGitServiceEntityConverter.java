@@ -29,17 +29,10 @@ public abstract class BaseGitServiceEntityConverter<S extends GHObject, T extend
 
     /**
      * Sanitizes a string for PostgreSQL storage by removing null bytes (0x00).
-     * PostgreSQL's TEXT/VARCHAR types don't accept null bytes in UTF-8 encoded strings.
-     *
-     * @param input The string to sanitize, may be null
-     * @return The sanitized string with null bytes removed, or null if input was null
+     * @see PostgresStringUtils#sanitize(String)
      */
     protected String sanitizeForPostgres(String input) {
-        if (input == null) {
-            return null;
-        }
-        // Remove null bytes (0x00) which PostgreSQL rejects with "invalid byte sequence for encoding UTF8: 0x00"
-        return input.replace("\u0000", "");
+        return PostgresStringUtils.sanitize(input);
     }
 
     protected void convertBaseFields(S source, T target) {

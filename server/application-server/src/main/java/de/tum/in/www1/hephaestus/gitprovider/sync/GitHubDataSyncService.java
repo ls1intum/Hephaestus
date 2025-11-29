@@ -55,10 +55,6 @@ public class GitHubDataSyncService {
     @Value("${monitoring.sync-cooldown-in-minutes}")
     private int syncCooldownInMinutes;
 
-    //TODO: Field is assigned but never accessed
-    @Value("${monitoring.sync-all-issues-and-pull-requests}")
-    private boolean syncAllIssuesAndPullRequests;
-
     @Autowired
     private WorkspaceRepository workspaceRepository;
 

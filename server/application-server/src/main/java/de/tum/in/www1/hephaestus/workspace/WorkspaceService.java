@@ -28,7 +28,6 @@ import de.tum.in.www1.hephaestus.leaderboard.LeaderboardSortType;
 import de.tum.in.www1.hephaestus.leaderboard.LeaguePointsCalculationService;
 import de.tum.in.www1.hephaestus.monitoring.MonitoringScopeFilter;
 import de.tum.in.www1.hephaestus.workspace.exception.*;
-import jakarta.transaction.Transactional;
 import java.time.Instant;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
@@ -57,6 +56,7 @@ import org.springframework.context.annotation.Lazy;
 import org.springframework.core.task.AsyncTaskExecutor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class WorkspaceService {
@@ -332,9 +332,6 @@ public class WorkspaceService {
         repositoryRepository.delete(repository.get());
     }
 
-    /**
-     * Idempotently ensure a repository monitor exists for a given installation id without issuing extra GitHub fetches.
-     */
     /**
      * Idempotently ensure a repository monitor exists for a given installation id without issuing extra GitHub fetches.
      */
