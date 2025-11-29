@@ -15,6 +15,8 @@ public class OrganizationService {
 
     /**
      * Ensure an organization row exists (by stable GitHub org id) and keep its login up to date (rename-safe).
+     * <p>
+     * With sequential processing within a workspace, concurrent insert race conditions are avoided.
      */
     @Transactional
     public Organization upsertIdentity(long githubId, String login) {
@@ -28,7 +30,6 @@ public class OrganizationService {
                 Organization o = new Organization();
                 o.setId(githubId);
                 o.setGithubId(githubId);
-
                 return o;
             });
 
@@ -57,5 +58,19 @@ public class OrganizationService {
 
     public Optional<Organization> getByInstallationId(Long installationId) {
         return organizations.findByInstallationId(installationId);
+    }
+
+    /**
+     * Detach the organization from its installation (e.g., when installation is deleted).
+     * Sets installationId to null so the organization can be re-linked later if needed.
+     */
+    @Transactional
+    public void detachInstallation(long installationId) {
+        organizations
+            .findByInstallationId(installationId)
+            .ifPresent(organization -> {
+                organization.setInstallationId(null);
+                organizations.save(organization);
+            });
     }
 }

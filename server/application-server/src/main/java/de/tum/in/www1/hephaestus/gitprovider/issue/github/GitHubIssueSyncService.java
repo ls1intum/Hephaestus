@@ -9,8 +9,7 @@ import de.tum.in.www1.hephaestus.gitprovider.milestone.MilestoneRepository;
 import de.tum.in.www1.hephaestus.gitprovider.milestone.github.GitHubMilestoneConverter;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
-import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
-import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserConverter;
+import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserSyncService;
 import jakarta.transaction.Transactional;
 import java.io.IOException;
 import java.time.Instant;
@@ -39,32 +38,29 @@ public class GitHubIssueSyncService {
     private final RepositoryRepository repositoryRepository;
     private final LabelRepository labelRepository;
     private final MilestoneRepository milestoneRepository;
-    private final UserRepository userRepository;
     private final GitHubIssueConverter issueConverter;
     private final GitHubLabelConverter labelConverter;
     private final GitHubMilestoneConverter milestoneConverter;
-    private final GitHubUserConverter userConverter;
+    private final GitHubUserSyncService userSyncService;
 
     public GitHubIssueSyncService(
         IssueRepository issueRepository,
         RepositoryRepository repositoryRepository,
         LabelRepository labelRepository,
         MilestoneRepository milestoneRepository,
-        UserRepository userRepository,
         GitHubIssueConverter issueConverter,
         GitHubLabelConverter labelConverter,
         GitHubMilestoneConverter milestoneConverter,
-        GitHubUserConverter userConverter
+        GitHubUserSyncService userSyncService
     ) {
         this.issueRepository = issueRepository;
         this.repositoryRepository = repositoryRepository;
         this.labelRepository = labelRepository;
         this.milestoneRepository = milestoneRepository;
-        this.userRepository = userRepository;
         this.issueConverter = issueConverter;
         this.labelConverter = labelConverter;
         this.milestoneConverter = milestoneConverter;
-        this.userConverter = userConverter;
+        this.userSyncService = userSyncService;
     }
 
     /**
@@ -225,18 +221,14 @@ public class GitHubIssueSyncService {
 
         // Link author
         var author = ghIssue.getUser();
-        var resultAuthor = userRepository
-            .findById(author.getId())
-            .orElseGet(() -> userRepository.save(userConverter.convert(author)));
+        var resultAuthor = userSyncService.getOrCreateUser(author);
         result.setAuthor(resultAuthor);
 
         // Link assignees
         var assignees = ghIssue.getAssignees();
         var resultAssignees = new HashSet<User>();
         assignees.forEach(assignee -> {
-            var resultAssignee = userRepository
-                .findById(assignee.getId())
-                .orElseGet(() -> userRepository.save(userConverter.convert(assignee)));
+            var resultAssignee = userSyncService.getOrCreateUser(assignee);
             resultAssignees.add(resultAssignee);
         });
         result.getAssignees().clear();

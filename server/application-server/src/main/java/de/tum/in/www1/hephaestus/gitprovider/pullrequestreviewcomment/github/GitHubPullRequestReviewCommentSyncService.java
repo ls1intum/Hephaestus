@@ -7,8 +7,7 @@ import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.PullReques
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.PullRequestReviewCommentRepository;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewthread.PullRequestReviewThread;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewthread.PullRequestReviewThreadRepository;
-import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
-import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserConverter;
+import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserSyncService;
 import jakarta.transaction.Transactional;
 import java.io.IOException;
 import java.util.List;
@@ -20,6 +19,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+/**
+ * Service for synchronizing GitHub pull request review comments with the local database.
+ * <p>
+ * With sequential processing within a workspace, race conditions are avoided.
+ * If a review is not found when processing a comment, it will be linked on the next sync.
+ */
 @Service
 public class GitHubPullRequestReviewCommentSyncService {
 
@@ -29,46 +34,40 @@ public class GitHubPullRequestReviewCommentSyncService {
     private final PullRequestReviewRepository pullRequestReviewRepository;
     private final PullRequestRepository pullRequestRepository;
     private final PullRequestReviewThreadRepository pullRequestReviewThreadRepository;
-    private final UserRepository userRepository;
     private final GitHubPullRequestReviewCommentConverter pullRequestReviewCommentConverter;
     private final GitHubPullRequestConverter pullRequestConverter;
-    private final GitHubUserConverter userConverter;
+    private final GitHubUserSyncService userSyncService;
 
     public GitHubPullRequestReviewCommentSyncService(
         PullRequestReviewCommentRepository pullRequestReviewCommentRepository,
         PullRequestReviewRepository pullRequestReviewRepository,
         PullRequestRepository pullRequestRepository,
         PullRequestReviewThreadRepository pullRequestReviewThreadRepository,
-        UserRepository userRepository,
         GitHubPullRequestReviewCommentConverter pullRequestReviewCommentConverter,
         GitHubPullRequestConverter pullRequestConverter,
-        GitHubUserConverter userConverter
+        GitHubUserSyncService userSyncService
     ) {
         this.pullRequestReviewCommentRepository = pullRequestReviewCommentRepository;
         this.pullRequestReviewRepository = pullRequestReviewRepository;
         this.pullRequestRepository = pullRequestRepository;
         this.pullRequestReviewThreadRepository = pullRequestReviewThreadRepository;
-        this.userRepository = userRepository;
         this.pullRequestReviewCommentConverter = pullRequestReviewCommentConverter;
         this.pullRequestConverter = pullRequestConverter;
-        this.userConverter = userConverter;
+        this.userSyncService = userSyncService;
     }
 
     /**
      * Synchronizes all review comments for the given list of GitHub pull requests.
-     *
-     * @param pullRequests the list of GitHub pull requests to sync review comments
-     *                     for
      */
+    @Transactional
     public void syncReviewCommentsOfAllPullRequests(List<GHPullRequest> pullRequests) {
-        pullRequests.stream().forEach(this::syncReviewCommentsOfPullRequest);
+        pullRequests.forEach(this::syncReviewCommentsOfPullRequest);
     }
 
     /**
      * Synchronizes all review comments for a specific GitHub pull request.
-     *
-     * @param pullRequest the GitHub pull request to sync review comments for
      */
+    @Transactional
     public void syncReviewCommentsOfPullRequest(GHPullRequest pullRequest) {
         pullRequest
             .listReviewComments()
@@ -77,15 +76,7 @@ public class GitHubPullRequestReviewCommentSyncService {
     }
 
     /**
-     * Processes a single GitHub pull request review comment by updating or creating
-     * it in the local repository.
-     * Links the comment to its parent pull request and review, as well as the
-     * author.
-     *
-     * @param ghPullRequestReviewComment the GitHub pull request review comment to
-     *                                   process
-     * @return the updated or newly created PullRequestReviewComment entity, or
-     *         {@code null} if an error occurred
+     * Processes a single GitHub pull request review comment.
      */
     @Transactional
     public PullRequestReviewComment processPullRequestReviewComment(GHPullRequestReviewComment ghComment) {
@@ -123,30 +114,31 @@ public class GitHubPullRequestReviewCommentSyncService {
             );
             return null;
         }
+
         var resultPullRequest = pullRequestRepository
             .findById(pullRequest.getId())
             .orElseGet(() -> pullRequestRepository.save(pullRequestConverter.convert(pullRequest)));
         result.setPullRequest(resultPullRequest);
 
+        // Link review if found - if not, it will be linked on next sync
+        long reviewId = ghPullRequestReviewComment.getPullRequestReviewId();
         pullRequestReviewRepository
-            .findById(ghPullRequestReviewComment.getPullRequestReviewId())
+            .findById(reviewId)
             .ifPresentOrElse(result::setReview, () ->
-                logger.error(
-                    "Failed to link review for pull request review comment {}: {}",
-                    ghPullRequestReviewComment.getId(),
-                    "Review not found"
+                logger.debug(
+                    "Review {} not found for comment {} - will be linked on next sync",
+                    reviewId,
+                    ghPullRequestReviewComment.getId()
                 )
             );
 
         attachAuthor(ghPullRequestReviewComment, result, fallbackUser);
-
         attachInReplyTo(ghPullRequestReviewComment, result);
 
         PullRequestReviewThread thread = ensureThread(ghPullRequestReviewComment, resultPullRequest);
         result.setThread(thread);
 
         var persisted = pullRequestReviewCommentRepository.save(result);
-
         updateThreadMetadata(thread, persisted, ghPullRequestReviewComment);
 
         return persisted;
@@ -173,8 +165,8 @@ public class GitHubPullRequestReviewCommentSyncService {
         try {
             user = ghPullRequestReviewComment.getUser();
         } catch (IOException | NullPointerException e) {
-            logger.error(
-                "Failed to fetch author via API for pull request review comment {}: {}",
+            logger.debug(
+                "Failed to fetch author for review comment {}: {}",
                 ghPullRequestReviewComment.getId(),
                 e.getMessage()
             );
@@ -189,10 +181,7 @@ public class GitHubPullRequestReviewCommentSyncService {
             return;
         }
 
-        var resultAuthor = userRepository.findById(user.getId()).orElse(null);
-        if (resultAuthor == null) {
-            resultAuthor = userRepository.save(userConverter.convert(user));
-        }
+        var resultAuthor = userSyncService.getOrCreateUser(user);
         comment.setAuthor(resultAuthor);
     }
 
@@ -210,8 +199,9 @@ public class GitHubPullRequestReviewCommentSyncService {
         if (parent.isPresent()) {
             comment.setInReplyTo(parent.get());
         } else {
-            logger.warn(
-                "Parent review comment {} not found for reply {}",
+            // Expected when processing webhook events out of order - will be linked on next sync
+            logger.debug(
+                "Parent comment {} not found for reply {} - will be linked on next sync",
                 inReplyToId,
                 ghPullRequestReviewComment.getId()
             );

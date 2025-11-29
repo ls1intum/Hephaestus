@@ -2,25 +2,35 @@ package de.tum.in.www1.hephaestus.gitprovider.user.github;
 
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
-import jakarta.transaction.Transactional;
+import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.util.Locale;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import org.kohsuke.github.GHFileNotFoundException;
 import org.kohsuke.github.GHUser;
 import org.kohsuke.github.GitHub;
+import org.kohsuke.github.HttpException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * Service for synchronizing GitHub users with the local database.
+ * <p>
+ * With sequential processing within a workspace, concurrent insert race conditions are avoided.
+ */
 @Service
 public class GitHubUserSyncService {
-
-    private GitHubUserSyncService self;
 
     private static final Logger logger = LoggerFactory.getLogger(GitHubUserSyncService.class);
 
     private final UserRepository userRepository;
     private final GitHubUserConverter userConverter;
+
+    /** Cache of logins that returned 404 - avoids repeated API calls for deleted/invalid accounts */
+    private final Set<String> missingLogins = ConcurrentHashMap.newKeySet();
 
     public GitHubUserSyncService(UserRepository userRepository, GitHubUserConverter userConverter) {
         this.userRepository = userRepository;
@@ -28,48 +38,102 @@ public class GitHubUserSyncService {
     }
 
     /**
-     * Sync all existing users in the local repository with their GitHub
-     * data.
+     * Sync all existing users in the local repository with their GitHub data.
      */
     public void syncAllExistingUsers(GitHub github) {
-        userRepository.findAll().stream().map(User::getLogin).forEach(login -> syncUser(github, login));
+        userRepository
+            .findAll()
+            .stream()
+            .map(User::getLogin)
+            .filter(login -> !isLoginMarkedMissing(login))
+            .forEach(login -> syncUser(github, login));
     }
 
     /**
-     * Sync a GitHub user's data by their login and processes it to synchronize
-     * with the local repository.
+     * Sync a GitHub user's data by their login.
      *
+     * @param github The GitHub client to use.
      * @param login The GitHub username (login) of the user to fetch.
+     * @return The synced user, or null if not found/error.
      */
     public User syncUser(GitHub github, String login) {
         try {
-            return self.processUser(github.getUser(login));
+            var user = processUser(github.getUser(login));
+            missingLogins.remove(normalizeLogin(login));
+            return user;
+        } catch (GHFileNotFoundException e) {
+            logger.info("Skipping user sync for '{}': user not found on GitHub.", login);
+            markLoginMissing(login);
+            return null;
+        } catch (HttpException e) {
+            if (e.getResponseCode() == 404) {
+                logger.info("Skipping user sync for '{}': user not found on GitHub.", login);
+                markLoginMissing(login);
+                return null;
+            }
+            logger.warn("Failed to fetch user '{}': HTTP {} - {}", login, e.getResponseCode(), e.getMessage());
+            return null;
+        } catch (FileNotFoundException e) {
+            logger.info("Skipping user sync for '{}': user not found on GitHub.", login);
+            markLoginMissing(login);
+            return null;
         } catch (IOException e) {
-            logger.error("Failed to fetch user {}: {}", login, e.getMessage());
+            logger.warn("Failed to fetch user '{}': {}", login, e.getMessage());
+            return null;
         }
-        return null;
     }
 
     /**
-     * Processes a GitHub user by either updating the existing user in the
-     * repository or creating a new one.
+     * Processes a fully-fetched GitHub user by either updating or creating in the repository.
+     * <p>
+     * Uses {@link GitHubUserConverter#updateFromFullUser} which accesses ALL user fields.
+     * Should ONLY be called with users from {@code GitHub.getUser(login)}.
      *
-     * @param ghUser The GitHub user data to process.
+     * @param ghUser The fully-fetched GitHub user data.
      * @return The updated or newly created User entity.
      */
     @Transactional
     public User processUser(GHUser ghUser) {
         var user = userRepository
             .findById(ghUser.getId())
-            .map(existingUser -> userConverter.update(ghUser, existingUser))
-            .orElseGet(() -> userConverter.convert(ghUser));
+            .map(existingUser -> userConverter.updateFromFullUser(ghUser, existingUser))
+            .orElseGet(() -> {
+                User newUser = new User();
+                return userConverter.updateFromFullUser(ghUser, newUser);
+            });
 
         return userRepository.save(user);
     }
 
-    @Autowired
-    @Lazy
-    public void setSelf(GitHubUserSyncService self) {
-        this.self = self;
+    /**
+     * Gets an existing user by ID or creates a new one from basic GHUser data.
+     * <p>
+     * Uses only the basic fields available in webhook payloads (id, login, avatar_url, type).
+     * For full user data sync, use {@link #processUser(GHUser)} instead.
+     *
+     * @param ghUser The GitHub user from a webhook payload or API response.
+     * @return The existing or newly created User entity.
+     */
+    @Transactional
+    public User getOrCreateUser(GHUser ghUser) {
+        return userRepository
+            .findById(ghUser.getId())
+            .orElseGet(() -> userRepository.save(userConverter.convert(ghUser)));
+    }
+
+    private boolean isLoginMarkedMissing(String login) {
+        var normalized = normalizeLogin(login);
+        return normalized != null && missingLogins.contains(normalized);
+    }
+
+    private void markLoginMissing(String login) {
+        var normalized = normalizeLogin(login);
+        if (normalized != null) {
+            missingLogins.add(normalized);
+        }
+    }
+
+    private String normalizeLogin(String login) {
+        return login == null ? null : login.trim().toLowerCase(Locale.ROOT);
     }
 }

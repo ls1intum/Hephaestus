@@ -10,8 +10,7 @@ import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
-import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
-import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserConverter;
+import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserSyncService;
 import jakarta.transaction.Transactional;
 import java.io.IOException;
 import java.time.Instant;
@@ -49,9 +48,6 @@ public class GitHubPullRequestSyncService {
     private MilestoneRepository milestoneRepository;
 
     @Autowired
-    private UserRepository userRepository;
-
-    @Autowired
     private GitHubPullRequestConverter pullRequestConverter;
 
     @Autowired
@@ -61,7 +57,7 @@ public class GitHubPullRequestSyncService {
     private GitHubMilestoneConverter milestoneConverter;
 
     @Autowired
-    private GitHubUserConverter userConverter;
+    private GitHubUserSyncService userSyncService;
 
     @Autowired
     private BadPracticeDetectorScheduler badPracticeDetectorScheduler;
@@ -278,18 +274,14 @@ public class GitHubPullRequestSyncService {
 
         // Link author
         var author = ghPullRequest.getUser();
-        var resultAuthor = userRepository
-            .findById(author.getId())
-            .orElseGet(() -> userRepository.save(userConverter.convert(author)));
+        var resultAuthor = userSyncService.getOrCreateUser(author);
         result.setAuthor(resultAuthor);
 
         // Link assignees
         var assignees = ghPullRequest.getAssignees();
         var resultAssignees = new HashSet<User>();
         assignees.forEach(assignee -> {
-            var resultAssignee = userRepository
-                .findById(assignee.getId())
-                .orElseGet(() -> userRepository.save(userConverter.convert(assignee)));
+            var resultAssignee = userSyncService.getOrCreateUser(assignee);
             resultAssignees.add(resultAssignee);
         });
         result.getAssignees().clear();
@@ -299,9 +291,7 @@ public class GitHubPullRequestSyncService {
         try {
             var mergedByUser = ghPullRequest.getMergedBy();
             if (mergedByUser != null) {
-                var resultMergedBy = userRepository
-                    .findById(ghPullRequest.getMergedBy().getId())
-                    .orElseGet(() -> userRepository.save(userConverter.convert(mergedByUser)));
+                var resultMergedBy = userSyncService.getOrCreateUser(mergedByUser);
                 result.setMergedBy(resultMergedBy);
             } else {
                 result.setMergedBy(null);
@@ -319,9 +309,7 @@ public class GitHubPullRequestSyncService {
             var requestedReviewers = ghPullRequest.getRequestedReviewers();
             var resultRequestedReviewers = new HashSet<User>();
             requestedReviewers.forEach(requestedReviewer -> {
-                var resultRequestedReviewer = userRepository
-                    .findById(requestedReviewer.getId())
-                    .orElseGet(() -> userRepository.save(userConverter.convert(requestedReviewer)));
+                var resultRequestedReviewer = userSyncService.getOrCreateUser(requestedReviewer);
                 resultRequestedReviewers.add(resultRequestedReviewer);
             });
             result.getRequestedReviewers().clear();

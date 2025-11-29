@@ -3,8 +3,7 @@ package de.tum.in.www1.hephaestus.gitprovider.milestone.github;
 import de.tum.in.www1.hephaestus.gitprovider.milestone.Milestone;
 import de.tum.in.www1.hephaestus.gitprovider.milestone.MilestoneRepository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
-import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
-import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserConverter;
+import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserSyncService;
 import jakarta.transaction.Transactional;
 import java.io.IOException;
 import java.util.HashSet;
@@ -24,22 +23,19 @@ public class GitHubMilestoneSyncService {
 
     private final MilestoneRepository milestoneRepository;
     private final RepositoryRepository repositoryRepository;
-    private final UserRepository userRepository;
     private final GitHubMilestoneConverter milestoneConverter;
-    private final GitHubUserConverter userConverter;
+    private final GitHubUserSyncService userSyncService;
 
     public GitHubMilestoneSyncService(
         MilestoneRepository milestoneRepository,
         RepositoryRepository repositoryRepository,
-        UserRepository userRepository,
         GitHubMilestoneConverter milestoneConverter,
-        GitHubUserConverter userConverter
+        GitHubUserSyncService userSyncService
     ) {
         this.milestoneRepository = milestoneRepository;
         this.repositoryRepository = repositoryRepository;
-        this.userRepository = userRepository;
         this.milestoneConverter = milestoneConverter;
-        this.userConverter = userConverter;
+        this.userSyncService = userSyncService;
     }
 
     /**
@@ -70,7 +66,7 @@ public class GitHubMilestoneSyncService {
         try {
             remoteMilestones = repository.listMilestones(GHIssueState.ALL).withPageSize(100).toList();
         } catch (IOException listingError) {
-            logger.error(
+            logger.warn(
                 "Failed to list milestones for repositoryId={}: {}",
                 repository.getId(),
                 listingError.getMessage()
@@ -129,9 +125,7 @@ public class GitHubMilestoneSyncService {
         // Link creator
         var creator = ghMilestone.getCreator();
         if (creator != null) {
-            var resultCreator = userRepository
-                .findById(creator.getId())
-                .orElseGet(() -> userRepository.save(userConverter.convert(creator)));
+            var resultCreator = userSyncService.getOrCreateUser(creator);
             result.setCreator(resultCreator);
         } else {
             result.setCreator(null);

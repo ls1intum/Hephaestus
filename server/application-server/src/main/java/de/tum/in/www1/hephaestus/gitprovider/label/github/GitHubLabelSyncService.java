@@ -60,11 +60,7 @@ public class GitHubLabelSyncService {
         try {
             remoteLabels = repository.listLabels().withPageSize(100).toList();
         } catch (IOException listingError) {
-            logger.error(
-                "Failed to list labels for repositoryId={}: {}",
-                repository.getId(),
-                listingError.getMessage()
-            );
+            logger.warn("Failed to list labels for repositoryId={}: {}", repository.getId(), listingError.getMessage());
             return;
         }
         Set<Long> seenLabelIds = new HashSet<>(remoteLabels.size());

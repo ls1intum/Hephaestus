@@ -3,57 +3,66 @@ package de.tum.in.www1.hephaestus.gitprovider.common.github;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
-import org.kohsuke.github.GHEvent;
 import org.springframework.stereotype.Component;
 
 @Component
 public class GitHubMessageHandlerRegistry {
 
-    private final Map<GHEvent, GitHubMessageHandler<?>> repositoryHandlerMap = new HashMap<>();
-    private final Map<GHEvent, GitHubMessageHandler<?>> organizationHandlerMap = new HashMap<>();
-    private final Map<GHEvent, GitHubMessageHandler<?>> installationHandlerMap = new HashMap<>();
+    private final Map<String, GitHubMessageHandler<?>> repositoryHandlerMap = new HashMap<>();
+    private final Map<String, GitHubMessageHandler<?>> organizationHandlerMap = new HashMap<>();
+    private final Map<String, GitHubMessageHandler<?>> installationHandlerMap = new HashMap<>();
 
     public GitHubMessageHandlerRegistry(GitHubMessageHandler<?>[] handlers) {
         for (GitHubMessageHandler<?> handler : handlers) {
-            // register primary domain
-            switch (handler.getDomain()) {
-                case ORGANIZATION -> organizationHandlerMap.put(handler.getHandlerEvent(), handler);
-                case INSTALLATION -> installationHandlerMap.put(handler.getHandlerEvent(), handler);
-                case REPOSITORY -> repositoryHandlerMap.put(handler.getHandlerEvent(), handler);
-            }
-            // register any additional domains for the same event
-            for (var domain : handler.getAdditionalDomains()) {
-                switch (domain) {
-                    case ORGANIZATION -> organizationHandlerMap.put(handler.getHandlerEvent(), handler);
-                    case INSTALLATION -> installationHandlerMap.put(handler.getHandlerEvent(), handler);
-                    case REPOSITORY -> repositoryHandlerMap.put(handler.getHandlerEvent(), handler);
-                }
-            }
+            String eventKey = normalize(handler.getEventKey());
+            registerHandler(handler.getDomain(), eventKey, handler);
+            handler.getAdditionalDomains().forEach(domain -> registerHandler(domain, eventKey, handler));
         }
     }
 
-    public GitHubMessageHandler<?> getHandler(GHEvent eventType) {
-        var handler = repositoryHandlerMap.get(eventType);
-        if (handler != null) {
-            return handler;
+    private void registerHandler(
+        GitHubMessageHandler.GitHubMessageDomain domain,
+        String eventKey,
+        GitHubMessageHandler<?> handler
+    ) {
+        if (eventKey == null || eventKey.isBlank()) {
+            throw new IllegalStateException(handler.getClass().getSimpleName() + " must declare an event key");
         }
-        handler = organizationHandlerMap.get(eventType);
-        if (handler != null) {
-            return handler;
+        switch (domain) {
+            case ORGANIZATION -> organizationHandlerMap.put(eventKey, handler);
+            case INSTALLATION -> installationHandlerMap.put(eventKey, handler);
+            case REPOSITORY -> repositoryHandlerMap.put(eventKey, handler);
         }
-        return installationHandlerMap.get(eventType);
     }
 
-    public List<GHEvent> getSupportedRepositoryEvents() {
+    public GitHubMessageHandler<?> getHandler(String eventKey) {
+        String normalized = normalize(eventKey);
+        var handler = repositoryHandlerMap.get(normalized);
+        if (handler != null) {
+            return handler;
+        }
+        handler = organizationHandlerMap.get(normalized);
+        if (handler != null) {
+            return handler;
+        }
+        return installationHandlerMap.get(normalized);
+    }
+
+    public List<String> getSupportedRepositoryEvents() {
         return new ArrayList<>(repositoryHandlerMap.keySet());
     }
 
-    public List<GHEvent> getSupportedOrganizationEvents() {
+    public List<String> getSupportedOrganizationEvents() {
         return new ArrayList<>(organizationHandlerMap.keySet());
     }
 
-    public List<GHEvent> getSupportedInstallationEvents() {
+    public List<String> getSupportedInstallationEvents() {
         return new ArrayList<>(installationHandlerMap.keySet());
+    }
+
+    private String normalize(String eventKey) {
+        return eventKey == null ? null : eventKey.trim().toLowerCase(Locale.ENGLISH);
     }
 }

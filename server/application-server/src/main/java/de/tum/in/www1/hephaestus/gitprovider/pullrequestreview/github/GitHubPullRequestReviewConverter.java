@@ -19,7 +19,7 @@ public class GitHubPullRequestReviewConverter implements Converter<GHPullRequest
 
     public PullRequestReview update(@NonNull GHPullRequestReview source, @NonNull PullRequestReview review) {
         review.setId(source.getId());
-        review.setBody(source.getBody());
+        review.setBody(sanitizeForPostgres(source.getBody()));
 
         if (review.getState() == null || source.getState() != GHPullRequestReviewState.DISMISSED) {
             review.setState(convertState(source.getState()));
@@ -35,6 +35,16 @@ public class GitHubPullRequestReviewConverter implements Converter<GHPullRequest
         }
         review.setCommitId(source.getCommitId());
         return review;
+    }
+
+    /**
+     * Sanitizes a string for PostgreSQL storage by removing null bytes (0x00).
+     */
+    private String sanitizeForPostgres(String input) {
+        if (input == null) {
+            return null;
+        }
+        return input.replace("\u0000", "");
     }
 
     private PullRequestReview.State convertState(org.kohsuke.github.GHPullRequestReviewState state) {

@@ -52,6 +52,7 @@ public class Organization extends BaseGitServiceEntity {
      * - organization.id/login ⇒ persisted as githubId/id and login.
      * - organization.avatar_url/html_url ⇒ stored in avatarUrl/htmlUrl when present.
      * - installation.id (installation event) ⇒ stored as installationId for GitHub App installations.
+     * - installation_target.login rename keeps login aligned with Workspace/account data.
      * Ignored although hub4j exposes them from payloads:
      * - organization.description/company/blog/location/email/twitter_username/is_verified.
      * - organization.has_organization_projects/has_repository_projects/public_repos/public_gists/followers/following/type/node_id.

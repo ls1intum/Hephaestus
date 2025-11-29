@@ -249,17 +249,17 @@ erDiagram
         TIMESTAMPTZ created_at
         TIMESTAMPTZ updated_at
         VARCHAR(255) default_branch
-        VARCHAR(255) description
+        TEXT description
         BOOLEAN has_issues "NOT NULL"
         BOOLEAN has_projects "NOT NULL"
         BOOLEAN has_wiki "NOT NULL"
-        VARCHAR(255) homepage
-        VARCHAR(255) html_url
+        VARCHAR(1024) homepage
+        VARCHAR(512) html_url
         BOOLEAN is_archived "NOT NULL"
         BOOLEAN is_disabled "NOT NULL"
         BOOLEAN is_private "NOT NULL"
         VARCHAR(255) name
-        VARCHAR(255) name_with_owner
+        VARCHAR(150) name_with_owner
         TIMESTAMPTZ pushed_at
         INTEGER stargazers_count "NOT NULL"
         VARCHAR(255) visibility
