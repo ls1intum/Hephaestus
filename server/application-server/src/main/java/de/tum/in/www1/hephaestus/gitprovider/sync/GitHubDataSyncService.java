@@ -1,6 +1,7 @@
 package de.tum.in.www1.hephaestus.gitprovider.sync;
 
-import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubClientProvider;
+import de.tum.in.www1.hephaestus.core.exception.EntityNotFoundException;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubClientExecutor;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.issue.IssueRepository;
 import de.tum.in.www1.hephaestus.gitprovider.issue.github.GitHubIssueSyncService;
@@ -14,12 +15,15 @@ import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.github.Git
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.github.GitHubRepositoryCollaboratorSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.repository.github.GitHubRepositorySyncService;
+import de.tum.in.www1.hephaestus.gitprovider.repository.github.RepositorySyncException;
 import de.tum.in.www1.hephaestus.gitprovider.team.github.GitHubTeamSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserSyncService;
+import de.tum.in.www1.hephaestus.monitoring.MonitoringScopeFilter;
 import de.tum.in.www1.hephaestus.workspace.RepositoryToMonitor;
 import de.tum.in.www1.hephaestus.workspace.RepositoryToMonitorRepository;
 import de.tum.in.www1.hephaestus.workspace.Workspace;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceRepository;
+import de.tum.in.www1.hephaestus.workspace.WorkspaceService;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.NoSuchElementException;
@@ -28,14 +32,17 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.kohsuke.github.GHIssue;
 import org.kohsuke.github.GHRepository;
-import org.kohsuke.github.GitHub;
 import org.kohsuke.github.PagedIterator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.scheduling.annotation.Async;
+import org.springframework.context.annotation.Lazy;
+import org.springframework.core.task.AsyncTaskExecutor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @Service
 public class GitHubDataSyncService {
@@ -48,15 +55,15 @@ public class GitHubDataSyncService {
     @Value("${monitoring.sync-cooldown-in-minutes}")
     private int syncCooldownInMinutes;
 
-    //TODO: Field is assigned but never accessed
-    @Value("${monitoring.sync-all-issues-and-pull-requests}")
-    private boolean syncAllIssuesAndPullRequests;
-
     @Autowired
     private WorkspaceRepository workspaceRepository;
 
     @Autowired
     private RepositoryToMonitorRepository repositoryToMonitorRepository;
+
+    @Autowired
+    @Lazy
+    private WorkspaceService workspaceService;
 
     @Autowired
     private GitHubUserSyncService userSyncService;
@@ -65,7 +72,7 @@ public class GitHubDataSyncService {
     private GitHubTeamSyncService teamSyncService;
 
     @Autowired
-    private GitHubClientProvider gitHubClientProvider;
+    private GitHubClientExecutor gitHubClientExecutor;
 
     @Autowired
     private GitHubRepositorySyncService repositorySyncService;
@@ -103,10 +110,24 @@ public class GitHubDataSyncService {
     @Autowired
     private PullRequestRepository pullRequestRepository;
 
+    @Autowired
+    @Qualifier("monitoringExecutor")
+    private AsyncTaskExecutor monitoringExecutor;
+
+    @Autowired
+    private MonitoringScopeFilter monitoringScopeFilter;
+
     /**
      * Syncs all existing users in the database with their GitHub data
      */
     public void syncUsers(Workspace workspace) {
+        // Reload workspace to get fresh state - repository monitors may have been deleted by other threads
+        workspace = workspaceRepository.findById(workspace.getId()).orElse(null);
+        if (workspace == null) {
+            logger.warn("Workspace no longer exists; skipping user sync.");
+            return;
+        }
+
         boolean shouldSyncUsers =
             workspace.getUsersSyncedAt() == null ||
             workspace.getUsersSyncedAt().isBefore(Instant.now().minusSeconds(syncCooldownInMinutes * 60L));
@@ -116,25 +137,76 @@ public class GitHubDataSyncService {
             return;
         }
 
-        logger.info("Syncing all existing users...");
-        GitHub gitHubClient;
-        try {
-            gitHubClient = gitHubClientProvider.forWorkspace(workspace.getId());
-        } catch (IOException e) {
-            logger.error("Failed to initialize GitHub client for workspace {}: {}", workspace.getId(), e.getMessage());
+        if (!monitoringScopeFilter.isWorkspaceAllowed(workspace)) {
+            logger.debug("Skipping user sync for workspace id={} due to monitoring filters.", workspace.getId());
             return;
         }
 
+        logger.info("Syncing all existing users...");
         var currentTime = Instant.now();
-        userSyncService.syncAllExistingUsers(gitHubClient);
-        workspace.setUsersSyncedAt(currentTime);
-        workspaceRepository.save(workspace);
+        Long workspaceId = workspace.getId();
+        try {
+            gitHubClientExecutor.execute(workspaceId, gitHub -> {
+                userSyncService.syncAllExistingUsers(gitHub);
+                return null;
+            });
+        } catch (IOException e) {
+            logger.error("Failed to initialize GitHub client for workspace {}: {}", workspaceId, e.getMessage());
+            return;
+        }
+
+        // Reload again before saving to avoid stale entity references
+        workspaceRepository
+            .findById(workspaceId)
+            .ifPresent(ws -> {
+                ws.setUsersSyncedAt(currentTime);
+                workspaceRepository.save(ws);
+            });
         logger.info("User sync completed.");
     }
 
-    @Async
     public void syncRepositoryToMonitorAsync(RepositoryToMonitor repositoryToMonitor) {
-        syncRepositoryToMonitor(repositoryToMonitor);
+        if (repositoryToMonitor == null || repositoryToMonitor.getId() == null) {
+            logger.warn("Ignoring async sync request for unsaved repository monitor.");
+            return;
+        }
+
+        Workspace workspace = repositoryToMonitor.getWorkspace();
+        if (
+            monitoringScopeFilter.isActive() &&
+            (!monitoringScopeFilter.isRepositoryAllowed(repositoryToMonitor) ||
+                !monitoringScopeFilter.isWorkspaceAllowed(workspace))
+        ) {
+            logger.debug(
+                "Repository {} filtered out; skipping async sync scheduling.",
+                repositoryToMonitor.getNameWithOwner()
+            );
+            return;
+        }
+
+        Long monitorId = repositoryToMonitor.getId();
+        Runnable submitTask = () -> monitoringExecutor.submit(() -> runRepositoryMonitorSync(monitorId));
+
+        if (TransactionSynchronizationManager.isActualTransactionActive()) {
+            TransactionSynchronizationManager.registerSynchronization(
+                new TransactionSynchronization() {
+                    @Override
+                    public void afterCommit() {
+                        submitTask.run();
+                    }
+                }
+            );
+        } else {
+            submitTask.run();
+        }
+    }
+
+    private void runRepositoryMonitorSync(Long monitorId) {
+        repositoryToMonitorRepository
+            .findById(monitorId)
+            .ifPresentOrElse(this::syncRepositoryToMonitor, () ->
+                logger.debug("Repository monitor {} no longer exists; skipping async sync.", monitorId)
+            );
     }
 
     /**
@@ -143,7 +215,15 @@ public class GitHubDataSyncService {
      * @param repositoryToMonitor the repository to sync and syncing status
      */
     public void syncRepositoryToMonitor(RepositoryToMonitor repositoryToMonitor) {
-        logger.info(repositoryToMonitor.getNameWithOwner() + " - Syncing data...");
+        Workspace workspace = repositoryToMonitor.getWorkspace();
+        if (
+            monitoringScopeFilter.isActive() &&
+            (!monitoringScopeFilter.isRepositoryAllowed(repositoryToMonitor) ||
+                !monitoringScopeFilter.isWorkspaceAllowed(workspace))
+        ) {
+            logger.debug("Repository {} filtered out; skipping sync.", repositoryToMonitor.getNameWithOwner());
+            return;
+        }
 
         var cooldownTime = Instant.now().minusSeconds(syncCooldownInMinutes * 60L);
 
@@ -172,78 +252,151 @@ public class GitHubDataSyncService {
 
         // Nothing to sync
         if (!shouldSyncRepository) {
-            logger.info(repositoryToMonitor.getNameWithOwner() + " - No data to sync.");
+            logger.debug(
+                "{} - Skipping sync (cooldown active). Last sync timestamps - repo: {}, labels: {}, milestones: {}, issues: {}",
+                repositoryToMonitor.getNameWithOwner(),
+                repositoryToMonitor.getRepositorySyncedAt(),
+                repositoryToMonitor.getLabelsSyncedAt(),
+                repositoryToMonitor.getMilestonesSyncedAt(),
+                repositoryToMonitor.getIssuesAndPullRequestsSyncedAt()
+            );
             return;
         }
 
-        logger.info(repositoryToMonitor.getNameWithOwner() + " - Syncing repository data...");
+        logger.info("{} - Syncing data...", repositoryToMonitor.getNameWithOwner());
         var ghRepository = syncRepository(repositoryToMonitor).orElse(null);
         if (ghRepository == null) {
+            logger.warn(
+                "{} - Repository data unavailable. Skipping downstream sync steps until access is restored.",
+                repositoryToMonitor.getNameWithOwner()
+            );
             return;
         }
 
         if (shouldSyncLabels) {
-            logger.info(repositoryToMonitor.getNameWithOwner() + " - Syncing labels...");
+            logger.info("{} - Syncing labels...", repositoryToMonitor.getNameWithOwner());
             syncRepositoryLabels(ghRepository, repositoryToMonitor);
         }
         if (shouldSyncMilestones) {
-            logger.info(repositoryToMonitor.getNameWithOwner() + " - Syncing milestones...");
+            logger.info("{} - Syncing milestones...", repositoryToMonitor.getNameWithOwner());
             syncRepositoryMilestones(ghRepository, repositoryToMonitor);
         }
         if (shouldSyncIssuesAndPullRequests) {
-            logger.info(repositoryToMonitor.getNameWithOwner() + " - Syncing recent issues and pull requests...");
+            logger.info("{} - Syncing recent issues and pull requests...", repositoryToMonitor.getNameWithOwner());
             syncRepositoryRecentIssuesAndPullRequests(ghRepository, repositoryToMonitor);
         }
 
         // TODO: Re-enable once it works without exceptions
         //
         // if (shouldSyncAllPastIssuesAndPullRequests(repositoryToMonitor)) {
-        //     logger.info(repositoryToMonitor.getNameWithOwner() + " - Syncing all past issues and pull requests...");
+        //     logger.info("{} - Syncing all past issues and pull requests...", repositoryToMonitor.getNameWithOwner());
         //     syncAllPastIssuesAndPullRequests(ghRepository, repositoryToMonitor);
         // }
-        logger.info(repositoryToMonitor.getNameWithOwner() + " - Data sync completed.");
+        logger.info("{} - Data sync completed.", repositoryToMonitor.getNameWithOwner());
     }
 
     private Optional<GHRepository> syncRepository(RepositoryToMonitor repositoryToMonitor) {
         String nameWithOwner = repositoryToMonitor.getNameWithOwner();
         Long workSpaceId = repositoryToMonitor.getWorkspace().getId();
         var currentTime = Instant.now();
-        var repository = repositorySyncService.syncRepository(workSpaceId, nameWithOwner);
-        repositoryToMonitor.setRepositorySyncedAt(currentTime);
-        repositoryToMonitorRepository.save(repositoryToMonitor);
+        try {
+            var repository = repositorySyncService.syncRepository(workSpaceId, nameWithOwner);
+            if (repository.isPresent()) {
+                repositoryToMonitor.setRepositorySyncedAt(currentTime);
+                repositoryToMonitorRepository.save(repositoryToMonitor);
+                collaboratorSyncService.syncCollaborators(repository.get());
+            }
+            return repository;
+        } catch (RepositorySyncException syncException) {
+            handleRepositorySyncFailure(repositoryToMonitor, syncException);
+            return Optional.empty();
+        }
+    }
 
-        repository.ifPresent(collaboratorSyncService::syncCollaborators);
-        return repository;
+    private void handleRepositorySyncFailure(RepositoryToMonitor monitor, RepositorySyncException exception) {
+        String nameWithOwner = monitor.getNameWithOwner();
+        switch (exception.getReason()) {
+            case NOT_FOUND -> {
+                logger.warn(
+                    "Repository {} was removed upstream; removing monitor for workspace {}.",
+                    nameWithOwner,
+                    monitor.getWorkspace() != null ? monitor.getWorkspace().getId() : "unknown"
+                );
+                removeMonitorFromWorkspace(monitor);
+            }
+            case FORBIDDEN -> logger.warn(
+                "Repository {} is no longer accessible to the GitHub App. Will retry during the next sync window.",
+                nameWithOwner
+            );
+            default -> logger.error(
+                "Unexpected repository sync failure for {}: {}",
+                nameWithOwner,
+                exception.getMessage()
+            );
+        }
+    }
+
+    private void removeMonitorFromWorkspace(RepositoryToMonitor monitor) {
+        var workspace = monitor.getWorkspace();
+        if (workspace == null || workspace.getWorkspaceSlug() == null) {
+            repositoryToMonitorRepository.delete(monitor);
+            return;
+        }
+        try {
+            workspaceService.removeRepositoryToMonitor(workspace.getWorkspaceSlug(), monitor.getNameWithOwner());
+        } catch (EntityNotFoundException ignored) {
+            // Already removed by another thread; nothing else to do.
+        }
     }
 
     public void syncTeams(Workspace workspace) {
-        GitHub gitHubClient;
+        // Reload workspace to get fresh repository monitor list
+        workspace = workspaceRepository.findById(workspace.getId()).orElse(null);
+        if (workspace == null) {
+            logger.warn("Workspace no longer exists; skipping team sync.");
+            return;
+        }
+
+        if (!monitoringScopeFilter.isWorkspaceAllowed(workspace)) {
+            logger.debug("Skipping team sync for workspace id={} due to monitoring filters.", workspace.getId());
+            return;
+        }
+
+        // Collect org names before entering GitHub client context to avoid lazy loading issues
+        var orgNames = workspace
+            .getRepositoriesToMonitor()
+            .stream()
+            .filter(monitoringScopeFilter::isRepositoryAllowed)
+            .map(RepositoryToMonitor::getNameWithOwner)
+            .map(s -> s.split("/")[0])
+            .distinct()
+            .toList();
+
+        if (orgNames.isEmpty()) {
+            logger.info("No organizations to sync teams for.");
+            return;
+        }
+
         try {
-            gitHubClient = gitHubClientProvider.forWorkspace(workspace.getId());
+            gitHubClientExecutor.execute(workspace.getId(), gitHubClient -> {
+                orgNames.forEach(org -> {
+                    try {
+                        logger.info("Syncing teams for organisation {}", org);
+                        teamSyncService.syncAndSaveTeams(gitHubClient, org);
+                    } catch (IOException e) {
+                        logger.error("Team sync for {} failed: {}", org, e.getMessage());
+                    }
+                });
+                logger.info("Team sync completed.");
+                return null;
+            });
         } catch (IOException e) {
             logger.error(
                 "Failed to initialize GitHub client for workspace {} while syncing teams: {}",
                 workspace.getId(),
                 e.getMessage()
             );
-            return;
         }
-        workspace
-            .getRepositoriesToMonitor()
-            .stream()
-            .map(RepositoryToMonitor::getNameWithOwner)
-            .map(s -> s.split("/")[0])
-            .distinct()
-            .forEach(org -> {
-                try {
-                    logger.info("Syncing teams for organisation {}", org);
-                    teamSyncService.syncAndSaveTeams(gitHubClient, org);
-                } catch (IOException e) {
-                    logger.error("Team sync for {} failed: {}", org, e.getMessage());
-                }
-            });
-
-        logger.info("Team sync completed.");
     }
 
     private void syncRepositoryLabels(GHRepository repository, RepositoryToMonitor repositoryToMonitor) {
@@ -281,8 +434,20 @@ public class GitHubDataSyncService {
         }
 
         PagedIterator<GHIssue> issuesIterator = issueSyncService.getIssuesIterator(repository, cutoffDate);
+        Instant syncedUpToTime = Instant.now();
+
         while (issuesIterator.hasNext()) {
-            var syncedUpToTime = syncRepositoryRecentIssuesAndPullRequestsNextPage(repository, issuesIterator);
+            syncedUpToTime = syncRepositoryRecentIssuesAndPullRequestsNextPage(repository, issuesIterator);
+            repositoryToMonitor.setIssuesAndPullRequestsSyncedAt(syncedUpToTime);
+            repositoryToMonitorRepository.save(repositoryToMonitor);
+        }
+
+        // Always update the timestamp, even if no issues were processed.
+        // This ensures cooldown is respected when there are no new issues.
+        if (
+            repositoryToMonitor.getIssuesAndPullRequestsSyncedAt() == null ||
+            repositoryToMonitor.getIssuesAndPullRequestsSyncedAt().isBefore(syncedUpToTime)
+        ) {
             repositoryToMonitor.setIssuesAndPullRequestsSyncedAt(syncedUpToTime);
             repositoryToMonitorRepository.save(repositoryToMonitor);
         }

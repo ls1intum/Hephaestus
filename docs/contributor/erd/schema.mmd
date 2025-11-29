@@ -253,13 +253,13 @@ erDiagram
         BOOLEAN has_issues "NOT NULL"
         BOOLEAN has_projects "NOT NULL"
         BOOLEAN has_wiki "NOT NULL"
-        VARCHAR(255) homepage
-        VARCHAR(255) html_url
+        VARCHAR(1024) homepage
+        VARCHAR(512) html_url
         BOOLEAN is_archived "NOT NULL"
         BOOLEAN is_disabled "NOT NULL"
         BOOLEAN is_private "NOT NULL"
         VARCHAR(255) name
-        VARCHAR(255) name_with_owner
+        VARCHAR(150) name_with_owner
         TIMESTAMPTZ pushed_at
         INTEGER stargazers_count "NOT NULL"
         VARCHAR(255) visibility
@@ -339,13 +339,35 @@ erDiagram
     Workspace {
         BIGINT id PK
         TIMESTAMP users_synced_at
-        VARCHAR(255) account_login
+        VARCHAR(120) account_login
         VARCHAR(255) git_provider_mode
         VARCHAR(255) github_repository_selection
         BIGINT installation_id
         TIMESTAMPTZ installation_linked_at
         BIGINT organization_id FK,UK
         TEXT personal_access_token
+        VARCHAR(10) account_type "NOT NULL"
+        TIMESTAMPTZ created_at "NOT NULL"
+        VARCHAR(120) display_name "NOT NULL"
+        BOOLEAN is_publicly_viewable "NOT NULL"
+        VARCHAR(100) leaderboard_notification_channel_id
+        BOOLEAN leaderboard_notification_enabled
+        VARCHAR(100) leaderboard_notification_team
+        INTEGER leaderboard_schedule_day
+        VARCHAR(10) leaderboard_schedule_time
+        TEXT slack_signing_secret
+        TEXT slack_token
+        VARCHAR(64) slug UK "NOT NULL"
+        VARCHAR(20) status "NOT NULL"
+        TIMESTAMPTZ updated_at
+    }
+
+    WorkspaceMembership {
+        TIMESTAMPTZ created_at "NOT NULL"
+        INTEGER league_points "NOT NULL"
+        VARCHAR(16) role "NOT NULL"
+        BIGINT user_id PK,FK
+        BIGINT workspace_id PK,FK
     }
 
     %% Relationships
@@ -354,6 +376,8 @@ erDiagram
     ChatMessage ||--|| ChatThread : references
     PullRequestReviewComment ||--|| PullRequestReviewThread : reviewed
     Organization ||--|| Workspace : has
+    User ||--|| WorkspaceMembership : belongs_to
+    Workspace ||--|| WorkspaceMembership : belongs_to
 
     %% One-to-Many relationships
     Issue ||--o{ BadPracticeDetection : references

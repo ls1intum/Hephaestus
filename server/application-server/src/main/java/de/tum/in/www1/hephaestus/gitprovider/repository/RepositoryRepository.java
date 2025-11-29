@@ -10,6 +10,8 @@ import org.springframework.data.repository.query.Param;
 public interface RepositoryRepository extends JpaRepository<Repository, Long> {
     Optional<Repository> findByNameWithOwner(String nameWithOwner);
 
+    List<Repository> findByNameWithOwnerStartingWithIgnoreCase(String prefix);
+
     @Query(
         """
         SELECT r

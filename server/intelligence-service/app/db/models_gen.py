@@ -410,6 +410,9 @@ class User(Base):
     repository_collaborator: Mapped[List["RepositoryCollaborator"]] = relationship(
         "RepositoryCollaborator", back_populates="user"
     )
+    workspace_membership: Mapped[List["WorkspaceMembership"]] = relationship(
+        "WorkspaceMembership", back_populates="user"
+    )
     issue: Mapped[List["Issue"]] = relationship(
         "Issue", foreign_keys="[Issue.author_id]", back_populates="author"
     )
@@ -490,10 +493,10 @@ class Repository(Base):
     updated_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime(True))
     default_branch: Mapped[Optional[str]] = mapped_column(String(255))
     description: Mapped[Optional[str]] = mapped_column(String(255))
-    homepage: Mapped[Optional[str]] = mapped_column(String(255))
-    html_url: Mapped[Optional[str]] = mapped_column(String(255))
+    homepage: Mapped[Optional[str]] = mapped_column(String(1024))
+    html_url: Mapped[Optional[str]] = mapped_column(String(512))
     name: Mapped[Optional[str]] = mapped_column(String(255))
-    name_with_owner: Mapped[Optional[str]] = mapped_column(String(255))
+    name_with_owner: Mapped[Optional[str]] = mapped_column(String(150))
     pushed_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime(True))
     visibility: Mapped[Optional[str]] = mapped_column(String(255))
     organization_id: Mapped[Optional[int]] = mapped_column(BigInteger)
@@ -539,6 +542,7 @@ class Workspace(Base):
         ),
         PrimaryKeyConstraint("id", name="workspacePK"),
         UniqueConstraint("organization_id", name="uc_workspaceorganization_id_col"),
+        UniqueConstraint("slug", name="uc_workspaceslug_col"),
     )
     id: Mapped[int] = mapped_column(
         BigInteger,
@@ -552,10 +556,26 @@ class Workspace(Base):
         ),
         primary_key=True,
     )
+    account_type: Mapped[str] = mapped_column(
+        String(10), server_default=text("'USER'::character varying")
+    )
+    created_at: Mapped[datetime.datetime] = mapped_column(
+        TIMESTAMP(True, 6), server_default=text("now()")
+    )
+    display_name: Mapped[str] = mapped_column(
+        String(120), server_default=text("''::character varying")
+    )
+    is_publicly_viewable: Mapped[bool] = mapped_column(
+        Boolean, server_default=text("false")
+    )
+    slug: Mapped[str] = mapped_column(String(64))
+    status: Mapped[str] = mapped_column(
+        String(20), server_default=text("'ACTIVE'::character varying")
+    )
     users_synced_at: Mapped[Optional[datetime.datetime]] = mapped_column(
         TIMESTAMP(precision=6)
     )
-    account_login: Mapped[Optional[str]] = mapped_column(String(255))
+    account_login: Mapped[Optional[str]] = mapped_column(String(120))
     git_provider_mode: Mapped[Optional[str]] = mapped_column(String(255))
     github_repository_selection: Mapped[Optional[str]] = mapped_column(String(255))
     installation_id: Mapped[Optional[int]] = mapped_column(BigInteger)
@@ -564,11 +584,24 @@ class Workspace(Base):
     )
     organization_id: Mapped[Optional[int]] = mapped_column(BigInteger)
     personal_access_token: Mapped[Optional[str]] = mapped_column(Text)
+    leaderboard_notification_channel_id: Mapped[Optional[str]] = mapped_column(
+        String(100)
+    )
+    leaderboard_notification_enabled: Mapped[Optional[bool]] = mapped_column(Boolean)
+    leaderboard_notification_team: Mapped[Optional[str]] = mapped_column(String(100))
+    leaderboard_schedule_day: Mapped[Optional[int]] = mapped_column(Integer)
+    leaderboard_schedule_time: Mapped[Optional[str]] = mapped_column(String(10))
+    slack_signing_secret: Mapped[Optional[str]] = mapped_column(Text)
+    slack_token: Mapped[Optional[str]] = mapped_column(Text)
+    updated_at: Mapped[Optional[datetime.datetime]] = mapped_column(TIMESTAMP(True, 6))
     organization: Mapped[Optional["Organization"]] = relationship(
         "Organization", back_populates="workspace"
     )
     repository_to_monitor: Mapped[List["RepositoryToMonitor"]] = relationship(
         "RepositoryToMonitor", back_populates="workspace"
+    )
+    workspace_membership: Mapped[List["WorkspaceMembership"]] = relationship(
+        "WorkspaceMembership", back_populates="workspace"
     )
 
 
@@ -717,6 +750,28 @@ class TeamRepositoryPermission(Base):
     )
     team: Mapped["Team"] = relationship(
         "Team", back_populates="team_repository_permission"
+    )
+
+
+class WorkspaceMembership(Base):
+    __tablename__ = "workspace_membership"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["user_id"], ["user.id"], name="fk_workspace_membership_user"
+        ),
+        ForeignKeyConstraint(
+            ["workspace_id"], ["workspace.id"], name="fk_workspace_membership_workspace"
+        ),
+        PrimaryKeyConstraint("user_id", "workspace_id", name="workspace_membershipPK"),
+    )
+    created_at: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(True, 6))
+    league_points: Mapped[int] = mapped_column(Integer)
+    role: Mapped[str] = mapped_column(String(16))
+    user_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    workspace_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    user: Mapped["User"] = relationship("User", back_populates="workspace_membership")
+    workspace: Mapped["Workspace"] = relationship(
+        "Workspace", back_populates="workspace_membership"
     )
 
 

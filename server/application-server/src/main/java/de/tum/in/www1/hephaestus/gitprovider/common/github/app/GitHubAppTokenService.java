@@ -70,21 +70,15 @@ public class GitHubAppTokenService {
      * Uses the cached token if it exists and has >60s of validity left; otherwise refreshes.
      */
     public String getInstallationToken(long installationId) {
-        CachedToken cached = installTokenCache.getIfPresent(installationId);
-        if (cached != null && cached.expiresAt.isAfter(Instant.now().plusSeconds(60))) {
-            return cached.token;
-        }
-        CachedToken fresh = installTokenCache.get(installationId, this::fetchTokenWithExpiry);
-        if (fresh == null) {
-            throw new IllegalStateException("Failed to mint installation token for " + installationId);
-        }
-        // If token returned with very little validity remaining, force a proactive refresh.
-        if (fresh.expiresAt.isBefore(Instant.now().plusSeconds(30))) {
-            fresh = fetchTokenWithExpiry(installationId);
-            installTokenCache.put(installationId, fresh);
-        }
+        return getInstallationTokenDetails(installationId).token();
+    }
 
-        return fresh.token;
+    /**
+     * Return a valid installation token along with its expiry so callers can proactively refresh clients.
+     */
+    public InstallationToken getInstallationTokenDetails(long installationId) {
+        CachedToken resolved = resolveToken(installationId);
+        return new InstallationToken(resolved.token, resolved.expiresAt);
     }
 
     /** Hub4J client authenticated as the installation (use this for repo/PR calls). */
@@ -266,6 +260,28 @@ public class GitHubAppTokenService {
     public long getConfiguredAppId() {
         return appId;
     }
+
+    private CachedToken resolveToken(long installationId) {
+        CachedToken cached = installTokenCache.getIfPresent(installationId);
+        if (cached != null && cached.expiresAt.isAfter(Instant.now().plusSeconds(60))) {
+            return cached;
+        }
+
+        CachedToken fresh = installTokenCache.get(installationId, this::fetchTokenWithExpiry);
+        if (fresh == null) {
+            throw new IllegalStateException("Failed to mint installation token for " + installationId);
+        }
+
+        // If token returned with very little validity remaining, force a proactive refresh.
+        if (fresh.expiresAt.isBefore(Instant.now().plusSeconds(30))) {
+            fresh = fetchTokenWithExpiry(installationId);
+            installTokenCache.put(installationId, fresh);
+        }
+
+        return fresh;
+    }
+
+    public record InstallationToken(String token, Instant expiresAt) {}
 
     private record CachedToken(String token, Instant expiresAt) {}
 }
