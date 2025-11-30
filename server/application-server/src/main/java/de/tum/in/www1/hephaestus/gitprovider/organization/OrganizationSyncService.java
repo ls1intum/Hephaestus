@@ -13,6 +13,7 @@ import de.tum.in.www1.hephaestus.workspace.WorkspaceMembership;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceMembershipService;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceRepository;
 import java.io.IOException;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -30,6 +31,7 @@ import org.kohsuke.github.GHOrganization;
 import org.kohsuke.github.GHUser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -47,6 +49,9 @@ public class OrganizationSyncService {
     private final WorkspaceGitHubAccess workspaceGitHubAccess;
     private final WorkspaceMembershipService workspaceMembershipService;
     private final GitHubUserConverter userConverter;
+
+    @Value("${monitoring.sync-cooldown-in-minutes:15}")
+    private int syncCooldownInMinutes;
 
     public OrganizationSyncService(
         OrganizationRepository organizationRepository,
@@ -81,7 +86,29 @@ public class OrganizationSyncService {
 
     @Transactional
     public void syncMembers(Workspace workspace) {
-        workspaceGitHubAccess.resolve(workspace).ifPresent(context -> synchronizeMembers(context));
+        // Check cooldown before syncing
+        boolean shouldSyncMembers =
+            workspace.getMembersSyncedAt() == null ||
+            workspace.getMembersSyncedAt().isBefore(Instant.now().minusSeconds(syncCooldownInMinutes * 60L));
+        if (!shouldSyncMembers) {
+            logger.debug(
+                "Skipping members sync for workspace {} due to cooldown (last synced at {}).",
+                workspace.getWorkspaceSlug(),
+                workspace.getMembersSyncedAt()
+            );
+            return;
+        }
+
+        workspaceGitHubAccess
+            .resolve(workspace)
+            .ifPresent(context -> {
+                synchronizeMembers(context);
+                // Update timestamp after successful sync
+                var currentTime = Instant.now();
+                Workspace ws = context.workspace();
+                ws.setMembersSyncedAt(currentTime);
+                workspaceRepository.save(ws);
+            });
     }
 
     @Transactional

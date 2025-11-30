@@ -1,7 +1,37 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.8.xsd">
+<?xml version="1.1" encoding="UTF-8" standalone="no"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog" xmlns:ext="http://www.liquibase.org/xml/ns/dbchangelog-ext" xmlns:pro="http://www.liquibase.org/xml/ns/pro" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog-ext http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-ext.xsd http://www.liquibase.org/xml/ns/pro http://www.liquibase.org/xml/ns/pro/liquibase-pro-latest.xsd http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
 
-    <changeSet id="1763975675925-1" author="FelixTJDietrich">
+    <!-- Backfill state tracking columns for repository_to_monitor -->
+    <changeSet author="felixdietrich (generated)" id="1764514002516-1">
+        <addColumn tableName="repository_to_monitor">
+            <column name="backfill_checkpoint" type="INTEGER"/>
+        </addColumn>
+    </changeSet>
+    <changeSet author="felixdietrich (generated)" id="1764514002516-2">
+        <addColumn tableName="repository_to_monitor">
+            <column name="backfill_high_water_mark" type="INTEGER"/>
+        </addColumn>
+    </changeSet>
+    <changeSet author="felixdietrich (generated)" id="1764514002516-3">
+        <addColumn tableName="repository_to_monitor">
+            <column name="backfill_last_run_at" type="TIMESTAMP(6) WITH TIME ZONE"/>
+        </addColumn>
+    </changeSet>
+
+    <!-- Sync cooldown tracking columns for workspace -->
+    <changeSet author="felixdietrich (generated)" id="1764514002516-4">
+        <addColumn tableName="workspace">
+            <column name="members_synced_at" type="TIMESTAMP(6) WITH TIME ZONE"/>
+        </addColumn>
+    </changeSet>
+    <changeSet author="felixdietrich (generated)" id="1764514002516-5">
+        <addColumn tableName="workspace">
+            <column name="teams_synced_at" type="TIMESTAMP(6) WITH TIME ZONE"/>
+        </addColumn>
+    </changeSet>
+
+    <!-- Workspace context resolver: Add workspace_id to chat_thread -->
+    <changeSet id="1764514002516-6" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <not>
                 <columnExists tableName="chat_thread" columnName="workspace_id"/>
@@ -45,7 +75,8 @@
         <addNotNullConstraint tableName="chat_thread" columnName="workspace_id"/>
     </changeSet>
 
-    <changeSet id="1763975675925-2" author="FelixTJDietrich">
+    <!-- Workspace context resolver: Add workspace_id to document -->
+    <changeSet id="1764514002516-7" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <not>
                 <columnExists tableName="document" columnName="workspace_id"/>

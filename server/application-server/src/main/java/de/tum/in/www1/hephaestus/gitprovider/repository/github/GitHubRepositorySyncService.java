@@ -1,6 +1,7 @@
 package de.tum.in.www1.hephaestus.gitprovider.repository.github;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubClientExecutor;
+import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationRepository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceService;
@@ -32,6 +33,9 @@ public class GitHubRepositorySyncService {
 
     @Autowired
     private RepositoryRepository repositoryRepository;
+
+    @Autowired
+    private OrganizationRepository organizationRepository;
 
     @Autowired
     private GitHubRepositoryConverter repositoryConverter;
@@ -166,6 +170,11 @@ public class GitHubRepositorySyncService {
             if (repository.getUpdatedAt() == null || repository.getUpdatedAt().isBefore(ghRepository.getUpdatedAt())) {
                 return repositoryConverter.update(ghRepository, repository);
             }
+            // Even if not stale, ensure organization link is set (backward compatibility for
+            // repositories created before organization linking was added)
+            if (repository.getOrganization() == null) {
+                return repositoryConverter.update(ghRepository, repository);
+            }
             return repository;
         } catch (IOException e) {
             logger.error("Failed to update repository {}: {}", ghRepository.getId(), e.getMessage());
@@ -218,6 +227,13 @@ public class GitHubRepositorySyncService {
         repository.setHasIssues(true);
         repository.setHasProjects(false);
         repository.setHasWiki(false);
+
+        // Link to organization if available (extracted from nameWithOwner)
+        if (repository.getOrganization() == null && nameWithOwner != null && nameWithOwner.contains("/")) {
+            String ownerLogin = nameWithOwner.split("/")[0];
+            organizationRepository.findByLoginIgnoreCase(ownerLogin).ifPresent(repository::setOrganization);
+        }
+
         return repositoryRepository.save(repository);
     }
 

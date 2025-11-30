@@ -37,4 +37,18 @@ public interface IssueRepository extends JpaRepository<Issue, Long> {
         """
     )
     Optional<Integer> findLastIssueNumber(long repositoryId);
+
+    /**
+     * Finds the lowest issue number that has been synced (has lastSyncAt set).
+     * Used to determine where backfill should start - just below this number.
+     */
+    @Query(
+        """
+        SELECT MIN(i.number)
+        FROM Issue i
+        WHERE i.repository.id = :repositoryId
+        AND i.lastSyncAt IS NOT NULL
+        """
+    )
+    Optional<Integer> findLowestSyncedIssueNumber(@Param("repositoryId") long repositoryId);
 }

@@ -28,7 +28,6 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.NoSuchElementException;
 import java.util.Optional;
-import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.kohsuke.github.GHIssue;
 import org.kohsuke.github.GHRepository;
@@ -54,6 +53,18 @@ public class GitHubDataSyncService {
 
     @Value("${monitoring.sync-cooldown-in-minutes}")
     private int syncCooldownInMinutes;
+
+    @Value("${monitoring.backfill.enabled:false}")
+    private boolean backfillEnabled;
+
+    @Value("${monitoring.backfill.batch-size:25}")
+    private int backfillBatchSize;
+
+    @Value("${monitoring.backfill.rate-limit-threshold:500}")
+    private int backfillRateLimitThreshold;
+
+    @Value("${monitoring.backfill.cooldown-minutes:5}")
+    private int backfillCooldownMinutes;
 
     @Autowired
     private WorkspaceRepository workspaceRepository;
@@ -245,9 +256,10 @@ public class GitHubDataSyncService {
             shouldSyncRepository = true;
         }
 
-        // Check if there are any unsynced issues or pull requests in the past
-        if (!shouldSyncRepository) {
-            shouldSyncRepository = shouldSyncAllPastIssuesAndPullRequests(repositoryToMonitor);
+        // Also trigger sync if backfill is enabled and may need to run
+        // Note: We pass false here because recent sync hasn't run in this cycle yet
+        if (!shouldSyncRepository && backfillEnabled && !repositoryToMonitor.isBackfillComplete()) {
+            shouldSyncRepository = shouldRunBackfill(repositoryToMonitor, false);
         }
 
         // Nothing to sync
@@ -286,12 +298,14 @@ public class GitHubDataSyncService {
             syncRepositoryRecentIssuesAndPullRequests(ghRepository, repositoryToMonitor);
         }
 
-        // TODO: Re-enable once it works without exceptions
-        //
-        // if (shouldSyncAllPastIssuesAndPullRequests(repositoryToMonitor)) {
-        //     logger.info("{} - Syncing all past issues and pull requests...", repositoryToMonitor.getNameWithOwner());
-        //     syncAllPastIssuesAndPullRequests(ghRepository, repositoryToMonitor);
-        // }
+        // Run backfill only if enabled and conditions are met
+        // - If recent sync just ran in this cycle, pass true (we know data is fresh)
+        // - If recent sync didn't run but has run before, pass false (requires timestamp validation)
+        if (backfillEnabled && shouldRunBackfill(repositoryToMonitor, shouldSyncIssuesAndPullRequests)) {
+            logger.info("{} - Running backfill batch...", repositoryToMonitor.getNameWithOwner());
+            runBackfillBatch(ghRepository, repositoryToMonitor);
+        }
+
         logger.info("{} - Data sync completed.", repositoryToMonitor.getNameWithOwner());
     }
 
@@ -362,6 +376,19 @@ public class GitHubDataSyncService {
             return;
         }
 
+        // Check cooldown before syncing
+        boolean shouldSyncTeams =
+            workspace.getTeamsSyncedAt() == null ||
+            workspace.getTeamsSyncedAt().isBefore(Instant.now().minusSeconds(syncCooldownInMinutes * 60L));
+        if (!shouldSyncTeams) {
+            logger.debug(
+                "Skipping team sync for workspace {} due to cooldown (last synced at {}).",
+                workspace.getWorkspaceSlug(),
+                workspace.getTeamsSyncedAt()
+            );
+            return;
+        }
+
         // Collect org names before entering GitHub client context to avoid lazy loading issues
         var orgNames = workspace
             .getRepositoriesToMonitor()
@@ -377,6 +404,7 @@ public class GitHubDataSyncService {
             return;
         }
 
+        final Workspace ws = workspace;
         try {
             gitHubClientExecutor.execute(workspace.getId(), gitHubClient -> {
                 orgNames.forEach(org -> {
@@ -387,6 +415,10 @@ public class GitHubDataSyncService {
                         logger.error("Team sync for {} failed: {}", org, e.getMessage());
                     }
                 });
+                // Update timestamp after successful sync
+                var currentTime = Instant.now();
+                ws.setTeamsSyncedAt(currentTime);
+                workspaceRepository.save(ws);
                 logger.info("Team sync completed.");
                 return null;
             });
@@ -455,9 +487,8 @@ public class GitHubDataSyncService {
             repositoryToMonitor.setIssuesAndPullRequestsSyncedAt(syncedUpToTime);
             repositoryToMonitorRepository.save(repositoryToMonitor);
         }
-
-        // Fallback: ensure we don't miss freshly created pull requests when the issues iterator returns empty
-        fallbackPullRequestSync(repository, repositoryToMonitor);
+        // Note: Removed fallbackPullRequestSync() - it was fetching ALL PRs which destroys rate limits.
+        // Historical data is now handled by the backfill system when sync-all-issues-and-pull-requests=true.
     }
 
     /**
@@ -478,7 +509,11 @@ public class GitHubDataSyncService {
         }
         var issues = ghIssues.stream().map(issueSyncService::processIssue).toList();
         issueCommentSyncService.syncIssueCommentsOfAllIssues(ghIssues);
-        issues.forEach(issue -> issue.setLastSyncAt(currentTime));
+        // Mark issues as synced and persist
+        issues.forEach(issue -> {
+            issue.setLastSyncAt(currentTime);
+            issueRepository.save(issue);
+        });
 
         var pullRequestNumbers = issues.stream().filter(Issue::isHasPullRequest).map(Issue::getNumber).toList();
 
@@ -486,7 +521,11 @@ public class GitHubDataSyncService {
         var pullRequests = ghPullRequests.stream().map(pullRequestSyncService::processPullRequest).toList();
         pullRequestReviewSyncService.syncReviewsOfAllPullRequests(ghPullRequests);
         pullRequestReviewCommentSyncService.syncReviewCommentsOfAllPullRequests(ghPullRequests);
-        pullRequests.forEach(pullRequest -> pullRequest.setLastSyncAt(currentTime));
+        // Mark pull requests as synced and persist
+        pullRequests.forEach(pullRequest -> {
+            pullRequest.setLastSyncAt(currentTime);
+            pullRequestRepository.save(pullRequest);
+        });
 
         try {
             return issues.getLast().getUpdatedAt();
@@ -495,122 +534,234 @@ public class GitHubDataSyncService {
         }
     }
 
-    private void fallbackPullRequestSync(GHRepository repository, RepositoryToMonitor monitor) {
-        try {
-            var ghPullRequests = repository.getPullRequests(org.kohsuke.github.GHIssueState.ALL);
-            if (ghPullRequests == null || ghPullRequests.isEmpty()) {
-                return;
-            }
-            ghPullRequests.forEach(pullRequestSyncService::processPullRequest);
-            pullRequestReviewSyncService.syncReviewsOfAllPullRequests(ghPullRequests);
-            pullRequestReviewCommentSyncService.syncReviewCommentsOfAllPullRequests(ghPullRequests);
-            monitor.setIssuesAndPullRequestsSyncedAt(Instant.now());
-            repositoryToMonitorRepository.save(monitor);
-        } catch (IOException e) {
-            logger.warn("Fallback PR sync failed for {}: {}", repository.getFullName(), e.getMessage());
-        }
-    }
+    // ═══════════════════════════════════════════════════════════════════════════
+    // BACKFILL SYSTEM
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Strategic historical data synchronization that respects rate limits.
+    //
+    // Design principles:
+    // 1. PRIORITY: Recent data first, backfill only after recent sync completes
+    // 2. BATCHING: Process in small batches to avoid rate limit exhaustion
+    // 3. CHECKPOINT: Track progress to resume after interruptions
+    // 4. RATE-AWARE: Stop backfill when rate limit is low
+    // 5. COOLDOWN: Wait between batches to spread load over time
+    // ═══════════════════════════════════════════════════════════════════════════
 
     /**
-     * Checks if there are any issues or pull requests that have not been synced
+     * Determines if a backfill batch should run for this repository.
+     * Prerequisites:
+     * - Recent sync must be fully complete (not just started)
+     * - Backfill must not be complete yet
+     * - Cooldown since last backfill must have elapsed
      *
-     * @param repositoryToMonitor
-     * @return true if there are any issues or pull requests that have not been synced
+     * @param monitor the repository monitor
+     * @param recentSyncJustCompleted true if this is called right after a recent sync finished in this cycle
      */
-    private boolean shouldSyncAllPastIssuesAndPullRequests(RepositoryToMonitor repositoryToMonitor) {
-        var repository = repositoryRepository.findByNameWithOwner(repositoryToMonitor.getNameWithOwner());
-        if (repository.isEmpty()) {
+    private boolean shouldRunBackfill(RepositoryToMonitor monitor, boolean recentSyncJustCompleted) {
+        // Recent sync must have run at least once
+        if (monitor.getIssuesAndPullRequestsSyncedAt() == null) {
             return false;
         }
 
-        var repositoryId = repository.get().getId();
-        int lastIssueNumber = issueRepository.findLastIssueNumber(repositoryId).orElse(0);
-        if (lastIssueNumber == 0) {
+        // If recent sync just completed in this cycle, we can proceed with backfill
+        // Otherwise, we need to ensure the recent sync timestamp is recent enough
+        // (within the cooldown window) to know it's not from a stale/interrupted sync
+        if (!recentSyncJustCompleted) {
+            var cooldownTime = Instant.now().minusSeconds(syncCooldownInMinutes * 60L);
+            if (monitor.getIssuesAndPullRequestsSyncedAt().isBefore(cooldownTime)) {
+                // Recent sync hasn't run recently, don't start backfill
+                // This prevents backfill from running on stale data
+                return false;
+            }
+        }
+
+        // Already complete
+        if (monitor.isBackfillComplete()) {
             return false;
         }
 
-        var syncedIssues = issueRepository.findAllSyncedIssueNumbers(repositoryId);
-        var unsyncedIssues = IntStream.iterate(lastIssueNumber, i -> i > 0, i -> i - 1)
-            .filter(i -> !syncedIssues.contains(i))
-            .boxed()
-            .collect(Collectors.toSet());
-
-        if (unsyncedIssues.isEmpty()) {
-            var pullRequestNumbers = issueRepository.findAllIssueNumbersWithPullRequest(repositoryId);
-            var syncedPullRequests = pullRequestRepository.findAllSyncedPullRequestNumbers(repositoryId);
-            var unsyncedPullRequests = pullRequestNumbers
-                .stream()
-                .filter(i -> !syncedPullRequests.contains(i))
-                .collect(Collectors.toSet());
-
-            return !unsyncedPullRequests.isEmpty();
+        // Respect cooldown between batches
+        if (monitor.getBackfillLastRunAt() != null) {
+            var cooldownEnd = monitor.getBackfillLastRunAt().plusSeconds(backfillCooldownMinutes * 60L);
+            if (Instant.now().isBefore(cooldownEnd)) {
+                return false;
+            }
         }
 
         return true;
     }
 
     /**
-     * Syncs all past issues and pull requests of the repository that have not been synced yet.
-     * This method will process all issues and pull requests that have not yet been synced and
-     * ensures they are synchronized with the repository.
+     * Runs a single backfill batch for the repository.
+     * Works backwards from the lowest synced issue number, syncing items that don't have lastSyncAt set.
      *
-     * @param repository the GitHub repository to sync
+     * The backfill starts from the lowest issue number that was synced during recent sync
+     * and works backwards to issue #1. This ensures we fill in gaps from before the timeframe
+     * without re-syncing recent items.
      */
-    //TODO: Method never used
-    private void syncAllPastIssuesAndPullRequests(GHRepository repository) {
-        int lastIssueNumber = issueRepository.findLastIssueNumber(repository.getId()).orElse(0);
-        if (lastIssueNumber == 0) {
+    private void runBackfillBatch(GHRepository ghRepository, RepositoryToMonitor monitor) {
+        var repository = repositoryRepository.findByNameWithOwner(monitor.getNameWithOwner());
+        if (repository.isEmpty()) {
+            logger.warn("{} - Repository not found in database, skipping backfill", monitor.getNameWithOwner());
+            return;
+        }
+        var repositoryId = repository.get().getId();
+
+        // Initialize high water mark if not set
+        // Use the LOWEST synced issue number as the starting point for backfill
+        // This way we don't re-sync issues that recent sync already covered
+        if (!monitor.isBackfillInitialized()) {
+            var lowestSyncedNumber = issueRepository.findLowestSyncedIssueNumber(repositoryId);
+            if (lowestSyncedNumber.isEmpty()) {
+                // No synced issues yet - this shouldn't happen if recent sync completed
+                logger.warn("{} - No synced issues found, cannot initialize backfill", monitor.getNameWithOwner());
+                return;
+            }
+            int startingPoint = lowestSyncedNumber.get() - 1; // Start just below what recent sync covered
+            if (startingPoint <= 0) {
+                // Recent sync already covered issue #1, nothing to backfill
+                monitor.setBackfillHighWaterMark(0);
+                monitor.setBackfillCheckpoint(0);
+                repositoryToMonitorRepository.save(monitor);
+                logger.info(
+                    "{} - Recent sync already covered all issues, nothing to backfill",
+                    monitor.getNameWithOwner()
+                );
+                return;
+            }
+            monitor.setBackfillHighWaterMark(startingPoint);
+            monitor.setBackfillCheckpoint(startingPoint);
+            repositoryToMonitorRepository.save(monitor);
+            logger.info(
+                "{} - Initialized backfill: starting from issue #{} down to #1",
+                monitor.getNameWithOwner(),
+                startingPoint
+            );
+        }
+
+        // Check rate limit before starting
+        if (!hasEnoughRateLimitForBackfill(monitor.getWorkspace().getId())) {
+            logger.debug("{} - Skipping backfill batch: rate limit below threshold", monitor.getNameWithOwner());
             return;
         }
 
-        var syncedIssues = issueRepository.findAllSyncedIssueNumbers(repository.getId());
-        var unsyncedIssues = IntStream.iterate(lastIssueNumber, i -> i > 0, i -> i - 1)
-            .filter(issueNumber -> !syncedIssues.contains(issueNumber))
+        // Find unsynced issues in the batch range
+        // Work backwards: from checkpoint down to (checkpoint - batchSize + 1), minimum 1
+        var syncedIssues = issueRepository.findAllSyncedIssueNumbers(repositoryId);
+        int currentCheckpoint = monitor.getBackfillCheckpoint();
+        int batchEnd = Math.max(1, currentCheckpoint - backfillBatchSize + 1);
+
+        var unsyncedInBatch = IntStream.iterate(currentCheckpoint, i -> i >= batchEnd, i -> i - 1)
+            .filter(i -> !syncedIssues.contains(i))
             .boxed()
             .toList();
 
-        logger.info("Syncing {} past issues and associated pull requests if necessary...", unsyncedIssues.size());
-        unsyncedIssues.forEach(issueNumber -> {
-            var isPullRequest = syncPastIssue(repository, issueNumber);
-            if (!isPullRequest) {
-                return;
-            }
-            var pullRequest = pullRequestRepository.findByRepositoryIdAndNumber(repository.getId(), issueNumber);
-            if (pullRequest.isEmpty() || pullRequest.get().getLastSyncAt() == null) {
-                syncPastPullRequest(repository, issueNumber);
-            }
-        });
-        logger.info("Past issues sync completed.");
+        logger.debug(
+            "{} - Backfill batch: checking issues {} to {}, {} unsynced",
+            monitor.getNameWithOwner(),
+            currentCheckpoint,
+            batchEnd,
+            unsyncedInBatch.size()
+        );
 
-        // Sync remaining pull requests in case they were not synced with the issues
-        var pullRequestNumbers = issueRepository.findAllIssueNumbersWithPullRequest(repository.getId());
-        var syncedPullRequests = pullRequestRepository.findAllSyncedPullRequestNumbers(repository.getId());
-        var unsyncedPullRequests = pullRequestNumbers
-            .stream()
-            .filter(pullRequestNumber -> !syncedPullRequests.contains(pullRequestNumber))
-            .sorted((a, b) -> b - a)
-            .toList();
+        int synced = 0;
+        for (Integer issueNumber : unsyncedInBatch) {
+            try {
+                boolean wasSynced = syncSingleIssueWithPullRequest(ghRepository, repositoryId, issueNumber);
+                if (wasSynced) {
+                    synced++;
+                }
+            } catch (Exception e) {
+                logger.warn(
+                    "{} - Failed to sync issue #{}: {}",
+                    monitor.getNameWithOwner(),
+                    issueNumber,
+                    e.getMessage()
+                );
+                // Continue with next issue instead of failing the whole batch
+            }
+        }
 
-        logger.info("Syncing {} past pull requests...", unsyncedPullRequests.size());
-        unsyncedPullRequests.forEach(pullRequestNumber -> syncPastPullRequest(repository, pullRequestNumber));
-        logger.info("Past pull requests sync completed.");
+        // Update checkpoint to one below the batch we just processed
+        int newCheckpoint = batchEnd - 1;
+        monitor.setBackfillCheckpoint(newCheckpoint);
+        monitor.setBackfillLastRunAt(Instant.now());
+        repositoryToMonitorRepository.save(monitor);
+
+        int remaining = monitor.getBackfillRemaining();
+        logger.info(
+            "{} - Backfill batch complete: synced {}/{} items, checkpoint now {}, {} remaining",
+            monitor.getNameWithOwner(),
+            synced,
+            unsyncedInBatch.size(),
+            newCheckpoint,
+            remaining
+        );
+
+        if (remaining == 0) {
+            logger.info("{} - Backfill complete!", monitor.getNameWithOwner());
+        }
     }
 
-    private boolean syncPastIssue(GHRepository repository, Integer issueNumber) {
-        var issue = issueSyncService.syncIssue(repository, issueNumber);
-        if (issue.isEmpty()) {
+    /**
+     * Syncs a single issue and its associated pull request if applicable.
+     * @return true if the issue was synced (existed), false if it was skipped (deleted/not found)
+     */
+    private boolean syncSingleIssueWithPullRequest(GHRepository ghRepository, long repositoryId, int issueNumber) {
+        var currentTime = Instant.now();
+
+        // Sync the issue
+        var ghIssue = issueSyncService.syncIssue(ghRepository, issueNumber);
+        if (ghIssue.isEmpty()) {
+            // Issue doesn't exist (deleted, never created, etc.) - not an error
+            logger.debug("Issue #{} not found on GitHub, skipping", issueNumber);
             return false;
         }
-        issueCommentSyncService.syncIssueCommentsOfIssue(issue.get());
-        return issue.get().isPullRequest();
+
+        var issue = issueSyncService.processIssue(ghIssue.get());
+        issueCommentSyncService.syncIssueCommentsOfIssue(ghIssue.get());
+        issue.setLastSyncAt(currentTime);
+        issueRepository.save(issue);
+
+        // If it's a PR, sync PR-specific data
+        if (issue.isHasPullRequest()) {
+            var existingPr = pullRequestRepository.findByRepositoryIdAndNumber(repositoryId, issueNumber);
+            if (existingPr.isEmpty() || existingPr.get().getLastSyncAt() == null) {
+                var ghPullRequest = pullRequestSyncService.syncPullRequest(ghRepository, issueNumber, true);
+                if (ghPullRequest.isPresent()) {
+                    var pullRequest = pullRequestSyncService.processPullRequest(ghPullRequest.get());
+                    pullRequestReviewSyncService.syncReviewsOfPullRequest(ghPullRequest.get());
+                    pullRequestReviewCommentSyncService.syncReviewCommentsOfPullRequest(ghPullRequest.get());
+                    pullRequest.setLastSyncAt(currentTime);
+                    pullRequestRepository.save(pullRequest);
+                }
+            }
+        }
+        return true;
     }
 
-    private void syncPastPullRequest(GHRepository repository, Integer pullRequestNumber) {
-        var pullRequest = pullRequestSyncService.syncPullRequest(repository, pullRequestNumber, true);
-        if (pullRequest.isEmpty()) {
-            return;
+    /**
+     * Checks if there's enough rate limit remaining to run a backfill batch.
+     * This prevents backfill from consuming rate limit needed for real-time operations.
+     */
+    private boolean hasEnoughRateLimitForBackfill(Long workspaceId) {
+        try {
+            return gitHubClientExecutor.execute(workspaceId, github -> {
+                var rateLimit = github.getRateLimit();
+                int remaining = rateLimit.getCore().getRemaining();
+                boolean hasEnough = remaining >= backfillRateLimitThreshold;
+                if (!hasEnough) {
+                    logger.debug(
+                        "Rate limit too low for backfill: {} remaining, {} threshold",
+                        remaining,
+                        backfillRateLimitThreshold
+                    );
+                }
+                return hasEnough;
+            });
+        } catch (IOException e) {
+            logger.warn("Failed to check rate limit: {}", e.getMessage());
+            return false; // Be conservative - don't run backfill if we can't check
         }
-        pullRequestReviewSyncService.syncReviewsOfPullRequest(pullRequest.get());
-        pullRequestReviewCommentSyncService.syncReviewCommentsOfPullRequest(pullRequest.get());
     }
 }
