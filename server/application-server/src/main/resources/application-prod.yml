@@ -83,7 +83,6 @@ nats:
 
 monitoring:
     run-on-startup: ${MONITORING_RUN_ON_STARTUP:true}
-    # Fetching timeframe in days
     timeframe: ${MONITORING_TIMEFRAME:7}
     sync-cron: ${MONITORING_SYNC_CRON:0 0 * * * *}
     sync-cooldown-in-minutes: ${MONITORING_SYNC_COOLDOWN_IN_MINUTES:60}
@@ -92,7 +91,7 @@ monitoring:
         enabled: ${MONITORING_BACKFILL_ENABLED:true}
         batch-size: ${MONITORING_BACKFILL_BATCH_SIZE:50}
         rate-limit-threshold: ${MONITORING_BACKFILL_RATE_LIMIT_THRESHOLD:500}
-        cooldown-minutes: ${MONITORING_BACKFILL_COOLDOWN_MINUTES:10}
+        cooldown-minutes: ${MONITORING_BACKFILL_COOLDOWN_MINUTES:5}
 
 github:
     app:

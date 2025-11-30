@@ -13,7 +13,9 @@ import java.io.UncheckedIOException;
 import java.time.Duration;
 import java.time.Instant;
 import org.kohsuke.github.GitHub;
+import org.kohsuke.github.GitHubAbuseLimitHandler;
 import org.kohsuke.github.GitHubBuilder;
+import org.kohsuke.github.GitHubRateLimitHandler;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -101,7 +103,7 @@ public class GitHubClientProvider {
                 if (refreshAt.isBefore(Instant.now())) {
                     refreshAt = Instant.now();
                 }
-                GitHub client = new GitHubBuilder().withOAuthToken(token.token()).build();
+                GitHub client = createGitHubClient(token.token());
                 return new GitHubClientHolder(client, refreshAt);
             }
 
@@ -112,7 +114,7 @@ public class GitHubClientProvider {
                 );
             }
 
-            GitHub client = new GitHubBuilder().withOAuthToken(token).build();
+            GitHub client = createGitHubClient(token);
             return new GitHubClientHolder(client, null);
         } catch (IOException e) {
             throw new UncheckedIOException(e);
@@ -123,5 +125,17 @@ public class GitHubClientProvider {
         boolean needsRefresh() {
             return refreshAt != null && Instant.now().isAfter(refreshAt);
         }
+    }
+
+    /**
+     * Creates a GitHub client with automatic rate limit error handling.
+     * Uses WAIT handlers to automatically retry when rate limits are hit.
+     */
+    private GitHub createGitHubClient(String token) throws IOException {
+        return new GitHubBuilder()
+            .withOAuthToken(token)
+            .withRateLimitHandler(GitHubRateLimitHandler.WAIT)
+            .withAbuseLimitHandler(GitHubAbuseLimitHandler.WAIT)
+            .build();
     }
 }
