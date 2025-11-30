@@ -37,7 +37,8 @@ public class MailService {
     public void sendBadPracticesDetectedInPullRequestEmail(
         User user,
         PullRequest pullRequest,
-        List<PullRequestBadPractice> badPractices
+        List<PullRequestBadPractice> badPractices,
+        List<PullRequestBadPractice> goodPractices
     ) {
         logger.info("Sending bad practice detected email to user: {}", user.getLogin());
         String email;
@@ -66,7 +67,9 @@ public class MailService {
             .fillPlaceholder(user, "user")
             .fillPlaceholder(pullRequest, "pullRequest")
             .fillPlaceholder(badPractices, "badPractices")
+            .fillPlaceholder(goodPractices, "goodPractices")
             .fillPlaceholder(getBadPracticeString(badPractices), "badPracticeString")
+            .fillPlaceholder(getGoodPracticeString(goodPractices), "goodPracticeString")
             .fillPlaceholder(pullRequest.getRepository().getName(), "repository")
             .send(javaMailSender);
     }
@@ -78,6 +81,16 @@ public class MailService {
             return badPractices.size() + " bad practices";
         } else {
             return "no bad practices";
+        }
+    }
+
+    private String getGoodPracticeString(List<PullRequestBadPractice> badPractices) {
+        if (badPractices.size() == 1) {
+            return "1 good practice";
+        } else if (badPractices.size() > 1) {
+            return badPractices.size() + " good practices";
+        } else {
+            return "no good practices";
         }
     }
 }
