@@ -5,6 +5,10 @@ import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+/**
+ * Repository for {@link RepositoryToMonitor} entities.
+ * Tracks which GitHub repositories are monitored by each workspace.
+ */
 @Repository
 public interface RepositoryToMonitorRepository extends JpaRepository<RepositoryToMonitor, Long> {
     boolean existsByWorkspaceIdAndNameWithOwner(Long workspaceId, String nameWithOwner);

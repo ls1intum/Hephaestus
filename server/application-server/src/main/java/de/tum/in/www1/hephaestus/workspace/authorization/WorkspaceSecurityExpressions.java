@@ -12,6 +12,11 @@ public class WorkspaceSecurityExpressions {
 
     private final WorkspaceAccessService accessService;
 
+    /**
+     * Constructor injection for access service.
+     *
+     * @param accessService the workspace access service
+     */
     public WorkspaceSecurityExpressions(WorkspaceAccessService accessService) {
         this.accessService = accessService;
     }

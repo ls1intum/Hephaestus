@@ -13,10 +13,14 @@ servers:
 - description: Default Server URL
   url: /
 tags:
+- description: Workspace statistics and contributor information
+  name: Workspace Metadata
 - description: |-
     REST controller for the chat functionality.
      Handles streaming chat responses, message persistence, and thread management.
   name: chat-controller
+- description: Global contributor information
+  name: Contributors
 - description: Document management with versioning support
   name: Documents
 - description: |-
@@ -24,6 +28,8 @@ tags:
      These routes stay under the classic /workspaces base path while slugged routes
      live in {@link WorkspaceController WorkspaceController} via <code>@WorkspaceScopedController</code>.
   name: workspace-registry-controller
+- description: Team management within workspace
+  name: Teams
 - description: Vote on chat messages (upvote/downvote)
   name: Chat Message Voting
 - description: |-
@@ -31,12 +37,19 @@ tags:
      Returns user profile data filtered by workspace (open PRs, review activity, etc.)
   name: workspace-user-profile-controller
 - description: |-
+    Controller for activity-related operations within a workspace context.
+     All endpoints require workspace membership via {@link WorkspaceScopedController WorkspaceScopedController}.
+  name: activity-controller
+- description: |-
     Controller for managing workspace memberships and roles.
      Handles CRUD operations for workspace members and role assignments.
   name: workspace-membership-controller
+- description: Contributor rankings and league statistics
+  name: Leaderboard
 paths:
   /contributors:
     get:
+      description: Returns all contributors across all workspaces
       operationId: listGlobalContributors
       responses:
         "200":
@@ -46,9 +59,10 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/Contributor"
-          description: OK
+          description: list of all contributors with their global contribution metrics
+      summary: List global contributors
       tags:
-      - contributor
+      - C
   /user:
     delete:
       operationId: deleteUser
@@ -644,6 +658,7 @@ paths:
       tags: []
   /workspaces/{workspaceSlug}/leaderboard:
     get:
+      description: Creates a ranked contributor list for the specified time range
       operationId: getLeaderboard
       parameters:
       - description: Workspace slug
@@ -653,13 +668,15 @@ paths:
         schema:
           type: string
           pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      - in: query
+      - description: start of the time range (inclusive)
+        in: query
         name: after
         required: true
         schema:
           type: string
           format: date-time
-      - in: query
+      - description: end of the time range (inclusive)
+        in: query
         name: before
         required: true
         schema:
@@ -682,7 +699,8 @@ paths:
           enum:
           - SCORE
           - LEAGUE_POINTS
-      - in: query
+      - description: aggregation mode (INDIVIDUAL or TEAM)
+        in: query
         name: mode
         required: true
         schema:
@@ -698,10 +716,11 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/LeaderboardEntry"
-          description: OK
-      tags:
-      - leaderboard
+          description: ranked list of leaderboard entries
+      summary: Generate leaderboard
+      tags: []
     post:
+      description: Calculates league changes for a specific user
       operationId: getUserLeagueStats
       parameters:
       - description: Workspace slug
@@ -711,7 +730,8 @@ paths:
         schema:
           type: string
           pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      - in: query
+      - description: the user's GitHub login
+        in: query
         name: login
         required: true
         schema:
@@ -721,6 +741,7 @@ paths:
           application/json:
             schema:
               $ref: "#/components/schemas/LeaderboardEntry"
+        description: the user's current leaderboard entry for comparison
         required: true
       responses:
         "200":
@@ -728,9 +749,9 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/LeagueChange"
-          description: OK
-      tags:
-      - leaderboard
+          description: league change statistics including promotion/demotion info
+      summary: Get user league stats
+      tags: []
   /workspaces/{workspaceSlug}/league/reset:
     put:
       operationId: resetAndRecalculateLeagues
@@ -816,7 +837,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: "#/components/schemas/WorkspaceMembership"
           description: Updated membership
       summary: Assign or update a role for a workspace member.
       tags:
@@ -839,7 +860,7 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/WorkspaceMembership"
-          description: OK
+          description: the current user's membership details
       summary: Get the current user's membership in this workspace.
       tags:
       - workspace-membership
@@ -867,10 +888,6 @@ paths:
           format: int64
       responses:
         "200":
-          content:
-            application/json:
-              schema:
-                type: object
           description: 204 No Content on success
       summary: Revoke a user's membership (remove them from workspace).
       tags:
@@ -900,7 +917,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: "#/components/schemas/WorkspaceMembership"
           description: Workspace membership details
       summary: Get a specific member's details.
       tags:
@@ -1013,6 +1030,7 @@ paths:
       - chat
   /workspaces/{workspaceSlug}/meta:
     get:
+      description: Returns aggregated statistics for the workspace
       operationId: getWorkspaceMeta
       parameters:
       - description: Workspace slug
@@ -1028,11 +1046,13 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/MetaData"
-          description: OK
+          description: workspace metadata including statistics
+      summary: Get workspace metadata
       tags:
-      - workspace-meta
+      - Workspa
   /workspaces/{workspaceSlug}/meta/contributors:
     get:
+      description: Returns all users who have contributed to the workspace
       operationId: listWorkspaceContributors
       parameters:
       - description: Workspace slug
@@ -1050,9 +1070,10 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/Contributor"
-          description: OK
+          description: list of contributors with their contribution metrics
+      summary: List workspace contributors
       tags:
-      - workspace-meta
+      - Workspa
   /workspaces/{workspaceSlug}/notifications:
     patch:
       operationId: updateNotifications
@@ -1266,6 +1287,7 @@ paths:
       - workspace
   /workspaces/{workspaceSlug}/team:
     get:
+      description: Returns all teams in the workspace organization
       operationId: getAllTeams
       parameters:
       - description: Workspace slug
@@ -1283,11 +1305,12 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/TeamInfo"
-          description: OK
-      tags:
-      - team
+          description: list of teams with their members and permissions
+      summary: List teams
+      tags: []
   /workspaces/{workspaceSlug}/team/{id}/visibility:
     post:
+      description: Show or hide a team in leaderboard calculations
       operationId: updateTeamVisibility
       parameters:
       - description: Workspace slug
@@ -1297,13 +1320,15 @@ paths:
         schema:
           type: string
           pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      - in: path
+      - description: the team ID
+        in: path
         name: id
         required: true
         schema:
           type: integer
           format: int64
-      - in: query
+      - description: "whether to hide the team (query parameter, fallback)"
+        in: query
         name: hidden
         required: false
         schema:
@@ -1313,11 +1338,12 @@ paths:
           application/json:
             schema:
               type: boolean
+        description: "whether to hide the team (body parameter, preferred)"
       responses:
         "200":
-          description: OK
-      tags:
-      - team
+          description: "200 OK on success, 404 if team not found"
+      summary: Update team visibility
+      tags: []
   /workspaces/{workspaceSlug}/team/{teamId}/repositories/{repositoryId}/visibility:
     post:
       operationId: updateRepositoryVisibility
@@ -1354,8 +1380,7 @@ paths:
       responses:
         "200":
           description: OK
-      tags:
-      - team
+      tags: []
   /workspaces/{workspaceSlug}/teams/{teamId}/labels/{labelId}:
     delete:
       operationId: removeLabelFromTeam
@@ -1456,6 +1481,7 @@ paths:
       - workspace
   /workspaces/{workspaceSlug}/user/{login}/profile:
     get:
+      description: Get a user's profile with workspace-scoped activity data.
       operationId: getUserProfile
       parameters:
       - description: Workspace slug
@@ -1465,7 +1491,8 @@ paths:
         schema:
           type: string
           pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      - in: path
+      - description: the user's GitHub login
+        in: path
         name: login
         required: true
         schema:
@@ -1476,7 +1503,7 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UserProfile"
-          description: OK
+          description: "user profile with open PRs, review activity, etc."
       summary: "Get user profile with workspace-scoped data (open PRs, review activity,\
         \ etc.)"
       tags:

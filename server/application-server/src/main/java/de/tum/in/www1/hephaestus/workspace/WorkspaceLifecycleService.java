@@ -6,23 +6,23 @@ import de.tum.in.www1.hephaestus.core.LoggingUtils;
 import de.tum.in.www1.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.in.www1.hephaestus.workspace.exception.WorkspaceLifecycleViolationException;
-import jakarta.transaction.Transactional;
+import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Service coordinating workspace lifecycle state transitions and validation.
  * Manages suspend, resume, and purge operations with proper guardrails.
  */
 @Service
+@RequiredArgsConstructor
 public class WorkspaceLifecycleService {
 
     private static final Logger logger = LoggerFactory.getLogger(WorkspaceLifecycleService.class);
 
-    @Autowired
-    private WorkspaceRepository workspaceRepository;
+    private final WorkspaceRepository workspaceRepository;
 
     /**
      * Suspend a workspace, preventing new sync cycles and making it read-only.

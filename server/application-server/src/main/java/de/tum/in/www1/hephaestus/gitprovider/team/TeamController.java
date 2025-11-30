@@ -6,6 +6,8 @@ import de.tum.in.www1.hephaestus.workspace.authorization.RequireAtLeastWorkspace
 import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContextResolver;
 import de.tum.in.www1.hephaestus.workspace.context.WorkspaceScopedController;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -18,8 +20,14 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
+/**
+ * Controller for managing teams within a workspace.
+ * Teams are synchronized from the GitHub organization and can be configured
+ * to filter leaderboard and activity data.
+ */
 @WorkspaceScopedController
 @RequestMapping("/team")
+@Tag(name = "Teams", description = "Team management within workspace")
 public class TeamController {
 
     private static final Logger logger = LoggerFactory.getLogger(TeamController.class);
@@ -41,8 +49,15 @@ public class TeamController {
         this.workspaceResolver = workspaceResolver;
     }
 
+    /**
+     * Get all teams in the workspace.
+     *
+     * @param workspaceContext the resolved workspace context
+     * @return list of teams with their members and permissions
+     */
     @GetMapping
     @Transactional(readOnly = true)
+    @Operation(summary = "List teams", description = "Returns all teams in the workspace organization")
     public ResponseEntity<List<TeamInfoDTO>> getAllTeams(WorkspaceContext workspaceContext) {
         logger.info("Listing teams for workspace {}", workspaceContext.slug());
         Workspace workspace = workspaceResolver.requireWorkspace(workspaceContext);
@@ -58,8 +73,19 @@ public class TeamController {
         return ResponseEntity.ok(teams);
     }
 
+    /**
+     * Update team visibility in the leaderboard.
+     * Hidden teams are excluded from leaderboard calculations.
+     *
+     * @param workspaceContext the resolved workspace context
+     * @param id the team ID
+     * @param hidden whether to hide the team (body parameter, preferred)
+     * @param hiddenParam whether to hide the team (query parameter, fallback)
+     * @return 200 OK on success, 404 if team not found
+     */
     @PostMapping("/{id}/visibility")
     @RequireAtLeastWorkspaceAdmin
+    @Operation(summary = "Update team visibility", description = "Show or hide a team in leaderboard calculations")
     public ResponseEntity<Void> updateTeamVisibility(
         WorkspaceContext workspaceContext,
         @PathVariable Long id,

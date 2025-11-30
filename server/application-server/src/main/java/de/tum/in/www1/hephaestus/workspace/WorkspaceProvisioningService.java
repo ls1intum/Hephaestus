@@ -16,6 +16,7 @@ import org.kohsuke.github.GitHub;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Central orchestrator for keeping workspace records in sync with external provisioning sources.
@@ -75,6 +76,7 @@ public class WorkspaceProvisioningService {
      * Bootstrap the configured PAT-backed workspace when none exist yet.
      * Pulls account, token, and repository selection from {@link WorkspaceProperties}.
      */
+    @Transactional
     public void bootstrapDefaultPatWorkspace() {
         if (!workspaceProperties.isInitDefault()) {
             logger.debug("Skipping default PAT workspace bootstrap because bootstrap is disabled.");
@@ -197,6 +199,7 @@ public class WorkspaceProvisioningService {
     /**
      * Mirror each GitHub App installation into a local workspace, including organization metadata and members.
      */
+    @Transactional
     public void ensureGitHubAppInstallations() {
         if (!gitHubAppTokenService.isConfigured()) {
             logger.info(

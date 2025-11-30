@@ -6,6 +6,10 @@ import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+/**
+ * Repository for {@link Workspace} entities.
+ * Provides methods for finding workspaces by various identifiers.
+ */
 @Repository
 public interface WorkspaceRepository extends JpaRepository<Workspace, Long> {
     Optional<Workspace> findByInstallationId(Long installationId);

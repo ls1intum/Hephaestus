@@ -1,18 +1,24 @@
 package de.tum.in.www1.hephaestus.activity;
 
 import de.tum.in.www1.hephaestus.activity.model.*;
+import de.tum.in.www1.hephaestus.core.exception.AccessForbiddenException;
+import de.tum.in.www1.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
+import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.workspace.Workspace;
 import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContextResolver;
 import de.tum.in.www1.hephaestus.workspace.context.WorkspaceScopedController;
-import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+/**
+ * Controller for activity-related operations within a workspace context.
+ * All endpoints require workspace membership via {@link WorkspaceScopedController}.
+ */
 @WorkspaceScopedController
 @RequestMapping("/activity")
 @RequiredArgsConstructor
@@ -40,16 +46,11 @@ public class ActivityController {
         @PathVariable String login
     ) {
         Workspace workspace = workspaceResolver.requireWorkspace(workspaceContext);
-        var user = userRepository.getCurrentUser();
+        User currentUser = requireCurrentUser();
+        requireSameUser(currentUser, login);
 
-        if (user.isEmpty()) {
-            return ResponseEntity.status(401).build();
-        } else if (!user.get().getLogin().equals(login)) {
-            return ResponseEntity.status(403).build();
-        }
-
-        DetectionResult detectionResult = activityService.detectBadPracticesForUser(workspace, login);
-        if (detectionResult == DetectionResult.ERROR_NO_UPDATE_ON_PULLREQUEST) {
+        DetectionResult result = activityService.detectBadPracticesForUser(workspace, login);
+        if (result == DetectionResult.ERROR_NO_UPDATE_ON_PULLREQUEST) {
             return ResponseEntity.badRequest().build();
         }
         return ResponseEntity.ok().build();
@@ -61,21 +62,12 @@ public class ActivityController {
         @PathVariable Long pullRequestId
     ) {
         Workspace workspace = workspaceResolver.requireWorkspace(workspaceContext);
-        var user = userRepository.getCurrentUser();
-        PullRequest pullRequest = pullRequestRepository.findById(pullRequestId).orElse(null);
+        User currentUser = requireCurrentUser();
+        PullRequest pullRequest = requirePullRequestInWorkspace(pullRequestId, workspace);
+        requireAssignee(pullRequest, currentUser);
 
-        if (pullRequest == null) {
-            return ResponseEntity.notFound().build();
-        } else if (!belongsToWorkspace(pullRequest, workspace)) {
-            return ResponseEntity.notFound().build();
-        } else if (user.isEmpty()) {
-            return ResponseEntity.status(401).build();
-        } else if (!pullRequest.getAssignees().contains(user.get())) {
-            return ResponseEntity.status(403).build();
-        }
-
-        DetectionResult detectionResult = activityService.detectBadPracticesForPullRequest(workspace, pullRequest);
-        if (detectionResult == DetectionResult.ERROR_NO_UPDATE_ON_PULLREQUEST) {
+        DetectionResult result = activityService.detectBadPracticesForPullRequest(workspace, pullRequest);
+        if (result == DetectionResult.ERROR_NO_UPDATE_ON_PULLREQUEST) {
             return ResponseEntity.badRequest().build();
         }
         return ResponseEntity.ok().build();
@@ -88,26 +80,12 @@ public class ActivityController {
         @RequestParam("state") PullRequestBadPracticeState state
     ) {
         Workspace workspace = workspaceResolver.requireWorkspace(workspaceContext);
-        var user = userRepository.getCurrentUser();
-        var badPractice = pullRequestBadPracticeRepository.findById(badPracticeId);
+        User currentUser = requireCurrentUser();
+        PullRequestBadPractice badPractice = requireBadPracticeInWorkspace(badPracticeId, workspace);
+        requireAssignee(badPractice.getPullrequest(), currentUser);
+        requireValidResolveState(state);
 
-        if (badPractice.isEmpty()) {
-            return ResponseEntity.notFound().build();
-        } else if (!belongsToWorkspace(badPractice.get().getPullrequest(), workspace)) {
-            return ResponseEntity.notFound().build();
-        } else if (user.isEmpty()) {
-            return ResponseEntity.status(401).build();
-        } else if (!badPractice.get().getPullrequest().getAssignees().contains(user.get())) {
-            return ResponseEntity.status(403).build();
-        } else if (
-            state != PullRequestBadPracticeState.FIXED &&
-            state != PullRequestBadPracticeState.WONT_FIX &&
-            state != PullRequestBadPracticeState.WRONG
-        ) {
-            return ResponseEntity.badRequest().build();
-        }
-
-        activityService.resolveBadPractice(workspace, badPractice.get(), state);
+        activityService.resolveBadPractice(workspace, badPractice, state);
         return ResponseEntity.ok().build();
     }
 
@@ -118,27 +96,70 @@ public class ActivityController {
         @RequestBody BadPracticeFeedbackDTO feedback
     ) {
         Workspace workspace = workspaceResolver.requireWorkspace(workspaceContext);
-        Optional<PullRequestBadPractice> badPractice = pullRequestBadPracticeRepository.findById(badPracticeId);
-
-        if (badPractice.isEmpty()) {
-            return ResponseEntity.notFound().build();
-        } else if (!belongsToWorkspace(badPractice.get().getPullrequest(), workspace)) {
-            return ResponseEntity.notFound().build();
-        }
-
-        activityService.provideFeedbackForBadPractice(workspace, badPractice.get(), feedback);
+        PullRequestBadPractice badPractice = requireBadPracticeInWorkspace(badPracticeId, workspace);
+        activityService.provideFeedbackForBadPractice(workspace, badPractice, feedback);
         return ResponseEntity.ok().build();
     }
 
-    private boolean belongsToWorkspace(PullRequest pullRequest, Workspace workspace) {
-        if (
-            pullRequest == null ||
-            pullRequest.getRepository() == null ||
-            pullRequest.getRepository().getOrganization() == null ||
-            pullRequest.getRepository().getOrganization().getWorkspace() == null
-        ) {
-            return false;
+    // ══════════════════════════════════════════════════════════════════════════
+    // Helper methods - throw proper exceptions for consistent RFC-7807 responses
+    // ══════════════════════════════════════════════════════════════════════════
+
+    private User requireCurrentUser() {
+        return userRepository
+            .getCurrentUser()
+            .orElseThrow(() -> new AccessForbiddenException("User not authenticated"));
+    }
+
+    private void requireSameUser(User currentUser, String login) {
+        if (!currentUser.getLogin().equals(login)) {
+            throw new AccessForbiddenException("Cannot access activity for another user");
         }
-        return pullRequest.getRepository().getOrganization().getWorkspace().getId().equals(workspace.getId());
+    }
+
+    private void requireAssignee(PullRequest pullRequest, User user) {
+        if (!pullRequest.getAssignees().contains(user)) {
+            throw new AccessForbiddenException("User is not an assignee of this pull request");
+        }
+    }
+
+    private void requireValidResolveState(PullRequestBadPracticeState state) {
+        if (
+            state != PullRequestBadPracticeState.FIXED &&
+            state != PullRequestBadPracticeState.WONT_FIX &&
+            state != PullRequestBadPracticeState.WRONG
+        ) {
+            throw new IllegalArgumentException("Invalid state: must be FIXED, WONT_FIX, or WRONG");
+        }
+    }
+
+    private PullRequest requirePullRequestInWorkspace(Long pullRequestId, Workspace workspace) {
+        PullRequest pr = pullRequestRepository
+            .findById(pullRequestId)
+            .orElseThrow(() -> new EntityNotFoundException("PullRequest", pullRequestId));
+        if (!belongsToWorkspace(pr, workspace)) {
+            throw new EntityNotFoundException("PullRequest", pullRequestId);
+        }
+        return pr;
+    }
+
+    private PullRequestBadPractice requireBadPracticeInWorkspace(Long badPracticeId, Workspace workspace) {
+        PullRequestBadPractice bp = pullRequestBadPracticeRepository
+            .findById(badPracticeId)
+            .orElseThrow(() -> new EntityNotFoundException("BadPractice", badPracticeId));
+        if (!belongsToWorkspace(bp.getPullrequest(), workspace)) {
+            throw new EntityNotFoundException("BadPractice", badPracticeId);
+        }
+        return bp;
+    }
+
+    private boolean belongsToWorkspace(PullRequest pullRequest, Workspace workspace) {
+        return (
+            pullRequest != null &&
+            pullRequest.getRepository() != null &&
+            pullRequest.getRepository().getOrganization() != null &&
+            pullRequest.getRepository().getOrganization().getWorkspace() != null &&
+            pullRequest.getRepository().getOrganization().getWorkspace().getId().equals(workspace.getId())
+        );
     }
 }

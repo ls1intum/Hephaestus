@@ -18,6 +18,10 @@ export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends 
     meta?: Record<string, unknown>;
 };
 
+/**
+ * List global contributors
+ * Returns all contributors across all workspaces
+ */
 export const listGlobalContributors = <ThrowOnError extends boolean = false>(options?: Options<ListGlobalContributorsData, ThrowOnError>) => {
     return (options?.client ?? _heyApiClient).get<ListGlobalContributorsResponses, unknown, ThrowOnError>({
         url: '/contributors',
@@ -236,6 +240,10 @@ export const getDocumentVersion = <ThrowOnError extends boolean = false>(options
     });
 };
 
+/**
+ * Generate leaderboard
+ * Creates a ranked contributor list for the specified time range
+ */
 export const getLeaderboard = <ThrowOnError extends boolean = false>(options: Options<GetLeaderboardData, ThrowOnError>) => {
     return (options.client ?? _heyApiClient).get<GetLeaderboardResponses, unknown, ThrowOnError>({
         url: '/workspaces/{workspaceSlug}/leaderboard',
@@ -243,6 +251,10 @@ export const getLeaderboard = <ThrowOnError extends boolean = false>(options: Op
     });
 };
 
+/**
+ * Get user league stats
+ * Calculates league changes for a specific user
+ */
 export const getUserLeagueStats = <ThrowOnError extends boolean = false>(options: Options<GetUserLeagueStatsData, ThrowOnError>) => {
     return (options.client ?? _heyApiClient).post<GetUserLeagueStatsResponses, unknown, ThrowOnError>({
         url: '/workspaces/{workspaceSlug}/leaderboard',
@@ -361,6 +373,10 @@ export const getGroupedThreads = <ThrowOnError extends boolean = false>(options:
     });
 };
 
+/**
+ * Get workspace metadata
+ * Returns aggregated statistics for the workspace
+ */
 export const getWorkspaceMeta = <ThrowOnError extends boolean = false>(options: Options<GetWorkspaceMetaData, ThrowOnError>) => {
     return (options.client ?? _heyApiClient).get<GetWorkspaceMetaResponses, unknown, ThrowOnError>({
         url: '/workspaces/{workspaceSlug}/meta',
@@ -368,6 +384,10 @@ export const getWorkspaceMeta = <ThrowOnError extends boolean = false>(options: 
     });
 };
 
+/**
+ * List workspace contributors
+ * Returns all users who have contributed to the workspace
+ */
 export const listWorkspaceContributors = <ThrowOnError extends boolean = false>(options: Options<ListWorkspaceContributorsData, ThrowOnError>) => {
     return (options.client ?? _heyApiClient).get<ListWorkspaceContributorsResponses, unknown, ThrowOnError>({
         url: '/workspaces/{workspaceSlug}/meta/contributors',
@@ -475,6 +495,10 @@ export const updateStatus = <ThrowOnError extends boolean = false>(options: Opti
     });
 };
 
+/**
+ * List teams
+ * Returns all teams in the workspace organization
+ */
 export const getAllTeams = <ThrowOnError extends boolean = false>(options: Options<GetAllTeamsData, ThrowOnError>) => {
     return (options.client ?? _heyApiClient).get<GetAllTeamsResponses, unknown, ThrowOnError>({
         url: '/workspaces/{workspaceSlug}/team',
@@ -482,6 +506,10 @@ export const getAllTeams = <ThrowOnError extends boolean = false>(options: Optio
     });
 };
 
+/**
+ * Update team visibility
+ * Show or hide a team in leaderboard calculations
+ */
 export const updateTeamVisibility = <ThrowOnError extends boolean = false>(options: Options<UpdateTeamVisibilityData, ThrowOnError>) => {
     return (options.client ?? _heyApiClient).post<UpdateTeamVisibilityResponses, unknown, ThrowOnError>({
         url: '/workspaces/{workspaceSlug}/team/{id}/visibility',
@@ -540,6 +568,7 @@ export const updateToken = <ThrowOnError extends boolean = false>(options: Optio
 
 /**
  * Get user profile with workspace-scoped data (open PRs, review activity, etc.)
+ * Get a user's profile with workspace-scoped activity data.
  */
 export const getUserProfile = <ThrowOnError extends boolean = false>(options: Options<GetUserProfileData, ThrowOnError>) => {
     return (options.client ?? _heyApiClient).get<GetUserProfileResponses, unknown, ThrowOnError>({

@@ -17,6 +17,11 @@ public class WorkspaceAccessService {
 
     private static final Logger logger = LoggerFactory.getLogger(WorkspaceAccessService.class);
 
+    // Role hierarchy levels (higher = more permissions)
+    private static final int ROLE_LEVEL_MEMBER = 1;
+    private static final int ROLE_LEVEL_ADMIN = 2;
+    private static final int ROLE_LEVEL_OWNER = 3;
+
     /**
      * Check if the current user has at least the specified role in the current workspace.
      * Uses role hierarchy: if user has OWNER, they also satisfy ADMIN and MEMBER checks.
@@ -145,9 +150,9 @@ public class WorkspaceAccessService {
      */
     private int getRoleLevel(WorkspaceRole role) {
         return switch (role) {
-            case OWNER -> 3;
-            case ADMIN -> 2;
-            case MEMBER -> 1;
+            case OWNER -> ROLE_LEVEL_OWNER;
+            case ADMIN -> ROLE_LEVEL_ADMIN;
+            case MEMBER -> ROLE_LEVEL_MEMBER;
         };
     }
 }

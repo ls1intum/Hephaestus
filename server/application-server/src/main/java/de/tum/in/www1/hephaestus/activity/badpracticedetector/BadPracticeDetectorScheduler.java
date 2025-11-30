@@ -12,6 +12,8 @@ import jakarta.ws.rs.NotAuthorizedException;
 import jakarta.ws.rs.ProcessingException;
 import java.time.Instant;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.keycloak.admin.client.Keycloak;
@@ -19,13 +21,15 @@ import org.keycloak.representations.idm.RoleRepresentation;
 import org.keycloak.representations.idm.UserRepresentation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.TaskScheduler;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+/**
+ * Scheduler for bad practice detection tasks.
+ * Schedules detection based on PR events (opened, labeled, closed) and user roles.
+ */
 @Component
 public class BadPracticeDetectorScheduler {
 
@@ -35,33 +39,37 @@ public class BadPracticeDetectorScheduler {
     private static final String READY_FOR_REVIEW = "ready for review";
     private static final String READY_TO_MERGE = "ready to merge";
 
-    @Qualifier("taskScheduler")
-    @Autowired
-    TaskScheduler taskScheduler;
+    private final TaskScheduler taskScheduler;
+    private final PullRequestBadPracticeDetector pullRequestBadPracticeDetector;
+    private final MailService mailService;
+    private final Keycloak keycloak;
+    private final RepositoryToMonitorRepository repositoryToMonitorRepository;
+    private final WorkspaceRepository workspaceRepository;
+    private final boolean runAutomaticDetectionForAll;
+    private final String realm;
 
-    @Autowired
-    PullRequestBadPracticeDetector pullRequestBadPracticeDetector;
-
-    @Autowired
-    MailService mailService;
-
-    @Autowired
-    Keycloak keycloak;
-
-    @Autowired
-    RepositoryToMonitorRepository repositoryToMonitorRepository;
-
-    @Autowired
-    WorkspaceRepository workspaceRepository;
-
-    @Value("${hephaestus.detection.run-automatic-detection-for-all}")
-    private boolean runAutomaticDetectionForAll;
-
-    @Value("${keycloak.realm}")
-    private String realm;
-
-    private final Map<Long, List<ScheduledFuture<?>>> scheduledTasks = new HashMap<>();
+    private final Map<Long, List<ScheduledFuture<?>>> scheduledTasks = new ConcurrentHashMap<>();
     private final AtomicBoolean keycloakRoleChecksHealthy = new AtomicBoolean(true);
+
+    public BadPracticeDetectorScheduler(
+        TaskScheduler taskScheduler,
+        PullRequestBadPracticeDetector pullRequestBadPracticeDetector,
+        MailService mailService,
+        Keycloak keycloak,
+        RepositoryToMonitorRepository repositoryToMonitorRepository,
+        WorkspaceRepository workspaceRepository,
+        @Value("${hephaestus.detection.run-automatic-detection-for-all}") boolean runAutomaticDetectionForAll,
+        @Value("${keycloak.realm}") String realm
+    ) {
+        this.taskScheduler = taskScheduler;
+        this.pullRequestBadPracticeDetector = pullRequestBadPracticeDetector;
+        this.mailService = mailService;
+        this.keycloak = keycloak;
+        this.repositoryToMonitorRepository = repositoryToMonitorRepository;
+        this.workspaceRepository = workspaceRepository;
+        this.runAutomaticDetectionForAll = runAutomaticDetectionForAll;
+        this.realm = realm;
+    }
 
     public void detectBadPracticeForPrWhenOpenedOrReadyForReviewEvent(PullRequest pullRequest) {
         Instant timeInOneHour = Instant.now().plusSeconds(3600);
@@ -190,7 +198,7 @@ public class BadPracticeDetectorScheduler {
             });
             scheduledTasksList.removeAll(tasksToRemove);
         } else {
-            scheduledTasks.put(pullRequest.getId(), new ArrayList<>());
+            scheduledTasks.put(pullRequest.getId(), new CopyOnWriteArrayList<>());
         }
 
         ScheduledFuture<?> scheduledTask = taskScheduler.schedule(badPracticeDetectorTask, scheduledTime);

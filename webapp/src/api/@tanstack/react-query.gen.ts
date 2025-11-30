@@ -2,7 +2,7 @@
 
 import { type Options, listGlobalContributors, deleteUser, getUserSettings, updateUserSettings, listWorkspaces, createWorkspace, purgeWorkspace, getWorkspace, provideFeedbackForBadPractice, resolveBadPractice, detectBadPracticesForPullRequest, detectBadPracticesByUser, getActivityByUser, voteMessage, getUserDocuments, createDocument, deleteDocument, getDocument, updateDocument, deleteVersionsAfterTimestamp, getDocumentVersions, getDocumentVersion, getLeaderboard, getUserLeagueStats, resetAndRecalculateLeagues, listMembers, assignRole, getCurrentUserMembership, removeMember, getMember, getThread, getThreads, getGroupedThreads, getWorkspaceMeta, listWorkspaceContributors, updateNotifications, updatePublicVisibility, getRepositoriesToMonitor, removeRepositoryToMonitor, addRepositoryToMonitor, updateSchedule, updateSlackCredentials, updateStatus, getAllTeams, updateTeamVisibility, updateRepositoryVisibility, removeLabelFromTeam, addLabelToTeam, updateToken, getUserProfile, getUsersWithTeams } from '../sdk.gen';
 import { queryOptions, type UseMutationOptions, type DefaultError, infiniteQueryOptions, type InfiniteData } from '@tanstack/react-query';
-import type { ListGlobalContributorsData, DeleteUserData, GetUserSettingsData, UpdateUserSettingsData, UpdateUserSettingsResponse, ListWorkspacesData, CreateWorkspaceData, CreateWorkspaceResponse, PurgeWorkspaceData, PurgeWorkspaceResponse, GetWorkspaceData, ProvideFeedbackForBadPracticeData, ResolveBadPracticeData, DetectBadPracticesForPullRequestData, DetectBadPracticesByUserData, GetActivityByUserData, VoteMessageData, VoteMessageError, VoteMessageResponse, GetUserDocumentsData, GetUserDocumentsResponse, CreateDocumentData, CreateDocumentError, CreateDocumentResponse, DeleteDocumentData, DeleteDocumentResponse, GetDocumentData, UpdateDocumentData, UpdateDocumentError, UpdateDocumentResponse, DeleteVersionsAfterTimestampData, DeleteVersionsAfterTimestampError, DeleteVersionsAfterTimestampResponse, GetDocumentVersionsData, GetDocumentVersionsError, GetDocumentVersionsResponse, GetDocumentVersionData, GetLeaderboardData, GetLeaderboardResponse, GetUserLeagueStatsData, GetUserLeagueStatsResponse, ResetAndRecalculateLeaguesData, ListMembersData, ListMembersResponse, AssignRoleData, AssignRoleResponse, GetCurrentUserMembershipData, RemoveMemberData, RemoveMemberResponse, GetMemberData, GetThreadData, GetThreadsData, GetGroupedThreadsData, GetWorkspaceMetaData, ListWorkspaceContributorsData, UpdateNotificationsData, UpdateNotificationsResponse, UpdatePublicVisibilityData, UpdatePublicVisibilityResponse, GetRepositoriesToMonitorData, RemoveRepositoryToMonitorData, AddRepositoryToMonitorData, UpdateScheduleData, UpdateScheduleResponse, UpdateSlackCredentialsData, UpdateSlackCredentialsResponse, UpdateStatusData, UpdateStatusResponse, GetAllTeamsData, UpdateTeamVisibilityData, UpdateRepositoryVisibilityData, RemoveLabelFromTeamData, RemoveLabelFromTeamResponse, AddLabelToTeamData, AddLabelToTeamResponse, UpdateTokenData, UpdateTokenResponse, GetUserProfileData, GetUsersWithTeamsData } from '../types.gen';
+import type { ListGlobalContributorsData, DeleteUserData, GetUserSettingsData, UpdateUserSettingsData, UpdateUserSettingsResponse, ListWorkspacesData, CreateWorkspaceData, CreateWorkspaceResponse, PurgeWorkspaceData, PurgeWorkspaceResponse, GetWorkspaceData, ProvideFeedbackForBadPracticeData, ResolveBadPracticeData, DetectBadPracticesForPullRequestData, DetectBadPracticesByUserData, GetActivityByUserData, VoteMessageData, VoteMessageError, VoteMessageResponse, GetUserDocumentsData, GetUserDocumentsResponse, CreateDocumentData, CreateDocumentError, CreateDocumentResponse, DeleteDocumentData, DeleteDocumentResponse, GetDocumentData, UpdateDocumentData, UpdateDocumentError, UpdateDocumentResponse, DeleteVersionsAfterTimestampData, DeleteVersionsAfterTimestampError, DeleteVersionsAfterTimestampResponse, GetDocumentVersionsData, GetDocumentVersionsError, GetDocumentVersionsResponse, GetDocumentVersionData, GetLeaderboardData, GetLeaderboardResponse, GetUserLeagueStatsData, GetUserLeagueStatsResponse, ResetAndRecalculateLeaguesData, ListMembersData, ListMembersResponse, AssignRoleData, AssignRoleResponse, GetCurrentUserMembershipData, RemoveMemberData, GetMemberData, GetThreadData, GetThreadsData, GetGroupedThreadsData, GetWorkspaceMetaData, ListWorkspaceContributorsData, UpdateNotificationsData, UpdateNotificationsResponse, UpdatePublicVisibilityData, UpdatePublicVisibilityResponse, GetRepositoriesToMonitorData, RemoveRepositoryToMonitorData, AddRepositoryToMonitorData, UpdateScheduleData, UpdateScheduleResponse, UpdateSlackCredentialsData, UpdateSlackCredentialsResponse, UpdateStatusData, UpdateStatusResponse, GetAllTeamsData, UpdateTeamVisibilityData, UpdateRepositoryVisibilityData, RemoveLabelFromTeamData, RemoveLabelFromTeamResponse, AddLabelToTeamData, AddLabelToTeamResponse, UpdateTokenData, UpdateTokenResponse, GetUserProfileData, GetUsersWithTeamsData } from '../types.gen';
 import { client as _heyApiClient } from '../client.gen';
 
 export type QueryKey<TOptions extends Options> = [
@@ -42,6 +42,10 @@ const createQueryKey = <TOptions extends Options>(id: string, options?: TOptions
 
 export const listGlobalContributorsQueryKey = (options?: Options<ListGlobalContributorsData>) => createQueryKey('listGlobalContributors', options);
 
+/**
+ * List global contributors
+ * Returns all contributors across all workspaces
+ */
 export const listGlobalContributorsOptions = (options?: Options<ListGlobalContributorsData>) => {
     return queryOptions({
         queryFn: async ({ queryKey, signal }) => {
@@ -631,6 +635,10 @@ export const getDocumentVersionOptions = (options: Options<GetDocumentVersionDat
 
 export const getLeaderboardQueryKey = (options: Options<GetLeaderboardData>) => createQueryKey('getLeaderboard', options);
 
+/**
+ * Generate leaderboard
+ * Creates a ranked contributor list for the specified time range
+ */
 export const getLeaderboardOptions = (options: Options<GetLeaderboardData>) => {
     return queryOptions({
         queryFn: async ({ queryKey, signal }) => {
@@ -648,6 +656,10 @@ export const getLeaderboardOptions = (options: Options<GetLeaderboardData>) => {
 
 export const getLeaderboardInfiniteQueryKey = (options: Options<GetLeaderboardData>): QueryKey<Options<GetLeaderboardData>> => createQueryKey('getLeaderboard', options, true);
 
+/**
+ * Generate leaderboard
+ * Creates a ranked contributor list for the specified time range
+ */
 export const getLeaderboardInfiniteOptions = (options: Options<GetLeaderboardData>) => {
     return infiniteQueryOptions<GetLeaderboardResponse, DefaultError, InfiniteData<GetLeaderboardResponse>, QueryKey<Options<GetLeaderboardData>>, Date | Pick<QueryKey<Options<GetLeaderboardData>>[0], 'body' | 'headers' | 'path' | 'query'>>(
     // @ts-ignore
@@ -674,6 +686,10 @@ export const getLeaderboardInfiniteOptions = (options: Options<GetLeaderboardDat
 
 export const getUserLeagueStatsQueryKey = (options: Options<GetUserLeagueStatsData>) => createQueryKey('getUserLeagueStats', options);
 
+/**
+ * Get user league stats
+ * Calculates league changes for a specific user
+ */
 export const getUserLeagueStatsOptions = (options: Options<GetUserLeagueStatsData>) => {
     return queryOptions({
         queryFn: async ({ queryKey, signal }) => {
@@ -689,6 +705,10 @@ export const getUserLeagueStatsOptions = (options: Options<GetUserLeagueStatsDat
     });
 };
 
+/**
+ * Get user league stats
+ * Calculates league changes for a specific user
+ */
 export const getUserLeagueStatsMutation = (options?: Partial<Options<GetUserLeagueStatsData>>): UseMutationOptions<GetUserLeagueStatsResponse, DefaultError, Options<GetUserLeagueStatsData>> => {
     const mutationOptions: UseMutationOptions<GetUserLeagueStatsResponse, DefaultError, Options<GetUserLeagueStatsData>> = {
         mutationFn: async (localOptions) => {
@@ -841,8 +861,8 @@ export const getCurrentUserMembershipOptions = (options: Options<GetCurrentUserM
  * OWNER can remove anyone except themselves if they are the last OWNER.
  * ADMIN can remove MEMBER and ADMIN roles.
  */
-export const removeMemberMutation = (options?: Partial<Options<RemoveMemberData>>): UseMutationOptions<RemoveMemberResponse, DefaultError, Options<RemoveMemberData>> => {
-    const mutationOptions: UseMutationOptions<RemoveMemberResponse, DefaultError, Options<RemoveMemberData>> = {
+export const removeMemberMutation = (options?: Partial<Options<RemoveMemberData>>): UseMutationOptions<unknown, DefaultError, Options<RemoveMemberData>> => {
+    const mutationOptions: UseMutationOptions<unknown, DefaultError, Options<RemoveMemberData>> = {
         mutationFn: async (localOptions) => {
             const { data } = await removeMember({
                 ...options,
@@ -942,6 +962,10 @@ export const getGroupedThreadsOptions = (options: Options<GetGroupedThreadsData>
 
 export const getWorkspaceMetaQueryKey = (options: Options<GetWorkspaceMetaData>) => createQueryKey('getWorkspaceMeta', options);
 
+/**
+ * Get workspace metadata
+ * Returns aggregated statistics for the workspace
+ */
 export const getWorkspaceMetaOptions = (options: Options<GetWorkspaceMetaData>) => {
     return queryOptions({
         queryFn: async ({ queryKey, signal }) => {
@@ -959,6 +983,10 @@ export const getWorkspaceMetaOptions = (options: Options<GetWorkspaceMetaData>) 
 
 export const listWorkspaceContributorsQueryKey = (options: Options<ListWorkspaceContributorsData>) => createQueryKey('listWorkspaceContributors', options);
 
+/**
+ * List workspace contributors
+ * Returns all users who have contributed to the workspace
+ */
 export const listWorkspaceContributorsOptions = (options: Options<ListWorkspaceContributorsData>) => {
     return queryOptions({
         queryFn: async ({ queryKey, signal }) => {
@@ -1135,6 +1163,10 @@ export const updateStatusMutation = (options?: Partial<Options<UpdateStatusData>
 
 export const getAllTeamsQueryKey = (options: Options<GetAllTeamsData>) => createQueryKey('getAllTeams', options);
 
+/**
+ * List teams
+ * Returns all teams in the workspace organization
+ */
 export const getAllTeamsOptions = (options: Options<GetAllTeamsData>) => {
     return queryOptions({
         queryFn: async ({ queryKey, signal }) => {
@@ -1152,6 +1184,10 @@ export const getAllTeamsOptions = (options: Options<GetAllTeamsData>) => {
 
 export const updateTeamVisibilityQueryKey = (options: Options<UpdateTeamVisibilityData>) => createQueryKey('updateTeamVisibility', options);
 
+/**
+ * Update team visibility
+ * Show or hide a team in leaderboard calculations
+ */
 export const updateTeamVisibilityOptions = (options: Options<UpdateTeamVisibilityData>) => {
     return queryOptions({
         queryFn: async ({ queryKey, signal }) => {
@@ -1167,6 +1203,10 @@ export const updateTeamVisibilityOptions = (options: Options<UpdateTeamVisibilit
     });
 };
 
+/**
+ * Update team visibility
+ * Show or hide a team in leaderboard calculations
+ */
 export const updateTeamVisibilityMutation = (options?: Partial<Options<UpdateTeamVisibilityData>>): UseMutationOptions<unknown, DefaultError, Options<UpdateTeamVisibilityData>> => {
     const mutationOptions: UseMutationOptions<unknown, DefaultError, Options<UpdateTeamVisibilityData>> = {
         mutationFn: async (localOptions) => {
@@ -1287,6 +1327,7 @@ export const getUserProfileQueryKey = (options: Options<GetUserProfileData>) => 
 
 /**
  * Get user profile with workspace-scoped data (open PRs, review activity, etc.)
+ * Get a user's profile with workspace-scoped activity data.
  */
 export const getUserProfileOptions = (options: Options<GetUserProfileData>) => {
     return queryOptions({

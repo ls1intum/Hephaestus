@@ -4,7 +4,9 @@ import de.tum.in.www1.hephaestus.workspace.Workspace;
 import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContextResolver;
 import de.tum.in.www1.hephaestus.workspace.context.WorkspaceScopedController;
+import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.constraints.NotBlank;
 import java.time.Instant;
 import java.util.List;
@@ -14,8 +16,14 @@ import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+/**
+ * Controller for leaderboard generation and league statistics.
+ * Provides ranked contributor lists based on configurable time ranges,
+ * team filters, and scoring modes.
+ */
 @WorkspaceScopedController
 @RequestMapping("/leaderboard")
+@Tag(name = "Leaderboard", description = "Contributor rankings and league statistics")
 public class LeaderboardController {
 
     private static final Logger logger = LoggerFactory.getLogger(LeaderboardController.class);
@@ -28,7 +36,22 @@ public class LeaderboardController {
         this.workspaceResolver = workspaceResolver;
     }
 
+    /**
+     * Generate a leaderboard for the specified time range and filters.
+     *
+     * @param workspaceContext the resolved workspace context
+     * @param after start of the time range (inclusive)
+     * @param before end of the time range (inclusive)
+     * @param team team filter for INDIVIDUAL mode
+     * @param sort sorting metric (SCORE or LEAGUE_POINTS)
+     * @param mode aggregation mode (INDIVIDUAL or TEAM)
+     * @return ranked list of leaderboard entries
+     */
     @GetMapping
+    @Operation(
+        summary = "Generate leaderboard",
+        description = "Creates a ranked contributor list for the specified time range"
+    )
     public ResponseEntity<List<LeaderboardEntryDTO>> getLeaderboard(
         WorkspaceContext workspaceContext,
         @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant after,
@@ -46,7 +69,16 @@ public class LeaderboardController {
         return ResponseEntity.ok(leaderboardService.createLeaderboard(workspace, after, before, team, sort, mode));
     }
 
+    /**
+     * Calculate league change statistics for a user.
+     *
+     * @param workspaceContext the resolved workspace context
+     * @param login the user's GitHub login
+     * @param entry the user's current leaderboard entry for comparison
+     * @return league change statistics including promotion/demotion info
+     */
     @PostMapping
+    @Operation(summary = "Get user league stats", description = "Calculates league changes for a specific user")
     public ResponseEntity<LeagueChangeDTO> getUserLeagueStats(
         WorkspaceContext workspaceContext,
         @RequestParam String login,

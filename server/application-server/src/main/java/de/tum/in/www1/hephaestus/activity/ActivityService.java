@@ -18,42 +18,49 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
+/**
+ * Service for managing user activity and bad practice detection within workspaces.
+ */
 @Service
 public class ActivityService {
 
     private static final Logger logger = LoggerFactory.getLogger(ActivityService.class);
 
-    @Autowired
-    private PullRequestRepository pullRequestRepository;
+    private final PullRequestRepository pullRequestRepository;
+    private final PullRequestBadPracticeRepository pullRequestBadPracticeRepository;
+    private final BadPracticeFeedbackRepository badPracticeFeedbackRepository;
+    private final BadPracticeDetectionRepository badPracticeDetectionRepository;
+    private final PullRequestBadPracticeDetector pullRequestBadPracticeDetector;
+    private final boolean tracingEnabled;
+    private final String tracingHost;
+    private final String tracingPublicKey;
+    private final String tracingSecretKey;
 
-    @Autowired
-    private PullRequestBadPracticeRepository pullRequestBadPracticeRepository;
-
-    @Autowired
-    private BadPracticeFeedbackRepository badPracticeFeedbackRepository;
-
-    @Autowired
-    private BadPracticeDetectionRepository badPracticeDetectionRepository;
-
-    @Autowired
-    private PullRequestBadPracticeDetector pullRequestBadPracticeDetector;
-
-    @Value("${hephaestus.detection.tracing.enabled}")
-    private boolean tracingEnabled;
-
-    @Value("${hephaestus.detection.tracing.host}")
-    private String tracingHost;
-
-    @Value("${hephaestus.detection.tracing.public-key}")
-    private String tracingPublicKey;
-
-    @Value("${hephaestus.detection.tracing.secret-key}")
-    private String tracingSecretKey;
+    public ActivityService(
+        PullRequestRepository pullRequestRepository,
+        PullRequestBadPracticeRepository pullRequestBadPracticeRepository,
+        BadPracticeFeedbackRepository badPracticeFeedbackRepository,
+        BadPracticeDetectionRepository badPracticeDetectionRepository,
+        PullRequestBadPracticeDetector pullRequestBadPracticeDetector,
+        @Value("${hephaestus.detection.tracing.enabled}") boolean tracingEnabled,
+        @Value("${hephaestus.detection.tracing.host}") String tracingHost,
+        @Value("${hephaestus.detection.tracing.public-key}") String tracingPublicKey,
+        @Value("${hephaestus.detection.tracing.secret-key}") String tracingSecretKey
+    ) {
+        this.pullRequestRepository = pullRequestRepository;
+        this.pullRequestBadPracticeRepository = pullRequestBadPracticeRepository;
+        this.badPracticeFeedbackRepository = badPracticeFeedbackRepository;
+        this.badPracticeDetectionRepository = badPracticeDetectionRepository;
+        this.pullRequestBadPracticeDetector = pullRequestBadPracticeDetector;
+        this.tracingEnabled = tracingEnabled;
+        this.tracingHost = tracingHost;
+        this.tracingPublicKey = tracingPublicKey;
+        this.tracingSecretKey = tracingSecretKey;
+    }
 
     @Transactional
     public ActivityDTO getActivity(Workspace workspace, String login) {
@@ -127,13 +134,11 @@ public class ActivityService {
 
     @Transactional
     public DetectionResult detectBadPracticesForPullRequest(Workspace workspace, PullRequest pullRequest) {
-        ensurePullRequestInWorkspace(pullRequest, workspace);
         logger.info(
             "Detecting bad practices for PR: {} in workspace {}",
             pullRequest.getId(),
             workspace.getWorkspaceSlug()
         );
-
         return pullRequestBadPracticeDetector.detectAndSyncBadPractices(pullRequest);
     }
 
@@ -142,14 +147,12 @@ public class ActivityService {
         PullRequestBadPractice badPractice,
         PullRequestBadPracticeState state
     ) {
-        ensurePullRequestInWorkspace(badPractice.getPullrequest(), workspace);
         logger.info(
             "Resolving bad practice {} with state {} in workspace {}",
             badPractice.getId(),
             state,
             workspace.getWorkspaceSlug()
         );
-
         badPractice.setUserState(state);
         pullRequestBadPracticeRepository.save(badPractice);
     }
@@ -159,9 +162,8 @@ public class ActivityService {
         PullRequestBadPractice badPractice,
         BadPracticeFeedbackDTO feedback
     ) {
-        ensurePullRequestInWorkspace(badPractice.getPullrequest(), workspace);
         logger.info(
-            "Marking bad practice with id: {} in workspace {}",
+            "Providing feedback for bad practice {} in workspace {}",
             badPractice.getId(),
             workspace.getWorkspaceSlug()
         );
@@ -200,22 +202,6 @@ public class ActivityService {
             logger.info("Feedback sent to Langfuse: {}", response.toString());
         } catch (Exception e) {
             logger.error("Failed to send feedback to Langfuse: {}", e.getMessage());
-        }
-    }
-
-    private void ensurePullRequestInWorkspace(PullRequest pullRequest, Workspace workspace) {
-        if (
-            pullRequest == null ||
-            pullRequest.getRepository() == null ||
-            pullRequest.getRepository().getOrganization() == null ||
-            pullRequest.getRepository().getOrganization().getWorkspace() == null ||
-            !pullRequest.getRepository().getOrganization().getWorkspace().getId().equals(workspace.getId())
-        ) {
-            throw new IllegalArgumentException(
-                "Pull request " +
-                (pullRequest != null ? pullRequest.getId() : "<null>") +
-                " is outside the workspace context"
-            );
         }
     }
 }

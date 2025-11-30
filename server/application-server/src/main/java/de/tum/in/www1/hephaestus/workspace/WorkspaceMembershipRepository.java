@@ -11,6 +11,10 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+/**
+ * Repository for {@link WorkspaceMembership} entities.
+ * Manages the relationship between users and workspaces, including role assignments.
+ */
 public interface WorkspaceMembershipRepository extends JpaRepository<WorkspaceMembership, WorkspaceMembership.Id> {
     List<WorkspaceMembership> findByWorkspace_Id(Long workspaceId);
 

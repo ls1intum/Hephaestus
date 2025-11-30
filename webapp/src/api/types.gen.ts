@@ -1658,7 +1658,7 @@ export type ListGlobalContributorsData = {
 
 export type ListGlobalContributorsResponses = {
     /**
-     * OK
+     * list of all contributors with their global contribution metrics
      */
     200: Array<Contributor>;
 };
@@ -2190,7 +2190,13 @@ export type GetLeaderboardData = {
         workspaceSlug: string;
     };
     query: {
+        /**
+         * start of the time range (inclusive)
+         */
         after: Date;
+        /**
+         * end of the time range (inclusive)
+         */
         before: Date;
         /**
          * Team filter to apply in INDIVIDUAL mode; ignored when mode is TEAM.
@@ -2200,6 +2206,9 @@ export type GetLeaderboardData = {
          * Determines the ranking metric. In TEAM mode SCORE uses summed contribution scores; LEAGUE_POINTS uses total league points.
          */
         sort: 'SCORE' | 'LEAGUE_POINTS';
+        /**
+         * aggregation mode (INDIVIDUAL or TEAM)
+         */
         mode: 'INDIVIDUAL' | 'TEAM';
     };
     url: '/workspaces/{workspaceSlug}/leaderboard';
@@ -2207,7 +2216,7 @@ export type GetLeaderboardData = {
 
 export type GetLeaderboardResponses = {
     /**
-     * OK
+     * ranked list of leaderboard entries
      */
     200: Array<LeaderboardEntry>;
 };
@@ -2215,6 +2224,9 @@ export type GetLeaderboardResponses = {
 export type GetLeaderboardResponse = GetLeaderboardResponses[keyof GetLeaderboardResponses];
 
 export type GetUserLeagueStatsData = {
+    /**
+     * the user's current leaderboard entry for comparison
+     */
     body: LeaderboardEntry;
     path: {
         /**
@@ -2223,6 +2235,9 @@ export type GetUserLeagueStatsData = {
         workspaceSlug: string;
     };
     query: {
+        /**
+         * the user's GitHub login
+         */
         login: string;
     };
     url: '/workspaces/{workspaceSlug}/leaderboard';
@@ -2230,7 +2245,7 @@ export type GetUserLeagueStatsData = {
 
 export type GetUserLeagueStatsResponses = {
     /**
-     * OK
+     * league change statistics including promotion/demotion info
      */
     200: LeagueChange;
 };
@@ -2305,9 +2320,7 @@ export type AssignRoleResponses = {
     /**
      * Updated membership
      */
-    200: {
-        [key: string]: unknown;
-    };
+    200: WorkspaceMembership;
 };
 
 export type AssignRoleResponse = AssignRoleResponses[keyof AssignRoleResponses];
@@ -2326,7 +2339,7 @@ export type GetCurrentUserMembershipData = {
 
 export type GetCurrentUserMembershipResponses = {
     /**
-     * OK
+     * the current user's membership details
      */
     200: WorkspaceMembership;
 };
@@ -2353,12 +2366,8 @@ export type RemoveMemberResponses = {
     /**
      * 204 No Content on success
      */
-    200: {
-        [key: string]: unknown;
-    };
+    200: unknown;
 };
-
-export type RemoveMemberResponse = RemoveMemberResponses[keyof RemoveMemberResponses];
 
 export type GetMemberData = {
     body?: never;
@@ -2380,9 +2389,7 @@ export type GetMemberResponses = {
     /**
      * Workspace membership details
      */
-    200: {
-        [key: string]: unknown;
-    };
+    200: WorkspaceMembership;
 };
 
 export type GetMemberResponse = GetMemberResponses[keyof GetMemberResponses];
@@ -2499,7 +2506,7 @@ export type GetWorkspaceMetaData = {
 
 export type GetWorkspaceMetaResponses = {
     /**
-     * OK
+     * workspace metadata including statistics
      */
     200: MetaData;
 };
@@ -2520,7 +2527,7 @@ export type ListWorkspaceContributorsData = {
 
 export type ListWorkspaceContributorsResponses = {
     /**
-     * OK
+     * list of contributors with their contribution metrics
      */
     200: Array<Contributor>;
 };
@@ -2709,7 +2716,7 @@ export type GetAllTeamsData = {
 
 export type GetAllTeamsResponses = {
     /**
-     * OK
+     * list of teams with their members and permissions
      */
     200: Array<TeamInfo>;
 };
@@ -2717,15 +2724,24 @@ export type GetAllTeamsResponses = {
 export type GetAllTeamsResponse = GetAllTeamsResponses[keyof GetAllTeamsResponses];
 
 export type UpdateTeamVisibilityData = {
+    /**
+     * whether to hide the team (body parameter, preferred)
+     */
     body?: boolean;
     path: {
         /**
          * Workspace slug
          */
         workspaceSlug: string;
+        /**
+         * the team ID
+         */
         id: number;
     };
     query?: {
+        /**
+         * whether to hide the team (query parameter, fallback)
+         */
         hidden?: boolean;
     };
     url: '/workspaces/{workspaceSlug}/team/{id}/visibility';
@@ -2733,7 +2749,7 @@ export type UpdateTeamVisibilityData = {
 
 export type UpdateTeamVisibilityResponses = {
     /**
-     * OK
+     * 200 OK on success, 404 if team not found
      */
     200: unknown;
 };
@@ -2836,6 +2852,9 @@ export type GetUserProfileData = {
          * Workspace slug
          */
         workspaceSlug: string;
+        /**
+         * the user's GitHub login
+         */
         login: string;
     };
     query?: never;
@@ -2844,7 +2863,7 @@ export type GetUserProfileData = {
 
 export type GetUserProfileResponses = {
     /**
-     * OK
+     * user profile with open PRs, review activity, etc.
      */
     200: UserProfile;
 };

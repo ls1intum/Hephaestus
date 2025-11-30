@@ -34,99 +34,117 @@ import org.kohsuke.github.GHRepository;
 import org.kohsuke.github.PagedIterator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.annotation.Lazy;
 import org.springframework.core.task.AsyncTaskExecutor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
+/**
+ * Service for synchronizing GitHub data (repositories, issues, PRs, users, teams) for workspaces.
+ * Handles both regular sync cycles and historical backfill operations.
+ */
 @Service
 public class GitHubDataSyncService {
 
     private static final Logger logger = LoggerFactory.getLogger(GitHubDataSyncService.class);
 
-    @Value("${monitoring.timeframe}")
-    private int timeframe;
+    // Configuration
+    private final int timeframe;
+    private final int syncCooldownInMinutes;
+    private final boolean backfillEnabled;
+    private final int backfillBatchSize;
+    private final int backfillRateLimitThreshold;
+    private final int backfillCooldownMinutes;
 
-    @Value("${monitoring.sync-cooldown-in-minutes}")
-    private int syncCooldownInMinutes;
+    // Repositories
+    private final WorkspaceRepository workspaceRepository;
+    private final RepositoryToMonitorRepository repositoryToMonitorRepository;
+    private final RepositoryRepository repositoryRepository;
+    private final IssueRepository issueRepository;
+    private final PullRequestRepository pullRequestRepository;
 
-    @Value("${monitoring.backfill.enabled:false}")
-    private boolean backfillEnabled;
+    // Sync services
+    private final GitHubUserSyncService userSyncService;
+    private final GitHubTeamSyncService teamSyncService;
+    private final GitHubClientExecutor gitHubClientExecutor;
+    private final GitHubRepositorySyncService repositorySyncService;
+    private final GitHubRepositoryCollaboratorSyncService collaboratorSyncService;
+    private final GitHubLabelSyncService labelSyncService;
+    private final GitHubMilestoneSyncService milestoneSyncService;
+    private final GitHubIssueSyncService issueSyncService;
+    private final GitHubIssueCommentSyncService issueCommentSyncService;
+    private final GitHubPullRequestSyncService pullRequestSyncService;
+    private final GitHubPullRequestReviewSyncService pullRequestReviewSyncService;
+    private final GitHubPullRequestReviewCommentSyncService pullRequestReviewCommentSyncService;
 
-    @Value("${monitoring.backfill.batch-size:25}")
-    private int backfillBatchSize;
+    // Other dependencies
+    private final ObjectProvider<WorkspaceService> workspaceServiceProvider;
+    private final AsyncTaskExecutor monitoringExecutor;
+    private final MonitoringScopeFilter monitoringScopeFilter;
 
-    @Value("${monitoring.backfill.rate-limit-threshold:500}")
-    private int backfillRateLimitThreshold;
+    public GitHubDataSyncService(
+        @Value("${monitoring.timeframe}") int timeframe,
+        @Value("${monitoring.sync-cooldown-in-minutes}") int syncCooldownInMinutes,
+        @Value("${monitoring.backfill.enabled:false}") boolean backfillEnabled,
+        @Value("${monitoring.backfill.batch-size:25}") int backfillBatchSize,
+        @Value("${monitoring.backfill.rate-limit-threshold:500}") int backfillRateLimitThreshold,
+        @Value("${monitoring.backfill.cooldown-minutes:5}") int backfillCooldownMinutes,
+        WorkspaceRepository workspaceRepository,
+        RepositoryToMonitorRepository repositoryToMonitorRepository,
+        RepositoryRepository repositoryRepository,
+        IssueRepository issueRepository,
+        PullRequestRepository pullRequestRepository,
+        GitHubUserSyncService userSyncService,
+        GitHubTeamSyncService teamSyncService,
+        GitHubClientExecutor gitHubClientExecutor,
+        GitHubRepositorySyncService repositorySyncService,
+        GitHubRepositoryCollaboratorSyncService collaboratorSyncService,
+        GitHubLabelSyncService labelSyncService,
+        GitHubMilestoneSyncService milestoneSyncService,
+        GitHubIssueSyncService issueSyncService,
+        GitHubIssueCommentSyncService issueCommentSyncService,
+        GitHubPullRequestSyncService pullRequestSyncService,
+        GitHubPullRequestReviewSyncService pullRequestReviewSyncService,
+        GitHubPullRequestReviewCommentSyncService pullRequestReviewCommentSyncService,
+        ObjectProvider<WorkspaceService> workspaceServiceProvider,
+        @Qualifier("monitoringExecutor") AsyncTaskExecutor monitoringExecutor,
+        MonitoringScopeFilter monitoringScopeFilter
+    ) {
+        this.timeframe = timeframe;
+        this.syncCooldownInMinutes = syncCooldownInMinutes;
+        this.backfillEnabled = backfillEnabled;
+        this.backfillBatchSize = backfillBatchSize;
+        this.backfillRateLimitThreshold = backfillRateLimitThreshold;
+        this.backfillCooldownMinutes = backfillCooldownMinutes;
+        this.workspaceRepository = workspaceRepository;
+        this.repositoryToMonitorRepository = repositoryToMonitorRepository;
+        this.repositoryRepository = repositoryRepository;
+        this.issueRepository = issueRepository;
+        this.pullRequestRepository = pullRequestRepository;
+        this.userSyncService = userSyncService;
+        this.teamSyncService = teamSyncService;
+        this.gitHubClientExecutor = gitHubClientExecutor;
+        this.repositorySyncService = repositorySyncService;
+        this.collaboratorSyncService = collaboratorSyncService;
+        this.labelSyncService = labelSyncService;
+        this.milestoneSyncService = milestoneSyncService;
+        this.issueSyncService = issueSyncService;
+        this.issueCommentSyncService = issueCommentSyncService;
+        this.pullRequestSyncService = pullRequestSyncService;
+        this.pullRequestReviewSyncService = pullRequestReviewSyncService;
+        this.pullRequestReviewCommentSyncService = pullRequestReviewCommentSyncService;
+        this.workspaceServiceProvider = workspaceServiceProvider;
+        this.monitoringExecutor = monitoringExecutor;
+        this.monitoringScopeFilter = monitoringScopeFilter;
+    }
 
-    @Value("${monitoring.backfill.cooldown-minutes:5}")
-    private int backfillCooldownMinutes;
-
-    @Autowired
-    private WorkspaceRepository workspaceRepository;
-
-    @Autowired
-    private RepositoryToMonitorRepository repositoryToMonitorRepository;
-
-    @Autowired
-    @Lazy
-    private WorkspaceService workspaceService;
-
-    @Autowired
-    private GitHubUserSyncService userSyncService;
-
-    @Autowired
-    private GitHubTeamSyncService teamSyncService;
-
-    @Autowired
-    private GitHubClientExecutor gitHubClientExecutor;
-
-    @Autowired
-    private GitHubRepositorySyncService repositorySyncService;
-
-    @Autowired
-    private GitHubRepositoryCollaboratorSyncService collaboratorSyncService;
-
-    @Autowired
-    private GitHubLabelSyncService labelSyncService;
-
-    @Autowired
-    private GitHubMilestoneSyncService milestoneSyncService;
-
-    @Autowired
-    private GitHubIssueSyncService issueSyncService;
-
-    @Autowired
-    private GitHubIssueCommentSyncService issueCommentSyncService;
-
-    @Autowired
-    private GitHubPullRequestSyncService pullRequestSyncService;
-
-    @Autowired
-    private GitHubPullRequestReviewSyncService pullRequestReviewSyncService;
-
-    @Autowired
-    private GitHubPullRequestReviewCommentSyncService pullRequestReviewCommentSyncService;
-
-    @Autowired
-    private RepositoryRepository repositoryRepository;
-
-    @Autowired
-    private IssueRepository issueRepository;
-
-    @Autowired
-    private PullRequestRepository pullRequestRepository;
-
-    @Autowired
-    @Qualifier("monitoringExecutor")
-    private AsyncTaskExecutor monitoringExecutor;
-
-    @Autowired
-    private MonitoringScopeFilter monitoringScopeFilter;
+    /** Lazy accessor for WorkspaceService to break circular dependency. */
+    private WorkspaceService getWorkspaceService() {
+        return workspaceServiceProvider.getObject();
+    }
 
     /**
      * Syncs all existing users in the database with their GitHub data
@@ -232,7 +250,12 @@ public class GitHubDataSyncService {
             (!monitoringScopeFilter.isRepositoryAllowed(repositoryToMonitor) ||
                 !monitoringScopeFilter.isWorkspaceAllowed(workspace))
         ) {
-            logger.debug("Repository {} filtered out; skipping sync.", repositoryToMonitor.getNameWithOwner());
+            logger.info(
+                "Repository {} filtered out; skipping sync (repo allowed={}, workspace allowed={}).",
+                repositoryToMonitor.getNameWithOwner(),
+                monitoringScopeFilter.isRepositoryAllowed(repositoryToMonitor),
+                monitoringScopeFilter.isWorkspaceAllowed(workspace)
+            );
             return;
         }
 
@@ -302,7 +325,13 @@ public class GitHubDataSyncService {
         // - If recent sync just ran in this cycle, pass true (we know data is fresh)
         // - If recent sync didn't run but has run before, pass false (requires timestamp validation)
         if (backfillEnabled && shouldRunBackfill(repositoryToMonitor, shouldSyncIssuesAndPullRequests)) {
-            logger.info("{} - Running backfill batch...", repositoryToMonitor.getNameWithOwner());
+            logger.info(
+                "{} - Running backfill batch (filter active={}, workspace allowed={}, repo allowed={})...",
+                repositoryToMonitor.getNameWithOwner(),
+                monitoringScopeFilter.isActive(),
+                monitoringScopeFilter.isWorkspaceAllowed(repositoryToMonitor.getWorkspace()),
+                monitoringScopeFilter.isRepositoryAllowed(repositoryToMonitor)
+            );
             runBackfillBatch(ghRepository, repositoryToMonitor);
         }
 
@@ -381,7 +410,7 @@ public class GitHubDataSyncService {
             return;
         }
         try {
-            workspaceService.removeRepositoryToMonitor(workspace.getWorkspaceSlug(), monitor.getNameWithOwner());
+            getWorkspaceService().removeRepositoryToMonitor(workspace.getWorkspaceSlug(), monitor.getNameWithOwner());
         } catch (EntityNotFoundException ignored) {
             // Already removed by another thread; nothing else to do.
         }

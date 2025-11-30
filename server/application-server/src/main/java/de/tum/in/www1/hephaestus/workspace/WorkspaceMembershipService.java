@@ -20,6 +20,17 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * Service for managing workspace memberships.
+ * <p>
+ * Handles CRUD operations for workspace memberships, including:
+ * <ul>
+ *   <li>Creating and removing memberships</li>
+ *   <li>Updating member roles</li>
+ *   <li>Syncing GitHub organization members with workspace memberships</li>
+ *   <li>Managing league points snapshots</li>
+ * </ul>
+ */
 @Service
 public class WorkspaceMembershipService {
 

@@ -53,15 +53,18 @@ import org.kohsuke.github.GHRepository;
 import org.kohsuke.github.GHRepositorySelection;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.annotation.Lazy;
 import org.springframework.core.task.AsyncTaskExecutor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * Central service for workspace management operations.
+ * Handles workspace creation, configuration, activation, and synchronization coordination.
+ */
 @Service
 public class WorkspaceService {
 
@@ -71,76 +74,93 @@ public class WorkspaceService {
 
     private static final Pattern SLACK_CHANNEL_ID_PATTERN = Pattern.compile("^[CGD][A-Z0-9]{8,}$");
 
-    @Autowired
-    private NatsConsumerService natsConsumerService;
+    // Configuration
+    private final boolean isNatsEnabled;
+    private final boolean runMonitoringOnStartup;
 
-    @Autowired
-    @Lazy
-    private GitHubDataSyncService gitHubDataSyncService;
+    // Core repositories
+    private final WorkspaceRepository workspaceRepository;
+    private final RepositoryToMonitorRepository repositoryToMonitorRepository;
+    private final UserRepository userRepository;
+    private final TeamRepository teamRepository;
+    private final RepositoryRepository repositoryRepository;
+    private final LabelRepository labelRepository;
+    private final WorkspaceMembershipRepository workspaceMembershipRepository;
 
-    @Autowired
-    private GitHubRepositorySyncService repositorySyncService;
+    // Services
+    private final NatsConsumerService natsConsumerService;
+    private final GitHubRepositorySyncService repositorySyncService;
+    private final GitHubInstallationRepositoryEnumerationService installationRepositoryEnumerator;
+    private final MonitoringScopeFilter monitoringScopeFilter;
+    private final TeamInfoDTOConverter teamInfoDTOConverter;
+    private final LeaderboardService leaderboardService;
+    private final LeaguePointsCalculationService leaguePointsCalculationService;
+    private final OrganizationService organizationService;
+    private final WorkspaceMembershipService workspaceMembershipService;
+    private final GitHubUserSyncService gitHubUserSyncService;
+    private final GitHubAppTokenService gitHubAppTokenService;
+    private final OrganizationSyncService organizationSyncService;
 
-    @Autowired
-    private GitHubInstallationRepositoryEnumerationService installationRepositoryEnumerator;
+    // Lazy-loaded dependencies (to break circular references)
+    private final ObjectProvider<GitHubDataSyncService> gitHubDataSyncServiceProvider;
 
-    @Autowired
-    private MonitoringScopeFilter monitoringScopeFilter;
+    // Infrastructure
+    private final AsyncTaskExecutor monitoringExecutor;
 
-    @Autowired
-    @Qualifier("monitoringExecutor")
-    private AsyncTaskExecutor monitoringExecutor;
+    public WorkspaceService(
+        @Value("${nats.enabled}") boolean isNatsEnabled,
+        @Value("${monitoring.run-on-startup}") boolean runMonitoringOnStartup,
+        WorkspaceRepository workspaceRepository,
+        RepositoryToMonitorRepository repositoryToMonitorRepository,
+        UserRepository userRepository,
+        TeamRepository teamRepository,
+        RepositoryRepository repositoryRepository,
+        LabelRepository labelRepository,
+        WorkspaceMembershipRepository workspaceMembershipRepository,
+        NatsConsumerService natsConsumerService,
+        GitHubRepositorySyncService repositorySyncService,
+        GitHubInstallationRepositoryEnumerationService installationRepositoryEnumerator,
+        MonitoringScopeFilter monitoringScopeFilter,
+        TeamInfoDTOConverter teamInfoDTOConverter,
+        LeaderboardService leaderboardService,
+        LeaguePointsCalculationService leaguePointsCalculationService,
+        OrganizationService organizationService,
+        WorkspaceMembershipService workspaceMembershipService,
+        GitHubUserSyncService gitHubUserSyncService,
+        GitHubAppTokenService gitHubAppTokenService,
+        OrganizationSyncService organizationSyncService,
+        ObjectProvider<GitHubDataSyncService> gitHubDataSyncServiceProvider,
+        @Qualifier("monitoringExecutor") AsyncTaskExecutor monitoringExecutor
+    ) {
+        this.isNatsEnabled = isNatsEnabled;
+        this.runMonitoringOnStartup = runMonitoringOnStartup;
+        this.workspaceRepository = workspaceRepository;
+        this.repositoryToMonitorRepository = repositoryToMonitorRepository;
+        this.userRepository = userRepository;
+        this.teamRepository = teamRepository;
+        this.repositoryRepository = repositoryRepository;
+        this.labelRepository = labelRepository;
+        this.workspaceMembershipRepository = workspaceMembershipRepository;
+        this.natsConsumerService = natsConsumerService;
+        this.repositorySyncService = repositorySyncService;
+        this.installationRepositoryEnumerator = installationRepositoryEnumerator;
+        this.monitoringScopeFilter = monitoringScopeFilter;
+        this.teamInfoDTOConverter = teamInfoDTOConverter;
+        this.leaderboardService = leaderboardService;
+        this.leaguePointsCalculationService = leaguePointsCalculationService;
+        this.organizationService = organizationService;
+        this.workspaceMembershipService = workspaceMembershipService;
+        this.gitHubUserSyncService = gitHubUserSyncService;
+        this.gitHubAppTokenService = gitHubAppTokenService;
+        this.organizationSyncService = organizationSyncService;
+        this.gitHubDataSyncServiceProvider = gitHubDataSyncServiceProvider;
+        this.monitoringExecutor = monitoringExecutor;
+    }
 
-    @Autowired
-    private WorkspaceRepository workspaceRepository;
-
-    @Autowired
-    private RepositoryToMonitorRepository repositoryToMonitorRepository;
-
-    @Autowired
-    private UserRepository userRepository;
-
-    @Autowired
-    private TeamRepository teamRepository;
-
-    @Autowired
-    private TeamInfoDTOConverter teamInfoDTOConverter;
-
-    @Autowired
-    private RepositoryRepository repositoryRepository;
-
-    @Autowired
-    private LabelRepository labelRepository;
-
-    @Autowired
-    private LeaderboardService leaderboardService;
-
-    @Autowired
-    private LeaguePointsCalculationService leaguePointsCalculationService;
-
-    @Autowired
-    private OrganizationService organizationService;
-
-    @Autowired
-    private WorkspaceMembershipService workspaceMembershipService;
-
-    @Autowired
-    private WorkspaceMembershipRepository workspaceMembershipRepository;
-
-    @Autowired
-    private GitHubUserSyncService gitHubUserSyncService;
-
-    @Autowired
-    private GitHubAppTokenService gitHubAppTokenService;
-
-    @Autowired
-    private OrganizationSyncService organizationSyncService;
-
-    @Value("${nats.enabled}")
-    private boolean isNatsEnabled;
-
-    @Value("${monitoring.run-on-startup}")
-    private boolean runMonitoringOnStartup;
+    /** Lazy accessor for GitHubDataSyncService to break circular dependency. */
+    private GitHubDataSyncService getGitHubDataSyncService() {
+        return gitHubDataSyncServiceProvider.getObject();
+    }
 
     /**
      * Prepare every workspace and start monitoring/sync routines for those that are ready.
@@ -224,7 +244,7 @@ public class WorkspaceService {
                 // Workspaces themselves run in parallel using virtual threads.
                 for (var repo : eligibleRepositories) {
                     try {
-                        gitHubDataSyncService.syncRepositoryToMonitor(repo);
+                        getGitHubDataSyncService().syncRepositoryToMonitor(repo);
                     } catch (Exception ex) {
                         logger.error(
                             "Error syncing repository {}: {}",
@@ -238,14 +258,14 @@ public class WorkspaceService {
                 // Users and teams sync sequentially after all repos
                 try {
                     logger.info("All repositories synced, now syncing users for workspace id={}", workspace.getId());
-                    gitHubDataSyncService.syncUsers(workspace);
+                    getGitHubDataSyncService().syncUsers(workspace);
                 } catch (Exception ex) {
                     logger.error("Error during syncUsers: {}", LoggingUtils.sanitizeForLog(ex.getMessage()), ex);
                 }
 
                 try {
                     logger.info("Users synced, now syncing teams for workspace id={}", workspace.getId());
-                    gitHubDataSyncService.syncTeams(workspace);
+                    getGitHubDataSyncService().syncTeams(workspace);
                 } catch (Exception ex) {
                     logger.error("Error during syncTeams: {}", LoggingUtils.sanitizeForLog(ex.getMessage()), ex);
                 }
@@ -265,6 +285,7 @@ public class WorkspaceService {
         }
     }
 
+    @Transactional(readOnly = true)
     public Workspace getWorkspaceByRepositoryOwner(String nameWithOwner) {
         return workspaceRepository
             .findByRepositoriesToMonitor_NameWithOwner(nameWithOwner)
@@ -275,14 +296,17 @@ public class WorkspaceService {
     /**
      * List all non-purged workspaces.
      */
+    @Transactional(readOnly = true)
     public List<Workspace> listAllWorkspaces() {
         return workspaceRepository.findByStatusNot(Workspace.WorkspaceStatus.PURGED);
     }
 
+    @Transactional(readOnly = true)
     public Optional<Workspace> findByInstallationId(Long installationId) {
         return workspaceRepository.findByInstallationId(installationId);
     }
 
+    @Transactional(readOnly = true)
     public List<String> getRepositoriesToMonitor(String slug) {
         Workspace workspace = requireWorkspace(slug);
         logger.info(
@@ -930,7 +954,7 @@ public class WorkspaceService {
             return;
         }
         if (repositoryAllowed) {
-            gitHubDataSyncService.syncRepositoryToMonitorAsync(monitor);
+            getGitHubDataSyncService().syncRepositoryToMonitorAsync(monitor);
         } else {
             logger.debug("Repository {} persisted but monitoring disabled by filters.", monitor.getNameWithOwner());
         }

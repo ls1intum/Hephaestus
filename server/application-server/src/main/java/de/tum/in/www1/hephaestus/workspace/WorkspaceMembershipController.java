@@ -1,6 +1,8 @@
 package de.tum.in.www1.hephaestus.workspace;
 
+import de.tum.in.www1.hephaestus.core.exception.AccessForbiddenException;
 import de.tum.in.www1.hephaestus.core.exception.EntityNotFoundException;
+import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceMembership.WorkspaceRole;
 import de.tum.in.www1.hephaestus.workspace.authorization.RequireAtLeastWorkspaceAdmin;
@@ -10,14 +12,13 @@ import de.tum.in.www1.hephaestus.workspace.context.WorkspaceScopedController;
 import de.tum.in.www1.hephaestus.workspace.dto.AssignRoleRequestDTO;
 import de.tum.in.www1.hephaestus.workspace.dto.WorkspaceMembershipDTO;
 import de.tum.in.www1.hephaestus.workspace.exception.InsufficientWorkspacePermissionsException;
+import de.tum.in.www1.hephaestus.workspace.exception.LastOwnerRemovalException;
 import jakarta.validation.Valid;
 import java.util.List;
-import java.util.Map;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -27,45 +28,32 @@ import org.springframework.web.bind.annotation.*;
  */
 @WorkspaceScopedController
 @RequestMapping("/members")
+@RequiredArgsConstructor
 public class WorkspaceMembershipController {
 
-    @Autowired
-    private WorkspaceMembershipService workspaceMembershipService;
-
-    @Autowired
-    private WorkspaceMembershipRepository workspaceMembershipRepository;
-
-    @Autowired
-    private UserRepository userRepository;
-
-    @Autowired
-    private WorkspaceAccessService accessService;
+    private final WorkspaceMembershipService workspaceMembershipService;
+    private final WorkspaceMembershipRepository workspaceMembershipRepository;
+    private final UserRepository userRepository;
+    private final WorkspaceAccessService accessService;
 
     /**
      * Get the current user's membership in this workspace.
+     *
+     * @param context the workspace context
+     * @return the current user's membership details
      */
     @GetMapping("/me")
     public ResponseEntity<WorkspaceMembershipDTO> getCurrentUserMembership(WorkspaceContext context) {
-        var currentUser = userRepository.getCurrentUser().orElse(null);
-        if (currentUser == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
-        }
-
-        var userOpt = workspaceMembershipRepository
-            .findByWorkspace_IdAndUser_Id(context.id(), currentUser.getId())
-            .orElse(null);
-
-        if (userOpt == null) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
-        }
-
-        return ResponseEntity.ok(WorkspaceMembershipDTO.from(userOpt));
+        User currentUser = requireCurrentUser();
+        WorkspaceMembership membership = requireMembership(context.id(), currentUser.getId());
+        return ResponseEntity.ok(WorkspaceMembershipDTO.from(membership));
     }
 
     /**
      * List all members of the workspace with pagination.
      * Accessible to all workspace members (MEMBER role and above).
      *
+     * @param context the workspace context
      * @param page Page number (0-indexed)
      * @param size Page size (default 50, max 100)
      * @return List of workspace memberships
@@ -76,11 +64,10 @@ public class WorkspaceMembershipController {
         @RequestParam(defaultValue = "0") int page,
         @RequestParam(defaultValue = "50") int size
     ) {
-        // Limit page size to 100
         int pageSize = Math.min(size, 100);
         Pageable pageable = PageRequest.of(page, pageSize, Sort.by("createdAt").ascending());
 
-        var memberships = workspaceMembershipRepository
+        List<WorkspaceMembershipDTO> memberships = workspaceMembershipRepository
             .findAllByWorkspace_Id(context.id(), pageable)
             .map(WorkspaceMembershipDTO::from)
             .getContent();
@@ -92,44 +79,37 @@ public class WorkspaceMembershipController {
      * Get a specific member's details.
      * Accessible to all workspace members.
      *
+     * @param context the workspace context
      * @param userId User ID
      * @return Workspace membership details
      */
     @GetMapping("/{userId}")
-    public ResponseEntity<?> getMember(WorkspaceContext context, @PathVariable Long userId) {
-        var membership = workspaceMembershipRepository.findByWorkspace_IdAndUser_Id(context.id(), userId);
-
-        if (membership.isEmpty()) {
-            return ResponseEntity.notFound().build();
-        }
-
-        return ResponseEntity.ok(WorkspaceMembershipDTO.from(membership.get()));
+    public ResponseEntity<WorkspaceMembershipDTO> getMember(WorkspaceContext context, @PathVariable Long userId) {
+        WorkspaceMembership membership = requireMembership(context.id(), userId);
+        return ResponseEntity.ok(WorkspaceMembershipDTO.from(membership));
     }
 
     /**
      * Assign or update a role for a workspace member.
      * OWNER can assign any role. ADMIN can assign ADMIN or MEMBER roles.
      *
+     * @param context the workspace context
      * @param request Role assignment request
      * @return Updated membership
      */
     @PostMapping("/assign")
     @RequireAtLeastWorkspaceAdmin
-    public ResponseEntity<?> assignRole(WorkspaceContext context, @Valid @RequestBody AssignRoleRequestDTO request) {
-        // Check if user can manage this role
-        if (!accessService.canManageRole(request.role())) {
-            throw new InsufficientWorkspacePermissionsException(
-                context.slug(),
-                "You cannot assign the " + request.role() + " role"
-            );
-        }
-
-        try {
-            var membership = workspaceMembershipService.assignRole(context.id(), request.userId(), request.role());
-            return ResponseEntity.ok(WorkspaceMembershipDTO.from(membership));
-        } catch (EntityNotFoundException e) {
-            return ResponseEntity.notFound().build();
-        }
+    public ResponseEntity<WorkspaceMembershipDTO> assignRole(
+        WorkspaceContext context,
+        @Valid @RequestBody AssignRoleRequestDTO request
+    ) {
+        requireCanManageRole(context, request.role());
+        WorkspaceMembership membership = workspaceMembershipService.assignRole(
+            context.id(),
+            request.userId(),
+            request.role()
+        );
+        return ResponseEntity.ok(WorkspaceMembershipDTO.from(membership));
     }
 
     /**
@@ -137,43 +117,55 @@ public class WorkspaceMembershipController {
      * OWNER can remove anyone except themselves if they are the last OWNER.
      * ADMIN can remove MEMBER and ADMIN roles.
      *
+     * @param context the workspace context
      * @param userId User ID to remove
      * @return 204 No Content on success
      */
     @DeleteMapping("/{userId}")
     @RequireAtLeastWorkspaceAdmin
-    public ResponseEntity<?> removeMember(WorkspaceContext context, @PathVariable Long userId) {
-        try {
-            // Get current membership to check role
-            var membership = workspaceMembershipRepository
-                .findByWorkspace_IdAndUser_Id(context.id(), userId)
-                .orElseThrow(() -> new EntityNotFoundException("Workspace membership not found"));
+    public ResponseEntity<Void> removeMember(WorkspaceContext context, @PathVariable Long userId) {
+        WorkspaceMembership membership = requireMembership(context.id(), userId);
+        requireCanManageRole(context, membership.getRole());
+        requireNotLastOwner(context, membership);
 
-            // Check if user can manage this role
-            if (!accessService.canManageRole(membership.getRole())) {
-                throw new InsufficientWorkspacePermissionsException(
-                    context.slug(),
-                    "You cannot remove a member with " + membership.getRole() + " role"
-                );
+        workspaceMembershipService.removeMembership(context.id(), userId);
+        return ResponseEntity.noContent().build();
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // Helper methods - throw proper exceptions for consistent RFC-7807 responses
+    // ══════════════════════════════════════════════════════════════════════════
+
+    private User requireCurrentUser() {
+        return userRepository
+            .getCurrentUser()
+            .orElseThrow(() -> new AccessForbiddenException("User not authenticated"));
+    }
+
+    private WorkspaceMembership requireMembership(Long workspaceId, Long userId) {
+        return workspaceMembershipRepository
+            .findByWorkspace_IdAndUser_Id(workspaceId, userId)
+            .orElseThrow(() -> new EntityNotFoundException("WorkspaceMembership", userId));
+    }
+
+    private void requireCanManageRole(WorkspaceContext context, WorkspaceRole role) {
+        if (!accessService.canManageRole(role)) {
+            throw new InsufficientWorkspacePermissionsException(
+                context.slug(),
+                "You cannot manage the " + role + " role"
+            );
+        }
+    }
+
+    private void requireNotLastOwner(WorkspaceContext context, WorkspaceMembership membership) {
+        if (membership.getRole() == WorkspaceRole.OWNER) {
+            long ownerCount = workspaceMembershipRepository.countByWorkspace_IdAndRole(
+                context.id(),
+                WorkspaceRole.OWNER
+            );
+            if (ownerCount <= 1) {
+                throw new LastOwnerRemovalException(context.slug());
             }
-
-            // Prevent removing the last OWNER
-            if (membership.getRole() == WorkspaceRole.OWNER) {
-                long ownerCount = workspaceMembershipRepository.countByWorkspace_IdAndRole(
-                    context.id(),
-                    WorkspaceRole.OWNER
-                );
-                if (ownerCount <= 1) {
-                    return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(
-                        Map.of("error", "Cannot remove the last OWNER from the workspace")
-                    );
-                }
-            }
-
-            workspaceMembershipService.removeMembership(context.id(), userId);
-            return ResponseEntity.noContent().build();
-        } catch (EntityNotFoundException e) {
-            return ResponseEntity.notFound().build();
         }
     }
 }

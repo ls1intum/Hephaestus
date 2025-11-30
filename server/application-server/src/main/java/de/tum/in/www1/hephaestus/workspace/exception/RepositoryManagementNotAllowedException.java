@@ -15,6 +15,8 @@ public class RepositoryManagementNotAllowedException extends RuntimeException {
     @Serial
     private static final long serialVersionUID = 1L;
 
+    private final String workspaceSlug;
+
     public RepositoryManagementNotAllowedException(String workspaceSlug) {
         super(
             "Repository management is not allowed for workspace '" +
@@ -23,5 +25,15 @@ public class RepositoryManagementNotAllowedException extends RuntimeException {
             "This workspace is managed by a GitHub App Installation. " +
             "Repositories are automatically synced based on the installation's configuration."
         );
+        this.workspaceSlug = workspaceSlug;
+    }
+
+    /**
+     * Get the workspace slug that triggered this exception.
+     *
+     * @return the workspace slug
+     */
+    public String getWorkspaceSlug() {
+        return workspaceSlug;
     }
 }
