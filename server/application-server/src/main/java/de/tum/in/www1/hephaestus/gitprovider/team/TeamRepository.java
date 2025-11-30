@@ -1,6 +1,7 @@
 package de.tum.in.www1.hephaestus.gitprovider.team;
 
 import java.util.List;
+import java.util.Optional;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
@@ -15,10 +16,37 @@ public interface TeamRepository extends JpaRepository<Team, Long> {
 
     /**
      * Fetch teams with all collections eagerly loaded for DTO conversion.
-     * Uses EntityGraph to fetch repoPermissions, labels, and memberships in one query.
+     * Uses EntityGraph to fetch repoPermissions (with nested repository and its labels),
+     * team labels, and memberships (with users) in one query.
      */
-    @EntityGraph(attributePaths = { "repoPermissions", "labels", "memberships", "memberships.user" })
+    @EntityGraph(
+        attributePaths = {
+            "repoPermissions",
+            "repoPermissions.repository",
+            "repoPermissions.repository.labels",
+            "labels",
+            "labels.repository",
+            "memberships",
+            "memberships.user",
+        }
+    )
     List<Team> findWithCollectionsByOrganizationIgnoreCase(String organization);
+
+    /**
+     * Fetch a single team by ID with all collections eagerly loaded for DTO conversion.
+     */
+    @EntityGraph(
+        attributePaths = {
+            "repoPermissions",
+            "repoPermissions.repository",
+            "repoPermissions.repository.labels",
+            "labels",
+            "labels.repository",
+            "memberships",
+            "memberships.user",
+        }
+    )
+    Optional<Team> findWithCollectionsById(Long id);
 
     List<Team> findAllByOrganizationIgnoreCaseAndHiddenFalse(String organization);
 }

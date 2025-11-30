@@ -45,9 +45,9 @@ export function BestPracticesContainer() {
 	// Query for user profile data to get display name
 	const profileQuery = useQuery({
 		...getUserProfileOptions({
-			path: { login: username },
+			path: { workspaceSlug: slug, login: username },
 		}),
-		enabled: Boolean(username),
+		enabled: hasWorkspace && Boolean(username),
 	});
 
 	// Mutation for detecting bad practices

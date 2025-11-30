@@ -3,6 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import {
 	addRepositoryToMonitorMutation,
 	getRepositoriesToMonitorOptions,
+	getWorkspaceOptions,
 	removeRepositoryToMonitorMutation,
 	resetAndRecalculateLeaguesMutation,
 } from "@/api/@tanstack/react-query.gen";
@@ -31,6 +32,20 @@ function AdminSettings() {
 		isLoading: isWorkspaceLoading,
 		error: workspaceError,
 	} = useActiveWorkspaceSlug();
+
+	// Fetch full workspace data for gitProviderMode
+	const workspaceQueryOptions = getWorkspaceOptions({
+		path: { workspaceSlug: workspaceSlug ?? "" },
+	});
+	const { data: workspaceData } = useQuery({
+		...workspaceQueryOptions,
+		enabled: Boolean(workspaceSlug),
+	});
+
+	// Check if repository management is allowed
+	// For GitHub App Installation workspaces, repositories are managed by the installation
+	const isAppInstallationWorkspace =
+		workspaceData?.gitProviderMode === "GITHUB_APP_INSTALLATION";
 
 	// Repositories query
 	const repositoriesQueryOptions = getRepositoriesToMonitorOptions({
@@ -135,6 +150,7 @@ function AdminSettings() {
 			isAddingRepository={addRepository.isPending}
 			isRemovingRepository={removeRepository.isPending}
 			isResettingLeagues={resetLeagues.isPending}
+			isAppInstallationWorkspace={isAppInstallationWorkspace}
 			onAddRepository={handleAddRepository}
 			onRemoveRepository={handleRemoveRepository}
 			onResetLeagues={() => {

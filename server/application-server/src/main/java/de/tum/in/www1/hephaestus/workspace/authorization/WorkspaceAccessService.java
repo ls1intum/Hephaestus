@@ -13,9 +13,9 @@ import org.springframework.stereotype.Service;
  * Uses role hierarchy: OWNER > ADMIN > MEMBER
  */
 @Service
-public class WorkspaceAccessEvaluator {
+public class WorkspaceAccessService {
 
-    private static final Logger logger = LoggerFactory.getLogger(WorkspaceAccessEvaluator.class);
+    private static final Logger logger = LoggerFactory.getLogger(WorkspaceAccessService.class);
 
     /**
      * Check if the current user has at least the specified role in the current workspace.

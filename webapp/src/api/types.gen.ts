@@ -1159,6 +1159,22 @@ export type TeamInfo = {
 };
 
 /**
+ * A lightweight DTO for team data that only contains basic information.
+ * This is used in contexts where full team details (repositories, labels, members) are not needed,
+ * avoiding expensive JOINs and lazy loading issues.
+ */
+export type TeamSummary = {
+    description?: string;
+    hidden: boolean;
+    htmlUrl?: string;
+    id: number;
+    name: string;
+    organization?: string;
+    parentId?: number;
+    privacy?: 'SECRET' | 'CLOSED';
+};
+
+/**
  * TextUIPart
  * A text part of a message.
  */
@@ -1480,7 +1496,7 @@ export type UserTeams = {
     id: number;
     login: string;
     name: string;
-    teams: Array<TeamInfo>;
+    teams: Array<TeamSummary>;
     url: string;
 };
 
@@ -1694,24 +1710,6 @@ export type UpdateUserSettingsResponses = {
 };
 
 export type UpdateUserSettingsResponse = UpdateUserSettingsResponses[keyof UpdateUserSettingsResponses];
-
-export type GetUserProfileData = {
-    body?: never;
-    path: {
-        login: string;
-    };
-    query?: never;
-    url: '/user/{login}/profile';
-};
-
-export type GetUserProfileResponses = {
-    /**
-     * OK
-     */
-    200: UserProfile;
-};
-
-export type GetUserProfileResponse = GetUserProfileResponses[keyof GetUserProfileResponses];
 
 export type ListWorkspacesData = {
     body?: never;
@@ -2830,6 +2828,28 @@ export type UpdateTokenResponses = {
 };
 
 export type UpdateTokenResponse = UpdateTokenResponses[keyof UpdateTokenResponses];
+
+export type GetUserProfileData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        login: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/user/{login}/profile';
+};
+
+export type GetUserProfileResponses = {
+    /**
+     * OK
+     */
+    200: UserProfile;
+};
+
+export type GetUserProfileResponse = GetUserProfileResponses[keyof GetUserProfileResponses];
 
 export type GetUsersWithTeamsData = {
     body?: never;

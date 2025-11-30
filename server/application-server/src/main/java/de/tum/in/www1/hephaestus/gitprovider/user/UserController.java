@@ -1,7 +1,6 @@
 package de.tum.in.www1.hephaestus.gitprovider.user;
 
 import de.tum.in.www1.hephaestus.integrations.posthog.PosthogClientException;
-import java.util.Optional;
 import org.keycloak.admin.client.Keycloak;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -16,7 +15,6 @@ import org.springframework.security.oauth2.core.oidc.StandardClaimNames;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -42,12 +40,6 @@ public class UserController {
 
     public UserController(UserService actorService) {
         this.userService = actorService;
-    }
-
-    @GetMapping("/{login}/profile")
-    public ResponseEntity<UserProfileDTO> getUserProfile(@PathVariable String login) {
-        Optional<UserProfileDTO> userProfile = userService.getUserProfile(login);
-        return userProfile.map(ResponseEntity::ok).orElseGet(() -> ResponseEntity.notFound().build());
     }
 
     @DeleteMapping

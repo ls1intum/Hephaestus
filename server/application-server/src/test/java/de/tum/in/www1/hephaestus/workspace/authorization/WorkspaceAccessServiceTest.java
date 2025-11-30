@@ -13,13 +13,13 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 @Tag("unit")
-class WorkspaceAccessEvaluatorTest {
+class WorkspaceAccessServiceTest {
 
-    private WorkspaceAccessEvaluator accessEvaluator;
+    private WorkspaceAccessService accessService;
 
     @BeforeEach
     void setUp() {
-        accessEvaluator = new WorkspaceAccessEvaluator();
+        accessService = new WorkspaceAccessService();
     }
 
     @AfterEach
@@ -31,7 +31,7 @@ class WorkspaceAccessEvaluatorTest {
     void hasRole_WithNoContext_ReturnsFalse() {
         // Given: No workspace context is set
         // When & Then
-        assertThat(accessEvaluator.hasRole(WorkspaceRole.MEMBER)).isFalse();
+        assertThat(accessService.hasRole(WorkspaceRole.MEMBER)).isFalse();
     }
 
     @Test
@@ -41,7 +41,7 @@ class WorkspaceAccessEvaluatorTest {
         WorkspaceContextHolder.setContext(context);
 
         // When & Then
-        assertThat(accessEvaluator.hasRole(WorkspaceRole.MEMBER)).isFalse();
+        assertThat(accessService.hasRole(WorkspaceRole.MEMBER)).isFalse();
     }
 
     @Test
@@ -58,9 +58,9 @@ class WorkspaceAccessEvaluatorTest {
         WorkspaceContextHolder.setContext(context);
 
         // When & Then
-        assertThat(accessEvaluator.hasRole(WorkspaceRole.MEMBER)).isTrue();
-        assertThat(accessEvaluator.hasRole(WorkspaceRole.ADMIN)).isFalse();
-        assertThat(accessEvaluator.hasRole(WorkspaceRole.OWNER)).isFalse();
+        assertThat(accessService.hasRole(WorkspaceRole.MEMBER)).isTrue();
+        assertThat(accessService.hasRole(WorkspaceRole.ADMIN)).isFalse();
+        assertThat(accessService.hasRole(WorkspaceRole.OWNER)).isFalse();
     }
 
     @Test
@@ -77,9 +77,9 @@ class WorkspaceAccessEvaluatorTest {
         WorkspaceContextHolder.setContext(context);
 
         // When & Then: Admin satisfies MEMBER and ADMIN requirements
-        assertThat(accessEvaluator.hasRole(WorkspaceRole.MEMBER)).isTrue();
-        assertThat(accessEvaluator.hasRole(WorkspaceRole.ADMIN)).isTrue();
-        assertThat(accessEvaluator.hasRole(WorkspaceRole.OWNER)).isFalse();
+        assertThat(accessService.hasRole(WorkspaceRole.MEMBER)).isTrue();
+        assertThat(accessService.hasRole(WorkspaceRole.ADMIN)).isTrue();
+        assertThat(accessService.hasRole(WorkspaceRole.OWNER)).isFalse();
     }
 
     @Test
@@ -96,9 +96,9 @@ class WorkspaceAccessEvaluatorTest {
         WorkspaceContextHolder.setContext(context);
 
         // When & Then: Owner satisfies all role requirements
-        assertThat(accessEvaluator.hasRole(WorkspaceRole.MEMBER)).isTrue();
-        assertThat(accessEvaluator.hasRole(WorkspaceRole.ADMIN)).isTrue();
-        assertThat(accessEvaluator.hasRole(WorkspaceRole.OWNER)).isTrue();
+        assertThat(accessService.hasRole(WorkspaceRole.MEMBER)).isTrue();
+        assertThat(accessService.hasRole(WorkspaceRole.ADMIN)).isTrue();
+        assertThat(accessService.hasRole(WorkspaceRole.OWNER)).isTrue();
     }
 
     @Test
@@ -115,7 +115,7 @@ class WorkspaceAccessEvaluatorTest {
         WorkspaceContextHolder.setContext(context);
 
         // When & Then
-        assertThat(accessEvaluator.isOwner()).isTrue();
+        assertThat(accessService.isOwner()).isTrue();
     }
 
     @Test
@@ -132,7 +132,7 @@ class WorkspaceAccessEvaluatorTest {
         WorkspaceContextHolder.setContext(context);
 
         // When & Then
-        assertThat(accessEvaluator.isOwner()).isFalse();
+        assertThat(accessService.isOwner()).isFalse();
     }
 
     @Test
@@ -149,7 +149,7 @@ class WorkspaceAccessEvaluatorTest {
         WorkspaceContextHolder.setContext(context);
 
         // When & Then
-        assertThat(accessEvaluator.isAdmin()).isTrue();
+        assertThat(accessService.isAdmin()).isTrue();
     }
 
     @Test
@@ -166,7 +166,7 @@ class WorkspaceAccessEvaluatorTest {
         WorkspaceContextHolder.setContext(context);
 
         // When & Then
-        assertThat(accessEvaluator.isAdmin()).isTrue();
+        assertThat(accessService.isAdmin()).isTrue();
     }
 
     @Test
@@ -183,7 +183,7 @@ class WorkspaceAccessEvaluatorTest {
 
         // When & Then: MEMBER
         WorkspaceContextHolder.setContext(memberContext);
-        assertThat(accessEvaluator.isMember()).isTrue();
+        assertThat(accessService.isMember()).isTrue();
 
         // Given: ADMIN
         WorkspaceContext adminContext = new WorkspaceContext(
@@ -195,7 +195,7 @@ class WorkspaceAccessEvaluatorTest {
             Set.of(WorkspaceRole.ADMIN)
         );
         WorkspaceContextHolder.setContext(adminContext);
-        assertThat(accessEvaluator.isMember()).isTrue();
+        assertThat(accessService.isMember()).isTrue();
 
         // Given: OWNER
         WorkspaceContext ownerContext = new WorkspaceContext(
@@ -207,7 +207,7 @@ class WorkspaceAccessEvaluatorTest {
             Set.of(WorkspaceRole.OWNER)
         );
         WorkspaceContextHolder.setContext(ownerContext);
-        assertThat(accessEvaluator.isMember()).isTrue();
+        assertThat(accessService.isMember()).isTrue();
     }
 
     @Test
@@ -224,9 +224,9 @@ class WorkspaceAccessEvaluatorTest {
         WorkspaceContextHolder.setContext(context);
 
         // When & Then: OWNER can manage all roles
-        assertThat(accessEvaluator.canManageRole(WorkspaceRole.MEMBER)).isTrue();
-        assertThat(accessEvaluator.canManageRole(WorkspaceRole.ADMIN)).isTrue();
-        assertThat(accessEvaluator.canManageRole(WorkspaceRole.OWNER)).isTrue();
+        assertThat(accessService.canManageRole(WorkspaceRole.MEMBER)).isTrue();
+        assertThat(accessService.canManageRole(WorkspaceRole.ADMIN)).isTrue();
+        assertThat(accessService.canManageRole(WorkspaceRole.OWNER)).isTrue();
     }
 
     @Test
@@ -243,9 +243,9 @@ class WorkspaceAccessEvaluatorTest {
         WorkspaceContextHolder.setContext(context);
 
         // When & Then: ADMIN can manage MEMBER and ADMIN, but not OWNER
-        assertThat(accessEvaluator.canManageRole(WorkspaceRole.MEMBER)).isTrue();
-        assertThat(accessEvaluator.canManageRole(WorkspaceRole.ADMIN)).isTrue();
-        assertThat(accessEvaluator.canManageRole(WorkspaceRole.OWNER)).isFalse();
+        assertThat(accessService.canManageRole(WorkspaceRole.MEMBER)).isTrue();
+        assertThat(accessService.canManageRole(WorkspaceRole.ADMIN)).isTrue();
+        assertThat(accessService.canManageRole(WorkspaceRole.OWNER)).isFalse();
     }
 
     @Test
@@ -262,16 +262,16 @@ class WorkspaceAccessEvaluatorTest {
         WorkspaceContextHolder.setContext(context);
 
         // When & Then: MEMBER cannot manage any roles
-        assertThat(accessEvaluator.canManageRole(WorkspaceRole.MEMBER)).isFalse();
-        assertThat(accessEvaluator.canManageRole(WorkspaceRole.ADMIN)).isFalse();
-        assertThat(accessEvaluator.canManageRole(WorkspaceRole.OWNER)).isFalse();
+        assertThat(accessService.canManageRole(WorkspaceRole.MEMBER)).isFalse();
+        assertThat(accessService.canManageRole(WorkspaceRole.ADMIN)).isFalse();
+        assertThat(accessService.canManageRole(WorkspaceRole.OWNER)).isFalse();
     }
 
     @Test
     void canManageRole_WithNoContext_ReturnsFalse() {
         // Given: No context
         // When & Then
-        assertThat(accessEvaluator.canManageRole(WorkspaceRole.MEMBER)).isFalse();
+        assertThat(accessService.canManageRole(WorkspaceRole.MEMBER)).isFalse();
     }
 
     @Test
@@ -288,14 +288,14 @@ class WorkspaceAccessEvaluatorTest {
         WorkspaceContextHolder.setContext(context);
 
         // When & Then: hasPermission behaves same as hasRole
-        assertThat(accessEvaluator.hasPermission(WorkspaceRole.MEMBER)).isEqualTo(
-            accessEvaluator.hasRole(WorkspaceRole.MEMBER)
+        assertThat(accessService.hasPermission(WorkspaceRole.MEMBER)).isEqualTo(
+            accessService.hasRole(WorkspaceRole.MEMBER)
         );
-        assertThat(accessEvaluator.hasPermission(WorkspaceRole.ADMIN)).isEqualTo(
-            accessEvaluator.hasRole(WorkspaceRole.ADMIN)
+        assertThat(accessService.hasPermission(WorkspaceRole.ADMIN)).isEqualTo(
+            accessService.hasRole(WorkspaceRole.ADMIN)
         );
-        assertThat(accessEvaluator.hasPermission(WorkspaceRole.OWNER)).isEqualTo(
-            accessEvaluator.hasRole(WorkspaceRole.OWNER)
+        assertThat(accessService.hasPermission(WorkspaceRole.OWNER)).isEqualTo(
+            accessService.hasRole(WorkspaceRole.OWNER)
         );
     }
 }

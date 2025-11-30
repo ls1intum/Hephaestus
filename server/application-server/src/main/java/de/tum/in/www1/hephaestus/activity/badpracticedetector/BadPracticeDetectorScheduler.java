@@ -2,8 +2,12 @@ package de.tum.in.www1.hephaestus.activity.badpracticedetector;
 
 import de.tum.in.www1.hephaestus.gitprovider.label.Label;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
+import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.notification.MailService;
+import de.tum.in.www1.hephaestus.workspace.RepositoryToMonitorRepository;
+import de.tum.in.www1.hephaestus.workspace.Workspace;
+import de.tum.in.www1.hephaestus.workspace.WorkspaceRepository;
 import jakarta.ws.rs.NotAuthorizedException;
 import jakarta.ws.rs.ProcessingException;
 import java.time.Instant;
@@ -43,6 +47,12 @@ public class BadPracticeDetectorScheduler {
 
     @Autowired
     Keycloak keycloak;
+
+    @Autowired
+    RepositoryToMonitorRepository repositoryToMonitorRepository;
+
+    @Autowired
+    WorkspaceRepository workspaceRepository;
 
     @Value("${hephaestus.detection.run-automatic-detection-for-all}")
     private boolean runAutomaticDetectionForAll;
@@ -196,7 +206,31 @@ public class BadPracticeDetectorScheduler {
         badPracticeDetectorTask.setMailService(mailService);
         badPracticeDetectorTask.setPullRequest(pullRequest);
         badPracticeDetectorTask.setSendBadPracticeDetectionEmail(sendBadPracticeDetectionEmail);
+        resolveWorkspaceSlugForRepository(pullRequest.getRepository()).ifPresent(
+            badPracticeDetectorTask::setWorkspaceSlug
+        );
         return badPracticeDetectorTask;
+    }
+
+    /**
+     * Resolve workspace slug for a repository without depending on WorkspaceService to avoid circular dependencies.
+     * Prefers repository monitor mapping; falls back to account login match.
+     */
+    private Optional<String> resolveWorkspaceSlugForRepository(Repository repository) {
+        if (repository == null || repository.getNameWithOwner() == null) {
+            return Optional.empty();
+        }
+        String nameWithOwner = repository.getNameWithOwner();
+        var monitor = repositoryToMonitorRepository.findByNameWithOwner(nameWithOwner);
+        if (monitor.isPresent()) {
+            Workspace workspace = monitor.get().getWorkspace();
+            return workspace != null ? Optional.ofNullable(workspace.getWorkspaceSlug()) : Optional.empty();
+        }
+        String owner = nameWithOwner.contains("/") ? nameWithOwner.substring(0, nameWithOwner.indexOf("/")) : null;
+        if (owner != null) {
+            return workspaceRepository.findByAccountLoginIgnoreCase(owner).map(Workspace::getWorkspaceSlug);
+        }
+        return Optional.empty();
     }
 
     @Scheduled(cron = "0 0 */12 * * *")

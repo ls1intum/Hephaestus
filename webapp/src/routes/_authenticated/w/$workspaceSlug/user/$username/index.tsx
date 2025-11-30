@@ -20,9 +20,9 @@ function UserProfile() {
 	// Query for user profile data
 	const profileQuery = useQuery({
 		...getUserProfileOptions({
-			path: { login: username },
+			path: { workspaceSlug, login: username },
 		}),
-		enabled: Boolean(username),
+		enabled: Boolean(username) && Boolean(workspaceSlug),
 	});
 
 	return (

@@ -2,36 +2,42 @@
 <databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog" xmlns:ext="http://www.liquibase.org/xml/ns/dbchangelog-ext" xmlns:pro="http://www.liquibase.org/xml/ns/pro" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog-ext http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-ext.xsd http://www.liquibase.org/xml/ns/pro http://www.liquibase.org/xml/ns/pro/liquibase-pro-latest.xsd http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
 
     <!-- Backfill state tracking columns for repository_to_monitor -->
-    <changeSet author="felixdietrich (generated)" id="1764514002516-1">
+    <changeSet author="FelixTJDietrich" id="1764514002516-1">
         <addColumn tableName="repository_to_monitor">
             <column name="backfill_checkpoint" type="INTEGER"/>
         </addColumn>
     </changeSet>
-    <changeSet author="felixdietrich (generated)" id="1764514002516-2">
+    <changeSet author="FelixTJDietrich" id="1764514002516-2">
         <addColumn tableName="repository_to_monitor">
             <column name="backfill_high_water_mark" type="INTEGER"/>
         </addColumn>
     </changeSet>
-    <changeSet author="felixdietrich (generated)" id="1764514002516-3">
+    <changeSet author="FelixTJDietrich" id="1764514002516-3">
         <addColumn tableName="repository_to_monitor">
             <column name="backfill_last_run_at" type="TIMESTAMP(6) WITH TIME ZONE"/>
         </addColumn>
     </changeSet>
+    <changeSet author="FelixTJDietrich" id="1764514002516-3b">
+        <addColumn tableName="repository_to_monitor">
+            <column name="collaborators_synced_at" type="TIMESTAMP(6) WITH TIME ZONE"/>
+        </addColumn>
+    </changeSet>
 
     <!-- Sync cooldown tracking columns for workspace -->
-    <changeSet author="felixdietrich (generated)" id="1764514002516-4">
+    <changeSet author="FelixTJDietrich" id="1764514002516-4">
         <addColumn tableName="workspace">
             <column name="members_synced_at" type="TIMESTAMP(6) WITH TIME ZONE"/>
         </addColumn>
     </changeSet>
-    <changeSet author="felixdietrich (generated)" id="1764514002516-5">
+    <changeSet author="FelixTJDietrich" id="1764514002516-5">
         <addColumn tableName="workspace">
             <column name="teams_synced_at" type="TIMESTAMP(6) WITH TIME ZONE"/>
         </addColumn>
     </changeSet>
 
     <!-- Workspace context resolver: Add workspace_id to chat_thread -->
-    <changeSet id="1764514002516-6" author="FelixTJDietrich">
+    <!-- Step 1: Add nullable column -->
+    <changeSet id="1764514002516-6a" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <not>
                 <columnExists tableName="chat_thread" columnName="workspace_id"/>
@@ -40,18 +46,23 @@
         <addColumn tableName="chat_thread">
             <column name="workspace_id" type="BIGINT" remarks="Workspace that owns the thread"/>
         </addColumn>
-        <addForeignKeyConstraint
-            baseTableName="chat_thread"
-            baseColumnNames="workspace_id"
-            referencedTableName="workspace"
-            referencedColumnNames="id"
-            constraintName="fk_chat_thread_workspace"
-            deferrable="false"
-            initiallyDeferred="false"
-            onDelete="SET NULL"/>
+    </changeSet>
+
+    <!-- Step 2: Create index for performance -->
+    <changeSet id="1764514002516-6b" author="FelixTJDietrich">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <indexExists indexName="idx_chat_thread_workspace_id"/>
+            </not>
+        </preConditions>
         <createIndex tableName="chat_thread" indexName="idx_chat_thread_workspace_id">
             <column name="workspace_id"/>
         </createIndex>
+    </changeSet>
+
+    <!-- Step 3: Migrate existing data -->
+    <changeSet id="1764514002516-6c" author="FelixTJDietrich">
+        <comment>Populate workspace_id from user's most recent workspace membership</comment>
         <sql>
             WITH membership AS (
                 SELECT DISTINCT ON (wm.user_id) wm.user_id, wm.workspace_id
@@ -64,19 +75,37 @@
             WHERE ct.workspace_id IS NULL
               AND ct.user_id = membership.user_id;
         </sql>
-        <sql splitStatements="false">
-            DO $$
-            BEGIN
-                IF EXISTS (SELECT 1 FROM chat_thread WHERE workspace_id IS NULL) THEN
-                    RAISE EXCEPTION 'chat_thread rows missing workspace_id after migration';
-                END IF;
-            END $$;
-        </sql>
+    </changeSet>
+
+    <!-- Step 4: Validate migration succeeded -->
+    <changeSet id="1764514002516-6d" author="FelixTJDietrich">
+        <preConditions onFail="HALT">
+            <sqlCheck expectedResult="0">SELECT COUNT(*) FROM chat_thread WHERE workspace_id IS NULL</sqlCheck>
+        </preConditions>
+        <comment>Validation: all chat_thread rows must have workspace_id populated</comment>
+        <sql>SELECT 1</sql>
+    </changeSet>
+
+    <!-- Step 5: Add NOT NULL constraint -->
+    <changeSet id="1764514002516-6e" author="FelixTJDietrich">
         <addNotNullConstraint tableName="chat_thread" columnName="workspace_id"/>
     </changeSet>
 
+    <!-- Step 6: Add FK with CASCADE delete (matches JPA @NonNull semantics) -->
+    <changeSet id="1764514002516-6f" author="FelixTJDietrich">
+        <addForeignKeyConstraint
+            baseTableName="chat_thread"
+            baseColumnNames="workspace_id"
+            referencedTableName="workspace"
+            referencedColumnNames="id"
+            constraintName="fk_chat_thread_workspace"
+            deferrable="false"
+            initiallyDeferred="false"
+            onDelete="CASCADE"/></changeSet>
+
     <!-- Workspace context resolver: Add workspace_id to document -->
-    <changeSet id="1764514002516-7" author="FelixTJDietrich">
+    <!-- Step 1: Add nullable column -->
+    <changeSet id="1764514002516-7a" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <not>
                 <columnExists tableName="document" columnName="workspace_id"/>
@@ -85,18 +114,23 @@
         <addColumn tableName="document">
             <column name="workspace_id" type="BIGINT" remarks="Workspace that owns the document"/>
         </addColumn>
-        <addForeignKeyConstraint
-            baseTableName="document"
-            baseColumnNames="workspace_id"
-            referencedTableName="workspace"
-            referencedColumnNames="id"
-            constraintName="fk_document_workspace"
-            deferrable="false"
-            initiallyDeferred="false"
-            onDelete="SET NULL"/>
+    </changeSet>
+
+    <!-- Step 2: Create index for performance -->
+    <changeSet id="1764514002516-7b" author="FelixTJDietrich">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <indexExists indexName="idx_document_workspace_id"/>
+            </not>
+        </preConditions>
         <createIndex tableName="document" indexName="idx_document_workspace_id">
             <column name="workspace_id"/>
         </createIndex>
+    </changeSet>
+
+    <!-- Step 3: Migrate existing data -->
+    <changeSet id="1764514002516-7c" author="FelixTJDietrich">
+        <comment>Populate workspace_id from user's most recent workspace membership</comment>
         <sql>
             WITH membership AS (
                 SELECT DISTINCT ON (wm.user_id) wm.user_id, wm.workspace_id
@@ -109,15 +143,33 @@
             WHERE d.workspace_id IS NULL
               AND d.user_id = membership.user_id;
         </sql>
-        <sql splitStatements="false">
-            DO $$
-            BEGIN
-                IF EXISTS (SELECT 1 FROM document WHERE workspace_id IS NULL) THEN
-                    RAISE EXCEPTION 'document rows missing workspace_id after migration';
-                END IF;
-            END $$;
-        </sql>
+    </changeSet>
+
+    <!-- Step 4: Validate migration succeeded -->
+    <changeSet id="1764514002516-7d" author="FelixTJDietrich">
+        <preConditions onFail="HALT">
+            <sqlCheck expectedResult="0">SELECT COUNT(*) FROM document WHERE workspace_id IS NULL</sqlCheck>
+        </preConditions>
+        <comment>Validation: all document rows must have workspace_id populated</comment>
+        <sql>SELECT 1</sql>
+    </changeSet>
+
+    <!-- Step 5: Add NOT NULL constraint -->
+    <changeSet id="1764514002516-7e" author="FelixTJDietrich">
         <addNotNullConstraint tableName="document" columnName="workspace_id"/>
+    </changeSet>
+
+    <!-- Step 6: Add FK with CASCADE delete (matches JPA @NonNull semantics) -->
+    <changeSet id="1764514002516-7f" author="FelixTJDietrich">
+        <addForeignKeyConstraint
+            baseTableName="document"
+            baseColumnNames="workspace_id"
+            referencedTableName="workspace"
+            referencedColumnNames="id"
+            constraintName="fk_document_workspace"
+            deferrable="false"
+            initiallyDeferred="false"
+            onDelete="CASCADE"/>
     </changeSet>
 
 </databaseChangeLog>

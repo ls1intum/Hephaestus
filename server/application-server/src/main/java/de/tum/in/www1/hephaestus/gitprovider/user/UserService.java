@@ -14,8 +14,6 @@ import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.integrations.posthog.PosthogClient;
 import de.tum.in.www1.hephaestus.integrations.posthog.PosthogClientException;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceMembershipService;
-import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContext;
-import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContextHolder;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -64,8 +62,8 @@ public class UserService {
     private PosthogClient posthogClient;
 
     @Transactional
-    public Optional<UserProfileDTO> getUserProfile(String login) {
-        logger.info("Getting user profile with login: " + login);
+    public Optional<UserProfileDTO> getUserProfile(String login, Long workspaceId) {
+        logger.info("Getting user profile with login: {} for workspaceId: {}", login, workspaceId);
 
         Optional<User> optionalUser = userRepository.findByLogin(login);
         if (optionalUser.isEmpty()) {
@@ -73,9 +71,6 @@ public class UserService {
         }
 
         User userEntity = optionalUser.get();
-
-        WorkspaceContext context = WorkspaceContextHolder.getContext();
-        Long workspaceId = context != null ? context.id() : null;
 
         int leaguePoints = workspaceMembershipService.getCurrentLeaguePoints(workspaceId, userEntity);
         UserInfoDTO user = UserInfoDTO.fromUser(userEntity, leaguePoints);

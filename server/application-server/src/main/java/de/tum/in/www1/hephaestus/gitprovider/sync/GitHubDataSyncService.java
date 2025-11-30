@@ -318,13 +318,37 @@ public class GitHubDataSyncService {
             if (repository.isPresent()) {
                 repositoryToMonitor.setRepositorySyncedAt(currentTime);
                 repositoryToMonitorRepository.save(repositoryToMonitor);
-                collaboratorSyncService.syncCollaborators(repository.get());
+                // Check cooldown before syncing collaborators
+                syncCollaboratorsIfNeeded(repository.get(), repositoryToMonitor, currentTime);
             }
             return repository;
         } catch (RepositorySyncException syncException) {
             handleRepositorySyncFailure(repositoryToMonitor, syncException);
             return Optional.empty();
         }
+    }
+
+    private void syncCollaboratorsIfNeeded(
+        GHRepository ghRepository,
+        RepositoryToMonitor repositoryToMonitor,
+        Instant currentTime
+    ) {
+        boolean shouldSync =
+            repositoryToMonitor.getCollaboratorsSyncedAt() == null ||
+            repositoryToMonitor
+                .getCollaboratorsSyncedAt()
+                .isBefore(currentTime.minusSeconds(syncCooldownInMinutes * 60L));
+        if (!shouldSync) {
+            logger.debug(
+                "{} - Skipping collaborator sync (cooldown active). Last synced at {}",
+                repositoryToMonitor.getNameWithOwner(),
+                repositoryToMonitor.getCollaboratorsSyncedAt()
+            );
+            return;
+        }
+        collaboratorSyncService.syncCollaborators(ghRepository);
+        repositoryToMonitor.setCollaboratorsSyncedAt(currentTime);
+        repositoryToMonitorRepository.save(repositoryToMonitor);
     }
 
     private void handleRepositorySyncFailure(RepositoryToMonitor monitor, RepositorySyncException exception) {

@@ -17,4 +17,6 @@ public interface WorkspaceRepository extends JpaRepository<Workspace, Long> {
 
     @NotNull
     List<Workspace> findAll();
+
+    List<Workspace> findByStatusNot(Workspace.WorkspaceStatus status);
 }

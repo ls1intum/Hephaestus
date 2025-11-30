@@ -13,13 +13,11 @@ import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationSyncServic
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserSyncService;
-import de.tum.in.www1.hephaestus.workspace.AccountType;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.kohsuke.github.GitHub;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -48,9 +46,6 @@ class WorkspaceProvisioningServiceTest {
     private OrganizationSyncService organizationSyncService;
 
     @Mock
-    private WorkspaceGitHubAccess workspaceGitHubAccess;
-
-    @Mock
     private WorkspaceMembershipRepository workspaceMembershipRepository;
 
     @Mock
@@ -77,10 +72,8 @@ class WorkspaceProvisioningServiceTest {
             gitHubUserSyncService,
             userRepository,
             organizationSyncService,
-            workspaceGitHubAccess,
             workspaceMembershipRepository,
-            workspaceMembershipService,
-            true
+            workspaceMembershipService
         );
     }
 

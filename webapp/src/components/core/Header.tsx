@@ -53,13 +53,24 @@ export default function Header({
 			<div className="flex items-center gap-2 px-4">
 				{sidebarTrigger}
 				<div className="flex items-center gap-2">
-					<Link
-						to="/landing"
-						className="flex gap-2 items-center hover:text-muted-foreground"
-					>
-						<Hammer className="text-2xl sm:text-3xl" />
-						<span className="text-xl font-semibold">Hephaestus</span>
-					</Link>
+					{hasWorkspace ? (
+						<Link
+							to="/w/$workspaceSlug"
+							params={{ workspaceSlug: workspaceSlug ?? "" }}
+							className="flex gap-2 items-center hover:text-muted-foreground"
+						>
+							<Hammer className="text-2xl sm:text-3xl" />
+							<span className="text-xl font-semibold">Hephaestus</span>
+						</Link>
+					) : (
+						<Link
+							to="/landing"
+							className="flex gap-2 items-center hover:text-muted-foreground"
+						>
+							<Hammer className="text-2xl sm:text-3xl" />
+							<span className="text-xl font-semibold">Hephaestus</span>
+						</Link>
+					)}
 					<span className="text-xs font-semibold mt-1 text-muted-foreground">
 						{version}
 					</span>

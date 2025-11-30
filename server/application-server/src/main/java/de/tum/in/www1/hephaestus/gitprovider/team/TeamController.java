@@ -1,8 +1,8 @@
 package de.tum.in.www1.hephaestus.gitprovider.team;
 
 import de.tum.in.www1.hephaestus.gitprovider.team.permission.TeamRepositoryPermissionRepository;
-import de.tum.in.www1.hephaestus.security.EnsureAdminUser;
 import de.tum.in.www1.hephaestus.workspace.Workspace;
+import de.tum.in.www1.hephaestus.workspace.authorization.RequireAtLeastWorkspaceAdmin;
 import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContextResolver;
 import de.tum.in.www1.hephaestus.workspace.context.WorkspaceScopedController;
@@ -10,6 +10,7 @@ import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -41,6 +42,7 @@ public class TeamController {
     }
 
     @GetMapping
+    @Transactional(readOnly = true)
     public ResponseEntity<List<TeamInfoDTO>> getAllTeams(WorkspaceContext workspaceContext) {
         logger.info("Listing teams for workspace {}", workspaceContext.slug());
         Workspace workspace = workspaceResolver.requireWorkspace(workspaceContext);
@@ -49,7 +51,7 @@ public class TeamController {
         }
 
         List<TeamInfoDTO> teams = teamRepo
-            .findAllByOrganizationIgnoreCase(workspace.getAccountLogin())
+            .findWithCollectionsByOrganizationIgnoreCase(workspace.getAccountLogin())
             .stream()
             .map(converter::convert)
             .toList();
@@ -57,7 +59,7 @@ public class TeamController {
     }
 
     @PostMapping("/{id}/visibility")
-    @EnsureAdminUser
+    @RequireAtLeastWorkspaceAdmin
     public ResponseEntity<Void> updateTeamVisibility(
         WorkspaceContext workspaceContext,
         @PathVariable Long id,
@@ -80,7 +82,7 @@ public class TeamController {
     }
 
     @PostMapping("/{teamId}/repositories/{repositoryId}/visibility")
-    @EnsureAdminUser
+    @RequireAtLeastWorkspaceAdmin
     public ResponseEntity<Void> updateRepositoryVisibility(
         WorkspaceContext workspaceContext,
         @PathVariable Long teamId,
@@ -103,8 +105,9 @@ public class TeamController {
             return ResponseEntity.badRequest().build();
         }
 
+        // Use findWithTeamBy... to eagerly load the team for the workspace check
         return permissionRepository
-            .findByTeam_IdAndRepository_Id(teamId, repositoryId)
+            .findWithTeamByTeam_IdAndRepository_Id(teamId, repositoryId)
             .filter(permission -> belongsToWorkspace(permission.getTeam(), workspace))
             .map(permission -> {
                 permission.setHiddenFromContributions(Boolean.TRUE.equals(resolvedHidden));

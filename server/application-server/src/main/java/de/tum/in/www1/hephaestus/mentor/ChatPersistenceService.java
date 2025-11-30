@@ -832,6 +832,10 @@ public class ChatPersistenceService {
                     errorMessagePart.setContent(objectMapper.valueToTree("Error: " + errorPart.toString()));
 
                     chatMessagePartRepository.save(errorMessagePart);
+
+                    // Add to message's parts collection to prevent orphan removal
+                    currentMessage.getParts().add(errorMessagePart);
+
                     logger.debug("Saved error part: messageId={}", currentMessage.getId());
                 }
             } catch (Exception e) {
@@ -860,6 +864,10 @@ public class ChatPersistenceService {
                 stepPart.setContent(objectMapper.createObjectNode()); // Empty content for step-start
 
                 chatMessagePartRepository.save(stepPart);
+
+                // Add to message's parts collection to prevent orphan removal
+                currentMessage.getParts().add(stepPart);
+
                 logger.debug("Saved step-start part: messageId={}", currentMessage.getId());
             } catch (Exception e) {
                 logger.error("Failed to process step start: {}", e.getMessage(), e);
@@ -1163,6 +1171,9 @@ public class ChatPersistenceService {
                     // Create new data part
                     ChatMessagePart newDataPart = createDataPart(dataPart);
                     chatMessagePartRepository.save(newDataPart);
+
+                    // Add to message's parts collection to prevent orphan removal
+                    currentMessage.getParts().add(newDataPart);
 
                     // Track by ID if provided
                     if (dataId != null) {

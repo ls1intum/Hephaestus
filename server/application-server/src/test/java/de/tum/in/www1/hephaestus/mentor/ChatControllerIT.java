@@ -46,6 +46,9 @@ public class ChatControllerIT extends BaseIntegrationTest {
     private ChatMessageRepository chatMessageRepository;
 
     @Autowired
+    private ChatMessagePartRepository chatMessagePartRepository;
+
+    @Autowired
     private UserRepository userRepository;
 
     @Autowired
@@ -158,9 +161,11 @@ public class ChatControllerIT extends BaseIntegrationTest {
         var response = performChatRequest(request);
 
         // Then
-        StepVerifier.create(response).expectComplete();
+        StepVerifier.create(response).thenConsumeWhile(s -> true).expectComplete().verify();
 
-        var assistantMessage = chatMessageRepository.findById(UUID.fromString(responseMessageId)).orElseThrow();
+        var assistantMessage = chatMessageRepository
+            .findByIdWithParts(UUID.fromString(responseMessageId))
+            .orElseThrow();
         var parts = assistantMessage.getParts();
 
         assertThat(parts).hasSize(4);
@@ -213,9 +218,11 @@ public class ChatControllerIT extends BaseIntegrationTest {
         var response = performChatRequest(request);
 
         // Then
-        StepVerifier.create(response).expectComplete();
+        StepVerifier.create(response).thenConsumeWhile(s -> true).expectComplete().verify();
 
-        var assistantMessage = chatMessageRepository.findById(UUID.fromString(responseMessageId)).orElseThrow();
+        var assistantMessage = chatMessageRepository
+            .findByIdWithParts(UUID.fromString(responseMessageId))
+            .orElseThrow();
         var parts = assistantMessage.getParts();
 
         // Only step-start should have been persisted
@@ -286,7 +293,7 @@ public class ChatControllerIT extends BaseIntegrationTest {
         var response = performChatRequest(request);
 
         // Then: The thread contains both messages in the correct order with proper parent-child relationships
-        StepVerifier.create(response).expectComplete();
+        StepVerifier.create(response).thenConsumeWhile(s -> true).expectComplete().verify();
 
         // Thread should have been created with the request ID
         ChatThread thread = chatThreadRepository
@@ -315,9 +322,13 @@ public class ChatControllerIT extends BaseIntegrationTest {
             .orElseThrow(() -> new AssertionError("No assistant message found"));
         assertThat(assistantMessage.getRole()).isEqualTo(ChatMessage.Role.ASSISTANT);
 
+        // Query parts directly from repository to avoid JPA caching issues
+        var parts = chatMessagePartRepository.findByIdMessageIdOrderByIdOrderIndexAsc(
+            UUID.fromString(responseMessageId)
+        );
+
         // Verify we have the expected parts per AI SDK structure: step-start + text
-        assertThat(assistantMessage.getParts()).hasSize(2);
-        var parts = assistantMessage.getParts();
+        assertThat(parts).hasSize(2);
 
         // First part should be step-start (AI SDK expects these to be persisted)
         assertThat(parts.get(0).getType()).isEqualTo(ChatMessagePart.PartType.STEP_START);
@@ -392,13 +403,15 @@ public class ChatControllerIT extends BaseIntegrationTest {
         var response = performChatRequest(request);
 
         // Then: New messages are added to the existing thread with correct linking
-        StepVerifier.create(response).expectComplete();
+        StepVerifier.create(response).thenConsumeWhile(s -> true).expectComplete().verify();
 
         var refreshedThread = chatThreadRepository.findById(existingThread.getId()).orElseThrow();
         assertThat(refreshedThread.getAllMessages()).hasSize(4); // 2 existing + 2 new
 
-        var newUserMessage = chatMessageRepository.findById(UUID.fromString(followUpMessage.getId())).orElseThrow();
-        assertThat(newUserMessage.getThread()).isEqualTo(refreshedThread);
+        var newUserMessage = chatMessageRepository
+            .findByIdWithParts(UUID.fromString(followUpMessage.getId()))
+            .orElseThrow();
+        assertThat(newUserMessage.getThread().getId()).isEqualTo(refreshedThread.getId());
         assertThat(newUserMessage.getParentMessage().getId()).isEqualTo(existingAssistantMessage.getId());
         assertThat(newUserMessage.getParts()).hasSize(1);
 
@@ -406,8 +419,10 @@ public class ChatControllerIT extends BaseIntegrationTest {
         var newUserPartContent = newUserMessage.getParts().get(0).toUIMessagePart();
         assertThat(newUserPartContent.getText()).isEqualTo("Follow-up question, what is 1+2?");
 
-        var newAssistantMessage = chatMessageRepository.findById(UUID.fromString(responseMessageId)).orElseThrow();
-        assertThat(newAssistantMessage.getThread()).isEqualTo(refreshedThread);
+        var newAssistantMessage = chatMessageRepository
+            .findByIdWithParts(UUID.fromString(responseMessageId))
+            .orElseThrow();
+        assertThat(newAssistantMessage.getThread().getId()).isEqualTo(refreshedThread.getId());
         assertThat(newAssistantMessage.getParentMessage().getId()).isEqualTo(newUserMessage.getId());
         assertThat(newAssistantMessage.getParts()).hasSize(2); // step-start + text
         assertThat(newAssistantMessage.getParts().get(0).getType()).isEqualTo(ChatMessagePart.PartType.STEP_START);
@@ -449,9 +464,11 @@ public class ChatControllerIT extends BaseIntegrationTest {
         var response = performChatRequest(request);
 
         // Then: Both reasoning and text parts are persisted with proper types and ordering
-        StepVerifier.create(response).expectComplete();
+        StepVerifier.create(response).thenConsumeWhile(s -> true).expectComplete().verify();
 
-        var assistantMessage = chatMessageRepository.findById(UUID.fromString(responseMessageId)).orElseThrow();
+        var assistantMessage = chatMessageRepository
+            .findByIdWithParts(UUID.fromString(responseMessageId))
+            .orElseThrow();
         var parts = assistantMessage.getParts();
 
         // Verify message has exactly 3 parts (step-start + reasoning + text)
@@ -540,9 +557,11 @@ public class ChatControllerIT extends BaseIntegrationTest {
         var response = performChatRequest(request);
 
         // Then: Tool call, result, and text parts are persisted with proper payloads and relationships
-        StepVerifier.create(response).expectComplete();
+        StepVerifier.create(response).thenConsumeWhile(s -> true).expectComplete().verify();
 
-        var assistantMessage = chatMessageRepository.findById(UUID.fromString(responseMessageId)).orElseThrow();
+        var assistantMessage = chatMessageRepository
+            .findByIdWithParts(UUID.fromString(responseMessageId))
+            .orElseThrow();
 
         // Verify message has exactly 4 parts (step-start, initial text, tool call+result, final text)
         assertThat(assistantMessage.getParts()).hasSize(4);
@@ -620,9 +639,11 @@ public class ChatControllerIT extends BaseIntegrationTest {
         var response = performChatRequest(request);
 
         // Then: Source URL and source document parts are correctly persisted with their metadata
-        StepVerifier.create(response).expectComplete();
+        StepVerifier.create(response).thenConsumeWhile(s -> true).expectComplete().verify();
 
-        var assistantMessage = chatMessageRepository.findById(UUID.fromString(responseMessageId)).orElseThrow();
+        var assistantMessage = chatMessageRepository
+            .findByIdWithParts(UUID.fromString(responseMessageId))
+            .orElseThrow();
         assertThat(assistantMessage.getParts()).hasSize(6); // step-start + 3 text parts + 2 source parts
 
         var parts = assistantMessage.getParts();
@@ -676,9 +697,11 @@ public class ChatControllerIT extends BaseIntegrationTest {
         var response = performChatRequest(request);
 
         // Then: The file part is persisted with correct metadata and retrievable content
-        StepVerifier.create(response).expectComplete();
+        StepVerifier.create(response).thenConsumeWhile(s -> true).expectComplete().verify();
 
-        var assistantMessage = chatMessageRepository.findById(UUID.fromString(responseMessageId)).orElseThrow();
+        var assistantMessage = chatMessageRepository
+            .findByIdWithParts(UUID.fromString(responseMessageId))
+            .orElseThrow();
         assertThat(assistantMessage.getParts()).hasSize(4); // step-start + text + file + text
 
         var parts = assistantMessage.getParts();
@@ -728,9 +751,11 @@ public class ChatControllerIT extends BaseIntegrationTest {
         var response = performChatRequest(request);
 
         // Then: The data part is replaced, not duplicated
-        StepVerifier.create(response).expectComplete();
+        StepVerifier.create(response).thenConsumeWhile(s -> true).expectComplete().verify();
 
-        var assistantMessage = chatMessageRepository.findById(UUID.fromString(responseMessageId)).orElseThrow();
+        var assistantMessage = chatMessageRepository
+            .findByIdWithParts(UUID.fromString(responseMessageId))
+            .orElseThrow();
         assertThat(assistantMessage.getParts()).hasSize(4); // step-start + text + data (replaced) + text
 
         var parts = assistantMessage.getParts();
@@ -792,9 +817,11 @@ public class ChatControllerIT extends BaseIntegrationTest {
         var response = performChatRequest(request);
 
         // Then: Steps are preserved as distinct groups in the persistence layer
-        StepVerifier.create(response).expectComplete();
+        StepVerifier.create(response).thenConsumeWhile(s -> true).expectComplete().verify();
 
-        var assistantMessage = chatMessageRepository.findById(UUID.fromString(responseMessageId)).orElseThrow();
+        var assistantMessage = chatMessageRepository
+            .findByIdWithParts(UUID.fromString(responseMessageId))
+            .orElseThrow();
 
         // Verify we have parts from multiple steps with step-start markers
         assertThat(assistantMessage.getParts().size()).isEqualTo(9);
@@ -866,12 +893,18 @@ public class ChatControllerIT extends BaseIntegrationTest {
         var response = performChatRequest(request);
 
         // Then: Steps are preserved as distinct groups in the persistence layer
-        StepVerifier.create(response).expectComplete();
+        StepVerifier.create(response).thenConsumeWhile(s -> true).expectComplete().verify();
 
         var thread = chatThreadRepository.findById(UUID.fromString(request.id())).orElseThrow();
-        var userMessage = chatMessageRepository.findById(UUID.fromString(request.message().getId())).orElseThrow();
-        var assistantMessage1 = chatMessageRepository.findById(UUID.fromString(responseMessageId1)).orElseThrow();
-        var assistantMessage2 = chatMessageRepository.findById(UUID.fromString(responseMessageId2)).orElseThrow();
+        var userMessage = chatMessageRepository
+            .findByIdWithParts(UUID.fromString(request.message().getId()))
+            .orElseThrow();
+        var assistantMessage1 = chatMessageRepository
+            .findByIdWithParts(UUID.fromString(responseMessageId1))
+            .orElseThrow();
+        var assistantMessage2 = chatMessageRepository
+            .findByIdWithParts(UUID.fromString(responseMessageId2))
+            .orElseThrow();
 
         // Verify first assistant message has step-start + text
         assertThat(assistantMessage1.getParts()).hasSize(2);
@@ -886,11 +919,11 @@ public class ChatControllerIT extends BaseIntegrationTest {
         assertThat(extractTextContent(assistantMessage2.getParts().get(1))).isEqualTo("This is the second message.");
 
         // Verify relationships
-        assertThat(assistantMessage1.getThread()).isEqualTo(thread);
-        assertThat(assistantMessage2.getThread()).isEqualTo(thread);
-        assertThat(assistantMessage1.getParentMessage()).isEqualTo(userMessage);
-        assertThat(assistantMessage2.getParentMessage()).isEqualTo(assistantMessage1);
-        assertThat(thread.getSelectedLeafMessage()).isEqualTo(assistantMessage2);
+        assertThat(assistantMessage1.getThread().getId()).isEqualTo(thread.getId());
+        assertThat(assistantMessage2.getThread().getId()).isEqualTo(thread.getId());
+        assertThat(assistantMessage1.getParentMessage().getId()).isEqualTo(userMessage.getId());
+        assertThat(assistantMessage2.getParentMessage().getId()).isEqualTo(assistantMessage1.getId());
+        assertThat(thread.getSelectedLeafMessage().getId()).isEqualTo(assistantMessage2.getId());
     }
 
     @Test
@@ -956,7 +989,7 @@ public class ChatControllerIT extends BaseIntegrationTest {
 
         // Verify no messages were persisted
         var threadOptional = chatThreadRepository.findById(requestThreadId);
-        var messageOptional = chatMessageRepository.findById(requestMessageId);
+        var messageOptional = chatMessageRepository.findByIdWithParts(requestMessageId);
 
         assertThat(threadOptional).isEmpty();
         assertThat(messageOptional).isEmpty();
@@ -985,10 +1018,12 @@ public class ChatControllerIT extends BaseIntegrationTest {
         var response = performChatRequest(request);
 
         // Then: The metadata is correctly persisted along with the message
-        StepVerifier.create(response).expectComplete();
+        StepVerifier.create(response).thenConsumeWhile(s -> true).expectComplete().verify();
 
         // Retrieve the message from the repository
-        var assistantMessage = chatMessageRepository.findById(UUID.fromString(responseMessageId)).orElseThrow();
+        var assistantMessage = chatMessageRepository
+            .findByIdWithParts(UUID.fromString(responseMessageId))
+            .orElseThrow();
 
         // Check the message has metadata associated with it
         assertThat(assistantMessage.getMetadata()).isNotNull();
@@ -1043,9 +1078,11 @@ public class ChatControllerIT extends BaseIntegrationTest {
         var response = performChatRequest(request);
 
         // Then: Message should have proper structure matching AI SDK expectations
-        StepVerifier.create(response).expectComplete();
+        StepVerifier.create(response).thenConsumeWhile(s -> true).expectComplete().verify();
 
-        var assistantMessage = chatMessageRepository.findById(UUID.fromString(responseMessageId)).orElseThrow();
+        var assistantMessage = chatMessageRepository
+            .findByIdWithParts(UUID.fromString(responseMessageId))
+            .orElseThrow();
         var parts = assistantMessage.getParts();
 
         // Should have 4 parts: step-start + tool + step-start + text (per AI SDK structure)
@@ -1103,9 +1140,11 @@ public class ChatControllerIT extends BaseIntegrationTest {
         var response = performChatRequest(request);
 
         // Then: Tool error should be properly persisted with AI SDK structure
-        StepVerifier.create(response).expectComplete();
+        StepVerifier.create(response).thenConsumeWhile(s -> true).expectComplete().verify();
 
-        var assistantMessage = chatMessageRepository.findById(UUID.fromString(responseMessageId)).orElseThrow();
+        var assistantMessage = chatMessageRepository
+            .findByIdWithParts(UUID.fromString(responseMessageId))
+            .orElseThrow();
         var parts = assistantMessage.getParts();
 
         // Should have 3 parts: step-start + tool-error + text
@@ -1149,9 +1188,11 @@ public class ChatControllerIT extends BaseIntegrationTest {
         var response = performChatRequest(request);
 
         // Then: Metadata should be properly merged per AI SDK expectations
-        StepVerifier.create(response).expectComplete();
+        StepVerifier.create(response).thenConsumeWhile(s -> true).expectComplete().verify();
 
-        var assistantMessage = chatMessageRepository.findById(UUID.fromString(responseMessageId)).orElseThrow();
+        var assistantMessage = chatMessageRepository
+            .findByIdWithParts(UUID.fromString(responseMessageId))
+            .orElseThrow();
 
         // Verify merged metadata
         var metadata = assistantMessage.getMetadata();
@@ -1189,9 +1230,11 @@ public class ChatControllerIT extends BaseIntegrationTest {
         var response = performChatRequest(request);
 
         // Then: File parts should be properly persisted
-        StepVerifier.create(response).expectComplete();
+        StepVerifier.create(response).thenConsumeWhile(s -> true).expectComplete().verify();
 
-        var assistantMessage = chatMessageRepository.findById(UUID.fromString(responseMessageId)).orElseThrow();
+        var assistantMessage = chatMessageRepository
+            .findByIdWithParts(UUID.fromString(responseMessageId))
+            .orElseThrow();
         var parts = assistantMessage.getParts();
 
         // Should have 4 parts: step-start + text + file + text
@@ -1239,9 +1282,11 @@ public class ChatControllerIT extends BaseIntegrationTest {
         var response = performChatRequest(request);
 
         // Then: Only the final state of the data part should be persisted
-        StepVerifier.create(response).expectComplete();
+        StepVerifier.create(response).thenConsumeWhile(s -> true).expectComplete().verify();
 
-        var assistantMessage = chatMessageRepository.findById(UUID.fromString(responseMessageId)).orElseThrow();
+        var assistantMessage = chatMessageRepository
+            .findByIdWithParts(UUID.fromString(responseMessageId))
+            .orElseThrow();
         var parts = assistantMessage.getParts();
 
         // Should have 4 parts: step-start + text + data + text (updated data part should replace original)
@@ -1295,9 +1340,11 @@ public class ChatControllerIT extends BaseIntegrationTest {
         var response = performChatRequest(request);
 
         // Then: All parts should be properly structured and persisted
-        StepVerifier.create(response).expectComplete();
+        StepVerifier.create(response).thenConsumeWhile(s -> true).expectComplete().verify();
 
-        var assistantMessage = chatMessageRepository.findById(UUID.fromString(responseMessageId)).orElseThrow();
+        var assistantMessage = chatMessageRepository
+            .findByIdWithParts(UUID.fromString(responseMessageId))
+            .orElseThrow();
         var parts = assistantMessage.getParts();
 
         // Should have 7 parts: step-start + reasoning + text + source-url + text + source-doc + text
@@ -1363,9 +1410,11 @@ public class ChatControllerIT extends BaseIntegrationTest {
         var response = performChatRequest(request);
 
         // Then: Error should be handled gracefully and persisted
-        StepVerifier.create(response).expectComplete();
+        StepVerifier.create(response).thenConsumeWhile(s -> true).expectComplete().verify();
 
-        var assistantMessage = chatMessageRepository.findById(UUID.fromString(responseMessageId)).orElseThrow();
+        var assistantMessage = chatMessageRepository
+            .findByIdWithParts(UUID.fromString(responseMessageId))
+            .orElseThrow();
         var parts = assistantMessage.getParts();
 
         // Should have 3 parts: step-start + text + error-text

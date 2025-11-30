@@ -87,9 +87,9 @@ function LeaderboardContainer() {
 	// Query for user profile data
 	const userProfileQuery = useQuery({
 		...getUserProfileOptions({
-			path: { login: username || "" },
+			path: { workspaceSlug: workspaceSlug ?? "", login: username || "" },
 		}),
-		enabled: Boolean(username),
+		enabled: hasWorkspace && Boolean(username),
 	});
 	// Find the current user's entry in the leaderboard
 	const currentUserEntry = username

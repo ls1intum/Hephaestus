@@ -9,16 +9,20 @@ import org.springframework.security.access.prepost.PreAuthorize;
 
 /**
  * Meta-annotation to require the current user to have the 'admin' authority.
+ * This is for super-admin level operations that affect the entire system,
+ * not workspace-scoped admin operations.
+ *
+ * For workspace-scoped admin operations, use {@code @RequireAtLeastWorkspaceAdmin} instead.
  *
  * Usage:
  * <pre>
- *  @EnsureAdminUser
- *  public ResponseEntity<Void> someAdminOnlyEndpoint() { ... }
+ *  @EnsureSuperAdminUser
+ *  public ResponseEntity<Void> someSuperAdminOnlyEndpoint() { ... }
  * </pre>
  */
 @Target({ ElementType.METHOD, ElementType.TYPE })
 @Retention(RetentionPolicy.RUNTIME)
 @Documented
 @PreAuthorize("hasAuthority('admin')")
-public @interface EnsureAdminUser {
+public @interface EnsureSuperAdminUser {
 }

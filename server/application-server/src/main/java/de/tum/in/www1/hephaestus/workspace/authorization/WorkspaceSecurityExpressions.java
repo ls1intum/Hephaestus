@@ -10,10 +10,10 @@ import org.springframework.stereotype.Component;
 @Component("workspaceSecure")
 public class WorkspaceSecurityExpressions {
 
-    private final WorkspaceAccessEvaluator accessEvaluator;
+    private final WorkspaceAccessService accessService;
 
-    public WorkspaceSecurityExpressions(WorkspaceAccessEvaluator accessEvaluator) {
-        this.accessEvaluator = accessEvaluator;
+    public WorkspaceSecurityExpressions(WorkspaceAccessService accessService) {
+        this.accessService = accessService;
     }
 
     /**
@@ -23,7 +23,7 @@ public class WorkspaceSecurityExpressions {
      * @return true if user is an admin or owner
      */
     public boolean isAdmin() {
-        return accessEvaluator.isAdmin();
+        return accessService.isAdmin();
     }
 
     /**
@@ -33,7 +33,7 @@ public class WorkspaceSecurityExpressions {
      * @return true if user is the owner
      */
     public boolean isOwner() {
-        return accessEvaluator.isOwner();
+        return accessService.isOwner();
     }
 
     /**
@@ -45,6 +45,6 @@ public class WorkspaceSecurityExpressions {
      * @return true if user can manage this role
      */
     public boolean canManageRole(WorkspaceRole role) {
-        return accessEvaluator.canManageRole(role);
+        return accessService.canManageRole(role);
     }
 }

@@ -10,4 +10,5 @@ public interface RepositoryToMonitorRepository extends JpaRepository<RepositoryT
     boolean existsByWorkspaceIdAndNameWithOwner(Long workspaceId, String nameWithOwner);
     Optional<RepositoryToMonitor> findByWorkspaceIdAndNameWithOwner(Long workspaceId, String nameWithOwner);
     List<RepositoryToMonitor> findByWorkspaceId(Long workspaceId);
+    Optional<RepositoryToMonitor> findByNameWithOwner(String nameWithOwner);
 }

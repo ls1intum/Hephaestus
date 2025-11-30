@@ -4,7 +4,7 @@ import de.tum.in.www1.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceMembership.WorkspaceRole;
 import de.tum.in.www1.hephaestus.workspace.authorization.RequireAtLeastWorkspaceAdmin;
-import de.tum.in.www1.hephaestus.workspace.authorization.WorkspaceAccessEvaluator;
+import de.tum.in.www1.hephaestus.workspace.authorization.WorkspaceAccessService;
 import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.in.www1.hephaestus.workspace.context.WorkspaceScopedController;
 import de.tum.in.www1.hephaestus.workspace.dto.AssignRoleRequestDTO;
@@ -39,7 +39,7 @@ public class WorkspaceMembershipController {
     private UserRepository userRepository;
 
     @Autowired
-    private WorkspaceAccessEvaluator accessEvaluator;
+    private WorkspaceAccessService accessService;
 
     /**
      * Get the current user's membership in this workspace.
@@ -117,7 +117,7 @@ public class WorkspaceMembershipController {
     @RequireAtLeastWorkspaceAdmin
     public ResponseEntity<?> assignRole(WorkspaceContext context, @Valid @RequestBody AssignRoleRequestDTO request) {
         // Check if user can manage this role
-        if (!accessEvaluator.canManageRole(request.role())) {
+        if (!accessService.canManageRole(request.role())) {
             throw new InsufficientWorkspacePermissionsException(
                 context.slug(),
                 "You cannot assign the " + request.role() + " role"
@@ -150,7 +150,7 @@ public class WorkspaceMembershipController {
                 .orElseThrow(() -> new EntityNotFoundException("Workspace membership not found"));
 
             // Check if user can manage this role
-            if (!accessEvaluator.canManageRole(membership.getRole())) {
+            if (!accessService.canManageRole(membership.getRole())) {
                 throw new InsufficientWorkspacePermissionsException(
                     context.slug(),
                     "You cannot remove a member with " + membership.getRole() + " role"

@@ -12,6 +12,8 @@ import de.tum.in.www1.hephaestus.leaderboard.*;
 import de.tum.in.www1.hephaestus.workspace.Workspace;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceRepository;
 import java.io.IOException;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.time.DayOfWeek;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -209,6 +211,8 @@ public class SlackWeeklyLeaderboardTask implements Runnable {
         Instant after,
         Instant before
     ) {
+        final String baseUrl = normalizeBaseUrl(hephaestusUrl);
+        final String workspaceBase = baseUrl + "/w/" + workspace.getWorkspaceSlug();
         String teamFilter = team == null ? "all" : team;
         return asBlocks(
             header(header -> header.text(plainText(pt -> pt.text(":newspaper: Reviews of the last week :newspaper:")))),
@@ -216,7 +220,7 @@ public class SlackWeeklyLeaderboardTask implements Runnable {
                 context.elements(
                     List.of(
                         markdownText(
-                            "<!date^" + currentDate + "^{date} at {time}| Today at 9:00AM CEST> | " + hephaestusUrl
+                            "<!date^" + currentDate + "^{date} at {time}| Today at 9:00AM CEST> | " + workspaceBase
                         )
                     )
                 )
@@ -228,13 +232,13 @@ public class SlackWeeklyLeaderboardTask implements Runnable {
                         "Workspace *" +
                         workspace.getWorkspaceSlug() +
                         "*: Another review leaderboard has concluded. You can check out your placement <" +
-                        hephaestusUrl +
+                        workspaceBase +
                         "?after=" +
-                        formatDateForURL(after) +
+                        encode(formatDateForURL(after)) +
                         "&before=" +
-                        formatDateForURL(before) +
+                        encode(formatDateForURL(before)) +
                         "&team=" +
-                        teamFilter +
+                        encode(teamFilter) +
                         "|here>."
                     )
                 )
@@ -252,5 +256,20 @@ public class SlackWeeklyLeaderboardTask implements Runnable {
             ),
             section(section -> section.text(markdownText("Happy coding and reviewing! :rocket:")))
         );
+    }
+
+    private String normalizeBaseUrl(String url) {
+        if (url == null || url.isBlank()) {
+            return "";
+        }
+        String trimmed = url.endsWith("/") ? url.substring(0, url.length() - 1) : url;
+        if (!trimmed.startsWith("http://") && !trimmed.startsWith("https://")) {
+            return "https://" + trimmed;
+        }
+        return trimmed;
+    }
+
+    private String encode(String value) {
+        return URLEncoder.encode(value, StandardCharsets.UTF_8);
     }
 }

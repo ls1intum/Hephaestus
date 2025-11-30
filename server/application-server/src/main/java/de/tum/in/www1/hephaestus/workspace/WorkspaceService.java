@@ -9,6 +9,7 @@ import de.tum.in.www1.hephaestus.gitprovider.label.LabelRepository;
 import de.tum.in.www1.hephaestus.gitprovider.organization.Organization;
 import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationService;
 import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationSyncService;
+import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.github.GitHubRepositorySyncService;
 import de.tum.in.www1.hephaestus.gitprovider.repository.github.RepositorySyncException;
@@ -271,8 +272,11 @@ public class WorkspaceService {
             .orElseThrow(() -> new IllegalStateException("No workspace found for repository: " + nameWithOwner));
     }
 
+    /**
+     * List all non-purged workspaces.
+     */
     public List<Workspace> listAllWorkspaces() {
-        return workspaceRepository.findAll();
+        return workspaceRepository.findByStatusNot(Workspace.WorkspaceStatus.PURGED);
     }
 
     public Optional<Workspace> findByInstallationId(Long installationId) {
@@ -296,6 +300,12 @@ public class WorkspaceService {
     public void addRepositoryToMonitor(String slug, String nameWithOwner)
         throws RepositoryAlreadyMonitoredException, EntityNotFoundException {
         Workspace workspace = requireWorkspace(slug);
+
+        // Block repository management for GitHub App Installation workspaces
+        if (Workspace.GitProviderMode.GITHUB_APP_INSTALLATION.equals(workspace.getGitProviderMode())) {
+            throw new RepositoryManagementNotAllowedException(slug);
+        }
+
         logger.info(
             "Adding repository to monitor: {} for workspace id={}",
             LoggingUtils.sanitizeForLog(nameWithOwner),
@@ -330,6 +340,12 @@ public class WorkspaceService {
 
     public void removeRepositoryToMonitor(String slug, String nameWithOwner) throws EntityNotFoundException {
         Workspace workspace = requireWorkspace(slug);
+
+        // Block repository management for GitHub App Installation workspaces
+        if (Workspace.GitProviderMode.GITHUB_APP_INSTALLATION.equals(workspace.getGitProviderMode())) {
+            throw new RepositoryManagementNotAllowedException(slug);
+        }
+
         logger.info(
             "Removing repository from monitor: {} for workspace id={}",
             LoggingUtils.sanitizeForLog(nameWithOwner),
@@ -433,6 +449,34 @@ public class WorkspaceService {
         removeRepositoryToMonitor(requireSlug(workspaceContext), nameWithOwner);
     }
 
+    /**
+     * Resolve the workspace slug responsible for a given repository.
+     * Priority:
+     * 1) Explicit repository monitor (authoritative)
+     * 2) Workspace account login matching repository owner (one-to-one enforced by business model)
+     * Returns empty if no unique mapping can be established.
+     */
+    public Optional<String> resolveWorkspaceSlugForRepository(Repository repository) {
+        if (repository == null || isBlank(repository.getNameWithOwner())) {
+            return Optional.empty();
+        }
+
+        var nameWithOwner = repository.getNameWithOwner();
+        var monitor = repositoryToMonitorRepository.findByNameWithOwner(nameWithOwner);
+        if (monitor.isPresent()) {
+            Workspace workspace = monitor.get().getWorkspace();
+            return workspace != null ? Optional.ofNullable(workspace.getWorkspaceSlug()) : Optional.empty();
+        }
+
+        // Fallback: org owner lookup (accountLogin is unique)
+        String owner = nameWithOwner.contains("/") ? nameWithOwner.substring(0, nameWithOwner.indexOf("/")) : null;
+        if (owner != null) {
+            return workspaceRepository.findByAccountLoginIgnoreCase(owner).map(Workspace::getWorkspaceSlug);
+        }
+
+        return Optional.empty();
+    }
+
     public List<UserTeamsDTO> getUsersWithTeams(String slug) {
         Workspace workspace = requireWorkspace(slug);
         logger.info(
@@ -457,7 +501,8 @@ public class WorkspaceService {
             teamId,
             workspace.getId()
         );
-        Optional<Team> optionalTeam = teamRepository.findById(teamId);
+        // Fetch with collections to avoid LazyInitializationException when calling addLabel()
+        Optional<Team> optionalTeam = teamRepository.findWithCollectionsById(teamId);
         if (optionalTeam.isEmpty()) {
             return Optional.empty();
         }
@@ -468,7 +513,7 @@ public class WorkspaceService {
         }
         team.addLabel(labelEntity.get());
         teamRepository.save(team);
-        return Optional.ofNullable(teamInfoDTOConverter.convert(team));
+        return Optional.of(teamInfoDTOConverter.convert(team));
     }
 
     public Optional<TeamInfoDTO> addLabelToTeam(
@@ -488,49 +533,41 @@ public class WorkspaceService {
             teamId,
             workspace.getId()
         );
-        Optional<Team> optionalTeam = teamRepository.findById(teamId);
+        // Fetch with collections to avoid LazyInitializationException when calling removeLabel()
+        Optional<Team> optionalTeam = teamRepository.findWithCollectionsById(teamId);
         if (optionalTeam.isEmpty()) {
+            logger.warn("Team not found with ID: {}", teamId);
             return Optional.empty();
         }
         Team team = optionalTeam.get();
         Optional<Label> labelEntity = labelRepository.findById(labelId);
         if (labelEntity.isEmpty()) {
+            logger.warn("Label not found with ID: {}", labelId);
             return Optional.empty();
         }
-        team.removeLabel(labelEntity.get());
+        Label label = labelEntity.get();
+        int labelCountBefore = team.getLabels().size();
+        logger.info(
+            "Team {} has {} labels before removal. Looking for label id={}, name={}",
+            team.getName(),
+            labelCountBefore,
+            label.getId(),
+            label.getName()
+        );
+        boolean removed = team.getLabels().remove(label);
+        int labelCountAfter = team.getLabels().size();
+        logger.info(
+            "Label removal result: removed={}, labelCountBefore={}, labelCountAfter={}",
+            removed,
+            labelCountBefore,
+            labelCountAfter
+        );
         teamRepository.save(team);
-        return Optional.ofNullable(teamInfoDTOConverter.convert(team));
+        return Optional.of(teamInfoDTOConverter.convert(team));
     }
 
     public Optional<TeamInfoDTO> removeLabelFromTeam(WorkspaceContext workspaceContext, Long teamId, Long labelId) {
         return removeLabelFromTeam(requireSlug(workspaceContext), teamId, labelId);
-    }
-
-    //TODO: Method never used
-    public Optional<TeamInfoDTO> deleteTeam(Long teamId) {
-        logger.info("Deleting team with ID: {}", teamId);
-        Optional<Team> optionalTeam = teamRepository.findById(teamId);
-        if (optionalTeam.isEmpty()) {
-            return Optional.empty();
-        }
-        teamRepository.delete(optionalTeam.get());
-        return Optional.ofNullable(teamInfoDTOConverter.convert(optionalTeam.get()));
-    }
-
-    //TODO: Method never used
-    @Transactional
-    public void automaticallyAssignTeams() {
-        logger.info("Automatically assigning teams");
-
-        var teams = teamRepository.findAll();
-        teams.forEach(team -> {
-            var contributors = userRepository.findAllContributingToTeam(team.getId());
-            contributors.forEach(contributor -> {
-                var membership = new TeamMembership(team, contributor, TeamMembership.Role.MEMBER);
-                team.addMembership(membership);
-                teamRepository.save(team);
-            });
-        });
     }
 
     /**
