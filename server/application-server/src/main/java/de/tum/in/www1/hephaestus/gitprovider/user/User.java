@@ -9,6 +9,8 @@ import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.PullReques
 import de.tum.in.www1.hephaestus.gitprovider.repository.collaborator.RepositoryCollaborator;
 import de.tum.in.www1.hephaestus.gitprovider.team.Team;
 import de.tum.in.www1.hephaestus.gitprovider.team.membership.TeamMembership;
+import de.tum.in.www1.hephaestus.workspace.WorkspaceMembership;
+import jakarta.persistence.CascadeType;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -99,6 +101,10 @@ public class User extends BaseGitServiceEntity {
     @OneToMany(mappedBy = "author")
     @ToString.Exclude
     private Set<PullRequestReviewComment> reviewComments = new HashSet<>();
+
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    @ToString.Exclude
+    private Set<WorkspaceMembership> workspaceMemberships = new HashSet<>();
 
     @NonNull
     private boolean notificationsEnabled = true;
