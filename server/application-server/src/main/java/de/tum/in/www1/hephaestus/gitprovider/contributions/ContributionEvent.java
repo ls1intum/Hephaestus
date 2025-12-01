@@ -16,6 +16,7 @@ import java.time.Instant;
 @NoArgsConstructor
 public class ContributionEvent {
     @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     protected Long id;
 
     @NotNull

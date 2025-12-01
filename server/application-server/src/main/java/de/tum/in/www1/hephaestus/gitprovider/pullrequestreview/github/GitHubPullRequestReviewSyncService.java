@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.github;
 
+import de.tum.in.www1.hephaestus.gitprovider.contributions.github.GitHubContributionEventSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.github.GitHubPullRequestConverter;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReview;
@@ -7,14 +8,15 @@ import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReview
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserConverter;
 import jakarta.transaction.Transactional;
-import java.io.IOException;
-import java.util.List;
 import org.kohsuke.github.GHPullRequest;
 import org.kohsuke.github.GHPullRequestReview;
 import org.kohsuke.github.GHUser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+
+import java.io.IOException;
+import java.util.List;
 
 @Service
 public class GitHubPullRequestReviewSyncService {
@@ -27,6 +29,7 @@ public class GitHubPullRequestReviewSyncService {
     private final GitHubPullRequestReviewConverter pullRequestReviewConverter;
     private final GitHubPullRequestConverter pullRequestConverter;
     private final GitHubUserConverter userConverter;
+    private final GitHubContributionEventSyncService contributionEventSyncService;
 
     public GitHubPullRequestReviewSyncService(
         PullRequestReviewRepository pullRequestReviewRepository,
@@ -34,7 +37,8 @@ public class GitHubPullRequestReviewSyncService {
         UserRepository userRepository,
         GitHubPullRequestReviewConverter pullRequestReviewConverter,
         GitHubPullRequestConverter pullRequestConverter,
-        GitHubUserConverter userConverter
+        GitHubUserConverter userConverter,
+        GitHubContributionEventSyncService contributionEventSyncService
     ) {
         this.pullRequestReviewRepository = pullRequestReviewRepository;
         this.pullRequestRepository = pullRequestRepository;
@@ -42,6 +46,7 @@ public class GitHubPullRequestReviewSyncService {
         this.pullRequestReviewConverter = pullRequestReviewConverter;
         this.pullRequestConverter = pullRequestConverter;
         this.userConverter = userConverter;
+        this.contributionEventSyncService = contributionEventSyncService;
     }
 
     /**
@@ -69,7 +74,7 @@ public class GitHubPullRequestReviewSyncService {
      *
      * @param ghPullRequestReview the GitHub pull request review to process
      * @return the updated or newly created PullRequestReview entity, or
-     *         {@code null} if an error occurred
+     * {@code null} if an error occurred
      */
     @Transactional
     public PullRequestReview processPullRequestReview(GHPullRequestReview ghPullRequestReview) {
@@ -84,9 +89,7 @@ public class GitHubPullRequestReviewSyncService {
     ) {
         var result = pullRequestReviewRepository
             .findById(ghPullRequestReview.getId())
-            .map(pullRequestReview -> {
-                return pullRequestReviewConverter.update(ghPullRequestReview, pullRequestReview);
-            })
+            .map(pullRequestReview -> pullRequestReviewConverter.update(ghPullRequestReview, pullRequestReview))
             .orElseGet(() -> pullRequestReviewConverter.convert(ghPullRequestReview));
 
         if (result == null) {
@@ -148,6 +151,8 @@ public class GitHubPullRequestReviewSyncService {
             result.setAuthor(null);
         }
 
-        return pullRequestReviewRepository.save(result);
+        var savedPrr = pullRequestReviewRepository.save(result);
+        contributionEventSyncService.processPullRequestReviewContribution(savedPrr);
+        return savedPrr;
     }
 }
