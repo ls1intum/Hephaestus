@@ -1,0 +1,31 @@
+<?xml version="1.1" encoding="UTF-8" standalone="no"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+    <changeSet author="Max Achterberg" id="1764585129209-1">
+        <createTable tableName="contribution_event">
+            <column autoIncrement="true" name="id" type="BIGINT">
+                <constraints nullable="false" primaryKey="true" primaryKeyName="contribution_eventPK"/>
+            </column>
+            <column name="occured_at" type="TIMESTAMP(6) WITH TIME ZONE">
+                <constraints nullable="false"/>
+            </column>
+            <column name="source_id" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="source_type" type="VARCHAR(128)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="xp_awarded" type="INTEGER">
+                <constraints nullable="false"/>
+            </column>
+            <column name="actor_id" type="BIGINT"/>
+        </createTable>
+    </changeSet>
+    <changeSet author="Max Achterberg" id="1764585129209-2">
+        <addForeignKeyConstraint baseColumnNames="actor_id" baseTableName="contribution_event"
+                                 constraintName="FKt59e4ph2p1f5k3avfoh2tkypn" deferrable="false"
+                                 initiallyDeferred="false" referencedColumnNames="id" referencedTableName="user"
+                                 validate="true"/>
+    </changeSet>
+</databaseChangeLog>
