@@ -6,7 +6,7 @@ import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.testconfig.TestAuthUtils;
 import de.tum.in.www1.hephaestus.testconfig.TestUserFactory;
 import de.tum.in.www1.hephaestus.testconfig.WithAdminUser;
-import de.tum.in.www1.hephaestus.testconfig.WithUser;
+import de.tum.in.www1.hephaestus.testconfig.WithMentorUser;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceMembership.WorkspaceRole;
 import de.tum.in.www1.hephaestus.workspace.dto.AssignRoleRequestDTO;
 import de.tum.in.www1.hephaestus.workspace.dto.WorkspaceMembershipDTO;
@@ -103,8 +103,11 @@ class WorkspaceMembershipControllerIntegrationTest extends AbstractWorkspaceInte
     }
 
     @Test
-    @WithUser(username = "outsider", authorities = "mentor_access")
+    @WithMentorUser
     void nonMembersCannotAccessMembershipEndpoints() {
+        // Create the mentor user to match @WithMentorUser's default username
+        persistUser("mentor");
+
         User owner = persistUser("membership-owner-3");
         Workspace workspace = createWorkspace(
             "membership-space-3",
@@ -114,8 +117,7 @@ class WorkspaceMembershipControllerIntegrationTest extends AbstractWorkspaceInte
             owner
         );
 
-        persistUser("outsider");
-        // outsider is intentionally not added to the workspace
+        // mentor is intentionally not added to the workspace
 
         webTestClient
             .get()

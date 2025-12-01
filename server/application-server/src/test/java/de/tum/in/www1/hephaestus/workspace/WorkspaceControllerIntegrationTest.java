@@ -7,7 +7,7 @@ import de.tum.in.www1.hephaestus.gitprovider.user.UserTeamsDTO;
 import de.tum.in.www1.hephaestus.leaderboard.LeaguePointsCalculationService;
 import de.tum.in.www1.hephaestus.testconfig.TestAuthUtils;
 import de.tum.in.www1.hephaestus.testconfig.WithAdminUser;
-import de.tum.in.www1.hephaestus.testconfig.WithUser;
+import de.tum.in.www1.hephaestus.testconfig.WithMentorUser;
 import de.tum.in.www1.hephaestus.workspace.dto.CreateWorkspaceRequestDTO;
 import de.tum.in.www1.hephaestus.workspace.dto.UpdateWorkspaceNotificationsRequestDTO;
 import de.tum.in.www1.hephaestus.workspace.dto.UpdateWorkspaceScheduleRequestDTO;
@@ -98,14 +98,14 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
     }
 
     @Test
-    @WithUser(authorities = { "mentor_access" })
-    void nonAdminUserCannotCreateWorkspace() {
-        User owner = persistUser("non-admin-owner");
+    @WithMentorUser
+    void anyAuthenticatedUserCanCreateWorkspace() {
+        User owner = persistUser("mentor");
 
         var request = new CreateWorkspaceRequestDTO(
-            "non-admin",
-            "Non Admin",
-            "non-admin",
+            "mentor-space",
+            "Mentor Space",
+            "mentor-org",
             AccountType.ORG,
             owner.getId()
         );
@@ -118,15 +118,15 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
             .bodyValue(request)
             .exchange()
             .expectStatus()
-            .isForbidden();
+            .isCreated();
 
-        assertThat(workspaceRepository.count()).isZero();
+        assertThat(workspaceRepository.count()).isEqualTo(1);
     }
 
     @Test
-    @WithAdminUser
+    @WithMentorUser
     void createWorkspaceEndpointAssignsOwnerMembershipAndListsWorkspace() {
-        User owner = persistUser("controller-owner");
+        User owner = persistUser("mentor");
 
         var request = new CreateWorkspaceRequestDTO(
             "controller-space",
