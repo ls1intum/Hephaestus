@@ -40,6 +40,13 @@ export function useActiveWorkspaceSlug() {
 		}
 	}, [activeSlug, selectedSlug, setSelectedSlug]);
 
+	// Clear persisted selection when the user logs out to avoid cross-user leakage
+	useEffect(() => {
+		if (!isAuthenticated && selectedSlug) {
+			setSelectedSlug(undefined);
+		}
+	}, [isAuthenticated, selectedSlug, setSelectedSlug]);
+
 	return {
 		workspaceSlug: activeSlug,
 		workspaces,

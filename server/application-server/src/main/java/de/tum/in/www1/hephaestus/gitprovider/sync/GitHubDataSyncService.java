@@ -29,7 +29,10 @@ import java.time.Instant;
 import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.stream.IntStream;
+import org.kohsuke.github.GHDirection;
 import org.kohsuke.github.GHIssue;
+import org.kohsuke.github.GHIssueQueryBuilder;
+import org.kohsuke.github.GHIssueState;
 import org.kohsuke.github.GHRepository;
 import org.kohsuke.github.PagedIterator;
 import org.slf4j.Logger;
@@ -652,7 +655,7 @@ public class GitHubDataSyncService {
      * and works backwards to issue #1. This ensures we fill in gaps from before the timeframe
      * without re-syncing recent items.
      */
-    private void runBackfillBatch(GHRepository ghRepository, RepositoryToMonitor monitor) {
+    void runBackfillBatch(GHRepository ghRepository, RepositoryToMonitor monitor) {
         var repository = repositoryRepository.findByNameWithOwner(monitor.getNameWithOwner());
         if (repository.isEmpty()) {
             logger.warn("{} - Repository not found in database, skipping backfill", monitor.getNameWithOwner());
@@ -661,27 +664,30 @@ public class GitHubDataSyncService {
         var repositoryId = repository.get().getId();
 
         // Initialize high water mark if not set
-        // Use the LOWEST synced issue number as the starting point for backfill
-        // This way we don't re-sync issues that recent sync already covered
+        // Use the HIGHEST issue number on GitHub as the starting point so we never miss older items.
         if (!monitor.isBackfillInitialized()) {
-            var lowestSyncedNumber = issueRepository.findLowestSyncedIssueNumber(repositoryId);
-            if (lowestSyncedNumber.isEmpty()) {
-                // No synced issues yet - this shouldn't happen if recent sync completed
-                logger.warn("{} - No synced issues found, cannot initialize backfill", monitor.getNameWithOwner());
-                return;
-            }
-            int startingPoint = lowestSyncedNumber.get() - 1; // Start just below what recent sync covered
-            if (startingPoint <= 0) {
-                // Recent sync already covered issue #1, nothing to backfill
-                monitor.setBackfillHighWaterMark(0);
-                monitor.setBackfillCheckpoint(0);
-                repositoryToMonitorRepository.save(monitor);
-                logger.info(
-                    "{} - Recent sync already covered all issues, nothing to backfill",
+            var highestIssueNumber = fetchHighestIssueNumber(ghRepository);
+
+            if (highestIssueNumber.isEmpty()) {
+                logger.warn(
+                    "{} - Unable to determine highest issue number, cannot initialize backfill",
                     monitor.getNameWithOwner()
                 );
                 return;
             }
+
+            int startingPoint = highestIssueNumber.get();
+            if (startingPoint <= 0) {
+                monitor.setBackfillHighWaterMark(0);
+                monitor.setBackfillCheckpoint(0);
+                repositoryToMonitorRepository.save(monitor);
+                logger.info(
+                    "{} - Repository has no issues; backfill complete by definition",
+                    monitor.getNameWithOwner()
+                );
+                return;
+            }
+
             monitor.setBackfillHighWaterMark(startingPoint);
             monitor.setBackfillCheckpoint(startingPoint);
             repositoryToMonitorRepository.save(monitor);
@@ -753,6 +759,30 @@ public class GitHubDataSyncService {
 
         if (remaining == 0) {
             logger.info("{} - Backfill complete!", monitor.getNameWithOwner());
+        }
+    }
+
+    /**
+     * Fetch the highest issue number in a repository by requesting the newest issue (created desc).
+     * We only need the first page; direction DESC guarantees the first item is the max number.
+     */
+    protected Optional<Integer> fetchHighestIssueNumber(GHRepository ghRepository) {
+        try {
+            var latestIssues = ghRepository
+                .queryIssues()
+                .state(GHIssueState.ALL)
+                .sort(GHIssueQueryBuilder.Sort.CREATED)
+                .direction(GHDirection.DESC)
+                .list()
+                .withPageSize(1)
+                .iterator();
+            if (!latestIssues.hasNext()) {
+                return Optional.empty();
+            }
+            return Optional.of(latestIssues.next().getNumber());
+        } catch (Exception e) {
+            logger.warn("Failed to fetch highest issue number for {}: {}", ghRepository.getFullName(), e.getMessage());
+            return Optional.empty();
         }
     }
 

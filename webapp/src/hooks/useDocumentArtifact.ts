@@ -4,6 +4,7 @@ import {
 	getDocumentOptions,
 	getDocumentQueryKey,
 	getDocumentVersionOptions,
+	getDocumentVersionQueryKey,
 	updateDocumentMutation,
 } from "@/api/@tanstack/react-query.gen";
 import type { Document } from "@/api/types.gen";
@@ -196,7 +197,15 @@ export function useDocumentArtifact({
 					path: { workspaceSlug: workspaceSlug ?? "", id: documentId },
 				}),
 			});
-			queryClient.invalidateQueries({ queryKey: ["getDocumentVersions"] });
+			queryClient.invalidateQueries({
+				queryKey: getDocumentVersionQueryKey({
+					path: {
+						workspaceSlug: workspaceSlug ?? "",
+						id: documentId,
+						versionNumber: selectedVersionNumber ?? 0,
+					},
+				}),
+			});
 			setSelectedIndex(-1);
 		},
 	});
