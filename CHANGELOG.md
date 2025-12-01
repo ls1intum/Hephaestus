@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.10.0-rc.24](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.23...v0.10.0-rc.24) (2025-11-29)
+
+### 🚀 Features
+
+* **application-server:** env file support for GitHub-PAT authentication ([#547](https://github.com/ls1intum/Hephaestus/issues/547)) ([1f410bd](https://github.com/ls1intum/Hephaestus/commit/1f410bd0aa55a5d4e7f9c951fb0e4169e9bd7653))
+
 ## [0.10.0-rc.23](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.22...v0.10.0-rc.23) (2025-11-29)
 
 ## [0.10.0-rc.22](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.21...v0.10.0-rc.22) (2025-11-21)
