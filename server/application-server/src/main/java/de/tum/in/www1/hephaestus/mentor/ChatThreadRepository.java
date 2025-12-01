@@ -13,8 +13,6 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface ChatThreadRepository extends JpaRepository<ChatThread, UUID> {
-    Optional<ChatThread> findFirstByUserAndWorkspaceOrderByCreatedAtDesc(User user, Workspace workspace);
-
     /**
      * Find all threads for a user ordered by creation date (newest first)
      */
@@ -24,27 +22,6 @@ public interface ChatThreadRepository extends JpaRepository<ChatThread, UUID> {
      * Find a thread by ID and user (security check)
      */
     Optional<ChatThread> findByIdAndUserAndWorkspace(UUID id, User user, Workspace workspace);
-
-    /**
-     * Find all threads for a user by user ID ordered by creation date (newest first)
-     */
-    @Query(
-        "SELECT t FROM ChatThread t WHERE t.user.id = :userId AND t.workspace = :workspace ORDER BY t.createdAt DESC"
-    )
-    List<ChatThread> findByUserIdAndWorkspaceOrderByCreatedAtDesc(
-        @Param("userId") Long userId,
-        @Param("workspace") Workspace workspace
-    );
-
-    /**
-     * Find a thread by ID and user ID
-     */
-    @Query("SELECT t FROM ChatThread t WHERE t.id = :id AND t.user.id = :userId AND t.workspace = :workspace")
-    Optional<ChatThread> findByIdAndUserIdAndWorkspace(
-        @Param("id") UUID id,
-        @Param("userId") Long userId,
-        @Param("workspace") Workspace workspace
-    );
 
     /**
      * Find a thread with its messages eagerly fetched

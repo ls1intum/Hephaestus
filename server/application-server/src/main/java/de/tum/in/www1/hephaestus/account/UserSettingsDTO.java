@@ -1,4 +1,4 @@
-package de.tum.in.www1.hephaestus.gitprovider.user;
+package de.tum.in.www1.hephaestus.account;
 
 import org.springframework.lang.NonNull;
 

@@ -11,27 +11,24 @@ import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReview
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReviewRepository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryInfoDTO;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
-import de.tum.in.www1.hephaestus.integrations.posthog.PosthogClient;
-import de.tum.in.www1.hephaestus.integrations.posthog.PosthogClientException;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceMembershipService;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.StringUtils;
-import org.springframework.web.server.ResponseStatusException;
 
+/**
+ * Service for user profile data (workspace-scoped git activity).
+ * Account management (settings, deletion) is handled by AccountService.
+ */
 @Service
 public class UserService {
 
@@ -58,9 +55,13 @@ public class UserService {
     @Autowired
     private WorkspaceMembershipService workspaceMembershipService;
 
-    @Autowired
-    private PosthogClient posthogClient;
-
+    /**
+     * Get user profile with workspace-scoped activity data.
+     *
+     * @param login GitHub login
+     * @param workspaceId workspace to scope activity to (null for global view)
+     * @return user profile with open PRs, review activity, etc.
+     */
     @Transactional
     public Optional<UserProfileDTO> getUserProfile(String login, Long workspaceId) {
         logger.info("Getting user profile with login: {} for workspaceId: {}", login, workspaceId);
@@ -117,75 +118,5 @@ public class UserService {
         return Optional.of(
             new UserProfileDTO(user, firstContribution, contributedRepositories, reviewActivity, openPullRequests)
         );
-    }
-
-    public UserSettingsDTO getUserSettings(User user) {
-        logger.info("Getting user settings with userId: " + user);
-        return new UserSettingsDTO(user.isNotificationsEnabled(), user.isParticipateInResearch());
-    }
-
-    public UserSettingsDTO updateUserSettings(User user, UserSettingsDTO userSettings, String keycloakUserId) {
-        logger.info("Updating user settings with userId: " + user);
-        user.setNotificationsEnabled(
-            Objects.requireNonNull(userSettings.receiveNotifications(), "receiveNotifications must not be null")
-        );
-        boolean previousParticipation = user.isParticipateInResearch();
-        boolean participatesInResearch = Objects.requireNonNull(
-            userSettings.participateInResearch(),
-            "participateInResearch must not be null"
-        );
-        user.setParticipateInResearch(participatesInResearch);
-        userRepository.save(user);
-        if (previousParticipation && !participatesInResearch) {
-            if (!StringUtils.hasText(keycloakUserId)) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Missing authentication subject");
-            }
-            try {
-                boolean anyDeleted = deletePosthogIdentities(user, keycloakUserId);
-                if (!anyDeleted) {
-                    logger.warn("No PostHog person matched the provided identifiers for user {}", user.getLogin());
-                }
-            } catch (PosthogClientException exception) {
-                throw new ResponseStatusException(
-                    HttpStatus.BAD_GATEWAY,
-                    "Failed to revoke analytics consent",
-                    exception
-                );
-            }
-        }
-        return new UserSettingsDTO(user.isNotificationsEnabled(), user.isParticipateInResearch());
-    }
-
-    public void deleteUserTrackingData(Optional<User> user, String keycloakUserId) {
-        try {
-            boolean anyDeleted = deletePosthogIdentities(user.orElse(null), keycloakUserId);
-            if (!anyDeleted) {
-                logger.warn(
-                    "No PostHog person matched the provided identifiers for user {} during account deletion",
-                    user.map(User::getLogin).orElse("unknown")
-                );
-            }
-        } catch (PosthogClientException exception) {
-            throw exception;
-        }
-    }
-
-    private boolean deletePosthogIdentities(User user, String primaryDistinctId) {
-        Set<String> distinctIds = new LinkedHashSet<>();
-        if (StringUtils.hasText(primaryDistinctId)) {
-            distinctIds.add(primaryDistinctId);
-        }
-        if (user != null) {
-            distinctIds.add(String.valueOf(user.getId()));
-        }
-
-        boolean anyDeleted = false;
-        for (String distinctId : distinctIds) {
-            if (!StringUtils.hasText(distinctId)) {
-                continue;
-            }
-            anyDeleted = posthogClient.deletePersonData(distinctId) || anyDeleted;
-        }
-        return anyDeleted;
     }
 }

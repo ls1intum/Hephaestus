@@ -1,35 +1,114 @@
 ---
 id: workspace-context
 sidebar_position: 5
-title: Workspace Context Guide
-description: Scope controllers, services, and async work to a workspace-safe execution context.
+title: Workspace-Scoped Endpoints
+description: How to build tenant-aware controllers that route through /workspaces/{slug}.
 ---
 
-The workspace context infrastructure keeps every `/workspaces/{workspaceSlug}/…` request isolated to a single tenant. A servlet filter resolves the slug, loads the workspace, checks that it is accessible (active or explicitly allowed), enriches the logged-in user with their roles, and stores the result in a request-scoped `WorkspaceContext`. `@WorkspaceScopedController` adds the workspace prefix to your controller routes automatically, handler methods receive the `WorkspaceContext` parameter directly via the argument resolver, and `WorkspaceContextExecutor` copies the context into async runnables so background work inherits the same visibility. `WorkspaceContextAccessor` still exists when you cannot reach a method parameter (for example deep infrastructure helpers), but controller code should prefer direct injection.
+Every API endpoint that operates on workspace data must be scoped to a workspace slug. This keeps tenants isolated and enables per-workspace authorization.
 
-## How it works
-- **Filter**: `WorkspaceContextFilter` matches `/workspaces/{slug}` routes, loads the workspace + membership, rejects missing/inactive slugs, and populates `WorkspaceContextHolder`.
-- **Handler mapping**: Controllers annotated with `@WorkspaceScopedController` automatically receive the `/workspaces/{workspaceSlug}` prefix at runtime (via `WorkspaceScopedWebMvcConfiguration`). Route declarations stay clean (`@RequestMapping("/mentor")`) while every request path includes the slug. Keep global `/workspaces` routes (creation/listing) inside a plain `@RestController` such as `WorkspaceRegistryController` so the scoped controllers stay purely tenant-aware.
-- **Context access**: Prefer declaring `WorkspaceContext workspaceContext` as a method parameter. The resolver injects it automatically, while `WorkspaceContextAccessor` remains a fallback for code that cannot accept method parameters (for example async callbacks assembled in infrastructure components).
-- **Async propagation**: Use `WorkspaceContextExecutor.wrap(...)` for any `Runnable`/`Callable` you hand to `CompletableFuture`, schedulers, or executors so MDC, authorization checks, and logging stay tied to the originating workspace.
+## Quick Start
 
-## Controller expectations
-- Annotate new workspace-aware controllers with `@WorkspaceScopedController` and declare routes relative to the controller (for example `@RequestMapping("/api/documents")`). The handler mapping adds `/workspaces/{workspaceSlug}` ahead of time.
-- Always resolve the context near the top of the controller by injecting a `WorkspaceContext workspaceContext` parameter. Throw fast if the context is missing to avoid leaking data outside the slug scope.
-- Pass the context (or the workspace ID/slug extracted from it) down to services, schedulers, and background helpers instead of re-reading request parameters.
-- Use the roles exposed on the context when you need to apply workspace-level authorization (`workspaceContext.hasRole(WorkspaceRole.OWNER)`).
-- Keep the legacy `/workspace/**` (singular) routes deprecated—new endpoints should always live under `/workspaces/{workspaceSlug}` to benefit from automatic scoping.
+```java
+@WorkspaceScopedController          // auto-prefixes routes with /workspaces/{workspaceSlug}
+@RequestMapping("/teams")           // becomes /workspaces/{slug}/teams
+@RequiredArgsConstructor
+public class TeamController {
 
-## Async and background work
-- Wrap any asynchronous callbacks with `WorkspaceContextExecutor.wrap` immediately after capturing the context to avoid context loss once you cross thread boundaries.
-- Clear the context after scheduling async work if you manually set it; the executor already restores/clears around the callback body, mirroring what the filter does per request.
+    private final TeamService teamService;
+
+    @GetMapping
+    public List<TeamDTO> list(WorkspaceContext ctx) {   // injected by framework
+        return teamService.findByWorkspace(ctx.id());
+    }
+
+    @PostMapping
+    @RequireAtLeastWorkspaceAdmin   // only ADMIN or OWNER can create
+    public TeamDTO create(WorkspaceContext ctx, @RequestBody CreateTeamDTO dto) {
+        return teamService.create(ctx.id(), dto);
+    }
+}
+```
+
+That's it. The filter handles slug resolution, membership checks, and 403/404 responses.
+
+## What You Get
+
+| Annotation | Effect |
+|------------|--------|
+| `@WorkspaceScopedController` | Adds `/workspaces/{workspaceSlug}` prefix to all routes |
+| `WorkspaceContext` parameter | Auto-injected with workspace ID, slug, and user's roles |
+| `@RequireAtLeastWorkspaceAdmin` | Requires ADMIN or OWNER role |
+| `@RequireWorkspaceOwner` | Requires OWNER role only |
+
+## Authorization
+
+Check roles via the context:
+
+```java
+if (ctx.hasRole(WorkspaceRole.OWNER)) {
+    // owner-only logic
+}
+
+if (!ctx.hasMembership()) {
+    // user has no role in this workspace
+}
+```
+
+Or use method-level annotations that fail fast with 403:
+
+```java
+@DeleteMapping("/{id}")
+@RequireWorkspaceOwner
+public void delete(WorkspaceContext ctx, @PathVariable Long id) { ... }
+```
+
+## Async Work
+
+When spawning background tasks, wrap the runnable to preserve context:
+
+```java
+CompletableFuture.runAsync(
+    WorkspaceContextExecutor.wrap(() -> heavyProcessing(ctx)),
+    executor
+);
+```
+
+## Global Routes
+
+Routes that don't belong to a specific workspace (like `/workspaces` listing or creation) stay in a plain `@RestController`:
+
+```java
+@RestController
+@RequestMapping("/workspaces")
+public class WorkspaceRegistryController {
+
+    @PostMapping
+    public WorkspaceDTO create(@RequestBody CreateWorkspaceDTO dto) { ... }
+
+    @GetMapping
+    public List<WorkspaceListItemDTO> list() { ... }
+}
+```
 
 ## Testing
-- `WorkspaceContextFilterIntegrationTest` exercises the filter + resolver stack end-to-end. Add new scenarios there whenever a controller relies on additional context metadata or when you extend the filter rules.
-- Unit tests that interact with services can fabricate a context via `WorkspaceContext.fromWorkspace(workspace, roles)` and pass it into the new overloads instead of hard-coding slugs.
-- Integration tests that hit controllers should create a workspace up front (the `WorkspaceTestFactory` helper builds active workspaces) and persist a `WorkspaceMembership` for the acting user so the security filter grants access.
 
-## Common pitfalls
-- Forgetting to annotate controllers with `@WorkspaceScopedController` leaves them at the old `/mentor/**` paths and bypasses the filter entirely.
-- Do not mutate the context; treat it as immutable metadata. If you need extra fields, extend `WorkspaceContext` and populate them in the filter.
-- Avoid touching `WorkspaceContextHolder` directly outside infrastructure code; prefer method parameters or (if absolutely needed) `WorkspaceContextAccessor`, plus the executor helpers.
+Integration tests must create a workspace and grant membership before hitting scoped endpoints:
+
+```java
+@Test
+@WithMentorUser
+void canListTeams() {
+    User user = persistUser("mentor");
+    Workspace ws = createWorkspace("test-ws", "Test", "org", AccountType.ORG, user);
+    addMembership(ws, user, WorkspaceRole.ADMIN);
+
+    webTestClient.get()
+        .uri("/workspaces/{slug}/teams", ws.getWorkspaceSlug())
+        .headers(TestAuthUtils.withCurrentUser())
+        .exchange()
+        .expectStatus().isOk();
+}
+```
+
+See `AbstractWorkspaceIntegrationTest` for helper methods.

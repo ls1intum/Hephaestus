@@ -9,7 +9,6 @@ import de.tum.in.www1.hephaestus.gitprovider.sync.GitHubDataSyncService;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Optional;
 import java.util.Set;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -506,44 +505,13 @@ class GitHubDataSyncIntegrationTest extends AbstractGitHubSyncIntegrationTest {
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // FINDLOWESTSYNCEDISSUENUMBER TESTS
+    // ISSUEREPOSITORYQUERIES TESTS
     // Verify the repository query method works correctly
     // ═══════════════════════════════════════════════════════════════════════════
 
     @Nested
     @DisplayName("Issue Repository Queries")
     class IssueRepositoryQueries {
-
-        @Test
-        @DisplayName("findLowestSyncedIssueNumber returns correct minimum")
-        void findLowestSyncedIssueNumberWorks() throws Exception {
-            // Arrange
-            var ghRepository = createEphemeralRepository("lowest-query");
-            var issue1 = createIssueWithComment(ghRepository); // #1
-            createIssueWithComment(ghRepository); // #2 - also created but we only check #1 is lowest
-            var monitor = registerRepositoryToMonitor(ghRepository);
-
-            // Wait for GitHub API to propagate
-            awaitIssuesVisibleInApi(ghRepository, 2);
-
-            // Act
-            dataSyncService.syncRepositoryToMonitor(monitor);
-
-            // Assert - wait for issues to be synced
-            var repoId = repositoryRepository.findByNameWithOwner(ghRepository.getFullName()).orElseThrow().getId();
-
-            awaitCondition("issues synced", () -> {
-                Set<Integer> synced = issueRepository.findAllSyncedIssueNumbers(repoId);
-                return synced.size() >= 2;
-            });
-
-            Optional<Integer> lowestSynced = issueRepository.findLowestSyncedIssueNumber(repoId);
-
-            assertThat(lowestSynced).as("Should find lowest synced issue number").isPresent();
-
-            // The lowest should be #1 (first issue created)
-            assertThat(lowestSynced.get()).as("Lowest synced issue should be #1").isEqualTo(issue1.issueNumber());
-        }
 
         @Test
         @DisplayName("findAllSyncedIssueNumbers returns all synced issues")

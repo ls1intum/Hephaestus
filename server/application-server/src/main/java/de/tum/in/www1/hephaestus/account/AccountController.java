@@ -1,10 +1,12 @@
-package de.tum.in.www1.hephaestus.gitprovider.user;
+package de.tum.in.www1.hephaestus.account;
 
+import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.integrations.posthog.PosthogClientException;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.keycloak.admin.client.Keycloak;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -20,29 +22,35 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+/**
+ * Controller for user account management operations.
+ * Handles account deletion (GDPR) and user preferences/settings.
+ */
 @RestController
 @RequestMapping("/user")
-public class UserController {
+@Tag(name = "Account", description = "User account management (settings, deletion)")
+public class AccountController {
 
-    private static final Logger logger = LoggerFactory.getLogger(UserController.class);
+    private static final Logger logger = LoggerFactory.getLogger(AccountController.class);
 
-    @Autowired
-    private UserService userService;
-
-    @Autowired
-    private Keycloak keycloak;
-
-    @Autowired
-    private UserRepository userRepository;
+    private final AccountService accountService;
+    private final Keycloak keycloak;
+    private final UserRepository userRepository;
 
     @Value("${keycloak.realm}")
     private String realm;
 
-    public UserController(UserService actorService) {
-        this.userService = actorService;
+    public AccountController(AccountService accountService, Keycloak keycloak, UserRepository userRepository) {
+        this.accountService = accountService;
+        this.keycloak = keycloak;
+        this.userRepository = userRepository;
     }
 
     @DeleteMapping
+    @Operation(
+        summary = "Delete user account",
+        description = "Permanently delete the current user's account and all associated data (GDPR)"
+    )
     public ResponseEntity<Void> deleteUser(@AuthenticationPrincipal JwtAuthenticationToken auth) {
         JwtAuthenticationToken token = resolveAuthentication(auth);
         if (token == null) {
@@ -57,7 +65,7 @@ public class UserController {
         }
 
         try {
-            userService.deleteUserTrackingData(gitUser, keycloakUserId);
+            accountService.deleteUserTrackingData(gitUser, keycloakUserId);
         } catch (PosthogClientException exception) {
             logger.error("Failed to remove analytics data before deleting user {}", keycloakUserId, exception);
             return ResponseEntity.status(HttpStatus.BAD_GATEWAY).build();
@@ -73,17 +81,25 @@ public class UserController {
     }
 
     @GetMapping("/settings")
+    @Operation(
+        summary = "Get user settings",
+        description = "Get the current user's notification and research participation preferences"
+    )
     public ResponseEntity<UserSettingsDTO> getUserSettings() {
         var user = userRepository.getCurrentUser();
         if (user.isEmpty()) {
             return ResponseEntity.notFound().build();
         }
 
-        UserSettingsDTO userSettings = userService.getUserSettings(user.get());
+        UserSettingsDTO userSettings = accountService.getUserSettings(user.get());
         return ResponseEntity.ok(userSettings);
     }
 
     @PostMapping("/settings")
+    @Operation(
+        summary = "Update user settings",
+        description = "Update the current user's notification and research participation preferences"
+    )
     public ResponseEntity<UserSettingsDTO> updateUserSettings(
         @AuthenticationPrincipal JwtAuthenticationToken auth,
         @RequestBody UserSettingsDTO userSettings
@@ -105,7 +121,11 @@ public class UserController {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
             }
         }
-        UserSettingsDTO updatedUserSettings = userService.updateUserSettings(user.get(), userSettings, keycloakUserId);
+        UserSettingsDTO updatedUserSettings = accountService.updateUserSettings(
+            user.get(),
+            userSettings,
+            keycloakUserId
+        );
         return ResponseEntity.ok(updatedUserSettings);
     }
 

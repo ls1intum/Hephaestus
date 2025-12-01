@@ -46,6 +46,8 @@ tags:
   name: workspace-membership-controller
 - description: Contributor rankings and league statistics
   name: Leaderboard
+- description: "User account management (settings, deletion)"
+  name: Account
 paths:
   /contributors:
     get:
@@ -65,14 +67,18 @@ paths:
       - C
   /user:
     delete:
+      description: Permanently delete the current user's account and all associated
+        data (GDPR)
       operationId: deleteUser
       responses:
         "200":
           description: OK
-      tags:
-      - user
+      summary: Delete user account
+      tags: []
   /user/settings:
     get:
+      description: Get the current user's notification and research participation
+        preferences
       operationId: getUserSettings
       responses:
         "200":
@@ -81,9 +87,11 @@ paths:
               schema:
                 $ref: "#/components/schemas/UserSettings"
           description: OK
-      tags:
-      - user
+      summary: Get user settings
+      tags: []
     post:
+      description: Update the current user's notification and research participation
+        preferences
       operationId: updateUserSettings
       requestBody:
         content:
@@ -98,8 +106,8 @@ paths:
               schema:
                 $ref: "#/components/schemas/UserSettings"
           description: OK
-      tags:
-      - user
+      summary: Update user settings
+      tags: []
   /workspaces:
     get:
       operationId: listWorkspaces

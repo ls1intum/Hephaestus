@@ -543,8 +543,6 @@ public class GitHubDataSyncService {
             repositoryToMonitor.setIssuesAndPullRequestsSyncedAt(syncedUpToTime);
             repositoryToMonitorRepository.save(repositoryToMonitor);
         }
-        // Note: Removed fallbackPullRequestSync() - it was fetching ALL PRs which destroys rate limits.
-        // Historical data is now handled by the backfill system when sync-all-issues-and-pull-requests=true.
     }
 
     /**
@@ -649,11 +647,11 @@ public class GitHubDataSyncService {
 
     /**
      * Runs a single backfill batch for the repository.
-     * Works backwards from the lowest synced issue number, syncing items that don't have lastSyncAt set.
+     * Works backwards from the highest issue number on GitHub, syncing items that don't have lastSyncAt set.
      *
-     * The backfill starts from the lowest issue number that was synced during recent sync
-     * and works backwards to issue #1. This ensures we fill in gaps from before the timeframe
-     * without re-syncing recent items.
+     * The backfill starts from the highest issue number in the repository (fetched from GitHub API)
+     * and works backwards to issue #1. This ensures we eventually sync all historical issues
+     * without re-syncing items that were already synced during recent sync.
      */
     void runBackfillBatch(GHRepository ghRepository, RepositoryToMonitor monitor) {
         var repository = repositoryRepository.findByNameWithOwner(monitor.getNameWithOwner());

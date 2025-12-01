@@ -12,17 +12,23 @@ import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReview
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReviewRepository;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.PullRequestReviewCommentRepository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
+import de.tum.in.www1.hephaestus.gitprovider.repository.collaborator.RepositoryCollaborator;
 import de.tum.in.www1.hephaestus.gitprovider.repository.collaborator.RepositoryCollaboratorRepository;
 import de.tum.in.www1.hephaestus.gitprovider.sync.GitHubDataSyncService;
+import de.tum.in.www1.hephaestus.gitprovider.team.permission.TeamRepositoryPermission;
 import de.tum.in.www1.hephaestus.gitprovider.team.permission.TeamRepositoryPermissionRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import java.io.IOException;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
+import org.kohsuke.github.GHIssueState;
 import org.springframework.beans.factory.annotation.Autowired;
 
 class GitHubRepositorySyncIntegrationTest extends AbstractGitHubSyncIntegrationTest {
@@ -113,8 +119,8 @@ class GitHubRepositorySyncIntegrationTest extends AbstractGitHubSyncIntegrationT
         awaitCondition("issues/PRs visible via GitHub API", () ->
             ghRepository
                 .queryIssues()
-                .state(org.kohsuke.github.GHIssueState.ALL)
-                .since(java.time.Instant.now().minus(java.time.Duration.ofHours(2)))
+                .state(GHIssueState.ALL)
+                .since(Instant.now().minus(Duration.ofHours(2)))
                 .list()
                 .iterator()
                 .hasNext()
@@ -184,9 +190,7 @@ class GitHubRepositorySyncIntegrationTest extends AbstractGitHubSyncIntegrationT
         var storedCollaborator = awaitAndFetch("collaborator persisted", () ->
             repositoryCollaboratorRepository.findByRepositoryIdAndUserId(ghRepository.getId(), collaboratorUserId)
         );
-        assertThat(storedCollaborator.getPermission()).isEqualTo(
-            de.tum.in.www1.hephaestus.gitprovider.repository.collaborator.RepositoryCollaborator.Permission.ADMIN
-        );
+        assertThat(storedCollaborator.getPermission()).isEqualTo(RepositoryCollaborator.Permission.ADMIN);
         var collaboratorEntries = repositoryCollaboratorRepository.findByRepository_Id(ghRepository.getId());
         var collaboratorUserIdsBeforeSync = collaboratorEntries
             .stream()
@@ -238,14 +242,14 @@ class GitHubRepositorySyncIntegrationTest extends AbstractGitHubSyncIntegrationT
             assertThat(permission.getPermission())
                 .as("team repository permission level")
                 .isIn(
-                    de.tum.in.www1.hephaestus.gitprovider.team.permission.TeamRepositoryPermission.PermissionLevel.MAINTAIN,
-                    de.tum.in.www1.hephaestus.gitprovider.team.permission.TeamRepositoryPermission.PermissionLevel.WRITE
+                    TeamRepositoryPermission.PermissionLevel.MAINTAIN,
+                    TeamRepositoryPermission.PermissionLevel.WRITE
                 );
             assertThat(permission.isHiddenFromContributions()).isFalse();
         });
     }
 
-    private <T> T awaitAndFetch(String description, Supplier<java.util.Optional<T>> supplier) throws Exception {
+    private <T> T awaitAndFetch(String description, Supplier<Optional<T>> supplier) throws Exception {
         awaitCondition(description, () -> supplier.get().isPresent());
         return supplier.get().orElseThrow();
     }

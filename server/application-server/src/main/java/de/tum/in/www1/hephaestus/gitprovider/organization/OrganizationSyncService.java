@@ -1,6 +1,5 @@
 package de.tum.in.www1.hephaestus.gitprovider.organization;
 
-import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationService;
 import de.tum.in.www1.hephaestus.gitprovider.organization.github.GitHubOrganizationConverter;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;

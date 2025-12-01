@@ -61,6 +61,10 @@ export const listGlobalContributorsOptions = (options?: Options<ListGlobalContri
     });
 };
 
+/**
+ * Delete user account
+ * Permanently delete the current user's account and all associated data (GDPR)
+ */
 export const deleteUserMutation = (options?: Partial<Options<DeleteUserData>>): UseMutationOptions<unknown, DefaultError, Options<DeleteUserData>> => {
     const mutationOptions: UseMutationOptions<unknown, DefaultError, Options<DeleteUserData>> = {
         mutationFn: async (localOptions) => {
@@ -77,6 +81,10 @@ export const deleteUserMutation = (options?: Partial<Options<DeleteUserData>>): 
 
 export const getUserSettingsQueryKey = (options?: Options<GetUserSettingsData>) => createQueryKey('getUserSettings', options);
 
+/**
+ * Get user settings
+ * Get the current user's notification and research participation preferences
+ */
 export const getUserSettingsOptions = (options?: Options<GetUserSettingsData>) => {
     return queryOptions({
         queryFn: async ({ queryKey, signal }) => {
@@ -94,6 +102,10 @@ export const getUserSettingsOptions = (options?: Options<GetUserSettingsData>) =
 
 export const updateUserSettingsQueryKey = (options: Options<UpdateUserSettingsData>) => createQueryKey('updateUserSettings', options);
 
+/**
+ * Update user settings
+ * Update the current user's notification and research participation preferences
+ */
 export const updateUserSettingsOptions = (options: Options<UpdateUserSettingsData>) => {
     return queryOptions({
         queryFn: async ({ queryKey, signal }) => {
@@ -109,6 +121,10 @@ export const updateUserSettingsOptions = (options: Options<UpdateUserSettingsDat
     });
 };
 
+/**
+ * Update user settings
+ * Update the current user's notification and research participation preferences
+ */
 export const updateUserSettingsMutation = (options?: Partial<Options<UpdateUserSettingsData>>): UseMutationOptions<UpdateUserSettingsResponse, DefaultError, Options<UpdateUserSettingsData>> => {
     const mutationOptions: UseMutationOptions<UpdateUserSettingsResponse, DefaultError, Options<UpdateUserSettingsData>> = {
         mutationFn: async (localOptions) => {

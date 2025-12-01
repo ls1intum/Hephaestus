@@ -29,6 +29,10 @@ export const listGlobalContributors = <ThrowOnError extends boolean = false>(opt
     });
 };
 
+/**
+ * Delete user account
+ * Permanently delete the current user's account and all associated data (GDPR)
+ */
 export const deleteUser = <ThrowOnError extends boolean = false>(options?: Options<DeleteUserData, ThrowOnError>) => {
     return (options?.client ?? _heyApiClient).delete<DeleteUserResponses, unknown, ThrowOnError>({
         url: '/user',
@@ -36,6 +40,10 @@ export const deleteUser = <ThrowOnError extends boolean = false>(options?: Optio
     });
 };
 
+/**
+ * Get user settings
+ * Get the current user's notification and research participation preferences
+ */
 export const getUserSettings = <ThrowOnError extends boolean = false>(options?: Options<GetUserSettingsData, ThrowOnError>) => {
     return (options?.client ?? _heyApiClient).get<GetUserSettingsResponses, unknown, ThrowOnError>({
         url: '/user/settings',
@@ -43,6 +51,10 @@ export const getUserSettings = <ThrowOnError extends boolean = false>(options?: 
     });
 };
 
+/**
+ * Update user settings
+ * Update the current user's notification and research participation preferences
+ */
 export const updateUserSettings = <ThrowOnError extends boolean = false>(options: Options<UpdateUserSettingsData, ThrowOnError>) => {
     return (options.client ?? _heyApiClient).post<UpdateUserSettingsResponses, unknown, ThrowOnError>({
         url: '/user/settings',
