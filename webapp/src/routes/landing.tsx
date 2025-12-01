@@ -10,7 +10,7 @@ export const Route = createFileRoute("/landing")({
 export function LandingContainer() {
 	const { login, isAuthenticated } = useAuth();
 	const { workspaceSlug, workspaces } = useActiveWorkspaceSlug();
-	const navigate = useNavigate();
+	const navigate = useNavigate({ from: Route.fullPath });
 
 	const handleGoToDashboard = () => {
 		const targetSlug = workspaceSlug ?? workspaces[0]?.workspaceSlug;

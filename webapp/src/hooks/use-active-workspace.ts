@@ -25,13 +25,20 @@ export function useActiveWorkspaceSlug() {
 		return match?.[1];
 	}, [location.pathname]);
 
-	const activeSlug =
-		slugFromPath && workspaces.some((ws) => ws.workspaceSlug === slugFromPath)
-			? slugFromPath
-			: selectedSlug &&
-					workspaces.some((ws) => ws.workspaceSlug === selectedSlug)
-				? selectedSlug
-				: (workspaces[0]?.workspaceSlug ?? undefined);
+	const isValidSlug = (slug?: string) =>
+		slug != null && workspaces.some((ws) => ws.workspaceSlug === slug);
+
+	const activeSlug = (() => {
+		if (slugFromPath) {
+			return isValidSlug(slugFromPath) ? slugFromPath : undefined;
+		}
+
+		if (isValidSlug(selectedSlug)) {
+			return selectedSlug;
+		}
+
+		return workspaces[0]?.workspaceSlug ?? undefined;
+	})();
 
 	// Keep store in sync if the stored slug is no longer valid
 	useEffect(() => {

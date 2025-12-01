@@ -136,9 +136,15 @@ public class WorkspaceContextFilter implements Filter {
             var currentUser = userRepository.getCurrentUser();
             Set<WorkspaceRole> roles = fetchUserRoles(workspace, currentUser);
 
-            if (roles.isEmpty()) {
-                log.debug("User is not a member of workspace {}. Returning 403.", slug);
-                sendWorkspaceMembershipForbiddenError(httpResponse, slug);
+            boolean isPublicRead = Boolean.TRUE.equals(workspace.getIsPubliclyViewable()) && isReadRequest;
+
+            if (roles.isEmpty() && !isPublicRead) {
+                if (currentUser.isEmpty()) {
+                    sendWorkspaceUnauthorizedError(httpResponse, slug);
+                } else {
+                    log.debug("User is not a member of workspace {}. Returning 403.", slug);
+                    sendWorkspaceMembershipForbiddenError(httpResponse, slug);
+                }
                 return;
             }
 
@@ -257,6 +263,15 @@ public class WorkspaceContextFilter implements Filter {
         problem.setTitle("Membership required");
         problem.setDetail("You must be a member of workspace " + slug + " to access this resource.");
         response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+        response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
+        response.getWriter().write(objectMapper.writeValueAsString(problem));
+    }
+
+    private void sendWorkspaceUnauthorizedError(HttpServletResponse response, String slug) throws IOException {
+        ProblemDetail problem = ProblemDetail.forStatus(HttpStatus.UNAUTHORIZED);
+        problem.setTitle("Authentication required");
+        problem.setDetail("You must sign in to access workspace " + slug + ".");
+        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
         response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
         response.getWriter().write(objectMapper.writeValueAsString(problem));
     }

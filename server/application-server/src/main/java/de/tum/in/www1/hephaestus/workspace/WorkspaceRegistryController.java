@@ -69,7 +69,7 @@ public class WorkspaceRegistryController {
     )
     public ResponseEntity<List<WorkspaceListItemDTO>> listWorkspaces() {
         List<WorkspaceListItemDTO> workspaces = workspaceService
-            .listAllWorkspaces()
+            .listAccessibleWorkspacesForCurrentUser()
             .stream()
             .map(WorkspaceListItemDTO::from)
             .toList();

@@ -37,7 +37,7 @@ class WorkspaceAccessServiceTest {
     @Test
     void hasRole_WithEmptyRoles_ReturnsFalse() {
         // Given: Context with no roles
-        WorkspaceContext context = new WorkspaceContext(1L, "test", "Test", AccountType.ORG, 123L, Set.of());
+        WorkspaceContext context = new WorkspaceContext(1L, "test", "Test", AccountType.ORG, 123L, false, Set.of());
         WorkspaceContextHolder.setContext(context);
 
         // When & Then
@@ -53,6 +53,7 @@ class WorkspaceAccessServiceTest {
             "Test",
             AccountType.ORG,
             123L,
+            false,
             Set.of(WorkspaceRole.MEMBER)
         );
         WorkspaceContextHolder.setContext(context);
@@ -72,6 +73,7 @@ class WorkspaceAccessServiceTest {
             "Test",
             AccountType.ORG,
             123L,
+            false,
             Set.of(WorkspaceRole.ADMIN)
         );
         WorkspaceContextHolder.setContext(context);
@@ -91,6 +93,7 @@ class WorkspaceAccessServiceTest {
             "Test",
             AccountType.ORG,
             123L,
+            false,
             Set.of(WorkspaceRole.OWNER)
         );
         WorkspaceContextHolder.setContext(context);
@@ -110,6 +113,7 @@ class WorkspaceAccessServiceTest {
             "Test",
             AccountType.ORG,
             123L,
+            false,
             Set.of(WorkspaceRole.OWNER)
         );
         WorkspaceContextHolder.setContext(context);
@@ -127,6 +131,7 @@ class WorkspaceAccessServiceTest {
             "Test",
             AccountType.ORG,
             123L,
+            false,
             Set.of(WorkspaceRole.ADMIN)
         );
         WorkspaceContextHolder.setContext(context);
@@ -144,6 +149,7 @@ class WorkspaceAccessServiceTest {
             "Test",
             AccountType.ORG,
             123L,
+            false,
             Set.of(WorkspaceRole.ADMIN)
         );
         WorkspaceContextHolder.setContext(context);
@@ -161,6 +167,7 @@ class WorkspaceAccessServiceTest {
             "Test",
             AccountType.ORG,
             123L,
+            false,
             Set.of(WorkspaceRole.OWNER)
         );
         WorkspaceContextHolder.setContext(context);
@@ -178,6 +185,7 @@ class WorkspaceAccessServiceTest {
             "Test",
             AccountType.ORG,
             123L,
+            false,
             Set.of(WorkspaceRole.MEMBER)
         );
 
@@ -192,6 +200,7 @@ class WorkspaceAccessServiceTest {
             "Test",
             AccountType.ORG,
             123L,
+            false,
             Set.of(WorkspaceRole.ADMIN)
         );
         WorkspaceContextHolder.setContext(adminContext);
@@ -204,6 +213,7 @@ class WorkspaceAccessServiceTest {
             "Test",
             AccountType.ORG,
             123L,
+            false,
             Set.of(WorkspaceRole.OWNER)
         );
         WorkspaceContextHolder.setContext(ownerContext);
@@ -219,6 +229,7 @@ class WorkspaceAccessServiceTest {
             "Test",
             AccountType.ORG,
             123L,
+            false,
             Set.of(WorkspaceRole.OWNER)
         );
         WorkspaceContextHolder.setContext(context);
@@ -238,6 +249,7 @@ class WorkspaceAccessServiceTest {
             "Test",
             AccountType.ORG,
             123L,
+            false,
             Set.of(WorkspaceRole.ADMIN)
         );
         WorkspaceContextHolder.setContext(context);
@@ -257,6 +269,7 @@ class WorkspaceAccessServiceTest {
             "Test",
             AccountType.ORG,
             123L,
+            false,
             Set.of(WorkspaceRole.MEMBER)
         );
         WorkspaceContextHolder.setContext(context);
@@ -283,6 +296,7 @@ class WorkspaceAccessServiceTest {
             "Test",
             AccountType.ORG,
             123L,
+            false,
             Set.of(WorkspaceRole.ADMIN)
         );
         WorkspaceContextHolder.setContext(context);

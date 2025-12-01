@@ -157,7 +157,7 @@ public class BadPracticeDetectorScheduler {
             }
         } catch (ProcessingException | NotAuthorizedException e) {
             if (keycloakRoleChecksHealthy.compareAndSet(true, false)) {
-                logger.error(
+                logger.info(
                     "Disabling automatic detection role checks after Keycloak responded with {}. " +
                     "Set KEYCLOAK credentials or restart the server to re-enable.",
                     e.getMessage()

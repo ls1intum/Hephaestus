@@ -54,5 +54,7 @@ public interface WorkspaceMembershipRepository extends JpaRepository<WorkspaceMe
     )
     List<User> findHumanUsersWithTeamsByWorkspaceId(@Param("workspaceId") Long workspaceId);
 
+    List<WorkspaceMembership> findByUser_Id(Long userId);
+
     long countByWorkspace_IdAndRole(Long workspaceId, WorkspaceRole role);
 }

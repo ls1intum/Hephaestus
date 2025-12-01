@@ -77,6 +77,23 @@
         </sql>
     </changeSet>
 
+    <!-- Step 3b: Fallback populate to oldest workspace if still null (legacy data without memberships) -->
+    <changeSet id="1764514002516-6c-fallback" author="FelixTJDietrich">
+        <preConditions onFail="MARK_RAN">
+            <tableExists tableName="workspace"/>
+            <sqlCheck expectedResult="TRUE">SELECT COUNT(*) &gt; 0 FROM workspace</sqlCheck>
+        </preConditions>
+        <comment>Assign remaining chat_thread rows to oldest workspace to satisfy NOT NULL</comment>
+        <sql>
+            WITH fallback AS (
+                SELECT id FROM workspace ORDER BY created_at NULLS LAST LIMIT 1
+            )
+            UPDATE chat_thread ct
+            SET workspace_id = (SELECT id FROM fallback)
+            WHERE ct.workspace_id IS NULL;
+        </sql>
+    </changeSet>
+
     <!-- Step 4: Validate migration succeeded -->
     <changeSet id="1764514002516-6d" author="FelixTJDietrich">
         <preConditions onFail="HALT">
@@ -142,6 +159,23 @@
             FROM membership
             WHERE d.workspace_id IS NULL
               AND d.user_id = membership.user_id;
+        </sql>
+    </changeSet>
+
+    <!-- Step 3b: Fallback populate to oldest workspace if still null (legacy data without memberships) -->
+    <changeSet id="1764514002516-7c-fallback" author="FelixTJDietrich">
+        <preConditions onFail="MARK_RAN">
+            <tableExists tableName="workspace"/>
+            <sqlCheck expectedResult="TRUE">SELECT COUNT(*) &gt; 0 FROM workspace</sqlCheck>
+        </preConditions>
+        <comment>Assign remaining document rows to oldest workspace to satisfy NOT NULL</comment>
+        <sql>
+            WITH fallback AS (
+                SELECT id FROM workspace ORDER BY created_at NULLS LAST LIMIT 1
+            )
+            UPDATE document d
+            SET workspace_id = (SELECT id FROM fallback)
+            WHERE d.workspace_id IS NULL;
         </sql>
     </changeSet>
 

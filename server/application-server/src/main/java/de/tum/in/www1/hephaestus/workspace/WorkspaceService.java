@@ -19,7 +19,6 @@ import de.tum.in.www1.hephaestus.gitprovider.team.Team;
 import de.tum.in.www1.hephaestus.gitprovider.team.TeamInfoDTO;
 import de.tum.in.www1.hephaestus.gitprovider.team.TeamInfoDTOConverter;
 import de.tum.in.www1.hephaestus.gitprovider.team.TeamRepository;
-import de.tum.in.www1.hephaestus.gitprovider.team.membership.TeamMembership;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserTeamsDTO;
@@ -40,6 +39,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
@@ -49,6 +49,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.kohsuke.github.GHRepository;
 import org.kohsuke.github.GHRepositorySelection;
 import org.slf4j.Logger;
@@ -299,6 +300,47 @@ public class WorkspaceService {
     @Transactional(readOnly = true)
     public List<Workspace> listAllWorkspaces() {
         return workspaceRepository.findByStatusNot(Workspace.WorkspaceStatus.PURGED);
+    }
+
+    /**
+     * Returns workspaces the current user can see: memberships + publicly viewable workspaces.
+     * If no user is authenticated, only publicly viewable workspaces are returned.
+     */
+    public List<Workspace> listAccessibleWorkspacesForCurrentUser() {
+        return listAccessibleWorkspaces(userRepository.getCurrentUser());
+    }
+
+    List<Workspace> listAccessibleWorkspaces(Optional<User> currentUser) {
+        // Always include public, non-purged workspaces
+        List<Workspace> publicWorkspaces = workspaceRepository.findByStatusNotAndIsPubliclyViewableTrue(
+            Workspace.WorkspaceStatus.PURGED
+        );
+
+        if (currentUser.isEmpty()) {
+            return publicWorkspaces;
+        }
+
+        // Fetch memberships for the current user and load workspaces by ID
+        var memberships = workspaceMembershipRepository.findByUser_Id(currentUser.get().getId());
+        var workspaceIds = memberships.stream().map(WorkspaceMembership::getWorkspace).map(Workspace::getId).toList();
+
+        List<Workspace> memberWorkspaces = workspaceIds.isEmpty()
+            ? List.of()
+            : workspaceRepository.findAllById(workspaceIds);
+
+        // Merge and de-duplicate by ID to avoid duplicate entities with different instances
+        return Stream.concat(publicWorkspaces.stream(), memberWorkspaces.stream())
+            .collect(
+                Collectors.toMap(
+                    Workspace::getId,
+                    w -> w,
+                    (existing, replacement) -> existing,
+                    LinkedHashMap::new
+                )
+            )
+            .values()
+            .stream()
+            .toList();
     }
 
     @Transactional(readOnly = true)

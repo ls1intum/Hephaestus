@@ -23,4 +23,6 @@ public interface WorkspaceRepository extends JpaRepository<Workspace, Long> {
     List<Workspace> findAll();
 
     List<Workspace> findByStatusNot(Workspace.WorkspaceStatus status);
+
+    List<Workspace> findByStatusNotAndIsPubliclyViewableTrue(Workspace.WorkspaceStatus status);
 }

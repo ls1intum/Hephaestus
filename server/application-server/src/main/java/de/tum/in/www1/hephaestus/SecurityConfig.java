@@ -8,6 +8,7 @@ import java.util.stream.Stream;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.convert.converter.Converter;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AbstractAuthenticationToken;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -74,8 +75,8 @@ public class SecurityConfig {
             .cors(cors -> cors.configurationSource(corsConfigurationSource()));
 
         http.authorizeHttpRequests(requests -> {
-            requests.requestMatchers("/workspaces/*", "/workspaces/*/**").hasAnyAuthority("mentor_access", "admin");
-            requests.requestMatchers("/workspaces/**").hasAuthority("admin");
+            requests.requestMatchers(HttpMethod.GET, "/workspaces", "/workspaces/").authenticated();
+            requests.requestMatchers("/workspaces/**").authenticated();
             requests.requestMatchers("/mentor/**").hasAuthority("mentor_access");
             requests.anyRequest().permitAll();
         });

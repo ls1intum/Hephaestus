@@ -70,6 +70,7 @@ class WorkspaceContextTest {
             "Test",
             AccountType.ORG,
             null,
+            false,
             Set.of(WorkspaceRole.MEMBER)
         );
 
@@ -89,10 +90,19 @@ class WorkspaceContextTest {
             "Test",
             AccountType.ORG,
             null,
+            false,
             Set.of(WorkspaceRole.MEMBER)
         );
 
-        WorkspaceContext withoutRoles = new WorkspaceContext(2L, "test2", "Test2", AccountType.USER, null, Set.of());
+        WorkspaceContext withoutRoles = new WorkspaceContext(
+            2L,
+            "test2",
+            "Test2",
+            AccountType.USER,
+            null,
+            false,
+            Set.of()
+        );
 
         // Assert
         assertTrue(withRoles.hasMembership());
@@ -124,7 +134,7 @@ class WorkspaceContextTest {
         Set<WorkspaceRole> roles = Set.of(WorkspaceRole.OWNER, WorkspaceRole.ADMIN, WorkspaceRole.MEMBER);
 
         // Act
-        WorkspaceContext context = new WorkspaceContext(1L, "test", "Test", AccountType.ORG, null, roles);
+        WorkspaceContext context = new WorkspaceContext(1L, "test", "Test", AccountType.ORG, null, false, roles);
 
         // Assert
         assertTrue(context.hasRole(WorkspaceRole.OWNER));
@@ -138,7 +148,7 @@ class WorkspaceContextTest {
     void shouldBeImmutableRecord() {
         // Arrange
         Set<WorkspaceRole> roles = Set.of(WorkspaceRole.OWNER);
-        WorkspaceContext context = new WorkspaceContext(1L, "test", "Test", AccountType.ORG, 100L, roles);
+        WorkspaceContext context = new WorkspaceContext(1L, "test", "Test", AccountType.ORG, 100L, false, roles);
 
         // Act - Try to get roles and verify they're the same set
         Set<WorkspaceRole> retrievedRoles = context.roles();
