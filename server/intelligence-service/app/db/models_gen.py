@@ -95,7 +95,7 @@ class ChatThread(Base):
         ForeignKeyConstraint(
             ["workspace_id"],
             ["workspace.id"],
-            ondelete="SET NULL",
+            ondelete="CASCADE",
             name="fk_chat_thread_workspace",
         ),
         PrimaryKeyConstraint("id", name="chat_threadPK"),
@@ -586,6 +586,12 @@ class Workspace(Base):
     slack_signing_secret: Mapped[Optional[str]] = mapped_column(Text)
     slack_token: Mapped[Optional[str]] = mapped_column(Text)
     updated_at: Mapped[Optional[datetime.datetime]] = mapped_column(TIMESTAMP(True, 6))
+    members_synced_at: Mapped[Optional[datetime.datetime]] = mapped_column(
+        TIMESTAMP(True, 6)
+    )
+    teams_synced_at: Mapped[Optional[datetime.datetime]] = mapped_column(
+        TIMESTAMP(True, 6)
+    )
     chat_thread: Mapped[List["ChatThread"]] = relationship(
         "ChatThread", back_populates="workspace"
     )
@@ -612,7 +618,7 @@ class Document(Base):
         ForeignKeyConstraint(
             ["workspace_id"],
             ["workspace.id"],
-            ondelete="SET NULL",
+            ondelete="CASCADE",
             name="fk_document_workspace",
         ),
         PrimaryKeyConstraint("id", "version_number", name="documentPK"),
@@ -753,6 +759,14 @@ class RepositoryToMonitor(Base):
         TIMESTAMP(precision=6)
     )
     workspace_id: Mapped[Optional[int]] = mapped_column(BigInteger)
+    backfill_checkpoint: Mapped[Optional[int]] = mapped_column(Integer)
+    backfill_high_water_mark: Mapped[Optional[int]] = mapped_column(Integer)
+    backfill_last_run_at: Mapped[Optional[datetime.datetime]] = mapped_column(
+        TIMESTAMP(True, 6)
+    )
+    collaborators_synced_at: Mapped[Optional[datetime.datetime]] = mapped_column(
+        TIMESTAMP(True, 6)
+    )
     workspace: Mapped[Optional["Workspace"]] = relationship(
         "Workspace", back_populates="repository_to_monitor"
     )

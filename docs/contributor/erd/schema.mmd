@@ -283,6 +283,10 @@ erDiagram
         VARCHAR(255) name_with_owner
         TIMESTAMP repository_synced_at
         BIGINT workspace_id FK
+        INTEGER backfill_checkpoint
+        INTEGER backfill_high_water_mark
+        TIMESTAMPTZ backfill_last_run_at
+        TIMESTAMPTZ collaborators_synced_at
     }
 
     Team {
@@ -362,6 +366,8 @@ erDiagram
         VARCHAR(64) slug UK "NOT NULL"
         VARCHAR(20) status "NOT NULL"
         TIMESTAMPTZ updated_at
+        TIMESTAMPTZ members_synced_at
+        TIMESTAMPTZ teams_synced_at
     }
 
     WorkspaceMembership {
