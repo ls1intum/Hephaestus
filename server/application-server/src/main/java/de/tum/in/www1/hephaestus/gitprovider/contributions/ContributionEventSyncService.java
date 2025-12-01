@@ -1,8 +1,6 @@
-package de.tum.in.www1.hephaestus.gitprovider.contributions.github;
+package de.tum.in.www1.hephaestus.gitprovider.contributions;
 
 
-import de.tum.in.www1.hephaestus.gitprovider.contributions.ContributionEvent;
-import de.tum.in.www1.hephaestus.gitprovider.contributions.ContributionEventRepository;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReview;
 import jakarta.transaction.Transactional;
 import org.slf4j.Logger;
@@ -10,13 +8,13 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 @Service
-public class GitHubContributionEventSyncService {
+public class ContributionEventSyncService {
 
-    private static final Logger logger = LoggerFactory.getLogger(GitHubContributionEventSyncService.class);
+    private static final Logger logger = LoggerFactory.getLogger(ContributionEventSyncService.class);
 
     private final ContributionEventRepository contributionEventRepository;
 
-    public GitHubContributionEventSyncService(ContributionEventRepository contributionEventRepository) {
+    public ContributionEventSyncService(ContributionEventRepository contributionEventRepository) {
         this.contributionEventRepository = contributionEventRepository;
     }
 
