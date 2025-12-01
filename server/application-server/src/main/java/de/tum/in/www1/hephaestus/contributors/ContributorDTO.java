@@ -1,9 +1,13 @@
-package de.tum.in.www1.hephaestus.meta;
+package de.tum.in.www1.hephaestus.contributors;
 
 import java.io.IOException;
 import org.kohsuke.github.GHRepository.Contributor;
 import org.springframework.lang.NonNull;
 
+/**
+ * Data transfer object representing a GitHub contributor.
+ * Used to display contributor information on the public about page.
+ */
 public record ContributorDTO(
     @NonNull Long id,
     @NonNull String login,

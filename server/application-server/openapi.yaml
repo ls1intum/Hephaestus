@@ -13,8 +13,6 @@ servers:
 - description: Default Server URL
   url: /
 tags:
-- description: Workspace statistics and contributor information
-  name: Workspace Metadata
 - description: |-
     REST controller for the chat functionality.
      Handles streaming chat responses, message persistence, and thread management.
@@ -33,13 +31,11 @@ tags:
 - description: Vote on chat messages (upvote/downvote)
   name: Chat Message Voting
 - description: |-
-    Workspace-scoped user profile endpoint.
-     Returns user profile data filtered by workspace (open PRs, review activity, etc.)
-  name: workspace-user-profile-controller
-- description: |-
     Controller for activity-related operations within a workspace context.
      All endpoints require workspace membership via {@link WorkspaceScopedController WorkspaceScopedController}.
   name: activity-controller
+- description: User profile and activity data
+  name: Profile
 - description: |-
     Controller for managing workspace memberships and roles.
      Handles CRUD operations for workspace members and role assignments.
@@ -61,7 +57,7 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/Contributor"
-          description: list of all contributors with their global contribution metrics
+          description: list of contributors sorted by contribution count
       summary: List global contributors
       tags:
       - C
@@ -1036,52 +1032,6 @@ paths:
       summary: Get user's grouped chat threads
       tags:
       - chat
-  /workspaces/{workspaceSlug}/meta:
-    get:
-      description: Returns aggregated statistics for the workspace
-      operationId: getWorkspaceMeta
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/MetaData"
-          description: workspace metadata including statistics
-      summary: Get workspace metadata
-      tags:
-      - Workspa
-  /workspaces/{workspaceSlug}/meta/contributors:
-    get:
-      description: Returns all users who have contributed to the workspace
-      operationId: listWorkspaceContributors
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/Contributor"
-          description: list of contributors with their contribution metrics
-      summary: List workspace contributors
-      tags:
-      - Workspa
   /workspaces/{workspaceSlug}/notifications:
     patch:
       operationId: updateNotifications
@@ -1109,6 +1059,35 @@ paths:
       summary: Update leaderboard notification preferences
       tags:
       - workspace
+  /workspaces/{workspaceSlug}/profile/{login}:
+    get:
+      description: "Returns user profile with workspace-scoped activity data including\
+        \ open PRs, review activity, and league points"
+      operationId: getUserProfile
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - description: the user's GitHub login
+        in: path
+        name: login
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+          description: "user profile with open PRs, review activity, league points,\
+            \ etc."
+      summary: Get user profile
+      tags: []
   /workspaces/{workspaceSlug}/public-visibility:
     patch:
       operationId: updatePublicVisibility
@@ -1487,35 +1466,6 @@ paths:
       summary: Update workspace Personal Access Token
       tags:
       - workspace
-  /workspaces/{workspaceSlug}/user/{login}/profile:
-    get:
-      description: Get a user's profile with workspace-scoped activity data.
-      operationId: getUserProfile
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      - description: the user's GitHub login
-        in: path
-        name: login
-        required: true
-        schema:
-          type: string
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/UserProfile"
-          description: "user profile with open PRs, review activity, etc."
-      summary: "Get user profile with workspace-scoped data (open PRs, review activity,\
-        \ etc.)"
-      tags:
-      - workspace-user-profile
   /workspaces/{workspaceSlug}/users:
     get:
       operationId: getUsersWithTeams
@@ -1666,6 +1616,9 @@ components:
       - title
     Contributor:
       type: object
+      description: |-
+        Data transfer object representing a GitHub contributor.
+         Used to display contributor information on the public about page.
       properties:
         avatarUrl:
           type: string
@@ -2129,21 +2082,6 @@ components:
       required:
       - leaguePointsChange
       - login
-    MetaData:
-      type: object
-      properties:
-        scheduledDay:
-          type: string
-        scheduledTime:
-          type: string
-        teams:
-          type: array
-          items:
-            $ref: "#/components/schemas/TeamInfo"
-      required:
-      - scheduledDay
-      - scheduledTime
-      - teams
     PageDocument:
       type: object
       properties:

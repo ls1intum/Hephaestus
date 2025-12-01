@@ -93,6 +93,10 @@ export type ChatThreadSummary = {
     title: string;
 };
 
+/**
+ * Data transfer object representing a GitHub contributor.
+ * Used to display contributor information on the public about page.
+ */
 export type Contributor = {
     avatarUrl: string;
     contributions?: number;
@@ -386,12 +390,6 @@ export type LeaderboardEntry = {
 export type LeagueChange = {
     leaguePointsChange: number;
     login: string;
-};
-
-export type MetaData = {
-    scheduledDay: string;
-    scheduledTime: string;
-    teams: Array<TeamInfo>;
 };
 
 export type PageDocument = {
@@ -1658,7 +1656,7 @@ export type ListGlobalContributorsData = {
 
 export type ListGlobalContributorsResponses = {
     /**
-     * list of all contributors with their global contribution metrics
+     * list of contributors sorted by contribution count
      */
     200: Array<Contributor>;
 };
@@ -2492,48 +2490,6 @@ export type GetGroupedThreadsResponses = {
 
 export type GetGroupedThreadsResponse = GetGroupedThreadsResponses[keyof GetGroupedThreadsResponses];
 
-export type GetWorkspaceMetaData = {
-    body?: never;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-    };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/meta';
-};
-
-export type GetWorkspaceMetaResponses = {
-    /**
-     * workspace metadata including statistics
-     */
-    200: MetaData;
-};
-
-export type GetWorkspaceMetaResponse = GetWorkspaceMetaResponses[keyof GetWorkspaceMetaResponses];
-
-export type ListWorkspaceContributorsData = {
-    body?: never;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-    };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/meta/contributors';
-};
-
-export type ListWorkspaceContributorsResponses = {
-    /**
-     * list of contributors with their contribution metrics
-     */
-    200: Array<Contributor>;
-};
-
-export type ListWorkspaceContributorsResponse = ListWorkspaceContributorsResponses[keyof ListWorkspaceContributorsResponses];
-
 export type UpdateNotificationsData = {
     body: UpdateWorkspaceNotificationsRequest;
     path: {
@@ -2554,6 +2510,31 @@ export type UpdateNotificationsResponses = {
 };
 
 export type UpdateNotificationsResponse = UpdateNotificationsResponses[keyof UpdateNotificationsResponses];
+
+export type GetUserProfileData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        /**
+         * the user's GitHub login
+         */
+        login: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/profile/{login}';
+};
+
+export type GetUserProfileResponses = {
+    /**
+     * user profile with open PRs, review activity, league points, etc.
+     */
+    200: UserProfile;
+};
+
+export type GetUserProfileResponse = GetUserProfileResponses[keyof GetUserProfileResponses];
 
 export type UpdatePublicVisibilityData = {
     body: UpdateWorkspacePublicVisibilityRequest;
@@ -2844,31 +2825,6 @@ export type UpdateTokenResponses = {
 };
 
 export type UpdateTokenResponse = UpdateTokenResponses[keyof UpdateTokenResponses];
-
-export type GetUserProfileData = {
-    body?: never;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-        /**
-         * the user's GitHub login
-         */
-        login: string;
-    };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/user/{login}/profile';
-};
-
-export type GetUserProfileResponses = {
-    /**
-     * user profile with open PRs, review activity, etc.
-     */
-    200: UserProfile;
-};
-
-export type GetUserProfileResponse = GetUserProfileResponses[keyof GetUserProfileResponses];
 
 export type GetUsersWithTeamsData = {
     body?: never;

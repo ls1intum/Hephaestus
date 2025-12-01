@@ -9,10 +9,11 @@ import { endOfISOWeek, formatISO, startOfISOWeek } from "date-fns";
 import { useEffect } from "react";
 import { z } from "zod";
 import {
+	getAllTeamsOptions,
 	getLeaderboardOptions,
 	getUserLeagueStatsOptions,
 	getUserProfileOptions,
-	getWorkspaceMetaOptions,
+	getWorkspaceOptions,
 } from "@/api/@tanstack/react-query.gen";
 import { LeaderboardPage } from "@/components/leaderboard/LeaderboardPage";
 import type { LeaderboardSortType } from "@/components/leaderboard/SortFilter";
@@ -61,9 +62,17 @@ function LeaderboardContainer() {
 	const { team, sort, after, before, mode } = Route.useSearch();
 	const navigate = useNavigate({ from: Route.fullPath });
 
-	// Query for metadata (teams, schedule info)
-	const metaQuery = useQuery({
-		...getWorkspaceMetaOptions({
+	// Query for workspace details (includes schedule info)
+	const workspaceQuery = useQuery({
+		...getWorkspaceOptions({
+			path: { workspaceSlug: slug },
+		}),
+		enabled: hasWorkspace,
+	});
+
+	// Query for teams in the workspace
+	const teamsQuery = useQuery({
+		...getAllTeamsOptions({
 			path: { workspaceSlug: slug },
 		}),
 		enabled: hasWorkspace,
@@ -81,7 +90,7 @@ function LeaderboardContainer() {
 				mode,
 			},
 		}),
-		enabled: hasWorkspace && Boolean(after && before && metaQuery.data),
+		enabled: hasWorkspace && Boolean(after && before && teamsQuery.data),
 	});
 
 	// Query for user profile data
@@ -107,7 +116,7 @@ function LeaderboardContainer() {
 	};
 
 	// Build a map for id->team to compute visible-only path labels
-	const teamsList = (metaQuery.data?.teams ?? []) as MetaTeam[];
+	const teamsList = (teamsQuery.data ?? []) as MetaTeam[];
 	const teamById = new Map<number, MetaTeam>(teamsList.map((t) => [t.id, t]));
 
 	// Helper to create the visible-only path label for a team
@@ -177,12 +186,12 @@ function LeaderboardContainer() {
 		}
 	}, [mode, sort, navigate]);
 
-	// Get the leaderboard schedule from the server's metadata
-	const scheduledTime = metaQuery.data?.scheduledTime || "9:00";
-	const scheduledDay = Number.parseInt(metaQuery.data?.scheduledDay || "2", 10);
+	// Get the leaderboard schedule from workspace config
+	const scheduledTime = workspaceQuery.data?.leaderboardScheduleTime || "9:00";
+	const scheduledDay = workspaceQuery.data?.leaderboardScheduleDay ?? 2;
 	const [hours, minutes] = scheduledTime
 		.split(":")
-		.map((part) => Number.parseInt(part, 10));
+		.map((part: string) => Number.parseInt(part, 10));
 	const leaderboardSchedule = {
 		day: scheduledDay,
 		hour: hours || 9,
@@ -299,7 +308,7 @@ function LeaderboardContainer() {
 		<LeaderboardPage
 			leaderboard={leaderboardQuery.data || []}
 			isLoading={
-				isWorkspaceLoading || leaderboardQuery.isPending || metaQuery.isPending
+				isWorkspaceLoading || leaderboardQuery.isPending || teamsQuery.isPending
 			}
 			currentUser={userProfileQuery.data?.userInfo}
 			currentUserEntry={currentUserEntry}
