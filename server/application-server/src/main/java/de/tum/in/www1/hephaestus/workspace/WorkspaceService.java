@@ -331,12 +331,7 @@ public class WorkspaceService {
         // Merge and de-duplicate by ID to avoid duplicate entities with different instances
         return Stream.concat(publicWorkspaces.stream(), memberWorkspaces.stream())
             .collect(
-                Collectors.toMap(
-                    Workspace::getId,
-                    w -> w,
-                    (existing, replacement) -> existing,
-                    LinkedHashMap::new
-                )
+                Collectors.toMap(Workspace::getId, w -> w, (existing, replacement) -> existing, LinkedHashMap::new)
             )
             .values()
             .stream()

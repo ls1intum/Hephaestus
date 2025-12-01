@@ -86,6 +86,7 @@ class WorkspaceContextFilterIntegrationTest extends AbstractWorkspaceIntegration
     @Test
     @WithAdminUser
     void adminWithoutMembershipIsAlsoForbidden() {
+        persistUser("admin");
         User workspaceOwner = persistUser("admin-workspace-owner");
         Workspace workspace = createWorkspace("gamma-space", "Gamma", "gamma", AccountType.ORG, workspaceOwner);
 
@@ -155,6 +156,47 @@ class WorkspaceContextFilterIntegrationTest extends AbstractWorkspaceIntegration
 
         assertThat(response).isNotNull();
         assertThat(response.workspaceSlug()).isEqualTo(workspace.getWorkspaceSlug());
+    }
+
+    @Test
+    void unauthenticatedWorkspaceListIsUnauthorized() {
+        webTestClient.get().uri("/workspaces").exchange().expectStatus().isUnauthorized();
+        webTestClient.get().uri("/workspaces/").exchange().expectStatus().isUnauthorized();
+    }
+
+    @Test
+    void unauthenticatedAccessToPublicWorkspaceIsAllowed() {
+        User owner = persistUser("public-owner");
+        Workspace workspace = createWorkspace("public-space", "Public", "public", AccountType.ORG, owner);
+        workspaceService.updatePublicVisibility(workspace.getWorkspaceSlug(), true);
+
+        WorkspaceContextSnapshot response = webTestClient
+            .get()
+            .uri("/workspaces/{workspaceSlug}/context-echo", workspace.getWorkspaceSlug())
+            .exchange()
+            .expectStatus()
+            .isOk()
+            .expectBody(WorkspaceContextSnapshot.class)
+            .returnResult()
+            .getResponseBody();
+
+        assertThat(response).isNotNull();
+        assertThat(response.contextSlug()).isEqualTo(workspace.getWorkspaceSlug());
+        assertThat(response.roles()).isEmpty(); // anonymous viewer
+    }
+
+    @Test
+    void unauthenticatedAccessToPrivateWorkspaceIsUnauthorized() {
+        User owner = persistUser("private-owner");
+        Workspace workspace = createWorkspace("private-space", "Private", "private", AccountType.ORG, owner);
+        workspaceService.updatePublicVisibility(workspace.getWorkspaceSlug(), false);
+
+        webTestClient
+            .get()
+            .uri("/workspaces/{workspaceSlug}/context-echo", workspace.getWorkspaceSlug())
+            .exchange()
+            .expectStatus()
+            .isUnauthorized();
     }
 
     private WorkspaceContextSnapshot requestContextEcho(String slug) {

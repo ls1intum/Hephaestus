@@ -85,8 +85,8 @@ public class WorkspaceContextFilter implements Filter {
             return;
         }
 
-        // Allow registry endpoints that include a trailing slash ("/workspaces/")
-        if ("/workspaces/".equals(path)) {
+        // Allow workspace registry endpoints that are not slugged
+        if ("/workspaces".equals(path) || "/workspaces/".equals(path)) {
             chain.doFilter(request, response);
             return;
         }
