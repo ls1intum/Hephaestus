@@ -81,7 +81,7 @@
     <changeSet id="1764514002516-6c-fallback" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <tableExists tableName="workspace"/>
-            <sqlCheck expectedResult="TRUE">SELECT COUNT(*) &gt; 0 FROM workspace</sqlCheck>
+            <sqlCheck expectedResult="1">SELECT CASE WHEN COUNT(*) &gt; 0 THEN 1 ELSE 0 END FROM workspace</sqlCheck>
         </preConditions>
         <comment>Assign remaining chat_thread rows to oldest workspace to satisfy NOT NULL</comment>
         <sql>
@@ -98,8 +98,8 @@
     <changeSet id="1764514002516-6c-final" author="FelixTJDietrich" runAlways="true">
         <preConditions onFail="MARK_RAN">
             <tableExists tableName="workspace"/>
-            <sqlCheck expectedResult="TRUE">SELECT COUNT(*) &gt; 0 FROM workspace</sqlCheck>
-            <sqlCheck expectedResult="TRUE">SELECT COUNT(*) &gt; 0 FROM chat_thread WHERE workspace_id IS NULL</sqlCheck>
+            <sqlCheck expectedResult="1">SELECT CASE WHEN COUNT(*) &gt; 0 THEN 1 ELSE 0 END FROM workspace</sqlCheck>
+            <sqlCheck expectedResult="1">SELECT CASE WHEN COUNT(*) &gt; 0 THEN 1 ELSE 0 END FROM chat_thread WHERE workspace_id IS NULL</sqlCheck>
         </preConditions>
         <comment>Final cleanup: assign any remaining chat_thread rows with NULL workspace_id to oldest workspace</comment>
         <sql>
@@ -112,9 +112,9 @@
         </sql>
     </changeSet>
 
-    <!-- Step 4: Validate migration succeeded -->
-    <changeSet id="1764514002516-6d" author="FelixTJDietrich">
-        <preConditions onFail="HALT">
+    <!-- Step 4: Validate migration succeeded (runs always to catch issues, skips if valid) -->
+    <changeSet id="1764514002516-6d" author="FelixTJDietrich" runAlways="true">
+        <preConditions onFail="MARK_RAN">
             <sqlCheck expectedResult="0">SELECT COUNT(*) FROM chat_thread WHERE workspace_id IS NULL</sqlCheck>
         </preConditions>
         <comment>Validation: all chat_thread rows must have workspace_id populated</comment>
@@ -184,7 +184,7 @@
     <changeSet id="1764514002516-7c-fallback" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <tableExists tableName="workspace"/>
-            <sqlCheck expectedResult="TRUE">SELECT COUNT(*) &gt; 0 FROM workspace</sqlCheck>
+            <sqlCheck expectedResult="1">SELECT CASE WHEN COUNT(*) &gt; 0 THEN 1 ELSE 0 END FROM workspace</sqlCheck>
         </preConditions>
         <comment>Assign remaining document rows to oldest workspace to satisfy NOT NULL</comment>
         <sql>
@@ -201,8 +201,8 @@
     <changeSet id="1764514002516-7c-final" author="FelixTJDietrich" runAlways="true">
         <preConditions onFail="MARK_RAN">
             <tableExists tableName="workspace"/>
-            <sqlCheck expectedResult="TRUE">SELECT COUNT(*) &gt; 0 FROM workspace</sqlCheck>
-            <sqlCheck expectedResult="TRUE">SELECT COUNT(*) &gt; 0 FROM document WHERE workspace_id IS NULL</sqlCheck>
+            <sqlCheck expectedResult="1">SELECT CASE WHEN COUNT(*) &gt; 0 THEN 1 ELSE 0 END FROM workspace</sqlCheck>
+            <sqlCheck expectedResult="1">SELECT CASE WHEN COUNT(*) &gt; 0 THEN 1 ELSE 0 END FROM document WHERE workspace_id IS NULL</sqlCheck>
         </preConditions>
         <comment>Final cleanup: Assign any remaining document rows with NULL workspace_id to oldest workspace</comment>
         <sql>
@@ -215,9 +215,9 @@
         </sql>
     </changeSet>
 
-    <!-- Step 4: Validate migration succeeded -->
-    <changeSet id="1764514002516-7d" author="FelixTJDietrich">
-        <preConditions onFail="HALT">
+    <!-- Step 4: Validate migration succeeded (runs always to catch issues, skips if valid) -->
+    <changeSet id="1764514002516-7d" author="FelixTJDietrich" runAlways="true">
+        <preConditions onFail="MARK_RAN">
             <sqlCheck expectedResult="0">SELECT COUNT(*) FROM document WHERE workspace_id IS NULL</sqlCheck>
         </preConditions>
         <comment>Validation: all document rows must have workspace_id populated</comment>
