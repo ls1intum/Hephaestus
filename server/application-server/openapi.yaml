@@ -17,15 +17,174 @@ tags:
     REST controller for the chat functionality.
      Handles streaming chat responses, message persistence, and thread management.
   name: chat-controller
+- description: Global contributor information
+  name: Contributors
 - description: Document management with versioning support
   name: Documents
+- description: |-
+    Workspace registry endpoints that operate outside of a specific workspace slug.
+     These routes stay under the classic /workspaces base path while slugged routes
+     live in {@link WorkspaceController WorkspaceController} via <code>@WorkspaceScopedController</code>.
+  name: workspace-registry-controller
+- description: Team management within workspace
+  name: Teams
 - description: Vote on chat messages (upvote/downvote)
   name: Chat Message Voting
+- description: |-
+    Controller for activity-related operations within a workspace context.
+     All endpoints require workspace membership via {@link WorkspaceScopedController WorkspaceScopedController}.
+  name: activity-controller
+- description: User profile and activity data
+  name: Profile
+- description: |-
+    Controller for managing workspace memberships and roles.
+     Handles CRUD operations for workspace members and role assignments.
+  name: workspace-membership-controller
+- description: Contributor rankings and league statistics
+  name: Leaderboard
+- description: "User account management (settings, deletion)"
+  name: Account
 paths:
-  /activity/badpractice/{badPracticeId}/feedback:
+  /contributors:
+    get:
+      description: Returns all contributors across all workspaces
+      operationId: listGlobalContributors
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Contributor"
+          description: list of contributors sorted by contribution count
+      summary: List global contributors
+      tags:
+      - C
+  /user:
+    delete:
+      description: Permanently delete the current user's account and all associated
+        data (GDPR)
+      operationId: deleteUser
+      responses:
+        "200":
+          description: OK
+      summary: Delete user account
+      tags: []
+  /user/settings:
+    get:
+      description: Get the current user's notification and research participation
+        preferences
+      operationId: getUserSettings
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserSettings"
+          description: OK
+      summary: Get user settings
+      tags: []
+    post:
+      description: Update the current user's notification and research participation
+        preferences
+      operationId: updateUserSettings
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserSettings"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserSettings"
+          description: OK
+      summary: Update user settings
+      tags: []
+  /workspaces:
+    get:
+      operationId: listWorkspaces
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/WorkspaceListItem"
+          description: Workspace list
+      summary: List all workspaces
+      tags:
+      - workspace-registry
+    post:
+      operationId: createWorkspace
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateWorkspaceRequest"
+        required: true
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Workspace"
+          description: Workspace created
+      summary: Create a new workspace
+      tags:
+      - workspace-registry
+  /workspaces/{workspaceSlug}:
+    delete:
+      operationId: purgeWorkspace
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      responses:
+        "204":
+          description: Workspace purged
+      summary: Purge (soft delete) a workspace
+      tags:
+      - workspace
+    get:
+      operationId: getWorkspace
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Workspace"
+          description: Workspace returned
+      summary: Fetch a workspace by slug
+      tags:
+      - workspace
+  /workspaces/{workspaceSlug}/activity/badpractice/{badPracticeId}/feedback:
     post:
       operationId: provideFeedbackForBadPractice
       parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
       - in: path
         name: badPracticeId
         required: true
@@ -43,10 +202,17 @@ paths:
           description: OK
       tags:
       - activity
-  /activity/badpractice/{badPracticeId}/resolve:
+  /workspaces/{workspaceSlug}/activity/badpractice/{badPracticeId}/resolve:
     post:
       operationId: resolveBadPractice
       parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
       - in: path
         name: badPracticeId
         required: true
@@ -71,10 +237,17 @@ paths:
           description: OK
       tags:
       - activity
-  /activity/pullrequest/{pullRequestId}/badpractices:
+  /workspaces/{workspaceSlug}/activity/pullrequest/{pullRequestId}/badpractices:
     post:
       operationId: detectBadPracticesForPullRequest
       parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
       - in: path
         name: pullRequestId
         required: true
@@ -86,10 +259,17 @@ paths:
           description: OK
       tags:
       - activity
-  /activity/user/{login}/badpractices:
+  /workspaces/{workspaceSlug}/activity/user/{login}/badpractices:
     post:
       operationId: detectBadPracticesByUser
       parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
       - in: path
         name: login
         required: true
@@ -100,10 +280,17 @@ paths:
           description: OK
       tags:
       - activity
-  /activity/{login}:
+  /workspaces/{workspaceSlug}/activity/{login}:
     get:
       operationId: getActivityByUser
       parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
       - in: path
         name: login
         required: true
@@ -118,11 +305,18 @@ paths:
           description: OK
       tags:
       - activity
-  /api/chat/messages/{messageId}/vote:
-    post:
+  /workspaces/{workspaceSlug}/api/chat/messages/{messageId}/vote:
+    patch:
       description: Cast an upvote or downvote on a chat message
       operationId: voteMessage
       parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
       - description: Message ID to vote on
         in: path
         name: messageId
@@ -158,10 +352,17 @@ paths:
       summary: Vote on a message
       tags:
       - Chat Mes
-  /api/documents:
+  /workspaces/{workspaceSlug}/api/documents:
     get:
       operationId: getUserDocuments
       parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
       - in: query
         name: page
         required: false
@@ -199,6 +400,14 @@ paths:
       tags: []
     post:
       operationId: createDocument
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
       requestBody:
         content:
           application/json:
@@ -220,10 +429,17 @@ paths:
           description: Invalid request data
       summary: Create a new document
       tags: []
-  /api/documents/{id}:
+  /workspaces/{workspaceSlug}/api/documents/{id}:
     delete:
       operationId: deleteDocument
       parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
       - in: path
         name: id
         required: true
@@ -240,6 +456,13 @@ paths:
     get:
       operationId: getDocument
       parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
       - in: path
         name: id
         required: true
@@ -264,6 +487,13 @@ paths:
     put:
       operationId: updateDocument
       parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
       - in: path
         name: id
         required: true
@@ -297,10 +527,17 @@ paths:
           description: Document not found
       summary: Update a document (creates new version)
       tags: []
-  /api/documents/{id}/versions:
+  /workspaces/{workspaceSlug}/api/documents/{id}/versions:
     delete:
       operationId: deleteVersionsAfterTimestamp
       parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
       - in: path
         name: id
         required: true
@@ -343,6 +580,13 @@ paths:
     get:
       operationId: getDocumentVersions
       parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
       - in: path
         name: id
         required: true
@@ -378,10 +622,17 @@ paths:
           description: Document not found
       summary: Get all versions of a document
       tags: []
-  /api/documents/{id}/versions/{versionNumber}:
+  /workspaces/{workspaceSlug}/api/documents/{id}/versions/{versionNumber}:
     get:
       operationId: getDocumentVersion
       parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
       - in: path
         name: id
         required: true
@@ -409,17 +660,27 @@ paths:
           description: Document version not found
       summary: Get specific version of a document by version number
       tags: []
-  /leaderboard:
+  /workspaces/{workspaceSlug}/leaderboard:
     get:
+      description: Creates a ranked contributor list for the specified time range
       operationId: getLeaderboard
       parameters:
-      - in: query
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - description: start of the time range (inclusive)
+        in: query
         name: after
         required: true
         schema:
           type: string
           format: date-time
-      - in: query
+      - description: end of the time range (inclusive)
+        in: query
         name: before
         required: true
         schema:
@@ -442,7 +703,8 @@ paths:
           enum:
           - SCORE
           - LEAGUE_POINTS
-      - in: query
+      - description: aggregation mode (INDIVIDUAL or TEAM)
+        in: query
         name: mode
         required: true
         schema:
@@ -458,13 +720,22 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/LeaderboardEntry"
-          description: OK
-      tags:
-      - leaderboard
+          description: ranked list of leaderboard entries
+      summary: Generate leaderboard
+      tags: []
     post:
+      description: Calculates league changes for a specific user
       operationId: getUserLeagueStats
       parameters:
-      - in: query
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - description: the user's GitHub login
+        in: query
         name: login
         required: true
         schema:
@@ -474,6 +745,7 @@ paths:
           application/json:
             schema:
               $ref: "#/components/schemas/LeaderboardEntry"
+        description: the user's current leaderboard entry for comparison
         required: true
       responses:
         "200":
@@ -481,14 +753,191 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/LeagueChange"
+          description: league change statistics including promotion/demotion info
+      summary: Get user league stats
+      tags: []
+  /workspaces/{workspaceSlug}/league/reset:
+    put:
+      operationId: resetAndRecalculateLeagues
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      responses:
+        "200":
           description: OK
+      summary: Reset and recalculate workspace leagues
       tags:
-      - leaderboard
-  /mentor/thread/{threadId}:
+      - workspace
+  /workspaces/{workspaceSlug}/members:
+    get:
+      description: |-
+        List all members of the workspace with pagination.
+         Accessible to all workspace members (MEMBER role and above).
+      operationId: listMembers
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - description: Page number (0-indexed)
+        in: query
+        name: page
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+      - description: "Page size (default 50, max 100)"
+        in: query
+        name: size
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 50
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/WorkspaceMembership"
+          description: List of workspace memberships
+      summary: List all members of the workspace with pagination.
+      tags:
+      - workspace-membership
+  /workspaces/{workspaceSlug}/members/assign:
+    post:
+      description: |-
+        Assign or update a role for a workspace member.
+         OWNER can assign any role. ADMIN can assign ADMIN or MEMBER roles.
+      operationId: assignRole
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AssignRoleRequest"
+        description: Role assignment request
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkspaceMembership"
+          description: Updated membership
+      summary: Assign or update a role for a workspace member.
+      tags:
+      - workspace-membership
+  /workspaces/{workspaceSlug}/members/me:
+    get:
+      description: Get the current user's membership in this workspace.
+      operationId: getCurrentUserMembership
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkspaceMembership"
+          description: the current user's membership details
+      summary: Get the current user's membership in this workspace.
+      tags:
+      - workspace-membership
+  /workspaces/{workspaceSlug}/members/{userId}:
+    delete:
+      description: |-
+        Revoke a user's membership (remove them from workspace).
+         OWNER can remove anyone except themselves if they are the last OWNER.
+         ADMIN can remove MEMBER and ADMIN roles.
+      operationId: removeMember
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - description: User ID to remove
+        in: path
+        name: userId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          description: 204 No Content on success
+      summary: Revoke a user's membership (remove them from workspace).
+      tags:
+      - workspace-membership
+    get:
+      description: |-
+        Get a specific member's details.
+         Accessible to all workspace members.
+      operationId: getMember
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - description: User ID
+        in: path
+        name: userId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkspaceMembership"
+          description: Workspace membership details
+      summary: Get a specific member's details.
+      tags:
+      - workspace-membership
+  /workspaces/{workspaceSlug}/mentor/thread/{threadId}:
     get:
       description: Retrieve a specific chat thread with all messages
       operationId: getThread
       parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
       - description: Thread ID
         in: path
         name: threadId
@@ -518,10 +967,18 @@ paths:
       summary: Get chat thread detail
       tags:
       - chat
-  /mentor/threads:
+  /workspaces/{workspaceSlug}/mentor/threads:
     get:
       description: Retrieve all chat threads for the authenticated user
       operationId: getThreads
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
       responses:
         "200":
           content:
@@ -542,11 +999,19 @@ paths:
       summary: Get user's chat threads
       tags:
       - chat
-  /mentor/threads/grouped:
+  /workspaces/{workspaceSlug}/mentor/threads/grouped:
     get:
       description: Retrieve all chat threads for the authenticated user grouped by
         time periods
       operationId: getGroupedThreads
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
       responses:
         "200":
           content:
@@ -567,21 +1032,100 @@ paths:
       summary: Get user's grouped chat threads
       tags:
       - chat
-  /meta:
-    get:
-      operationId: getMetaData
+  /workspaces/{workspaceSlug}/notifications:
+    patch:
+      operationId: updateNotifications
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateWorkspaceNotificationsRequest"
+        required: true
       responses:
         "200":
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/MetaData"
-          description: OK
+                $ref: "#/components/schemas/Workspace"
+          description: Workspace updated
+      summary: Update leaderboard notification preferences
       tags:
-      - meta
-  /meta/contributors:
+      - workspace
+  /workspaces/{workspaceSlug}/profile/{login}:
     get:
-      operationId: getContributors
+      description: "Returns user profile with workspace-scoped activity data including\
+        \ open PRs, review activity, and league points"
+      operationId: getUserProfile
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - description: the user's GitHub login
+        in: path
+        name: login
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+          description: "user profile with open PRs, review activity, league points,\
+            \ etc."
+      summary: Get user profile
+      tags: []
+  /workspaces/{workspaceSlug}/public-visibility:
+    patch:
+      operationId: updatePublicVisibility
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateWorkspacePublicVisibilityRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Workspace"
+          description: Workspace updated
+      summary: Toggle public visibility for a workspace
+      tags:
+      - workspace
+  /workspaces/{workspaceSlug}/repositories:
+    get:
+      operationId: getRepositoriesToMonitor
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
       responses:
         "200":
           content:
@@ -589,13 +1133,157 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: "#/components/schemas/Contributor"
-          description: OK
+                  type: string
+          description: Repository list
+      summary: List repositories monitored by a workspace
       tags:
-      - meta
-  /team:
+      - workspace
+  /workspaces/{workspaceSlug}/repositories/{owner}/{name}:
+    delete:
+      operationId: removeRepositoryToMonitor
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: owner
+        required: true
+        schema:
+          type: string
+      - in: path
+        name: name
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+      summary: Remove a repository from a workspace monitor list
+      tags:
+      - workspace
+    post:
+      operationId: addRepositoryToMonitor
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: owner
+        required: true
+        schema:
+          type: string
+      - in: path
+        name: name
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+      summary: Add a repository to a workspace monitor list
+      tags:
+      - workspace
+  /workspaces/{workspaceSlug}/schedule:
+    patch:
+      operationId: updateSchedule
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateWorkspaceScheduleRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Workspace"
+          description: Workspace updated
+      summary: Update leaderboard schedule configuration
+      tags:
+      - workspace
+  /workspaces/{workspaceSlug}/slack-credentials:
+    patch:
+      operationId: updateSlackCredentials
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateWorkspaceSlackCredentialsRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Workspace"
+          description: Workspace updated
+      summary: Update Slack credentials for a workspace
+      tags:
+      - workspace
+  /workspaces/{workspaceSlug}/status:
+    patch:
+      operationId: updateStatus
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateWorkspaceStatusRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Workspace"
+          description: Workspace updated
+      summary: Update workspace lifecycle status
+      tags:
+      - workspace
+  /workspaces/{workspaceSlug}/team:
     get:
+      description: Returns all teams in the workspace organization
       operationId: getAllTeams
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
       responses:
         "200":
           content:
@@ -604,20 +1292,30 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/TeamInfo"
-          description: OK
-      tags:
-      - team
-  /team/{id}/visibility:
+          description: list of teams with their members and permissions
+      summary: List teams
+      tags: []
+  /workspaces/{workspaceSlug}/team/{id}/visibility:
     post:
+      description: Show or hide a team in leaderboard calculations
       operationId: updateTeamVisibility
       parameters:
-      - in: path
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - description: the team ID
+        in: path
         name: id
         required: true
         schema:
           type: integer
           format: int64
-      - in: query
+      - description: "whether to hide the team (query parameter, fallback)"
+        in: query
         name: hidden
         required: false
         schema:
@@ -627,15 +1325,23 @@ paths:
           application/json:
             schema:
               type: boolean
+        description: "whether to hide the team (body parameter, preferred)"
       responses:
         "200":
-          description: OK
-      tags:
-      - team
-  /team/{teamId}/repositories/{repositoryId}/visibility:
+          description: "200 OK on success, 404 if team not found"
+      summary: Update team visibility
+      tags: []
+  /workspaces/{workspaceSlug}/team/{teamId}/repositories/{repositoryId}/visibility:
     post:
       operationId: updateRepositoryVisibility
       parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
       - in: path
         name: teamId
         required: true
@@ -661,348 +1367,18 @@ paths:
       responses:
         "200":
           description: OK
-      tags:
-      - team
-  /user:
-    delete:
-      operationId: deleteUser
-      responses:
-        "200":
-          description: OK
-      tags:
-      - user
-  /user/settings:
-    get:
-      operationId: getUserSettings
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/UserSettings"
-          description: OK
-      tags:
-      - user
-    post:
-      operationId: updateUserSettings
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/UserSettings"
-        required: true
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/UserSettings"
-          description: OK
-      tags:
-      - user
-  /user/{login}/profile:
-    get:
-      operationId: getUserProfile
-      parameters:
-      - in: path
-        name: login
-        required: true
-        schema:
-          type: string
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/UserProfile"
-          description: OK
-      tags:
-      - user
-  /workspaces:
-    get:
-      operationId: listWorkspaces
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/WorkspaceListItem"
-          description: Workspace list
-      summary: List all workspaces
-      tags:
-      - workspace
-    post:
-      operationId: createWorkspace
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/CreateWorkspaceRequest"
-        required: true
-      responses:
-        "201":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Workspace"
-          description: Workspace created
-      summary: Create a new workspace
-      tags:
-      - workspace
-  /workspaces/{workspaceSlug}:
-    delete:
-      operationId: purgeWorkspace
-      parameters:
-      - in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-      responses:
-        "204":
-          description: Workspace purged
-      summary: Purge (soft delete) a workspace
-      tags:
-      - workspace
-    get:
-      operationId: getWorkspace
-      parameters:
-      - in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Workspace"
-          description: Workspace returned
-      summary: Fetch a workspace by slug
-      tags:
-      - workspace
-  /workspaces/{workspaceSlug}/league/reset:
-    put:
-      operationId: resetAndRecalculateLeagues
-      parameters:
-      - in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-      responses:
-        "200":
-          description: OK
-      summary: Reset and recalculate workspace leagues
-      tags:
-      - workspace
-  /workspaces/{workspaceSlug}/notifications:
-    patch:
-      operationId: updateNotifications
-      parameters:
-      - in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/UpdateWorkspaceNotificationsRequest"
-        required: true
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Workspace"
-          description: Workspace updated
-      summary: Update leaderboard notification preferences
-      tags:
-      - workspace
-  /workspaces/{workspaceSlug}/public-visibility:
-    patch:
-      operationId: updatePublicVisibility
-      parameters:
-      - in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/UpdateWorkspacePublicVisibilityRequest"
-        required: true
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Workspace"
-          description: Workspace updated
-      summary: Toggle public visibility for a workspace
-      tags:
-      - workspace
-  /workspaces/{workspaceSlug}/repositories:
-    get:
-      operationId: getRepositoriesToMonitor
-      parameters:
-      - in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  type: string
-          description: Repository list
-      summary: List repositories monitored by a workspace
-      tags:
-      - workspace
-  /workspaces/{workspaceSlug}/repositories/{owner}/{name}:
-    delete:
-      operationId: removeRepositoryToMonitor
-      parameters:
-      - in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-      - in: path
-        name: owner
-        required: true
-        schema:
-          type: string
-      - in: path
-        name: name
-        required: true
-        schema:
-          type: string
-      responses:
-        "200":
-          description: OK
-      summary: Remove a repository from a workspace monitor list
-      tags:
-      - workspace
-    post:
-      operationId: addRepositoryToMonitor
-      parameters:
-      - in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-      - in: path
-        name: owner
-        required: true
-        schema:
-          type: string
-      - in: path
-        name: name
-        required: true
-        schema:
-          type: string
-      responses:
-        "200":
-          description: OK
-      summary: Add a repository to a workspace monitor list
-      tags:
-      - workspace
-  /workspaces/{workspaceSlug}/schedule:
-    patch:
-      operationId: updateSchedule
-      parameters:
-      - in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/UpdateWorkspaceScheduleRequest"
-        required: true
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Workspace"
-          description: Workspace updated
-      summary: Update leaderboard schedule configuration
-      tags:
-      - workspace
-  /workspaces/{workspaceSlug}/slack-credentials:
-    patch:
-      operationId: updateSlackCredentials
-      parameters:
-      - in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/UpdateWorkspaceSlackCredentialsRequest"
-        required: true
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Workspace"
-          description: Workspace updated
-      summary: Update Slack credentials for a workspace
-      tags:
-      - workspace
-  /workspaces/{workspaceSlug}/status:
-    patch:
-      operationId: updateStatus
-      parameters:
-      - in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/UpdateWorkspaceStatusRequest"
-        required: true
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Workspace"
-          description: Workspace updated
-      summary: Update workspace lifecycle status
-      tags:
-      - workspace
+      tags: []
   /workspaces/{workspaceSlug}/teams/{teamId}/labels/{labelId}:
     delete:
       operationId: removeLabelFromTeam
       parameters:
-      - in: path
+      - description: Workspace slug
+        in: path
         name: workspaceSlug
         required: true
         schema:
           type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
       - in: path
         name: teamId
         required: true
@@ -1029,11 +1405,13 @@ paths:
     post:
       operationId: addLabelToTeam
       parameters:
-      - in: path
+      - description: Workspace slug
+        in: path
         name: workspaceSlug
         required: true
         schema:
           type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
       - in: path
         name: teamId
         required: true
@@ -1065,11 +1443,13 @@ paths:
     patch:
       operationId: updateToken
       parameters:
-      - in: path
+      - description: Workspace slug
+        in: path
         name: workspaceSlug
         required: true
         schema:
           type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
       requestBody:
         content:
           application/json:
@@ -1090,11 +1470,13 @@ paths:
     get:
       operationId: getUsersWithTeams
       parameters:
-      - in: path
+      - description: Workspace slug
+        in: path
         name: workspaceSlug
         required: true
         schema:
           type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
       responses:
         "200":
           content:
@@ -1118,6 +1500,22 @@ components:
             $ref: "#/components/schemas/PullRequestWithBadPractices"
       required:
       - pullRequests
+    AssignRoleRequest:
+      type: object
+      description: DTO for assigning or updating a role for a workspace member.
+      properties:
+        role:
+          type: string
+          enum:
+          - OWNER
+          - ADMIN
+          - MEMBER
+        userId:
+          type: integer
+          format: int64
+      required:
+      - role
+      - userId
     BadPracticeFeedback:
       type: object
       properties:
@@ -1218,6 +1616,9 @@ components:
       - title
     Contributor:
       type: object
+      description: |-
+        Data transfer object representing a GitHub contributor.
+         Used to display contributor information on the public about page.
       properties:
         avatarUrl:
           type: string
@@ -1681,21 +2082,6 @@ components:
       required:
       - leaguePointsChange
       - login
-    MetaData:
-      type: object
-      properties:
-        scheduledDay:
-          type: string
-        scheduledTime:
-          type: string
-        teams:
-          type: array
-          items:
-            $ref: "#/components/schemas/TeamInfo"
-      required:
-      - scheduledDay
-      - scheduledTime
-      - teams
     PageDocument:
       type: object
       properties:
@@ -2711,6 +3097,38 @@ components:
       - name
       - repoPermissionCount
       - repositories
+    TeamSummary:
+      type: object
+      description: |-
+        A lightweight DTO for team data that only contains basic information.
+         This is used in contexts where full team details (repositories, labels, members) are not needed,
+         avoiding expensive JOINs and lazy loading issues.
+      properties:
+        description:
+          type: string
+        hidden:
+          type: boolean
+        htmlUrl:
+          type: string
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        organization:
+          type: string
+        parentId:
+          type: integer
+          format: int64
+        privacy:
+          type: string
+          enum:
+          - SECRET
+          - CLOSED
+      required:
+      - hidden
+      - id
+      - name
     TextUIPart:
       type: object
       description: A text part of a message.
@@ -3127,7 +3545,7 @@ components:
         teams:
           type: array
           items:
-            $ref: "#/components/schemas/TeamInfo"
+            $ref: "#/components/schemas/TeamSummary"
           uniqueItems: true
         url:
           type: string
@@ -3334,3 +3752,26 @@ components:
       - id
       - status
       - workspaceSlug
+    WorkspaceMembership:
+      type: object
+      description: DTO representing a workspace membership with user information.
+      properties:
+        createdAt:
+          type: string
+          format: date-time
+        leaguePoints:
+          type: integer
+          format: int32
+        role:
+          type: string
+          enum:
+          - OWNER
+          - ADMIN
+          - MEMBER
+        userId:
+          type: integer
+          format: int64
+        userLogin:
+          type: string
+        userName:
+          type: string

@@ -130,12 +130,22 @@ public class GitHubIssueSyncService {
             processIssue(ghIssue);
             return Optional.of(ghIssue);
         } catch (IOException e) {
-            logger.error(
-                "Failed to fetch issue {} from repository {}: {}",
-                issueNumber,
-                repository.getFullName(),
-                e.getMessage()
-            );
+            String message = e.getMessage();
+            // 404 = not found, 410 = gone/deleted - these are expected during backfill
+            if (message != null && (message.contains("\"status\":\"404\"") || message.contains("\"status\":\"410\""))) {
+                logger.debug(
+                    "Issue {} not found in repository {} (deleted or never existed)",
+                    issueNumber,
+                    repository.getFullName()
+                );
+            } else {
+                logger.error(
+                    "Failed to fetch issue {} from repository {}: {}",
+                    issueNumber,
+                    repository.getFullName(),
+                    message
+                );
+            }
             return Optional.empty();
         }
     }

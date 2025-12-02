@@ -22,6 +22,8 @@ public class BadPracticeDetectorTask implements Runnable {
 
     private boolean sendBadPracticeDetectionEmail = true;
 
+    private String workspaceSlug;
+
     @Override
     public void run() {
         BadPracticeDetection detectionResult = pullRequestBadPracticeDetector.detectBadPracticesForPullRequest(
@@ -44,7 +46,12 @@ public class BadPracticeDetectorTask implements Runnable {
 
         if (sendBadPracticeDetectionEmail && !unResolvedBadPractices.isEmpty()) {
             for (User user : pullRequest.getAssignees()) {
-                mailService.sendBadPracticesDetectedInPullRequestEmail(user, pullRequest, unResolvedBadPractices);
+                mailService.sendBadPracticesDetectedInPullRequestEmail(
+                    user,
+                    pullRequest,
+                    unResolvedBadPractices,
+                    workspaceSlug
+                );
             }
         }
     }

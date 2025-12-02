@@ -13,9 +13,26 @@ import java.io.UncheckedIOException;
 import java.time.Duration;
 import java.time.Instant;
 import org.kohsuke.github.GitHub;
+import org.kohsuke.github.GitHubAbuseLimitHandler;
 import org.kohsuke.github.GitHubBuilder;
+import org.kohsuke.github.GitHubRateLimitHandler;
 import org.springframework.stereotype.Component;
 
+/**
+ * Provides cached GitHub API clients per workspace.
+ * <p>
+ * This provider manages Hub4J {@link GitHub} client instances with the following features:
+ * <ul>
+ *   <li>Automatic caching with 50-minute expiry to minimize token generation overhead</li>
+ *   <li>Support for both GitHub App installations and Personal Access Tokens (PATs)</li>
+ *   <li>Automatic rate limit handling via {@link GitHubRateLimitHandler#WAIT}</li>
+ *   <li>Secondary rate limit (abuse) handling via {@link GitHubAbuseLimitHandler#WAIT}</li>
+ * </ul>
+ * <p>
+ * The WAIT handlers ensure that when GitHub's rate limits are exceeded, the client
+ * automatically sleeps until the rate limit resets instead of throwing an exception.
+ * This is critical for background sync operations that may run for extended periods.
+ */
 @Component
 public class GitHubClientProvider {
 
@@ -101,7 +118,7 @@ public class GitHubClientProvider {
                 if (refreshAt.isBefore(Instant.now())) {
                     refreshAt = Instant.now();
                 }
-                GitHub client = new GitHubBuilder().withOAuthToken(token.token()).build();
+                GitHub client = createGitHubClient(token.token());
                 return new GitHubClientHolder(client, refreshAt);
             }
 
@@ -112,7 +129,7 @@ public class GitHubClientProvider {
                 );
             }
 
-            GitHub client = new GitHubBuilder().withOAuthToken(token).build();
+            GitHub client = createGitHubClient(token);
             return new GitHubClientHolder(client, null);
         } catch (IOException e) {
             throw new UncheckedIOException(e);
@@ -123,5 +140,27 @@ public class GitHubClientProvider {
         boolean needsRefresh() {
             return refreshAt != null && Instant.now().isAfter(refreshAt);
         }
+    }
+
+    /**
+     * Creates a GitHub client configured with automatic rate limit handling.
+     * <p>
+     * The client uses WAIT handlers which automatically sleep and retry when:
+     * <ul>
+     *   <li>Primary rate limit is exceeded (5000 requests/hour for GitHub Apps)</li>
+     *   <li>Secondary/abuse rate limits are triggered (e.g., concurrent request limits)</li>
+     * </ul>
+     * This ensures long-running sync operations complete successfully without manual intervention.
+     *
+     * @param token OAuth token for authentication
+     * @return configured GitHub client
+     * @throws IOException if client creation fails
+     */
+    private GitHub createGitHubClient(String token) throws IOException {
+        return new GitHubBuilder()
+            .withOAuthToken(token)
+            .withRateLimitHandler(GitHubRateLimitHandler.WAIT)
+            .withAbuseLimitHandler(GitHubAbuseLimitHandler.WAIT)
+            .build();
     }
 }

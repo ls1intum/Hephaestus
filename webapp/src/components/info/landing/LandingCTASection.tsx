@@ -6,11 +6,13 @@ import { cn } from "@/lib/utils";
 
 interface LandingCTASectionProps {
 	onSignIn: () => void;
+	onGoToDashboard?: () => void;
 	isSignedIn: boolean;
 }
 
 export function LandingCTASection({
 	onSignIn,
+	onGoToDashboard,
 	isSignedIn,
 }: LandingCTASectionProps) {
 	const { theme } = useTheme();
@@ -31,7 +33,7 @@ export function LandingCTASection({
 					</p>
 					<div className="flex w-full flex-col gap-4 sm:w-auto sm:flex-row">
 						{isSignedIn ? (
-							<Button size="lg" onClick={onSignIn}>
+							<Button size="lg" onClick={onGoToDashboard}>
 								Go to Dashboard
 								<ArrowRight className="h-4 w-4" />
 							</Button>

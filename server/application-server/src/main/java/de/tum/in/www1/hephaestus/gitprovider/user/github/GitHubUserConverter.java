@@ -65,9 +65,10 @@ public class GitHubUserConverter extends BaseGitServiceEntityConverter<GHUser, U
         user.setLogin(source.getLogin());
         user.setAvatarUrl(source.getAvatarUrl());
         user.setHtmlUrl(source.getHtmlUrl() != null ? source.getHtmlUrl().toString() : null);
-        user.setDescription(source.getBio());
+        user.setDescription(sanitizeForPostgres(source.getBio()));
 
         // Default name to login if not already set
+        // Note: Do NOT call source.getName() here as it triggers populate() on minimal users
         if (user.getName() == null || user.getName().isEmpty()) {
             user.setName(source.getLogin());
         }

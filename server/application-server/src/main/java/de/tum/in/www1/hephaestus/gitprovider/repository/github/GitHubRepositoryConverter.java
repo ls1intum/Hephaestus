@@ -38,7 +38,7 @@ public class GitHubRepositoryConverter extends BaseGitServiceEntityConverter<GHR
         } else if (repository.getHtmlUrl() == null && repository.getNameWithOwner() != null) {
             repository.setHtmlUrl("https://github.com/" + repository.getNameWithOwner());
         }
-        repository.setDescription(source.getDescription());
+        repository.setDescription(sanitizeForPostgres(source.getDescription()));
         repository.setHomepage(source.getHomepage());
         Instant pushedAt = source.getPushedAt();
         if (pushedAt != null) {

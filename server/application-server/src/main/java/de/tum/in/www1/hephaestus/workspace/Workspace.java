@@ -43,6 +43,10 @@ public class Workspace {
 
     private Instant usersSyncedAt;
 
+    private Instant teamsSyncedAt;
+
+    private Instant membersSyncedAt;
+
     @Column(name = "slug", unique = true, nullable = false, length = 64)
     @NotBlank(message = "Workspace slug is required")
     @Pattern(regexp = "^[a-z0-9][a-z0-9-]{2,50}$")

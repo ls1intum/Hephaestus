@@ -2,10 +2,13 @@ package de.tum.in.www1.hephaestus.monitoring;
 
 import de.tum.in.www1.hephaestus.workspace.RepositoryToMonitor;
 import de.tum.in.www1.hephaestus.workspace.Workspace;
+import jakarta.annotation.PostConstruct;
 import java.util.Collections;
 import java.util.Locale;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 /**
@@ -27,12 +30,27 @@ import org.springframework.stereotype.Component;
 @Component
 public class MonitoringScopeFilter {
 
+    private static final Logger logger = LoggerFactory.getLogger(MonitoringScopeFilter.class);
+
     private final Set<String> allowedOrganizations;
     private final Set<String> allowedRepositories;
 
     public MonitoringScopeFilter(MonitoringFilterProperties properties) {
         this.allowedOrganizations = normalizeSet(properties.getAllowedOrganizations());
         this.allowedRepositories = normalizeSet(properties.getAllowedRepositories());
+    }
+
+    @PostConstruct
+    void logConfiguration() {
+        if (isActive()) {
+            logger.info(
+                "Monitoring scope filter ACTIVE: allowed-organizations={}, allowed-repositories={}",
+                allowedOrganizations,
+                allowedRepositories
+            );
+        } else {
+            logger.info("Monitoring scope filter INACTIVE: all workspaces and repositories will be synced.");
+        }
     }
 
     public boolean isWorkspaceAllowed(Workspace workspace) {

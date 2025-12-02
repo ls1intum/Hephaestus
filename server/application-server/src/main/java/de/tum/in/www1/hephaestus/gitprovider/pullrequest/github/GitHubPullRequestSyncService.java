@@ -257,9 +257,7 @@ public class GitHubPullRequestSyncService {
             resultLabels.add(resultLabel);
         });
         badPracticeDetectorScheduler.detectBadPracticeForPrIfReadyLabels(result, previousLabels, resultLabels);
-        previousLabels.forEach(label -> label.getIssues().remove(result));
         result.getLabels().clear();
-        resultLabels.forEach(label -> label.getIssues().add(result));
         result.getLabels().addAll(resultLabels);
 
         // Link milestone

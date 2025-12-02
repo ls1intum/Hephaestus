@@ -4,12 +4,14 @@ import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.UIMessage;
 import de.tum.in.www1.hephaestus.mentor.vote.ChatMessageVoteDTO;
 import de.tum.in.www1.hephaestus.mentor.vote.ChatMessageVoteService;
+import de.tum.in.www1.hephaestus.workspace.Workspace;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -38,10 +40,11 @@ public class ChatThreadService {
      * @param user the authenticated user
      * @return List of thread summaries ordered by creation date (newest first)
      */
-    public List<ChatThreadSummaryDTO> getThreadSummariesForUser(User user) {
-        log.debug("Getting thread summaries for user: {}", user.getLogin());
+    public List<ChatThreadSummaryDTO> getThreadSummariesForUser(User user, Workspace workspace) {
+        Long workspaceId = requireWorkspaceId(workspace);
+        log.debug("Getting thread summaries for user: {} in workspace {}", user.getLogin(), workspaceId);
 
-        List<ChatThread> threads = chatThreadRepository.findByUserOrderByCreatedAtDesc(user);
+        List<ChatThread> threads = chatThreadRepository.findByUserAndWorkspaceOrderByCreatedAtDesc(user, workspace);
 
         return threads.stream().map(this::convertToSummaryDTO).collect(Collectors.toList());
     }
@@ -53,11 +56,12 @@ public class ChatThreadService {
      * @param user the authenticated user
      * @return List of thread groups ordered by time relevance
      */
-    public List<ChatThreadGroupDTO> getGroupedThreadSummariesForUser(User user) {
-        log.debug("Getting grouped thread summaries for user: {}", user.getLogin());
+    public List<ChatThreadGroupDTO> getGroupedThreadSummariesForUser(User user, Workspace workspace) {
+        Long workspaceId = requireWorkspaceId(workspace);
+        log.debug("Getting grouped thread summaries for user: {} in workspace {}", user.getLogin(), workspaceId);
 
         // Get all threads for the user in a single query, ordered by creation date
-        List<ChatThread> threads = chatThreadRepository.findByUserOrderByCreatedAtDesc(user);
+        List<ChatThread> threads = chatThreadRepository.findByUserAndWorkspaceOrderByCreatedAtDesc(user, workspace);
 
         if (threads.isEmpty()) {
             return new ArrayList<>();
@@ -119,12 +123,17 @@ public class ChatThreadService {
      * @param user the authenticated user
      * @return Optional containing the thread detail if found and belongs to user
      */
-    @Transactional(readOnly = true)
-    public Optional<ChatThreadDetailDTO> getThreadDetailForUser(UUID threadId, User user) {
-        log.debug("Getting thread detail {} for user: {}", threadId, user.getLogin());
+    @Transactional
+    public Optional<ChatThreadDetailDTO> getThreadDetailForUser(UUID threadId, User user, Workspace workspace) {
+        Long workspaceId = requireWorkspaceId(workspace);
+        log.debug("Getting thread detail {} for user: {} in workspace {}", threadId, user.getLogin(), workspaceId);
 
         // Fetch thread with messages first
-        Optional<ChatThread> threadOpt = chatThreadRepository.findByIdAndUserWithMessages(threadId, user);
+        Optional<ChatThread> threadOpt = chatThreadRepository.findByIdAndUserAndWorkspaceWithMessages(
+            threadId,
+            user,
+            workspace
+        );
 
         if (threadOpt.isEmpty()) {
             return Optional.empty();
@@ -154,19 +163,21 @@ public class ChatThreadService {
      * Build the conversation path up to and including the specified message, ensuring the message belongs to the user.
      * This is used for message editing to reconstruct context based on previousMessageId rather than the selected leaf.
      */
-    @Transactional(readOnly = true)
-    public List<UIMessage> getConversationPathForMessage(UUID messageId, User user) {
+    @Transactional
+    public List<UIMessage> getConversationPathForMessage(UUID messageId, User user, Workspace workspace) {
         var messageOpt = chatMessageRepository.findById(messageId);
         if (messageOpt.isEmpty()) {
             return new ArrayList<>();
         }
         ChatMessage target = messageOpt.get();
-        if (
-            target.getThread() == null ||
-            target.getThread().getUser() == null ||
-            !user.getId().equals(target.getThread().getUser().getId())
-        ) {
+        ChatThread thread = target.getThread();
+        if (thread == null || thread.getUser() == null || !Objects.equals(user.getId(), thread.getUser().getId())) {
             // Not owned by user or invalid thread association
+            return new ArrayList<>();
+        }
+
+        Long workspaceId = requireWorkspaceId(workspace);
+        if (thread.getWorkspace() == null || !Objects.equals(workspaceId, thread.getWorkspace().getId())) {
             return new ArrayList<>();
         }
 
@@ -192,8 +203,9 @@ public class ChatThreadService {
      * @param user the authenticated user
      * @return true if thread exists and is owned by user
      */
-    public boolean isThreadOwnedByUser(UUID threadId, User user) {
-        return chatThreadRepository.findByIdAndUser(threadId, user).isPresent();
+    public boolean isThreadOwnedByUser(UUID threadId, User user, Workspace workspace) {
+        requireWorkspaceId(workspace);
+        return chatThreadRepository.findByIdAndUserAndWorkspace(threadId, user, workspace).isPresent();
     }
 
     /**
@@ -280,5 +292,12 @@ public class ChatThreadService {
             ids.add(message.getId());
         }
         return ids;
+    }
+
+    private Long requireWorkspaceId(Workspace workspace) {
+        if (workspace == null || workspace.getId() == null) {
+            throw new IllegalArgumentException("Workspace context is required");
+        }
+        return workspace.getId();
     }
 }

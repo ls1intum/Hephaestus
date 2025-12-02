@@ -65,6 +65,18 @@ public interface UserRepository extends JpaRepository<User, Long> {
         """
             SELECT DISTINCT u
             FROM User u
+            JOIN FETCH u.teamMemberships m
+            JOIN FETCH m.team t
+            WHERE u.type = 'USER'
+            AND LOWER(t.organization) = LOWER(:organization)
+        """
+    )
+    List<User> findAllHumanInTeamsOfOrganization(@Param("organization") String organization);
+
+    @Query(
+        """
+            SELECT DISTINCT u
+            FROM User u
             JOIN u.teamMemberships m
             JOIN m.team t
             WHERE t.id IN :teamIds
