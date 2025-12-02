@@ -21,8 +21,8 @@ public class WorkspaceContextResolver {
     }
 
     /**
-     * Resolves the workspace referenced by the current context, using the ID when available and falling back
-     * to the slug for legacy callers.
+     * Resolves the workspace referenced by the current context.
+     * Prefers lookup by ID when available, falls back to slug otherwise.
      */
     public Workspace requireWorkspace(WorkspaceContext context) {
         Objects.requireNonNull(context, "WorkspaceContext must not be null");

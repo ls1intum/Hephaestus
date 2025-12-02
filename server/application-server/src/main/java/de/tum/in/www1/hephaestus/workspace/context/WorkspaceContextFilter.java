@@ -78,13 +78,6 @@ public class WorkspaceContextFilter implements Filter {
 
         String path = httpRequest.getRequestURI();
 
-        // Skip legacy workspace endpoints that don't use workspace context
-        // These endpoints are at /workspace/** (singular) instead of /workspaces/{slug}/**
-        if (path.startsWith("/workspace/")) {
-            chain.doFilter(request, response);
-            return;
-        }
-
         // Allow workspace registry endpoints that are not slugged
         if ("/workspaces".equals(path) || "/workspaces/".equals(path)) {
             chain.doFilter(request, response);
