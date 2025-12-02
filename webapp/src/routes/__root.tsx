@@ -247,7 +247,8 @@ function AppSidebarContainer() {
 	const workspaceAccess = useWorkspaceAccess();
 	const { workspaceSlug, workspaces, selectWorkspace } = workspaceAccess;
 	const hasWorkspace = Boolean(workspaceSlug);
-	const activeWorkspace = workspaces.find(
+	const workspaceList = Array.isArray(workspaces) ? workspaces : [];
+	const activeWorkspace = workspaceList.find(
 		(ws) => ws.workspaceSlug === workspaceSlug,
 	);
 
@@ -293,7 +294,7 @@ function AppSidebarContainer() {
 			isAdmin={workspaceAccess.isAdmin}
 			hasMentorAccess={hasRole("mentor_access")}
 			context={sidebarContext}
-			workspaces={workspaces}
+			workspaces={workspaceList}
 			activeWorkspace={activeWorkspace}
 			onWorkspaceChange={handleWorkspaceChange}
 			onAddWorkspace={handleAddWorkspace}

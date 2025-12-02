@@ -16,7 +16,7 @@ export function useActiveWorkspaceSlug() {
 		...listWorkspacesOptions(),
 		enabled: isAuthenticated && !authLoading,
 	});
-	const workspaces = query.data ?? [];
+	const workspaces = Array.isArray(query.data) ? query.data : [];
 	const location = useLocation();
 
 	// Extract slug from the current path if present (/w/<slug>/...)
