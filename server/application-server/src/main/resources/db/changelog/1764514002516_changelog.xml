@@ -204,7 +204,7 @@
             <sqlCheck expectedResult="TRUE">SELECT COUNT(*) &gt; 0 FROM workspace</sqlCheck>
             <sqlCheck expectedResult="TRUE">SELECT COUNT(*) &gt; 0 FROM document WHERE workspace_id IS NULL</sqlCheck>
         </preConditions>
-        <comment>Final cleanup: assign any remaining document rows with NULL workspace_id to oldest workspace</comment>
+        <comment>Final cleanup: Assign any remaining document rows with NULL workspace_id to oldest workspace</comment>
         <sql>
             WITH fallback AS (
                 SELECT id FROM workspace ORDER BY created_at NULLS LAST LIMIT 1
