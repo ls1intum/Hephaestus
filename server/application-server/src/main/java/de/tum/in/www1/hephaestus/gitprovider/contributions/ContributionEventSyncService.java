@@ -2,7 +2,7 @@ package de.tum.in.www1.hephaestus.gitprovider.contributions;
 
 
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReview;
-import jakarta.transaction.Transactional;
+import org.springframework.transaction.annotation.Transactional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -39,7 +39,7 @@ public class ContributionEventSyncService {
             event.setSourceType("PULL_REQUEST_REVIEW");
             event.setSourceId(pullRequestReview.getId());
             event.setActor(pullRequestReview.getAuthor());
-            event.setOccuredAt(pullRequestReview.getSubmittedAt());
+            event.setOccurredAt(pullRequestReview.getSubmittedAt());
             event.setXpAwarded(0); // TODO: Real XP calculation
 
             contributionEventRepository.save(event);

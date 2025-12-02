@@ -32,8 +32,8 @@ public class ContributionEvent {
     private User actor;
 
     @NotNull
-    @Column(name = "occured_at", nullable = false)
-    private Instant occuredAt;
+    @Column(name = "occurred_at", nullable = false)
+    private Instant occurredAt;
 
     @NotNull
     @Column(name = "xp_awarded", nullable = false)
