@@ -5,6 +5,7 @@ import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationSyncServic
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserSyncService;
+import de.tum.in.www1.hephaestus.workspace.WorkspaceMembership.WorkspaceRole;
 import java.io.IOException;
 import java.util.List;
 import org.kohsuke.github.GHApp;
@@ -15,6 +16,7 @@ import org.kohsuke.github.GitHub;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Central orchestrator for keeping workspace records in sync with external provisioning sources.
@@ -43,6 +45,8 @@ public class WorkspaceProvisioningService {
     private final GitHubUserSyncService gitHubUserSyncService;
     private final UserRepository userRepository;
     private final OrganizationSyncService organizationSyncService;
+    private final WorkspaceMembershipRepository workspaceMembershipRepository;
+    private final WorkspaceMembershipService workspaceMembershipService;
 
     public WorkspaceProvisioningService(
         WorkspaceProperties workspaceProperties,
@@ -52,7 +56,9 @@ public class WorkspaceProvisioningService {
         GitHubAppTokenService gitHubAppTokenService,
         GitHubUserSyncService gitHubUserSyncService,
         UserRepository userRepository,
-        OrganizationSyncService organizationSyncService
+        OrganizationSyncService organizationSyncService,
+        WorkspaceMembershipRepository workspaceMembershipRepository,
+        WorkspaceMembershipService workspaceMembershipService
     ) {
         this.workspaceProperties = workspaceProperties;
         this.workspaceRepository = workspaceRepository;
@@ -62,12 +68,15 @@ public class WorkspaceProvisioningService {
         this.gitHubUserSyncService = gitHubUserSyncService;
         this.userRepository = userRepository;
         this.organizationSyncService = organizationSyncService;
+        this.workspaceMembershipRepository = workspaceMembershipRepository;
+        this.workspaceMembershipService = workspaceMembershipService;
     }
 
     /**
      * Bootstrap the configured PAT-backed workspace when none exist yet.
      * Pulls account, token, and repository selection from {@link WorkspaceProperties}.
      */
+    @Transactional
     public void bootstrapDefaultPatWorkspace() {
         if (!workspaceProperties.isInitDefault()) {
             logger.debug("Skipping default PAT workspace bootstrap because bootstrap is disabled.");
@@ -75,7 +84,10 @@ public class WorkspaceProvisioningService {
         }
 
         if (workspaceRepository.count() > 0) {
-            logger.debug("Skipping default PAT workspace bootstrap because workspaces already exist.");
+            logger.debug(
+                "Skipping PAT workspace creation because workspaces already exist. Ensuring admin membership."
+            );
+            ensureDefaultAdminMembershipIfPresent();
             return;
         }
 
@@ -138,11 +150,56 @@ public class WorkspaceProvisioningService {
 
         workspaceRepository.save(savedWorkspace);
         logger.info("PAT workspace provisioning complete. Repositories will be synced by startup monitoring.");
+
+        ensureAdminMembership(savedWorkspace);
+    }
+
+    private void ensureDefaultAdminMembershipIfPresent() {
+        String defaultSlug = workspaceProperties.getDefaultWorkspace().getLogin();
+        Workspace target = null;
+        if (!isBlank(defaultSlug)) {
+            target = workspaceRepository.findByWorkspaceSlug(defaultSlug.trim()).orElse(null);
+        }
+        if (target == null) {
+            target = workspaceRepository.findAll().stream().findFirst().orElse(null);
+        }
+        if (target != null) {
+            ensureAdminMembership(target);
+        }
+    }
+
+    private void ensureAdminMembership(Workspace workspace) {
+        userRepository
+            .findByLogin("admin")
+            .ifPresent(adminUser -> {
+                boolean alreadyMember = workspaceMembershipRepository
+                    .findByWorkspace_IdAndUser_Id(workspace.getId(), adminUser.getId())
+                    .isPresent();
+                if (alreadyMember) {
+                    logger.debug(
+                        "Default admin already member of workspace {} (id={})",
+                        workspace.getWorkspaceSlug(),
+                        workspace.getId()
+                    );
+                    return;
+                }
+                try {
+                    workspaceMembershipService.createMembership(workspace, adminUser.getId(), WorkspaceRole.ADMIN);
+                    logger.info("Added default admin user to workspace {} as ADMIN", workspace.getWorkspaceSlug());
+                } catch (IllegalArgumentException ex) {
+                    logger.debug(
+                        "Could not add default admin to workspace {}: {}",
+                        workspace.getWorkspaceSlug(),
+                        ex.getMessage()
+                    );
+                }
+            });
     }
 
     /**
      * Mirror each GitHub App installation into a local workspace, including organization metadata and members.
      */
+    @Transactional
     public void ensureGitHubAppInstallations() {
         if (!gitHubAppTokenService.isConfigured()) {
             logger.info(
@@ -262,7 +319,7 @@ public class WorkspaceProvisioningService {
                 logger.info("Synced GitHub user '{}' (id={}) as PAT workspace owner.", accountLogin, user.getId());
                 return user.getId();
             }
-        } catch (Exception e) {
+        } catch (IOException e) {
             logger.warn("Failed to sync GitHub user '{}' for PAT workspace: {}", accountLogin, e.getMessage());
         }
 

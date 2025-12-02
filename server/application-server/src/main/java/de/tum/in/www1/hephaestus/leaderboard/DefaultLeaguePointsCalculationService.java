@@ -26,11 +26,11 @@ public class DefaultLeaguePointsCalculationService implements LeaguePointsCalcul
     private static final double K_FACTOR_HIGH_POINTS = LeaguePointsCalculationService.K_FACTOR_HIGH_POINTS;
 
     @Override
-    public int calculateNewPoints(User user, LeaderboardEntryDTO entry) {
+    public int calculateNewPoints(User user, int currentLeaguePoints, LeaderboardEntryDTO entry) {
         Objects.requireNonNull(user, "user must not be null");
         Objects.requireNonNull(entry, "entry must not be null");
 
-        int storedPoints = user.getLeaguePoints();
+        int storedPoints = currentLeaguePoints;
         int effectivePoints = storedPoints == 0 ? DEFAULT_POINTS : storedPoints;
         double kFactor = getKFactor(user, effectivePoints);
         int decay = calculateDecay(effectivePoints);

@@ -12,7 +12,7 @@
     </parent>
     <groupId>de.tum.in.www1</groupId>
     <artifactId>hephaestus</artifactId>
-    <version>0.10.0-rc.24-SNAPSHOT</version>
+    <version>0.10.0-rc.29-SNAPSHOT</version>
     <name>Hephaestus</name>
     <description>AI-driven learning for better software development</description>
     <url/>
@@ -46,6 +46,9 @@
         <!-- Encoding -->
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+
+        <!-- Maven wrapper version -->
+        <maven.wrapper.version>3.9.9</maven.wrapper.version>
     </properties>
     <dependencies>
         <dependency>
@@ -101,12 +104,6 @@
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-devtools</artifactId>
-            <scope>runtime</scope>
-            <optional>true</optional>
-        </dependency>
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-docker-compose</artifactId>
             <scope>runtime</scope>
             <optional>true</optional>
@@ -118,6 +115,12 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-thymeleaf</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-devtools</artifactId>
+            <scope>runtime</scope>
+            <optional>true</optional>
         </dependency>
         <!-- Override plexus-utils to fix CVE-2017-1000487 and CVE-2022-4244 -->
         <dependency>
@@ -217,12 +220,12 @@
         <dependency>
             <groupId>net.bytebuddy</groupId>
             <artifactId>byte-buddy</artifactId>
-            <version>1.17.6</version>
+            <version>1.17.5</version>
         </dependency>
         <dependency>
             <groupId>net.bytebuddy</groupId>
             <artifactId>byte-buddy-agent</artifactId>
-            <version>1.17.6</version>
+            <version>1.17.5</version>
         </dependency>
         <dependency>
             <groupId>io.hypersistence</groupId>
@@ -256,6 +259,10 @@
                     <groupId>com.github.java-json-tools</groupId>
                     <artifactId>jackson-coreutils</artifactId>
                 </exclusion>
+                <exclusion>
+                    <groupId>org.slf4j</groupId>
+                    <artifactId>slf4j-simple</artifactId>
+                </exclusion>
             </exclusions>
         </dependency>
         <dependency>
@@ -263,6 +270,10 @@
             <artifactId>openapi-generator</artifactId>
             <version>7.11.0</version>
             <exclusions>
+                <exclusion>
+                    <groupId>org.slf4j</groupId>
+                    <artifactId>slf4j-simple</artifactId>
+                </exclusion>
                 <exclusion>
                     <groupId>com.github.jknack</groupId>
                     <artifactId>handlebars</artifactId>
@@ -466,7 +477,7 @@
                 <artifactId>spring-boot-maven-plugin</artifactId>
                 <configuration>
                     <profiles>${app.profiles}</profiles>
-                    <jvmArguments>-Dspring.application.admin.enabled=true</jvmArguments>
+                    <jvmArguments>-Dspring.application.admin.enabled=true -XX:+EnableDynamicAgentLoading --enable-native-access=ALL-UNNAMED</jvmArguments>
                     <excludes>
                         <exclude>
                             <groupId>org.projectlombok</groupId>

@@ -37,7 +37,8 @@ public class MailService {
     public void sendBadPracticesDetectedInPullRequestEmail(
         User user,
         PullRequest pullRequest,
-        List<PullRequestBadPractice> badPractices
+        List<PullRequestBadPractice> badPractices,
+        String workspaceSlug
     ) {
         logger.info("Sending bad practice detected email to user: {}", user.getLogin());
         String email;
@@ -61,6 +62,11 @@ public class MailService {
             " detected in your pull request #" +
             pullRequest.getNumber();
 
+        if (workspaceSlug == null || workspaceSlug.isBlank()) {
+            logger.warn("Skipping email send because workspace slug is missing for PR {}", pullRequest.getNumber());
+            return;
+        }
+
         MailBuilder mailBuilder = new MailBuilder(mailConfig, user, email, subject, "bad-practices-detected");
         mailBuilder
             .fillPlaceholder(user, "user")
@@ -68,14 +74,16 @@ public class MailService {
             .fillPlaceholder(badPractices, "badPractices")
             .fillPlaceholder(getBadPracticeString(badPractices), "badPracticeString")
             .fillPlaceholder(pullRequest.getRepository().getName(), "repository")
+            .fillPlaceholder(workspaceSlug, "workspaceSlug")
             .send(javaMailSender);
     }
 
     private String getBadPracticeString(List<PullRequestBadPractice> badPractices) {
-        if (badPractices.size() == 1) {
+        int size = badPractices == null ? 0 : badPractices.size();
+        if (size == 1) {
             return "1 bad practice";
-        } else if (badPractices.size() > 1) {
-            return badPractices.size() + " bad practices";
+        } else if (size > 1) {
+            return size + " bad practices";
         } else {
             return "no bad practices";
         }

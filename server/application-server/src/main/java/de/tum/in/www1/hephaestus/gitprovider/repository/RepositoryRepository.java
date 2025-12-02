@@ -14,12 +14,16 @@ public interface RepositoryRepository extends JpaRepository<Repository, Long> {
 
     @Query(
         """
-        SELECT r
+        SELECT DISTINCT r
         FROM Repository r
         JOIN PullRequest pr ON r.id = pr.repository.id
         WHERE pr.author.login ILIKE :contributorLogin
+            AND r.organization.workspace.id = :workspaceId
         ORDER BY r.name ASC
         """
     )
-    List<Repository> findContributedByLogin(@Param("contributorLogin") String contributorLogin);
+    List<Repository> findContributedByLogin(
+        @Param("contributorLogin") String contributorLogin,
+        @Param("workspaceId") Long workspaceId
+    );
 }

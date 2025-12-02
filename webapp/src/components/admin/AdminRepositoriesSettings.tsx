@@ -29,6 +29,8 @@ interface AdminRepositoriesSettingsProps {
 	addRepositoryError: Error | null;
 	isAddingRepository: boolean;
 	isRemovingRepository: boolean;
+	/** Whether repository management is disabled (for GitHub App Installation workspaces) */
+	isReadOnly?: boolean;
 	onAddRepository: (nameWithOwner: string) => void;
 	onRemoveRepository: (nameWithOwner: string) => void;
 }
@@ -43,6 +45,7 @@ export function AdminRepositoriesSettings({
 	addRepositoryError,
 	isAddingRepository,
 	isRemovingRepository,
+	isReadOnly = false,
 	onAddRepository,
 	onRemoveRepository,
 }: AdminRepositoriesSettingsProps) {
@@ -60,6 +63,15 @@ export function AdminRepositoriesSettings({
 		<div className="space-y-6">
 			<div>
 				<h2 className="text-lg font-semibold mb-4">Monitored Repositories</h2>
+				{isReadOnly && (
+					<div className="mb-4 p-4 bg-muted/50 border border-muted rounded-lg">
+						<p className="text-sm text-muted-foreground">
+							This workspace is managed by a GitHub App Installation.
+							Repositories are automatically synced based on the
+							installation&apos;s configuration.
+						</p>
+					</div>
+				)}
 				<Card>
 					<CardContent>
 						<div className="space-y-4">
@@ -70,40 +82,42 @@ export function AdminRepositoriesSettings({
 										key={repo.nameWithOwner}
 										className="flex items-center gap-2"
 									>
-										<AlertDialog>
-											<AlertDialogTrigger asChild>
-												<Button
-													variant="outline"
-													size="icon"
-													aria-label={`Remove ${repo.nameWithOwner}`}
-												>
-													<Trash2 className="h-4 w-4" />
-												</Button>
-											</AlertDialogTrigger>
-											<AlertDialogContent>
-												<AlertDialogHeader>
-													<AlertDialogTitle>
-														Stop monitoring {repo.nameWithOwner}?
-													</AlertDialogTitle>
-													<AlertDialogDescription>
-														Are you sure you want to stop monitoring this
-														repository? This action cannot be undone and will
-														remove all data associated with this repository.
-													</AlertDialogDescription>
-												</AlertDialogHeader>
-												<AlertDialogFooter>
-													<AlertDialogCancel>Cancel</AlertDialogCancel>
-													<AlertDialogAction
-														onClick={() =>
-															onRemoveRepository(repo.nameWithOwner)
-														}
-														disabled={isRemovingRepository}
+										{!isReadOnly && (
+											<AlertDialog>
+												<AlertDialogTrigger asChild>
+													<Button
+														variant="outline"
+														size="icon"
+														aria-label={`Remove ${repo.nameWithOwner}`}
 													>
-														Stop Monitoring
-													</AlertDialogAction>
-												</AlertDialogFooter>
-											</AlertDialogContent>
-										</AlertDialog>
+														<Trash2 className="h-4 w-4" />
+													</Button>
+												</AlertDialogTrigger>
+												<AlertDialogContent>
+													<AlertDialogHeader>
+														<AlertDialogTitle>
+															Stop monitoring {repo.nameWithOwner}?
+														</AlertDialogTitle>
+														<AlertDialogDescription>
+															Are you sure you want to stop monitoring this
+															repository? This action cannot be undone and will
+															remove all data associated with this repository.
+														</AlertDialogDescription>
+													</AlertDialogHeader>
+													<AlertDialogFooter>
+														<AlertDialogCancel>Cancel</AlertDialogCancel>
+														<AlertDialogAction
+															onClick={() =>
+																onRemoveRepository(repo.nameWithOwner)
+															}
+															disabled={isRemovingRepository}
+														>
+															Stop Monitoring
+														</AlertDialogAction>
+													</AlertDialogFooter>
+												</AlertDialogContent>
+											</AlertDialog>
+										)}
 										<div className="bg-accent/50 p-2 px-4 rounded-md">
 											{repo.nameWithOwner}
 										</div>
@@ -121,28 +135,30 @@ export function AdminRepositoriesSettings({
 								)}
 							</div>
 
-							{/* Add Repository Input */}
-							<div className="space-y-2">
-								<div className="flex items-center gap-2">
-									<Input
-										placeholder="Add a repository (owner/name)"
-										value={repositoryInput}
-										onChange={(e) => setRepositoryInput(e.target.value)}
-										className="flex-1"
-									/>
-									<Button
-										onClick={handleAddRepository}
-										disabled={!isValidInput || isAddingRepository}
-									>
-										Add
-									</Button>
-								</div>
-								{addRepositoryError && (
-									<div className="text-destructive text-sm">
-										An error occurred while adding the repository.
+							{/* Add Repository Input - only show when not read-only */}
+							{!isReadOnly && (
+								<div className="space-y-2">
+									<div className="flex items-center gap-2">
+										<Input
+											placeholder="Add a repository (owner/name)"
+											value={repositoryInput}
+											onChange={(e) => setRepositoryInput(e.target.value)}
+											className="flex-1"
+										/>
+										<Button
+											onClick={handleAddRepository}
+											disabled={!isValidInput || isAddingRepository}
+										>
+											Add
+										</Button>
 									</div>
-								)}
-							</div>
+									{addRepositoryError && (
+										<div className="text-destructive text-sm">
+											An error occurred while adding the repository.
+										</div>
+									)}
+								</div>
+							)}
 						</div>
 					</CardContent>
 				</Card>

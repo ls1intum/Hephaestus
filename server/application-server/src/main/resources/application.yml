@@ -1,7 +1,7 @@
 spring:
     application:
         name: Hephaestus
-        version: "0.10.0-rc.24"
+        version: "0.10.0-rc.29"
 
     config:
         import: optional:file:.env[.properties]
@@ -37,6 +37,7 @@ spring:
     devtools:
         restart:
             additional-exclude: org/kohsuke/github/**
+        add-properties: false
 
     security:
         oauth2:
@@ -183,13 +184,29 @@ nats:
 
 monitoring:
     run-on-startup: true
-    # Fetching timeframe in days
+    # Fetching timeframe in days for recent data sync
     timeframe: 7
     sync-cron: "0 0 3 * * *"
     # Cooldown in minutes before running the monitoring again
     sync-cooldown-in-minutes: 15
-    # Whether to sync all issues and pull requests that are missing in the database
-    sync-all-issues-and-pull-requests: false
+    # ═══════════════════════════════════════════════════════════════════════════
+    # BACKFILL CONFIGURATION
+    # ═══════════════════════════════════════════════════════════════════════════
+    # Historical data synchronization settings.
+    # When enabled, backfill runs AFTER recent sync completes, in small batches
+    # to avoid exhausting GitHub API rate limits.
+    backfill:
+        # Whether to backfill historical issues and pull requests
+        enabled: false
+        # Number of issues/PRs to sync per batch (default: 25)
+        # Lower = fewer API calls per sync cycle, Higher = faster backfill
+        batch-size: 25
+        # Minimum rate limit remaining before backfill runs (default: 500)
+        # Backfill skips if remaining < threshold to preserve rate limit for real-time sync
+        rate-limit-threshold: 500
+        # Minutes to wait between backfill batches (default: 5)
+        # Spreads API usage over time to avoid rate limit exhaustion
+        cooldown-minutes: 5
     # ═══════════════════════════════════════════════════════════════════════════
     # DEVELOPMENT FILTERS
     # ═══════════════════════════════════════════════════════════════════════════

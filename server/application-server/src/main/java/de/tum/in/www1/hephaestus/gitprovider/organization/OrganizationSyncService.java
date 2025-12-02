@@ -8,9 +8,13 @@ import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserSyncService;
 import de.tum.in.www1.hephaestus.workspace.Workspace;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceGitHubAccess;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceGitHubAccess.Context;
+import de.tum.in.www1.hephaestus.workspace.WorkspaceMembership;
+import de.tum.in.www1.hephaestus.workspace.WorkspaceMembershipService;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceRepository;
 import java.io.IOException;
+import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -26,6 +30,8 @@ import org.kohsuke.github.GHOrganization;
 import org.kohsuke.github.GHUser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -37,9 +43,14 @@ public class OrganizationSyncService {
     private final OrganizationMembershipRepository membershipRepository;
     private final UserRepository userRepository;
     private final WorkspaceRepository workspaceRepository;
+    private final OrganizationService organizationService;
     private final GitHubUserSyncService userSyncService;
     private final WorkspaceGitHubAccess workspaceGitHubAccess;
+    private final WorkspaceMembershipService workspaceMembershipService;
     private final GitHubUserConverter userConverter;
+
+    @Value("${monitoring.sync-cooldown-in-minutes:15}")
+    private int syncCooldownInMinutes;
 
     public OrganizationSyncService(
         OrganizationRepository organizationRepository,
@@ -47,8 +58,10 @@ public class OrganizationSyncService {
         OrganizationMembershipRepository membershipRepository,
         UserRepository userRepository,
         WorkspaceRepository workspaceRepository,
+        OrganizationService organizationService,
         GitHubUserSyncService userSyncService,
         WorkspaceGitHubAccess workspaceGitHubAccess,
+        WorkspaceMembershipService workspaceMembershipService,
         GitHubUserConverter userConverter
     ) {
         this.organizationRepository = organizationRepository;
@@ -56,8 +69,10 @@ public class OrganizationSyncService {
         this.membershipRepository = membershipRepository;
         this.userRepository = userRepository;
         this.workspaceRepository = workspaceRepository;
+        this.organizationService = organizationService;
         this.userSyncService = userSyncService;
         this.workspaceGitHubAccess = workspaceGitHubAccess;
+        this.workspaceMembershipService = workspaceMembershipService;
         this.userConverter = userConverter;
     }
 
@@ -70,7 +85,29 @@ public class OrganizationSyncService {
 
     @Transactional
     public void syncMembers(Workspace workspace) {
-        workspaceGitHubAccess.resolve(workspace).ifPresent(context -> synchronizeMembers(context));
+        // Check cooldown before syncing
+        boolean shouldSyncMembers =
+            workspace.getMembersSyncedAt() == null ||
+            workspace.getMembersSyncedAt().isBefore(Instant.now().minusSeconds(syncCooldownInMinutes * 60L));
+        if (!shouldSyncMembers) {
+            logger.debug(
+                "Skipping members sync for workspace {} due to cooldown (last synced at {}).",
+                workspace.getWorkspaceSlug(),
+                workspace.getMembersSyncedAt()
+            );
+            return;
+        }
+
+        workspaceGitHubAccess
+            .resolve(workspace)
+            .ifPresent(context -> {
+                synchronizeMembers(context);
+                // Update timestamp after successful sync
+                var currentTime = Instant.now();
+                Workspace ws = context.workspace();
+                ws.setMembersSyncedAt(currentTime);
+                workspaceRepository.save(ws);
+            });
     }
 
     @Transactional
@@ -89,16 +126,14 @@ public class OrganizationSyncService {
     private Organization upsertOrganization(Context context) {
         GHOrganization ghOrg = context.ghOrganization();
 
-        Organization organization = organizationRepository
-            .findByGithubId(ghOrg.getId())
-            .or(() -> organizationRepository.findByLoginIgnoreCase(ghOrg.getLogin()))
-            .orElseGet(Organization::new);
-
+        Organization organization = context.workspace().getInstallationId() != null
+            ? organizationService.upsertIdentityAndAttachInstallation(
+                ghOrg.getId(),
+                ghOrg.getLogin(),
+                context.workspace().getInstallationId()
+            )
+            : organizationService.upsertIdentity(ghOrg.getId(), ghOrg.getLogin());
         organizationConverter.update(ghOrg, organization);
-        if (context.workspace().getInstallationId() != null) {
-            organization.setInstallationId(context.workspace().getInstallationId());
-        }
-
         organization = organizationRepository.save(organization);
 
         Workspace workspace = context.workspace();
@@ -126,12 +161,38 @@ public class OrganizationSyncService {
             throw new RuntimeException("Failed to list members for organization " + ghOrg.getLogin(), e);
         }
 
+        // Build role map per login using GitHub's membership endpoint (authoritative for role)
         Map<String, String> desiredRoleByLoginLower = new HashMap<>();
-        for (GHUser user : members) {
-            desiredRoleByLoginLower.put(user.getLogin().toLowerCase(Locale.ROOT), "MEMBER");
-        }
-        for (GHUser user : admins) {
-            desiredRoleByLoginLower.put(user.getLogin().toLowerCase(Locale.ROOT), "ADMIN");
+        Set<String> adminLogins = admins
+            .stream()
+            .map(u -> u.getLogin().toLowerCase(Locale.ROOT))
+            .collect(Collectors.toSet());
+
+        for (GHUser user : Stream.concat(admins.stream(), members.stream())
+            .collect(Collectors.toMap(GHUser::getLogin, Function.identity(), (existing, ignore) -> existing))
+            .values()) {
+            String loginLower = user.getLogin().toLowerCase(Locale.ROOT);
+            String role = "MEMBER";
+            try {
+                var membership = ghOrg.getMembership(user.getLogin());
+                if (membership != null && membership.getRole() != null) {
+                    role = membership.getRole().name();
+                } else if (adminLogins.contains(loginLower)) {
+                    role = "ADMIN";
+                }
+            } catch (IOException membershipError) {
+                logger.warn(
+                    "Failed to fetch membership role for user {} in org {}: {} – defaulting to {}",
+                    user.getLogin(),
+                    ghOrg.getLogin(),
+                    membershipError.getMessage(),
+                    adminLogins.contains(loginLower) ? "ADMIN" : "MEMBER"
+                );
+                if (adminLogins.contains(loginLower)) {
+                    role = "ADMIN";
+                }
+            }
+            desiredRoleByLoginLower.put(loginLower, role);
         }
 
         if (desiredRoleByLoginLower.isEmpty()) {
@@ -139,6 +200,7 @@ public class OrganizationSyncService {
             if (!existing.isEmpty()) {
                 membershipRepository.deleteByOrganizationIdAndUserIdIn(organization.getGithubId(), existing);
             }
+            workspaceMembershipService.syncWorkspaceMembers(context.workspace(), Collections.emptyMap());
             logger.info(
                 "Org members synced: orgId={} total=0 (cleared {})",
                 organization.getGithubId(),
@@ -172,6 +234,7 @@ public class OrganizationSyncService {
         }
 
         Set<Long> seen = new HashSet<>();
+        Map<Long, WorkspaceMembership.WorkspaceRole> desiredWorkspaceRoles = new HashMap<>();
         for (Map.Entry<String, String> entry : desiredRoleByLoginLower.entrySet()) {
             User user = byLoginLower.get(entry.getKey());
             if (user == null) {
@@ -179,6 +242,10 @@ public class OrganizationSyncService {
             }
             membershipRepository.upsertMembership(organization.getGithubId(), user.getId(), entry.getValue());
             seen.add(user.getId());
+            desiredWorkspaceRoles.put(
+                user.getId(),
+                WorkspaceMembership.WorkspaceRole.fromOrganizationRole(entry.getValue())
+            );
         }
 
         List<Long> current = membershipRepository.findUserIdsByOrganizationId(organization.getGithubId());
@@ -186,6 +253,8 @@ public class OrganizationSyncService {
         if (!toRemove.isEmpty()) {
             membershipRepository.deleteByOrganizationIdAndUserIdIn(organization.getGithubId(), toRemove);
         }
+
+        workspaceMembershipService.syncWorkspaceMembers(context.workspace(), desiredWorkspaceRoles);
 
         logger.info(
             "Org members synced: orgId={} total={}, createdUsers={}, removedMemberships={}",
@@ -200,10 +269,15 @@ public class OrganizationSyncService {
         if (ghUser == null) {
             throw new IllegalArgumentException("GHUser required for membership upsert");
         }
-        User user = userRepository.findById(ghUser.getId()).orElseGet(User::new);
-        user.setId(ghUser.getId());
+        long userId = ghUser.getId();
+        User user = userRepository.findById(userId).orElseGet(User::new);
+        user.setId(userId);
         userConverter.update(ghUser, user);
-        return userRepository.save(user);
+        try {
+            return userRepository.saveAndFlush(user);
+        } catch (DataIntegrityViolationException ex) {
+            return userRepository.findById(userId).orElseThrow(() -> ex);
+        }
     }
 
     private String normalizeRole(String role) {

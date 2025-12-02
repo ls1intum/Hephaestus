@@ -2,6 +2,7 @@ package de.tum.in.www1.hephaestus.mentor.document;
 
 import de.tum.in.www1.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
+import de.tum.in.www1.hephaestus.workspace.Workspace;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -28,14 +29,27 @@ public class DocumentService {
      * Create a new document
      */
     @Transactional
-    public DocumentDTO createDocument(CreateDocumentRequestDTO request, User user) {
-        logger.info("Creating new document: {} for user: {}", request.title(), user.getId());
+    public DocumentDTO createDocument(CreateDocumentRequestDTO request, User user, Workspace workspace) {
+        logger.info(
+            "Creating new document: {} for user: {} in workspace {}",
+            request.title(),
+            user.getId(),
+            workspace.getId()
+        );
 
         // Generate new UUID for document
         UUID documentId = UUID.randomUUID();
 
         // First version is 1
-        Document document = new Document(documentId, 1, request.title(), request.content(), request.kind(), user);
+        Document document = new Document(
+            documentId,
+            1,
+            request.title(),
+            request.content(),
+            request.kind(),
+            user,
+            workspace
+        );
 
         Document savedDocument = documentRepository.save(document);
         logger.info("Document created successfully with ID: {}", savedDocument.getId());
@@ -47,22 +61,30 @@ public class DocumentService {
      * Update document (creates new version)
      */
     @Transactional
-    public DocumentDTO updateDocument(UUID id, UpdateDocumentRequestDTO request, User user) {
-        logger.info("Updating document: {} for user: {}", id, user.getId());
+    public DocumentDTO updateDocument(UUID id, UpdateDocumentRequestDTO request, User user, Workspace workspace) {
+        logger.info("Updating document: {} for user: {} in workspace {}", id, user.getId(), workspace.getId());
 
         // Verify document exists and belongs to user
-        if (!documentRepository.existsByIdAndUser(id, user)) {
+        if (!documentRepository.existsByWorkspaceAndIdAndUser(workspace, id, user)) {
             throw new EntityNotFoundException("Document", id.toString());
         }
 
         // Determine next version number
         int nextVersion = documentRepository
-            .findFirstByIdAndUserOrderByVersionNumberDesc(id, user)
+            .findFirstByWorkspaceAndUserAndIdOrderByVersionNumberDesc(workspace, user, id)
             .map(d -> d.getVersionNumber() + 1)
             .orElse(1);
 
         // Create new version
-        Document document = new Document(id, nextVersion, request.title(), request.content(), request.kind(), user);
+        Document document = new Document(
+            id,
+            nextVersion,
+            request.title(),
+            request.content(),
+            request.kind(),
+            user,
+            workspace
+        );
 
         Document savedDocument = documentRepository.save(document);
         logger.info("Document updated successfully: {}", id);
@@ -74,10 +96,14 @@ public class DocumentService {
      * Get all versions of a document by id, ordered by createdAt desc (latest first)
      */
     @Transactional(readOnly = true)
-    public List<DocumentDTO> getDocumentsById(UUID id, User user) {
+    public List<DocumentDTO> getDocumentsById(UUID id, User user, Workspace workspace) {
         logger.debug("Getting all versions of document ID: {} for user: {}", id, user.getId());
 
-        List<Document> documents = documentRepository.findByIdAndUserOrderByVersionNumberDesc(id, user);
+        List<Document> documents = documentRepository.findByWorkspaceAndUserAndIdOrderByVersionNumberDesc(
+            workspace,
+            id,
+            user
+        );
 
         return documents.stream().map(DocumentDTO::from).toList();
     }
@@ -86,11 +112,11 @@ public class DocumentService {
      * Get latest version of a document
      */
     @Transactional(readOnly = true)
-    public DocumentDTO getLatestDocument(UUID id, User user) {
+    public DocumentDTO getLatestDocument(UUID id, User user, Workspace workspace) {
         logger.debug("Getting latest document ID: {} for user: {}", id, user.getId());
 
         return documentRepository
-            .findFirstByIdAndUserOrderByVersionNumberDesc(id, user)
+            .findFirstByWorkspaceAndUserAndIdOrderByVersionNumberDesc(workspace, user, id)
             .map(DocumentDTO::from)
             .orElseThrow(() -> new EntityNotFoundException("Document", id.toString()));
     }
@@ -99,7 +125,7 @@ public class DocumentService {
      * Delete document versions after specified timestamp
      */
     @Transactional
-    public List<DocumentDTO> deleteDocumentsAfterTimestamp(UUID id, Instant timestamp, User user) {
+    public List<DocumentDTO> deleteDocumentsAfterTimestamp(UUID id, Instant timestamp, User user, Workspace workspace) {
         logger.info(
             "Deleting document versions for ID: {} after timestamp: {} for user: {}",
             id,
@@ -108,13 +134,13 @@ public class DocumentService {
         );
 
         // Verify user has access to the document
-        if (!documentRepository.existsByIdAndUser(id, user)) {
+        if (!documentRepository.existsByWorkspaceAndIdAndUser(workspace, id, user)) {
             throw new EntityNotFoundException("Document", id.toString());
         }
 
         // Determine the smallest version strictly after the timestamp.
         // Then delete all versions with versionNumber >= that minimum (i.e., greater than min-1).
-        var versionsDesc = documentRepository.findByIdAndUserOrderByVersionNumberDesc(id, user);
+        var versionsDesc = documentRepository.findByWorkspaceAndUserAndIdOrderByVersionNumberDesc(workspace, id, user);
         int minVersionAfter = versionsDesc
             .stream()
             .filter(d -> d.getCreatedAt().isAfter(timestamp))
@@ -124,14 +150,20 @@ public class DocumentService {
 
         List<Document> deletedDocuments = minVersionAfter == Integer.MAX_VALUE
             ? List.of()
-            : documentRepository.findByIdAndUserAndVersionNumberGreaterThanOrderByVersionNumberDesc(
+            : documentRepository.findByWorkspaceAndUserAndIdAndVersionNumberGreaterThanOrderByVersionNumberDesc(
+                workspace,
                 id,
                 user,
                 minVersionAfter - 1
             );
 
         if (minVersionAfter != Integer.MAX_VALUE) {
-            documentRepository.deleteByIdAndUserAndVersionNumberGreaterThan(id, user, minVersionAfter - 1);
+            documentRepository.deleteByWorkspaceAndUserAndIdAndVersionNumberGreaterThan(
+                workspace,
+                id,
+                user,
+                minVersionAfter - 1
+            );
         }
 
         return deletedDocuments.stream().map(DocumentDTO::from).toList();
@@ -141,11 +173,11 @@ public class DocumentService {
      * Get documents by user (all documents, latest version only)
      */
     @Transactional(readOnly = true)
-    public List<DocumentSummaryDTO> getDocumentsByUser(User user) {
-        logger.debug("Getting all documents for user: {}", user.getId());
+    public List<DocumentSummaryDTO> getDocumentsByUser(User user, Workspace workspace) {
+        logger.debug("Getting all documents for user: {} in workspace {}", user.getId(), workspace.getId());
 
         // Get latest version of each document
-        List<Document> documents = documentRepository.findLatestVersionsByUser(user);
+        List<Document> documents = documentRepository.findLatestVersionsByUser(workspace, user);
 
         return documents
             .stream()
@@ -157,10 +189,10 @@ public class DocumentService {
      * Delete document and all its versions
      */
     @Transactional
-    public void deleteDocument(UUID id, User user) {
-        logger.info("Deleting document: {} for user: {}", id, user.getId());
+    public void deleteDocument(UUID id, User user, Workspace workspace) {
+        logger.info("Deleting document: {} for user: {} in workspace {}", id, user.getId(), workspace.getId());
 
-        List<Document> documents = documentRepository.findByIdAndUser(id, user);
+        List<Document> documents = documentRepository.findByWorkspaceAndUserAndId(workspace, user, id);
         if (documents.isEmpty()) {
             throw new EntityNotFoundException("Document", id.toString());
         }
@@ -172,10 +204,10 @@ public class DocumentService {
     /**
      * Get document versions with pagination
      */
-    public Page<DocumentDTO> getDocumentVersions(UUID id, User user, Pageable pageable) {
+    public Page<DocumentDTO> getDocumentVersions(UUID id, User user, Workspace workspace, Pageable pageable) {
         logger.info("Getting versions for document: {} for user: {}", id, user.getId());
 
-        Page<Document> documents = documentRepository.findByIdAndUser(id, user, pageable);
+        Page<Document> documents = documentRepository.findByWorkspaceAndUserAndId(workspace, user, id, pageable);
         if (documents.isEmpty()) {
             throw new EntityNotFoundException("Document", id.toString());
         }
@@ -186,11 +218,11 @@ public class DocumentService {
     /**
      * Get specific document version by timestamp
      */
-    public DocumentDTO getDocumentVersion(UUID id, Integer versionNumber, User user) {
+    public DocumentDTO getDocumentVersion(UUID id, Integer versionNumber, User user, Workspace workspace) {
         logger.info("Getting document version: {} #{} for user: {}", id, versionNumber, user.getId());
 
         Document document = documentRepository
-            .findByIdAndUserAndVersionNumber(id, user, versionNumber)
+            .findByWorkspaceAndUserAndIdAndVersionNumber(workspace, user, id, versionNumber)
             .orElseThrow(() -> new EntityNotFoundException("Document version", id + " #" + versionNumber));
 
         return mapToResponseDTO(document);
@@ -199,10 +231,10 @@ public class DocumentService {
     /**
      * Get documents by user with pagination (summary view)
      */
-    public Page<DocumentSummaryDTO> getDocumentsByUser(User user, Pageable pageable) {
+    public Page<DocumentSummaryDTO> getDocumentsByUser(User user, Workspace workspace, Pageable pageable) {
         logger.debug("Getting documents for user: {} with pagination", user.getId());
 
-        Page<Document> latestDocuments = documentRepository.findLatestVersionsByUser(user, pageable);
+        Page<Document> latestDocuments = documentRepository.findLatestVersionsByUser(workspace, user, pageable);
         return latestDocuments.map(DocumentSummaryDTO::from); // Use summary DTO for lists
     }
 

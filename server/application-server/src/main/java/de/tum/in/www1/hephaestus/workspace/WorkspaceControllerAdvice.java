@@ -4,6 +4,7 @@ import de.tum.in.www1.hephaestus.core.LoggingUtils;
 import de.tum.in.www1.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.in.www1.hephaestus.workspace.exception.InvalidWorkspaceSlugException;
 import de.tum.in.www1.hephaestus.workspace.exception.RepositoryAlreadyMonitoredException;
+import de.tum.in.www1.hephaestus.workspace.exception.RepositoryManagementNotAllowedException;
 import de.tum.in.www1.hephaestus.workspace.exception.WorkspaceLifecycleViolationException;
 import de.tum.in.www1.hephaestus.workspace.exception.WorkspaceSlugConflictException;
 import jakarta.validation.ConstraintViolation;
@@ -48,6 +49,15 @@ public class WorkspaceControllerAdvice {
     @ExceptionHandler(RepositoryAlreadyMonitoredException.class)
     ProblemDetail handleRepositoryConflict(RepositoryAlreadyMonitoredException exception) {
         return problem(HttpStatus.CONFLICT, "Repository already monitored", userFacingDetail(exception.getMessage()));
+    }
+
+    @ExceptionHandler(RepositoryManagementNotAllowedException.class)
+    ProblemDetail handleRepositoryManagementNotAllowed(RepositoryManagementNotAllowedException exception) {
+        return problem(
+            HttpStatus.BAD_REQUEST,
+            "Repository management not allowed",
+            userFacingDetail(exception.getMessage())
+        );
     }
 
     @ExceptionHandler(WorkspaceLifecycleViolationException.class)
