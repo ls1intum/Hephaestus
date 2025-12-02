@@ -242,4 +242,14 @@
             onDelete="CASCADE"/>
     </changeSet>
 
+    <!-- Fix empty display_name values in workspace table -->
+    <changeSet id="1764514002516-8" author="FelixTJDietrich">
+        <comment>Populate empty display_name with slug value to satisfy NOT NULL validation</comment>
+        <sql>
+            UPDATE workspace
+            SET display_name = slug
+            WHERE display_name IS NULL OR display_name = '';
+        </sql>
+    </changeSet>
+
 </databaseChangeLog>
