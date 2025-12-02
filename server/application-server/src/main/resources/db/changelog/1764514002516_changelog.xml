@@ -94,6 +94,24 @@
         </sql>
     </changeSet>
 
+    <!-- Step 3c: Final fallback for any remaining NULL rows (runs every time if needed) -->
+    <changeSet id="1764514002516-6c-final" author="FelixTJDietrich" runAlways="true">
+        <preConditions onFail="MARK_RAN">
+            <tableExists tableName="workspace"/>
+            <sqlCheck expectedResult="TRUE">SELECT COUNT(*) &gt; 0 FROM workspace</sqlCheck>
+            <sqlCheck expectedResult="TRUE">SELECT COUNT(*) &gt; 0 FROM chat_thread WHERE workspace_id IS NULL</sqlCheck>
+        </preConditions>
+        <comment>Final cleanup: assign any remaining chat_thread rows with NULL workspace_id to oldest workspace</comment>
+        <sql>
+            WITH fallback AS (
+                SELECT id FROM workspace ORDER BY created_at NULLS LAST LIMIT 1
+            )
+            UPDATE chat_thread ct
+            SET workspace_id = (SELECT id FROM fallback)
+            WHERE ct.workspace_id IS NULL;
+        </sql>
+    </changeSet>
+
     <!-- Step 4: Validate migration succeeded -->
     <changeSet id="1764514002516-6d" author="FelixTJDietrich">
         <preConditions onFail="HALT">
@@ -169,6 +187,24 @@
             <sqlCheck expectedResult="TRUE">SELECT COUNT(*) &gt; 0 FROM workspace</sqlCheck>
         </preConditions>
         <comment>Assign remaining document rows to oldest workspace to satisfy NOT NULL</comment>
+        <sql>
+            WITH fallback AS (
+                SELECT id FROM workspace ORDER BY created_at NULLS LAST LIMIT 1
+            )
+            UPDATE document d
+            SET workspace_id = (SELECT id FROM fallback)
+            WHERE d.workspace_id IS NULL;
+        </sql>
+    </changeSet>
+
+    <!-- Step 3c: Final fallback for any remaining NULL rows (runs every time if needed) -->
+    <changeSet id="1764514002516-7c-final" author="FelixTJDietrich" runAlways="true">
+        <preConditions onFail="MARK_RAN">
+            <tableExists tableName="workspace"/>
+            <sqlCheck expectedResult="TRUE">SELECT COUNT(*) &gt; 0 FROM workspace</sqlCheck>
+            <sqlCheck expectedResult="TRUE">SELECT COUNT(*) &gt; 0 FROM document WHERE workspace_id IS NULL</sqlCheck>
+        </preConditions>
+        <comment>Final cleanup: assign any remaining document rows with NULL workspace_id to oldest workspace</comment>
         <sql>
             WITH fallback AS (
                 SELECT id FROM workspace ORDER BY created_at NULLS LAST LIMIT 1
