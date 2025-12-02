@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.10.0-rc.25](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.24...v0.10.0-rc.25) (2025-12-02)
+
+### 🚀 Features
+
+* add workspace switching and viewing with backfill and improved GitHub installation management ([#550](https://github.com/ls1intum/Hephaestus/issues/550)) ([75d4998](https://github.com/ls1intum/Hephaestus/commit/75d4998aebaad1267b4f5b215633771852104421))
+
 ## [0.10.0-rc.24](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.23...v0.10.0-rc.24) (2025-11-29)
 
 ### 🚀 Features
