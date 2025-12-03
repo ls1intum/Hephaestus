@@ -53,7 +53,7 @@ services:
   # ---------------------------------------------------------------------------
   intelligence-service:
     build:
-      context: ../../server/intelligence-service
+      context: ./server/intelligence-service
       dockerfile: Dockerfile
     restart: unless-stopped
     environment:
@@ -99,7 +99,7 @@ services:
   # ---------------------------------------------------------------------------
   application-server:
     build:
-      context: ../../server/application-server
+      context: ./server/application-server
       dockerfile: Dockerfile
     restart: unless-stopped
     environment:
@@ -164,7 +164,7 @@ services:
   # ---------------------------------------------------------------------------
   webapp:
     build:
-      context: ../../webapp
+      context: ./webapp
       dockerfile: Dockerfile
     restart: unless-stopped
     environment:
