@@ -1,6 +1,6 @@
 {
   "name": "webapp",
-  "version": "0.10.0-rc.32",
+  "version": "0.10.0-rc.33",
   "private": true,
   "type": "module",
   "scripts": {
