@@ -1,21 +1,26 @@
 # =============================================================================
-# PER-PR APPLICATION STACK FOR PREVIEW DEPLOYMENTS
+# PER-PR APPLICATION STACK FOR PREVIEW DEPLOYMENTS (Coolify)
 # =============================================================================
 #
 # Coolify deploys this for each Pull Request automatically.
 # Each PR gets its own isolated stack with its own Postgres database.
 #
-# Connects to shared infrastructure services by container name:
-#   - hephaestus-preview-nats (NATS server)
-#   - hephaestus-preview-keycloak (authentication)
-#   - hephaestus-preview-postfix (email)
+# Coolify Setup:
+#   1. Create Application → Docker Compose (from Git repository)
+#   2. Point to: docker/preview/compose.app.yaml
+#   3. Enable "Connect to Predefined Network" to access shared infra
+#   4. Enable Preview Deployments in the application settings
+#   5. Configure environment variables (see .env.example)
+#   6. Assign domain in Coolify UI for webapp service
 #
-# Required Coolify Environment Variables:
-#   PREVIEW_DOMAIN          - Base domain (e.g., preview.hephaestus.cit.tum.de)
-#   PR_NUMBER               - Pull request number (Coolify provides this)
-#   KEYCLOAK_HEPHAESTUS_CONFIDENTIAL_CLIENT_SECRET
-#   GH_APP_ID, GH_APP_PRIVATE_KEY, GH_AUTH_TOKEN
-#   MODEL_NAME, DETECTION_MODEL_NAME, OPENAI_API_KEY
+# Coolify Magic Variables Used:
+#   - SERVICE_FQDN_WEBAPP: Auto-generated domain for webapp
+#   - COOLIFY_BRANCH: Branch name (used to identify PR)
+#
+# Connects to shared infrastructure services (from compose.shared-infra.yaml):
+#   - nats-server: Message queue
+#   - keycloak: Authentication  
+#   - postfix: Email relay
 #
 # =============================================================================
 
@@ -25,17 +30,13 @@ services:
   # ---------------------------------------------------------------------------
   postgres:
     image: postgres:17-alpine
-    container_name: hephaestus-pr-${PR_NUMBER:-0}-db
     restart: unless-stopped
     environment:
       POSTGRES_DB: hephaestus
       POSTGRES_USER: hephaestus
-      POSTGRES_PASSWORD: hephaestus-preview
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-hephaestus-preview}
     volumes:
       - postgres-data:/var/lib/postgresql/data
-    networks:
-      - hephaestus-preview-network
-      - internal
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U hephaestus -d hephaestus"]
       interval: 5s
@@ -48,22 +49,21 @@ services:
         max-file: "3"
 
   # ---------------------------------------------------------------------------
-  # Intelligence Service - AI analysis backend
+  # Intelligence Service - AI analysis backend (internal only)
   # ---------------------------------------------------------------------------
   intelligence-service:
     build:
       context: ../../server/intelligence-service
       dockerfile: Dockerfile
-    container_name: hephaestus-pr-${PR_NUMBER:-0}-intel
     restart: unless-stopped
     environment:
-      # Database (per-PR postgres)
-      DATABASE_URL: postgresql://hephaestus-pr-${PR_NUMBER:-0}-db:5432/hephaestus
+      # Database - use Coolify's service naming
+      DATABASE_URL: postgresql://postgres:5432/hephaestus
       DATABASE_USERNAME: hephaestus
-      DATABASE_PASSWORD: hephaestus-preview
+      DATABASE_PASSWORD: ${POSTGRES_PASSWORD:-hephaestus-preview}
       # AI Models
-      MODEL_NAME: ${MODEL_NAME}
-      DETECTION_MODEL_NAME: ${DETECTION_MODEL_NAME}
+      MODEL_NAME: ${MODEL_NAME:?Required}
+      DETECTION_MODEL_NAME: ${DETECTION_MODEL_NAME:?Required}
       # OpenAI
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENAI_API_VERSION: ${OPENAI_API_VERSION:-}
@@ -81,9 +81,6 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    networks:
-      - hephaestus-preview-network
-      - internal
     healthcheck:
       test: ["CMD", "curl", "-f", "http://127.0.0.1:5000/health"]
       interval: 10s
@@ -98,46 +95,47 @@ services:
 
   # ---------------------------------------------------------------------------
   # Application Server - Spring Boot backend
+  # Assign domain in Coolify: pr-{id}.preview.example.com/api → port 8080
   # ---------------------------------------------------------------------------
   application-server:
     build:
       context: ../../server/application-server
       dockerfile: Dockerfile
-    container_name: hephaestus-pr-${PR_NUMBER:-0}-server
     restart: unless-stopped
     environment:
       SPRING_PROFILES_ACTIVE: prod
-      # URLs
-      APPLICATION_HOST_URL: https://pr-${PR_NUMBER:-0}.${PREVIEW_DOMAIN}
-      # Database (per-PR postgres)
-      DATABASE_URL: postgresql://hephaestus-pr-${PR_NUMBER:-0}-db:5432/hephaestus
+      # URL - Coolify provides SERVICE_FQDN_WEBAPP
+      APPLICATION_HOST_URL: https://${SERVICE_FQDN_WEBAPP}
+      # Database - internal service reference
+      DATABASE_URL: postgresql://postgres:5432/hephaestus
       DATABASE_USERNAME: hephaestus
-      DATABASE_PASSWORD: hephaestus-preview
-      # Internal services
-      INTELLIGENCE_SERVICE_URL: http://hephaestus-pr-${PR_NUMBER:-0}-intel:5000
-      # Shared infrastructure (by container name)
-      NATS_SERVER: nats://hephaestus-preview-nats:4222
+      DATABASE_PASSWORD: ${POSTGRES_PASSWORD:-hephaestus-preview}
+      # Internal service reference
+      INTELLIGENCE_SERVICE_URL: http://intelligence-service:5000
+      # Shared infrastructure (must match shared-infra service names with UUID suffix)
+      # When "Connect to Predefined Network" is enabled, use the full container names
+      NATS_SERVER: nats://nats-server:4222
       NATS_ENABLED: ${NATS_ENABLED:-true}
-      NATS_DURABLE_CONSUMER_NAME: hephaestus-pr-${PR_NUMBER:-0}-consumer
-      # Shared Keycloak
-      KEYCLOAK_URL: https://${PREVIEW_DOMAIN}/keycloak
+      NATS_DURABLE_CONSUMER_NAME: ${COOLIFY_CONTAINER_NAME:-preview}-consumer
+      # Shared Keycloak - use base preview domain
+      KEYCLOAK_URL: https://${PREVIEW_DOMAIN:?Required}/keycloak
       KEYCLOAK_REALM: hephaestus
       KEYCLOAK_CLIENT_ID: hephaestus-confidential
-      KEYCLOAK_CLIENT_SECRET: ${KEYCLOAK_HEPHAESTUS_CONFIDENTIAL_CLIENT_SECRET}
+      KEYCLOAK_CLIENT_SECRET: ${KEYCLOAK_HEPHAESTUS_CONFIDENTIAL_CLIENT_SECRET:?Required}
       # Shared Postfix
-      POSTFIX_HOST: hephaestus-preview-postfix
+      POSTFIX_HOST: postfix
       POSTFIX_PORT: 25
       # GitHub integration
-      GH_APP_ID: ${GH_APP_ID}
-      GH_APP_PRIVATE_KEY: ${GH_APP_PRIVATE_KEY}
-      GH_AUTH_TOKEN: ${GH_AUTH_TOKEN}
+      GH_APP_ID: ${GH_APP_ID:?Required}
+      GH_APP_PRIVATE_KEY: ${GH_APP_PRIVATE_KEY:?Required}
+      GH_AUTH_TOKEN: ${GH_AUTH_TOKEN:?Required}
       # Monitoring (relaxed for previews)
       MONITORING_TIMEFRAME: ${MONITORING_TIMEFRAME:-14}
       MONITORING_RUN_ON_STARTUP: ${MONITORING_RUN_ON_STARTUP:-false}
       MONITORING_SYNC_CRON: ${MONITORING_SYNC_CRON:-0 0 2 * * *}
-      MONITORING_BACKFILL_ENABLED: false
+      MONITORING_BACKFILL_ENABLED: "false"
       # Notifications disabled for previews
-      LEADERBOARD_NOTIFICATION_ENABLED: false
+      LEADERBOARD_NOTIFICATION_ENABLED: "false"
       # Observability (optional)
       SENTRY_DSN: ${SENTRY_DSN:-}
       LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-}
@@ -148,26 +146,12 @@ services:
         condition: service_healthy
       intelligence-service:
         condition: service_healthy
-    networks:
-      - hephaestus-preview-network
-      - internal
     healthcheck:
       test: ["CMD", "wget", "--spider", "--quiet", "http://127.0.0.1:8080/actuator/health"]
       interval: 10s
       timeout: 10s
       retries: 20
       start_period: 90s
-    labels:
-      - "traefik.enable=true"
-      # API routes (strip /api prefix)
-      - "traefik.http.routers.pr-${PR_NUMBER:-0}-api.rule=Host(`pr-${PR_NUMBER:-0}.${PREVIEW_DOMAIN}`) && PathPrefix(`/api`)"
-      - "traefik.http.routers.pr-${PR_NUMBER:-0}-api.entrypoints=https"
-      - "traefik.http.routers.pr-${PR_NUMBER:-0}-api.tls=true"
-      - "traefik.http.routers.pr-${PR_NUMBER:-0}-api.middlewares=pr-${PR_NUMBER:-0}-api-strip"
-      - "traefik.http.middlewares.pr-${PR_NUMBER:-0}-api-strip.stripprefix.prefixes=/api"
-      - "traefik.http.routers.pr-${PR_NUMBER:-0}-api.service=pr-${PR_NUMBER:-0}-api"
-      - "traefik.http.services.pr-${PR_NUMBER:-0}-api.loadbalancer.server.port=8080"
-      - "traefik.http.routers.pr-${PR_NUMBER:-0}-api.priority=10"
     logging:
       driver: "json-file"
       options:
@@ -176,46 +160,35 @@ services:
 
   # ---------------------------------------------------------------------------
   # Webapp - React frontend served by nginx
+  # Assign domain in Coolify: pr-{id}.preview.example.com → port 80
   # ---------------------------------------------------------------------------
   webapp:
     build:
       context: ../../webapp
       dockerfile: Dockerfile
-    container_name: hephaestus-pr-${PR_NUMBER:-0}-webapp
     restart: unless-stopped
     environment:
-      # Runtime substitution (nginx envsubst)
-      APPLICATION_CLIENT_URL: https://pr-${PR_NUMBER:-0}.${PREVIEW_DOMAIN}
-      APPLICATION_SERVER_URL: https://pr-${PR_NUMBER:-0}.${PREVIEW_DOMAIN}/api
-      KEYCLOAK_URL: https://${PREVIEW_DOMAIN}/keycloak
+      # Coolify provides SERVICE_FQDN_WEBAPP automatically
+      APPLICATION_CLIENT_URL: https://${SERVICE_FQDN_WEBAPP}
+      APPLICATION_SERVER_URL: https://${SERVICE_FQDN_WEBAPP}/api
+      # Shared Keycloak
+      KEYCLOAK_URL: https://${PREVIEW_DOMAIN:?Required}/keycloak
       KEYCLOAK_REALM: hephaestus
       KEYCLOAK_CLIENT_ID: hephaestus
       KEYCLOAK_SKIP_LOGIN: ${KEYCLOAK_SKIP_LOGIN:-false}
       # Optional
       SENTRY_ENVIRONMENT: preview
       SENTRY_DSN: ${SENTRY_DSN:-}
-      POSTHOG_ENABLED: false
+      POSTHOG_ENABLED: "false"
     depends_on:
       application-server:
         condition: service_healthy
-    networks:
-      - hephaestus-preview-network
-      - internal
     healthcheck:
       test: ["CMD", "curl", "-f", "http://127.0.0.1:80/"]
       interval: 10s
       timeout: 5s
       retries: 10
       start_period: 10s
-    labels:
-      - "traefik.enable=true"
-      # Webapp routes (catch-all for the subdomain)
-      - "traefik.http.routers.pr-${PR_NUMBER:-0}-webapp.rule=Host(`pr-${PR_NUMBER:-0}.${PREVIEW_DOMAIN}`)"
-      - "traefik.http.routers.pr-${PR_NUMBER:-0}-webapp.entrypoints=https"
-      - "traefik.http.routers.pr-${PR_NUMBER:-0}-webapp.tls=true"
-      - "traefik.http.routers.pr-${PR_NUMBER:-0}-webapp.service=pr-${PR_NUMBER:-0}-webapp"
-      - "traefik.http.services.pr-${PR_NUMBER:-0}-webapp.loadbalancer.server.port=80"
-      - "traefik.http.routers.pr-${PR_NUMBER:-0}-webapp.priority=1"
     logging:
       driver: "json-file"
       options:
@@ -223,20 +196,7 @@ services:
         max-file: "3"
 
 # =============================================================================
-# NETWORKS
-# =============================================================================
-networks:
-  # Shared network with infrastructure (external - created by compose.infrastructure.yaml)
-  hephaestus-preview-network:
-    external: true
-    name: hephaestus-preview-network
-  # Internal network for this PR stack only
-  internal:
-    driver: bridge
-
-# =============================================================================
-# VOLUMES (per-PR, isolated)
+# VOLUMES (per-deployment, isolated)
 # =============================================================================
 volumes:
   postgres-data:
-    name: hephaestus-pr-${PR_NUMBER:-0}-postgres-data

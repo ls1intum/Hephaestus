@@ -1,84 +1,74 @@
 # =============================================================================
-# SHARED INFRASTRUCTURE FOR PREVIEW DEPLOYMENTS
+# SHARED INFRASTRUCTURE FOR PREVIEW DEPLOYMENTS (Coolify)
 # =============================================================================
 #
-# Deploy ONCE on the preview server. All PR stacks connect to these services.
+# Deploy ONCE as a Docker Compose service in Coolify.
+# All PR preview stacks will connect to these shared services.
 #
 # Services:
 #   - nats-server: Message queue for GitHub webhook events
 #   - webhook-ingest: Receives GitHub webhooks, publishes to NATS
-#   - keycloak + keycloak-db: Authentication (wildcard redirect URIs for *.preview-host)
+#   - keycloak + keycloak-db: Authentication (wildcard redirect URIs)
 #   - postfix: Email relay
 #
-# Network:
-#   All services attach to 'hephaestus-preview-network' which PR stacks also join.
+# Coolify Setup:
+#   1. Create new Service → Docker Compose
+#   2. Point to this file in the repo: docker/preview/compose.shared-infra.yaml
+#   3. Enable "Connect to Predefined Network" 
+#   4. Configure environment variables (see .env.example)
+#   5. In Coolify UI, assign domains:
+#      - keycloak: https://preview.example.com/keycloak (port 8080)
+#      - webhook-ingest: https://preview.example.com/webhooks (port 4200)
 #
-# Usage in Coolify:
-#   1. Create new Service → Docker Compose (Empty)
-#   2. Paste this file
-#   3. Configure environment variables
-#   4. Set domain for keycloak: preview.example.com with path /keycloak
-#   5. Set domain for webhook-ingest: preview.example.com with path /webhooks
+# Note: Coolify auto-generates Traefik labels when you assign domains in the UI.
+#       No manual Traefik labels needed here.
 #
 # =============================================================================
 
 services:
   # ---------------------------------------------------------------------------
-  # NATS Server - Message queue for webhook events
+  # NATS Server - Message queue for webhook events (internal only)
   # ---------------------------------------------------------------------------
   nats-server:
     image: nats:2.10-alpine
-    container_name: hephaestus-preview-nats
     restart: unless-stopped
     command: ["--config", "/etc/nats/nats-server.conf"]
     volumes:
       - nats-data:/data
-    networks:
-      - hephaestus-preview-network
     healthcheck:
       test: ["CMD", "wget", "--spider", "--quiet", "http://127.0.0.1:8222/healthz"]
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 5s
+    configs:
+      - source: nats-config
+        target: /etc/nats/nats-server.conf
     logging:
       driver: "json-file"
       options:
         max-size: "10m"
         max-file: "3"
-    configs:
-      - source: nats-config
-        target: /etc/nats/nats-server.conf
 
   # ---------------------------------------------------------------------------
   # Webhook Ingest - Receives GitHub webhooks, publishes to NATS
+  # Assign domain in Coolify: preview.example.com/webhooks → port 4200
   # ---------------------------------------------------------------------------
   webhook-ingest:
-    image: ghcr.io/ls1intum/hephaestus/webhook-ingest:latest
-    container_name: hephaestus-preview-webhook-ingest
+    image: ghcr.io/ls1intum/hephaestus/webhook-ingest:${IMAGE_TAG:-latest}
     restart: unless-stopped
     environment:
-      NATS_URL: nats://hephaestus-preview-nats:4222
-      WEBHOOK_SECRET: ${WEBHOOK_SECRET}
+      NATS_URL: nats://nats-server:4222
+      WEBHOOK_SECRET: ${WEBHOOK_SECRET:?Required}
     depends_on:
       nats-server:
         condition: service_healthy
-    networks:
-      - hephaestus-preview-network
     healthcheck:
       test: ["CMD", "curl", "-f", "http://127.0.0.1:4200/health"]
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 5s
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.preview-webhook.rule=Host(`${PREVIEW_DOMAIN}`) && PathPrefix(`/webhooks`)"
-      - "traefik.http.routers.preview-webhook.entrypoints=https"
-      - "traefik.http.routers.preview-webhook.tls=true"
-      - "traefik.http.routers.preview-webhook.middlewares=preview-webhook-strip"
-      - "traefik.http.middlewares.preview-webhook-strip.stripprefix.prefixes=/webhooks"
-      - "traefik.http.services.preview-webhook.loadbalancer.server.port=4200"
     logging:
       driver: "json-file"
       options:
@@ -86,20 +76,17 @@ services:
         max-file: "3"
 
   # ---------------------------------------------------------------------------
-  # Keycloak PostgreSQL - Database for Keycloak
+  # Keycloak PostgreSQL - Database for Keycloak (internal only)
   # ---------------------------------------------------------------------------
   keycloak-db:
     image: postgres:16-alpine
-    container_name: hephaestus-preview-keycloak-db
     restart: unless-stopped
     environment:
       POSTGRES_DB: keycloak
       POSTGRES_USER: keycloak
-      POSTGRES_PASSWORD: ${KEYCLOAK_DB_PASSWORD:-keycloak-preview-secret}
+      POSTGRES_PASSWORD: ${KEYCLOAK_DB_PASSWORD:?Required}
     volumes:
       - keycloak-db-data:/var/lib/postgresql/data
-    networks:
-      - hephaestus-preview-network
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U keycloak -d keycloak"]
       interval: 5s
@@ -112,11 +99,11 @@ services:
         max-file: "3"
 
   # ---------------------------------------------------------------------------
-  # Keycloak - Authentication with wildcard redirect URIs for all PR subdomains
+  # Keycloak - Authentication with wildcard redirect URIs
+  # Assign domain in Coolify: preview.example.com/keycloak → port 8080
   # ---------------------------------------------------------------------------
   keycloak:
     image: quay.io/keycloak/keycloak:26.0
-    container_name: hephaestus-preview-keycloak
     restart: unless-stopped
     depends_on:
       keycloak-db:
@@ -124,33 +111,30 @@ services:
     environment:
       # Database
       KC_DB: postgres
-      KC_DB_URL: jdbc:postgresql://hephaestus-preview-keycloak-db:5432/keycloak
+      KC_DB_URL: jdbc:postgresql://keycloak-db:5432/keycloak
       KC_DB_USERNAME: keycloak
-      KC_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:-keycloak-preview-secret}
+      KC_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:?Required}
       # Admin
       KC_BOOTSTRAP_ADMIN_USERNAME: ${KC_ADMIN_USERNAME:-admin}
-      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_ADMIN_PASSWORD}
-      # Hostname - base preview domain (NOT wildcard)
-      KC_HOSTNAME: ${PREVIEW_DOMAIN}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_ADMIN_PASSWORD:?Required}
+      # Hostname
+      KC_HOSTNAME: ${PREVIEW_DOMAIN:?Required}
       KC_HTTP_RELATIVE_PATH: /keycloak
       KC_HTTP_ENABLED: "true"
       KC_HEALTH_ENABLED: "true"
       KC_PROXY_HEADERS: xforwarded
       # GitHub OAuth for user login
-      KEYCLOAK_GITHUB_CLIENT_ID: ${KEYCLOAK_GITHUB_CLIENT_ID}
-      KEYCLOAK_GITHUB_CLIENT_SECRET: ${KEYCLOAK_GITHUB_CLIENT_SECRET}
+      KEYCLOAK_GITHUB_CLIENT_ID: ${KEYCLOAK_GITHUB_CLIENT_ID:?Required}
+      KEYCLOAK_GITHUB_CLIENT_SECRET: ${KEYCLOAK_GITHUB_CLIENT_SECRET:?Required}
       # Confidential client secret (shared across all PR deployments)
-      KEYCLOAK_HEPHAESTUS_CONFIDENTIAL_CLIENT_SECRET: ${KEYCLOAK_HEPHAESTUS_CONFIDENTIAL_CLIENT_SECRET}
-      # Preview domain for wildcard redirect URIs
-      PREVIEW_DOMAIN: ${PREVIEW_DOMAIN}
+      KEYCLOAK_HEPHAESTUS_CONFIDENTIAL_CLIENT_SECRET: ${KEYCLOAK_HEPHAESTUS_CONFIDENTIAL_CLIENT_SECRET:?Required}
+      # For realm import template
+      PREVIEW_DOMAIN: ${PREVIEW_DOMAIN:?Required}
     volumes:
       - keycloak-data:/opt/keycloak/data
-    networks:
-      - hephaestus-preview-network
     configs:
       - source: realm-import
         target: /opt/keycloak/data/realm-import.json
-    # Move realm-import.json to import folder and start
     entrypoint: ["sh", "-c", "mkdir -p /opt/keycloak/data/import && [ -f /opt/keycloak/data/realm-import.json ] && mv /opt/keycloak/data/realm-import.json /opt/keycloak/data/import/realm-import.json; exec /opt/keycloak/bin/kc.sh start --import-realm"]
     healthcheck:
       test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/9000 && echo -e 'GET /keycloak/health/ready HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n' >&3 && cat <&3 | grep -q 'UP'"]
@@ -158,12 +142,6 @@ services:
       timeout: 10s
       retries: 20
       start_period: 60s
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.preview-keycloak.rule=Host(`${PREVIEW_DOMAIN}`) && PathPrefix(`/keycloak`)"
-      - "traefik.http.routers.preview-keycloak.entrypoints=https"
-      - "traefik.http.routers.preview-keycloak.tls=true"
-      - "traefik.http.services.preview-keycloak.loadbalancer.server.port=8080"
     logging:
       driver: "json-file"
       options:
@@ -171,15 +149,12 @@ services:
         max-file: "5"
 
   # ---------------------------------------------------------------------------
-  # Postfix - Email relay
+  # Postfix - Email relay (internal only)
   # ---------------------------------------------------------------------------
   postfix:
     image: ghcr.io/ls1admin/postfix:latest
-    container_name: hephaestus-preview-postfix
     restart: unless-stopped
-    hostname: ${PREVIEW_DOMAIN}
-    networks:
-      - hephaestus-preview-network
+    hostname: ${PREVIEW_DOMAIN:?Required}
     logging:
       driver: "json-file"
       options:
@@ -187,23 +162,12 @@ services:
         max-file: "3"
 
 # =============================================================================
-# NETWORK - Shared across infrastructure and all PR stacks
-# =============================================================================
-networks:
-  hephaestus-preview-network:
-    name: hephaestus-preview-network
-    driver: bridge
-
-# =============================================================================
 # VOLUMES
 # =============================================================================
 volumes:
   nats-data:
-    name: hephaestus-preview-nats-data
   keycloak-data:
-    name: hephaestus-preview-keycloak-data
   keycloak-db-data:
-    name: hephaestus-preview-keycloak-db-data
 
 # =============================================================================
 # CONFIGS
