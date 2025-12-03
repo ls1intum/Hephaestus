@@ -13,6 +13,7 @@ export interface ProfileContentProps {
 	username: string;
 	displayName?: string;
 	currUserIsDashboardUser: boolean;
+	workspaceSlug: string;
 }
 
 export function ProfileContent({
@@ -22,6 +23,7 @@ export function ProfileContent({
 	username,
 	displayName,
 	currUserIsDashboardUser,
+	workspaceSlug,
 }: ProfileContentProps) {
 	// Generate skeleton arrays for loading state
 	const skeletonReviews = isLoading
@@ -76,7 +78,10 @@ export function ProfileContent({
 				<span className="flex justify-between items-center">
 					<h2 className="text-xl font-semibold">Open Pull Requests</h2>
 					<Button variant="secondary" asChild>
-						<Link to="/user/$username/best-practices" params={{ username }}>
+						<Link
+							to="/w/$workspaceSlug/user/$username/best-practices"
+							params={{ username, workspaceSlug }}
+						>
 							Best practices
 						</Link>
 					</Button>

@@ -13,6 +13,7 @@ import {
 	DropdownMenuSeparator,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 
 export interface HeaderProps {
 	/** Sidebar trigger button component */
@@ -43,18 +44,33 @@ export default function Header({
 	onLogin,
 	onLogout,
 }: HeaderProps) {
+	const { workspaceSlug } = useActiveWorkspaceSlug();
+	const hasWorkspace = Boolean(workspaceSlug);
+	const hasUsername = Boolean(username);
+
 	return (
 		<header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12 justify-between">
 			<div className="flex items-center gap-2 px-4">
 				{sidebarTrigger}
 				<div className="flex items-center gap-2">
-					<Link
-						to="/"
-						className="flex gap-2 items-center hover:text-muted-foreground"
-					>
-						<Hammer className="text-2xl sm:text-3xl" />
-						<span className="text-xl font-semibold">Hephaestus</span>
-					</Link>
+					{hasWorkspace ? (
+						<Link
+							to="/w/$workspaceSlug"
+							params={{ workspaceSlug: workspaceSlug ?? "" }}
+							className="flex gap-2 items-center hover:text-muted-foreground"
+						>
+							<Hammer className="text-2xl sm:text-3xl" />
+							<span className="text-xl font-semibold">Hephaestus</span>
+						</Link>
+					) : (
+						<Link
+							to="/landing"
+							className="flex gap-2 items-center hover:text-muted-foreground"
+						>
+							<Hammer className="text-2xl sm:text-3xl" />
+							<span className="text-xl font-semibold">Hephaestus</span>
+						</Link>
+					)}
 					<span className="text-xs font-semibold mt-1 text-muted-foreground">
 						{version}
 					</span>
@@ -62,7 +78,6 @@ export default function Header({
 			</div>
 			<div className="flex gap-2 px-4">
 				<ModeToggle />
-
 				<div className="flex items-center gap-2">
 					{!isAuthenticated ? (
 						<GitHubSignInButton onClick={onLogin} disabled={isLoading}>
@@ -92,16 +107,28 @@ export default function Header({
 									</DropdownMenuLabel>
 									<DropdownMenuSeparator />
 									<DropdownMenuGroup>
-										<DropdownMenuItem asChild>
-											<Link
-												to="/user/$username"
-												search={{}}
-												params={{ username: username ?? "" }}
+										{hasWorkspace && hasUsername ? (
+											<DropdownMenuItem asChild>
+												<Link
+													to="/w/$workspaceSlug/user/$username"
+													params={{
+														workspaceSlug: workspaceSlug ?? "",
+														username: username ?? "",
+													}}
+												>
+													<User />
+													<span>My Profile</span>
+												</Link>
+											</DropdownMenuItem>
+										) : (
+											<DropdownMenuItem
+												disabled
+												title="Join a workspace to view your profile"
 											>
 												<User />
 												<span>My Profile</span>
-											</Link>
-										</DropdownMenuItem>
+											</DropdownMenuItem>
+										)}
 										<DropdownMenuItem asChild>
 											<Link to="/settings" search={{}}>
 												<Settings />

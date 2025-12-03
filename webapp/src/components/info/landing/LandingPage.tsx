@@ -8,11 +8,13 @@ import { LandingWhyChooseSection } from "./LandingWhyChooseSection";
 
 interface LandingPageProps {
 	onSignIn: () => void;
+	onGoToDashboard?: () => void;
 	isSignedIn?: boolean;
 }
 
 export function LandingPage({
 	onSignIn,
+	onGoToDashboard,
 	isSignedIn = false,
 }: LandingPageProps) {
 	const learnMoreRef = useRef<HTMLDivElement>(null);
@@ -28,16 +30,25 @@ export function LandingPage({
 		<div className="flex flex-col">
 			<LandingHeroSection
 				onSignIn={onSignIn}
+				onGoToDashboard={onGoToDashboard}
 				isSignedIn={isSignedIn}
 				onLearnMoreClick={handleLearnMoreClick}
 			/>
 			<div ref={learnMoreRef}>
 				<LandingFeaturesSection />
 			</div>
-			<LandingWhyChooseSection onSignIn={onSignIn} isSignedIn={isSignedIn} />
+			<LandingWhyChooseSection
+				onSignIn={onSignIn}
+				onGoToDashboard={onGoToDashboard}
+				isSignedIn={isSignedIn}
+			/>
 			<LandingTestimonialSection />
 			<LandingFAQSection />
-			<LandingCTASection onSignIn={onSignIn} isSignedIn={isSignedIn} />
+			<LandingCTASection
+				onSignIn={onSignIn}
+				onGoToDashboard={onGoToDashboard}
+				isSignedIn={isSignedIn}
+			/>
 		</div>
 	);
 }

@@ -10,6 +10,7 @@ import de.tum.in.www1.hephaestus.intelligenceservice.model.*;
 import de.tum.in.www1.hephaestus.mentor.document.Document;
 import de.tum.in.www1.hephaestus.mentor.document.DocumentKind;
 import de.tum.in.www1.hephaestus.mentor.document.DocumentRepository;
+import de.tum.in.www1.hephaestus.workspace.Workspace;
 import java.lang.reflect.Method;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -53,9 +54,9 @@ public class ChatPersistenceService {
      * Creates a processor for a complete chat request, handling thread and user message persistence.
      * This method encapsulates the full setup required for a chat request.
      */
-    public StreamPartProcessor createProcessorForRequest(User user, ChatRequestDTO chatRequest) {
+    public StreamPartProcessor createProcessorForRequest(User user, ChatRequestDTO chatRequest, Workspace workspace) {
         // Get or create chat thread
-        ChatThread thread = getOrCreateChatThread(chatRequest.id(), user);
+        ChatThread thread = getOrCreateChatThread(chatRequest.id(), user, workspace);
 
         // Resolve parent by explicit previousMessageId when provided, else fallback to thread's selected leaf
         ChatMessage parent = null;
@@ -831,6 +832,10 @@ public class ChatPersistenceService {
                     errorMessagePart.setContent(objectMapper.valueToTree("Error: " + errorPart.toString()));
 
                     chatMessagePartRepository.save(errorMessagePart);
+
+                    // Add to message's parts collection to prevent orphan removal
+                    currentMessage.getParts().add(errorMessagePart);
+
                     logger.debug("Saved error part: messageId={}", currentMessage.getId());
                 }
             } catch (Exception e) {
@@ -859,6 +864,10 @@ public class ChatPersistenceService {
                 stepPart.setContent(objectMapper.createObjectNode()); // Empty content for step-start
 
                 chatMessagePartRepository.save(stepPart);
+
+                // Add to message's parts collection to prevent orphan removal
+                currentMessage.getParts().add(stepPart);
+
                 logger.debug("Saved step-start part: messageId={}", currentMessage.getId());
             } catch (Exception e) {
                 logger.error("Failed to process step start: {}", e.getMessage(), e);
@@ -1163,6 +1172,9 @@ public class ChatPersistenceService {
                     ChatMessagePart newDataPart = createDataPart(dataPart);
                     chatMessagePartRepository.save(newDataPart);
 
+                    // Add to message's parts collection to prevent orphan removal
+                    currentMessage.getParts().add(newDataPart);
+
                     // Track by ID if provided
                     if (dataId != null) {
                         dataPartsById.put(dataId, newDataPart);
@@ -1299,10 +1311,12 @@ public class ChatPersistenceService {
                         DocumentKind kind = state.kind != null ? state.kind : DocumentKind.TEXT;
                         String content = state.content.toString();
 
-                        var latestExisting = documentRepository.findFirstByIdAndUserOrderByVersionNumberDesc(
-                            id,
-                            thread.getUser()
-                        );
+                        var latestExisting =
+                            documentRepository.findFirstByWorkspaceAndUserAndIdOrderByVersionNumberDesc(
+                                thread.getWorkspace(),
+                                thread.getUser(),
+                                id
+                            );
                         if (latestExisting.isPresent() && (title == null || title.isBlank())) {
                             title = latestExisting.get().getTitle();
                         }
@@ -1311,7 +1325,15 @@ public class ChatPersistenceService {
                         }
 
                         int nextVersion = latestExisting.map(d -> d.getVersionNumber() + 1).orElse(1);
-                        Document toSave = new Document(id, nextVersion, title, content, kind, thread.getUser());
+                        Document toSave = new Document(
+                            id,
+                            nextVersion,
+                            title,
+                            content,
+                            kind,
+                            thread.getUser(),
+                            thread.getWorkspace()
+                        );
                         documentRepository.save(toSave);
                         logger.info(
                             "Persisted document version: id={}, title='{}', kind={}, contentLen={}",
@@ -1374,7 +1396,7 @@ public class ChatPersistenceService {
     /**
      * Get or create a chat thread for the given ID and user.
      */
-    private ChatThread getOrCreateChatThread(String threadId, User user) {
+    private ChatThread getOrCreateChatThread(String threadId, User user, Workspace workspace) {
         UUID parsedUuid;
         try {
             parsedUuid = UUID.fromString(threadId);
@@ -1386,11 +1408,16 @@ public class ChatPersistenceService {
 
         return chatThreadRepository
             .findById(threadUuid)
+            .map(existing -> {
+                validateThreadOwnership(existing, user, workspace);
+                return existing;
+            })
             .orElseGet(() -> {
                 logger.debug("Creating new chat thread with ID: {}", threadUuid);
                 ChatThread newThread = new ChatThread();
                 newThread.setId(threadUuid);
                 newThread.setUser(user);
+                newThread.setWorkspace(workspace);
 
                 // Format current date/time as thread title
                 LocalDateTime now = LocalDateTime.now();
@@ -1399,6 +1426,20 @@ public class ChatPersistenceService {
 
                 return chatThreadRepository.save(newThread);
             });
+    }
+
+    private void validateThreadOwnership(ChatThread thread, User user, Workspace workspace) {
+        if (thread.getUser() == null || !thread.getUser().getId().equals(user.getId())) {
+            throw new IllegalArgumentException("Thread " + thread.getId() + " is not owned by the current user");
+        }
+        if (thread.getWorkspace() == null) {
+            throw new IllegalStateException("Thread " + thread.getId() + " has no workspace assigned");
+        }
+        if (!thread.getWorkspace().getId().equals(workspace.getId())) {
+            throw new IllegalArgumentException(
+                "Thread " + thread.getId() + " does not belong to workspace " + workspace.getWorkspaceSlug()
+            );
+        }
     }
 
     /**

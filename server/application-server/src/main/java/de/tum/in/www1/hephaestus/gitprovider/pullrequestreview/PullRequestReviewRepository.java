@@ -18,13 +18,16 @@ public interface PullRequestReviewRepository extends JpaRepository<PullRequestRe
         LEFT JOIN FETCH prr.pullRequest
         LEFT JOIN FETCH prr.pullRequest.repository
         LEFT JOIN FETCH prr.comments
-        WHERE prr.author.login ILIKE :authorLogin AND prr.submittedAt >= :activitySince
+        WHERE prr.author.login ILIKE :authorLogin
+            AND prr.submittedAt >= :activitySince
+            AND prr.pullRequest.repository.organization.workspace.id = :workspaceId
         ORDER BY prr.submittedAt DESC
         """
     )
     List<PullRequestReview> findAllByAuthorLoginSince(
         @Param("authorLogin") String authorLogin,
-        @Param("activitySince") Instant activitySince
+        @Param("activitySince") Instant activitySince,
+        @Param("workspaceId") Long workspaceId
     );
 
     @Query(
@@ -38,10 +41,15 @@ public interface PullRequestReviewRepository extends JpaRepository<PullRequestRe
         WHERE
             prr.submittedAt BETWEEN :after AND :before
             AND prr.author.type = 'USER'
+            AND prr.pullRequest.repository.organization.workspace.id = :workspaceId
         ORDER BY prr.submittedAt DESC
         """
     )
-    List<PullRequestReview> findAllInTimeframe(@Param("after") Instant after, @Param("before") Instant before);
+    List<PullRequestReview> findAllInTimeframe(
+        @Param("after") Instant after,
+        @Param("before") Instant before,
+        @Param("workspaceId") Long workspaceId
+    );
 
     @Query(
         value = """
@@ -54,6 +62,7 @@ public interface PullRequestReviewRepository extends JpaRepository<PullRequestRe
         WHERE
             prr.submittedAt BETWEEN :after AND :before
             AND prr.author.type = 'USER'
+            AND prr.pullRequest.repository.organization.workspace.id = :workspaceId
             AND EXISTS (
                 SELECT 1
                 FROM TeamRepositoryPermission trp
@@ -88,6 +97,7 @@ public interface PullRequestReviewRepository extends JpaRepository<PullRequestRe
     List<PullRequestReview> findAllInTimeframeOfTeams(
         @Param("after") Instant after,
         @Param("before") Instant before,
-        @Param("teamIds") Collection<Long> teamIds
+        @Param("teamIds") Collection<Long> teamIds,
+        @Param("workspaceId") Long workspaceId
     );
 }

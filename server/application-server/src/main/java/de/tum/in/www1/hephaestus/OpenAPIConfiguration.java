@@ -6,8 +6,11 @@ import io.swagger.v3.oas.annotations.info.Info;
 import io.swagger.v3.oas.annotations.info.License;
 import io.swagger.v3.oas.annotations.servers.Server;
 import io.swagger.v3.oas.models.media.Schema;
+import io.swagger.v3.oas.models.media.StringSchema;
+import io.swagger.v3.oas.models.parameters.Parameter;
 import io.swagger.v3.parser.OpenAPIV3Parser;
 import java.io.File;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
@@ -26,7 +29,7 @@ import org.springframework.context.annotation.Configuration;
     info = @Info(
         title = "Hephaestus API",
         description = "API documentation for the Hephaestus application server.",
-        version = "0.10.0-rc.21",
+        version = "0.10.0-rc.30",
         contact = @Contact(name = "Felix T.J. Dietrich", email = "felixtj.dietrich@tum.de"),
         license = @License(name = "MIT License", url = "https://github.com/ls1intum/Hephaestus/blob/develop/LICENSE")
     ),
@@ -253,12 +256,66 @@ public class OpenAPIConfiguration {
                                         .collect(Collectors.toList())
                                 );
                             }
+                            if (operation.getParameters() != null && !operation.getParameters().isEmpty()) {
+                                var filteredParameters = operation
+                                    .getParameters()
+                                    .stream()
+                                    .filter(parameter -> !isWorkspaceContextParameter(parameter))
+                                    .collect(Collectors.toList());
+                                operation.setParameters(filteredParameters);
+                            }
+
+                            if (path.contains("{workspaceSlug}")) {
+                                ensureWorkspaceSlugParameter(operation);
+                            }
                         });
                 });
             } else {
                 logger.warn("Paths are null in OpenAPI configuration.");
             }
         };
+    }
+
+    private boolean isWorkspaceContextParameter(Parameter parameter) {
+        if (parameter == null) {
+            return false;
+        }
+        if ("workspaceContext".equals(parameter.getName())) {
+            return true;
+        }
+        if (parameter.getSchema() != null && parameter.getSchema().get$ref() != null) {
+            return parameter.getSchema().get$ref().endsWith("/WorkspaceContext");
+        }
+        return false;
+    }
+
+    private void ensureWorkspaceSlugParameter(io.swagger.v3.oas.models.Operation operation) {
+        if (operation == null) {
+            return;
+        }
+
+        var parameters = operation.getParameters();
+        if (parameters == null) {
+            parameters = new ArrayList<>();
+            operation.setParameters(parameters);
+        }
+
+        boolean alreadyPresent = parameters
+            .stream()
+            .anyMatch(parameter -> "workspaceSlug".equals(parameter.getName()) && "path".equals(parameter.getIn()));
+
+        if (alreadyPresent) {
+            return;
+        }
+
+        Parameter slugParameter = new Parameter()
+            .name("workspaceSlug")
+            .in("path")
+            .required(true)
+            .description("Workspace slug")
+            .schema(new StringSchema().pattern("^[a-z0-9][a-z0-9-]{2,50}$"));
+
+        parameters.add(0, slugParameter);
     }
 
     /**

@@ -1,7 +1,6 @@
 package de.tum.in.www1.hephaestus.leaderboard;
 
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
-import de.tum.in.www1.hephaestus.leaderboard.LeaderboardEntryDTO;
 
 public interface LeaguePointsCalculationService {
     int POINTS_DEFAULT = 1000;
@@ -14,5 +13,5 @@ public interface LeaguePointsCalculationService {
     double K_FACTOR_MEDIUM_POINTS = 1.2;
     double K_FACTOR_HIGH_POINTS = 1.1;
 
-    int calculateNewPoints(User user, LeaderboardEntryDTO entry);
+    int calculateNewPoints(User user, int currentLeaguePoints, LeaderboardEntryDTO entry);
 }

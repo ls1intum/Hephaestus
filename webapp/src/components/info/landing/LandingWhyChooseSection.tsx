@@ -6,11 +6,13 @@ import { Button } from "@/components/ui/button";
 
 interface LandingWhyChooseSectionProps {
 	onSignIn: () => void;
+	onGoToDashboard?: () => void;
 	isSignedIn: boolean;
 }
 
 export function LandingWhyChooseSection({
 	onSignIn,
+	onGoToDashboard,
 	isSignedIn,
 }: LandingWhyChooseSectionProps) {
 	return (
@@ -75,7 +77,7 @@ export function LandingWhyChooseSection({
 
 						<div className="pt-4">
 							{isSignedIn ? (
-								<Button onClick={onSignIn} className="gap-2">
+								<Button onClick={onGoToDashboard} className="gap-2">
 									Go to Dashboard <ArrowRight className="h-4 w-4" />
 								</Button>
 							) : (

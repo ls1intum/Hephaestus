@@ -2,7 +2,6 @@ package de.tum.in.www1.hephaestus.workspace;
 
 import java.util.ArrayList;
 import java.util.List;
-import org.kohsuke.github.GHRepositorySelection;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 
@@ -36,7 +35,6 @@ public class WorkspaceProperties {
 
         private String login;
         private String token;
-        private GHRepositorySelection repositorySelection = GHRepositorySelection.SELECTED;
         private final List<String> repositoriesToMonitor = new ArrayList<>();
 
         public String getLogin() {
@@ -53,14 +51,6 @@ public class WorkspaceProperties {
 
         public void setToken(String token) {
             this.token = token;
-        }
-
-        public GHRepositorySelection getRepositorySelection() {
-            return repositorySelection;
-        }
-
-        public void setRepositorySelection(GHRepositorySelection repositorySelection) {
-            this.repositorySelection = repositorySelection;
         }
 
         public List<String> getRepositoriesToMonitor() {

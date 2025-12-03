@@ -165,6 +165,10 @@ const meta = {
 			description: "GitHub username of the profile owner",
 			control: "text",
 		},
+		workspaceSlug: {
+			description: "Active workspace slug",
+			control: "text",
+		},
 	},
 	tags: ["autodocs"],
 } satisfies Meta<typeof ProfileContent>;
@@ -182,6 +186,7 @@ export const Default: Story = {
 		isLoading: false,
 		username: "johndoe",
 		currUserIsDashboardUser: true,
+		workspaceSlug: "aet",
 	},
 };
 
@@ -193,6 +198,7 @@ export const Loading: Story = {
 		isLoading: true,
 		username: "johndoe",
 		currUserIsDashboardUser: true,
+		workspaceSlug: "aet",
 	},
 };
 
@@ -206,6 +212,7 @@ export const EmptyReviews: Story = {
 		isLoading: false,
 		username: "johndoe",
 		currUserIsDashboardUser: true,
+		workspaceSlug: "aet",
 	},
 };
 
@@ -219,6 +226,7 @@ export const EmptyPullRequests: Story = {
 		isLoading: false,
 		username: "johndoe",
 		currUserIsDashboardUser: true,
+		workspaceSlug: "aet",
 	},
 };
 
@@ -232,5 +240,6 @@ export const CompletelyEmpty: Story = {
 		isLoading: false,
 		username: "johndoe",
 		currUserIsDashboardUser: true,
+		workspaceSlug: "aet",
 	},
 };

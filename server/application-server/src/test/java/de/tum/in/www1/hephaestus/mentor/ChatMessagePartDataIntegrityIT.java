@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.UIMessagePartsInner;
 import de.tum.in.www1.hephaestus.testconfig.BaseIntegrationTest;
+import de.tum.in.www1.hephaestus.testconfig.TestUserFactory;
 import de.tum.in.www1.hephaestus.testconfig.WithMentorUser;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -31,7 +32,7 @@ public class ChatMessagePartDataIntegrityIT extends BaseIntegrationTest {
     @Transactional
     void setUp() {
         // Ensure mentor user exists for the test
-        userRepository.findByLogin("mentor").orElseThrow(() -> new RuntimeException("Mentor user not found"));
+        TestUserFactory.ensureUser(userRepository, "mentor", 2L);
     }
 
     @Test

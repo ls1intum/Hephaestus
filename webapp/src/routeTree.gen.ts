@@ -17,22 +17,24 @@ import { Route as ImprintRouteImport } from './routes/imprint'
 import { Route as AboutRouteImport } from './routes/about'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
-import { Route as AuthenticatedTeamsRouteImport } from './routes/_authenticated/teams'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
-import { Route as AuthenticatedBestPracticesRouteImport } from './routes/_authenticated/best-practices'
-import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/_admin'
-import { Route as AuthenticatedMentorIndexRouteImport } from './routes/_authenticated/mentor/index'
 import { Route as AuthenticatedMentorMentor_accessRouteImport } from './routes/_authenticated/mentor/_mentor_access'
-import { Route as AuthenticatedMentorThreadIdRouteImport } from './routes/_authenticated/mentor/$threadId'
-import { Route as AuthenticatedUserUsernameIndexRouteImport } from './routes/_authenticated/user/$username/index'
-import { Route as AuthenticatedAdminAdminIndexRouteImport } from './routes/_authenticated/_admin/admin/index'
-import { Route as AuthenticatedUserUsernameBestPracticesRouteImport } from './routes/_authenticated/user/$username/best-practices'
-import { Route as AuthenticatedAdminAdminTeamsRouteImport } from './routes/_authenticated/_admin/admin/teams'
-import { Route as AuthenticatedAdminAdminSettingsRouteImport } from './routes/_authenticated/_admin/admin/settings'
-import { Route as AuthenticatedAdminAdminMembersRouteImport } from './routes/_authenticated/_admin/admin/members'
+import { Route as AuthenticatedWWorkspaceSlugIndexRouteImport } from './routes/_authenticated/w/$workspaceSlug/index'
+import { Route as AuthenticatedWWorkspaceSlugTeamsIndexRouteImport } from './routes/_authenticated/w/$workspaceSlug/teams/index'
+import { Route as AuthenticatedWWorkspaceSlugMentorIndexRouteImport } from './routes/_authenticated/w/$workspaceSlug/mentor/index'
+import { Route as AuthenticatedWWorkspaceSlugMentorThreadIdRouteImport } from './routes/_authenticated/w/$workspaceSlug/mentor/$threadId'
+import { Route as AuthenticatedWWorkspaceSlugAdminAdminRouteImport } from './routes/_authenticated/w/$workspaceSlug/admin/_admin'
+import { Route as AuthenticatedWWorkspaceSlugUserUsernameIndexRouteImport } from './routes/_authenticated/w/$workspaceSlug/user/$username/index'
+import { Route as AuthenticatedWWorkspaceSlugUserUsernameBestPracticesRouteImport } from './routes/_authenticated/w/$workspaceSlug/user/$username/best-practices'
+import { Route as AuthenticatedWWorkspaceSlugAdminAdminTeamsRouteImport } from './routes/_authenticated/w/$workspaceSlug/admin/_admin/teams'
+import { Route as AuthenticatedWWorkspaceSlugAdminAdminSettingsRouteImport } from './routes/_authenticated/w/$workspaceSlug/admin/_admin/settings'
+import { Route as AuthenticatedWWorkspaceSlugAdminAdminMembersRouteImport } from './routes/_authenticated/w/$workspaceSlug/admin/_admin/members'
 
 const AuthenticatedMentorRouteImport = createFileRoute(
   '/_authenticated/mentor',
+)()
+const AuthenticatedWWorkspaceSlugAdminRouteImport = createFileRoute(
+  '/_authenticated/w/$workspaceSlug/admin',
 )()
 
 const PrivacyRoute = PrivacyRouteImport.update({
@@ -69,78 +71,80 @@ const AuthenticatedIndexRoute = AuthenticatedIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
-const AuthenticatedTeamsRoute = AuthenticatedTeamsRouteImport.update({
-  id: '/teams',
-  path: '/teams',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
 const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
-const AuthenticatedBestPracticesRoute =
-  AuthenticatedBestPracticesRouteImport.update({
-    id: '/best-practices',
-    path: '/best-practices',
-    getParentRoute: () => AuthenticatedRoute,
-  } as any)
-const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
-  id: '/_admin',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
-const AuthenticatedMentorIndexRoute =
-  AuthenticatedMentorIndexRouteImport.update({
-    id: '/',
-    path: '/',
-    getParentRoute: () => AuthenticatedMentorRoute,
-  } as any)
 const AuthenticatedMentorMentor_accessRoute =
   AuthenticatedMentorMentor_accessRouteImport.update({
     id: '/_mentor_access',
     getParentRoute: () => AuthenticatedMentorRoute,
   } as any)
-const AuthenticatedMentorThreadIdRoute =
-  AuthenticatedMentorThreadIdRouteImport.update({
-    id: '/mentor/$threadId',
-    path: '/mentor/$threadId',
+const AuthenticatedWWorkspaceSlugAdminRoute =
+  AuthenticatedWWorkspaceSlugAdminRouteImport.update({
+    id: '/w/$workspaceSlug/admin',
+    path: '/w/$workspaceSlug/admin',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
-const AuthenticatedUserUsernameIndexRoute =
-  AuthenticatedUserUsernameIndexRouteImport.update({
-    id: '/user/$username/',
-    path: '/user/$username/',
+const AuthenticatedWWorkspaceSlugIndexRoute =
+  AuthenticatedWWorkspaceSlugIndexRouteImport.update({
+    id: '/w/$workspaceSlug/',
+    path: '/w/$workspaceSlug/',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
-const AuthenticatedAdminAdminIndexRoute =
-  AuthenticatedAdminAdminIndexRouteImport.update({
-    id: '/admin/',
-    path: '/admin/',
-    getParentRoute: () => AuthenticatedAdminRoute,
-  } as any)
-const AuthenticatedUserUsernameBestPracticesRoute =
-  AuthenticatedUserUsernameBestPracticesRouteImport.update({
-    id: '/user/$username/best-practices',
-    path: '/user/$username/best-practices',
+const AuthenticatedWWorkspaceSlugTeamsIndexRoute =
+  AuthenticatedWWorkspaceSlugTeamsIndexRouteImport.update({
+    id: '/w/$workspaceSlug/teams/',
+    path: '/w/$workspaceSlug/teams/',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
-const AuthenticatedAdminAdminTeamsRoute =
-  AuthenticatedAdminAdminTeamsRouteImport.update({
-    id: '/admin/teams',
-    path: '/admin/teams',
-    getParentRoute: () => AuthenticatedAdminRoute,
+const AuthenticatedWWorkspaceSlugMentorIndexRoute =
+  AuthenticatedWWorkspaceSlugMentorIndexRouteImport.update({
+    id: '/w/$workspaceSlug/mentor/',
+    path: '/w/$workspaceSlug/mentor/',
+    getParentRoute: () => AuthenticatedRoute,
   } as any)
-const AuthenticatedAdminAdminSettingsRoute =
-  AuthenticatedAdminAdminSettingsRouteImport.update({
-    id: '/admin/settings',
-    path: '/admin/settings',
-    getParentRoute: () => AuthenticatedAdminRoute,
+const AuthenticatedWWorkspaceSlugMentorThreadIdRoute =
+  AuthenticatedWWorkspaceSlugMentorThreadIdRouteImport.update({
+    id: '/w/$workspaceSlug/mentor/$threadId',
+    path: '/w/$workspaceSlug/mentor/$threadId',
+    getParentRoute: () => AuthenticatedRoute,
   } as any)
-const AuthenticatedAdminAdminMembersRoute =
-  AuthenticatedAdminAdminMembersRouteImport.update({
-    id: '/admin/members',
-    path: '/admin/members',
-    getParentRoute: () => AuthenticatedAdminRoute,
+const AuthenticatedWWorkspaceSlugAdminAdminRoute =
+  AuthenticatedWWorkspaceSlugAdminAdminRouteImport.update({
+    id: '/_admin',
+    getParentRoute: () => AuthenticatedWWorkspaceSlugAdminRoute,
+  } as any)
+const AuthenticatedWWorkspaceSlugUserUsernameIndexRoute =
+  AuthenticatedWWorkspaceSlugUserUsernameIndexRouteImport.update({
+    id: '/w/$workspaceSlug/user/$username/',
+    path: '/w/$workspaceSlug/user/$username/',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedWWorkspaceSlugUserUsernameBestPracticesRoute =
+  AuthenticatedWWorkspaceSlugUserUsernameBestPracticesRouteImport.update({
+    id: '/w/$workspaceSlug/user/$username/best-practices',
+    path: '/w/$workspaceSlug/user/$username/best-practices',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedWWorkspaceSlugAdminAdminTeamsRoute =
+  AuthenticatedWWorkspaceSlugAdminAdminTeamsRouteImport.update({
+    id: '/teams',
+    path: '/teams',
+    getParentRoute: () => AuthenticatedWWorkspaceSlugAdminAdminRoute,
+  } as any)
+const AuthenticatedWWorkspaceSlugAdminAdminSettingsRoute =
+  AuthenticatedWWorkspaceSlugAdminAdminSettingsRouteImport.update({
+    id: '/settings',
+    path: '/settings',
+    getParentRoute: () => AuthenticatedWWorkspaceSlugAdminAdminRoute,
+  } as any)
+const AuthenticatedWWorkspaceSlugAdminAdminMembersRoute =
+  AuthenticatedWWorkspaceSlugAdminAdminMembersRouteImport.update({
+    id: '/members',
+    path: '/members',
+    getParentRoute: () => AuthenticatedWWorkspaceSlugAdminAdminRoute,
   } as any)
 
 export interface FileRoutesByFullPath {
@@ -148,37 +152,38 @@ export interface FileRoutesByFullPath {
   '/imprint': typeof ImprintRoute
   '/landing': typeof LandingRoute
   '/privacy': typeof PrivacyRoute
-  '/best-practices': typeof AuthenticatedBestPracticesRoute
   '/settings': typeof AuthenticatedSettingsRoute
-  '/teams': typeof AuthenticatedTeamsRoute
   '/': typeof AuthenticatedIndexRoute
-  '/mentor/$threadId': typeof AuthenticatedMentorThreadIdRoute
   '/mentor': typeof AuthenticatedMentorMentor_accessRoute
-  '/mentor/': typeof AuthenticatedMentorIndexRoute
-  '/admin/members': typeof AuthenticatedAdminAdminMembersRoute
-  '/admin/settings': typeof AuthenticatedAdminAdminSettingsRoute
-  '/admin/teams': typeof AuthenticatedAdminAdminTeamsRoute
-  '/user/$username/best-practices': typeof AuthenticatedUserUsernameBestPracticesRoute
-  '/admin': typeof AuthenticatedAdminAdminIndexRoute
-  '/user/$username': typeof AuthenticatedUserUsernameIndexRoute
+  '/w/$workspaceSlug': typeof AuthenticatedWWorkspaceSlugIndexRoute
+  '/w/$workspaceSlug/admin': typeof AuthenticatedWWorkspaceSlugAdminAdminRouteWithChildren
+  '/w/$workspaceSlug/mentor/$threadId': typeof AuthenticatedWWorkspaceSlugMentorThreadIdRoute
+  '/w/$workspaceSlug/mentor': typeof AuthenticatedWWorkspaceSlugMentorIndexRoute
+  '/w/$workspaceSlug/teams': typeof AuthenticatedWWorkspaceSlugTeamsIndexRoute
+  '/w/$workspaceSlug/admin/members': typeof AuthenticatedWWorkspaceSlugAdminAdminMembersRoute
+  '/w/$workspaceSlug/admin/settings': typeof AuthenticatedWWorkspaceSlugAdminAdminSettingsRoute
+  '/w/$workspaceSlug/admin/teams': typeof AuthenticatedWWorkspaceSlugAdminAdminTeamsRoute
+  '/w/$workspaceSlug/user/$username/best-practices': typeof AuthenticatedWWorkspaceSlugUserUsernameBestPracticesRoute
+  '/w/$workspaceSlug/user/$username': typeof AuthenticatedWWorkspaceSlugUserUsernameIndexRoute
 }
 export interface FileRoutesByTo {
   '/about': typeof AboutRoute
   '/imprint': typeof ImprintRoute
   '/landing': typeof LandingRoute
   '/privacy': typeof PrivacyRoute
-  '/best-practices': typeof AuthenticatedBestPracticesRoute
   '/settings': typeof AuthenticatedSettingsRoute
-  '/teams': typeof AuthenticatedTeamsRoute
   '/': typeof AuthenticatedIndexRoute
-  '/mentor/$threadId': typeof AuthenticatedMentorThreadIdRoute
-  '/mentor': typeof AuthenticatedMentorIndexRoute
-  '/admin/members': typeof AuthenticatedAdminAdminMembersRoute
-  '/admin/settings': typeof AuthenticatedAdminAdminSettingsRoute
-  '/admin/teams': typeof AuthenticatedAdminAdminTeamsRoute
-  '/user/$username/best-practices': typeof AuthenticatedUserUsernameBestPracticesRoute
-  '/admin': typeof AuthenticatedAdminAdminIndexRoute
-  '/user/$username': typeof AuthenticatedUserUsernameIndexRoute
+  '/mentor': typeof AuthenticatedMentorMentor_accessRoute
+  '/w/$workspaceSlug': typeof AuthenticatedWWorkspaceSlugIndexRoute
+  '/w/$workspaceSlug/admin': typeof AuthenticatedWWorkspaceSlugAdminAdminRouteWithChildren
+  '/w/$workspaceSlug/mentor/$threadId': typeof AuthenticatedWWorkspaceSlugMentorThreadIdRoute
+  '/w/$workspaceSlug/mentor': typeof AuthenticatedWWorkspaceSlugMentorIndexRoute
+  '/w/$workspaceSlug/teams': typeof AuthenticatedWWorkspaceSlugTeamsIndexRoute
+  '/w/$workspaceSlug/admin/members': typeof AuthenticatedWWorkspaceSlugAdminAdminMembersRoute
+  '/w/$workspaceSlug/admin/settings': typeof AuthenticatedWWorkspaceSlugAdminAdminSettingsRoute
+  '/w/$workspaceSlug/admin/teams': typeof AuthenticatedWWorkspaceSlugAdminAdminTeamsRoute
+  '/w/$workspaceSlug/user/$username/best-practices': typeof AuthenticatedWWorkspaceSlugUserUsernameBestPracticesRoute
+  '/w/$workspaceSlug/user/$username': typeof AuthenticatedWWorkspaceSlugUserUsernameIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -187,21 +192,21 @@ export interface FileRoutesById {
   '/imprint': typeof ImprintRoute
   '/landing': typeof LandingRoute
   '/privacy': typeof PrivacyRoute
-  '/_authenticated/_admin': typeof AuthenticatedAdminRouteWithChildren
-  '/_authenticated/best-practices': typeof AuthenticatedBestPracticesRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
-  '/_authenticated/teams': typeof AuthenticatedTeamsRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
-  '/_authenticated/mentor/$threadId': typeof AuthenticatedMentorThreadIdRoute
   '/_authenticated/mentor': typeof AuthenticatedMentorRouteWithChildren
   '/_authenticated/mentor/_mentor_access': typeof AuthenticatedMentorMentor_accessRoute
-  '/_authenticated/mentor/': typeof AuthenticatedMentorIndexRoute
-  '/_authenticated/_admin/admin/members': typeof AuthenticatedAdminAdminMembersRoute
-  '/_authenticated/_admin/admin/settings': typeof AuthenticatedAdminAdminSettingsRoute
-  '/_authenticated/_admin/admin/teams': typeof AuthenticatedAdminAdminTeamsRoute
-  '/_authenticated/user/$username/best-practices': typeof AuthenticatedUserUsernameBestPracticesRoute
-  '/_authenticated/_admin/admin/': typeof AuthenticatedAdminAdminIndexRoute
-  '/_authenticated/user/$username/': typeof AuthenticatedUserUsernameIndexRoute
+  '/_authenticated/w/$workspaceSlug/': typeof AuthenticatedWWorkspaceSlugIndexRoute
+  '/_authenticated/w/$workspaceSlug/admin': typeof AuthenticatedWWorkspaceSlugAdminRouteWithChildren
+  '/_authenticated/w/$workspaceSlug/admin/_admin': typeof AuthenticatedWWorkspaceSlugAdminAdminRouteWithChildren
+  '/_authenticated/w/$workspaceSlug/mentor/$threadId': typeof AuthenticatedWWorkspaceSlugMentorThreadIdRoute
+  '/_authenticated/w/$workspaceSlug/mentor/': typeof AuthenticatedWWorkspaceSlugMentorIndexRoute
+  '/_authenticated/w/$workspaceSlug/teams/': typeof AuthenticatedWWorkspaceSlugTeamsIndexRoute
+  '/_authenticated/w/$workspaceSlug/admin/_admin/members': typeof AuthenticatedWWorkspaceSlugAdminAdminMembersRoute
+  '/_authenticated/w/$workspaceSlug/admin/_admin/settings': typeof AuthenticatedWWorkspaceSlugAdminAdminSettingsRoute
+  '/_authenticated/w/$workspaceSlug/admin/_admin/teams': typeof AuthenticatedWWorkspaceSlugAdminAdminTeamsRoute
+  '/_authenticated/w/$workspaceSlug/user/$username/best-practices': typeof AuthenticatedWWorkspaceSlugUserUsernameBestPracticesRoute
+  '/_authenticated/w/$workspaceSlug/user/$username/': typeof AuthenticatedWWorkspaceSlugUserUsernameIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -210,37 +215,38 @@ export interface FileRouteTypes {
     | '/imprint'
     | '/landing'
     | '/privacy'
-    | '/best-practices'
     | '/settings'
-    | '/teams'
     | '/'
-    | '/mentor/$threadId'
     | '/mentor'
-    | '/mentor/'
-    | '/admin/members'
-    | '/admin/settings'
-    | '/admin/teams'
-    | '/user/$username/best-practices'
-    | '/admin'
-    | '/user/$username'
+    | '/w/$workspaceSlug'
+    | '/w/$workspaceSlug/admin'
+    | '/w/$workspaceSlug/mentor/$threadId'
+    | '/w/$workspaceSlug/mentor'
+    | '/w/$workspaceSlug/teams'
+    | '/w/$workspaceSlug/admin/members'
+    | '/w/$workspaceSlug/admin/settings'
+    | '/w/$workspaceSlug/admin/teams'
+    | '/w/$workspaceSlug/user/$username/best-practices'
+    | '/w/$workspaceSlug/user/$username'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/about'
     | '/imprint'
     | '/landing'
     | '/privacy'
-    | '/best-practices'
     | '/settings'
-    | '/teams'
     | '/'
-    | '/mentor/$threadId'
     | '/mentor'
-    | '/admin/members'
-    | '/admin/settings'
-    | '/admin/teams'
-    | '/user/$username/best-practices'
-    | '/admin'
-    | '/user/$username'
+    | '/w/$workspaceSlug'
+    | '/w/$workspaceSlug/admin'
+    | '/w/$workspaceSlug/mentor/$threadId'
+    | '/w/$workspaceSlug/mentor'
+    | '/w/$workspaceSlug/teams'
+    | '/w/$workspaceSlug/admin/members'
+    | '/w/$workspaceSlug/admin/settings'
+    | '/w/$workspaceSlug/admin/teams'
+    | '/w/$workspaceSlug/user/$username/best-practices'
+    | '/w/$workspaceSlug/user/$username'
   id:
     | '__root__'
     | '/_authenticated'
@@ -248,21 +254,21 @@ export interface FileRouteTypes {
     | '/imprint'
     | '/landing'
     | '/privacy'
-    | '/_authenticated/_admin'
-    | '/_authenticated/best-practices'
     | '/_authenticated/settings'
-    | '/_authenticated/teams'
     | '/_authenticated/'
-    | '/_authenticated/mentor/$threadId'
     | '/_authenticated/mentor'
     | '/_authenticated/mentor/_mentor_access'
-    | '/_authenticated/mentor/'
-    | '/_authenticated/_admin/admin/members'
-    | '/_authenticated/_admin/admin/settings'
-    | '/_authenticated/_admin/admin/teams'
-    | '/_authenticated/user/$username/best-practices'
-    | '/_authenticated/_admin/admin/'
-    | '/_authenticated/user/$username/'
+    | '/_authenticated/w/$workspaceSlug/'
+    | '/_authenticated/w/$workspaceSlug/admin'
+    | '/_authenticated/w/$workspaceSlug/admin/_admin'
+    | '/_authenticated/w/$workspaceSlug/mentor/$threadId'
+    | '/_authenticated/w/$workspaceSlug/mentor/'
+    | '/_authenticated/w/$workspaceSlug/teams/'
+    | '/_authenticated/w/$workspaceSlug/admin/_admin/members'
+    | '/_authenticated/w/$workspaceSlug/admin/_admin/settings'
+    | '/_authenticated/w/$workspaceSlug/admin/_admin/teams'
+    | '/_authenticated/w/$workspaceSlug/user/$username/best-practices'
+    | '/_authenticated/w/$workspaceSlug/user/$username/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -324,40 +330,12 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedIndexRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
-    '/_authenticated/teams': {
-      id: '/_authenticated/teams'
-      path: '/teams'
-      fullPath: '/teams'
-      preLoaderRoute: typeof AuthenticatedTeamsRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
     '/_authenticated/settings': {
       id: '/_authenticated/settings'
       path: '/settings'
       fullPath: '/settings'
       preLoaderRoute: typeof AuthenticatedSettingsRouteImport
       parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/best-practices': {
-      id: '/_authenticated/best-practices'
-      path: '/best-practices'
-      fullPath: '/best-practices'
-      preLoaderRoute: typeof AuthenticatedBestPracticesRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/_admin': {
-      id: '/_authenticated/_admin'
-      path: ''
-      fullPath: ''
-      preLoaderRoute: typeof AuthenticatedAdminRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/mentor/': {
-      id: '/_authenticated/mentor/'
-      path: '/'
-      fullPath: '/mentor/'
-      preLoaderRoute: typeof AuthenticatedMentorIndexRouteImport
-      parentRoute: typeof AuthenticatedMentorRoute
     }
     '/_authenticated/mentor/_mentor_access': {
       id: '/_authenticated/mentor/_mentor_access'
@@ -366,111 +344,163 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedMentorMentor_accessRouteImport
       parentRoute: typeof AuthenticatedMentorRoute
     }
-    '/_authenticated/mentor/$threadId': {
-      id: '/_authenticated/mentor/$threadId'
-      path: '/mentor/$threadId'
-      fullPath: '/mentor/$threadId'
-      preLoaderRoute: typeof AuthenticatedMentorThreadIdRouteImport
+    '/_authenticated/w/$workspaceSlug/admin': {
+      id: '/_authenticated/w/$workspaceSlug/admin'
+      path: '/w/$workspaceSlug/admin'
+      fullPath: '/w/$workspaceSlug/admin'
+      preLoaderRoute: typeof AuthenticatedWWorkspaceSlugAdminRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
-    '/_authenticated/user/$username/': {
-      id: '/_authenticated/user/$username/'
-      path: '/user/$username'
-      fullPath: '/user/$username'
-      preLoaderRoute: typeof AuthenticatedUserUsernameIndexRouteImport
+    '/_authenticated/w/$workspaceSlug/': {
+      id: '/_authenticated/w/$workspaceSlug/'
+      path: '/w/$workspaceSlug'
+      fullPath: '/w/$workspaceSlug'
+      preLoaderRoute: typeof AuthenticatedWWorkspaceSlugIndexRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
-    '/_authenticated/_admin/admin/': {
-      id: '/_authenticated/_admin/admin/'
-      path: '/admin'
-      fullPath: '/admin'
-      preLoaderRoute: typeof AuthenticatedAdminAdminIndexRouteImport
-      parentRoute: typeof AuthenticatedAdminRoute
-    }
-    '/_authenticated/user/$username/best-practices': {
-      id: '/_authenticated/user/$username/best-practices'
-      path: '/user/$username/best-practices'
-      fullPath: '/user/$username/best-practices'
-      preLoaderRoute: typeof AuthenticatedUserUsernameBestPracticesRouteImport
+    '/_authenticated/w/$workspaceSlug/teams/': {
+      id: '/_authenticated/w/$workspaceSlug/teams/'
+      path: '/w/$workspaceSlug/teams'
+      fullPath: '/w/$workspaceSlug/teams'
+      preLoaderRoute: typeof AuthenticatedWWorkspaceSlugTeamsIndexRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
-    '/_authenticated/_admin/admin/teams': {
-      id: '/_authenticated/_admin/admin/teams'
-      path: '/admin/teams'
-      fullPath: '/admin/teams'
-      preLoaderRoute: typeof AuthenticatedAdminAdminTeamsRouteImport
-      parentRoute: typeof AuthenticatedAdminRoute
+    '/_authenticated/w/$workspaceSlug/mentor/': {
+      id: '/_authenticated/w/$workspaceSlug/mentor/'
+      path: '/w/$workspaceSlug/mentor'
+      fullPath: '/w/$workspaceSlug/mentor'
+      preLoaderRoute: typeof AuthenticatedWWorkspaceSlugMentorIndexRouteImport
+      parentRoute: typeof AuthenticatedRoute
     }
-    '/_authenticated/_admin/admin/settings': {
-      id: '/_authenticated/_admin/admin/settings'
-      path: '/admin/settings'
-      fullPath: '/admin/settings'
-      preLoaderRoute: typeof AuthenticatedAdminAdminSettingsRouteImport
-      parentRoute: typeof AuthenticatedAdminRoute
+    '/_authenticated/w/$workspaceSlug/mentor/$threadId': {
+      id: '/_authenticated/w/$workspaceSlug/mentor/$threadId'
+      path: '/w/$workspaceSlug/mentor/$threadId'
+      fullPath: '/w/$workspaceSlug/mentor/$threadId'
+      preLoaderRoute: typeof AuthenticatedWWorkspaceSlugMentorThreadIdRouteImport
+      parentRoute: typeof AuthenticatedRoute
     }
-    '/_authenticated/_admin/admin/members': {
-      id: '/_authenticated/_admin/admin/members'
-      path: '/admin/members'
-      fullPath: '/admin/members'
-      preLoaderRoute: typeof AuthenticatedAdminAdminMembersRouteImport
-      parentRoute: typeof AuthenticatedAdminRoute
+    '/_authenticated/w/$workspaceSlug/admin/_admin': {
+      id: '/_authenticated/w/$workspaceSlug/admin/_admin'
+      path: '/w/$workspaceSlug/admin'
+      fullPath: '/w/$workspaceSlug/admin'
+      preLoaderRoute: typeof AuthenticatedWWorkspaceSlugAdminAdminRouteImport
+      parentRoute: typeof AuthenticatedWWorkspaceSlugAdminRoute
+    }
+    '/_authenticated/w/$workspaceSlug/user/$username/': {
+      id: '/_authenticated/w/$workspaceSlug/user/$username/'
+      path: '/w/$workspaceSlug/user/$username'
+      fullPath: '/w/$workspaceSlug/user/$username'
+      preLoaderRoute: typeof AuthenticatedWWorkspaceSlugUserUsernameIndexRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/w/$workspaceSlug/user/$username/best-practices': {
+      id: '/_authenticated/w/$workspaceSlug/user/$username/best-practices'
+      path: '/w/$workspaceSlug/user/$username/best-practices'
+      fullPath: '/w/$workspaceSlug/user/$username/best-practices'
+      preLoaderRoute: typeof AuthenticatedWWorkspaceSlugUserUsernameBestPracticesRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/w/$workspaceSlug/admin/_admin/teams': {
+      id: '/_authenticated/w/$workspaceSlug/admin/_admin/teams'
+      path: '/teams'
+      fullPath: '/w/$workspaceSlug/admin/teams'
+      preLoaderRoute: typeof AuthenticatedWWorkspaceSlugAdminAdminTeamsRouteImport
+      parentRoute: typeof AuthenticatedWWorkspaceSlugAdminAdminRoute
+    }
+    '/_authenticated/w/$workspaceSlug/admin/_admin/settings': {
+      id: '/_authenticated/w/$workspaceSlug/admin/_admin/settings'
+      path: '/settings'
+      fullPath: '/w/$workspaceSlug/admin/settings'
+      preLoaderRoute: typeof AuthenticatedWWorkspaceSlugAdminAdminSettingsRouteImport
+      parentRoute: typeof AuthenticatedWWorkspaceSlugAdminAdminRoute
+    }
+    '/_authenticated/w/$workspaceSlug/admin/_admin/members': {
+      id: '/_authenticated/w/$workspaceSlug/admin/_admin/members'
+      path: '/members'
+      fullPath: '/w/$workspaceSlug/admin/members'
+      preLoaderRoute: typeof AuthenticatedWWorkspaceSlugAdminAdminMembersRouteImport
+      parentRoute: typeof AuthenticatedWWorkspaceSlugAdminAdminRoute
     }
   }
 }
 
-interface AuthenticatedAdminRouteChildren {
-  AuthenticatedAdminAdminMembersRoute: typeof AuthenticatedAdminAdminMembersRoute
-  AuthenticatedAdminAdminSettingsRoute: typeof AuthenticatedAdminAdminSettingsRoute
-  AuthenticatedAdminAdminTeamsRoute: typeof AuthenticatedAdminAdminTeamsRoute
-  AuthenticatedAdminAdminIndexRoute: typeof AuthenticatedAdminAdminIndexRoute
-}
-
-const AuthenticatedAdminRouteChildren: AuthenticatedAdminRouteChildren = {
-  AuthenticatedAdminAdminMembersRoute: AuthenticatedAdminAdminMembersRoute,
-  AuthenticatedAdminAdminSettingsRoute: AuthenticatedAdminAdminSettingsRoute,
-  AuthenticatedAdminAdminTeamsRoute: AuthenticatedAdminAdminTeamsRoute,
-  AuthenticatedAdminAdminIndexRoute: AuthenticatedAdminAdminIndexRoute,
-}
-
-const AuthenticatedAdminRouteWithChildren =
-  AuthenticatedAdminRoute._addFileChildren(AuthenticatedAdminRouteChildren)
-
 interface AuthenticatedMentorRouteChildren {
   AuthenticatedMentorMentor_accessRoute: typeof AuthenticatedMentorMentor_accessRoute
-  AuthenticatedMentorIndexRoute: typeof AuthenticatedMentorIndexRoute
 }
 
 const AuthenticatedMentorRouteChildren: AuthenticatedMentorRouteChildren = {
   AuthenticatedMentorMentor_accessRoute: AuthenticatedMentorMentor_accessRoute,
-  AuthenticatedMentorIndexRoute: AuthenticatedMentorIndexRoute,
 }
 
 const AuthenticatedMentorRouteWithChildren =
   AuthenticatedMentorRoute._addFileChildren(AuthenticatedMentorRouteChildren)
 
+interface AuthenticatedWWorkspaceSlugAdminAdminRouteChildren {
+  AuthenticatedWWorkspaceSlugAdminAdminMembersRoute: typeof AuthenticatedWWorkspaceSlugAdminAdminMembersRoute
+  AuthenticatedWWorkspaceSlugAdminAdminSettingsRoute: typeof AuthenticatedWWorkspaceSlugAdminAdminSettingsRoute
+  AuthenticatedWWorkspaceSlugAdminAdminTeamsRoute: typeof AuthenticatedWWorkspaceSlugAdminAdminTeamsRoute
+}
+
+const AuthenticatedWWorkspaceSlugAdminAdminRouteChildren: AuthenticatedWWorkspaceSlugAdminAdminRouteChildren =
+  {
+    AuthenticatedWWorkspaceSlugAdminAdminMembersRoute:
+      AuthenticatedWWorkspaceSlugAdminAdminMembersRoute,
+    AuthenticatedWWorkspaceSlugAdminAdminSettingsRoute:
+      AuthenticatedWWorkspaceSlugAdminAdminSettingsRoute,
+    AuthenticatedWWorkspaceSlugAdminAdminTeamsRoute:
+      AuthenticatedWWorkspaceSlugAdminAdminTeamsRoute,
+  }
+
+const AuthenticatedWWorkspaceSlugAdminAdminRouteWithChildren =
+  AuthenticatedWWorkspaceSlugAdminAdminRoute._addFileChildren(
+    AuthenticatedWWorkspaceSlugAdminAdminRouteChildren,
+  )
+
+interface AuthenticatedWWorkspaceSlugAdminRouteChildren {
+  AuthenticatedWWorkspaceSlugAdminAdminRoute: typeof AuthenticatedWWorkspaceSlugAdminAdminRouteWithChildren
+}
+
+const AuthenticatedWWorkspaceSlugAdminRouteChildren: AuthenticatedWWorkspaceSlugAdminRouteChildren =
+  {
+    AuthenticatedWWorkspaceSlugAdminAdminRoute:
+      AuthenticatedWWorkspaceSlugAdminAdminRouteWithChildren,
+  }
+
+const AuthenticatedWWorkspaceSlugAdminRouteWithChildren =
+  AuthenticatedWWorkspaceSlugAdminRoute._addFileChildren(
+    AuthenticatedWWorkspaceSlugAdminRouteChildren,
+  )
+
 interface AuthenticatedRouteChildren {
-  AuthenticatedAdminRoute: typeof AuthenticatedAdminRouteWithChildren
-  AuthenticatedBestPracticesRoute: typeof AuthenticatedBestPracticesRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
-  AuthenticatedTeamsRoute: typeof AuthenticatedTeamsRoute
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
-  AuthenticatedMentorThreadIdRoute: typeof AuthenticatedMentorThreadIdRoute
   AuthenticatedMentorRoute: typeof AuthenticatedMentorRouteWithChildren
-  AuthenticatedUserUsernameBestPracticesRoute: typeof AuthenticatedUserUsernameBestPracticesRoute
-  AuthenticatedUserUsernameIndexRoute: typeof AuthenticatedUserUsernameIndexRoute
+  AuthenticatedWWorkspaceSlugIndexRoute: typeof AuthenticatedWWorkspaceSlugIndexRoute
+  AuthenticatedWWorkspaceSlugAdminRoute: typeof AuthenticatedWWorkspaceSlugAdminRouteWithChildren
+  AuthenticatedWWorkspaceSlugMentorThreadIdRoute: typeof AuthenticatedWWorkspaceSlugMentorThreadIdRoute
+  AuthenticatedWWorkspaceSlugMentorIndexRoute: typeof AuthenticatedWWorkspaceSlugMentorIndexRoute
+  AuthenticatedWWorkspaceSlugTeamsIndexRoute: typeof AuthenticatedWWorkspaceSlugTeamsIndexRoute
+  AuthenticatedWWorkspaceSlugUserUsernameBestPracticesRoute: typeof AuthenticatedWWorkspaceSlugUserUsernameBestPracticesRoute
+  AuthenticatedWWorkspaceSlugUserUsernameIndexRoute: typeof AuthenticatedWWorkspaceSlugUserUsernameIndexRoute
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
-  AuthenticatedAdminRoute: AuthenticatedAdminRouteWithChildren,
-  AuthenticatedBestPracticesRoute: AuthenticatedBestPracticesRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
-  AuthenticatedTeamsRoute: AuthenticatedTeamsRoute,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
-  AuthenticatedMentorThreadIdRoute: AuthenticatedMentorThreadIdRoute,
   AuthenticatedMentorRoute: AuthenticatedMentorRouteWithChildren,
-  AuthenticatedUserUsernameBestPracticesRoute:
-    AuthenticatedUserUsernameBestPracticesRoute,
-  AuthenticatedUserUsernameIndexRoute: AuthenticatedUserUsernameIndexRoute,
+  AuthenticatedWWorkspaceSlugIndexRoute: AuthenticatedWWorkspaceSlugIndexRoute,
+  AuthenticatedWWorkspaceSlugAdminRoute:
+    AuthenticatedWWorkspaceSlugAdminRouteWithChildren,
+  AuthenticatedWWorkspaceSlugMentorThreadIdRoute:
+    AuthenticatedWWorkspaceSlugMentorThreadIdRoute,
+  AuthenticatedWWorkspaceSlugMentorIndexRoute:
+    AuthenticatedWWorkspaceSlugMentorIndexRoute,
+  AuthenticatedWWorkspaceSlugTeamsIndexRoute:
+    AuthenticatedWWorkspaceSlugTeamsIndexRoute,
+  AuthenticatedWWorkspaceSlugUserUsernameBestPracticesRoute:
+    AuthenticatedWWorkspaceSlugUserUsernameBestPracticesRoute,
+  AuthenticatedWWorkspaceSlugUserUsernameIndexRoute:
+    AuthenticatedWWorkspaceSlugUserUsernameIndexRoute,
 }
 
 const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(

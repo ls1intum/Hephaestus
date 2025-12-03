@@ -3,7 +3,6 @@ package de.tum.in.www1.hephaestus.gitprovider.label.github;
 import de.tum.in.www1.hephaestus.gitprovider.label.Label;
 import de.tum.in.www1.hephaestus.gitprovider.label.LabelRepository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
-import jakarta.transaction.Transactional;
 import java.io.IOException;
 import java.util.HashSet;
 import java.util.List;
@@ -13,6 +12,7 @@ import org.kohsuke.github.GHRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class GitHubLabelSyncService {
@@ -60,11 +60,7 @@ public class GitHubLabelSyncService {
         try {
             remoteLabels = repository.listLabels().withPageSize(100).toList();
         } catch (IOException listingError) {
-            logger.error(
-                "Failed to list labels for repositoryId={}: {}",
-                repository.getId(),
-                listingError.getMessage()
-            );
+            logger.warn("Failed to list labels for repositoryId={}: {}", repository.getId(), listingError.getMessage());
             return;
         }
         Set<Long> seenLabelIds = new HashSet<>(remoteLabels.size());

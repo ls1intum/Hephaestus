@@ -21,8 +21,8 @@ public class GitHubIssueConverter extends BaseGitServiceEntityConverter<GHIssue,
         convertBaseFields(source, issue);
         issue.setNumber(source.getNumber());
         issue.setState(convertState(source.getState()));
-        issue.setTitle(source.getTitle());
-        issue.setBody(source.getBody());
+        issue.setTitle(sanitizeForPostgres(source.getTitle()));
+        issue.setBody(sanitizeForPostgres(source.getBody()));
         issue.setHtmlUrl(source.getHtmlUrl().toString());
         issue.setLocked(source.isLocked());
         issue.setClosedAt(source.getClosedAt());

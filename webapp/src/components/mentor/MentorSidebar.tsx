@@ -4,6 +4,7 @@ import { MessageSquare, Plus } from "lucide-react";
 import { getGroupedThreadsOptions } from "@/api/@tanstack/react-query.gen";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 import { cn } from "@/lib/utils";
 
 interface MentorSidebarProps {
@@ -12,9 +13,16 @@ interface MentorSidebarProps {
 
 export function MentorSidebar({ className }: MentorSidebarProps) {
 	const { threadId } = useParams({ strict: false });
-	const { data: groupedThreads, isLoading } = useQuery(
-		getGroupedThreadsOptions(),
-	);
+	const { workspaceSlug, isLoading: isWorkspaceLoading } =
+		useActiveWorkspaceSlug();
+	const slug = workspaceSlug ?? "";
+	const { data: groupedThreads, isLoading: isThreadsLoading } = useQuery({
+		...getGroupedThreadsOptions({
+			path: { workspaceSlug: workspaceSlug ?? "" },
+		}),
+		enabled: Boolean(workspaceSlug),
+	});
+	const isLoading = isWorkspaceLoading || isThreadsLoading;
 
 	const formatDate = (dateString: string) => {
 		const date = new Date(dateString);
@@ -46,7 +54,13 @@ export function MentorSidebar({ className }: MentorSidebarProps) {
 		>
 			{/* Header */}
 			<div className="p-4 border-b">
-				<Link to="/mentor">
+				<Link
+					to="/w/$workspaceSlug/mentor"
+					params={{ workspaceSlug: slug }}
+					className={
+						!workspaceSlug ? "pointer-events-none opacity-50" : undefined
+					}
+				>
 					<Button variant="outline" className="w-full justify-start">
 						<Plus className="h-4 w-4 mr-2" />
 						New Conversation
@@ -72,8 +86,8 @@ export function MentorSidebar({ className }: MentorSidebarProps) {
 										{group.threads.map((thread) => (
 											<Link
 												key={thread.id}
-												to="/mentor/$threadId"
-												params={{ threadId: thread.id }}
+												to="/w/$workspaceSlug/mentor/$threadId"
+												params={{ workspaceSlug: slug, threadId: thread.id }}
 												className="block"
 											>
 												<Button

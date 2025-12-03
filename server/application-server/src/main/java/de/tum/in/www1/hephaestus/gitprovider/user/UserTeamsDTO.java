@@ -1,6 +1,6 @@
 package de.tum.in.www1.hephaestus.gitprovider.user;
 
-import de.tum.in.www1.hephaestus.gitprovider.team.TeamInfoDTO;
+import de.tum.in.www1.hephaestus.gitprovider.team.TeamSummaryDTO;
 import java.util.LinkedHashSet;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -12,7 +12,7 @@ public record UserTeamsDTO(
     String email,
     @NonNull String name,
     @NonNull String url,
-    @NonNull Set<TeamInfoDTO> teams
+    @NonNull Set<TeamSummaryDTO> teams
 ) {
     public static UserTeamsDTO fromUser(User user) {
         return new UserTeamsDTO(
@@ -26,7 +26,7 @@ public record UserTeamsDTO(
                 .stream()
                 .map(m -> m.getTeam())
                 .filter(t -> t != null)
-                .map(TeamInfoDTO::fromTeam)
+                .map(TeamSummaryDTO::fromTeam)
                 .collect(Collectors.toCollection(LinkedHashSet::new))
         );
     }

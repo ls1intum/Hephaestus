@@ -24,7 +24,7 @@ public class GitHubIssueCommentConverter extends BaseGitServiceEntityConverter<G
     @Override
     public IssueComment update(@NonNull GHIssueComment source, @NonNull IssueComment comment) {
         convertBaseFields(source, comment);
-        comment.setBody(source.getBody());
+        comment.setBody(sanitizeForPostgres(source.getBody()));
         comment.setHtmlUrl(source.getHtmlUrl().toString());
         comment.setAuthorAssociation(authorAssociationConverter.convert(source.getAuthorAssociation()));
         return comment;
