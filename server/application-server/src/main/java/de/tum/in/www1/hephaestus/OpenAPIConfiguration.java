@@ -29,7 +29,7 @@ import org.springframework.context.annotation.Configuration;
     info = @Info(
         title = "Hephaestus API",
         description = "API documentation for the Hephaestus application server.",
-        version = "0.10.0-rc.30",
+        version = "0.10.0-rc.31",
         contact = @Contact(name = "Felix T.J. Dietrich", email = "felixtj.dietrich@tum.de"),
         license = @License(name = "MIT License", url = "https://github.com/ls1intum/Hephaestus/blob/develop/LICENSE")
     ),
