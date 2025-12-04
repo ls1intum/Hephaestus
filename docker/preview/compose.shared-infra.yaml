@@ -16,12 +16,13 @@
 #   2. Point to this file in the repo: docker/preview/compose.shared-infra.yaml
 #   3. Enable "Connect to Predefined Network" 
 #   4. Configure environment variables (see .env.example)
-#   5. In Coolify UI, set domains for each service:
-#      - keycloak: https://example.com/keycloak:8080
-#      - webhook-ingest: https://example.com/webhooks:4200
+#   5. In Coolify UI, set domains for each service (with Strip Prefix ENABLED):
+#      - keycloak: https://example.com:8080/keycloak
+#      - webhook-ingest: https://example.com:4200/webhooks
 #
-# Domain format: https://domain.com/path:PORT
+# Domain format: https://domain.com:PORT/path
 # The :PORT tells Coolify which container port to proxy to.
+# Strip Prefix removes /keycloak and /webhooks before forwarding.
 #
 # =============================================================================
 
@@ -121,9 +122,8 @@ services:
       # Admin
       KC_BOOTSTRAP_ADMIN_USERNAME: ${KC_ADMIN_USERNAME:-admin}
       KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_ADMIN_PASSWORD:?Required}
-      # Hostname
-      KC_HOSTNAME: ${PREVIEW_DOMAIN:?Required}
-      KC_HTTP_RELATIVE_PATH: /keycloak
+      # Hostname - path is stripped by proxy, but URLs should include /keycloak
+      KC_HOSTNAME: ${PREVIEW_DOMAIN:?Required}/keycloak
       KC_HTTP_ENABLED: "true"
       KC_HEALTH_ENABLED: "true"
       KC_PROXY_HEADERS: xforwarded
@@ -141,7 +141,7 @@ services:
         target: /opt/keycloak/data/realm-import.json
     entrypoint: ["sh", "-c", "mkdir -p /opt/keycloak/data/import && [ -f /opt/keycloak/data/realm-import.json ] && mv /opt/keycloak/data/realm-import.json /opt/keycloak/data/import/realm-import.json; exec /opt/keycloak/bin/kc.sh start --import-realm"]
     healthcheck:
-      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/9000 && echo -e 'GET /keycloak/health/ready HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n' >&3 && cat <&3 | grep -q 'UP'"]
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/9000 && echo -e 'GET /health/ready HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n' >&3 && cat <&3 | grep -q 'UP'"]
       interval: 10s
       timeout: 10s
       retries: 20
