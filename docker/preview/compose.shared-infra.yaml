@@ -16,12 +16,11 @@
 #   2. Point to this file in the repo: docker/preview/compose.shared-infra.yaml
 #   3. Enable "Connect to Predefined Network" 
 #   4. Configure environment variables (see .env.example)
-#   5. In Coolify UI, assign domains:
-#      - keycloak: https://preview.example.com/keycloak (port 8080)
-#      - webhook-ingest: https://preview.example.com/webhooks (port 4200)
+#   5. Coolify will auto-generate domains from SERVICE_FQDN_* variables
 #
-# Note: Coolify auto-generates Traefik labels when you assign domains in the UI.
-#       No manual Traefik labels needed here.
+# The compose uses Coolify magic environment variables:
+#   - SERVICE_FQDN_KEYCLOAK_8080=/keycloak → proxies /keycloak to port 8080
+#   - SERVICE_FQDN_WEBHOOKINGEST_4200=/webhooks → proxies /webhooks to port 4200
 #
 # =============================================================================
 
@@ -52,12 +51,17 @@ services:
 
   # ---------------------------------------------------------------------------
   # Webhook Ingest - Receives GitHub webhooks, publishes to NATS
-  # Assign domain in Coolify: preview.example.com/webhooks → port 4200
+  # Coolify auto-configures domain via SERVICE_FQDN_WEBHOOKINGEST_4200
   # ---------------------------------------------------------------------------
   webhook-ingest:
     image: ghcr.io/ls1intum/hephaestus/webhook-ingest:${IMAGE_TAG:-latest}
     restart: unless-stopped
+    expose:
+      - "4200"
     environment:
+      # Coolify magic variable: auto-generates domain with correct port
+      # Format: SERVICE_FQDN_<SERVICENAME>_<PORT>=<path>
+      SERVICE_FQDN_WEBHOOKINGEST_4200: /webhooks
       NATS_URL: nats://nats-server:4222
       WEBHOOK_SECRET: ${WEBHOOK_SECRET:?Required}
     depends_on:
@@ -100,7 +104,7 @@ services:
 
   # ---------------------------------------------------------------------------
   # Keycloak - Authentication with wildcard redirect URIs
-  # Assign domain in Coolify: preview.example.com/keycloak → port 8080
+  # Coolify auto-configures domain via SERVICE_FQDN_KEYCLOAK_8080
   # ---------------------------------------------------------------------------
   keycloak:
     image: quay.io/keycloak/keycloak:26.0
@@ -108,7 +112,12 @@ services:
     depends_on:
       keycloak-db:
         condition: service_healthy
+    expose:
+      - "8080"
     environment:
+      # Coolify magic variable: auto-generates domain with correct port
+      # Format: SERVICE_FQDN_<SERVICENAME>_<PORT>=<path>
+      SERVICE_FQDN_KEYCLOAK_8080: /keycloak
       # Database
       KC_DB: postgres
       KC_DB_URL: jdbc:postgresql://keycloak-db:5432/keycloak
