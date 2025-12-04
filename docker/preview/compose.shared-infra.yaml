@@ -18,9 +18,9 @@
 #   4. Configure environment variables (see .env.example)
 #   5. Coolify will auto-generate domains from SERVICE_FQDN_* variables
 #
-# The compose uses Coolify magic environment variables:
-#   - SERVICE_URL_KEYCLOAK_8080=/keycloak → proxies /keycloak to port 8080
-#   - SERVICE_URL_WEBHOOKINGEST_4200=/webhooks → proxies /webhooks to port 4200
+# The compose uses explicit Caddy labels for path-based routing:
+#   - /keycloak/* → keycloak:8080 (path preserved)
+#   - /webhooks/* → webhook-ingest:4200 (path stripped)
 #
 # =============================================================================
 
@@ -51,17 +51,19 @@ services:
 
   # ---------------------------------------------------------------------------
   # Webhook Ingest - Receives GitHub webhooks, publishes to NATS
-  # Coolify auto-configures domain via SERVICE_URL_WEBHOOKINGEST_4200
+  # Uses explicit Caddy labels for path-based routing
   # ---------------------------------------------------------------------------
   webhook-ingest:
     image: ghcr.io/ls1intum/hephaestus/webhook-ingest:${IMAGE_TAG:-latest}
     restart: unless-stopped
     expose:
       - "4200"
+    labels:
+      # Caddy labels for path-based routing (lucaslorentz/caddy-docker-proxy)
+      caddy: ${PREVIEW_DOMAIN:?Required}
+      caddy.handle_path: /webhooks/*
+      caddy.handle_path.0_reverse_proxy: "{{upstreams 4200}}"
     environment:
-      # Coolify magic variable: auto-generates domain with correct port
-      # Format: SERVICE_URL_<SERVICENAME>_<PORT>=<path>
-      SERVICE_URL_WEBHOOKINGEST_4200: /webhooks
       NATS_URL: nats://nats-server:4222
       WEBHOOK_SECRET: ${WEBHOOK_SECRET:?Required}
     depends_on:
@@ -104,7 +106,7 @@ services:
 
   # ---------------------------------------------------------------------------
   # Keycloak - Authentication with wildcard redirect URIs
-  # Coolify auto-configures domain via SERVICE_URL_KEYCLOAK_8080
+  # Uses explicit Caddy labels for path-based routing
   # ---------------------------------------------------------------------------
   keycloak:
     image: quay.io/keycloak/keycloak:26.0
@@ -114,10 +116,13 @@ services:
         condition: service_healthy
     expose:
       - "8080"
+    labels:
+      # Caddy labels for path-based routing (lucaslorentz/caddy-docker-proxy)
+      # Note: Keycloak serves on /keycloak, so we use handle (not handle_path) to preserve the path
+      caddy: ${PREVIEW_DOMAIN:?Required}
+      caddy.handle: /keycloak/*
+      caddy.handle.0_reverse_proxy: "{{upstreams 8080}}"
     environment:
-      # Coolify magic variable: auto-generates domain with correct port
-      # Format: SERVICE_URL_<SERVICENAME>_<PORT>=<path>
-      SERVICE_URL_KEYCLOAK_8080: /keycloak
       # Database
       KC_DB: postgres
       KC_DB_URL: jdbc:postgresql://keycloak-db:5432/keycloak
