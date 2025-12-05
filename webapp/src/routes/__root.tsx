@@ -35,10 +35,15 @@ import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 import { useWorkspaceAccess } from "@/hooks/use-workspace-access";
 import { useMentorChat } from "@/hooks/useMentorChat";
 import { type AuthContextType, useAuth } from "@/integrations/auth/AuthContext";
-import { isPosthogEnabled } from "@/integrations/posthog/config";
+import {
+	isPosthogEnabled,
+	sanitizeBoolean,
+} from "@/integrations/posthog/config";
 import { useTheme } from "@/integrations/theme";
 import type { ChatMessage } from "@/lib/types";
 import TanstackQueryLayout from "../integrations/tanstack-query/layout";
+
+const enableTanstackDevtools = sanitizeBoolean(environment.devtools?.tanstack);
 
 interface MyRouterContext {
 	queryClient: QueryClient;
@@ -96,8 +101,12 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 					</SidebarInset>
 				</SidebarProvider>
 				<Toaster theme={theme} />
-				<TanStackRouterDevtools />
-				<TanstackQueryLayout />
+				{enableTanstackDevtools ? (
+					<>
+						<TanStackRouterDevtools position="bottom-right" />
+						<TanstackQueryLayout />
+					</>
+				) : null}
 
 				{showCopilot && <GlobalCopilot />}
 				{!isLoading && isAuthenticated && allowSurveys && (

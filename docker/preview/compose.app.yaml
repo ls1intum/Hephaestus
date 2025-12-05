@@ -311,6 +311,7 @@ services:
       KEYCLOAK_REALM: hephaestus
       KEYCLOAK_CLIENT_ID: hephaestus
       KEYCLOAK_SKIP_LOGIN: ${KEYCLOAK_SKIP_LOGIN:-false}
+      TANSTACK_DEVTOOLS_ENABLED: ${TANSTACK_DEVTOOLS_ENABLED:-true}
       # Optional
       SENTRY_ENVIRONMENT: preview
       SENTRY_DSN: ${SENTRY_DSN:-}
