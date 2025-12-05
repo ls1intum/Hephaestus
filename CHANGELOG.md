@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.10.0-rc.42](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.41...v0.10.0-rc.42) (2025-12-05)
+
+## [0.10.0-rc.41](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.40...v0.10.0-rc.41) (2025-12-05)
+
+## [0.10.0-rc.40](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.39...v0.10.0-rc.40) (2025-12-04)
+
+## [0.10.0-rc.39](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.38...v0.10.0-rc.39) (2025-12-04)
+
+## [0.10.0-rc.38](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.37...v0.10.0-rc.38) (2025-12-04)
+
+## [0.10.0-rc.37](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.36...v0.10.0-rc.37) (2025-12-04)
+
+## [0.10.0-rc.36](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.35...v0.10.0-rc.36) (2025-12-04)
+
+## [0.10.0-rc.35](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.34...v0.10.0-rc.35) (2025-12-04)
+
+## [0.10.0-rc.34](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.33...v0.10.0-rc.34) (2025-12-04)
+
 ## [0.10.0-rc.33](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.32...v0.10.0-rc.33) (2025-12-03)
 
 ## [0.10.0-rc.32](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.31...v0.10.0-rc.32) (2025-12-03)

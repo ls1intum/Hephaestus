@@ -117,9 +117,12 @@ services:
       NATS_SERVER: nats://nats-server:4222
       NATS_ENABLED: ${NATS_ENABLED:-true}
       NATS_DURABLE_CONSUMER_NAME: ${COOLIFY_CONTAINER_NAME:-preview}-consumer
-      # Shared Keycloak - use base preview domain
+      # Shared Keycloak
+      # Public URL for issuer validation (must match token's iss claim)
       KEYCLOAK_URL: https://${PREVIEW_DOMAIN:?Required}/keycloak
       KEYCLOAK_REALM: hephaestus
+      # Internal URL for fetching JWKS (container-to-container, avoids firewall)
+      KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/hephaestus/protocol/openid-connect/certs
       KEYCLOAK_CLIENT_ID: hephaestus-confidential
       KEYCLOAK_CLIENT_SECRET: ${KEYCLOAK_HEPHAESTUS_CONFIDENTIAL_CLIENT_SECRET:?Required}
       # Shared Postfix
