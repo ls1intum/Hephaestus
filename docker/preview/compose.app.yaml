@@ -41,6 +41,20 @@
 services:
   # ---------------------------------------------------------------------------
   # PostgreSQL - Per-PR database (isolated data per preview)
+  # 
+  # DATABASE SEEDING:
+  # The seed directory /data/hephaestus/seed is mounted to /docker-entrypoint-initdb.d
+  # PostgreSQL runs *.sql.gz files from this directory on FIRST container start only.
+  #
+  # Create/update the seed dump from your base deployment:
+  #   docker exec <base-postgres> pg_dump -U hephaestus -d hephaestus --clean --if-exists | gzip > /data/hephaestus/seed/dump.sql.gz
+  #
+  # If the seed directory is empty or missing, postgres starts with an empty database
+  # and Liquibase will create the schema from scratch.
+  #
+  # SCHEMA COMPATIBILITY:
+  # GitHub's "Require branches to be up to date" setting ensures PRs have compatible schemas.
+  # Liquibase migrations are additive, so newer PRs can apply on top of develop's schema.
   # ---------------------------------------------------------------------------
   postgres:
     image: postgres:17-alpine
@@ -51,6 +65,9 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-hephaestus-preview}
     volumes:
       - postgres-data:/var/lib/postgresql/data
+      # Seed directory - must exist on host (create with: sudo mkdir -p /data/hephaestus/seed)
+      # If empty or missing, postgres starts empty and Liquibase creates schema from scratch
+      - /data/hephaestus/seed:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U hephaestus -d hephaestus"]
       interval: 5s
