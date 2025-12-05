@@ -199,7 +199,7 @@ services:
       KEYCLOAK_CLIENT_ID: hephaestus
       KEYCLOAK_SKIP_LOGIN: ${KEYCLOAK_SKIP_LOGIN:-false}
       # Preview build flag to enable Storybook link in footer
-      PREVIEW_BUILD: "true"
+      WEB_ENV_PREVIEW_BUILD: "true"
       # Optional
       SENTRY_ENVIRONMENT: preview
       SENTRY_DSN: ${SENTRY_DSN:-}
