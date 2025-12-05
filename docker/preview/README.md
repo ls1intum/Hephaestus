@@ -32,8 +32,11 @@ Uses a **privileged init container** to detect and replace Coolify's modified pa
    # Find your base postgres container
    docker ps --format '{{.Names}}' | grep postgres
    
-   # Create the dump (replace <container-name>)
+   # Create the dump (MUST be named dump.sql.gz in the seed directory)
    docker exec <postgres-container> pg_dump -U hephaestus -d hephaestus --clean --if-exists | gzip > /data/hephaestus/seed/dump.sql.gz
+   
+   # Verify the file exists
+   ls -lh /data/hephaestus/seed/dump.sql.gz
    ```
 
 3. **(Optional) Auto-update seed with cron:**
