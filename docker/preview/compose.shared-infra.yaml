@@ -218,7 +218,7 @@ configs:
               "*"
             ],
             "webOrigins": [
-              "+"
+              "*"
             ],
             "notBefore": 0,
             "bearerOnly": false,
@@ -256,7 +256,9 @@ configs:
             "redirectUris": [
               "*"
             ],
-            "webOrigins": ["+"],
+            "webOrigins": [
+              "*"
+            ],
             "notBefore": 0,
             "bearerOnly": false,
             "consentRequired": false,
