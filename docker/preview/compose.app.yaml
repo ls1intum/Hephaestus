@@ -102,6 +102,10 @@ services:
       context: ./server/application-server
       dockerfile: Dockerfile
     restart: unless-stopped
+    # Allow container to reach the public domain for JWT issuer validation
+    # host-gateway resolves to the Docker host IP where Traefik is listening
+    extra_hosts:
+      - "${PREVIEW_DOMAIN}:host-gateway"
     environment:
       SPRING_PROFILES_ACTIVE: prod
       # URL - Coolify provides SERVICE_FQDN_WEBAPP
