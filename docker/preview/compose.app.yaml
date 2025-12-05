@@ -265,3 +265,4 @@ volumes:
   postgres-data:
   hephaestus-seed:
     external: true
+    name: hephaestus-seed
