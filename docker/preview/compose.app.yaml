@@ -42,26 +42,44 @@ services:
   # ---------------------------------------------------------------------------
   # Seed Init Container - Creates symlink to shared seed before postgres starts
   # 
-  # WORKAROUND: Coolify appends -pr-{id} to ALL bind mount paths. This init
-  # container creates a symlink so the modified path points to the real seed.
+  # WORKAROUND: Coolify appends -pr-{id} to ALL bind mount paths for previews.
+  # This init container creates a symlink so the modified path points to shared seed.
+  # For non-preview deployments (develop), symlink creation fails gracefully.
   # ---------------------------------------------------------------------------
   seed-init:
     image: alpine:latest
     command: |
       sh -c '
-        TARGET_DIR="/host-root/data/hephaestus/seed-pr-${PR_ID}"
-        SOURCE_DIR="/host-root/data/hephaestus/seed"
+        # Mount point that Coolify modified (for previews: /data/hephaestus/seed-pr-123)
+        MODIFIED_SOURCE="/data/hephaestus/seed"
+        REAL_SEED="/data/hephaestus/seed"
         
-        if [ ! -e "$TARGET_DIR" ]; then
-          echo "Creating symlink: $TARGET_DIR -> $SOURCE_DIR"
-          ln -s "$SOURCE_DIR" "$TARGET_DIR"
-          echo "Symlink created successfully"
-        else
-          echo "Path already exists: $TARGET_DIR"
+        # If running on host root (for symlink creation), try to create symlink
+        if [ -d /host-root ]; then
+          # Extract PR ID from modified source path if it exists on the host
+          # For previews: MODIFIED_SOURCE will be modified by Coolify at bind mount time
+          # We need to find where Coolify actually mounted it
+          
+          # List all seed-* mounts to find the pattern
+          for mount_path in /host-root/data/hephaestus/seed-*; do
+            if [ -d "$mount_path" ] && [ ! -L "$mount_path" ]; then
+              # This is the modified path - replace it with symlink to real seed
+              SYMLINK_TARGET="$mount_path"
+              rm -rf "$SYMLINK_TARGET"
+              ln -s "$REAL_SEED" "$SYMLINK_TARGET"
+              echo "Created symlink: $SYMLINK_TARGET -> $REAL_SEED"
+              exit 0
+            fi
+          done
+          
+          echo "No seed mount found (not a preview deployment - this is OK)"
+          exit 0
         fi
+        
+        # If no /host-root, just exit - postgres will start with empty database
+        echo "Running in standard container mode"
+        exit 0
       '
-    environment:
-      PR_ID: ${COOLIFY_CONTAINER_NAME##*-pr-}
     volumes:
       - /:/host-root:rw
     privileged: true

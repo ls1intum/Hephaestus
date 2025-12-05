@@ -4,18 +4,18 @@ This directory contains Docker Compose configuration for PR preview deployments 
 
 ## Database Seeding for PR Previews
 
-Uses a **privileged init container** to create symlinks so Coolify's modified paths point to the shared seed.
+Uses a **privileged init container** to detect and replace Coolify's modified paths with symlinks to the shared seed. Works for both preview deployments AND develop branch deployments.
 
 ### How It Works
 
-**The Problem:** Coolify appends `-pr-{id}` suffix to ALL bind mount paths.
+**The Problem:** Coolify appends `-pr-{id}` suffix to bind mount paths during preview deployments, but NOT during develop branch deployments.
 
 **The Solution:**
 
-1. Init container mounts host root filesystem (`/:/host-root`)
-2. Creates symlink: `/data/hephaestus/seed-pr-{id}` → `/data/hephaestus/seed`
-3. When postgres tries to read `/data/hephaestus/seed-pr-{id}`, it follows the symlink to the shared seed
-4. All PRs share the same seed data
+1. Init container scans `/host-root/data/hephaestus/seed-*` for Coolify's modified mounts
+2. If found (preview deployment): creates symlink pointing to `/data/hephaestus/seed`
+3. If not found (develop deployment or first run): exits gracefully
+4. Postgres mounts the (possibly symlinked) path and reads seed data
 
 ### Setup on Server (one-time)
 
