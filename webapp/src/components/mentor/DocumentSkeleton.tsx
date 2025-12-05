@@ -12,7 +12,7 @@ export const DocumentSkeleton = ({
 			<Skeleton className="h-5 w-full" />
 			<Skeleton className="h-5 w-full" />
 			<Skeleton className="h-5 w-1/3" />
-			<div className="h-5 w-52" />
+			<Skeleton className="h-5 w-52" />
 			<Skeleton className="h-8 w-52" />
 			<Skeleton className="h-5 w-2/3" />
 		</div>

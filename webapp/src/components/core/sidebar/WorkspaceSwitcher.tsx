@@ -66,7 +66,7 @@ export function WorkspaceSwitcher({
 			<SidebarMenu>
 				<SidebarMenuItem>
 					<SidebarMenuButton size="lg" className="pointer-events-none">
-						<Skeleton className="flex aspect-square size-8 items-center justify-center rounded-lg" />
+						<Skeleton className="aspect-square size-8 rounded-lg" />
 						<div className="grid flex-1 text-left text-sm leading-tight gap-1 group-data-[collapsible=icon]:hidden">
 							<Skeleton className="h-3 w-20" />
 							<Skeleton className="h-2.5 w-12" />
