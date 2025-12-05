@@ -82,10 +82,18 @@ services:
       PGPASSWORD: ${POSTGRES_PASSWORD:-hephaestus-preview}
       SERVICE_NAME_POSTGRES: ${SERVICE_NAME_POSTGRES:-}
       COOLIFY_RESOURCE_UUID: ${COOLIFY_RESOURCE_UUID:-}
+      SERVICE_FQDN_APPLICATION_SERVER: ${SERVICE_FQDN_APPLICATION_SERVER:-}
+      SERVICE_FQDN_WEBAPP: ${SERVICE_FQDN_WEBAPP:-}
     command: |
       sh -c '
         set -e
         apk add --no-cache docker-cli 2>/dev/null
+
+        # Skip seeding on non-PR (develop/main) deployments: require pr-prefixed FQDN
+        if ! echo "${SERVICE_FQDN_APPLICATION_SERVER}${SERVICE_FQDN_WEBAPP}" | grep -Eq "pr[0-9]"; then
+          echo "Skipping seed-loader: non-PR deployment detected"
+          exit 0
+        fi
 
         # Find base postgres volume (non-PR)
         BASE_VOL=$$(docker volume ls --format "{{.Name}}" | grep "postgres-data" | grep -v "pr-" | head -1 || true)
@@ -122,14 +130,35 @@ services:
         # Dump from base (running or temp) into temp and restore into preview DB via docker exec (no DNS needed)
         PREVIEW_PG=${SERVICE_NAME_POSTGRES:-}
         UUID=${COOLIFY_RESOURCE_UUID:-}
+        APP_FQDN=${SERVICE_FQDN_APPLICATION_SERVER:-}
 
-        # If SERVICE_NAME_POSTGRES not provided, derive deterministically: match postgres-* containing the resource UUID (avoids cross-PR collisions)
-        if [ -z "$$PREVIEW_PG" ]; then
-          if [ -n "$$UUID" ]; then
-            PREVIEW_PG=$(docker ps --format "{{.Names}}" | grep '^postgres-' | grep "$$UUID" | head -1 || true)
-          else
-            PREVIEW_PG=$(docker ps --format "{{.Names}}" | grep '^postgres-' | grep 'pr-' | head -1 || true)
+        # Derive PR id from FQDN (expects pr{ID}.api...)
+        PR_ID=""
+        if [ -n "$$APP_FQDN" ]; then
+          PR_ID=$(echo "$APP_FQDN" | sed -n 's/^pr\([0-9]\+\)\.*/\1/p')
+        fi
+
+        # Compose project name (from Coolify project-name if set), fallback to known identifier
+        PROJECT_NAME=${COMPOSE_PROJECT_NAME:-wg44k0ccsoscsgcco8swc4ks}
+
+        # Resolution priority: explicit env -> UUID match -> PR+project pattern -> project pattern -> generic pr-
+        if [ -z "$$PREVIEW_PG" ] && [ -n "$$UUID" ]; then
+          PREVIEW_PG=$(docker ps --format "{{.Names}}" | grep "^postgres-" | grep "$$UUID" | head -1 || true)
+        fi
+
+        if [ -z "$$PREVIEW_PG" ] && [ -n "$$PR_ID" ]; then
+          PREVIEW_PG="postgres-$$PROJECT_NAME-pr-$$PR_ID"
+          if ! docker ps --format "{{.Names}}" | grep -qx "$$PREVIEW_PG"; then
+            PREVIEW_PG=""
           fi
+        fi
+
+        if [ -z "$$PREVIEW_PG" ]; then
+          PREVIEW_PG=$(docker ps --format "{{.Names}}" | grep "^postgres-$$PROJECT_NAME-pr-" | head -1 || true)
+        fi
+
+        if [ -z "$$PREVIEW_PG" ]; then
+          PREVIEW_PG=$(docker ps --format "{{.Names}}" | grep '^postgres-' | grep 'pr-' | head -1 || true)
         fi
 
         if [ -z "$$PREVIEW_PG" ]; then
