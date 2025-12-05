@@ -5,23 +5,31 @@
 # Coolify deploys this for each Pull Request automatically.
 # Each PR gets its own isolated stack with its own Postgres database.
 #
-# Coolify Setup:
+# Coolify Setup (ONE-TIME on main application):
 #   1. Create Application → Docker Compose (from Git repository)
 #   2. Point to: docker/preview/compose.app.yaml
 #   3. Enable "Connect to Predefined Network" to access shared infra
 #   4. Enable Preview Deployments in the application settings
 #   5. Configure environment variables (see .env.example)
-#   6. Assign domain in Coolify UI for webapp service
+#   6. Configure domains in Coolify UI (General tab) on the MAIN application:
+#      - webapp: https://hephaestus.example.com
+#      - application-server: https://api.hephaestus.example.com
 #
-# Coolify Magic Variables Used:
-#   - SERVICE_FQDN_WEBAPP: Auto-generated domain for webapp (e.g., pr123.domain.com)
-#   - SERVICE_FQDN_API=/api: Auto-generated domain with /api path for application-server
-#   - SERVICE_NAME_POSTGRES: Container name for postgres (e.g., postgres-pr-123)
-#   - SERVICE_NAME_INTELLIGENCE_SERVICE: Container name for intelligence-service
-#   - COOLIFY_BRANCH: Branch name (used to identify PR)
+#   Preview deployments will AUTOMATICALLY get domains like:
+#      - webapp: https://{{pr_id}}.hephaestus.example.com
+#      - application-server: https://{{pr_id}}.api.hephaestus.example.com
 #
-# IMPORTANT: When clicking "Generate Domain" in Coolify UI for application-server,
-#            Coolify will automatically append /api to the domain because of SERVICE_FQDN_API=/api
+# GitHub Actions Variables (set in repo settings):
+#   - PREVIEW_HOSTNAME: e.g., hephaestus.example.com
+#   - PREVIEW_API_HOSTNAME: e.g., api.hephaestus.example.com
+#
+# Coolify Auto-Generated Variables:
+#   - SERVICE_FQDN_WEBAPP: Domain for webapp (host only, no scheme)
+#   - SERVICE_URL_WEBAPP: Full URL for webapp (with https://)
+#   - SERVICE_FQDN_APPLICATION_SERVER: Domain for API (host only)  
+#   - SERVICE_URL_APPLICATION_SERVER: Full URL for API (with https://)
+#   - SERVICE_NAME_<SERVICE>: Container name (e.g., postgres-wg44k0c-pr-557)
+#   - COOLIFY_CONTAINER_NAME: Unique container identifier
 #
 # Connects to shared infrastructure services (from compose.shared-infra.yaml):
 #   - nats-server: Message queue
@@ -101,7 +109,8 @@ services:
 
   # ---------------------------------------------------------------------------
   # Application Server - Spring Boot backend
-  # When clicking "Generate Domain" in Coolify UI, it will automatically include /api
+  # Main app domain (set once): https://api.hephaestus.example.com
+  # Previews auto-generate: https://{{pr_id}}.api.hephaestus.example.com
   # ---------------------------------------------------------------------------
   application-server:
     build:
@@ -109,10 +118,6 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     environment:
-      # Coolify Magic: This tells Coolify to auto-generate domain with /api path
-      # When you click "Generate Domain" in Coolify UI, it will generate: https://pr-{id}.domain.com/api
-      # The _8080 suffix tells Coolify to route to port 8080
-      SERVICE_FQDN_API_8080: /api
       SPRING_PROFILES_ACTIVE: prod
       # URL - Coolify provides SERVICE_FQDN_WEBAPP
       APPLICATION_HOST_URL: https://${SERVICE_FQDN_WEBAPP}
@@ -183,7 +188,8 @@ services:
     environment:
       # Coolify provides SERVICE_FQDN_WEBAPP automatically
       APPLICATION_CLIENT_URL: https://${SERVICE_FQDN_WEBAPP}
-      APPLICATION_SERVER_URL: https://${SERVICE_FQDN_WEBAPP}/api
+      # Coolify provides SERVICE_FQDN_APPLICATION_SERVER (e.g., {{pr_id}}.api.example.com)
+      APPLICATION_SERVER_URL: https://${SERVICE_FQDN_APPLICATION_SERVER}
       # Shared Keycloak
       KEYCLOAK_URL: https://${PREVIEW_DOMAIN:?Required}/keycloak
       KEYCLOAK_REALM: hephaestus
