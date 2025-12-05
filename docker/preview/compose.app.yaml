@@ -43,33 +43,43 @@ services:
   # Seed Init Container - Creates symlink to shared seed before postgres starts
   # 
   # WORKAROUND: Coolify appends -pr-{id} to ALL bind mount paths for previews.
-  # This init container scans for the modified path and creates a symlink.
+  # This init container runs once to create a symlink.
   # For non-preview deployments (develop), exits gracefully.
   # ---------------------------------------------------------------------------
   seed-init:
     image: alpine:latest
     command: |
       sh -c '
-        # Scan for Coolify-modified seed paths (pattern: /data/hephaestus/seed-*)
-        for mount_path in /host-root/data/hephaestus/seed-*; do
-          if [ -d "$mount_path" ] && [ ! -L "$mount_path" ]; then
-            # This is the modified path by Coolify
-            REAL_SEED="/host-root/data/hephaestus/seed"
+        set -e
+        
+        # Give the host mount time to stabilize
+        sleep 2
+        
+        # Check if host root is mounted
+        if [ ! -d /host-root/data ]; then
+          echo "Host root not available - not a preview deployment"
+          exit 0
+        fi
+        
+        # Find the PR-suffixed seed path (only check if it exists and is a directory)
+        for seed_mount in /host-root/data/hephaestus/seed-pr-*; do
+          if [ -d "$seed_mount" ] && [ ! -L "$seed_mount" ]; then
+            # Found the Coolify-modified path, replace it with symlink
+            real_seed="/host-root/data/hephaestus/seed"
             
-            if [ -d "$REAL_SEED" ]; then
-              # Replace modified path with symlink to real seed
-              rm -rf "$mount_path"
-              ln -s "$REAL_SEED" "$mount_path"
-              echo "Created symlink: $mount_path -> $REAL_SEED"
+            if [ -d "$real_seed" ]; then
+              rm -rf "$seed_mount"
+              ln -s "$real_seed" "$seed_mount"
+              echo "✓ Created symlink: $seed_mount -> $real_seed"
               exit 0
             else
-              echo "Seed directory not found at $REAL_SEED"
+              echo "✗ Real seed not found at $real_seed"
               exit 0
             fi
           fi
         done
         
-        echo "No seed mount found (not a preview deployment or already symlinked)"
+        echo "✓ No PR-suffixed seed mount found (seed will be created by Liquibase)"
         exit 0
       '
     volumes:
