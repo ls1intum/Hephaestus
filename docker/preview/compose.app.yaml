@@ -85,31 +85,42 @@ services:
         set -e
         apk add --no-cache docker-cli 2>/dev/null
 
-        # Find base postgres container (non-PR). Prefer running; fall back to stopped and start temporarily.
-        BASE_CTN=$(docker ps --format "{{.Names}}" | grep postgres | grep -v "pr-" | head -1 || true)
-        BASE_WAS_STARTED=0
+        # Find base postgres volume (non-PR)
+        BASE_VOL=$(docker volume ls --format "{{.Name}}" | grep "postgres-data" | grep -v "pr-" | head -1 || true)
 
-        if [ -z "$BASE_CTN" ]; then
-          BASE_CTN=$(docker ps -a --format "{{.Names}}" | grep postgres | grep -v "pr-" | head -1 || true)
-          if [ -z "$BASE_CTN" ]; then
-            echo "✗ No base postgres container found; Liquibase will initialize schema"
-            exit 0
-          fi
-          echo "Base container found stopped: $BASE_CTN (starting temporarily)"
-          docker start "$BASE_CTN" >/tmp/base-start.log 2>/tmp/base-start.err || {
-            echo "✗ Failed to start base container; falling back to Liquibase"
+        if [ -z "$$BASE_VOL" ]; then
+          echo "✗ No base postgres volume found; Liquibase will initialize schema"
+          exit 0
+        fi
+
+        echo "Using base volume: $$BASE_VOL"
+
+        # If a running base container exists, reuse it; otherwise start a temporary one
+        BASE_CTN=$(docker ps --format "{{.Names}}" | grep postgres | grep -v "pr-" | head -1 || true)
+        TEMP_STARTED=0
+
+        if [ -z "$$BASE_CTN" ]; then
+          BASE_CTN="seed-base-$$RANDOM"
+          echo "Starting temporary postgres from base volume: $$BASE_CTN"
+          docker run -d --name "$$BASE_CTN" -v "$$BASE_VOL":/var/lib/postgresql/data postgres:17-alpine >/tmp/base-start.log 2>/tmp/base-start.err || {
+            echo "✗ Failed to start temporary base container; falling back to Liquibase"
             cat /tmp/base-start.err || true
             exit 0
           }
-          BASE_WAS_STARTED=1
+          TEMP_STARTED=1
+          # Wait for readiness
+          for i in $(seq 1 10); do
+            if docker exec "$$BASE_CTN" pg_isready -U hephaestus -d hephaestus >/dev/null 2>&1; then break; fi
+            sleep 2
+          done
         else
-          echo "Using running base container: $BASE_CTN"
+          echo "Using running base container: $$BASE_CTN"
         fi
 
-        # Dump from base container into temp and restore into preview DB
-        if docker exec "$BASE_CTN" pg_dump -U hephaestus -d hephaestus --clean --if-exists > /tmp/dump.sql 2>/tmp/dump.err; then
+        # Dump from base (running or temp) into temp and restore into preview DB
+        if docker exec "$$BASE_CTN" pg_dump -U hephaestus -d hephaestus --clean --if-exists > /tmp/dump.sql 2>/tmp/dump.err; then
           if [ -s /tmp/dump.sql ]; then
-            echo "Loading seed from base container..."
+            echo "Loading seed from base..."
             psql -h postgres -U hephaestus -d hephaestus < /tmp/dump.sql && echo "✓ Seed loaded successfully" || echo "✗ Failed to restore database (Liquibase will create schema)"
           else
             echo "✓ Dump was empty; Liquibase will initialize schema"
@@ -120,11 +131,11 @@ services:
           echo "✓ Database will be initialized by Liquibase"
         fi
 
-        # If we started the base container, stop it to leave host state unchanged.
-        if [ "$BASE_WAS_STARTED" -eq 1 ]; then
-          echo "Stopping base container we started: $BASE_CTN"
-          docker stop "$BASE_CTN" >/tmp/base-stop.log 2>/tmp/base-stop.err || {
-            echo "! Warning: failed to stop base container; check /tmp/base-stop.err"
+        # Stop temp container if we started one
+        if [ "$$TEMP_STARTED" -eq 1 ]; then
+          echo "Stopping temporary base container: $$BASE_CTN"
+          docker rm -f "$$BASE_CTN" >/tmp/base-stop.log 2>/tmp/base-stop.err || {
+            echo "! Warning: failed to stop temporary base container; check /tmp/base-stop.err"
             cat /tmp/base-stop.err || true
           }
         fi
