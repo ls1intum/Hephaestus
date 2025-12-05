@@ -14,6 +14,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 
 /**
  * Interface for repository item
@@ -125,7 +126,7 @@ export function AdminRepositoriesSettings({
 								))}{" "}
 								{isLoading && (
 									<div className="flex items-center justify-center py-4">
-										<div className="animate-pulse h-8 w-32 bg-muted rounded" />
+										<Skeleton className="h-8 w-32" />
 									</div>
 								)}
 								{error && (

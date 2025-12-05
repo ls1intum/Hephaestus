@@ -17,6 +17,7 @@ import {
 	SidebarMenuItem,
 	useSidebar,
 } from "@/components/ui/sidebar";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export function WorkspaceSwitcher({
 	workspaces,
@@ -65,10 +66,10 @@ export function WorkspaceSwitcher({
 			<SidebarMenu>
 				<SidebarMenuItem>
 					<SidebarMenuButton size="lg" className="pointer-events-none">
-						<div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary/10 animate-pulse" />
+						<Skeleton className="flex aspect-square size-8 items-center justify-center rounded-lg" />
 						<div className="grid flex-1 text-left text-sm leading-tight gap-1 group-data-[collapsible=icon]:hidden">
-							<div className="h-3 w-20 rounded bg-sidebar-primary/10 animate-pulse" />
-							<div className="h-2.5 w-12 rounded bg-sidebar-primary/10 animate-pulse" />
+							<Skeleton className="h-3 w-20" />
+							<Skeleton className="h-2.5 w-12" />
 						</div>
 						<ChevronsUpDown className="ml-auto size-4 opacity-50 group-data-[collapsible=icon]:hidden" />
 					</SidebarMenuButton>
