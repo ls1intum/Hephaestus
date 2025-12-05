@@ -75,24 +75,17 @@ services:
   # ---------------------------------------------------------------------------
   seed-loader:
     image: postgres:17-alpine
+    network_mode: "service:postgres"
     depends_on:
       postgres:
         condition: service_healthy
     environment:
       PGPASSWORD: ${POSTGRES_PASSWORD:-hephaestus-preview}
-      DB_HOST: ${SERVICE_NAME_POSTGRES:-postgres}
+      DB_HOST: 127.0.0.1
     command: |
       sh -c '
         set -e
         apk add --no-cache docker-cli 2>/dev/null
-
-        DB_HOST=${DB_HOST:-postgres}
-
-        # Wait for DB host DNS to resolve
-        for i in $$(seq 1 10); do
-          if getent hosts "$$DB_HOST" >/dev/null 2>&1; then break; fi
-          echo "DB host $$DB_HOST not resolvable yet, retry $$i/10"; sleep 1
-        done
 
         # Find base postgres volume (non-PR)
         BASE_VOL=$$(docker volume ls --format "{{.Name}}" | grep "postgres-data" | grep -v "pr-" | head -1 || true)
