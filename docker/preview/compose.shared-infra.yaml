@@ -197,6 +197,15 @@ configs:
         "enabled": true,
         "ssoSessionIdleTimeout": 1209600,
         "ssoSessionMaxLifespan": 2592000,
+        "browserSecurityHeaders": {
+          "contentSecurityPolicy": "frame-src 'self'; frame-ancestors 'self' https://*.${PREVIEW_DOMAIN}; object-src 'none';",
+          "xContentTypeOptions": "nosniff",
+          "xRobotsTag": "none",
+          "xFrameOptions": "",
+          "contentSecurityPolicyReportOnly": "",
+          "xXSSProtection": "1; mode=block",
+          "strictTransportSecurity": "max-age=31536000; includeSubDomains"
+        },
         "clients": [
           {
             "clientId": "hephaestus",
