@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import environment from "@/environment";
 
 export default function Footer() {
-	const isPreviewBuild = environment.previewBuild === "true";
+	const includeStorybook = environment.includeStorybook === "true";
 
 	return (
 		<footer className="py-2 md:px-8 bg-sidebar border-sidebar-border border-t">
@@ -16,7 +16,7 @@ export default function Footer() {
 								<Link to="/about">About</Link>
 							</Button>
 
-							{isPreviewBuild && (
+							{includeStorybook && (
 								<Button variant="link" size="none" asChild>
 									<a
 										href="/storybook"

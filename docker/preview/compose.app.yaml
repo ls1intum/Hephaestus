@@ -314,7 +314,7 @@ services:
       KEYCLOAK_REALM: hephaestus
       KEYCLOAK_CLIENT_ID: hephaestus
       KEYCLOAK_SKIP_LOGIN: ${KEYCLOAK_SKIP_LOGIN:-false}
-      PREVIEW_STORYBOOK: "true"
+      DEV_INCLUDE_STORYBOOK: "true"
       TANSTACK_DEVTOOLS_ENABLED: ${TANSTACK_DEVTOOLS_ENABLED:-true}
       # Optional
       SENTRY_ENVIRONMENT: preview
