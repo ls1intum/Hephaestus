@@ -3,7 +3,8 @@ import Footer from "./Footer";
 
 /**
  * Footer component displays navigation links and attribution information for the Hephaestus application.
- * It includes links to About, Releases, Feature requests, Privacy, Imprint, and project information.
+ * It includes links to About, Releases, Privacy, Imprint, and project information.
+ * In preview deployments, an additional Storybook link is displayed for easy access to the component library.
  */
 const meta = {
 	component: Footer,
@@ -13,7 +14,7 @@ const meta = {
 		docs: {
 			description: {
 				component:
-					"A responsive footer providing navigation and attribution information for the Hephaestus application.",
+					"A responsive footer providing navigation and attribution information for the Hephaestus application. In preview deployments, includes a link to the bundled Storybook component library.",
 			},
 		},
 	},
