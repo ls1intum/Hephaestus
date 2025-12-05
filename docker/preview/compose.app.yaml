@@ -80,6 +80,8 @@ services:
         condition: service_healthy
     environment:
       PGPASSWORD: ${POSTGRES_PASSWORD:-hephaestus-preview}
+      SERVICE_NAME_POSTGRES: ${SERVICE_NAME_POSTGRES:-}
+      COOLIFY_RESOURCE_UUID: ${COOLIFY_RESOURCE_UUID:-}
     command: |
       sh -c '
         set -e
@@ -118,7 +120,22 @@ services:
         fi
 
         # Dump from base (running or temp) into temp and restore into preview DB via docker exec (no DNS needed)
-        PREVIEW_PG=${SERVICE_NAME_POSTGRES:-postgres}
+        PREVIEW_PG=${SERVICE_NAME_POSTGRES:-}
+        UUID=${COOLIFY_RESOURCE_UUID:-}
+
+        # If SERVICE_NAME_POSTGRES not provided, derive deterministically: match postgres-* containing the resource UUID (avoids cross-PR collisions)
+        if [ -z "$$PREVIEW_PG" ]; then
+          if [ -n "$$UUID" ]; then
+            PREVIEW_PG=$(docker ps --format "{{.Names}}" | grep '^postgres-' | grep "$$UUID" | head -1 || true)
+          else
+            PREVIEW_PG=$(docker ps --format "{{.Names}}" | grep '^postgres-' | grep 'pr-' | head -1 || true)
+          fi
+        fi
+
+        if [ -z "$$PREVIEW_PG" ]; then
+          echo "✗ Could not resolve preview postgres container (expected SERVICE_NAME_POSTGRES or postgres-*pr-*)."
+          exit 1
+        fi
 
         if docker exec "$$BASE_CTN" pg_dump -U hephaestus -d hephaestus --clean --if-exists > /tmp/dump.sql 2>/tmp/dump.err; then
           if [ -s /tmp/dump.sql ]; then
