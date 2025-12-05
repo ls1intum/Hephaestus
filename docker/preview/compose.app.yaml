@@ -15,6 +15,8 @@
 #
 # Coolify Magic Variables Used:
 #   - SERVICE_FQDN_WEBAPP: Auto-generated domain for webapp
+#   - SERVICE_NAME_POSTGRES: Container name for postgres (e.g., postgres-pr-123)
+#   - SERVICE_NAME_INTELLIGENCE_SERVICE: Container name for intelligence-service
 #   - COOLIFY_BRANCH: Branch name (used to identify PR)
 #
 # Connects to shared infrastructure services (from compose.shared-infra.yaml):
@@ -57,8 +59,8 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     environment:
-      # Database - use Coolify's service naming
-      DATABASE_URL: postgresql://postgres:5432/hephaestus
+      # Database - Coolify provides SERVICE_NAME_POSTGRES with the correct container name
+      DATABASE_URL: postgresql://${SERVICE_NAME_POSTGRES:-postgres}:5432/hephaestus
       DATABASE_USERNAME: hephaestus
       DATABASE_PASSWORD: ${POSTGRES_PASSWORD:-hephaestus-preview}
       # AI Models
@@ -106,12 +108,12 @@ services:
       SPRING_PROFILES_ACTIVE: prod
       # URL - Coolify provides SERVICE_FQDN_WEBAPP
       APPLICATION_HOST_URL: https://${SERVICE_FQDN_WEBAPP}
-      # Database - internal service reference
-      DATABASE_URL: postgresql://postgres:5432/hephaestus
+      # Database - Coolify provides SERVICE_NAME_POSTGRES with the correct container name
+      DATABASE_URL: postgresql://${SERVICE_NAME_POSTGRES:-postgres}:5432/hephaestus
       DATABASE_USERNAME: hephaestus
       DATABASE_PASSWORD: ${POSTGRES_PASSWORD:-hephaestus-preview}
-      # Internal service reference
-      INTELLIGENCE_SERVICE_URL: http://intelligence-service:5000
+      # Internal service - Coolify provides SERVICE_NAME_INTELLIGENCE_SERVICE
+      INTELLIGENCE_SERVICE_URL: http://${SERVICE_NAME_INTELLIGENCE_SERVICE:-intelligence-service}:5000
       # Shared infrastructure (must match shared-infra service names with UUID suffix)
       # When "Connect to Predefined Network" is enabled, use the full container names
       NATS_SERVER: nats://nats-server:4222
