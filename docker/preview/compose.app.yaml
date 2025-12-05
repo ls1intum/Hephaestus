@@ -81,34 +81,31 @@ services:
     environment:
       PGPASSWORD: ${POSTGRES_PASSWORD:-hephaestus-preview}
       SERVICE_NAME_POSTGRES: ${SERVICE_NAME_POSTGRES:-}
-      COOLIFY_RESOURCE_UUID: ${COOLIFY_RESOURCE_UUID:-}
       SERVICE_FQDN_APPLICATION_SERVER: ${SERVICE_FQDN_APPLICATION_SERVER:-}
       SERVICE_FQDN_WEBAPP: ${SERVICE_FQDN_WEBAPP:-}
     command: |
       sh -c '
         set -e
-        apk add --no-cache docker-cli 2>/dev/null
+        apk add --no-cache docker-cli >/tmp/apk.log 2>&1
 
-        # Skip seeding on non-PR (develop/main) deployments: require pr-prefixed FQDN
-        if ! echo "${SERVICE_FQDN_APPLICATION_SERVER}${SERVICE_FQDN_WEBAPP}" | grep -Eq "pr[0-9]"; then
+        APP_FQDN="${SERVICE_FQDN_APPLICATION_SERVER:-${SERVICE_FQDN_WEBAPP:-}}"
+        if ! echo "$$APP_FQDN" | grep -Eq "^pr[0-9]+"; then
           echo "Skipping seed-loader: non-PR deployment detected"
           exit 0
         fi
 
-        # Find base postgres volume (non-PR)
-        BASE_VOL=$$(docker volume ls --format "{{.Name}}" | grep "postgres-data" | grep -v "pr-" | head -1 || true)
+        PR_ID=$$(echo "$$APP_FQDN" | sed -n "s/^pr\\([0-9]\\+\\).*/\\1/p")
+        PROJECT_NAME=${COMPOSE_PROJECT_NAME:-}
 
+        BASE_VOL=$$(docker volume ls --format "{{.Name}}" | grep "postgres-data" | grep -v "pr-" | head -1 || true)
         if [ -z "$$BASE_VOL" ]; then
           echo "✗ No base postgres volume found; Liquibase will initialize schema"
           exit 0
         fi
-
         echo "Using base volume: $$BASE_VOL"
 
-        # If a running base container exists, reuse it; otherwise start a temporary one
-        BASE_CTN=$$(docker ps --format "{{.Names}}" | grep postgres | grep -v "pr-" | head -1 || true)
+        BASE_CTN=$$(docker ps --format "{{.Names}}" | grep "^postgres-" | grep -v "pr-" | head -1 || true)
         TEMP_STARTED=0
-
         if [ -z "$$BASE_CTN" ]; then
           BASE_CTN="seed-base-$$RANDOM"
           echo "Starting temporary postgres from base volume: $$BASE_CTN"
@@ -118,7 +115,6 @@ services:
             exit 0
           }
           TEMP_STARTED=1
-          # Wait for readiness
           for i in $$(seq 1 10); do
             if docker exec "$$BASE_CTN" pg_isready -U hephaestus -d hephaestus >/dev/null 2>&1; then break; fi
             sleep 2
@@ -127,38 +123,20 @@ services:
           echo "Using running base container: $$BASE_CTN"
         fi
 
-        # Dump from base (running or temp) into temp and restore into preview DB via docker exec (no DNS needed)
         PREVIEW_PG=${SERVICE_NAME_POSTGRES:-}
-        UUID=${COOLIFY_RESOURCE_UUID:-}
-        APP_FQDN=${SERVICE_FQDN_APPLICATION_SERVER:-}
-
-        # Derive PR id from FQDN (expects pr{ID}.api...)
-        PR_ID=""
-        if [ -n "$$APP_FQDN" ]; then
-          PR_ID=$(echo "$APP_FQDN" | sed -n 's/^pr\([0-9]\+\)\.*/\1/p')
-        fi
-
-        # Compose project name (from Coolify project-name if set), fallback to known identifier
-        PROJECT_NAME=${COMPOSE_PROJECT_NAME:-wg44k0ccsoscsgcco8swc4ks}
-
-        # Resolution priority: explicit env -> UUID match -> PR+project pattern -> project pattern -> generic pr-
-        if [ -z "$$PREVIEW_PG" ] && [ -n "$$UUID" ]; then
-          PREVIEW_PG=$(docker ps --format "{{.Names}}" | grep "^postgres-" | grep "$$UUID" | head -1 || true)
+        if [ -n "$$PREVIEW_PG" ] && ! docker ps --format "{{.Names}}" | grep -qx "$$PREVIEW_PG"; then
+          PREVIEW_PG=""
         fi
 
         if [ -z "$$PREVIEW_PG" ] && [ -n "$$PR_ID" ]; then
-          PREVIEW_PG="postgres-$$PROJECT_NAME-pr-$$PR_ID"
-          if ! docker ps --format "{{.Names}}" | grep -qx "$$PREVIEW_PG"; then
-            PREVIEW_PG=""
+          CANDIDATE="postgres-$$PROJECT_NAME-pr-$$PR_ID"
+          if docker ps --format "{{.Names}}" | grep -qx "$$CANDIDATE"; then
+            PREVIEW_PG="$$CANDIDATE"
           fi
         fi
 
         if [ -z "$$PREVIEW_PG" ]; then
-          PREVIEW_PG=$(docker ps --format "{{.Names}}" | grep "^postgres-$$PROJECT_NAME-pr-" | head -1 || true)
-        fi
-
-        if [ -z "$$PREVIEW_PG" ]; then
-          PREVIEW_PG=$(docker ps --format "{{.Names}}" | grep '^postgres-' | grep 'pr-' | head -1 || true)
+          PREVIEW_PG=$$(docker ps --format "{{.Names}}" | grep "^postgres-" | grep "pr-" | head -1 || true)
         fi
 
         if [ -z "$$PREVIEW_PG" ]; then
@@ -183,7 +161,6 @@ services:
           echo "✓ Database will be initialized by Liquibase"
         fi
 
-        # Stop temp container if we started one
         if [ "$$TEMP_STARTED" -eq 1 ]; then
           echo "Stopping temporary base container: $$BASE_CTN"
           docker rm -f "$$BASE_CTN" >/tmp/base-stop.log 2>/tmp/base-stop.err || {
@@ -194,7 +171,6 @@ services:
         exit 0
       '
     volumes:
-      # Docker socket required to access base postgres container
       - /var/run/docker.sock:/var/run/docker.sock:ro
     restart: "no"
 
