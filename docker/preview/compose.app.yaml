@@ -99,7 +99,12 @@ services:
       '
     volumes:
       # Mount external named volume (NOT subject to Coolify path modification)
-      - hephaestus-seed:/seed:ro
+      - type: volume
+        source: hephaestus-seed
+        target: /seed
+        read_only: true
+        volume:
+          nocopy: true
     restart: "no"
 
   # ---------------------------------------------------------------------------

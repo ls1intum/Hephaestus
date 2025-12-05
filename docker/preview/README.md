@@ -10,7 +10,7 @@ Uses an **external Docker named volume** (`hephaestus-seed`) that is created onc
 
 **Key Insight:** Coolify modifies **bind mount paths** but NOT **named volume names**!
 
-1. Create external volume `hephaestus-seed` once on host
+1. Create external volume `hephaestus-seed` once on host (name is pinned via `name: hephaestus-seed` so Coolify must find this exact volume)
 2. Populate it with `dump.sql.gz` (done once, manually or via cron)
 3. Each preview deployment mounts the same external volume
 4. seed-loader reads the dump and restores it
