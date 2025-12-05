@@ -14,6 +14,7 @@ Uses the **main (non-PR) postgres data volume** via Docker socket: seed-loader w
 2. seed-loader (in previews) uses Docker socket to either reuse a running base container or spin up a temporary postgres container with the base volume attached, then `pg_dump`.
 3. seed-loader pipes the dump into the preview postgres via `psql`.
 4. Graceful fallback if the base volume is missing or dump fails.
+5. DB host is configurable via `SERVICE_NAME_POSTGRES`; defaults to `postgres` with a short DNS retry loop.
 
 ### Setup on Server (one-time)
 

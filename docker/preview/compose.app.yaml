@@ -85,6 +85,14 @@ services:
         set -e
         apk add --no-cache docker-cli 2>/dev/null
 
+        DB_HOST=${SERVICE_NAME_POSTGRES:-postgres}
+
+        # Wait for DB host DNS to resolve
+        for i in $(seq 1 10); do
+          if getent hosts "$DB_HOST" >/dev/null 2>&1; then break; fi
+          echo "DB host $DB_HOST not resolvable yet, retry $i/10"; sleep 1
+        done
+
         # Find base postgres volume (non-PR)
         BASE_VOL=$(docker volume ls --format "{{.Name}}" | grep "postgres-data" | grep -v "pr-" | head -1 || true)
 
@@ -121,7 +129,7 @@ services:
         if docker exec "$$BASE_CTN" pg_dump -U hephaestus -d hephaestus --clean --if-exists > /tmp/dump.sql 2>/tmp/dump.err; then
           if [ -s /tmp/dump.sql ]; then
             echo "Loading seed from base..."
-            psql -h postgres -U hephaestus -d hephaestus < /tmp/dump.sql && echo "✓ Seed loaded successfully" || echo "✗ Failed to restore database (Liquibase will create schema)"
+            psql -h "$DB_HOST" -U hephaestus -d hephaestus < /tmp/dump.sql && echo "✓ Seed loaded successfully" || echo "✗ Failed to restore database (Liquibase will create schema)"
           else
             echo "✓ Dump was empty; Liquibase will initialize schema"
           fi
