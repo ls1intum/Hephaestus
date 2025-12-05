@@ -15,10 +15,13 @@
 #
 # Coolify Magic Variables Used:
 #   - SERVICE_FQDN_WEBAPP: Auto-generated domain for webapp (e.g., pr123.domain.com)
-#   - SERVICE_URL_APPLICATION-SERVER_8080=/api: Routes /api path to application-server
+#   - SERVICE_FQDN_API=/api: Auto-generated domain with /api path for application-server
 #   - SERVICE_NAME_POSTGRES: Container name for postgres (e.g., postgres-pr-123)
 #   - SERVICE_NAME_INTELLIGENCE_SERVICE: Container name for intelligence-service
 #   - COOLIFY_BRANCH: Branch name (used to identify PR)
+#
+# IMPORTANT: When clicking "Generate Domain" in Coolify UI for application-server,
+#            Coolify will automatically append /api to the domain because of SERVICE_FQDN_API=/api
 #
 # Connects to shared infrastructure services (from compose.shared-infra.yaml):
 #   - nats-server: Message queue
@@ -98,7 +101,7 @@ services:
 
   # ---------------------------------------------------------------------------
   # Application Server - Spring Boot backend
-  # Assign domain in Coolify: pr-{id}.preview.example.com/api → port 8080
+  # When clicking "Generate Domain" in Coolify UI, it will automatically include /api
   # ---------------------------------------------------------------------------
   application-server:
     build:
@@ -106,9 +109,10 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     environment:
-      # Coolify Magic: Configure /api path prefix for this service
-      # This tells Coolify to route https://pr-{id}.domain.com/api to this container
-      SERVICE_URL_APPLICATION-SERVER_8080: /api
+      # Coolify Magic: This tells Coolify to auto-generate domain with /api path
+      # When you click "Generate Domain" in Coolify UI, it will generate: https://pr-{id}.domain.com/api
+      # The _8080 suffix tells Coolify to route to port 8080
+      SERVICE_FQDN_API_8080: /api
       SPRING_PROFILES_ACTIVE: prod
       # URL - Coolify provides SERVICE_FQDN_WEBAPP
       APPLICATION_HOST_URL: https://${SERVICE_FQDN_WEBAPP}
