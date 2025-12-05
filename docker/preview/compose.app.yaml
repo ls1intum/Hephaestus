@@ -14,7 +14,8 @@
 #   6. Assign domain in Coolify UI for webapp service
 #
 # Coolify Magic Variables Used:
-#   - SERVICE_FQDN_WEBAPP: Auto-generated domain for webapp
+#   - SERVICE_FQDN_WEBAPP: Auto-generated domain for webapp (e.g., pr123.domain.com)
+#   - SERVICE_URL_APPLICATION-SERVER_8080=/api: Routes /api path to application-server
 #   - SERVICE_NAME_POSTGRES: Container name for postgres (e.g., postgres-pr-123)
 #   - SERVICE_NAME_INTELLIGENCE_SERVICE: Container name for intelligence-service
 #   - COOLIFY_BRANCH: Branch name (used to identify PR)
@@ -105,6 +106,9 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     environment:
+      # Coolify Magic: Configure /api path prefix for this service
+      # This tells Coolify to route https://pr-{id}.domain.com/api to this container
+      SERVICE_URL_APPLICATION-SERVER_8080: /api
       SPRING_PROFILES_ACTIVE: prod
       # URL - Coolify provides SERVICE_FQDN_WEBAPP
       APPLICATION_HOST_URL: https://${SERVICE_FQDN_WEBAPP}
