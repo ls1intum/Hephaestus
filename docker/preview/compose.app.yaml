@@ -40,56 +40,10 @@
 
 services:
   # ---------------------------------------------------------------------------
-  # Seed Init Container - Creates symlink to shared seed before postgres starts
-  # 
-  # WORKAROUND: Coolify appends -pr-{id} to ALL bind mount paths for previews.
-  # This init container runs once to create a symlink.
-  # For non-preview deployments (develop), exits gracefully.
-  # ---------------------------------------------------------------------------
-  seed-init:
-    image: alpine:latest
-    command: |
-      sh -c '
-        set -e
-        
-        # Give the host mount time to stabilize
-        sleep 2
-        
-        # Check if host root is mounted
-        if [ ! -d /host-root/data ]; then
-          echo "Host root not available - not a preview deployment"
-          exit 0
-        fi
-        
-        # Find the PR-suffixed seed path (only check if it exists and is a directory)
-        for seed_mount in /host-root/data/hephaestus/seed-pr-*; do
-          if [ -d "$seed_mount" ] && [ ! -L "$seed_mount" ]; then
-            # Found the Coolify-modified path, replace it with symlink
-            real_seed="/host-root/data/hephaestus/seed"
-            
-            if [ -d "$real_seed" ]; then
-              rm -rf "$seed_mount"
-              ln -s "$real_seed" "$seed_mount"
-              echo "✓ Created symlink: $seed_mount -> $real_seed"
-              exit 0
-            else
-              echo "✗ Real seed not found at $real_seed"
-              exit 0
-            fi
-          fi
-        done
-        
-        echo "✓ No PR-suffixed seed mount found (seed will be created by Liquibase)"
-        exit 0
-      '
-    volumes:
-      - /:/host-root:rw
-    privileged: true
-
-  # ---------------------------------------------------------------------------
   # PostgreSQL - Per-PR database (isolated data per preview)
   # 
-  # Reads seed from symlinked path after seed-init creates it.
+  # SEEDING HACK: Uses init container to populate via psql commands
+  # after postgres starts, rather than relying on /docker-entrypoint-initdb.d
   # ---------------------------------------------------------------------------
   postgres:
     image: postgres:17-alpine
@@ -100,12 +54,6 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-hephaestus-preview}
     volumes:
       - postgres-data:/var/lib/postgresql/data
-      # Coolify will modify this to /data/hephaestus/seed-pr-{id}
-      # seed-init creates a symlink there pointing to /data/hephaestus/seed
-      - /data/hephaestus/seed:/docker-entrypoint-initdb.d:ro
-    depends_on:
-      seed-init:
-        condition: service_completed_successfully
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U hephaestus -d hephaestus"]
       interval: 5s
@@ -116,6 +64,43 @@ services:
       options:
         max-size: "50m"
         max-file: "3"
+
+  # ---------------------------------------------------------------------------
+  # Seed Loader - Restores database from external named volume
+  # 
+  # Loads SQL dump from `hephaestus-seed` external named volume.
+  # This volume is created/managed on the HOST and shared across deployments.
+  # Uses standard psql restore - no security issues.
+  # If dump not found, postgres starts empty and Liquibase creates schema.
+  # ---------------------------------------------------------------------------
+  seed-loader:
+    image: postgres:17-alpine
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD:-hephaestus-preview}
+    command: |
+      sh -c '
+        if [ -f /seed/dump.sql.gz ]; then
+          echo "Loading seed data from external volume..."
+          gunzip -c /seed/dump.sql.gz | psql -h postgres -U hephaestus -d hephaestus
+          
+          if [ $? -eq 0 ]; then
+            echo "✓ Seed loaded successfully"
+          else
+            echo "✗ Failed to restore database (Liquibase will create schema)"
+          fi
+        else
+          echo "✓ No seed dump found (external volume not populated)"
+          echo "✓ Database will be initialized by Liquibase"
+        fi
+        exit 0
+      '
+    volumes:
+      # Mount external named volume (NOT subject to Coolify path modification)
+      - hephaestus-seed:/seed:ro
+    restart: "no"
 
   # ---------------------------------------------------------------------------
   # Intelligence Service - AI analysis backend (internal only)
@@ -150,6 +135,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      seed-loader:
+        condition: service_completed_successfully
     healthcheck:
       test: ["CMD", "curl", "-f", "http://127.0.0.1:5000/health"]
       interval: 10s
@@ -219,6 +206,8 @@ services:
         condition: service_healthy
       intelligence-service:
         condition: service_healthy
+      seed-loader:
+        condition: service_completed_successfully
     healthcheck:
       test: ["CMD", "wget", "--spider", "--quiet", "http://127.0.0.1:8080/actuator/health"]
       interval: 10s
@@ -274,3 +263,5 @@ services:
 # =============================================================================
 volumes:
   postgres-data:
+  hephaestus-seed:
+    external: true
