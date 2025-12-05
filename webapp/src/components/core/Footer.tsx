@@ -1,7 +1,10 @@
 import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
+import environment from "@/environment";
 
 export default function Footer() {
+	const isPreviewBuild = environment.previewBuild === "true";
+
 	return (
 		<footer className="py-2 md:px-8 bg-sidebar border-sidebar-border border-t">
 			<div className="container p-0">
@@ -12,6 +15,18 @@ export default function Footer() {
 							<Button variant="link" size="none" asChild>
 								<Link to="/about">About</Link>
 							</Button>
+
+							{isPreviewBuild && (
+								<Button variant="link" size="none" asChild>
+									<a
+										href="/storybook"
+										target="_blank"
+										rel="noopener noreferrer"
+									>
+										Storybook
+									</a>
+								</Button>
+							)}
 
 							<Button variant="link" size="none" asChild>
 								<a

@@ -15,7 +15,21 @@ COPY ./ /app/
 # This runs copy-env-prod.js first to use the production environment config
 RUN npm run build:prod
 
-# Stage 2: Serve the app with Nginx
+# Stage 2: Conditionally build Storybook (for preview deployments only)
+FROM build AS build-storybook
+
+# Build argument to control whether to build Storybook
+ARG BUILD_STORYBOOK=false
+
+# Build Storybook only if BUILD_STORYBOOK is set to true
+RUN if [ "$BUILD_STORYBOOK" = "true" ]; then \
+        echo "Building Storybook for preview deployment..."; \
+        npm run build-storybook; \
+    else \
+        echo "Skipping Storybook build (not a preview deployment)"; \
+    fi
+
+# Stage 3: Serve the app with Nginx
 FROM nginx:stable-alpine
 
 # Install necessary packages and explicitly update libxml2 for security fixes
@@ -24,8 +38,14 @@ RUN apk update && \
     apk add --no-cache bash grep sed perl libxml2>=2.13.4-r6 && \
     rm -rf /var/cache/apk/*
 
+# Build argument to control whether to include Storybook
+ARG BUILD_STORYBOOK=false
+
 # Copy built React app from the build stage 
 COPY --from=build /app/dist /usr/share/nginx/html
+
+# Conditionally copy Storybook build if it exists
+COPY --from=build-storybook /app/storybook-static /usr/share/nginx/html/storybook 2>/dev/null || true
 
 # Copy the substitution script into the image
 COPY substitute_env_variables.sh /usr/local/bin/

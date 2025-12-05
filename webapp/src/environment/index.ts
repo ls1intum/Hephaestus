@@ -20,4 +20,5 @@ export default {
 		imprintHtml: "<p>This is the imprint.</p>",
 		privacyHtml: "<p>This is the privacy policy.</p>",
 	},
+	previewBuild: "false",
 };

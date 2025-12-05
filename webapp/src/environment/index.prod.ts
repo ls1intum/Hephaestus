@@ -23,4 +23,5 @@ export default {
 		imprintHtml: "WEB_ENV_LEGAL_IMPRINT_HTML",
 		privacyHtml: "WEB_ENV_LEGAL_PRIVACY_HTML",
 	},
+	previewBuild: "WEB_ENV_PREVIEW_BUILD",
 };

@@ -184,6 +184,9 @@ services:
     build:
       context: ./webapp
       dockerfile: Dockerfile
+      args:
+        # Enable Storybook build for preview deployments
+        BUILD_STORYBOOK: "true"
     restart: unless-stopped
     environment:
       # Coolify provides SERVICE_FQDN_WEBAPP automatically
@@ -195,6 +198,8 @@ services:
       KEYCLOAK_REALM: hephaestus
       KEYCLOAK_CLIENT_ID: hephaestus
       KEYCLOAK_SKIP_LOGIN: ${KEYCLOAK_SKIP_LOGIN:-false}
+      # Preview build flag to enable Storybook link in footer
+      PREVIEW_BUILD: "true"
       # Optional
       SENTRY_ENVIRONMENT: preview
       SENTRY_DSN: ${SENTRY_DSN:-}
