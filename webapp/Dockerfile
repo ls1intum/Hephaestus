@@ -22,11 +22,13 @@ FROM build AS build-storybook
 ARG BUILD_STORYBOOK=false
 
 # Build Storybook only if BUILD_STORYBOOK is set to true
+# Create an empty directory if not building to ensure COPY doesn't fail
 RUN if [ "$BUILD_STORYBOOK" = "true" ]; then \
         echo "Building Storybook for preview deployment..."; \
         npm run build-storybook; \
     else \
         echo "Skipping Storybook build (not a preview deployment)"; \
+        mkdir -p /app/storybook-static; \
     fi
 
 # Stage 3: Serve the app with Nginx
@@ -44,8 +46,8 @@ ARG BUILD_STORYBOOK=false
 # Copy built React app from the build stage 
 COPY --from=build /app/dist /usr/share/nginx/html
 
-# Conditionally copy Storybook build if it exists
-COPY --from=build-storybook /app/storybook-static /usr/share/nginx/html/storybook 2>/dev/null || true
+# Copy Storybook build (will be empty dir if not built)
+COPY --from=build-storybook /app/storybook-static /usr/share/nginx/html/storybook
 
 # Copy the substitution script into the image
 COPY substitute_env_variables.sh /usr/local/bin/
