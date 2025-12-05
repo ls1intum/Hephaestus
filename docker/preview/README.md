@@ -4,102 +4,62 @@ This directory contains Docker Compose configuration for PR preview deployments 
 
 ## Database Seeding for PR Previews
 
-Uses an **external Docker named volume** (`hephaestus-seed`) that is created once on the host and shared across all deployments (main + previews).
+Uses the **running main (non-PR) postgres container** via Docker socket to `pg_dump` and restore directly into each preview DB. No separate seed volume or seed file is required.
 
 ### How It Works
 
-**Key Insight:** Coolify modifies **bind mount paths** but NOT **named volume names**!
+**Key Insight:** Coolify renames PR resources, but the main (non-PR) postgres container is stable. We exec `pg_dump` inside that container via Docker socket and pipe into the preview DB.
 
-1. Create external volume `hephaestus-seed` once on host (name is pinned via `name: hephaestus-seed` so Coolify must find this exact volume)
-2. Populate it with `dump.sql.gz` (done once, manually or via cron)
-3. Each preview deployment mounts the same external volume
-4. seed-loader reads the dump and restores it
-5. Gracefully falls back to empty DB if dump unavailable
+1. The main deployment provides the base postgres container (no `-pr-*`). If it is stopped, seed-loader will start it temporarily, dump, then stop it again.
+2. seed-loader (in previews) uses Docker socket to `docker exec <base-container> pg_dump ...`.
+3. seed-loader pipes the dump into the preview postgres via `psql`.
+4. Graceful fallback if the base container is missing or dump fails.
 
 ### Setup on Server (one-time)
 
-1. **Create the external named volume:**
-
-   ```bash
-   docker volume create hephaestus-seed
-   ```
-
-2. **Verify it was created:**
-
-   ```bash
-   docker volume ls | grep hephaestus-seed
-   docker volume inspect hephaestus-seed
-   ```
-
-3. **Generate seed dump into the volume:**
-
-   ```bash
-   # Find your base postgres container
-   docker ps --format '{{.Names}}' | grep postgres
-   
-   # Get the volume mount point
-   VOLUME_PATH=$(docker volume inspect hephaestus-seed --format '{{.Mountpoint}}')
-   
-   # Dump and compress into the volume
-   docker exec <postgres-container> pg_dump -U hephaestus -d hephaestus --clean --if-exists | gzip > "$VOLUME_PATH/dump.sql.gz"
-   
-   # Verify
-   ls -lh "$VOLUME_PATH/dump.sql.gz"
-   ```
-
-4. **(Optional) Auto-refresh seed every 6 hours:**
-
-   ```bash
-   0 */6 * * * VOLUME_PATH=$(docker volume inspect hephaestus-seed --format '{{.Mountpoint}}') && docker exec $(docker ps -qf "name=postgres" --filter "label=coolify.applicationId=<BASE_APP_ID>") pg_dump -U hephaestus -d hephaestus --clean --if-exists 2>/dev/null | gzip > "$VOLUME_PATH/dump.sql.gz"
-   ```
+1. Ensure the main deployment exists; if its postgres is stopped, seed-loader will start/stop it around the dump.
+2. Nothing to pre-seed: seed-loader live-dumps from the base container each preview deploy.
+3. Docker socket must be available to seed-loader (compose mounts `/var/run/docker.sock:ro`).
 
 ### Deployment Flow
 
 1. **postgres container starts** - fresh empty database
 2. **seed-loader waits** for postgres to be healthy
-3. **seed-loader mounts external volume** `hephaestus-seed:/seed:ro`
-4. **seed-loader restores dump** via psql pipe
-5. **seed-loader exits** (success or failure doesn't matter)
-6. **application-server and intelligence-service wait for seed-loader to finish**
-7. **Rest of stack runs** with seeded data (or empty DB fallback)
+3. **seed-loader uses docker socket** to exec `pg_dump` inside the base postgres container (no `-pr-*`).
+4. **seed-loader restores dump** via `psql` into preview postgres.
+5. **seed-loader exits** (success or failure doesn't matter).
+6. **application-server and intelligence-service wait for seed-loader to finish**.
+7. **Rest of stack runs** with seeded data (or empty DB fallback).
 
 ### Why This Works
 
-- ✅ **Named volumes are NOT modified by Coolify** (only bind mount paths are)
-- ✅ **Persistent across deployments** - main + all previews share one seed
-- ✅ **Standard Docker practice** - external volumes are meant for this
-- ✅ **No security issues** - standard psql restore, no sockets
-- ✅ **Graceful fallback** - works even if volume empty
+- ✅ Works despite Coolify renaming preview resources (we target the base non-PR container)
+- ✅ No manual seed files or extra volumes required (live dump)
+- ✅ Standard `pg_dump` → `psql` flow
+- ✅ Graceful fallback if base volume missing or dump fails
 
 ### Fallback Behavior
 
-If external volume empty OR dump doesn't exist:
+If base container missing or dump fails:
 
-- seed-loader logs "No seed dump found"
+- seed-loader logs the issue
 - Exits cleanly (non-blocking)
 - Postgres starts with empty database
 - Liquibase creates schema from scratch (~30s)
 
 ### Troubleshooting
 
-Check if external volume exists:
+Check base postgres container (no `-pr-*`):
 
 ```bash
-docker volume ls | grep hephaestus-seed
+docker ps --format '{{.Names}}' | grep postgres | grep -v pr-
 ```
 
-Check volume contents:
+Manual test dump:
 
 ```bash
-VOLUME_PATH=$(docker volume inspect hephaestus-seed --format '{{.Mountpoint}}')
-ls -lh "$VOLUME_PATH"
-```
-
-Manually recreate dump:
-
-```bash
-VOLUME_PATH=$(docker volume inspect hephaestus-seed --format '{{.Mountpoint}}')
-docker exec <postgres-container> pg_dump -U hephaestus -d hephaestus --clean --if-exists | gzip > "$VOLUME_PATH/dump.sql.gz"
+BASE_CTN=$(docker ps --format '{{.Names}}' | grep postgres | grep -v pr- | head -1)
+docker exec "$BASE_CTN" pg_dump -U hephaestus -d hephaestus --clean --if-exists | head
 ```
 
 ## Files

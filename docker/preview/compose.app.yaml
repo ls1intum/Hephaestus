@@ -82,29 +82,57 @@ services:
       PGPASSWORD: ${POSTGRES_PASSWORD:-hephaestus-preview}
     command: |
       sh -c '
-        if [ -f /seed/dump.sql.gz ]; then
-          echo "Loading seed data from external volume..."
-          gunzip -c /seed/dump.sql.gz | psql -h postgres -U hephaestus -d hephaestus
-          
-          if [ $? -eq 0 ]; then
-            echo "✓ Seed loaded successfully"
+        set -e
+        apk add --no-cache docker-cli 2>/dev/null
+
+        # Find base postgres container (non-PR). Prefer running; fall back to stopped and start temporarily.
+        BASE_CTN=$(docker ps --format "{{.Names}}" | grep postgres | grep -v "pr-" | head -1 || true)
+        BASE_WAS_STARTED=0
+
+        if [ -z "$BASE_CTN" ]; then
+          BASE_CTN=$(docker ps -a --format "{{.Names}}" | grep postgres | grep -v "pr-" | head -1 || true)
+          if [ -z "$BASE_CTN" ]; then
+            echo "✗ No base postgres container found; Liquibase will initialize schema"
+            exit 0
+          fi
+          echo "Base container found stopped: $BASE_CTN (starting temporarily)"
+          docker start "$BASE_CTN" >/tmp/base-start.log 2>/tmp/base-start.err || {
+            echo "✗ Failed to start base container; falling back to Liquibase"
+            cat /tmp/base-start.err || true
+            exit 0
+          }
+          BASE_WAS_STARTED=1
+        else
+          echo "Using running base container: $BASE_CTN"
+        fi
+
+        # Dump from base container into temp and restore into preview DB
+        if docker exec "$BASE_CTN" pg_dump -U hephaestus -d hephaestus --clean --if-exists > /tmp/dump.sql 2>/tmp/dump.err; then
+          if [ -s /tmp/dump.sql ]; then
+            echo "Loading seed from base container..."
+            psql -h postgres -U hephaestus -d hephaestus < /tmp/dump.sql && echo "✓ Seed loaded successfully" || echo "✗ Failed to restore database (Liquibase will create schema)"
           else
-            echo "✗ Failed to restore database (Liquibase will create schema)"
+            echo "✓ Dump was empty; Liquibase will initialize schema"
           fi
         else
-          echo "✓ No seed dump found (external volume not populated)"
+          echo "✗ Dump failed; see error log below"
+          cat /tmp/dump.err || true
           echo "✓ Database will be initialized by Liquibase"
+        fi
+
+        # If we started the base container, stop it to leave host state unchanged.
+        if [ "$BASE_WAS_STARTED" -eq 1 ]; then
+          echo "Stopping base container we started: $BASE_CTN"
+          docker stop "$BASE_CTN" >/tmp/base-stop.log 2>/tmp/base-stop.err || {
+            echo "! Warning: failed to stop base container; check /tmp/base-stop.err"
+            cat /tmp/base-stop.err || true
+          }
         fi
         exit 0
       '
     volumes:
-      # Mount external named volume (NOT subject to Coolify path modification)
-      - type: volume
-        source: hephaestus-seed
-        target: /seed
-        read_only: true
-        volume:
-          nocopy: true
+      # Docker socket required to access base postgres container
+      - /var/run/docker.sock:/var/run/docker.sock:ro
     restart: "no"
 
   # ---------------------------------------------------------------------------
@@ -268,6 +296,3 @@ services:
 # =============================================================================
 volumes:
   postgres-data:
-  hephaestus-seed:
-    external: true
-    name: hephaestus-seed
