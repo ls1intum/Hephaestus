@@ -102,10 +102,6 @@ services:
       context: ./server/application-server
       dockerfile: Dockerfile
     restart: unless-stopped
-    # Allow container to reach the public domain for JWT issuer validation
-    # host-gateway resolves to the Docker host IP where Traefik is listening
-    extra_hosts:
-      - "${PREVIEW_DOMAIN}:host-gateway"
     environment:
       SPRING_PROFILES_ACTIVE: prod
       # URL - Coolify provides SERVICE_FQDN_WEBAPP
@@ -121,9 +117,12 @@ services:
       NATS_SERVER: nats://nats-server:4222
       NATS_ENABLED: ${NATS_ENABLED:-true}
       NATS_DURABLE_CONSUMER_NAME: ${COOLIFY_CONTAINER_NAME:-preview}-consumer
-      # Shared Keycloak - use base preview domain
+      # Shared Keycloak
+      # Public URL for issuer validation (must match token's iss claim)
       KEYCLOAK_URL: https://${PREVIEW_DOMAIN:?Required}/keycloak
       KEYCLOAK_REALM: hephaestus
+      # Internal URL for fetching JWKS (container-to-container, avoids firewall)
+      KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/hephaestus/protocol/openid-connect/certs
       KEYCLOAK_CLIENT_ID: hephaestus-confidential
       KEYCLOAK_CLIENT_SECRET: ${KEYCLOAK_HEPHAESTUS_CONFIDENTIAL_CLIENT_SECRET:?Required}
       # Shared Postfix
