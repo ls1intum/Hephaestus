@@ -75,13 +75,11 @@ services:
   # ---------------------------------------------------------------------------
   seed-loader:
     image: postgres:17-alpine
-    network_mode: "service:postgres"
     depends_on:
       postgres:
         condition: service_healthy
     environment:
       PGPASSWORD: ${POSTGRES_PASSWORD:-hephaestus-preview}
-      DB_HOST: 127.0.0.1
     command: |
       sh -c '
         set -e
@@ -119,11 +117,17 @@ services:
           echo "Using running base container: $$BASE_CTN"
         fi
 
-        # Dump from base (running or temp) into temp and restore into preview DB
+        # Dump from base (running or temp) into temp and restore into preview DB via docker exec (no DNS needed)
+        PREVIEW_PG=${SERVICE_NAME_POSTGRES:-postgres}
+
         if docker exec "$$BASE_CTN" pg_dump -U hephaestus -d hephaestus --clean --if-exists > /tmp/dump.sql 2>/tmp/dump.err; then
           if [ -s /tmp/dump.sql ]; then
-            echo "Loading seed from base..."
-            psql -h "$$DB_HOST" -U hephaestus -d hephaestus < /tmp/dump.sql && echo "✓ Seed loaded successfully" || echo "✗ Failed to restore database (Liquibase will create schema)"
+            echo "Loading seed from base into preview DB via docker exec to $$PREVIEW_PG..."
+            if cat /tmp/dump.sql | docker exec -i "$$PREVIEW_PG" psql -U hephaestus -d hephaestus; then
+              echo "✓ Seed loaded successfully"
+            else
+              echo "✗ Failed to restore database (Liquibase will create schema)"
+            fi
           else
             echo "✓ Dump was empty; Liquibase will initialize schema"
           fi
