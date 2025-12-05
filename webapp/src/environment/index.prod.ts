@@ -1,7 +1,8 @@
 import { version } from "@/../package.json";
+
 // WEB_ENV_<VARIABLE_NAME> will be substituted with `substitute_env_variables.sh` on docker container start
 
-export default {
+const environment = {
 	version,
 	clientUrl: "WEB_ENV_APPLICATION_CLIENT_URL",
 	serverUrl: "WEB_ENV_APPLICATION_SERVER_URL",
@@ -23,5 +24,10 @@ export default {
 		imprintHtml: "WEB_ENV_LEGAL_IMPRINT_HTML",
 		privacyHtml: "WEB_ENV_LEGAL_PRIVACY_HTML",
 	},
-	previewBuild: "WEB_ENV_PREVIEW_BUILD",
+	includeStorybook: "WEB_ENV_DEV_INCLUDE_STORYBOOK",
+	devtools: {
+		tanstack: "WEB_ENV_TANSTACK_DEVTOOLS_ENABLED",
+	},
 };
+
+export default environment;

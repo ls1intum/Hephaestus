@@ -2,7 +2,7 @@ import environment from "@/environment";
 
 const PLACEHOLDER_PREFIX = "WEB_ENV_";
 
-const sanitizeValue = (value?: string | boolean) => {
+export const sanitizeValue = (value?: string | boolean) => {
 	if (typeof value === "boolean") {
 		return value ? "true" : "false";
 	}
@@ -16,7 +16,7 @@ const sanitizeValue = (value?: string | boolean) => {
 	return trimmed;
 };
 
-const sanitizeBoolean = (value?: string | boolean) => {
+export const sanitizeBoolean = (value?: string | boolean) => {
 	const sanitized = sanitizeValue(value);
 	if (!sanitized) {
 		return false;
