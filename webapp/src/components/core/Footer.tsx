@@ -1,9 +1,10 @@
 import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import environment from "@/environment";
+import { sanitizeBoolean } from "@/integrations/posthog/config";
 
 export default function Footer() {
-	const includeStorybook = environment.includeStorybook === "true";
+	const includeStorybook = sanitizeBoolean(environment.includeStorybook);
 
 	return (
 		<footer className="py-2 md:px-8 bg-sidebar border-sidebar-border border-t">
