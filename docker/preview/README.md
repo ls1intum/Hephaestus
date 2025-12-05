@@ -4,7 +4,7 @@ This directory contains Docker Compose configuration for PR preview deployments 
 
 ## Database Seeding for PR Previews
 
-Uses the **main (non-PR) postgres data volume** via Docker socket: seed-loader will start a temporary postgres container from that volume (if no base container is running), `pg_dump`, restore into the preview DB, then clean up.
+Uses the **main (non-PR) postgres data volume** via Docker socket: seed-loader will start a temporary postgres container from that volume (if no base container is running), `pg_dump`, restore into the preview DB, then clean up. Seed-loader shares the postgres network namespace (`network_mode: service:postgres`), so it connects via localhost.
 
 ### How It Works
 
@@ -12,7 +12,7 @@ Uses the **main (non-PR) postgres data volume** via Docker socket: seed-loader w
 
 1. The main deployment provides the base postgres volume (no `-pr-*`).
 2. seed-loader (in previews) uses Docker socket to either reuse a running base container or spin up a temporary postgres container with the base volume attached, then `pg_dump`.
-3. seed-loader pipes the dump into the preview postgres via `psql`.
+3. seed-loader pipes the dump into the preview postgres via `psql` over localhost (shared namespace).
 4. Graceful fallback if the base volume is missing or dump fails.
 5. DB host is configurable via `SERVICE_NAME_POSTGRES`; defaults to `postgres` with a short DNS retry loop.
 
@@ -27,7 +27,7 @@ Uses the **main (non-PR) postgres data volume** via Docker socket: seed-loader w
 1. **postgres container starts** - fresh empty database
 2. **seed-loader waits** for postgres to be healthy
 3. **seed-loader uses docker socket** to run `pg_dump` from a running base container or a temporary container started with the base volume (no `-pr-*`).
-4. **seed-loader restores dump** via `psql` into preview postgres.
+4. **seed-loader restores dump** via `psql` into preview postgres (localhost, shared namespace).
 5. **seed-loader exits** (success or failure doesn't matter).
 6. **application-server and intelligence-service wait for seed-loader to finish**.
 7. **Rest of stack runs** with seeded data (or empty DB fallback).
