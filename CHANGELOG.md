@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.10.0-rc.50](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.49...v0.10.0-rc.50) (2025-12-06)
+
+### ♻️ Code Refactoring
+
+* **application-server:** improve PostgreSQL connection error diagnostics for tests ([#563](https://github.com/ls1intum/Hephaestus/issues/563)) ([b01aa32](https://github.com/ls1intum/Hephaestus/commit/b01aa32061a06a6a8c4541241d266ae2a7307a73))
+
 ## [0.10.0-rc.49](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.48...v0.10.0-rc.49) (2025-12-06)
 
 ### 🚀 Features
