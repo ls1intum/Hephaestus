@@ -38,6 +38,29 @@ public interface IssueCommentRepository extends JpaRepository<IssueComment, Long
         LEFT JOIN FETCH ic.issue
         LEFT JOIN FETCH ic.issue.repository
         WHERE
+            ic.author.login ILIKE :authorLogin
+            AND ic.createdAt BETWEEN :after AND :before
+            AND ic.issue.repository.organization.workspace.id = :workspaceId
+            AND (:onlyFromPullRequests = false OR ic.issue.htmlUrl LIKE '%/pull/%')
+        ORDER BY ic.createdAt DESC
+        """
+    )
+    List<IssueComment> findAllByAuthorLoginInTimeframe(
+        @Param("authorLogin") String authorLogin,
+        @Param("after") Instant after,
+        @Param("before") Instant before,
+        @Param("onlyFromPullRequests") boolean onlyFromPullRequests,
+        @Param("workspaceId") Long workspaceId
+    );
+
+    @Query(
+        """
+        SELECT ic
+        FROM IssueComment ic
+        LEFT JOIN FETCH ic.author
+        LEFT JOIN FETCH ic.issue
+        LEFT JOIN FETCH ic.issue.repository
+        WHERE
             ic.createdAt BETWEEN :after AND :before
             AND ic.author.type = 'USER'
             AND ic.issue.repository.organization.workspace.id = :workspaceId

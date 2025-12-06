@@ -19,7 +19,7 @@ export interface LeaderboardFilterProps {
 	onSortChange?: (sort: LeaderboardSortType) => void;
 	onTimeframeChange?: (
 		afterDate: string,
-		beforeDate: string,
+		beforeDate?: string,
 		timeframe?: string,
 	) => void;
 	selectedTeam?: string;

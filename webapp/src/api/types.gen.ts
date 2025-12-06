@@ -2527,7 +2527,10 @@ export type GetUserProfileData = {
          */
         login: string;
     };
-    query?: never;
+    query?: {
+        after?: Date;
+        before?: Date;
+    };
     url: '/workspaces/{workspaceSlug}/profile/{login}';
 };
 

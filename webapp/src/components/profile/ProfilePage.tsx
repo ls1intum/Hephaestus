@@ -11,6 +11,9 @@ interface ProfileProps {
 	username: string;
 	currUserIsDashboardUser: boolean;
 	workspaceSlug: string;
+	after?: string;
+	before?: string;
+	onTimeframeChange?: (afterDate: string, beforeDate?: string) => void;
 }
 
 export function ProfilePage({
@@ -20,6 +23,9 @@ export function ProfilePage({
 	username,
 	currUserIsDashboardUser,
 	workspaceSlug,
+	after,
+	before,
+	onTimeframeChange,
 }: ProfileProps) {
 	if (error) {
 		return (
@@ -52,6 +58,9 @@ export function ProfilePage({
 				displayName={profileData?.userInfo?.name}
 				currUserIsDashboardUser={currUserIsDashboardUser}
 				workspaceSlug={workspaceSlug}
+				afterDate={after}
+				beforeDate={before}
+				onTimeframeChange={onTimeframeChange}
 			/>
 		</div>
 	);

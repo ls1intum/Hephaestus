@@ -38,6 +38,27 @@ public interface PullRequestReviewRepository extends JpaRepository<PullRequestRe
         LEFT JOIN FETCH prr.pullRequest
         LEFT JOIN FETCH prr.pullRequest.repository
         LEFT JOIN FETCH prr.comments
+        WHERE prr.author.login ILIKE :authorLogin
+            AND prr.submittedAt BETWEEN :after AND :before
+            AND prr.pullRequest.repository.organization.workspace.id = :workspaceId
+        ORDER BY prr.submittedAt DESC
+        """
+    )
+    List<PullRequestReview> findAllByAuthorLoginInTimeframe(
+        @Param("authorLogin") String authorLogin,
+        @Param("after") Instant after,
+        @Param("before") Instant before,
+        @Param("workspaceId") Long workspaceId
+    );
+
+    @Query(
+        value = """
+        SELECT prr
+        FROM PullRequestReview prr
+        LEFT JOIN FETCH prr.author
+        LEFT JOIN FETCH prr.pullRequest
+        LEFT JOIN FETCH prr.pullRequest.repository
+        LEFT JOIN FETCH prr.comments
         WHERE
             prr.submittedAt BETWEEN :after AND :before
             AND prr.author.type = 'USER'

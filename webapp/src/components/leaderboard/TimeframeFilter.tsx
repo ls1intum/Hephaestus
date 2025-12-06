@@ -43,12 +43,13 @@ type TimeframeOption =
 	| "last-week"
 	| "this-month"
 	| "last-month"
-	| "custom";
+	| "custom"
+	| "all-activity";
 
 export interface TimeframeFilterProps {
 	onTimeframeChange?: (
 		afterDate: string,
-		beforeDate: string,
+		beforeDate?: string,
 		timeframe?: string,
 	) => void;
 	initialAfterDate?: string;
@@ -59,6 +60,15 @@ export interface TimeframeFilterProps {
 		minute: number;
 		formatted: string;
 	};
+	/**
+	 * When true, presets “this week/this month” emit only `afterDate` (open-ended).
+	 * “Last week/last month” always send both bounds so their labels remain bounded.
+	 */
+	openEndedPresets?: boolean;
+	/**
+	 * Enable an "All activity" option that covers the full history.
+	 */
+	enableAllActivityOption?: boolean;
 }
 
 export function TimeframeFilter({
@@ -66,9 +76,12 @@ export function TimeframeFilter({
 	leaderboardSchedule,
 	initialAfterDate,
 	initialBeforeDate,
+	openEndedPresets = false,
+	enableAllActivityOption = false,
 }: TimeframeFilterProps) {
 	// Track whether the user has manually selected a timeframe
 	const [userSelectedTimeframe, setUserSelectedTimeframe] = useState(false);
+	const allActivityStart = startOfDay(new Date(0));
 
 	// Helper function to set a date to a specific day of the week with specific time
 	// day is 1-7 where 1 is Monday (ISO)
@@ -131,6 +144,21 @@ export function TimeframeFilter({
 
 	// Function to detect which timeframe option matches the given date range
 	const detectTimeframeFromDates = (): TimeframeOption => {
+		if (enableAllActivityOption) {
+			const parsedAfter = parseDateSafely(initialAfterDate ?? null);
+
+			const isAllActivityAfter = parsedAfter
+				? parsedAfter.getTime() <= allActivityStart.getTime()
+				: false;
+
+			if (
+				(!initialAfterDate && !initialBeforeDate) ||
+				isAllActivityAfter
+			) {
+				return "all-activity";
+			}
+		}
+
 		if (!initialAfterDate || !initialBeforeDate) return "this-week";
 
 		try {
@@ -392,26 +420,28 @@ export function TimeframeFilter({
 	// Update timeframe if initialDates change, but only if user hasn't manually selected a timeframe
 	// biome-ignore lint/correctness/useExhaustiveDependencies: detectTimeframeFromDates is stable
 	useEffect(() => {
-		if (initialAfterDate && initialBeforeDate && !userSelectedTimeframe) {
-			const detectedTimeframe = detectTimeframeFromDates();
+		if (userSelectedTimeframe) {
+			return;
+		}
 
-			if (detectedTimeframe !== selectedTimeframe) {
-				setSelectedTimeframe(detectedTimeframe);
+		const detectedTimeframe = detectTimeframeFromDates();
 
-				// If custom timeframe is detected, update the dateRange
-				if (detectedTimeframe === "custom") {
-					try {
-						const afterDate = parseISO(initialAfterDate);
-						const beforeDate = parseISO(initialBeforeDate);
-						const displayEndDate = subDays(beforeDate, 1);
+		if (detectedTimeframe !== selectedTimeframe) {
+			setSelectedTimeframe(detectedTimeframe);
 
-						setDateRange({
-							from: afterDate,
-							to: displayEndDate,
-						});
-					} catch (e) {
-						console.error("Error parsing dates:", e);
-					}
+			// If custom timeframe is detected, update the dateRange
+			if (detectedTimeframe === "custom" && initialAfterDate && initialBeforeDate) {
+				try {
+					const afterDate = parseISO(initialAfterDate);
+					const beforeDate = parseISO(initialBeforeDate);
+					const displayEndDate = subDays(beforeDate, 1);
+
+					setDateRange({
+						from: afterDate,
+						to: displayEndDate,
+					});
+				} catch (e) {
+					console.error("Error parsing dates:", e);
 				}
 			}
 		}
@@ -435,9 +465,15 @@ export function TimeframeFilter({
 		const scheduledMinute = leaderboardSchedule?.minute ?? 0; // Default to 0 minutes
 
 		let afterDate: Date;
-		let beforeDate: Date;
+		let beforeDate: Date | undefined;
 
 		switch (selectedTimeframe) {
+			case "all-activity": {
+				return {
+					afterDate: formatISO(allActivityStart),
+					beforeDate: undefined,
+				};
+			}
 			case "this-week": {
 				const currentISODay = getISODay(now);
 
@@ -460,7 +496,7 @@ export function TimeframeFilter({
 				}
 
 				// End date is the next scheduled day (next week or this coming one)
-				beforeDate = addWeeks(afterDate, 1);
+				beforeDate = openEndedPresets ? undefined : addWeeks(afterDate, 1);
 				break;
 			}
 			case "last-week": {
@@ -497,7 +533,9 @@ export function TimeframeFilter({
 				// Start at the beginning of this month (midnight)
 				afterDate = startOfMonth(now);
 				// End at the start of the next month (midnight)
-				beforeDate = startOfMonth(addDays(endOfMonth(now), 1));
+				beforeDate = openEndedPresets
+					? undefined
+					: startOfMonth(addDays(endOfMonth(now), 1));
 				break;
 			}
 			case "last-month": {
@@ -508,11 +546,9 @@ export function TimeframeFilter({
 				break;
 			}
 			case "custom": {
-				// Use the selected date range from the date picker
+				// Allow open-ended ranges: if only a start date is chosen, treat beforeDate as now
 				if (dateRange?.from && dateRange?.to) {
-					// Start at midnight of the selected start date
 					const customStartDate = startOfDay(dateRange.from);
-					// End at the beginning of the day after the selected end date (to include the full end date)
 					const customEndDate = addDays(startOfDay(dateRange.to), 1);
 
 					return {
@@ -520,6 +556,15 @@ export function TimeframeFilter({
 						beforeDate: formatISO(customEndDate),
 					};
 				}
+
+				if (dateRange?.from && !dateRange?.to) {
+					const customStartDate = startOfDay(dateRange.from);
+					return {
+						afterDate: formatISO(customStartDate),
+						beforeDate: formatISO(now),
+					};
+				}
+
 				// Fallback to last 7 days if no range is selected
 				afterDate = subDays(now, 7);
 				beforeDate = now;
@@ -536,7 +581,7 @@ export function TimeframeFilter({
 		// Format dates in ISO 8601 format with timezone offset
 		return {
 			afterDate: formatISO(afterDate),
-			beforeDate: formatISO(beforeDate),
+			beforeDate: beforeDate ? formatISO(beforeDate) : undefined,
 		};
 	};
 	const { afterDate, beforeDate } = computeDates();
@@ -547,8 +592,8 @@ export function TimeframeFilter({
 
 	useEffect(() => {
 		latestDates.current = { afterDate, beforeDate };
-		onTimeframeChange?.(afterDate, beforeDate);
-	}, [afterDate, beforeDate, onTimeframeChange]);
+		onTimeframeChange?.(afterDate, beforeDate, selectedTimeframe);
+	}, [afterDate, beforeDate, onTimeframeChange, selectedTimeframe]);
 
 	return (
 		<div className="space-y-1.5">
@@ -558,6 +603,9 @@ export function TimeframeFilter({
 					<SelectValue placeholder="Select timeframe" />
 				</SelectTrigger>
 				<SelectContent>
+					{enableAllActivityOption && (
+						<SelectItem value="all-activity">All activity</SelectItem>
+					)}
 					<SelectItem value="this-week">This week</SelectItem>
 					<SelectItem value="last-week">Last week</SelectItem>
 					<SelectItem value="this-month">This month</SelectItem>

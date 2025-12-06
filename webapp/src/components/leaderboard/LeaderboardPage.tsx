@@ -20,7 +20,7 @@ interface LeaderboardPageProps {
 	onSortChange?: (sort: LeaderboardSortType) => void;
 	onTimeframeChange?: (
 		afterDate: string,
-		beforeDate: string,
+		beforeDate?: string,
 		timeframe?: string,
 	) => void;
 	onUserClick?: (username: string) => void;

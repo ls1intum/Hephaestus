@@ -1,11 +1,9 @@
 package de.tum.in.www1.hephaestus.profile;
 
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
-import de.tum.in.www1.hephaestus.gitprovider.issuecomment.IssueComment;
 import de.tum.in.www1.hephaestus.gitprovider.issuecomment.IssueCommentRepository;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestInfoDTO;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
-import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReview;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReviewInfoDTO;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReviewInfoDTOConverter;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReviewRepository;
@@ -16,6 +14,7 @@ import de.tum.in.www1.hephaestus.gitprovider.user.UserInfoDTO;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserProfileDTO;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceMembershipService;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -36,6 +35,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class UserProfileService {
 
     private static final Logger logger = LoggerFactory.getLogger(UserProfileService.class);
+    private static final Duration DEFAULT_ACTIVITY_WINDOW = Duration.ofDays(7);
 
     private final UserRepository userRepository;
     private final RepositoryRepository repositoryRepository;
@@ -71,8 +71,15 @@ public class UserProfileService {
      * @return user profile with open PRs, review activity, etc.
      */
     @Transactional(readOnly = true)
-    public Optional<UserProfileDTO> getUserProfile(String login, Long workspaceId) {
-        logger.debug("Getting user profile for login: {} in workspace: {}", login, workspaceId);
+    public Optional<UserProfileDTO> getUserProfile(String login, Long workspaceId, Instant after, Instant before) {
+        TimeRange timeRange = resolveTimeRange(login, after, before);
+        logger.debug(
+            "Getting user profile for login: {} in workspace: {} with timeframe {} - {}",
+            login,
+            workspaceId,
+            timeRange.after(),
+            timeRange.before()
+        );
 
         Optional<User> optionalUser = userRepository.findByLogin(login);
         if (optionalUser.isEmpty()) {
@@ -103,29 +110,39 @@ public class UserProfileService {
                 .toList();
 
         // Review activity includes both pull request reviews and issue comments
-        List<PullRequestReviewInfoDTO> reviewActivity = buildReviewActivity(login, workspaceId);
+        List<PullRequestReviewInfoDTO> reviewActivity = buildReviewActivity(login, workspaceId, timeRange);
 
         return Optional.of(
             new UserProfileDTO(user, firstContribution, contributedRepositories, reviewActivity, openPullRequests)
         );
     }
 
-    private List<PullRequestReviewInfoDTO> buildReviewActivity(String login, Long workspaceId) {
+    private TimeRange resolveTimeRange(String login, Instant after, Instant before) {
+        Instant resolvedBefore = before == null ? Instant.now() : before;
+        Instant resolvedAfter = after == null ? resolvedBefore.minus(DEFAULT_ACTIVITY_WINDOW) : after;
+
+        if (resolvedAfter.isAfter(resolvedBefore)) {
+            logger.debug("Clamping activity window for user {} because after > before", login);
+            resolvedAfter = resolvedBefore;
+        }
+
+        return new TimeRange(resolvedAfter, resolvedBefore);
+    }
+
+    private List<PullRequestReviewInfoDTO> buildReviewActivity(String login, Long workspaceId, TimeRange timeRange) {
         if (workspaceId == null) {
             return List.of();
         }
 
-        Instant since = Instant.now().minusSeconds(7L * 24 * 60 * 60);
-
         List<PullRequestReviewInfoDTO> reviewActivity = pullRequestReviewRepository
-            .findAllByAuthorLoginSince(login, since, workspaceId)
+            .findAllByAuthorLoginInTimeframe(login, timeRange.after(), timeRange.before(), workspaceId)
             .stream()
             .map(pullRequestReviewInfoDTOConverter::convert)
             .collect(Collectors.toCollection(ArrayList::new));
 
         reviewActivity.addAll(
             issueCommentRepository
-                .findAllByAuthorLoginSince(login, since, true, workspaceId)
+                .findAllByAuthorLoginInTimeframe(login, timeRange.after(), timeRange.before(), true, workspaceId)
                 .stream()
                 .map(pullRequestReviewInfoDTOConverter::convert)
                 .toList()
@@ -134,4 +151,6 @@ public class UserProfileService {
         reviewActivity.sort(Comparator.comparing(PullRequestReviewInfoDTO::submittedAt).reversed());
         return reviewActivity;
     }
+
+    private record TimeRange(Instant after, Instant before) {}
 }

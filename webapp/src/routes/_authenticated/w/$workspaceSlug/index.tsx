@@ -78,26 +78,39 @@ function LeaderboardContainer() {
 		enabled: hasWorkspace,
 	});
 
-	// Query for leaderboard data based on filters
+	// Query for leaderboard data based on filters (API requires before; fall back when missing)
+	const normalizedBefore = before
+		? new Date(before)
+		: new Date(endOfCurrentWeek);
 	const leaderboardQuery = useQuery({
 		...getLeaderboardOptions({
 			path: { workspaceSlug: slug },
 			query: {
-				after: new Date(after || startOfCurrentWeek),
-				before: new Date(before || endOfCurrentWeek),
+				after: after ? new Date(after) : new Date(startOfCurrentWeek),
+				before: normalizedBefore,
 				team,
 				sort,
 				mode,
 			},
 		}),
-		enabled: hasWorkspace && Boolean(after && before && teamsQuery.data),
+		enabled:
+			hasWorkspace && Boolean((after || startOfCurrentWeek) && teamsQuery.data),
 	});
 
-	// Query for user profile data
+	// Query for user profile data (mirror leaderboard filters if provided)
+	const userProfileOptions = getUserProfileOptions({
+		path: { workspaceSlug: workspaceSlug ?? "", login: username || "" },
+		query:
+			after || before
+				? {
+					after: after ? new Date(after) : undefined,
+					before: before ? new Date(before) : undefined,
+				}
+			: undefined,
+	});
+
 	const userProfileQuery = useQuery({
-		...getUserProfileOptions({
-			path: { workspaceSlug: workspaceSlug ?? "", login: username || "" },
-		}),
+		...userProfileOptions,
 		enabled: hasWorkspace && Boolean(username),
 	});
 	// Find the current user's entry in the leaderboard
@@ -260,7 +273,7 @@ function LeaderboardContainer() {
 	};
 
 	// Handle timeframe changes - note we're not passing timeframe in URL anymore
-	const handleTimeframeChange = (afterDate: string, beforeDate: string) => {
+	const handleTimeframeChange = (afterDate: string, beforeDate?: string) => {
 		navigate({
 			search: (prev) => ({
 				...prev,
