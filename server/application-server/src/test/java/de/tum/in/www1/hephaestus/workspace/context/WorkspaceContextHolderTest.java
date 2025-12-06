@@ -34,6 +34,7 @@ class WorkspaceContextHolderTest {
             "Test Workspace",
             AccountType.ORG,
             123L,
+            false,
             Set.of(WorkspaceRole.OWNER)
         );
 
@@ -55,7 +56,15 @@ class WorkspaceContextHolderTest {
     @DisplayName("Should enrich MDC with workspace metadata")
     void shouldEnrichMDC() {
         // Arrange
-        WorkspaceContext context = new WorkspaceContext(42L, "test-slug", "Test", AccountType.USER, 999L, Set.of());
+        WorkspaceContext context = new WorkspaceContext(
+            42L,
+            "test-slug",
+            "Test",
+            AccountType.USER,
+            999L,
+            false,
+            Set.of()
+        );
 
         // Act
         WorkspaceContextHolder.setContext(context);
@@ -70,7 +79,7 @@ class WorkspaceContextHolderTest {
     @DisplayName("Should clear context and MDC")
     void shouldClearContextAndMDC() {
         // Arrange
-        WorkspaceContext context = new WorkspaceContext(1L, "test", "Test", AccountType.ORG, 100L, Set.of());
+        WorkspaceContext context = new WorkspaceContext(1L, "test", "Test", AccountType.ORG, 100L, false, Set.of());
         WorkspaceContextHolder.setContext(context);
 
         // Act
@@ -93,6 +102,7 @@ class WorkspaceContextHolderTest {
             "Test",
             AccountType.ORG,
             null, // No installation ID
+            false,
             Set.of()
         );
 
@@ -115,6 +125,7 @@ class WorkspaceContextHolderTest {
             "Main",
             AccountType.ORG,
             100L,
+            false,
             Set.of(WorkspaceRole.OWNER)
         );
 
@@ -124,6 +135,7 @@ class WorkspaceContextHolderTest {
             "Other",
             AccountType.USER,
             200L,
+            false,
             Set.of(WorkspaceRole.MEMBER)
         );
 
@@ -166,7 +178,7 @@ class WorkspaceContextHolderTest {
     @DisplayName("Should handle setting null context")
     void shouldHandleSettingNullContext() {
         // Arrange
-        WorkspaceContext context = new WorkspaceContext(1L, "test", "Test", AccountType.ORG, 100L, Set.of());
+        WorkspaceContext context = new WorkspaceContext(1L, "test", "Test", AccountType.ORG, 100L, false, Set.of());
         WorkspaceContextHolder.setContext(context);
 
         // Act

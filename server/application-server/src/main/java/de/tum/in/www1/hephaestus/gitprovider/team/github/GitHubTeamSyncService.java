@@ -61,11 +61,7 @@ public class GitHubTeamSyncService {
                 // must call via the proxy (self) to trigger @Transactional on processTeam()
                 Team saved = self.processTeam(ghTeam);
                 if (saved == null) {
-                    log.warn(
-                        "Skipped team {} with following id: {} due to an error:",
-                        ghTeam.getName(),
-                        ghTeam.getId()
-                    );
+                    log.warn("Skipped team {} with id {} due to an error", ghTeam.getName(), ghTeam.getId());
                 }
             });
         // parent relationships

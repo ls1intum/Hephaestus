@@ -12,7 +12,6 @@ import de.tum.in.www1.hephaestus.gitprovider.label.github.GitHubLabelConverter;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.testconfig.BaseIntegrationTest;
-import jakarta.transaction.Transactional;
 import java.time.Instant;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -25,6 +24,7 @@ import org.kohsuke.github.GHEventPayload;
 import org.kohsuke.github.GHIssue;
 import org.kohsuke.github.GHLabel;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.transaction.annotation.Transactional;
 
 @DisplayName("GitHub Issue Message Handler")
 @ExtendWith(GitHubPayloadExtension.class)

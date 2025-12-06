@@ -2,6 +2,7 @@ package de.tum.in.www1.hephaestus.gitprovider.github;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.github.app.GitHubAppTokenService;
 import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserSyncService;
+import de.tum.in.www1.hephaestus.workspace.AccountType;
 import de.tum.in.www1.hephaestus.workspace.RepositoryToMonitor;
 import de.tum.in.www1.hephaestus.workspace.RepositoryToMonitorRepository;
 import de.tum.in.www1.hephaestus.workspace.Workspace;
@@ -91,9 +92,24 @@ abstract class AbstractGitHubSyncIntegrationTest extends BaseGitHubIntegrationTe
         var ws = new Workspace();
         ws.setGitProviderMode(Workspace.GitProviderMode.GITHUB_APP_INSTALLATION);
         ws.setInstallationId(githubInstallationId());
+        ws.setWorkspaceSlug(generateWorkspaceSlug());
+        ws.setDisplayName(githubOrganization());
         ws.setAccountLogin(githubOrganization());
+        ws.setAccountType(AccountType.ORG);
         ws.setGithubRepositorySelection(org.kohsuke.github.GHRepositorySelection.ALL);
         return workspaceRepository.save(ws);
+    }
+
+    private String generateWorkspaceSlug() {
+        String lowerCase = githubOrganization().toLowerCase();
+        String normalized = lowerCase.replaceAll("[^a-z0-9]+", "-").replaceAll("^-+|-+$", "");
+        if (normalized.isBlank()) {
+            normalized = "workspace-" + Long.toString(System.currentTimeMillis(), 36);
+        }
+        if (normalized.length() < 3) {
+            normalized = normalized + "-ws";
+        }
+        return normalized;
     }
 
     protected GHRepository createEphemeralRepository(String suffix) throws IOException, InterruptedException {

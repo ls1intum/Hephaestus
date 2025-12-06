@@ -6,7 +6,12 @@
     <link rel="icon" href="/favicon.ico" />
     <meta name="theme-color" content="#000000" />
     <link rel="apple-touch-icon" href="/logo192.png" />
-    <link rel="manifest" href="/manifest.json" />
+    <script>
+      const link = document.createElement('link');
+      link.rel = 'manifest';
+      link.href = window.location.hostname === 'localhost' ? '/manifest-dev.json' : '/manifest.json';
+      document.head.appendChild(link);
+    </script>
     <title>Hephaestus</title>
   </head>
   <body class="bg-sidebar">

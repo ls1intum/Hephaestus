@@ -8,14 +8,20 @@ import {
 	SidebarMenuItem,
 } from "@/components/ui/sidebar";
 
-export function NavDashboards({ username }: { username: string }) {
+export function NavDashboards({
+	username,
+	workspaceSlug,
+}: {
+	username: string;
+	workspaceSlug: string;
+}) {
 	return (
 		<SidebarGroup>
 			<SidebarGroupLabel>Dashboards</SidebarGroupLabel>
 			<SidebarMenu>
 				<SidebarMenuItem>
 					<SidebarMenuButton asChild tooltip="Leaderboard">
-						<Link to="/">
+						<Link to="/w/$workspaceSlug" params={{ workspaceSlug }}>
 							<Trophy />
 							<span>Leaderboard</span>
 						</Link>
@@ -23,7 +29,10 @@ export function NavDashboards({ username }: { username: string }) {
 				</SidebarMenuItem>
 				<SidebarMenuItem>
 					<SidebarMenuButton asChild tooltip="Best practices">
-						<Link to="/best-practices">
+						<Link
+							to="/w/$workspaceSlug/user/$username/best-practices"
+							params={{ workspaceSlug, username }}
+						>
 							<CheckCheck />
 							<span>Best practices</span>
 						</Link>
@@ -32,9 +41,8 @@ export function NavDashboards({ username }: { username: string }) {
 				<SidebarMenuItem>
 					<SidebarMenuButton asChild tooltip="Profile">
 						<Link
-							to="/user/$username"
-							search={{}}
-							params={{ username: username ?? "" }}
+							to="/w/$workspaceSlug/user/$username"
+							params={{ username: username ?? "", workspaceSlug }}
 						>
 							<User />
 							<span>Profile</span>
@@ -43,7 +51,7 @@ export function NavDashboards({ username }: { username: string }) {
 				</SidebarMenuItem>
 				<SidebarMenuItem>
 					<SidebarMenuButton asChild tooltip="Teams">
-						<Link to="/teams">
+						<Link to="/w/$workspaceSlug/teams" params={{ workspaceSlug }}>
 							<Users />
 							<span>Teams</span>
 						</Link>

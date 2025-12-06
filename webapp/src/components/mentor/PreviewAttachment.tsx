@@ -1,5 +1,5 @@
+import { Spinner } from "@/components/ui/spinner";
 import type { Attachment } from "@/lib/types";
-import { LoaderIcon } from "./LoaderIcon";
 
 export const PreviewAttachment = ({
 	attachment,
@@ -31,9 +31,9 @@ export const PreviewAttachment = ({
 				{isUploading && (
 					<div
 						data-testid="input-attachment-loader"
-						className="animate-spin absolute text-zinc-500"
+						className="absolute text-zinc-500"
 					>
-						<LoaderIcon />
+						<Spinner size="sm" />
 					</div>
 				)}
 			</div>

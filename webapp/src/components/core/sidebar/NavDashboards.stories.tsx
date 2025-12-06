@@ -20,11 +20,16 @@ const meta = {
 	tags: ["autodocs"],
 	args: {
 		username: "johnDoe",
+		workspaceSlug: "aet",
 	},
 	argTypes: {
 		username: {
 			control: "text",
 			description: "Username of the current user",
+		},
+		workspaceSlug: {
+			control: "text",
+			description: "Active workspace slug",
 		},
 	},
 	decorators: [
@@ -50,5 +55,6 @@ export const Default: Story = {};
 export const DifferentUser: Story = {
 	args: {
 		username: "janeDoe",
+		workspaceSlug: "aet",
 	},
 };

@@ -14,6 +14,8 @@ export interface AdminSettingsPageProps {
 	isAddingRepository: boolean;
 	isRemovingRepository: boolean;
 	isResettingLeagues: boolean;
+	/** Whether repository management is disabled (for GitHub App Installation workspaces) */
+	isAppInstallationWorkspace?: boolean;
 	onAddRepository: (nameWithOwner: string) => void;
 	onRemoveRepository: (nameWithOwner: string) => void;
 	onResetLeagues: () => void;
@@ -30,6 +32,7 @@ export function AdminSettingsPage({
 	isAddingRepository,
 	isRemovingRepository,
 	isResettingLeagues,
+	isAppInstallationWorkspace = false,
 	onAddRepository,
 	onRemoveRepository,
 	onResetLeagues,
@@ -47,6 +50,7 @@ export function AdminSettingsPage({
 					addRepositoryError={addRepositoryError}
 					isAddingRepository={isAddingRepository}
 					isRemovingRepository={isRemovingRepository}
+					isReadOnly={isAppInstallationWorkspace}
 					onAddRepository={onAddRepository}
 					onRemoveRepository={onRemoveRepository}
 				/>

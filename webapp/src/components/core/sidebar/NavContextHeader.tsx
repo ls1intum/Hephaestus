@@ -9,14 +9,20 @@ import { SidebarMenuButton, SidebarSeparator } from "@/components/ui/sidebar";
 export function NavContextHeader({
 	title,
 	children,
+	workspaceSlug,
 }: {
 	title: string;
 	children?: React.ReactNode;
+	workspaceSlug: string;
 }) {
 	return (
 		<>
 			<SidebarMenuButton asChild>
-				<Link to="/" className="font-semibold">
+				<Link
+					to="/w/$workspaceSlug"
+					params={{ workspaceSlug }}
+					className="font-semibold"
+				>
 					<ChevronLeft className="h-4 w-4" />
 					{title}
 				</Link>

@@ -1,6 +1,5 @@
 package de.tum.in.www1.hephaestus.gitprovider.pullrequest;
 
-import jakarta.transaction.Transactional;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -9,6 +8,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 @Repository
 public interface PullRequestRepository extends JpaRepository<PullRequest, Long> {
@@ -30,13 +30,16 @@ public interface PullRequestRepository extends JpaRepository<PullRequest, Long> 
         JOIN FETCH p.author
         LEFT JOIN FETCH p.assignees
         LEFT JOIN FETCH p.repository
-        WHERE (p.author.login ILIKE :assigneeLogin OR LOWER(:assigneeLogin) IN (SELECT LOWER(u.login) FROM p.assignees u)) AND p.state IN :states
+        WHERE (p.author.login ILIKE :assigneeLogin OR LOWER(:assigneeLogin) IN (SELECT LOWER(u.login) FROM p.assignees u))
+            AND p.state IN :states
+            AND p.repository.organization.workspace.id = :workspaceId
         ORDER BY p.createdAt DESC
         """
     )
     List<PullRequest> findAssignedByLoginAndStates(
         @Param("assigneeLogin") String assigneeLogin,
-        @Param("states") Set<PullRequest.State> states
+        @Param("states") Set<PullRequest.State> states,
+        @Param("workspaceId") Long workspaceId
     );
 
     @Query(
@@ -47,14 +50,18 @@ public interface PullRequestRepository extends JpaRepository<PullRequest, Long> 
         JOIN FETCH p.author
         LEFT JOIN FETCH p.assignees
         LEFT JOIN FETCH p.repository
-        WHERE (p.author.login ILIKE :assigneeLogin OR LOWER(:assigneeLogin) IN (SELECT LOWER(u.login) FROM p.assignees u)) AND p.state IN :states AND p.updatedAt >= :activitySince
+        WHERE (p.author.login ILIKE :assigneeLogin OR LOWER(:assigneeLogin) IN (SELECT LOWER(u.login) FROM p.assignees u))
+            AND p.state IN :states
+            AND p.updatedAt >= :activitySince
+            AND p.repository.organization.workspace.id = :workspaceId
         ORDER BY p.createdAt DESC
         """
     )
     List<PullRequest> findAssignedByLoginAndStatesUpdatedSince(
         @Param("assigneeLogin") String assigneeLogin,
         @Param("states") Set<PullRequest.State> states,
-        @Param("activitySince") Instant activitySince
+        @Param("activitySince") Instant activitySince,
+        @Param("workspaceId") Long workspaceId
     );
 
     @Query(

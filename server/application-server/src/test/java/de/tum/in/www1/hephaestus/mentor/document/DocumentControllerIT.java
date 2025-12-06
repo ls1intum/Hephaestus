@@ -6,7 +6,13 @@ import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.in.www1.hephaestus.testconfig.TestAuthUtils;
+import de.tum.in.www1.hephaestus.testconfig.TestUserFactory;
 import de.tum.in.www1.hephaestus.testconfig.WithMentorUser;
+import de.tum.in.www1.hephaestus.testconfig.WorkspaceTestFactory;
+import de.tum.in.www1.hephaestus.workspace.Workspace;
+import de.tum.in.www1.hephaestus.workspace.WorkspaceMembership;
+import de.tum.in.www1.hephaestus.workspace.WorkspaceMembershipRepository;
+import de.tum.in.www1.hephaestus.workspace.WorkspaceRepository;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -16,10 +22,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.reactive.AutoConfigureWebTestClient;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.reactive.server.WebTestClient;
-import org.springframework.transaction.annotation.Transactional;
 
 @AutoConfigureWebTestClient
-@Transactional
 public class DocumentControllerIT extends BaseIntegrationTest {
 
     @Autowired
@@ -31,11 +35,41 @@ public class DocumentControllerIT extends BaseIntegrationTest {
     @Autowired
     private UserRepository userRepository;
 
+    @Autowired
+    private WorkspaceRepository workspaceRepository;
+
+    @Autowired
+    private WorkspaceMembershipRepository workspaceMembershipRepository;
+
     private User testUser;
+    private Workspace workspace;
+    private static final String WORKSPACE_SLUG = "mentor-docs";
 
     @BeforeEach
     void setup() {
-        testUser = userRepository.findByLogin("mentor").orElseThrow();
+        documentRepository.deleteAll();
+        testUser = TestUserFactory.ensureUser(userRepository, "mentor", 2L);
+        workspace = workspaceRepository
+            .findByWorkspaceSlug(WORKSPACE_SLUG)
+            .orElseGet(() -> workspaceRepository.save(WorkspaceTestFactory.activeWorkspace(WORKSPACE_SLUG)));
+        ensureWorkspaceMembership(workspace, testUser);
+    }
+
+    private String documentsPath() {
+        return "/workspaces/" + workspace.getWorkspaceSlug() + "/api/documents";
+    }
+
+    private void ensureWorkspaceMembership(Workspace targetWorkspace, User user) {
+        workspaceMembershipRepository
+            .findByWorkspace_IdAndUser_Id(targetWorkspace.getId(), user.getId())
+            .orElseGet(() -> {
+                WorkspaceMembership membership = new WorkspaceMembership();
+                membership.setId(new WorkspaceMembership.Id(targetWorkspace.getId(), user.getId()));
+                membership.setWorkspace(targetWorkspace);
+                membership.setUser(user);
+                membership.setRole(WorkspaceMembership.WorkspaceRole.MEMBER);
+                return workspaceMembershipRepository.save(membership);
+            });
     }
 
     // ==================== Document CRUD Operations ====================
@@ -49,7 +83,7 @@ public class DocumentControllerIT extends BaseIntegrationTest {
         // Act & Assert
         webTestClient
             .post()
-            .uri("/api/documents") // Plural resource name
+            .uri(documentsPath()) // Plural resource name
             .headers(TestAuthUtils.withCurrentUser())
             .contentType(MediaType.APPLICATION_JSON)
             .bodyValue(request)
@@ -75,7 +109,7 @@ public class DocumentControllerIT extends BaseIntegrationTest {
         // Act & Assert
         webTestClient
             .get()
-            .uri("/api/documents/{id}", documentId) // Path parameter
+            .uri(documentsPath() + "/{id}", documentId) // Path parameter
             .headers(TestAuthUtils.withCurrentUser())
             .exchange()
             .expectStatus()
@@ -90,6 +124,35 @@ public class DocumentControllerIT extends BaseIntegrationTest {
 
     @Test
     @WithMentorUser
+    void shouldNotExposeDocumentsAcrossWorkspaces() {
+        // Arrange: persist document in the primary workspace
+        UUID documentId = createTestDocument("Scoped Document", "Scoped content");
+        Workspace otherWorkspace = workspaceRepository
+            .findByWorkspaceSlug("mentor-docs-isolation")
+            .orElseGet(() -> workspaceRepository.save(WorkspaceTestFactory.activeWorkspace("mentor-docs-isolation")));
+        ensureWorkspaceMembership(otherWorkspace, testUser);
+
+        // Act & Assert: the same user cannot fetch the document via a different workspace slug
+        webTestClient
+            .get()
+            .uri("/workspaces/" + otherWorkspace.getWorkspaceSlug() + "/api/documents/{id}", documentId)
+            .headers(TestAuthUtils.withCurrentUser())
+            .exchange()
+            .expectStatus()
+            .isNotFound();
+
+        // Verify the document remains accessible through its original workspace
+        webTestClient
+            .get()
+            .uri(documentsPath() + "/{id}", documentId)
+            .headers(TestAuthUtils.withCurrentUser())
+            .exchange()
+            .expectStatus()
+            .isOk();
+    }
+
+    @Test
+    @WithMentorUser
     void shouldUpdateDocumentSuccessfully() {
         // Arrange - Create document first
         UUID documentId = createTestDocument("Original Title", "Original content");
@@ -99,7 +162,7 @@ public class DocumentControllerIT extends BaseIntegrationTest {
         // Act & Assert
         webTestClient
             .put()
-            .uri("/api/documents/{id}", documentId) // PUT for updates
+            .uri(documentsPath() + "/{id}", documentId) // PUT for updates
             .headers(TestAuthUtils.withCurrentUser())
             .contentType(MediaType.APPLICATION_JSON)
             .bodyValue(updateRequest)
@@ -115,7 +178,11 @@ public class DocumentControllerIT extends BaseIntegrationTest {
             });
 
         // Assert - Should have created new version
-        var allVersions = documentRepository.findByIdAndUserOrderByVersionNumberDesc(documentId, testUser);
+        var allVersions = documentRepository.findByWorkspaceAndUserAndIdOrderByVersionNumberDesc(
+            workspace,
+            documentId,
+            testUser
+        );
         assertThat(allVersions).hasSize(2);
         assertThat(allVersions.get(0).getTitle()).isEqualTo("Updated Title"); // Latest first
         assertThat(allVersions.get(1).getTitle()).isEqualTo("Original Title");
@@ -130,14 +197,14 @@ public class DocumentControllerIT extends BaseIntegrationTest {
         // Act & Assert
         webTestClient
             .delete()
-            .uri("/api/documents/{id}", documentId)
+            .uri(documentsPath() + "/{id}", documentId)
             .headers(TestAuthUtils.withCurrentUser())
             .exchange()
             .expectStatus()
             .isNoContent(); // 204 for successful deletion
 
         // Assert - Document should be gone
-        var documents = documentRepository.findByIdAndUser(documentId, testUser);
+        var documents = documentRepository.findByWorkspaceAndUserAndId(workspace, testUser, documentId);
         assertThat(documents).isEmpty();
     }
 
@@ -155,7 +222,7 @@ public class DocumentControllerIT extends BaseIntegrationTest {
         // Act & Assert - Use proper DTO and filter our test data
         webTestClient
             .get()
-            .uri("/api/documents")
+            .uri(documentsPath())
             .headers(TestAuthUtils.withCurrentUser())
             .exchange()
             .expectStatus()
@@ -189,7 +256,7 @@ public class DocumentControllerIT extends BaseIntegrationTest {
         // Act & Assert - Use proper DTO types for paginated response
         webTestClient
             .get()
-            .uri("/api/documents/{id}/versions?page=0&size=10", documentId)
+            .uri(documentsPath() + "/{id}/versions?page=0&size=10", documentId)
             .headers(TestAuthUtils.withCurrentUser())
             .exchange()
             .expectStatus()
@@ -214,14 +281,16 @@ public class DocumentControllerIT extends BaseIntegrationTest {
     void shouldGetSpecificDocumentVersionSuccessfully() {
         // Arrange - Create document with multiple versions
         UUID documentId = createTestDocument("Version 1", "Content 1");
-        var firstVersion = documentRepository.findFirstByIdAndUserOrderByVersionNumberDesc(documentId, testUser).get();
+        var firstVersion = documentRepository
+            .findFirstByWorkspaceAndUserAndIdOrderByVersionNumberDesc(workspace, testUser, documentId)
+            .get();
 
         updateTestDocument(documentId, "Version 2", "Content 2");
 
         // Act & Assert - Get specific version by version number
         webTestClient
             .get()
-            .uri("/api/documents/{id}/versions/{versionNumber}", documentId, firstVersion.getVersionNumber())
+            .uri(documentsPath() + "/{id}/versions/{versionNumber}", documentId, firstVersion.getVersionNumber())
             .headers(TestAuthUtils.withCurrentUser())
             .exchange()
             .expectStatus()
@@ -240,7 +309,7 @@ public class DocumentControllerIT extends BaseIntegrationTest {
         // Arrange - Create multiple versions
         UUID documentId = createTestDocument("Version 1", "Content 1");
         var firstVersionTime = documentRepository
-            .findFirstByIdAndUserOrderByVersionNumberDesc(documentId, testUser)
+            .findFirstByWorkspaceAndUserAndIdOrderByVersionNumberDesc(workspace, testUser, documentId)
             .get()
             .getCreatedAt();
 
@@ -254,7 +323,7 @@ public class DocumentControllerIT extends BaseIntegrationTest {
         // Act & Assert
         webTestClient
             .delete()
-            .uri("/api/documents/{id}/versions?after={timestamp}", documentId, firstVersionTime.plusMillis(1))
+            .uri(documentsPath() + "/{id}/versions?after={timestamp}", documentId, firstVersionTime.plusMillis(1))
             .headers(TestAuthUtils.withCurrentUser())
             .exchange()
             .expectStatus()
@@ -268,7 +337,11 @@ public class DocumentControllerIT extends BaseIntegrationTest {
             });
 
         // Assert - Only first version should remain
-        var remainingVersions = documentRepository.findByIdAndUserOrderByVersionNumberDesc(documentId, testUser);
+        var remainingVersions = documentRepository.findByWorkspaceAndUserAndIdOrderByVersionNumberDesc(
+            workspace,
+            documentId,
+            testUser
+        );
         assertThat(remainingVersions).hasSize(1);
         assertThat(remainingVersions.get(0).getTitle()).isEqualTo("Version 1");
     }
@@ -281,7 +354,7 @@ public class DocumentControllerIT extends BaseIntegrationTest {
         // Act & Assert
         webTestClient
             .get()
-            .uri("/api/documents/{id}", UUID.randomUUID())
+            .uri(documentsPath() + "/{id}", UUID.randomUUID())
             .headers(TestAuthUtils.withCurrentUser())
             .exchange()
             .expectStatus()
@@ -297,7 +370,7 @@ public class DocumentControllerIT extends BaseIntegrationTest {
         // Act & Assert
         webTestClient
             .put()
-            .uri("/api/documents/{id}", UUID.randomUUID())
+            .uri(documentsPath() + "/{id}", UUID.randomUUID())
             .headers(TestAuthUtils.withCurrentUser())
             .contentType(MediaType.APPLICATION_JSON)
             .bodyValue(updateRequest)
@@ -319,7 +392,7 @@ public class DocumentControllerIT extends BaseIntegrationTest {
         // Act & Assert
         webTestClient
             .post()
-            .uri("/api/documents")
+            .uri(documentsPath())
             .headers(TestAuthUtils.withCurrentUser())
             .contentType(MediaType.APPLICATION_JSON)
             .bodyValue(invalidRequest)
@@ -346,7 +419,7 @@ public class DocumentControllerIT extends BaseIntegrationTest {
         // Act & Assert - Test pagination structure without relying on absolute counts
         webTestClient
             .get()
-            .uri("/api/documents?page=0&size=2")
+            .uri(documentsPath() + "?page=0&size=2")
             .headers(TestAuthUtils.withCurrentUser())
             .exchange()
             .expectStatus()
@@ -381,7 +454,7 @@ public class DocumentControllerIT extends BaseIntegrationTest {
         // Act & Assert
         webTestClient
             .get()
-            .uri("/api/documents/{id}/versions?page=0&size=2", documentId)
+            .uri(documentsPath() + "/{id}/versions?page=0&size=2", documentId)
             .headers(TestAuthUtils.withCurrentUser())
             .exchange()
             .expectStatus()
@@ -402,7 +475,7 @@ public class DocumentControllerIT extends BaseIntegrationTest {
 
         return webTestClient
             .post()
-            .uri("/api/documents")
+            .uri(documentsPath())
             .headers(TestAuthUtils.withCurrentUser())
             .contentType(MediaType.APPLICATION_JSON)
             .bodyValue(request)
@@ -420,7 +493,7 @@ public class DocumentControllerIT extends BaseIntegrationTest {
 
         webTestClient
             .put()
-            .uri("/api/documents/{id}", documentId)
+            .uri(documentsPath() + "/{id}", documentId)
             .headers(TestAuthUtils.withCurrentUser())
             .contentType(MediaType.APPLICATION_JSON)
             .bodyValue(updateRequest)

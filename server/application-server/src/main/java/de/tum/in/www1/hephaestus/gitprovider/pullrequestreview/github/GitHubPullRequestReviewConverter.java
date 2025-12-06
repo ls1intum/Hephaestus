@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.github;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.PostgresStringUtils;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReview;
 import org.kohsuke.github.GHPullRequestReview;
 import org.kohsuke.github.GHPullRequestReviewState;
@@ -19,7 +20,7 @@ public class GitHubPullRequestReviewConverter implements Converter<GHPullRequest
 
     public PullRequestReview update(@NonNull GHPullRequestReview source, @NonNull PullRequestReview review) {
         review.setId(source.getId());
-        review.setBody(source.getBody());
+        review.setBody(PostgresStringUtils.sanitize(source.getBody()));
 
         if (review.getState() == null || source.getState() != GHPullRequestReviewState.DISMISSED) {
             review.setState(convertState(source.getState()));

@@ -83,17 +83,31 @@ public final class WorkspaceContextExecutor {
         Map<String, String> capturedMdc = MDC.getCopyOfContextMap();
 
         return () -> {
+            WorkspaceContext previousContext = WorkspaceContextHolder.getContext();
+            Map<String, String> previousMdc = MDC.getCopyOfContextMap();
+
             // Restore context in execution thread
             WorkspaceContextHolder.setContext(capturedContext);
             if (capturedMdc != null) {
                 MDC.setContextMap(capturedMdc);
+            } else {
+                MDC.clear();
             }
 
             try {
                 runnable.run();
             } finally {
-                // Clean up after execution
+                // Clean up after execution and restore prior state
                 WorkspaceContextHolder.clearContext();
+                if (previousContext != null) {
+                    WorkspaceContextHolder.setContext(previousContext);
+                }
+
+                if (previousMdc != null) {
+                    MDC.setContextMap(previousMdc);
+                } else {
+                    MDC.clear();
+                }
             }
         };
     }
@@ -118,17 +132,31 @@ public final class WorkspaceContextExecutor {
         Map<String, String> capturedMdc = MDC.getCopyOfContextMap();
 
         return () -> {
+            WorkspaceContext previousContext = WorkspaceContextHolder.getContext();
+            Map<String, String> previousMdc = MDC.getCopyOfContextMap();
+
             // Restore context in execution thread
             WorkspaceContextHolder.setContext(capturedContext);
             if (capturedMdc != null) {
                 MDC.setContextMap(capturedMdc);
+            } else {
+                MDC.clear();
             }
 
             try {
                 return callable.call();
             } finally {
-                // Clean up after execution
+                // Clean up after execution and restore prior state
                 WorkspaceContextHolder.clearContext();
+                if (previousContext != null) {
+                    WorkspaceContextHolder.setContext(previousContext);
+                }
+
+                if (previousMdc != null) {
+                    MDC.setContextMap(previousMdc);
+                } else {
+                    MDC.clear();
+                }
             }
         };
     }

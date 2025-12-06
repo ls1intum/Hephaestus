@@ -10,6 +10,7 @@ interface ProfileProps {
 	error: boolean;
 	username: string;
 	currUserIsDashboardUser: boolean;
+	workspaceSlug: string;
 }
 
 export function ProfilePage({
@@ -18,6 +19,7 @@ export function ProfilePage({
 	error,
 	username,
 	currUserIsDashboardUser,
+	workspaceSlug,
 }: ProfileProps) {
 	if (error) {
 		return (
@@ -49,6 +51,7 @@ export function ProfilePage({
 				username={username}
 				displayName={profileData?.userInfo?.name}
 				currUserIsDashboardUser={currUserIsDashboardUser}
+				workspaceSlug={workspaceSlug}
 			/>
 		</div>
 	);

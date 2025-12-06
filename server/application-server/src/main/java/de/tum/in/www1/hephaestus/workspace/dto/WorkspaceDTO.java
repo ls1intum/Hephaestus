@@ -2,31 +2,32 @@ package de.tum.in.www1.hephaestus.workspace.dto;
 
 import de.tum.in.www1.hephaestus.workspace.Workspace;
 import java.time.Instant;
+import org.springframework.lang.NonNull;
 
 public record WorkspaceDTO(
-    Long id,
-    String slug,
-    String displayName,
-    Boolean isPubliclyViewable,
-    String status,
-    String accountLogin,
+    @NonNull Long id,
+    @NonNull String workspaceSlug,
+    @NonNull String displayName,
+    @NonNull Boolean isPubliclyViewable,
+    @NonNull String status,
+    @NonNull String accountLogin,
     Long installationId,
     String gitProviderMode,
-    Instant createdAt,
-    Instant updatedAt,
+    @NonNull Instant createdAt,
+    @NonNull Instant updatedAt,
     Instant installationLinkedAt,
     Integer leaderboardScheduleDay,
     String leaderboardScheduleTime,
     Boolean leaderboardNotificationEnabled,
     String leaderboardNotificationTeam,
     String leaderboardNotificationChannelId,
-    Boolean hasSlackToken,
-    Boolean hasSlackSigningSecret
+    @NonNull Boolean hasSlackToken,
+    @NonNull Boolean hasSlackSigningSecret
 ) {
     public static WorkspaceDTO from(Workspace workspace) {
         return new WorkspaceDTO(
             workspace.getId(),
-            workspace.getSlug(),
+            workspace.getWorkspaceSlug(),
             workspace.getDisplayName(),
             workspace.getIsPubliclyViewable(),
             workspace.getStatus() != null ? workspace.getStatus().name() : null,
