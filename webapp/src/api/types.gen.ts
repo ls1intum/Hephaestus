@@ -524,6 +524,10 @@ export type ReasoningUiPart = {
     type?: 'reasoning';
 };
 
+export type RenameWorkspaceSlugRequest = {
+    newSlug: string;
+};
+
 export type RepositoryInfo = {
     description?: string;
     hiddenFromContributions: boolean;
@@ -2661,6 +2665,27 @@ export type UpdateSlackCredentialsResponses = {
 };
 
 export type UpdateSlackCredentialsResponse = UpdateSlackCredentialsResponses[keyof UpdateSlackCredentialsResponses];
+
+export type RenameSlugData = {
+    body: RenameWorkspaceSlugRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/slug';
+};
+
+export type RenameSlugResponses = {
+    /**
+     * Workspace renamed
+     */
+    200: Workspace;
+};
+
+export type RenameSlugResponse = RenameSlugResponses[keyof RenameSlugResponses];
 
 export type UpdateStatusData = {
     body: UpdateWorkspaceStatusRequest;

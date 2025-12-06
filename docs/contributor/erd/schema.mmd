@@ -378,6 +378,15 @@ erDiagram
         BIGINT workspace_id PK,FK
     }
 
+    WorkspaceSlugHistory {
+        BIGINT id PK
+        TIMESTAMPTZ changed_at "NOT NULL"
+        VARCHAR(255) new_slug "NOT NULL"
+        VARCHAR(255) old_slug "NOT NULL"
+        TIMESTAMPTZ redirect_expires_at
+        BIGINT workspace_id FK "NOT NULL"
+    }
+
     %% Relationships
     %% One-to-One relationships
     ChatMessage ||--|| ChatMessagePart : has
@@ -418,6 +427,7 @@ erDiagram
     Issue ||--o{ PullRequestBadPractice : references
     Organization ||--o{ Repository : has
     Workspace ||--o{ RepositoryToMonitor : monitors
+    Workspace ||--o{ WorkspaceSlugHistory : has
 
     %% Many-to-Many relationships
     Issue }o--o{ IssueAssignee : assigned_to

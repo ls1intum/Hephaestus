@@ -1245,6 +1245,33 @@ paths:
       summary: Update Slack credentials for a workspace
       tags:
       - workspace
+  /workspaces/{workspaceSlug}/slug:
+    patch:
+      operationId: renameSlug
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RenameWorkspaceSlugRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Workspace"
+          description: Workspace renamed
+      summary: Rename workspace slug and create redirect
+      tags:
+      - workspace
   /workspaces/{workspaceSlug}/status:
     patch:
       operationId: updateStatus
@@ -2419,6 +2446,14 @@ components:
       required:
       - text
       title: ReasoningUIPart
+    RenameWorkspaceSlugRequest:
+      type: object
+      properties:
+        newSlug:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      required:
+      - newSlug
     RepositoryInfo:
       type: object
       properties:

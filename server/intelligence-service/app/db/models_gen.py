@@ -607,6 +607,9 @@ class Workspace(Base):
     workspace_membership: Mapped[List["WorkspaceMembership"]] = relationship(
         "WorkspaceMembership", back_populates="workspace"
     )
+    workspace_slug_history: Mapped[List["WorkspaceSlugHistory"]] = relationship(
+        "WorkspaceSlugHistory", back_populates="workspace"
+    )
 
 
 class Document(Base):
@@ -818,6 +821,44 @@ class WorkspaceMembership(Base):
     user: Mapped["User"] = relationship("User", back_populates="workspace_membership")
     workspace: Mapped["Workspace"] = relationship(
         "Workspace", back_populates="workspace_membership"
+    )
+
+
+class WorkspaceSlugHistory(Base):
+    __tablename__ = "workspace_slug_history"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["workspace_id"],
+            ["workspace.id"],
+            ondelete="CASCADE",
+            name="fk_workspace_slug_history_workspace",
+        ),
+        PrimaryKeyConstraint("id", name="workspace_slug_historyPK"),
+        Index("idx_workspace_slug_history_old_slug", "old_slug"),
+        Index("idx_workspace_slug_history_redirect_expires_at", "redirect_expires_at"),
+        Index("idx_workspace_slug_history_workspace_id", "workspace_id"),
+    )
+    id: Mapped[int] = mapped_column(
+        BigInteger,
+        Identity(
+            start=1,
+            increment=1,
+            minvalue=1,
+            maxvalue=9223372036854775807,
+            cycle=False,
+            cache=1,
+        ),
+        primary_key=True,
+    )
+    changed_at: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(True, 6))
+    new_slug: Mapped[str] = mapped_column(String(255))
+    old_slug: Mapped[str] = mapped_column(String(255))
+    workspace_id: Mapped[int] = mapped_column(BigInteger)
+    redirect_expires_at: Mapped[Optional[datetime.datetime]] = mapped_column(
+        TIMESTAMP(True, 6)
+    )
+    workspace: Mapped["Workspace"] = relationship(
+        "Workspace", back_populates="workspace_slug_history"
     )
 
 
