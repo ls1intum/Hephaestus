@@ -6,5 +6,12 @@ import java.util.Optional;
 
 public interface ContributionEventRepository extends JpaRepository<ContributionEvent, Long> {
 
-    Optional<ContributionEvent> findBySourceTypeAndSourceId(String sourceType, Long id);
+    /**
+     * Finds a ContributionEvent by its source type and source ID.
+     *
+     * @param sourceType the type of the contribution
+     * @param id         the ID of the contribution source
+     * @return an {@link Optional} containing the ContributionEvent if found, or empty otherwise
+     */
+    Optional<ContributionEvent> findBySourceTypeAndSourceId(ContributionSourceType sourceType, Long id);
 }

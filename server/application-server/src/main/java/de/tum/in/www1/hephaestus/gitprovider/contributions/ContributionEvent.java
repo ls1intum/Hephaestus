@@ -20,11 +20,11 @@ public class ContributionEvent {
     protected Long id;
 
     @NotNull
-    @Column(name = "source_type", length = 128, nullable = false)
-    private String sourceType;
+    @Enumerated(EnumType.STRING)
+    private ContributionSourceType sourceType;
 
     @NotNull
-    @Column(name = "source_id", nullable = false)
+    @Column(nullable = false)
     private Long sourceId;
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -32,11 +32,11 @@ public class ContributionEvent {
     private User actor;
 
     @NotNull
-    @Column(name = "occurred_at", nullable = false)
+    @Column(nullable = false)
     private Instant occurredAt;
 
     @NotNull
-    @Column(name = "xp_awarded", nullable = false)
+    @Column(nullable = false)
     private Integer xpAwarded;
 
 }

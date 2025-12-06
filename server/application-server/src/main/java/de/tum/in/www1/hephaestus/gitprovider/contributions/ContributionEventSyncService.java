@@ -2,10 +2,10 @@ package de.tum.in.www1.hephaestus.gitprovider.contributions;
 
 
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReview;
-import org.springframework.transaction.annotation.Transactional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class ContributionEventSyncService {
@@ -33,10 +33,10 @@ public class ContributionEventSyncService {
 
         try {
             ContributionEvent event = contributionEventRepository
-                .findBySourceTypeAndSourceId("PULL_REQUEST_REVIEW", pullRequestReview.getId())
+                .findBySourceTypeAndSourceId(ContributionSourceType.PULL_REQUEST_REVIEW, pullRequestReview.getId())
                 .orElseGet(ContributionEvent::new);
 
-            event.setSourceType("PULL_REQUEST_REVIEW");
+            event.setSourceType(ContributionSourceType.PULL_REQUEST_REVIEW);
             event.setSourceId(pullRequestReview.getId());
             event.setActor(pullRequestReview.getAuthor());
             event.setOccurredAt(pullRequestReview.getSubmittedAt());
