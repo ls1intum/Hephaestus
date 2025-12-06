@@ -2,6 +2,7 @@ import { FileText, Maximize } from "lucide-react";
 import type { MouseEvent } from "react";
 import type { Document } from "@/api/types.gen";
 import { Spinner } from "@/components/ui/spinner";
+import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { InlineDocumentSkeleton } from "./DocumentSkeleton";
 import { TextEditor } from "./TextEditor";
@@ -50,7 +51,7 @@ const LoadingSkeleton = () => (
 				<div className="text-muted-foreground">
 					<Spinner size="sm" />
 				</div>
-				<div className="h-4 w-32 bg-muted-foreground/20 rounded animate-pulse" />
+				<Skeleton className="h-4 w-32" />
 			</div>
 			<div className="text-muted-foreground">
 				<Maximize />
