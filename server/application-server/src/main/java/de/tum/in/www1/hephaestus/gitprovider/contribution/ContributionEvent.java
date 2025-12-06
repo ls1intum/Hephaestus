@@ -26,7 +26,7 @@ public class ContributionEvent {
 
     @NotNull
     @Enumerated(EnumType.STRING)
-    @Column(length = 20, nullable = false)
+    @Column(length = 32, nullable = false)
     private ContributionSourceType sourceType;
 
     @NotNull
