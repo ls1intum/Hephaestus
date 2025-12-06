@@ -20,9 +20,9 @@ async def lifespan(app: FastAPI):
         try:
             await nats_client.js.stream_info(stream_name)
             logger.info("Stream '%s' already exists", stream_name)
-        except Exception:
+        except Exception as exc:  # TODO: narrow to JetStream not-found once available
+            logger.warning("Stream '%s' missing, creating. Cause: %s", stream_name, exc)
             # Only create stream if it doesn't exist
-            logger.info("Creating '%s' stream", stream_name)
             # Production limits: retain for ~180 days and cap messages
             retention_cfg = StreamConfig(
                 storage=StorageType.FILE,
@@ -152,7 +152,7 @@ async def github_webhook(
 
     if not settings.WEBHOOK_SECRET:
         raise HTTPException(
-            status_code=500, detail="GitHub webhook secret not configured"
+            status_code=401, detail="GitHub webhook secret not configured"
         )
 
     signature = signature_sha256 or signature_sha1
@@ -200,7 +200,7 @@ async def gitlab_webhook(
     expected_token = settings.WEBHOOK_SECRET or None
     if not expected_token:
         raise HTTPException(
-            status_code=500, detail="GitLab webhook secret not configured"
+            status_code=401, detail="GitLab webhook secret not configured"
         )
 
     # Constant-time compare to avoid timing attacks
