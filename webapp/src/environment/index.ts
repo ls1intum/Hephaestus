@@ -1,4 +1,4 @@
-export default {
+const environment = {
 	version: "DEV",
 	clientUrl: "http://localhost:4200",
 	serverUrl: "http://localhost:8080",
@@ -20,4 +20,9 @@ export default {
 		imprintHtml: "<p>This is the imprint.</p>",
 		privacyHtml: "<p>This is the privacy policy.</p>",
 	},
+	devtools: {
+		tanstack: true,
+	},
 };
+
+export default environment;

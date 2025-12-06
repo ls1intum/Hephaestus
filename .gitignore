@@ -173,6 +173,10 @@ application-local.yml
 server/application-server/postgres-data/
 server/application-server/postgres-data-temp/
 server/application-server/postgres-data-local/
+server/application-server/logs/
+
+# Private keys
+*.pem
 
 # Private keys
 *.pem

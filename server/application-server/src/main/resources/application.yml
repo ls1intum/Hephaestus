@@ -1,17 +1,29 @@
 spring:
     application:
         name: Hephaestus
-        version: "0.10.0-rc.21"
+        version: "0.10.0-rc.46"
+
+    config:
+        import: optional:file:.env[.properties]
 
     datasource:
         url: jdbc:postgresql://localhost:5432/hephaestus
         username: root
         password: root
+        hikari:
+            connection-timeout: 45000
+            idle-timeout: 600000
+            max-lifetime: 1800000
+            maximum-pool-size: 30
+            minimum-idle: 5
 
     jpa:
         hibernate:
             # We use update for development and none for production, as we use liquibase
             ddl-auto: update
+        # Disable open-in-view to prevent lazy loading during view rendering
+        # and avoid the warning. Database queries should be completed in the service layer.
+        open-in-view: false
 
         # show-sql: "true"
         properties:
@@ -25,6 +37,7 @@ spring:
     devtools:
         restart:
             additional-exclude: org/kohsuke/github/**
+        add-properties: false
 
     security:
         oauth2:
@@ -49,6 +62,10 @@ spring:
                     starttls:
                         enable: true
                 debug: ${MAIL_DEBUG:false}
+
+    # Disable Mustache template location check as we don't use Mustache templates
+    mustache:
+        check-template-location: false
 
 springdoc:
     default-produces-media-type: application/json
@@ -76,12 +93,36 @@ hephaestus:
             team: "all"
             channel-id: ""
     
+    # ═══════════════════════════════════════════════════════════════════════════
+    # WORKSPACE CONFIGURATION
+    # ═══════════════════════════════════════════════════════════════════════════
+    # Hephaestus supports two GitHub authentication modes:
+    #
+    # 1. GITHUB APP MODE (recommended for production)
+    #    - Workspaces are automatically created from GitHub App installations
+    #    - Repository monitors are managed by installation events (webhooks)
+    #    - Configure: github.app.id and github.app.privateKey
+    #    - Set init-default: false (workspaces come from installations)
+    #
+    # 2. PAT MODE (recommended for local development)
+    #    - A single workspace is bootstrapped from configuration below
+    #    - You manually specify which repositories to monitor
+    #    - Configure: hephaestus.workspace.default.token
+    #    - Set init-default: true
+    #
+    # The init-default setting only affects PAT-based workspace creation.
+    # GitHub App installations are always processed regardless of this setting.
+    # ═══════════════════════════════════════════════════════════════════════════
     workspace:
+        # Set to true to bootstrap a PAT workspace on startup (for local development)
+        # Set to false in production when using GitHub App installations
         init-default: true
         default:
+            # GitHub organization or user login for the PAT workspace
             login: ${GITHUB_PAT_LOGIN:ls1intum}
+            # Personal Access Token with repo, read:org, and read:user scopes
             token: ${GITHUB_PAT:}
-            repository-selection: SELECTED
+            # Repositories to monitor (PAT mode always uses explicit list)
             repositories-to-monitor:
                 - ls1intum/Hephaestus
                 - ls1intum/Artemis
@@ -120,24 +161,80 @@ keycloak:
     url: http://localhost:8081
     realm: hephaestus
     client-id: hephaestus-confidential
-    client-secret: 0g0QtFmz6GB1Jv03SszCFepPro0hiP7G
+    client-secret: ${KEYCLOAK_HEPHAESTUS_CONFIDENTIAL_CLIENT_SECRET:${KEYCLOAK_CLIENT_SECRET:0g0QtFmz6GB1Jv03SszCFepPro0hiP7G}}
 
 nats:
     enabled: false
     timeframe: 7
     durable-consumer-name: ""
     server: ""
+    consumer:
+        # How long to wait for acknowledgment before redelivery (minutes)
+        ack-wait-minutes: 5
+        # Maximum pending unacknowledged messages per consumer
+        max-ack-pending: 500
+        # Minimum interval between heartbeat alarm log messages (minutes)
+        heartbeat-log-interval-minutes: 5
+        # Number of consecutive heartbeat alarms before triggering consumer restart
+        heartbeat-restart-threshold: 3
+        # Delay between reconnection attempts (seconds)
+        reconnect-delay-seconds: 2
+        # Request timeout for JetStream API calls (seconds) - increase for workspaces with many repositories
+        request-timeout-seconds: 60
 
 monitoring:
     run-on-startup: true
-    # Fetching timeframe in days
+    # Fetching timeframe in days for recent data sync
     timeframe: 7
     sync-cron: "0 0 3 * * *"
     # Cooldown in minutes before running the monitoring again
     sync-cooldown-in-minutes: 15
-    # Whether to sync all issues and pull requests that are missing in the database
-    sync-all-issues-and-pull-requests: false
+    # ═══════════════════════════════════════════════════════════════════════════
+    # BACKFILL CONFIGURATION
+    # ═══════════════════════════════════════════════════════════════════════════
+    # Historical data synchronization settings.
+    # When enabled, backfill runs AFTER recent sync completes, in small batches
+    # to avoid exhausting GitHub API rate limits.
+    backfill:
+        # Whether to backfill historical issues and pull requests
+        enabled: false
+        # Number of issues/PRs to sync per batch (default: 25)
+        # Lower = fewer API calls per sync cycle, Higher = faster backfill
+        batch-size: 25
+        # Minimum rate limit remaining before backfill runs (default: 500)
+        # Backfill skips if remaining < threshold to preserve rate limit for real-time sync
+        rate-limit-threshold: 500
+        # Minutes to wait between backfill batches (default: 5)
+        # Spreads API usage over time to avoid rate limit exhaustion
+        cooldown-minutes: 5
+    # ═══════════════════════════════════════════════════════════════════════════
+    # DEVELOPMENT FILTERS
+    # ═══════════════════════════════════════════════════════════════════════════
+    # Limit which organizations/repositories are actively synced.
+    # Useful in development to avoid syncing hundreds of repos from GitHub App installations.
+    #
+    # Empty lists = no filtering (production behavior, sync everything)
+    # Non-empty = only sync matching items
+    #
+    # Configure these in application-local.yml for development:
+    #   monitoring:
+    #     filters:
+    #       allowed-organizations:
+    #         - ls1intum
+    #         - HephaestusTest
+    #       allowed-repositories:
+    #         - ls1intum/Hephaestus
+    #         - ls1intum/Artemis
+    # ═══════════════════════════════════════════════════════════════════════════
+    filters:
+        # Limit to workspaces owned by these organizations (case-insensitive)
+        allowed-organizations: []
+        # Limit to these specific repositories (format: owner/repo, case-insensitive)
+        allowed-repositories: []
 
+# ═══════════════════════════════════════════════════════════════════════════
+# GITHUB AUTHENTICATION
+# ═══════════════════════════════════════════════════════════════════════════
 # Can be any OAuth token, such as the PAT
 github:
     app:

@@ -75,6 +75,49 @@ class GitHubLabelMessageHandlerIntegrationTest extends BaseIntegrationTest {
 }
 ```
 
+## Controller integration tests
+
+Spring's own docs and battle-tested community guides (see [rieckpil.de](https://rieckpil.de/how-to-test-spring-boot-web-controller-the-right-way/) and [Baeldung](https://www.baeldung.com/spring-security-integration-tests)) emphasise two things:
+
+1. Test controllers at the HTTP boundary to catch security misconfigurations.
+2. Keep fixtures reusable so every new endpoint does not need bespoke bootstrapping.
+
+To make that concrete for Hephaestus:
+
+- Extend `AbstractWorkspaceIntegrationTest` (or a service-specific base) so every controller IT automatically cleans the database, provides helper factories such as `persistUser`, and exposes `workspaceService` for setup.
+- Use `WebTestClient` instead of `MockMvc`. We already run the full Spring Boot context, which lets us verify access control rules (`401` unauthenticated vs `403` non-admin) exactly as delivered to the frontend.
+- Reach for the custom security annotations (`@WithAdminUser`, `@WithUser`) together with `TestAuthUtils.withCurrentUser()` so the generated JWT matches our resource-server configuration.
+- Assert on status code, payload shape, and repository side effects. A minimal test covers "happy path", "validation failure", and at least one access-control branch.
+- Keep factories close to the domain: prefer `createWorkspace("slug", "Display", ...)` over manually seeding repositories, which keeps each test focused on behaviour instead of boilerplate.
+
+Example skeleton:
+
+```java
+@AutoConfigureWebTestClient
+class FooControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
+
+    @Autowired
+    private WebTestClient webTestClient;
+
+    @Test
+    @WithAdminUser
+    void endpointHappyPath() {
+        User owner = persistUser("owner");
+        Workspace workspace = createWorkspace("slug", "Display", "login", AccountType.ORG, owner);
+
+        webTestClient
+            .get()
+            .uri("/workspaces/{workspaceSlug}", workspace.getWorkspaceSlug())
+            .headers(TestAuthUtils.withCurrentUser())
+            .exchange()
+            .expectStatus()
+            .isOk();
+    }
+}
+```
+
+Documenting each new controller integration test in this format keeps future work predictable and minimises copy/paste.
+
 ## Webhook fixtures and tooling
 
 Reusable webhook JSON lives in `src/test/resources/github`. Use `@GitHubPayload("event.name")` to inject them, or extract new samples with:

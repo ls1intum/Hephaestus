@@ -7,7 +7,6 @@ import de.tum.in.www1.hephaestus.gitprovider.repository.collaborator.RepositoryC
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserConverter;
-import jakarta.transaction.Transactional;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -19,7 +18,9 @@ import org.kohsuke.github.GHRepository;
 import org.kohsuke.github.GHUser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class GitHubRepositoryCollaboratorSyncService {
@@ -116,10 +117,17 @@ public class GitHubRepositoryCollaboratorSyncService {
     }
 
     private User upsertUser(GHUser ghUser) {
-        User user = userRepository.findById(ghUser.getId()).orElseGet(User::new);
-        user.setId(ghUser.getId());
+        long userId = ghUser.getId();
+        User user = userRepository.findById(userId).orElseGet(User::new);
+        user.setId(userId);
         userConverter.update(ghUser, user);
-        return userRepository.save(user);
+        try {
+            // Flush to surface constraint violations immediately and minimize retry window
+            return userRepository.saveAndFlush(user);
+        } catch (DataIntegrityViolationException ex) {
+            // Another thread inserted the user concurrently; load the existing row
+            return userRepository.findById(userId).orElseThrow(() -> ex);
+        }
     }
 
     private RepositoryCollaborator.Permission mapPermission(GHPermissionType permissionType) {

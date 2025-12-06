@@ -10,51 +10,46 @@ import org.springframework.stereotype.Component;
 @Component("workspaceSecure")
 public class WorkspaceSecurityExpressions {
 
-    private final WorkspaceAccessEvaluator accessEvaluator;
-
-    public WorkspaceSecurityExpressions(WorkspaceAccessEvaluator accessEvaluator) {
-        this.accessEvaluator = accessEvaluator;
-    }
+    private final WorkspaceAccessService accessService;
 
     /**
-     * Check if user is authenticated and has MEMBER role or higher in the workspace.
-     * Use: @PreAuthorize("isAuthenticated() and @workspaceSecure.isMember()")
+     * Constructor injection for access service.
      *
-     * @return true if user is a member
+     * @param accessService the workspace access service
      */
-    public boolean isMember() {
-        return accessEvaluator.isMember();
+    public WorkspaceSecurityExpressions(WorkspaceAccessService accessService) {
+        this.accessService = accessService;
     }
 
     /**
      * Check if user is authenticated and has ADMIN role or higher in the workspace.
-     * Use: @PreAuthorize("isAuthenticated() and @workspaceSecure.isAdmin()")
+     * Use: @RequireAtLeastWorkspaceAdmin
      *
      * @return true if user is an admin or owner
      */
     public boolean isAdmin() {
-        return accessEvaluator.isAdmin();
+        return accessService.isAdmin();
     }
 
     /**
      * Check if user is authenticated and has OWNER role in the workspace.
-     * Use: @PreAuthorize("isAuthenticated() and @workspaceSecure.isOwner()")
+     * Use: @RequireWorkspaceOwner
      *
      * @return true if user is the owner
      */
     public boolean isOwner() {
-        return accessEvaluator.isOwner();
+        return accessService.isOwner();
     }
 
     /**
      * Check if user has permission to manage the specified role.
      * OWNER can manage all roles, ADMIN can manage ADMIN and MEMBER.
-     * Use: @PreAuthorize("isAuthenticated() and @workspaceSecure.canManageRole(#role)")
+     * Can be used in SpEL: @PreAuthorize("@workspaceSecure.canManageRole(#role)")
      *
      * @param role Role to manage
      * @return true if user can manage this role
      */
     public boolean canManageRole(WorkspaceRole role) {
-        return accessEvaluator.canManageRole(role);
+        return accessService.canManageRole(role);
     }
 }

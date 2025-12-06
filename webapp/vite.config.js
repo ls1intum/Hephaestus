@@ -24,6 +24,9 @@ export default defineConfig(({ command }) => {
 					output: ["terminal", "console"],
 				}),
 		].filter(Boolean), // Filter out falsy values
+		build: {
+			sourcemap: true,
+		},
 		optimizeDeps: {
 			exclude: ["storybook-static"],
 		},

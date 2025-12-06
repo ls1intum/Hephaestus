@@ -1,0 +1,35 @@
+<?xml version="1.1" encoding="UTF-8" standalone="no"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog" xmlns:ext="http://www.liquibase.org/xml/ns/dbchangelog-ext" xmlns:pro="http://www.liquibase.org/xml/ns/pro" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog-ext http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-ext.xsd http://www.liquibase.org/xml/ns/pro http://www.liquibase.org/xml/ns/pro/liquibase-pro-latest.xsd http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+    <changeSet author="FelixTJDietrich" id="workspace-slug-rename-1">
+        <createTable tableName="workspace_slug_history">
+            <column autoIncrement="true" name="id" type="BIGINT">
+                <constraints nullable="false" primaryKey="true" primaryKeyName="workspace_slug_historyPK"/>
+            </column>
+            <column name="changed_at" type="TIMESTAMP(6) WITH TIME ZONE">
+                <constraints nullable="false"/>
+            </column>
+            <column name="new_slug" type="VARCHAR(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="old_slug" type="VARCHAR(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="workspace_id" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+    </changeSet>
+    <changeSet author="FelixTJDietrich" id="workspace-slug-rename-2">
+        <addForeignKeyConstraint baseColumnNames="workspace_id" baseTableName="workspace_slug_history" constraintName="fk_workspace_slug_history_workspace" deferrable="false" initiallyDeferred="false" onDelete="CASCADE" referencedColumnNames="id" referencedTableName="workspace" validate="true"/>
+    </changeSet>
+    <changeSet author="FelixTJDietrich" id="workspace-slug-rename-3">
+        <createIndex indexName="idx_workspace_slug_history_old_slug" tableName="workspace_slug_history">
+            <column name="old_slug"/>
+        </createIndex>
+    </changeSet>
+    <changeSet author="FelixTJDietrich" id="workspace-slug-rename-4">
+        <createIndex indexName="idx_workspace_slug_history_workspace_id" tableName="workspace_slug_history">
+            <column name="workspace_id"/>
+        </createIndex>
+    </changeSet>
+</databaseChangeLog>

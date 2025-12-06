@@ -1,5 +1,79 @@
 # Changelog
 
+## [0.10.0-rc.46](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.45...v0.10.0-rc.46) (2025-12-06)
+
+### 🐛 Bug Fixes
+
+* **webapp:** standardize loading spinners across codebase ([#561](https://github.com/ls1intum/Hephaestus/issues/561)) ([392c955](https://github.com/ls1intum/Hephaestus/commit/392c955b1f72e0e314c319fe4530b42b9c9cd302))
+
+## [0.10.0-rc.45](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.44...v0.10.0-rc.45) (2025-12-06)
+
+### 🐛 Bug Fixes
+
+* **webapp:** invert colors on ReviewsPopover hover in dark mode ([#562](https://github.com/ls1intum/Hephaestus/issues/562)) ([4c9423b](https://github.com/ls1intum/Hephaestus/commit/4c9423b718da1b9547a0e1275151429913ca1c20))
+
+## [0.10.0-rc.44](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.43...v0.10.0-rc.44) (2025-12-06)
+
+### 🐛 Bug Fixes
+
+* **webapp:** standardize skeleton loading states to eliminate color inconsistencies ([#559](https://github.com/ls1intum/Hephaestus/issues/559)) ([2ac9491](https://github.com/ls1intum/Hephaestus/commit/2ac9491e1ee4be58fcd9e51d55e03e2c67751ca9))
+
+## [0.10.0-rc.43](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.42...v0.10.0-rc.43) (2025-12-05)
+
+## [0.10.0-rc.42](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.41...v0.10.0-rc.42) (2025-12-05)
+
+## [0.10.0-rc.41](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.40...v0.10.0-rc.41) (2025-12-05)
+
+## [0.10.0-rc.40](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.39...v0.10.0-rc.40) (2025-12-04)
+
+## [0.10.0-rc.39](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.38...v0.10.0-rc.39) (2025-12-04)
+
+## [0.10.0-rc.38](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.37...v0.10.0-rc.38) (2025-12-04)
+
+## [0.10.0-rc.37](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.36...v0.10.0-rc.37) (2025-12-04)
+
+## [0.10.0-rc.36](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.35...v0.10.0-rc.36) (2025-12-04)
+
+## [0.10.0-rc.35](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.34...v0.10.0-rc.35) (2025-12-04)
+
+## [0.10.0-rc.34](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.33...v0.10.0-rc.34) (2025-12-04)
+
+## [0.10.0-rc.33](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.32...v0.10.0-rc.33) (2025-12-03)
+
+## [0.10.0-rc.32](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.31...v0.10.0-rc.32) (2025-12-03)
+
+## [0.10.0-rc.31](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.30...v0.10.0-rc.31) (2025-12-03)
+
+## [0.10.0-rc.30](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.29...v0.10.0-rc.30) (2025-12-02)
+
+## [0.10.0-rc.29](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.28...v0.10.0-rc.29) (2025-12-02)
+
+## [0.10.0-rc.28](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.27...v0.10.0-rc.28) (2025-12-02)
+
+## [0.10.0-rc.27](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.26...v0.10.0-rc.27) (2025-12-02)
+
+## [0.10.0-rc.26](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.25...v0.10.0-rc.26) (2025-12-02)
+
+## [0.10.0-rc.25](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.24...v0.10.0-rc.25) (2025-12-02)
+
+### 🚀 Features
+
+* add workspace switching and viewing with backfill and improved GitHub installation management ([#550](https://github.com/ls1intum/Hephaestus/issues/550)) ([75d4998](https://github.com/ls1intum/Hephaestus/commit/75d4998aebaad1267b4f5b215633771852104421))
+
+## [0.10.0-rc.24](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.23...v0.10.0-rc.24) (2025-11-29)
+
+### 🚀 Features
+
+* **application-server:** env file support for GitHub-PAT authentication ([#547](https://github.com/ls1intum/Hephaestus/issues/547)) ([1f410bd](https://github.com/ls1intum/Hephaestus/commit/1f410bd0aa55a5d4e7f9c951fb0e4169e9bd7653))
+
+## [0.10.0-rc.23](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.22...v0.10.0-rc.23) (2025-11-29)
+
+## [0.10.0-rc.22](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.21...v0.10.0-rc.22) (2025-11-21)
+
+### 🚀 Features
+
+* **application-server:** implement workspace entity extensions and CRUD API ([#408](https://github.com/ls1intum/Hephaestus/issues/408), [#416](https://github.com/ls1intum/Hephaestus/issues/416)) ([#541](https://github.com/ls1intum/Hephaestus/issues/541)) ([93d0c7d](https://github.com/ls1intum/Hephaestus/commit/93d0c7d99a85f63baa27d3815754d9a42fb8f684))
+
 ## [0.10.0-rc.21](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.20...v0.10.0-rc.21) (2025-11-09)
 
 ## [0.10.0-rc.20](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.19...v0.10.0-rc.20) (2025-11-07)

@@ -1,0 +1,114 @@
+---
+id: workspace-context
+sidebar_position: 5
+title: Workspace-Scoped Endpoints
+description: How to build tenant-aware controllers that route through /workspaces/{slug}.
+---
+
+Every API endpoint that operates on workspace data must be scoped to a workspace slug. This keeps tenants isolated and enables per-workspace authorization.
+
+## Quick Start
+
+```java
+@WorkspaceScopedController          // auto-prefixes routes with /workspaces/{workspaceSlug}
+@RequestMapping("/teams")           // becomes /workspaces/{slug}/teams
+@RequiredArgsConstructor
+public class TeamController {
+
+    private final TeamService teamService;
+
+    @GetMapping
+    public List<TeamDTO> list(WorkspaceContext ctx) {   // injected by framework
+        return teamService.findByWorkspace(ctx.id());
+    }
+
+    @PostMapping
+    @RequireAtLeastWorkspaceAdmin   // only ADMIN or OWNER can create
+    public TeamDTO create(WorkspaceContext ctx, @RequestBody CreateTeamDTO dto) {
+        return teamService.create(ctx.id(), dto);
+    }
+}
+```
+
+That's it. The filter handles slug resolution, membership checks, and 403/404 responses.
+
+## What You Get
+
+| Annotation | Effect |
+|------------|--------|
+| `@WorkspaceScopedController` | Adds `/workspaces/{workspaceSlug}` prefix to all routes |
+| `WorkspaceContext` parameter | Auto-injected with workspace ID, slug, and user's roles |
+| `@RequireAtLeastWorkspaceAdmin` | Requires ADMIN or OWNER role |
+| `@RequireWorkspaceOwner` | Requires OWNER role only |
+
+## Authorization
+
+Check roles via the context:
+
+```java
+if (ctx.hasRole(WorkspaceRole.OWNER)) {
+    // owner-only logic
+}
+
+if (!ctx.hasMembership()) {
+    // user has no role in this workspace
+}
+```
+
+Or use method-level annotations that fail fast with 403:
+
+```java
+@DeleteMapping("/{id}")
+@RequireWorkspaceOwner
+public void delete(WorkspaceContext ctx, @PathVariable Long id) { ... }
+```
+
+## Async Work
+
+When spawning background tasks, wrap the runnable to preserve context:
+
+```java
+CompletableFuture.runAsync(
+    WorkspaceContextExecutor.wrap(() -> heavyProcessing(ctx)),
+    executor
+);
+```
+
+## Global Routes
+
+Routes that don't belong to a specific workspace (like `/workspaces` listing or creation) stay in a plain `@RestController`:
+
+```java
+@RestController
+@RequestMapping("/workspaces")
+public class WorkspaceRegistryController {
+
+    @PostMapping
+    public WorkspaceDTO create(@RequestBody CreateWorkspaceDTO dto) { ... }
+
+    @GetMapping
+    public List<WorkspaceListItemDTO> list() { ... }
+}
+```
+
+## Testing
+
+Integration tests must create a workspace and grant membership before hitting scoped endpoints:
+
+```java
+@Test
+@WithMentorUser
+void canListTeams() {
+    User user = persistUser("mentor");
+    Workspace ws = createWorkspace("test-ws", "Test", "org", AccountType.ORG, user);
+    addMembership(ws, user, WorkspaceRole.ADMIN);
+
+    webTestClient.get()
+        .uri("/workspaces/{slug}/teams", ws.getWorkspaceSlug())
+        .headers(TestAuthUtils.withCurrentUser())
+        .exchange()
+        .expectStatus().isOk();
+}
+```
+
+See `AbstractWorkspaceIntegrationTest` for helper methods.

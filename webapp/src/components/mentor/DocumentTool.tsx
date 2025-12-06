@@ -1,6 +1,6 @@
 import { FileText, MessageCircle, PenLine } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 import type { ArtifactKind } from "@/lib/types";
-import { LoaderIcon } from "./LoaderIcon";
 
 const getActionText = (
 	type: "create" | "update" | "request-suggestions",
@@ -91,11 +91,7 @@ export function DocumentTool({
 		>
 			<div className="text-muted-foreground">{icon}</div>
 			<div className="text-left flex-1">{displayText}</div>
-			{isLoading && (
-				<div className="animate-spin mt-1">
-					<LoaderIcon />
-				</div>
-			)}
+			{isLoading && <Spinner size="sm" />}
 		</button>
 	);
 }

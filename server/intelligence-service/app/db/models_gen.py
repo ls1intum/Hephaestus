@@ -92,14 +92,24 @@ class ChatThread(Base):
         ForeignKeyConstraint(
             ["user_id"], ["user.id"], name="FKikdxlx9viomcwrgxj7fbyfsew"
         ),
+        ForeignKeyConstraint(
+            ["workspace_id"],
+            ["workspace.id"],
+            ondelete="CASCADE",
+            name="fk_chat_thread_workspace",
+        ),
         PrimaryKeyConstraint("id", name="chat_threadPK"),
         UniqueConstraint(
             "selected_leaf_message_id",
             name="uc_chat_threadselected_leaf_message_id_col",
         ),
+        Index("idx_chat_thread_workspace_id", "workspace_id"),
     )
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
     created_at: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(True, 6))
+    workspace_id: Mapped[int] = mapped_column(
+        BigInteger, comment="Workspace that owns the thread"
+    )
     title: Mapped[Optional[str]] = mapped_column(Text)
     selected_leaf_message_id: Mapped[Optional[uuid.UUID]] = mapped_column(Uuid)
     user_id: Mapped[Optional[int]] = mapped_column(BigInteger)
@@ -112,6 +122,9 @@ class ChatThread(Base):
         back_populates="chat_thread",
     )
     user: Mapped[Optional["User"]] = relationship("User", back_populates="chat_thread")
+    workspace: Mapped["Workspace"] = relationship(
+        "Workspace", back_populates="chat_thread"
+    )
 
 
 t_databasechangelog = Table(
@@ -372,6 +385,7 @@ class User(Base):
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     followers: Mapped[int] = mapped_column(Integer)
     following: Mapped[int] = mapped_column(Integer)
+    league_points: Mapped[int] = mapped_column(Integer, server_default=text("0"))
     notifications_enabled: Mapped[bool] = mapped_column(
         Boolean, server_default=text("true")
     )
@@ -399,10 +413,10 @@ class User(Base):
     pull_request_review_thread: Mapped[List["PullRequestReviewThread"]] = relationship(
         "PullRequestReviewThread", back_populates="resolved_by"
     )
-    document: Mapped[List["Document"]] = relationship("Document", back_populates="user")
     team_membership: Mapped[List["TeamMembership"]] = relationship(
         "TeamMembership", back_populates="user"
     )
+    document: Mapped[List["Document"]] = relationship("Document", back_populates="user")
     milestone: Mapped[List["Milestone"]] = relationship(
         "Milestone", back_populates="creator"
     )
@@ -450,27 +464,6 @@ class ChatMessagePart(Base):
     )
 
 
-class Document(Base):
-    __tablename__ = "document"
-    __table_args__ = (
-        ForeignKeyConstraint(
-            ["user_id"], ["user.id"], name="FKjhdxdv9sijhujiynqbb5jc010"
-        ),
-        PrimaryKeyConstraint("id", "version_number", name="documentPK"),
-        Index("idx_document_created_at", "created_at"),
-        Index("idx_document_id", "id"),
-        Index("idx_document_user_id", "user_id"),
-    )
-    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
-    version_number: Mapped[int] = mapped_column(Integer, primary_key=True)
-    created_at: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(True, 6))
-    kind: Mapped[str] = mapped_column(String(255))
-    title: Mapped[str] = mapped_column(String(255))
-    user_id: Mapped[int] = mapped_column(BigInteger)
-    content: Mapped[Optional[str]] = mapped_column(Text)
-    user: Mapped["User"] = relationship("User", back_populates="document")
-
-
 class Repository(Base):
     __tablename__ = "repository"
     __table_args__ = (
@@ -492,10 +485,10 @@ class Repository(Base):
     updated_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime(True))
     default_branch: Mapped[Optional[str]] = mapped_column(String(255))
     description: Mapped[Optional[str]] = mapped_column(String(255))
-    homepage: Mapped[Optional[str]] = mapped_column(String(255))
-    html_url: Mapped[Optional[str]] = mapped_column(String(255))
+    homepage: Mapped[Optional[str]] = mapped_column(String(1024))
+    html_url: Mapped[Optional[str]] = mapped_column(String(512))
     name: Mapped[Optional[str]] = mapped_column(String(255))
-    name_with_owner: Mapped[Optional[str]] = mapped_column(String(255))
+    name_with_owner: Mapped[Optional[str]] = mapped_column(String(150))
     pushed_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime(True))
     visibility: Mapped[Optional[str]] = mapped_column(String(255))
     organization_id: Mapped[Optional[int]] = mapped_column(BigInteger)
@@ -593,14 +586,60 @@ class Workspace(Base):
     slack_signing_secret: Mapped[Optional[str]] = mapped_column(Text)
     slack_token: Mapped[Optional[str]] = mapped_column(Text)
     updated_at: Mapped[Optional[datetime.datetime]] = mapped_column(TIMESTAMP(True, 6))
+    members_synced_at: Mapped[Optional[datetime.datetime]] = mapped_column(
+        TIMESTAMP(True, 6)
+    )
+    teams_synced_at: Mapped[Optional[datetime.datetime]] = mapped_column(
+        TIMESTAMP(True, 6)
+    )
+    chat_thread: Mapped[List["ChatThread"]] = relationship(
+        "ChatThread", back_populates="workspace"
+    )
     organization: Mapped[Optional["Organization"]] = relationship(
         "Organization", back_populates="workspace"
+    )
+    document: Mapped[List["Document"]] = relationship(
+        "Document", back_populates="workspace"
     )
     repository_to_monitor: Mapped[List["RepositoryToMonitor"]] = relationship(
         "RepositoryToMonitor", back_populates="workspace"
     )
     workspace_membership: Mapped[List["WorkspaceMembership"]] = relationship(
         "WorkspaceMembership", back_populates="workspace"
+    )
+
+
+class Document(Base):
+    __tablename__ = "document"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["user_id"], ["user.id"], name="FKjhdxdv9sijhujiynqbb5jc010"
+        ),
+        ForeignKeyConstraint(
+            ["workspace_id"],
+            ["workspace.id"],
+            ondelete="CASCADE",
+            name="fk_document_workspace",
+        ),
+        PrimaryKeyConstraint("id", "version_number", name="documentPK"),
+        Index("idx_document_created_at", "created_at"),
+        Index("idx_document_id", "id"),
+        Index("idx_document_user_id", "user_id"),
+        Index("idx_document_workspace_id", "workspace_id"),
+    )
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
+    version_number: Mapped[int] = mapped_column(Integer, primary_key=True)
+    created_at: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(True, 6))
+    kind: Mapped[str] = mapped_column(String(255))
+    title: Mapped[str] = mapped_column(String(255))
+    user_id: Mapped[int] = mapped_column(BigInteger)
+    workspace_id: Mapped[int] = mapped_column(
+        BigInteger, comment="Workspace that owns the document"
+    )
+    content: Mapped[Optional[str]] = mapped_column(Text)
+    user: Mapped["User"] = relationship("User", back_populates="document")
+    workspace: Mapped["Workspace"] = relationship(
+        "Workspace", back_populates="document"
     )
 
 
@@ -720,6 +759,14 @@ class RepositoryToMonitor(Base):
         TIMESTAMP(precision=6)
     )
     workspace_id: Mapped[Optional[int]] = mapped_column(BigInteger)
+    backfill_checkpoint: Mapped[Optional[int]] = mapped_column(Integer)
+    backfill_high_water_mark: Mapped[Optional[int]] = mapped_column(Integer)
+    backfill_last_run_at: Mapped[Optional[datetime.datetime]] = mapped_column(
+        TIMESTAMP(True, 6)
+    )
+    collaborators_synced_at: Mapped[Optional[datetime.datetime]] = mapped_column(
+        TIMESTAMP(True, 6)
+    )
     workspace: Mapped[Optional["Workspace"]] = relationship(
         "Workspace", back_populates="repository_to_monitor"
     )

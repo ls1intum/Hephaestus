@@ -8,6 +8,7 @@ import de.tum.in.www1.hephaestus.gitprovider.organization.Organization;
 import de.tum.in.www1.hephaestus.gitprovider.repository.collaborator.RepositoryCollaborator;
 import de.tum.in.www1.hephaestus.gitprovider.team.permission.TeamRepositoryPermission;
 import jakarta.persistence.CascadeType;
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -37,17 +38,24 @@ public class Repository extends BaseGitServiceEntity {
     @NonNull
     private String name;
 
+    // GitHub limits: owner (39) + "/" (1) + repo name (100) = 140 chars max
     @NonNull
+    @Column(length = 150)
     private String nameWithOwner;
 
     // Whether the repository is private or public.
     private boolean isPrivate;
 
+    // GitHub repository URL: https://github.com/owner/repo (max ~160 base + paths)
     @NonNull
+    @Column(length = 512)
     private String htmlUrl;
 
+    @Column(columnDefinition = "TEXT")
     private String description;
 
+    // External URL, can vary widely
+    @Column(length = 1024)
     private String homepage;
 
     @NonNull

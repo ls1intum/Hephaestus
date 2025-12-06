@@ -12,6 +12,10 @@ on:
 jobs:
   # Intelligent test execution matrix
   tests:
+    permissions:
+      contents: read
+      checks: write
+      statuses: write
     name: ${{ matrix.test-type }}
     runs-on: ubuntu-latest
     if: inputs.should_skip != 'true'

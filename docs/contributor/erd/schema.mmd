@@ -55,6 +55,7 @@ erDiagram
         TEXT title
         UUID selected_leaf_message_id FK,UK
         BIGINT user_id FK
+        BIGINT workspace_id FK "NOT NULL"
     }
 
     Document {
@@ -65,6 +66,7 @@ erDiagram
         VARCHAR(255) kind "NOT NULL"
         VARCHAR(255) title "NOT NULL"
         BIGINT user_id FK "NOT NULL"
+        BIGINT workspace_id FK "NOT NULL"
     }
 
     Issue {
@@ -253,13 +255,13 @@ erDiagram
         BOOLEAN has_issues "NOT NULL"
         BOOLEAN has_projects "NOT NULL"
         BOOLEAN has_wiki "NOT NULL"
-        VARCHAR(255) homepage
-        VARCHAR(255) html_url
+        VARCHAR(1024) homepage
+        VARCHAR(512) html_url
         BOOLEAN is_archived "NOT NULL"
         BOOLEAN is_disabled "NOT NULL"
         BOOLEAN is_private "NOT NULL"
         VARCHAR(255) name
-        VARCHAR(255) name_with_owner
+        VARCHAR(150) name_with_owner
         TIMESTAMPTZ pushed_at
         INTEGER stargazers_count "NOT NULL"
         VARCHAR(255) visibility
@@ -281,6 +283,10 @@ erDiagram
         VARCHAR(255) name_with_owner
         TIMESTAMP repository_synced_at
         BIGINT workspace_id FK
+        INTEGER backfill_checkpoint
+        INTEGER backfill_high_water_mark
+        TIMESTAMPTZ backfill_last_run_at
+        TIMESTAMPTZ collaborators_synced_at
     }
 
     Team {
@@ -331,9 +337,9 @@ erDiagram
         VARCHAR(255) login
         VARCHAR(255) name
         VARCHAR(255) type
+        INTEGER league_points "NOT NULL"
         BOOLEAN notifications_enabled "NOT NULL"
         BOOLEAN participate_in_research "NOT NULL"
-        INTEGER league_points "NOT NULL"
     }
 
     Workspace {
@@ -360,13 +366,8 @@ erDiagram
         VARCHAR(64) slug UK "NOT NULL"
         VARCHAR(20) status "NOT NULL"
         TIMESTAMPTZ updated_at
-    }
-
-    WorkspaceMember {
-        BIGINT workspace_id PK,FK
-        BIGINT user_id PK,FK
-        INTEGER league_points "NOT NULL"
-        VARCHAR(32) role "NOT NULL"
+        TIMESTAMPTZ members_synced_at
+        TIMESTAMPTZ teams_synced_at
     }
 
     WorkspaceMembership {
@@ -392,7 +393,9 @@ erDiagram
     ChatMessage ||--o{ ChatMessage : references
     ChatThread ||--o{ ChatMessage : has
     User ||--o{ ChatThread : has
+    Workspace ||--o{ ChatThread : has
     User ||--o{ Document : has
+    Workspace ||--o{ Document : has
     User ||--o{ Issue : authored_by
     User ||--o{ Issue : merged_by
     Milestone ||--o{ Issue : has
@@ -431,8 +434,6 @@ erDiagram
     User }o--o{ TeamMembership : belongs_to
     Repository }o--o{ TeamRepositoryPermission : has
     Team }o--o{ TeamRepositoryPermission : has
-    User }o--o{ WorkspaceMember : belongs_to
-    Workspace }o--o{ WorkspaceMember : belongs_to
 
     %% Styling
     classDef primaryEntity fill:#e1f5fe,stroke:#01579b,stroke-width:2px

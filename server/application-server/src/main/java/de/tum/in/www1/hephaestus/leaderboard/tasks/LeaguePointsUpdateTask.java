@@ -6,8 +6,6 @@ import de.tum.in.www1.hephaestus.leaderboard.*;
 import de.tum.in.www1.hephaestus.workspace.Workspace;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceMembershipService;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceRepository;
-import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContext;
-import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContextHolder;
 import jakarta.transaction.Transactional;
 import java.time.DayOfWeek;
 import java.time.Instant;
@@ -15,7 +13,6 @@ import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.temporal.TemporalAdjusters;
 import java.util.List;
-import java.util.Set;
 import java.util.function.Consumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -62,21 +59,16 @@ public class LeaguePointsUpdateTask implements Runnable {
         logger.info("Starting scheduled league points update for {} workspace(s).", workspaces.size());
 
         for (Workspace workspace : workspaces) {
-            WorkspaceContext context = WorkspaceContext.fromWorkspace(workspace, Set.of());
-            WorkspaceContextHolder.setContext(context);
-
             try {
-                updateLeaguePointsForWorkspace(workspace.getId());
+                updateLeaguePointsForWorkspace(workspace);
             } catch (Exception e) {
                 logger.error(
                     "Failed to update league points for workspace '{}' (id={}): {}",
-                    workspace.getSlug(),
+                    workspace.getWorkspaceSlug(),
                     workspace.getId(),
                     e.getMessage(),
                     e
                 );
-            } finally {
-                WorkspaceContextHolder.clearContext();
             }
         }
 
@@ -88,10 +80,16 @@ public class LeaguePointsUpdateTask implements Runnable {
      *
      * @param workspaceId the workspace ID for which to update league points
      */
-    private void updateLeaguePointsForWorkspace(Long workspaceId) {
+    private void updateLeaguePointsForWorkspace(Workspace workspace) {
+        if (workspace == null || workspace.getId() == null) {
+            logger.warn("Skipping league points update because workspace context is missing an id");
+            return;
+        }
+
+        Long workspaceId = workspace.getId();
         logger.debug("Updating league points for workspace id={}.", workspaceId);
 
-        List<LeaderboardEntryDTO> leaderboard = getLatestLeaderboard();
+        List<LeaderboardEntryDTO> leaderboard = getLatestLeaderboard(workspace);
         leaderboard.forEach(updateLeaderboardEntry(workspaceId));
 
         logger.debug("Updated league points for {} users in workspace id={}.", leaderboard.size(), workspaceId);
@@ -120,7 +118,7 @@ public class LeaguePointsUpdateTask implements Runnable {
      *
      * @return List of {@code LeaderboardEntryDTO} representing the latest leaderboard
      */
-    private List<LeaderboardEntryDTO> getLatestLeaderboard() {
+    private List<LeaderboardEntryDTO> getLatestLeaderboard(Workspace workspace) {
         String[] timeParts = scheduledTime.split(":");
         ZonedDateTime zonedNow = ZonedDateTime.now(ZoneId.systemDefault());
         ZonedDateTime zonedBefore = zonedNow
@@ -132,6 +130,7 @@ public class LeaguePointsUpdateTask implements Runnable {
         Instant before = zonedBefore.toInstant();
         Instant after = zonedBefore.minusWeeks(1).toInstant();
         return leaderboardService.createLeaderboard(
+            workspace,
             after,
             before,
             "all",

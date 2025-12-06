@@ -8,14 +8,17 @@ import {
 	SidebarMenuItem,
 } from "@/components/ui/sidebar";
 
-export function NavAdmin() {
+export function NavAdmin({ workspaceSlug }: { workspaceSlug: string }) {
 	return (
 		<SidebarGroup>
 			<SidebarGroupLabel>Administration</SidebarGroupLabel>
 			<SidebarMenu>
 				<SidebarMenuItem>
 					<SidebarMenuButton asChild tooltip="Manage workspace">
-						<Link to="/admin/settings">
+						<Link
+							to="/w/$workspaceSlug/admin/settings"
+							params={{ workspaceSlug }}
+						>
 							<Settings2 />
 							<span>Manage workspace</span>
 						</Link>
@@ -23,7 +26,10 @@ export function NavAdmin() {
 				</SidebarMenuItem>
 				<SidebarMenuItem>
 					<SidebarMenuButton asChild tooltip="Manage members">
-						<Link to="/admin">
+						<Link
+							to="/w/$workspaceSlug/admin/members"
+							params={{ workspaceSlug }}
+						>
 							<BookUser />
 							<span>Manage members</span>
 						</Link>
@@ -31,7 +37,7 @@ export function NavAdmin() {
 				</SidebarMenuItem>
 				<SidebarMenuItem>
 					<SidebarMenuButton asChild tooltip="Manage teams">
-						<Link to="/admin/teams">
+						<Link to="/w/$workspaceSlug/admin/teams" params={{ workspaceSlug }}>
 							<Users />
 							<span>Manage teams</span>
 						</Link>

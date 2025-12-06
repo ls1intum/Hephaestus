@@ -11,6 +11,7 @@ spring:
     oauth2:
       resourceserver:
         jwt:
+          # Public URL for issuer validation (must match token's iss claim)
           issuer-uri: ${KEYCLOAK_URL}/realms/${KEYCLOAK_REALM}
 
   mail:
@@ -74,6 +75,9 @@ keycloak:
     realm: ${KEYCLOAK_REALM}
     client-id: ${KEYCLOAK_CLIENT_ID}
     client-secret: ${KEYCLOAK_CLIENT_SECRET}
+    # Internal JWKS endpoint for containerized deployments (optional)
+    # When set, fetches signing keys from this URL instead of discovering via issuer-uri
+    jwk-set-uri: ${KEYCLOAK_JWK_SET_URI:}
 
 nats:
     enabled: ${NATS_ENABLED:false}
@@ -83,11 +87,15 @@ nats:
 
 monitoring:
     run-on-startup: ${MONITORING_RUN_ON_STARTUP:true}
-    # Fetching timeframe in days
     timeframe: ${MONITORING_TIMEFRAME:7}
     sync-cron: ${MONITORING_SYNC_CRON:0 0 * * * *}
-    sync-cooldown-in-minutes: ${MONITORING_SYNC_COOLDOWN_IN_MINUTES:0}
+    sync-cooldown-in-minutes: ${MONITORING_SYNC_COOLDOWN_IN_MINUTES:60}
     sync-all-issues-and-pull-requests: ${MONITORING_SYNC_ALL_ISSUES_AND_PULL_REQUESTS:true}
+    backfill:
+        enabled: ${MONITORING_BACKFILL_ENABLED:true}
+        batch-size: ${MONITORING_BACKFILL_BATCH_SIZE:50}
+        rate-limit-threshold: ${MONITORING_BACKFILL_RATE_LIMIT_THRESHOLD:500}
+        cooldown-minutes: ${MONITORING_BACKFILL_COOLDOWN_MINUTES:5}
 
 github:
     app:

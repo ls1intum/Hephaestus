@@ -99,12 +99,14 @@ const SAMPLE_LEADERBOARD_ENTRIES: LeaderboardEntry[] = [
 
 interface LandingHeroSectionProps {
 	onSignIn: () => void;
+	onGoToDashboard?: () => void;
 	isSignedIn: boolean;
 	onLearnMoreClick: () => void;
 }
 
 export function LandingHeroSection({
 	onSignIn,
+	onGoToDashboard,
 	isSignedIn,
 	onLearnMoreClick,
 }: LandingHeroSectionProps) {
@@ -124,7 +126,7 @@ export function LandingHeroSection({
 					</div>
 					<div className="flex flex-col items-center gap-4 sm:flex-row sm:gap-6">
 						{isSignedIn ? (
-							<Button onClick={onSignIn} size="lg" className="gap-2">
+							<Button onClick={onGoToDashboard} size="lg" className="gap-2">
 								Go to Dashboard <ArrowRight className="h-4 w-4" />
 							</Button>
 						) : (

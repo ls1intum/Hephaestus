@@ -43,10 +43,14 @@ public class Workspace {
 
     private Instant usersSyncedAt;
 
+    private Instant teamsSyncedAt;
+
+    private Instant membersSyncedAt;
+
     @Column(name = "slug", unique = true, nullable = false, length = 64)
-    @NotBlank(message = "Slug is required")
+    @NotBlank(message = "Workspace slug is required")
     @Pattern(regexp = "^[a-z0-9][a-z0-9-]{2,50}$")
-    private String slug;
+    private String workspaceSlug;
 
     @Column(name = "display_name", nullable = false, length = 120)
     @NotBlank(message = "Display name is required")
@@ -111,7 +115,7 @@ public class Workspace {
     private String leaderboardScheduleTime; // Format: "HH:mm"
 
     @Column(name = "leaderboard_notification_enabled")
-    private Boolean leaderboardNotificationEnabled = false;
+    private Boolean leaderboardNotificationEnabled;
 
     @Column(name = "leaderboard_notification_team", length = 100)
     private String leaderboardNotificationTeam;

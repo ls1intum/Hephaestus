@@ -1,10 +1,12 @@
 package de.tum.in.www1.hephaestus.workspace.context;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.workspace.Workspace.WorkspaceStatus;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceMembership.WorkspaceRole;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceMembershipRepository;
+import de.tum.in.www1.hephaestus.workspace.WorkspaceMembershipService;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceRepository;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceSlugHistoryRepository;
 import jakarta.servlet.Filter;
@@ -16,12 +18,15 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.regex.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.annotation.Order;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.ProblemDetail;
 import org.springframework.stereotype.Component;
 
 /**
@@ -44,20 +49,23 @@ public class WorkspaceContextFilter implements Filter {
     private final WorkspaceRepository workspaceRepository;
     private final WorkspaceMembershipRepository workspaceMembershipRepository;
     private final UserRepository userRepository;
-    private final WorkspaceSlugHistoryRepository slugHistoryRepository;
+    private final WorkspaceMembershipService workspaceMembershipService;
+    private final WorkspaceSlugHistoryRepository workspaceSlugHistoryRepository;
     private final ObjectMapper objectMapper;
 
     public WorkspaceContextFilter(
         WorkspaceRepository workspaceRepository,
         WorkspaceMembershipRepository workspaceMembershipRepository,
         UserRepository userRepository,
-        WorkspaceSlugHistoryRepository slugHistoryRepository,
+        WorkspaceMembershipService workspaceMembershipService,
+        WorkspaceSlugHistoryRepository workspaceSlugHistoryRepository,
         ObjectMapper objectMapper
     ) {
         this.workspaceRepository = workspaceRepository;
         this.workspaceMembershipRepository = workspaceMembershipRepository;
         this.userRepository = userRepository;
-        this.slugHistoryRepository = slugHistoryRepository;
+        this.workspaceMembershipService = workspaceMembershipService;
+        this.workspaceSlugHistoryRepository = workspaceSlugHistoryRepository;
         this.objectMapper = objectMapper;
     }
 
@@ -74,9 +82,14 @@ public class WorkspaceContextFilter implements Filter {
 
         String path = httpRequest.getRequestURI();
 
-        // Skip legacy workspace endpoints that don't use workspace context
-        // These endpoints are at /workspace/** (singular) instead of /workspaces/{slug}/**
-        if (path.startsWith("/workspace/")) {
+        // Allow workspace registry endpoints that are not slugged
+        if ("/workspaces".equals(path) || "/workspaces/".equals(path)) {
+            chain.doFilter(request, response);
+            return;
+        }
+
+        if (!path.startsWith("/workspaces/")) {
+            // Not a workspace-scoped path, continue without context (allows /workspaces root endpoints)
             chain.doFilter(request, response);
             return;
         }
@@ -84,34 +97,56 @@ public class WorkspaceContextFilter implements Filter {
         var matcher = WORKSPACE_PATH_PATTERN.matcher(path);
 
         if (!matcher.matches()) {
-            // Not a workspace-scoped path, continue without context
-            chain.doFilter(request, response);
+            sendWorkspaceSlugValidationError(httpResponse, extractInvalidSlug(path));
             return;
         }
 
         String slug = matcher.group(1);
+        String method = httpRequest.getMethod();
+        String remainingPath = matcher.group(2) != null ? matcher.group(2) : "";
+        boolean isBasePath = remainingPath.isBlank() || "/".equals(remainingPath);
+        boolean isStatusPath = remainingPath.startsWith("/status");
 
         try {
             // Look up workspace by slug
-            var workspaceOpt = workspaceRepository.findBySlug(slug);
+            var workspaceOpt = workspaceRepository.findByWorkspaceSlug(slug);
 
             if (workspaceOpt.isEmpty()) {
-                // Slug not found in active workspaces - check redirect history
-                handleSlugRedirect(httpResponse, slug);
+                if (handleSlugRedirect(httpRequest, httpResponse, slug, remainingPath)) {
+                    return;
+                }
+                sendWorkspaceNotFoundError(httpResponse, slug);
                 return;
             }
 
             var workspace = workspaceOpt.get();
 
             // Check workspace status - only ACTIVE workspaces are accessible
-            if (workspace.getStatus() != WorkspaceStatus.ACTIVE) {
+            boolean isReadRequest = "GET".equalsIgnoreCase(method) || "HEAD".equalsIgnoreCase(method);
+            boolean allowLifecycleDelete = isBasePath && "DELETE".equalsIgnoreCase(method);
+            boolean allowNonActive = isStatusPath || (isBasePath && isReadRequest) || allowLifecycleDelete;
+
+            if (workspace.getStatus() != WorkspaceStatus.ACTIVE && !allowNonActive) {
                 log.debug("Workspace {} has non-ACTIVE status: {}. Returning 404.", slug, workspace.getStatus());
                 sendWorkspaceNotFoundError(httpResponse, slug);
                 return;
             }
 
             // Fetch user roles
-            Set<WorkspaceRole> roles = fetchUserRoles(workspace.getId());
+            var currentUser = userRepository.getCurrentUser();
+            Set<WorkspaceRole> roles = fetchUserRoles(workspace, currentUser);
+
+            boolean isPublicRead = Boolean.TRUE.equals(workspace.getIsPubliclyViewable()) && isReadRequest;
+
+            if (roles.isEmpty() && !isPublicRead) {
+                if (currentUser.isEmpty()) {
+                    sendWorkspaceUnauthorizedError(httpResponse, slug);
+                } else {
+                    log.debug("User is not a member of workspace {}. Returning 403.", slug);
+                    sendWorkspaceMembershipForbiddenError(httpResponse, slug);
+                }
+                return;
+            }
 
             // Create and set context
             WorkspaceContext context = WorkspaceContext.fromWorkspace(workspace, roles);
@@ -142,16 +177,18 @@ public class WorkspaceContextFilter implements Filter {
      * @param workspaceId Workspace ID
      * @return Set of workspace roles (empty if user has no membership or not authenticated)
      */
-    private Set<WorkspaceRole> fetchUserRoles(Long workspaceId) {
+    private Set<WorkspaceRole> fetchUserRoles(
+        de.tum.in.www1.hephaestus.workspace.Workspace workspace,
+        Optional<User> userOpt
+    ) {
         try {
-            var userOpt = userRepository.getCurrentUser();
             if (userOpt.isEmpty()) {
                 log.debug("No authenticated user found, returning empty roles");
                 return Set.of();
             }
 
             var membershipOpt = workspaceMembershipRepository.findByWorkspace_IdAndUser_Id(
-                workspaceId,
+                workspace.getId(),
                 userOpt.get().getId()
             );
 
@@ -160,12 +197,68 @@ public class WorkspaceContextFilter implements Filter {
                 return Set.of(membershipOpt.get().getRole());
             }
 
-            log.debug("User has no membership in workspace {}", workspaceId);
+            // Auto-heal only when workspace has zero memberships (fresh dev DB)
+            if (workspaceMembershipRepository.findByWorkspace_Id(workspace.getId()).isEmpty()) {
+                try {
+                    var created = workspaceMembershipService.createMembership(
+                        workspace,
+                        userOpt.get().getId(),
+                        WorkspaceRole.ADMIN
+                    );
+                    log.info(
+                        "Auto-added user {} to workspace {} as {} (bootstrap fallback)",
+                        userOpt.get().getLogin(),
+                        workspace.getWorkspaceSlug(),
+                        created.getRole()
+                    );
+                    return Set.of(created.getRole());
+                } catch (IllegalArgumentException ex) {
+                    log.debug(
+                        "Membership auto-add skipped for user {} in workspace {}: {}",
+                        userOpt.get().getLogin(),
+                        workspace.getWorkspaceSlug(),
+                        ex.getMessage()
+                    );
+                }
+            }
+
+            log.debug("User has no membership in workspace {}", workspace.getId());
             return Set.of();
         } catch (Exception e) {
-            log.warn("Failed to fetch user roles for workspace {}: {}", workspaceId, e.getMessage());
+            log.warn("Failed to fetch user roles for workspace {}: {}", workspace.getId(), e.getMessage());
             return Set.of();
         }
+    }
+
+    private boolean handleSlugRedirect(
+        HttpServletRequest request,
+        HttpServletResponse response,
+        String oldSlug,
+        String remainingPath
+    ) throws IOException {
+        var historyOpt = workspaceSlugHistoryRepository.findFirstByOldSlugOrderByChangedAtDesc(oldSlug);
+        if (historyOpt.isEmpty()) {
+            return false;
+        }
+
+        var history = historyOpt.get();
+        String newSlug = history.getNewSlug();
+        String suffix = remainingPath == null ? "" : remainingPath;
+        String location = request.getContextPath() + "/workspaces/" + newSlug + suffix;
+
+        log.info("Workspace slug redirect: '{}' → '{}'", oldSlug, newSlug);
+
+        ProblemDetail problem = ProblemDetail.forStatus(HttpStatus.MOVED_PERMANENTLY);
+        problem.setTitle("Workspace slug moved");
+        problem.setDetail("Workspace slug has been renamed");
+        problem.setProperty("oldSlug", oldSlug);
+        problem.setProperty("newSlug", newSlug);
+
+        response.setStatus(HttpServletResponse.SC_MOVED_PERMANENTLY);
+        response.setHeader("Location", location);
+        response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
+        response.getWriter().write(objectMapper.writeValueAsString(problem));
+        return true;
     }
 
     /**
@@ -175,50 +268,51 @@ public class WorkspaceContextFilter implements Filter {
      * @param slug Workspace slug
      */
     private void sendWorkspaceNotFoundError(HttpServletResponse response, String slug) throws IOException {
+        ProblemDetail problem = ProblemDetail.forStatus(HttpStatus.NOT_FOUND);
+        problem.setTitle("Resource not found");
+        problem.setDetail("Workspace not found: " + slug);
         response.setStatus(HttpServletResponse.SC_NOT_FOUND);
-        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-
-        var errorBody = Map.of("error", "WORKSPACE_NOT_FOUND", "message", "Workspace not found: " + slug);
-
-        response.getWriter().write(objectMapper.writeValueAsString(errorBody));
+        response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
+        response.getWriter().write(objectMapper.writeValueAsString(problem));
     }
 
-    /**
-     * Handle slug redirect lookup. Checks history for redirects.
-     * Returns 301 with new slug location for redirects, or 404 if no redirect found.
-     *
-     * @param response HTTP response
-     * @param oldSlug The slug that was not found in active workspaces
-     */
-    private void handleSlugRedirect(HttpServletResponse response, String oldSlug) throws IOException {
-        var historyOpt = slugHistoryRepository.findFirstByOldSlugOrderByChangedAtDesc(oldSlug);
+    private void sendWorkspaceSlugValidationError(HttpServletResponse response, String slug) throws IOException {
+        ProblemDetail problem = ProblemDetail.forStatus(HttpStatus.BAD_REQUEST);
+        problem.setTitle("Validation failed");
+        problem.setDetail("Invalid workspace slug: " + slug);
+        problem.setProperty(
+            "errors",
+            Map.of("workspaceSlug", "Slug must be 3-51 lowercase characters or digits and may include single hyphens")
+        );
+        response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+        response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
+        response.getWriter().write(objectMapper.writeValueAsString(problem));
+    }
 
-        if (historyOpt.isPresent()) {
-            // Redirect found - return 301 with new slug reference
-            var history = historyOpt.get();
-            String newSlug = history.getNewSlug();
+    private void sendWorkspaceMembershipForbiddenError(HttpServletResponse response, String slug) throws IOException {
+        ProblemDetail problem = ProblemDetail.forStatus(HttpStatus.FORBIDDEN);
+        problem.setTitle("Membership required");
+        problem.setDetail("You must be a member of workspace " + slug + " to access this resource.");
+        response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+        response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
+        response.getWriter().write(objectMapper.writeValueAsString(problem));
+    }
 
-            log.info("Workspace slug redirect: '{}' → '{}'", oldSlug, newSlug);
+    private void sendWorkspaceUnauthorizedError(HttpServletResponse response, String slug) throws IOException {
+        ProblemDetail problem = ProblemDetail.forStatus(HttpStatus.UNAUTHORIZED);
+        problem.setTitle("Authentication required");
+        problem.setDetail("You must sign in to access workspace " + slug + ".");
+        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+        response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
+        response.getWriter().write(objectMapper.writeValueAsString(problem));
+    }
 
-            response.setStatus(HttpServletResponse.SC_MOVED_PERMANENTLY); // 301
-            response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-
-            var redirectBody = Map.of(
-                "error",
-                "WORKSPACE_SLUG_MOVED",
-                "message",
-                "Workspace slug has been renamed",
-                "oldSlug",
-                oldSlug,
-                "newSlug",
-                newSlug
-            );
-
-            response.getWriter().write(objectMapper.writeValueAsString(redirectBody));
-            return;
+    private String extractInvalidSlug(String path) {
+        String remainder = path.substring("/workspaces/".length());
+        int slashIndex = remainder.indexOf('/');
+        if (slashIndex >= 0) {
+            remainder = remainder.substring(0, slashIndex);
         }
-
-        // No redirect found - standard 404
-        sendWorkspaceNotFoundError(response, oldSlug);
+        return remainder;
     }
 }

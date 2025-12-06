@@ -37,6 +37,7 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
+import { Spinner } from "@/components/ui/spinner";
 import {
 	Table,
 	TableBody,
@@ -289,7 +290,7 @@ export function UsersTable({
 									className="h-32 text-center"
 								>
 									<div className="flex flex-col items-center justify-center space-y-2">
-										<div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" />
+										<Spinner />
 										<p className="text-sm text-muted-foreground">
 											Loading users...
 										</p>

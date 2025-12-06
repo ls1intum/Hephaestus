@@ -16,7 +16,9 @@ public interface IssueCommentRepository extends JpaRepository<IssueComment, Long
         LEFT JOIN FETCH ic.issue
         LEFT JOIN FETCH ic.issue.repository
         WHERE
-            ic.author.login ILIKE :authorLogin AND ic.createdAt >= :activitySince
+            ic.author.login ILIKE :authorLogin
+            AND ic.createdAt >= :activitySince
+            AND ic.issue.repository.organization.workspace.id = :workspaceId
             AND (:onlyFromPullRequests = false OR ic.issue.htmlUrl LIKE '%/pull/%')
         ORDER BY ic.createdAt DESC
         """
@@ -24,7 +26,8 @@ public interface IssueCommentRepository extends JpaRepository<IssueComment, Long
     List<IssueComment> findAllByAuthorLoginSince(
         @Param("authorLogin") String authorLogin,
         @Param("activitySince") Instant activitySince,
-        @Param("onlyFromPullRequests") boolean onlyFromPullRequests
+        @Param("onlyFromPullRequests") boolean onlyFromPullRequests,
+        @Param("workspaceId") Long workspaceId
     );
 
     @Query(
@@ -37,6 +40,7 @@ public interface IssueCommentRepository extends JpaRepository<IssueComment, Long
         WHERE
             ic.createdAt BETWEEN :after AND :before
             AND ic.author.type = 'USER'
+            AND ic.issue.repository.organization.workspace.id = :workspaceId
             AND (:onlyFromPullRequests = false OR ic.issue.htmlUrl LIKE '%/pull/%')
         ORDER BY ic.createdAt DESC
         """
@@ -44,7 +48,8 @@ public interface IssueCommentRepository extends JpaRepository<IssueComment, Long
     List<IssueComment> findAllInTimeframe(
         @Param("after") Instant after,
         @Param("before") Instant before,
-        @Param("onlyFromPullRequests") boolean onlyFromPullRequests
+        @Param("onlyFromPullRequests") boolean onlyFromPullRequests,
+        @Param("workspaceId") Long workspaceId
     );
 
     @Query(
@@ -57,6 +62,7 @@ public interface IssueCommentRepository extends JpaRepository<IssueComment, Long
         WHERE
             ic.createdAt BETWEEN :after AND :before
             AND ic.author.type = 'USER'
+            AND ic.issue.repository.organization.workspace.id = :workspaceId
             AND EXISTS (
                 SELECT 1
                 FROM TeamRepositoryPermission trp
@@ -93,6 +99,7 @@ public interface IssueCommentRepository extends JpaRepository<IssueComment, Long
         @Param("after") Instant after,
         @Param("before") Instant before,
         @Param("teamIds") Collection<Long> teamIds,
-        @Param("onlyFromPullRequests") boolean onlyFromPullRequests
+        @Param("onlyFromPullRequests") boolean onlyFromPullRequests,
+        @Param("workspaceId") Long workspaceId
     );
 }

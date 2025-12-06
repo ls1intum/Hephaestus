@@ -14,6 +14,7 @@ import java.util.Set;
  * @param displayName Workspace display name
  * @param accountType GitHub account type (ORG or USER)
  * @param installationId GitHub App installation ID (nullable)
+ * @param publiclyViewable Whether the workspace allows public read access
  * @param roles Set of workspace roles for the current user
  */
 public record WorkspaceContext(
@@ -22,6 +23,7 @@ public record WorkspaceContext(
     String displayName,
     AccountType accountType,
     Long installationId,
+    boolean publiclyViewable,
     Set<WorkspaceRole> roles
 ) {
     /**
@@ -34,10 +36,11 @@ public record WorkspaceContext(
     public static WorkspaceContext fromWorkspace(Workspace workspace, Set<WorkspaceRole> roles) {
         return new WorkspaceContext(
             workspace.getId(),
-            workspace.getSlug(),
+            workspace.getWorkspaceSlug(),
             workspace.getDisplayName(),
             workspace.getAccountType(),
             workspace.getInstallationId(),
+            Boolean.TRUE.equals(workspace.getIsPubliclyViewable()),
             roles != null ? roles : Set.of()
         );
     }

@@ -47,6 +47,23 @@ Hephaestus can connect to GitHub using either a **Personal Access Token (PAT)** 
 
 The application works with either approach. If GitHub App credentials are not provided (defaults to `GH_APP_ID=0`), workspaces will use Personal Access Tokens instead.
 
+### Data sync and backfill
+
+The sync scheduler fetches recent GitHub activity (issues, PRs, reviews) for monitored repositories. Backfill optionally syncs historical data in batches to avoid rate limit exhaustion.
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `MONITORING_RUN_ON_STARTUP` | `true` | Run initial sync when application starts |
+| `MONITORING_TIMEFRAME` | `7` | Days of recent activity to sync each cycle |
+| `MONITORING_SYNC_CRON` | `0 0 * * * *` | Cron schedule for sync (hourly by default) |
+| `MONITORING_SYNC_COOLDOWN_IN_MINUTES` | `60` | Minimum gap between syncs per repository |
+| `MONITORING_BACKFILL_ENABLED` | `true` | Enable historical data backfill |
+| `MONITORING_BACKFILL_BATCH_SIZE` | `50` | Issues/PRs per backfill batch |
+| `MONITORING_BACKFILL_RATE_LIMIT_THRESHOLD` | `500` | Skip backfill if rate limit below this |
+| `MONITORING_BACKFILL_COOLDOWN_MINUTES` | `5` | Gap between backfill batches |
+
+**Backfill behavior:** After recent sync completes, backfill works backwards from the highest issue number, syncing in small batches. It pauses when rate limits drop below the threshold and resumes on the next cycle. Progress is checkpointed per repository.
+
 ## Deployment steps
 
 1. **Provision infrastructure:** Ensure PostgreSQL, Redis (if used), and storage volumes are ready.
