@@ -16,12 +16,13 @@
 #   2. Point to this file in the repo: docker/preview/compose.shared-infra.yaml
 #   3. Enable "Connect to Predefined Network" 
 #   4. Configure environment variables (see .env.example)
-#   5. In Coolify UI, assign domains:
-#      - keycloak: https://preview.example.com/keycloak (port 8080)
-#      - webhook-ingest: https://preview.example.com/webhooks (port 4200)
+#   5. In Coolify UI, set domains for each service (with Strip Prefix ENABLED):
+#      - keycloak: https://example.com:8080/keycloak
+#      - webhook-ingest: https://example.com:4200/webhooks
 #
-# Note: Coolify auto-generates Traefik labels when you assign domains in the UI.
-#       No manual Traefik labels needed here.
+# Domain format: https://domain.com:PORT/path
+# The :PORT tells Coolify which container port to proxy to.
+# Strip Prefix removes /keycloak and /webhooks before forwarding.
 #
 # =============================================================================
 
@@ -52,11 +53,13 @@ services:
 
   # ---------------------------------------------------------------------------
   # Webhook Ingest - Receives GitHub webhooks, publishes to NATS
-  # Assign domain in Coolify: preview.example.com/webhooks → port 4200
+  # Configure domain in Coolify UI: https://example.com/webhooks:4200
   # ---------------------------------------------------------------------------
   webhook-ingest:
     image: ghcr.io/ls1intum/hephaestus/webhook-ingest:${IMAGE_TAG:-latest}
     restart: unless-stopped
+    expose:
+      - "4200"
     environment:
       NATS_URL: nats://nats-server:4222
       WEBHOOK_SECRET: ${WEBHOOK_SECRET:?Required}
@@ -100,7 +103,7 @@ services:
 
   # ---------------------------------------------------------------------------
   # Keycloak - Authentication with wildcard redirect URIs
-  # Assign domain in Coolify: preview.example.com/keycloak → port 8080
+  # Configure domain in Coolify UI: https://example.com/keycloak:8080
   # ---------------------------------------------------------------------------
   keycloak:
     image: quay.io/keycloak/keycloak:26.0
@@ -108,6 +111,8 @@ services:
     depends_on:
       keycloak-db:
         condition: service_healthy
+    expose:
+      - "8080"
     environment:
       # Database
       KC_DB: postgres
@@ -117,9 +122,9 @@ services:
       # Admin
       KC_BOOTSTRAP_ADMIN_USERNAME: ${KC_ADMIN_USERNAME:-admin}
       KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_ADMIN_PASSWORD:?Required}
-      # Hostname
-      KC_HOSTNAME: ${PREVIEW_DOMAIN:?Required}
-      KC_HTTP_RELATIVE_PATH: /keycloak
+      # Hostname - full URL with path for proper URL generation
+      # Proxy strips /keycloak, but Keycloak generates URLs with it
+      KC_HOSTNAME: https://${PREVIEW_DOMAIN:?Required}/keycloak
       KC_HTTP_ENABLED: "true"
       KC_HEALTH_ENABLED: "true"
       KC_PROXY_HEADERS: xforwarded
@@ -137,7 +142,7 @@ services:
         target: /opt/keycloak/data/realm-import.json
     entrypoint: ["sh", "-c", "mkdir -p /opt/keycloak/data/import && [ -f /opt/keycloak/data/realm-import.json ] && mv /opt/keycloak/data/realm-import.json /opt/keycloak/data/import/realm-import.json; exec /opt/keycloak/bin/kc.sh start --import-realm"]
     healthcheck:
-      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/9000 && echo -e 'GET /keycloak/health/ready HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n' >&3 && cat <&3 | grep -q 'UP'"]
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/9000 && echo -e 'GET /health/ready HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n' >&3 && cat <&3 | grep -q 'UP'"]
       interval: 10s
       timeout: 10s
       retries: 20
@@ -192,6 +197,15 @@ configs:
         "enabled": true,
         "ssoSessionIdleTimeout": 1209600,
         "ssoSessionMaxLifespan": 2592000,
+        "browserSecurityHeaders": {
+          "contentSecurityPolicy": "frame-src 'self'; frame-ancestors 'self' https://*.${PREVIEW_DOMAIN}; object-src 'none';",
+          "xContentTypeOptions": "nosniff",
+          "xRobotsTag": "none",
+          "xFrameOptions": "",
+          "contentSecurityPolicyReportOnly": "",
+          "xXSSProtection": "1; mode=block",
+          "strictTransportSecurity": "max-age=31536000; includeSubDomains"
+        },
         "clients": [
           {
             "clientId": "hephaestus",
@@ -201,12 +215,10 @@ configs:
             "alwaysDisplayInConsole": false,
             "clientAuthenticatorType": "client-secret",
             "redirectUris": [
-              "https://${PREVIEW_DOMAIN}/*",
-              "https://*.${PREVIEW_DOMAIN}/*"
+              "*"
             ],
             "webOrigins": [
-              "https://${PREVIEW_DOMAIN}",
-              "https://*.${PREVIEW_DOMAIN}"
+              "*"
             ],
             "notBefore": 0,
             "bearerOnly": false,
@@ -219,7 +231,7 @@ configs:
             "frontchannelLogout": true,
             "protocol": "openid-connect",
             "attributes": {
-              "post.logout.redirect.uris": "https://${PREVIEW_DOMAIN}/*##https://*.${PREVIEW_DOMAIN}/*",
+              "post.logout.redirect.uris": "+",
               "oauth2.device.authorization.grant.enabled": "false",
               "backchannel.logout.revoke.offline.tokens": "false",
               "use.refresh.tokens": "true",
@@ -242,10 +254,11 @@ configs:
             "clientAuthenticatorType": "client-secret",
             "secret": "${KEYCLOAK_HEPHAESTUS_CONFIDENTIAL_CLIENT_SECRET}",
             "redirectUris": [
-              "https://${PREVIEW_DOMAIN}/*",
-              "https://*.${PREVIEW_DOMAIN}/*"
+              "*"
             ],
-            "webOrigins": ["+"],
+            "webOrigins": [
+              "*"
+            ],
             "notBefore": 0,
             "bearerOnly": false,
             "consentRequired": false,
@@ -257,7 +270,7 @@ configs:
             "frontchannelLogout": true,
             "protocol": "openid-connect",
             "attributes": {
-              "post.logout.redirect.uris": "https://${PREVIEW_DOMAIN}/*##https://*.${PREVIEW_DOMAIN}/*",
+              "post.logout.redirect.uris": "+",
               "oauth2.device.authorization.grant.enabled": "false",
               "backchannel.logout.revoke.offline.tokens": "false"
             },

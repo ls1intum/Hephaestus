@@ -15,6 +15,7 @@ services:
       POSTHOG_ENABLED: ${POSTHOG_ENABLED:-false}
       POSTHOG_PROJECT_API_KEY: ${POSTHOG_PROJECT_API_KEY}
       POSTHOG_API_HOST: ${POSTHOG_API_HOST}
+      TANSTACK_DEVTOOLS_ENABLED: ${TANSTACK_DEVTOOLS_ENABLED:-false}
     ports:
       - '80'
     depends_on:
@@ -64,6 +65,8 @@ services:
       NATS_SERVER: nats://nats-server:4222
       KEYCLOAK_URL: https://${APP_HOSTNAME}/keycloak
       KEYCLOAK_REALM: hephaestus
+      # Internal URL for fetching JWKS (container-to-container, bypasses public URL)
+      KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/hephaestus/protocol/openid-connect/certs
       KEYCLOAK_CLIENT_ID: hephaestus-confidential
       KEYCLOAK_CLIENT_SECRET: ${KEYCLOAK_HEPHAESTUS_CONFIDENTIAL_CLIENT_SECRET}
       GH_APP_ID: ${GH_APP_ID}

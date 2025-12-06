@@ -2,6 +2,7 @@ import { Search, Users } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { LabelInfo, TeamInfo } from "@/api/types.gen";
 import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 import { TeamTree } from "./teams/TeamTree";
 
 export interface TeamsTableProps {
@@ -133,15 +134,12 @@ export function AdminTeamsTable({
 		return (
 			<div className="space-y-4">
 				<div className="flex items-center justify-between">
-					<div className="h-10 w-64 bg-muted animate-pulse rounded" />
-					<div className="h-10 w-32 bg-muted animate-pulse rounded" />
+					<Skeleton className="h-10 w-64" />
+					<Skeleton className="h-10 w-32" />
 				</div>
 				<div className="space-y-4">
 					{["a", "b", "c", "d"].map((id) => (
-						<div
-							key={`loading-${id}`}
-							className="h-32 bg-muted animate-pulse rounded-lg"
-						/>
+						<Skeleton key={`loading-${id}`} className="h-32" />
 					))}
 				</div>
 			</div>

@@ -11,6 +11,7 @@ spring:
     oauth2:
       resourceserver:
         jwt:
+          # Public URL for issuer validation (must match token's iss claim)
           issuer-uri: ${KEYCLOAK_URL}/realms/${KEYCLOAK_REALM}
 
   mail:
@@ -74,6 +75,9 @@ keycloak:
     realm: ${KEYCLOAK_REALM}
     client-id: ${KEYCLOAK_CLIENT_ID}
     client-secret: ${KEYCLOAK_CLIENT_SECRET}
+    # Internal JWKS endpoint for containerized deployments (optional)
+    # When set, fetches signing keys from this URL instead of discovering via issuer-uri
+    jwk-set-uri: ${KEYCLOAK_JWK_SET_URI:}
 
 nats:
     enabled: ${NATS_ENABLED:false}

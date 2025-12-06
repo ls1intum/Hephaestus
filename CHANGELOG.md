@@ -1,5 +1,37 @@
 # Changelog
 
+## [0.10.0-rc.45](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.44...v0.10.0-rc.45) (2025-12-06)
+
+### 🐛 Bug Fixes
+
+* **webapp:** invert colors on ReviewsPopover hover in dark mode ([#562](https://github.com/ls1intum/Hephaestus/issues/562)) ([4c9423b](https://github.com/ls1intum/Hephaestus/commit/4c9423b718da1b9547a0e1275151429913ca1c20))
+
+## [0.10.0-rc.44](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.43...v0.10.0-rc.44) (2025-12-06)
+
+### 🐛 Bug Fixes
+
+* **webapp:** standardize skeleton loading states to eliminate color inconsistencies ([#559](https://github.com/ls1intum/Hephaestus/issues/559)) ([2ac9491](https://github.com/ls1intum/Hephaestus/commit/2ac9491e1ee4be58fcd9e51d55e03e2c67751ca9))
+
+## [0.10.0-rc.43](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.42...v0.10.0-rc.43) (2025-12-05)
+
+## [0.10.0-rc.42](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.41...v0.10.0-rc.42) (2025-12-05)
+
+## [0.10.0-rc.41](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.40...v0.10.0-rc.41) (2025-12-05)
+
+## [0.10.0-rc.40](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.39...v0.10.0-rc.40) (2025-12-04)
+
+## [0.10.0-rc.39](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.38...v0.10.0-rc.39) (2025-12-04)
+
+## [0.10.0-rc.38](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.37...v0.10.0-rc.38) (2025-12-04)
+
+## [0.10.0-rc.37](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.36...v0.10.0-rc.37) (2025-12-04)
+
+## [0.10.0-rc.36](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.35...v0.10.0-rc.36) (2025-12-04)
+
+## [0.10.0-rc.35](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.34...v0.10.0-rc.35) (2025-12-04)
+
+## [0.10.0-rc.34](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.33...v0.10.0-rc.34) (2025-12-04)
+
 ## [0.10.0-rc.33](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.32...v0.10.0-rc.33) (2025-12-03)
 
 ## [0.10.0-rc.32](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.31...v0.10.0-rc.32) (2025-12-03)
