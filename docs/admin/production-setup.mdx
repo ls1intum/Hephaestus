@@ -25,7 +25,7 @@ Set the following secrets before starting the stack:
 
 | Variable | Purpose |
 | --- | --- |
-| `WEBHOOK_SECRET` | Shared secret for GitHub webhooks (`openssl rand -base64 32`) |
+| `WEBHOOK_SECRET` | HMAC secret for GitHub and GitLab webhooks (`openssl rand -base64 32`) |
 | `KEYCLOAK_GITHUB_CLIENT_ID` | GitHub OAuth app client ID |
 | `KEYCLOAK_GITHUB_CLIENT_SECRET` | GitHub OAuth app client secret |
 | `KEYCLOAK_GITHUB_ADMIN_USERNAME` | GitHub username that should receive Keycloak admin rights |
@@ -46,6 +46,8 @@ Hephaestus can connect to GitHub using either a **Personal Access Token (PAT)** 
   - `GH_APP_PRIVATE_KEY_LOCATION`: Alternative path to private key file (optional)
 
 The application works with either approach. If GitHub App credentials are not provided (defaults to `GH_APP_ID=0`), workspaces will use Personal Access Tokens instead.
+
+**Webhook secret:** Set `WEBHOOK_SECRET` to the secret configured on your GitHub and GitLab webhooks (generate with `openssl rand -base64 32`).
 
 ### Data sync and backfill
 

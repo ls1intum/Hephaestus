@@ -5,8 +5,7 @@ services:
       - "4200"
     environment:
       NATS_URL: "nats://nats-server:4222"
-      GITHUB_WEBHOOK_SECRET: ${GITHUB_WEBHOOK_SECRET}
-      GITLAB_WEBHOOK_SECRET: ${GITLAB_WEBHOOK_SECRET}
+      WEBHOOK_SECRET: ${WEBHOOK_SECRET}
     depends_on:
       nats-server:
         condition: service_healthy

@@ -128,7 +128,7 @@ async def github_webhook(
 ):
     body = await request.body()
 
-    if not verify_github_signature(signature, settings.GITHUB_WEBHOOK_SECRET, body):
+    if not verify_github_signature(signature, settings.WEBHOOK_SECRET, body):
         raise HTTPException(status_code=401, detail="Invalid signature")
 
     # Ignore ping events
@@ -169,7 +169,7 @@ async def gitlab_webhook(
 ):
     body = await request.body()
 
-    expected_token = settings.GITLAB_WEBHOOK_SECRET or None
+    expected_token = settings.WEBHOOK_SECRET or None
     if expected_token:
         if token != expected_token:
             raise HTTPException(status_code=401, detail="Invalid token")
