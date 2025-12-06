@@ -37,10 +37,6 @@ on:
         type: boolean
         description: (Re-)deploys the proxy components. Usually not necessary and might cause downtime.
 
-permissions:
-  contents: read
-  actions: read
-
 jobs:  
   deploy-app:
     if: ${{ inputs.deploy-app }}
