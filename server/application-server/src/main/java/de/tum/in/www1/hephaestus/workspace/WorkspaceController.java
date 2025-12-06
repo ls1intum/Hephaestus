@@ -164,6 +164,22 @@ public class WorkspaceController {
         return ResponseEntity.ok(WorkspaceDTO.from(workspace));
     }
 
+    @PatchMapping("/slug")
+    @Operation(summary = "Rename workspace slug and create redirect")
+    @ApiResponse(
+        responseCode = "200",
+        description = "Workspace renamed",
+        content = @Content(schema = @Schema(implementation = WorkspaceDTO.class))
+    )
+    @RequireWorkspaceOwner
+    public ResponseEntity<WorkspaceDTO> renameSlug(
+        WorkspaceContext workspaceContext,
+        @Valid @RequestBody RenameWorkspaceSlugRequestDTO request
+    ) {
+        Workspace workspace = workspaceService.renameSlug(workspaceContext, request.newSlug());
+        return ResponseEntity.ok(WorkspaceDTO.from(workspace));
+    }
+
     @GetMapping("/repositories")
     @Operation(summary = "List repositories monitored by a workspace")
     @ApiResponse(

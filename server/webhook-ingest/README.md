@@ -1,192 +1,52 @@
-# WebHook Ingest
+# Webhook Ingest
 
-## Overview
+A FastAPI service that accepts GitHub and GitLab webhooks and publishes the
+payload to NATS JetStream.
 
-A service to ingest GitHub webhooks and publish the data to NATS JetStream.
+## Configuration
 
-## Setup
+Provide the following environment variables when running the service:
 
-### Prerequisites
+- `NATS_URL` – NATS server URL, for example `nats://nats-server:4222`
+- `WEBHOOK_SECRET` – HMAC secret configured on your GitHub and GitLab webhooks (prefer SHA-256; e.g., `openssl rand -hex 32`)
 
-- **Python 3.13**
-- **Poetry** for dependency management
-- **Docker** for containerization
-
-### Installation
-
-Install dependencies using Poetry:
+### Local development
 
 ```bash
 pip install poetry
 poetry install
+poetry run fastapi dev app/main.py
 ```
 
-## Running the Service
+### Docker Compose
 
-### Development
+A `compose.yaml` file is provided for local testing together with a NATS
+instance:
 
 ```bash
-fastapi dev
+docker compose up --build
 ```
 
-### Production
+The compose file exposes the webhook service on port `4200` and the embedded
+NATS server on port `4222`.
 
-```bash
-fastapi run
-```
+Set `WEBHOOK_SECRET` in your shell or a `.env` file before starting the compose
+stack so the service can validate incoming requests. GitHub webhooks are
+validated against `X-Hub-Signature-256` (or `X-Hub-Signature` as a fallback).
 
-## Docker Deployment
-
-Build and run with Docker Compose:
-
-```bash
-docker-compose up --build
-```
-
-Service ports:
-- **Webhook Service**: `4200`
-- **NATS Server**: `4222`
-
-## Environment Variables
-
-- `NATS_URL`: NATS server URL
-- `NATS_AUTH_TOKEN`: Authorization token for NATS server
-- `WEBHOOK_SECRET`: HMAC secret for verifying GitHub webhooks
-- `TLS_CERT_FILE`: Path to the TLS certificate file (used by NATS server)
-- `TLS_KEY_FILE`: Path to the TLS key file (used by NATS server)
-
-## Usage
-
-Configure your GitHub webhooks to POST to:
-
-```
-https://<server>:4200/github
-```
-
-### Event Handling
-
-Events are published to NATS with the subject:
-
-```
-github.<owner>.<repo>.<event_type>
-```
-
-## NATS Configuration with TLS
+## Webhook endpoints
 
 
+The service verifies GitHub webhooks via `X-Hub-Signature-256` (preferred) or `X-Hub-Signature`, and the
+GitLab secret token via `X-GitLab-Token`. Requests without the correct secret are rejected with `401 Unauthorized`.
 
-You're absolutely right. The NATS configuration with TLS and Let's Encrypt, along with the corresponding environment variables, is crucial for ensuring secure communication and should be highlighted in the README. Here’s an updated version:
+## NATS subjects
 
----
+Events are published to JetStream using the following subjects:
 
-# WebHook Ingest
+- GitHub: `github.<owner>.<repo>.<event_type>`
+- GitLab: `gitlab.<namespace>.<project>.<event_type>`
 
-## Overview
-
-A service to ingest GitHub webhooks and publish the data to NATS JetStream.
-
-## Setup
-
-### Prerequisites
-
-- **Python 3.13**
-- **Poetry** for dependency management
-- **Docker** for containerization
-
-### Installation
-
-Install dependencies using Poetry:
-
-```bash
-pip install poetry
-poetry install
-```
-
-## Running the Service
-
-### Development
-
-```bash
-fastapi dev
-```
-
-### Production
-
-```bash
-fastapi run
-```
-
-## Docker Deployment
-
-Build and run with Docker Compose:
-
-```bash
-docker-compose up --build
-```
-
-Service ports:
-
-- **Webhook Service**: `4200`
-- **NATS Server**: `4222`
-
-## Environment Variables
-
-- `NATS_URL`: NATS server URL
-- `NATS_AUTH_TOKEN`: Authorization token for NATS server
-- `WEBHOOK_SECRET`: HMAC secret for verifying GitHub webhooks
-- `TLS_CERT_FILE`: Path to the TLS certificate file (used by NATS server)
-- `TLS_KEY_FILE`: Path to the TLS key file (used by NATS server)
-
-## NATS Configuration with TLS
-
-For secure communication in production, NATS can be configured with TLS using Let's Encrypt certificates.
-
-### Steps to Create TLS Certificates
-
-1. **Install Certbot** on your server:
-
-```bash
-sudo apt-get install certbot
-```
-
-2. **Obtain a Certificate**:
-
-```bash
-sudo certbot certonly --standalone -d <your.domain.com>
-```
-
-Replace `<your.domain.com>` with your actual domain name.
-
-3. **Configure NATS** to use the certificate and key in the environment variables:
-
-```bash
-TLS_CERT_FILE=/etc/letsencrypt/live/<your.domain.com>/fullchain.pem
-TLS_KEY_FILE=/etc/letsencrypt/live/<your.domain.com>/privkey.pem
-
-NATS_URL=tls://<your.domain.com>
-```
-
-For more detailed instructions and options, refer to the [Certbot documentation](https://certbot.eff.org/).
-
-### NATS Authorization Token
-
-1. **Generate a Token**:
-  
-```bash
-openssl rand -hex 48
-```
-
-2. **Set the Token** as an environment variable:
-
-```bash
-NATS_AUTH_TOKEN=<your_generated_token>
-```
-
-### Important Notes
-
-- The service automatically sets up a NATS JetStream stream named `github` to store events.
-- Ensure your firewall allows traffic on port 4222 (NATS) and ports 80/443 (Let's Encrypt challenge).
-- TLS is essential so no sensitive data can be intercepted during communication (such as webhook payloads).
-- Authentication tokens are crucial for securing the NATS server and ensuring only authorized clients can connect.
-- The webhook ingest service connects to the NATS server like any other client using the specified URL and token.
-- Allowing unauthenticated non-TLS connections from within the internal Docker network does not seem to be possible with the NATS server.
+For GitLab events the full group path (including subgroups) is flattened into a
+single `<namespace>` segment using `~` as separator. Any missing information is
+replaced with `?`.
