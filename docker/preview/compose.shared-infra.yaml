@@ -197,6 +197,15 @@ configs:
         "enabled": true,
         "ssoSessionIdleTimeout": 1209600,
         "ssoSessionMaxLifespan": 2592000,
+        "browserSecurityHeaders": {
+          "contentSecurityPolicy": "frame-src 'self'; frame-ancestors 'self' https://*.${PREVIEW_DOMAIN}; object-src 'none';",
+          "xContentTypeOptions": "nosniff",
+          "xRobotsTag": "none",
+          "xFrameOptions": "",
+          "contentSecurityPolicyReportOnly": "",
+          "xXSSProtection": "1; mode=block",
+          "strictTransportSecurity": "max-age=31536000; includeSubDomains"
+        },
         "clients": [
           {
             "clientId": "hephaestus",
@@ -206,12 +215,10 @@ configs:
             "alwaysDisplayInConsole": false,
             "clientAuthenticatorType": "client-secret",
             "redirectUris": [
-              "https://${PREVIEW_DOMAIN}/*",
-              "https://*.${PREVIEW_DOMAIN}/*"
+              "*"
             ],
             "webOrigins": [
-              "https://${PREVIEW_DOMAIN}",
-              "https://*.${PREVIEW_DOMAIN}"
+              "*"
             ],
             "notBefore": 0,
             "bearerOnly": false,
@@ -224,7 +231,7 @@ configs:
             "frontchannelLogout": true,
             "protocol": "openid-connect",
             "attributes": {
-              "post.logout.redirect.uris": "https://${PREVIEW_DOMAIN}/*##https://*.${PREVIEW_DOMAIN}/*",
+              "post.logout.redirect.uris": "+",
               "oauth2.device.authorization.grant.enabled": "false",
               "backchannel.logout.revoke.offline.tokens": "false",
               "use.refresh.tokens": "true",
@@ -247,10 +254,11 @@ configs:
             "clientAuthenticatorType": "client-secret",
             "secret": "${KEYCLOAK_HEPHAESTUS_CONFIDENTIAL_CLIENT_SECRET}",
             "redirectUris": [
-              "https://${PREVIEW_DOMAIN}/*",
-              "https://*.${PREVIEW_DOMAIN}/*"
+              "*"
             ],
-            "webOrigins": ["+"],
+            "webOrigins": [
+              "*"
+            ],
             "notBefore": 0,
             "bearerOnly": false,
             "consentRequired": false,
@@ -262,7 +270,7 @@ configs:
             "frontchannelLogout": true,
             "protocol": "openid-connect",
             "attributes": {
-              "post.logout.redirect.uris": "https://${PREVIEW_DOMAIN}/*##https://*.${PREVIEW_DOMAIN}/*",
+              "post.logout.redirect.uris": "+",
               "oauth2.device.authorization.grant.enabled": "false",
               "backchannel.logout.revoke.offline.tokens": "false"
             },

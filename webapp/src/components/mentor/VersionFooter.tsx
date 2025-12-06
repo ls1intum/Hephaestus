@@ -4,7 +4,7 @@ import { useWindowSize } from "usehooks-ts";
 import type { Document } from "@/api/types.gen";
 
 import { Button } from "@/components/ui/button";
-import { LoaderIcon } from "./LoaderIcon";
+import { Spinner } from "@/components/ui/spinner";
 
 interface VersionFooterProps {
 	/** Handler for version navigation */
@@ -52,11 +52,7 @@ export const VersionFooter = ({
 			<div className="flex flex-row gap-4">
 				<Button disabled={isRestoring} onClick={onRestore}>
 					<div>Restore this version</div>
-					{isRestoring && (
-						<div className="animate-spin">
-							<LoaderIcon />
-						</div>
-					)}
+					{isRestoring && <Spinner size="sm" />}
 				</Button>
 				<Button variant="outline" onClick={() => handleVersionChange("latest")}>
 					Back to latest version
