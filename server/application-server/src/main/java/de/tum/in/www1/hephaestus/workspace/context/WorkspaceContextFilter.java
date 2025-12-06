@@ -24,6 +24,7 @@ import java.util.regex.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.annotation.Order;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
@@ -242,22 +243,43 @@ public class WorkspaceContextFilter implements Filter {
         }
 
         var history = historyOpt.get();
+        var workspace = workspaceRepository
+            .findById(history.getWorkspace().getId())
+            .orElse(null);
+
+        if (workspace == null) {
+            log.warn("Slug redirect history points to missing workspace for oldSlug={}", oldSlug);
+            return false;
+        }
+
+        // Avoid leaking workspace existence for private workspaces when the user lacks membership.
+        boolean isPublic = Boolean.TRUE.equals(workspace.getIsPubliclyViewable());
+        boolean hasMembership = userRepository
+            .getCurrentUser()
+            .flatMap(user ->
+                workspaceMembershipRepository.findByWorkspace_IdAndUser_Id(workspace.getId(), user.getId())
+            )
+            .isPresent();
+
+        if (!isPublic && !hasMembership) {
+            return false;
+        }
+
         String newSlug = history.getNewSlug();
         String suffix = remainingPath == null ? "" : remainingPath;
+        String queryString = request.getQueryString();
         String location = request.getContextPath() + "/workspaces/" + newSlug + suffix;
+        if (queryString != null && !queryString.isBlank()) {
+            location += '?' + queryString;
+        }
 
-        log.info("Workspace slug redirect: '{}' → '{}'", oldSlug, newSlug);
+        log.debug("Workspace slug redirect: '{}' → '{}'", oldSlug, newSlug);
 
-        ProblemDetail problem = ProblemDetail.forStatus(HttpStatus.MOVED_PERMANENTLY);
-        problem.setTitle("Workspace slug moved");
-        problem.setDetail("Workspace slug has been renamed");
-        problem.setProperty("oldSlug", oldSlug);
-        problem.setProperty("newSlug", newSlug);
-
-        response.setStatus(HttpServletResponse.SC_MOVED_PERMANENTLY);
-        response.setHeader("Location", location);
-        response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
-        response.getWriter().write(objectMapper.writeValueAsString(problem));
+        response.setStatus(HttpStatus.PERMANENT_REDIRECT.value());
+        response.setHeader(HttpHeaders.LOCATION, location);
+        response.setHeader(HttpHeaders.CACHE_CONTROL, "no-store");
+        response.setContentLength(0);
+        response.flushBuffer();
         return true;
     }
 
