@@ -205,18 +205,22 @@ public final class PostgreSQLTestContainer {
             if (reason == LocalDatabaseReason.EXPLICIT_LOCAL_MODE) {
                 // User explicitly chose local mode
                 message.append("To resolve this issue (local PostgreSQL mode):\n");
-                message.append("  1. Run 'scripts/codex-setup.sh' to set up the local PostgreSQL instance\n");
-                message.append("  2. Ensure 'scripts/local-postgres.sh start' completes successfully\n");
-                message.append("  3. Verify the database is running: scripts/local-postgres.sh status\n\n");
+                appendLocalPostgresSetupSteps(message);
+                message.append("\n");
             } else {
                 // Docker unavailable or failed - recommend Docker for local dev
                 message.append("Recommended solution for local development:\n");
                 message.append("  Install and start Docker, then re-run tests to use Testcontainers automatically.\n\n");
                 message.append("Alternative (for cloud environments without Docker):\n");
-                message.append("  1. Run 'scripts/codex-setup.sh' to set up the local PostgreSQL instance\n");
-                message.append("  2. Ensure 'scripts/local-postgres.sh start' completes successfully\n");
-                message.append("  3. Verify the database is running: scripts/local-postgres.sh status\n\n");
+                appendLocalPostgresSetupSteps(message);
+                message.append("\n");
             }
+        }
+        
+        private void appendLocalPostgresSetupSteps(StringBuilder message) {
+            message.append("  1. Run 'scripts/codex-setup.sh' to set up the local PostgreSQL instance\n");
+            message.append("  2. Ensure 'scripts/local-postgres.sh start' completes successfully\n");
+            message.append("  3. Verify the database is running: scripts/local-postgres.sh status");
         }
         
         private void appendEnvironmentVariables(StringBuilder message) {
