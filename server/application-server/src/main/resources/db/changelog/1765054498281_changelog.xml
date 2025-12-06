@@ -13,25 +13,25 @@
             <column name="source_id" type="BIGINT">
                 <constraints nullable="false"/>
             </column>
-            <column name="source_type" type="VARCHAR(128)">
+            <column name="source_type" type="VARCHAR(20)">
                 <constraints nullable="false"/>
             </column>
             <column name="xp_awarded" type="INTEGER">
                 <constraints nullable="false"/>
             </column>
-            <column name="actor_id" type="BIGINT"/>
+            <column name="actor_id" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
         </createTable>
     </changeSet>
     <changeSet author="Max Achterberg" id="1764585129209-2">
         <addForeignKeyConstraint baseColumnNames="actor_id" baseTableName="contribution_event"
-                                 constraintName="FKt59e4ph2p1f5k3avfoh2tkypn" deferrable="false"
+                                 constraintName="FK_contribution_event_actor" deferrable="false"
                                  initiallyDeferred="false" referencedColumnNames="id" referencedTableName="user"
                                  validate="true"/>
     </changeSet>
     <changeSet author="Max Achterberg" id="1764585129209-3">
-        <comment>Shrink the source_type down to 20 chars (probably enough since PULL_REQUEST_REVIEW is the longest type
-            so far with 19 chars)
-        </comment>
-        <modifyDataType columnName="source_type" newDataType="varchar(20)" tableName="contribution_event"/>
+        <addUniqueConstraint columnNames="source_type, source_id" constraintName="uk_contribution_event_source"
+                             tableName="contribution_event"/>
     </changeSet>
 </databaseChangeLog>

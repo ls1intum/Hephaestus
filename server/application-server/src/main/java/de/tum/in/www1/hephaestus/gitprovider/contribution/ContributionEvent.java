@@ -10,7 +10,12 @@ import lombok.Setter;
 import java.time.Instant;
 
 @Entity
-@Table(name = "contribution_event")
+@Table(
+    name = "contribution_event",
+    uniqueConstraints = {
+        @UniqueConstraint(name = "uk_contribution_event_source", columnNames = { "source_type", "source_id" })
+    }
+)
 @Getter
 @Setter
 @NoArgsConstructor
