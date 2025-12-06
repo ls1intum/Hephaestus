@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.10.0-rc.46](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.45...v0.10.0-rc.46) (2025-12-06)
+
+### 🐛 Bug Fixes
+
+* **webapp:** standardize loading spinners across codebase ([#561](https://github.com/ls1intum/Hephaestus/issues/561)) ([392c955](https://github.com/ls1intum/Hephaestus/commit/392c955b1f72e0e314c319fe4530b42b9c9cd302))
+
 ## [0.10.0-rc.45](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.44...v0.10.0-rc.45) (2025-12-06)
 
 ### 🐛 Bug Fixes

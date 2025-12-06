@@ -1,6 +1,6 @@
 [project]
 name = "webhook-ingest"
-version = "0.10.0-rc.45"
+version = "0.10.0-rc.46"
 description = "A FastAPI service for ingesting GitHub webhooks and publishing events to NATS JetStream."
 authors = [
   { name = "Felix T.J. Dietrich", email = "felixtj.dietrich@tum.de"}
