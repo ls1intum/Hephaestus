@@ -1,8 +1,8 @@
 import { FileText, Maximize } from "lucide-react";
 import type { MouseEvent } from "react";
 import type { Document } from "@/api/types.gen";
-import { Spinner } from "@/components/ui/spinner";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
 import { InlineDocumentSkeleton } from "./DocumentSkeleton";
 import { TextEditor } from "./TextEditor";
