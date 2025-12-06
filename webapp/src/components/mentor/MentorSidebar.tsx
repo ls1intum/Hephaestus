@@ -4,6 +4,7 @@ import { MessageSquare, Plus } from "lucide-react";
 import { getGroupedThreadsOptions } from "@/api/@tanstack/react-query.gen";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Spinner } from "@/components/ui/spinner";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 import { cn } from "@/lib/utils";
 
@@ -73,7 +74,7 @@ export function MentorSidebar({ className }: MentorSidebarProps) {
 				<div className="p-2">
 					{isLoading ? (
 						<div className="flex items-center justify-center py-8">
-							<div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" />
+							<Spinner />
 						</div>
 					) : (
 						<div className="space-y-4">

@@ -2,9 +2,9 @@ import { FileText, Maximize } from "lucide-react";
 import type { MouseEvent } from "react";
 import type { Document } from "@/api/types.gen";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
 import { InlineDocumentSkeleton } from "./DocumentSkeleton";
-import { LoaderIcon } from "./LoaderIcon";
 import { TextEditor } from "./TextEditor";
 
 interface DocumentPreviewProps {
@@ -49,7 +49,7 @@ const LoadingSkeleton = () => (
 		<div className="p-4 border rounded-t-2xl flex flex-row gap-2 items-center justify-between dark:bg-muted h-[57px] dark:border-zinc-700 border-b-0">
 			<div className="flex flex-row items-center gap-3">
 				<div className="text-muted-foreground">
-					<LoaderIcon />
+					<Spinner size="sm" />
 				</div>
 				<Skeleton className="h-4 w-32" />
 			</div>
@@ -91,13 +91,7 @@ const DocumentHeader = ({ title, isStreaming }: DocumentHeaderProps) => (
 	<div className="p-4 border rounded-t-2xl flex flex-row gap-2 items-start sm:items-center justify-between dark:bg-muted border-b-0 dark:border-zinc-700">
 		<div className="flex flex-row items-start sm:items-center gap-3">
 			<div className="text-muted-foreground">
-				{isStreaming ? (
-					<div className="animate-spin">
-						<LoaderIcon />
-					</div>
-				) : (
-					<FileText />
-				)}
+				{isStreaming ? <Spinner size="sm" /> : <FileText />}
 			</div>
 			<div className="-translate-y-1 sm:translate-y-0 font-medium">{title}</div>
 		</div>
