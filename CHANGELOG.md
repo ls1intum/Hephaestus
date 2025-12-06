@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.10.0-rc.45](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.44...v0.10.0-rc.45) (2025-12-06)
+
+### 🐛 Bug Fixes
+
+* **webapp:** invert colors on ReviewsPopover hover in dark mode ([#562](https://github.com/ls1intum/Hephaestus/issues/562)) ([4c9423b](https://github.com/ls1intum/Hephaestus/commit/4c9423b718da1b9547a0e1275151429913ca1c20))
+
 ## [0.10.0-rc.44](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.43...v0.10.0-rc.44) (2025-12-06)
 
 ### 🐛 Bug Fixes
