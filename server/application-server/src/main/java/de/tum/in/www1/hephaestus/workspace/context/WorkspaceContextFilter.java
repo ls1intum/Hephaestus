@@ -3,6 +3,7 @@ package de.tum.in.www1.hephaestus.workspace.context;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
+import de.tum.in.www1.hephaestus.core.LoggingUtils;
 import de.tum.in.www1.hephaestus.workspace.Workspace.WorkspaceStatus;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceMembership.WorkspaceRole;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceMembershipRepository;
@@ -17,6 +18,7 @@ import jakarta.servlet.ServletResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.time.Instant;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -243,12 +245,29 @@ public class WorkspaceContextFilter implements Filter {
         }
 
         var history = historyOpt.get();
+        Instant now = Instant.now();
+        if (history.getRedirectExpiresAt() != null && history.getRedirectExpiresAt().isBefore(now)) {
+            log.debug(
+                "Workspace slug redirect expired: '{}' at {}",
+                LoggingUtils.sanitizeForLog(oldSlug),
+                history.getRedirectExpiresAt()
+            );
+            ProblemDetail problem = ProblemDetail.forStatus(HttpStatus.GONE);
+            problem.setTitle("Workspace slug expired");
+            problem.setDetail("Redirect for this workspace slug has expired");
+            problem.setProperty("oldSlug", oldSlug);
+            problem.setProperty("expiredAt", history.getRedirectExpiresAt());
+            response.setStatus(HttpStatus.GONE.value());
+            response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
+            response.getWriter().write(objectMapper.writeValueAsString(problem));
+            return true;
+        }
         var workspace = workspaceRepository
             .findById(history.getWorkspace().getId())
             .orElse(null);
 
         if (workspace == null) {
-            log.warn("Slug redirect history points to missing workspace for oldSlug={}", oldSlug);
+            log.warn("Slug redirect history points to missing workspace for oldSlug={}", LoggingUtils.sanitizeForLog(oldSlug));
             return false;
         }
 
@@ -273,7 +292,11 @@ public class WorkspaceContextFilter implements Filter {
             location += '?' + queryString;
         }
 
-        log.debug("Workspace slug redirect: '{}' → '{}'", oldSlug, newSlug);
+        log.debug(
+            "Workspace slug redirect: '{}' → '{}'",
+            LoggingUtils.sanitizeForLog(oldSlug),
+            LoggingUtils.sanitizeForLog(newSlug)
+        );
 
         response.setStatus(HttpStatus.PERMANENT_REDIRECT.value());
         response.setHeader(HttpHeaders.LOCATION, location);

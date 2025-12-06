@@ -14,6 +14,9 @@
             <column name="old_slug" type="VARCHAR(255)">
                 <constraints nullable="false"/>
             </column>
+            <column name="redirect_expires_at" type="TIMESTAMP(6) WITH TIME ZONE">
+                <constraints nullable="true"/>
+            </column>
             <column name="workspace_id" type="BIGINT">
                 <constraints nullable="false"/>
             </column>
@@ -30,6 +33,11 @@
     <changeSet author="FelixTJDietrich" id="workspace-slug-rename-4">
         <createIndex indexName="idx_workspace_slug_history_workspace_id" tableName="workspace_slug_history">
             <column name="workspace_id"/>
+        </createIndex>
+    </changeSet>
+    <changeSet author="FelixTJDietrich" id="workspace-slug-rename-5">
+        <createIndex indexName="idx_workspace_slug_history_redirect_expires_at" tableName="workspace_slug_history">
+            <column name="redirect_expires_at"/>
         </createIndex>
     </changeSet>
 </databaseChangeLog>

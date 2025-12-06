@@ -9,6 +9,8 @@ import org.kohsuke.github.GHRepositorySelection;
 
 import de.tum.in.www1.hephaestus.workspace.dto.CreateWorkspaceRequestDTO;
 import de.tum.in.www1.hephaestus.workspace.dto.RenameWorkspaceSlugRequestDTO;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -195,5 +197,25 @@ class WorkspaceSlugRenameIntegrationTest extends AbstractWorkspaceIntegrationTes
         assertThat(linked.getId()).isEqualTo(existing.getId());
         assertThat(linked.getWorkspaceSlug()).isEqualTo("collision");
         assertThat(workspaceSlugHistoryRepository.findByWorkspaceOrderByChangedAtDesc(existing)).isEmpty();
+    }
+
+    @Test
+    @WithAdminUser
+    void renameAllowsReusingExpiredHistorySlug() {
+        User owner = persistUser("expired-owner");
+        Workspace workspace = createWorkspace("ttl-old", "Old", "old", AccountType.ORG, owner);
+        ensureOwnerMembership(workspace);
+
+        workspaceService.renameSlug(workspace.getId(), "ttl-new");
+
+        WorkspaceSlugHistory history = workspaceSlugHistoryRepository
+            .findFirstByOldSlugOrderByChangedAtDesc("ttl-old")
+            .orElseThrow();
+        history.setRedirectExpiresAt(Instant.now().minus(2, ChronoUnit.DAYS));
+        workspaceSlugHistoryRepository.save(history);
+
+        Workspace renamed = workspaceService.renameSlug(workspace.getId(), "ttl-old");
+
+        assertThat(renamed.getWorkspaceSlug()).isEqualTo("ttl-old");
     }
 }

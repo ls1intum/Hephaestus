@@ -112,6 +112,8 @@ public class WorkspaceService {
     // Infrastructure
     private final AsyncTaskExecutor monitoringExecutor;
 
+    private final int redirectTtlDays;
+
     public WorkspaceService(
         @Value("${nats.enabled}") boolean isNatsEnabled,
         @Value("${monitoring.run-on-startup}") boolean runMonitoringOnStartup,
@@ -135,7 +137,8 @@ public class WorkspaceService {
         GitHubUserSyncService gitHubUserSyncService,
         GitHubAppTokenService gitHubAppTokenService,
         ObjectProvider<GitHubDataSyncService> gitHubDataSyncServiceProvider,
-        @Qualifier("monitoringExecutor") AsyncTaskExecutor monitoringExecutor
+        @Qualifier("monitoringExecutor") AsyncTaskExecutor monitoringExecutor,
+        @Value("${hephaestus.workspace.slug.redirect.ttl-days:30}") int redirectTtlDays
     ) {
         this.isNatsEnabled = isNatsEnabled;
         this.runMonitoringOnStartup = runMonitoringOnStartup;
@@ -160,6 +163,7 @@ public class WorkspaceService {
         this.gitHubAppTokenService = gitHubAppTokenService;
         this.gitHubDataSyncServiceProvider = gitHubDataSyncServiceProvider;
         this.monitoringExecutor = monitoringExecutor;
+        this.redirectTtlDays = redirectTtlDays;
     }
 
     /** Lazy accessor for GitHubDataSyncService to break circular dependency. */
@@ -1252,7 +1256,7 @@ public class WorkspaceService {
         String slug = normalizeSlug(rawSlug);
         validateSlug(slug);
 
-        if (workspaceSlugHistoryRepository.existsByOldSlug(slug)) {
+        if (hasActiveHistory(slug)) {
             throw new WorkspaceSlugConflictException(slug);
         }
 
@@ -1451,7 +1455,7 @@ public class WorkspaceService {
             throw new WorkspaceSlugConflictException(newSlug);
         }
 
-        if (workspaceSlugHistoryRepository.existsByOldSlug(newSlug)) {
+        if (hasActiveHistory(newSlug)) {
             throw new WorkspaceSlugConflictException(newSlug);
         }
 
@@ -1459,7 +1463,11 @@ public class WorkspaceService {
         history.setWorkspace(workspace);
         history.setOldSlug(currentSlug);
         history.setNewSlug(newSlug);
-        history.setChangedAt(Instant.now());
+        Instant now = Instant.now();
+        history.setChangedAt(now);
+        if (redirectTtlDays > 0) {
+            history.setRedirectExpiresAt(now.plus(redirectTtlDays, ChronoUnit.DAYS));
+        }
         workspaceSlugHistoryRepository.save(history);
 
         pruneSlugHistory(workspace);
@@ -1572,7 +1580,13 @@ public class WorkspaceService {
     }
 
     private boolean isSlugFree(String slug) {
-        return !workspaceRepository.existsByWorkspaceSlug(slug) && !workspaceSlugHistoryRepository.existsByOldSlug(slug);
+        return !workspaceRepository.existsByWorkspaceSlug(slug) && !hasActiveHistory(slug);
+    }
+
+    private boolean hasActiveHistory(String slug) {
+        Instant now = Instant.now();
+        return workspaceSlugHistoryRepository.existsByOldSlugAndRedirectExpiresAtIsNull(slug) ||
+            workspaceSlugHistoryRepository.existsByOldSlugAndRedirectExpiresAtAfter(slug, now);
     }
 
     /**

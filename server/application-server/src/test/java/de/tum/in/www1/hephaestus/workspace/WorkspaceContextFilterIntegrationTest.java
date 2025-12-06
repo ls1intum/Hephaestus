@@ -10,12 +10,14 @@ import de.tum.in.www1.hephaestus.workspace.Workspace.WorkspaceStatus;
 import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.in.www1.hephaestus.workspace.dto.WorkspaceDTO;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Objects;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.reactive.AutoConfigureWebTestClient;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
@@ -288,6 +290,34 @@ class WorkspaceContextFilterIntegrationTest extends AbstractWorkspaceIntegration
             .exchange()
             .expectStatus()
             .isNotFound();
+    }
+
+    @Test
+    void expiredSlugReturnsGone() {
+        User owner = persistUser("redirect-owner-expired");
+        Workspace workspace = createWorkspace("old-expired", "Expired", "expired", AccountType.ORG, owner);
+
+        WorkspaceSlugHistory history = new WorkspaceSlugHistory();
+        history.setWorkspace(workspace);
+        history.setOldSlug("old-expired");
+        history.setNewSlug("new-expired");
+        history.setChangedAt(Instant.now().minus(3, ChronoUnit.DAYS));
+        history.setRedirectExpiresAt(Instant.now().minus(1, ChronoUnit.DAYS));
+        workspaceSlugHistoryRepository.save(history);
+
+        workspace.setWorkspaceSlug("new-expired");
+        workspaceRepository.save(workspace);
+
+        webTestClient
+            .get()
+            .uri("/workspaces/{workspaceSlug}/context-echo", "old-expired")
+            .exchange()
+            .expectStatus()
+            .isEqualTo(HttpStatus.GONE)
+            .expectBody(ProblemDetail.class)
+            .value(problem -> {
+                assertThat(problem.getTitle()).containsIgnoringCase("expired");
+            });
     }
 
     private WorkspaceContextSnapshot requestContextEcho(String slug) {

@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.workspace;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -22,6 +23,10 @@ public interface WorkspaceSlugHistoryRepository extends JpaRepository<WorkspaceS
      * @return true if the slug exists as an old slug
      */
     boolean existsByOldSlug(String slug);
+
+    boolean existsByOldSlugAndRedirectExpiresAtIsNull(String slug);
+
+    boolean existsByOldSlugAndRedirectExpiresAtAfter(String slug, Instant now);
 
     /**
      * Get all history entries for a workspace.

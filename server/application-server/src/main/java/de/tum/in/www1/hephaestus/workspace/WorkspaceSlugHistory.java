@@ -54,4 +54,7 @@ public class WorkspaceSlugHistory {
     @Column(name = "changed_at", nullable = false)
     @NotNull(message = "Changed at timestamp is required")
     private Instant changedAt;
+
+    @Column(name = "redirect_expires_at")
+    private Instant redirectExpiresAt;
 }
