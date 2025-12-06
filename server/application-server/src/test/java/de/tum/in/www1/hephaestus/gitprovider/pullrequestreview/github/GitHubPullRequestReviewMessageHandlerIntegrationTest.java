@@ -9,6 +9,8 @@ import de.tum.in.www1.hephaestus.gitprovider.pullrequest.github.GitHubPullReques
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReview;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReviewRepository;
 import de.tum.in.www1.hephaestus.testconfig.BaseIntegrationTest;
+import de.tum.in.www1.hephaestus.gitprovider.contribution.ContributionEventRepository;
+import de.tum.in.www1.hephaestus.gitprovider.contribution.ContributionSourceType;
 import java.time.Instant;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -32,6 +34,9 @@ class GitHubPullRequestReviewMessageHandlerIntegrationTest extends BaseIntegrati
 
     @Autowired
     private GitHubPullRequestConverter pullRequestConverter;
+
+    @Autowired
+    private ContributionEventRepository contributionEventRepository;
 
     @BeforeEach
     void setUp() {
@@ -57,6 +62,23 @@ class GitHubPullRequestReviewMessageHandlerIntegrationTest extends BaseIntegrati
                 assertThat(saved.getHtmlUrl()).isEqualTo(payload.getReview().getHtmlUrl().toString());
                 assertThat(saved.getSubmittedAt()).isEqualTo(payload.getReview().getSubmittedAt());
             });
+    }
+
+    @Test
+    @DisplayName("should persist contribution events for submitted reviews")
+    void submittedEventCreatesContributionEvent(
+        @GitHubPayload("pull_request_review.submitted") GHEventPayload.PullRequestReview payload
+    ) throws Exception {
+        handler.handleEvent(payload);
+
+        var event = contributionEventRepository
+            .findBySourceTypeAndSourceId(ContributionSourceType.PULL_REQUEST_REVIEW, payload.getReview().getId())
+            .orElseThrow();
+
+        assertThat(event.getActor()).isNotNull();
+        assertThat(event.getActor().getId()).isEqualTo(payload.getReview().getUser().getId());
+        assertThat(event.getOccurredAt()).isEqualTo(payload.getReview().getSubmittedAt());
+        assertThat(event.getXpAwarded()).isZero();
     }
 
     @Test
@@ -101,6 +123,22 @@ class GitHubPullRequestReviewMessageHandlerIntegrationTest extends BaseIntegrati
         assertThat(review.getSubmittedAt()).isEqualTo(originalSubmittedAt);
         assertThat(review.getBody()).isEqualTo(payload.getReview().getBody());
         assertThat(review.isDismissed()).isFalse();
+    }
+
+    @Test
+    @DisplayName("should upsert contribution events idempotently on replay")
+    void replayedSubmittedEventUpsertsContributionEvent(
+        @GitHubPayload("pull_request_review.submitted") GHEventPayload.PullRequestReview payload
+    ) throws Exception {
+        handler.handleEvent(payload);
+        handler.handleEvent(payload);
+
+        assertThat(contributionEventRepository.count()).isEqualTo(1);
+
+        var event = contributionEventRepository
+            .findBySourceTypeAndSourceId(ContributionSourceType.PULL_REQUEST_REVIEW, payload.getReview().getId())
+            .orElseThrow();
+        assertThat(event.getOccurredAt()).isEqualTo(payload.getReview().getSubmittedAt());
     }
 
     @Test

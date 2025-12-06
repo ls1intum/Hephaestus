@@ -413,6 +413,9 @@ class User(Base):
     pull_request_review_thread: Mapped[List["PullRequestReviewThread"]] = relationship(
         "PullRequestReviewThread", back_populates="resolved_by"
     )
+    contribution_event: Mapped[List["ContributionEvent"]] = relationship(
+        "ContributionEvent", back_populates="actor"
+    )
     team_membership: Mapped[List["TeamMembership"]] = relationship(
         "TeamMembership", back_populates="user"
     )
@@ -462,6 +465,37 @@ class ChatMessagePart(Base):
     message: Mapped["ChatMessage"] = relationship(
         "ChatMessage", back_populates="chat_message_part"
     )
+
+
+class ContributionEvent(Base):
+    __tablename__ = "contribution_event"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["actor_id"], ["user.id"], name="FK_contribution_event_actor"
+        ),
+        PrimaryKeyConstraint("id", name="contribution_eventPK"),
+        UniqueConstraint(
+            "source_type", "source_id", name="uk_contribution_event_source"
+        ),
+    )
+    id: Mapped[int] = mapped_column(
+        BigInteger,
+        Identity(
+            start=1,
+            increment=1,
+            minvalue=1,
+            maxvalue=9223372036854775807,
+            cycle=False,
+            cache=1,
+        ),
+        primary_key=True,
+    )
+    occurred_at: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(True, 6))
+    source_id: Mapped[int] = mapped_column(BigInteger)
+    source_type: Mapped[str] = mapped_column(String(32))
+    xp_awarded: Mapped[int] = mapped_column(Integer)
+    actor_id: Mapped[int] = mapped_column(BigInteger)
+    actor: Mapped["User"] = relationship("User", back_populates="contribution_event")
 
 
 class Repository(Base):
