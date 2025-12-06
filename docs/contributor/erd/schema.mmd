@@ -58,6 +58,15 @@ erDiagram
         BIGINT workspace_id FK "NOT NULL"
     }
 
+    ContributionEvent {
+        BIGINT id PK
+        TIMESTAMPTZ occurred_at "NOT NULL"
+        BIGINT source_id UK "NOT NULL"
+        VARCHAR(32) source_type UK "NOT NULL"
+        INTEGER xp_awarded "NOT NULL"
+        BIGINT actor_id FK "NOT NULL"
+    }
+
     Document {
         UUID id PK
         INTEGER version_number PK
@@ -403,6 +412,7 @@ erDiagram
     ChatThread ||--o{ ChatMessage : has
     User ||--o{ ChatThread : has
     Workspace ||--o{ ChatThread : has
+    User ||--o{ ContributionEvent : references
     User ||--o{ Document : has
     Workspace ||--o{ Document : has
     User ||--o{ Issue : authored_by
