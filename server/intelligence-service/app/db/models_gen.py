@@ -851,8 +851,8 @@ class WorkspaceSlugHistory(Base):
         primary_key=True,
     )
     changed_at: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(True, 6))
-    new_slug: Mapped[str] = mapped_column(String(255))
-    old_slug: Mapped[str] = mapped_column(String(255))
+    new_slug: Mapped[str] = mapped_column(String(64))
+    old_slug: Mapped[str] = mapped_column(String(64))
     workspace_id: Mapped[int] = mapped_column(BigInteger)
     redirect_expires_at: Mapped[Optional[datetime.datetime]] = mapped_column(
         TIMESTAMP(True, 6)
