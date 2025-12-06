@@ -5,7 +5,6 @@ import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReview
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class ContributionEventSyncService {
@@ -22,8 +21,9 @@ public class ContributionEventSyncService {
      * Upserts a ContributionEvent for a pull request review.
      *
      * @param pullRequestReview The local PullRequestReview entity
+     * @implNote This method is missing a @Transactional annotation and should be executed in a parent transactional context
+     * (usually the event processing where the main event is saved)
      */
-    @Transactional
     public void processPullRequestReviewContribution(PullRequestReview pullRequestReview) {
         if (pullRequestReview == null || pullRequestReview.getAuthor() == null) {
             logger.warn("Cannot create ContributionEvent: {} is null",
