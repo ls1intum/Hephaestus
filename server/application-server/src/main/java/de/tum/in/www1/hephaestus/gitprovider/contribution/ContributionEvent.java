@@ -1,4 +1,4 @@
-package de.tum.in.www1.hephaestus.gitprovider.contributions;
+package de.tum.in.www1.hephaestus.gitprovider.contribution;
 
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import jakarta.persistence.*;

@@ -1,15 +1,11 @@
 package de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.github;
 
-import de.tum.in.www1.hephaestus.gitprovider.contributions.ContributionEventSyncService;
+import de.tum.in.www1.hephaestus.gitprovider.contribution.ContributionEventSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.github.GitHubPullRequestConverter;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReview;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReviewRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserSyncService;
-
-import java.io.IOException;
-import java.util.List;
-
 import org.kohsuke.github.GHPullRequest;
 import org.kohsuke.github.GHPullRequestReview;
 import org.kohsuke.github.GHUser;
@@ -17,6 +13,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.io.IOException;
+import java.util.List;
 
 @Service
 public class GitHubPullRequestReviewSyncService {
