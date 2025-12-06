@@ -9,11 +9,6 @@ on:
         type: string
         default: "false"
 
-permissions:
-  contents: read
-  checks: write
-  statuses: write
-
 jobs:
   # Intelligent test execution matrix
   tests:
