@@ -201,10 +201,22 @@ public final class PostgreSQLTestContainer {
         }
         
         private void appendResolutionSteps(StringBuilder message) {
-            message.append("To resolve this issue:\n");
-            message.append("  1. Run 'scripts/codex-setup.sh' to set up the local PostgreSQL instance\n");
-            message.append("  2. Ensure 'scripts/local-postgres.sh start' completes successfully\n");
-            message.append("  3. Verify the database is running: scripts/local-postgres.sh status\n\n");
+            // Prioritize Docker for local development, local PostgreSQL for cloud environments
+            if (reason == LocalDatabaseReason.EXPLICIT_LOCAL_MODE) {
+                // User explicitly chose local mode
+                message.append("To resolve this issue (local PostgreSQL mode):\n");
+                message.append("  1. Run 'scripts/codex-setup.sh' to set up the local PostgreSQL instance\n");
+                message.append("  2. Ensure 'scripts/local-postgres.sh start' completes successfully\n");
+                message.append("  3. Verify the database is running: scripts/local-postgres.sh status\n\n");
+            } else {
+                // Docker unavailable or failed - recommend Docker for local dev
+                message.append("Recommended solution for local development:\n");
+                message.append("  Install and start Docker, then re-run tests to use Testcontainers automatically.\n\n");
+                message.append("Alternative (for cloud environments without Docker):\n");
+                message.append("  1. Run 'scripts/codex-setup.sh' to set up the local PostgreSQL instance\n");
+                message.append("  2. Ensure 'scripts/local-postgres.sh start' completes successfully\n");
+                message.append("  3. Verify the database is running: scripts/local-postgres.sh status\n\n");
+            }
         }
         
         private void appendEnvironmentVariables(StringBuilder message) {
@@ -218,8 +230,7 @@ public final class PostgreSQLTestContainer {
                 .append(System.getenv(ENV_TEST_DB_USER) != null ? "configured" : "using default")
                 .append(")\n");
             message.append("  ").append(ENV_TEST_DB_PASSWORD).append(": Custom database password\n");
-            message.append("  ").append(ENV_DB_MODE).append(": Set to 'local' to force local database mode\n\n");
-            message.append("Alternative: Ensure Docker is available and running to use Testcontainers instead.");
+            message.append("  ").append(ENV_DB_MODE).append(": Set to 'local' to force local database mode\n");
         }
 
         @Override
