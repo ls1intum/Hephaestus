@@ -164,10 +164,10 @@ public final class PostgreSQLTestContainer {
                     "  1. Run 'scripts/codex-setup.sh' to set up the local PostgreSQL instance%n" +
                     "  2. Ensure 'scripts/local-postgres.sh start' completes successfully%n" +
                     "  3. Verify the database is running: scripts/local-postgres.sh status%n%n" +
-                    "Environment variables (if you need custom configuration):%n" +
-                    "  %s: %s (current: %s)%n" +
-                    "  %s: %s (current: %s)%n" +
-                    "  %s: %s%n" +
+                    "Environment variables for custom configuration:%n" +
+                    "  %s: Custom JDBC URL (default: %s, current: %s)%n" +
+                    "  %s: Custom database user (default: %s, current: %s)%n" +
+                    "  %s: Custom database password%n" +
                     "  %s: Set to 'local' to force local database mode%n%n" +
                     "Alternative: Ensure Docker is available and running to use Testcontainers instead.",
                     jdbcUrl,
@@ -182,7 +182,6 @@ public final class PostgreSQLTestContainer {
                     DEFAULT_TEST_USER, 
                     System.getenv(ENV_TEST_DB_USER) != null ? "configured" : "using default",
                     ENV_TEST_DB_PASSWORD,
-                    System.getenv(ENV_TEST_DB_PASSWORD) != null ? "configured" : "using default",
                     ENV_DB_MODE
                 );
                 
