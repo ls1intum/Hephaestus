@@ -1,7 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import environment from "@/environment";
-import { sanitizeBoolean } from "@/integrations/posthog/config";
+import { sanitizeBoolean } from "@/lib/utils";
 
 export default function Footer() {
 	const includeStorybook = sanitizeBoolean(environment.includeStorybook);

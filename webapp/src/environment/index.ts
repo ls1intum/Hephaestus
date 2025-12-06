@@ -20,7 +20,7 @@ const environment = {
 		imprintHtml: "<p>This is the imprint.</p>",
 		privacyHtml: "<p>This is the privacy policy.</p>",
 	},
-	includeStorybook: "false",
+	includeStorybook: false,
 	devtools: {
 		tanstack: true,
 	},

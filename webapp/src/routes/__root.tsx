@@ -35,12 +35,10 @@ import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 import { useWorkspaceAccess } from "@/hooks/use-workspace-access";
 import { useMentorChat } from "@/hooks/useMentorChat";
 import { type AuthContextType, useAuth } from "@/integrations/auth/AuthContext";
-import {
-	isPosthogEnabled,
-	sanitizeBoolean,
-} from "@/integrations/posthog/config";
+import { isPosthogEnabled } from "@/integrations/posthog/config";
 import { useTheme } from "@/integrations/theme";
 import type { ChatMessage } from "@/lib/types";
+import { sanitizeBoolean } from "@/lib/utils";
 import TanstackQueryLayout from "../integrations/tanstack-query/layout";
 
 const enableTanstackDevtools = sanitizeBoolean(environment.devtools?.tanstack);
