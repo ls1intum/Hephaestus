@@ -3,23 +3,23 @@ package de.tum.in.www1.hephaestus.gitprovider.contribution;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
-import java.time.Instant;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+
+import java.time.Instant;
 
 @Entity
 @Table(
     name = "contribution_event",
     uniqueConstraints = {
-        @UniqueConstraint(name = "uk_contribution_event_source", columnNames = { "source_type", "source_id" }),
+        @UniqueConstraint(name = "uk_contribution_event_source", columnNames = { "source_type", "source_id" })
     }
 )
 @Getter
 @Setter
 @NoArgsConstructor
 public class ContributionEvent {
-
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     protected Long id;
@@ -45,4 +45,5 @@ public class ContributionEvent {
     @NotNull
     @Column(nullable = false)
     private Integer xpAwarded;
+
 }

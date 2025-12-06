@@ -1,9 +1,11 @@
 package de.tum.in.www1.hephaestus.gitprovider.contribution;
 
-import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.util.Optional;
+
 public interface ContributionEventRepository extends JpaRepository<ContributionEvent, Long> {
+
     /**
      * Finds a ContributionEvent by its source type and source ID.
      *

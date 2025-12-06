@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.gitprovider.contribution;
 
+
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReview;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,10 +36,7 @@ public class ContributionEventSyncService {
             return;
         }
         if (pullRequestReview.getSubmittedAt() == null) {
-            logger.warn(
-                "Cannot create ContributionEvent: submittedAt is null for review {}",
-                pullRequestReview.getId()
-            );
+            logger.warn("Cannot create ContributionEvent: submittedAt is null for review {}", pullRequestReview.getId());
             return;
         }
 
