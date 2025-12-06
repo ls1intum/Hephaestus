@@ -16,14 +16,6 @@ public interface WorkspaceSlugHistoryRepository extends JpaRepository<WorkspaceS
      */
     Optional<WorkspaceSlugHistory> findFirstByOldSlugOrderByChangedAtDesc(String oldSlug);
 
-    /**
-     * Check if a slug exists as an old slug in history (for collision detection).
-     *
-     * @param slug the slug to check
-     * @return true if the slug exists as an old slug
-     */
-    boolean existsByOldSlug(String slug);
-
     boolean existsByOldSlugAndRedirectExpiresAtIsNull(String slug);
 
     boolean existsByOldSlugAndRedirectExpiresAtAfter(String slug, Instant now);

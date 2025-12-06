@@ -105,6 +105,7 @@ public class WorkspaceContextFilter implements Filter {
         }
 
         String slug = matcher.group(1);
+        String safeSlug = LoggingUtils.sanitizeForLog(slug);
         String method = httpRequest.getMethod();
         String remainingPath = matcher.group(2) != null ? matcher.group(2) : "";
         boolean isBasePath = remainingPath.isBlank() || "/".equals(remainingPath);
@@ -130,7 +131,7 @@ public class WorkspaceContextFilter implements Filter {
             boolean allowNonActive = isStatusPath || (isBasePath && isReadRequest) || allowLifecycleDelete;
 
             if (workspace.getStatus() != WorkspaceStatus.ACTIVE && !allowNonActive) {
-                log.debug("Workspace {} has non-ACTIVE status: {}. Returning 404.", slug, workspace.getStatus());
+                log.debug("Workspace {} has non-ACTIVE status: {}. Returning 404.", safeSlug, workspace.getStatus());
                 sendWorkspaceNotFoundError(httpResponse, slug);
                 return;
             }
@@ -145,7 +146,7 @@ public class WorkspaceContextFilter implements Filter {
                 if (currentUser.isEmpty()) {
                     sendWorkspaceUnauthorizedError(httpResponse, slug);
                 } else {
-                    log.debug("User is not a member of workspace {}. Returning 403.", slug);
+                    log.debug("User is not a member of workspace {}. Returning 403.", safeSlug);
                     sendWorkspaceMembershipForbiddenError(httpResponse, slug);
                 }
                 return;
@@ -158,13 +159,13 @@ public class WorkspaceContextFilter implements Filter {
             if (WorkspaceContextHolder.getContext() != null) {
                 log.warn(
                     "Context already set when entering filter for slug={}. This may indicate a filter ordering issue or context leak.",
-                    slug
+                    safeSlug
                 );
             }
 
             WorkspaceContextHolder.setContext(context);
 
-            log.debug("Workspace context set: slug={}, id={}, roles={}", context.slug(), context.id(), context.roles());
+            log.debug("Workspace context set: slug={}, id={}, roles={}", safeSlug, context.id(), context.roles());
 
             // Continue filter chain
             chain.doFilter(request, response);
@@ -210,17 +211,17 @@ public class WorkspaceContextFilter implements Filter {
                     );
                     log.info(
                         "Auto-added user {} to workspace {} as {} (bootstrap fallback)",
-                        userOpt.get().getLogin(),
-                        workspace.getWorkspaceSlug(),
+                        LoggingUtils.sanitizeForLog(userOpt.get().getLogin()),
+                        LoggingUtils.sanitizeForLog(workspace.getWorkspaceSlug()),
                         created.getRole()
                     );
                     return Set.of(created.getRole());
                 } catch (IllegalArgumentException ex) {
                     log.debug(
                         "Membership auto-add skipped for user {} in workspace {}: {}",
-                        userOpt.get().getLogin(),
-                        workspace.getWorkspaceSlug(),
-                        ex.getMessage()
+                        LoggingUtils.sanitizeForLog(userOpt.get().getLogin()),
+                        LoggingUtils.sanitizeForLog(workspace.getWorkspaceSlug()),
+                        LoggingUtils.sanitizeForLog(ex.getMessage())
                     );
                 }
             }
