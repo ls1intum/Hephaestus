@@ -117,6 +117,10 @@ hephaestus:
         # Set to true to bootstrap a PAT workspace on startup (for local development)
         # Set to false in production when using GitHub App installations
         init-default: true
+        slug:
+            # TTL (in days) for slug redirects; set to 0 to disable redirects while preserving history
+            redirect:
+                ttl-days: 30
         default:
             # GitHub organization or user login for the PAT workspace
             login: ${GITHUB_PAT_LOGIN:ls1intum}

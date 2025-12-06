@@ -178,5 +178,8 @@ server/application-server/logs/
 # Private keys
 *.pem
 
+# Private keys
+*.pem
+
 # Java-Client creation temporary
 tmp

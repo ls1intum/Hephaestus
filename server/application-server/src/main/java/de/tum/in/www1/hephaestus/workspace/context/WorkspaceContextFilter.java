@@ -1,6 +1,7 @@
 package de.tum.in.www1.hephaestus.workspace.context;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import de.tum.in.www1.hephaestus.core.LoggingUtils;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.workspace.Workspace.WorkspaceStatus;
@@ -8,6 +9,7 @@ import de.tum.in.www1.hephaestus.workspace.WorkspaceMembership.WorkspaceRole;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceMembershipRepository;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceMembershipService;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceRepository;
+import de.tum.in.www1.hephaestus.workspace.WorkspaceSlugHistoryRepository;
 import jakarta.servlet.Filter;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -16,6 +18,7 @@ import jakarta.servlet.ServletResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.time.Instant;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -23,6 +26,7 @@ import java.util.regex.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.annotation.Order;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
@@ -49,6 +53,7 @@ public class WorkspaceContextFilter implements Filter {
     private final WorkspaceMembershipRepository workspaceMembershipRepository;
     private final UserRepository userRepository;
     private final WorkspaceMembershipService workspaceMembershipService;
+    private final WorkspaceSlugHistoryRepository workspaceSlugHistoryRepository;
     private final ObjectMapper objectMapper;
 
     public WorkspaceContextFilter(
@@ -56,12 +61,14 @@ public class WorkspaceContextFilter implements Filter {
         WorkspaceMembershipRepository workspaceMembershipRepository,
         UserRepository userRepository,
         WorkspaceMembershipService workspaceMembershipService,
+        WorkspaceSlugHistoryRepository workspaceSlugHistoryRepository,
         ObjectMapper objectMapper
     ) {
         this.workspaceRepository = workspaceRepository;
         this.workspaceMembershipRepository = workspaceMembershipRepository;
         this.userRepository = userRepository;
         this.workspaceMembershipService = workspaceMembershipService;
+        this.workspaceSlugHistoryRepository = workspaceSlugHistoryRepository;
         this.objectMapper = objectMapper;
     }
 
@@ -98,6 +105,7 @@ public class WorkspaceContextFilter implements Filter {
         }
 
         String slug = matcher.group(1);
+        String safeSlug = LoggingUtils.sanitizeForLog(slug);
         String method = httpRequest.getMethod();
         String remainingPath = matcher.group(2) != null ? matcher.group(2) : "";
         boolean isBasePath = remainingPath.isBlank() || "/".equals(remainingPath);
@@ -108,6 +116,9 @@ public class WorkspaceContextFilter implements Filter {
             var workspaceOpt = workspaceRepository.findByWorkspaceSlug(slug);
 
             if (workspaceOpt.isEmpty()) {
+                if (handleSlugRedirect(httpRequest, httpResponse, slug, remainingPath)) {
+                    return;
+                }
                 sendWorkspaceNotFoundError(httpResponse, slug);
                 return;
             }
@@ -120,7 +131,7 @@ public class WorkspaceContextFilter implements Filter {
             boolean allowNonActive = isStatusPath || (isBasePath && isReadRequest) || allowLifecycleDelete;
 
             if (workspace.getStatus() != WorkspaceStatus.ACTIVE && !allowNonActive) {
-                log.debug("Workspace {} has non-ACTIVE status: {}. Returning 404.", slug, workspace.getStatus());
+                log.debug("Workspace {} has non-ACTIVE status: {}. Returning 404.", safeSlug, workspace.getStatus());
                 sendWorkspaceNotFoundError(httpResponse, slug);
                 return;
             }
@@ -135,7 +146,7 @@ public class WorkspaceContextFilter implements Filter {
                 if (currentUser.isEmpty()) {
                     sendWorkspaceUnauthorizedError(httpResponse, slug);
                 } else {
-                    log.debug("User is not a member of workspace {}. Returning 403.", slug);
+                    log.debug("User is not a member of workspace {}. Returning 403.", safeSlug);
                     sendWorkspaceMembershipForbiddenError(httpResponse, slug);
                 }
                 return;
@@ -148,13 +159,13 @@ public class WorkspaceContextFilter implements Filter {
             if (WorkspaceContextHolder.getContext() != null) {
                 log.warn(
                     "Context already set when entering filter for slug={}. This may indicate a filter ordering issue or context leak.",
-                    slug
+                    safeSlug
                 );
             }
 
             WorkspaceContextHolder.setContext(context);
 
-            log.debug("Workspace context set: slug={}, id={}, roles={}", context.slug(), context.id(), context.roles());
+            log.debug("Workspace context set: slug={}, id={}, roles={}", safeSlug, context.id(), context.roles());
 
             // Continue filter chain
             chain.doFilter(request, response);
@@ -200,17 +211,17 @@ public class WorkspaceContextFilter implements Filter {
                     );
                     log.info(
                         "Auto-added user {} to workspace {} as {} (bootstrap fallback)",
-                        userOpt.get().getLogin(),
-                        workspace.getWorkspaceSlug(),
+                        LoggingUtils.sanitizeForLog(userOpt.get().getLogin()),
+                        LoggingUtils.sanitizeForLog(workspace.getWorkspaceSlug()),
                         created.getRole()
                     );
                     return Set.of(created.getRole());
                 } catch (IllegalArgumentException ex) {
                     log.debug(
                         "Membership auto-add skipped for user {} in workspace {}: {}",
-                        userOpt.get().getLogin(),
-                        workspace.getWorkspaceSlug(),
-                        ex.getMessage()
+                        LoggingUtils.sanitizeForLog(userOpt.get().getLogin()),
+                        LoggingUtils.sanitizeForLog(workspace.getWorkspaceSlug()),
+                        LoggingUtils.sanitizeForLog(ex.getMessage())
                     );
                 }
             }
@@ -221,6 +232,79 @@ public class WorkspaceContextFilter implements Filter {
             log.warn("Failed to fetch user roles for workspace {}: {}", workspace.getId(), e.getMessage());
             return Set.of();
         }
+    }
+
+    private boolean handleSlugRedirect(
+        HttpServletRequest request,
+        HttpServletResponse response,
+        String oldSlug,
+        String remainingPath
+    ) throws IOException {
+        var historyOpt = workspaceSlugHistoryRepository.findFirstByOldSlugOrderByChangedAtDesc(oldSlug);
+        if (historyOpt.isEmpty()) {
+            return false;
+        }
+
+        var history = historyOpt.get();
+        Instant now = Instant.now();
+        if (history.getRedirectExpiresAt() != null && history.getRedirectExpiresAt().isBefore(now)) {
+            log.debug(
+                "Workspace slug redirect expired: '{}' at {}",
+                LoggingUtils.sanitizeForLog(oldSlug),
+                history.getRedirectExpiresAt()
+            );
+            ProblemDetail problem = ProblemDetail.forStatus(HttpStatus.GONE);
+            problem.setTitle("Workspace slug expired");
+            problem.setDetail("Redirect for this workspace slug has expired");
+            problem.setProperty("oldSlug", oldSlug);
+            problem.setProperty("expiredAt", history.getRedirectExpiresAt());
+            response.setStatus(HttpStatus.GONE.value());
+            response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
+            response.getWriter().write(objectMapper.writeValueAsString(problem));
+            return true;
+        }
+        var workspace = workspaceRepository.findById(history.getWorkspace().getId()).orElse(null);
+
+        if (workspace == null) {
+            log.warn(
+                "Slug redirect history points to missing workspace for oldSlug={}",
+                LoggingUtils.sanitizeForLog(oldSlug)
+            );
+            return false;
+        }
+
+        // Avoid leaking workspace existence for private workspaces when the user lacks membership.
+        boolean isPublic = Boolean.TRUE.equals(workspace.getIsPubliclyViewable());
+        boolean hasMembership = userRepository
+            .getCurrentUser()
+            .flatMap(user -> workspaceMembershipRepository.findByWorkspace_IdAndUser_Id(workspace.getId(), user.getId())
+            )
+            .isPresent();
+
+        if (!isPublic && !hasMembership) {
+            return false;
+        }
+
+        String newSlug = history.getNewSlug();
+        String suffix = remainingPath == null ? "" : remainingPath;
+        String queryString = request.getQueryString();
+        String location = request.getContextPath() + "/workspaces/" + newSlug + suffix;
+        if (queryString != null && !queryString.isBlank()) {
+            location += '?' + queryString;
+        }
+
+        log.debug(
+            "Workspace slug redirect: '{}' → '{}'",
+            LoggingUtils.sanitizeForLog(oldSlug),
+            LoggingUtils.sanitizeForLog(newSlug)
+        );
+
+        response.setStatus(HttpStatus.PERMANENT_REDIRECT.value());
+        response.setHeader(HttpHeaders.LOCATION, location);
+        response.setHeader(HttpHeaders.CACHE_CONTROL, "no-store");
+        response.setContentLength(0);
+        response.flushBuffer();
+        return true;
     }
 
     /**
