@@ -2,13 +2,17 @@ import hmac
 import hashlib
 from contextlib import asynccontextmanager
 
-from fastapi import Body, FastAPI, HTTPException, Header, Request, status
-from pydantic import BaseModel
-from nats.js.api import StreamConfig, RetentionPolicy, DiscardPolicy, StorageType
-
 from app.config import settings
 from app.nats_client import nats_client
 from app.logger import logger
+from fastapi import Body, FastAPI, HTTPException, Header, Request, status
+from nats.js.api import StreamConfig, RetentionPolicy, DiscardPolicy, StorageType
+from nats.js.errors import NotFoundError
+from pydantic import BaseModel
+
+
+STREAM_MAX_AGE_SECONDS = 180 * 24 * 60 * 60  # nats.py expects seconds, not ns
+STREAM_MAX_MSGS = 2_000_000
 
 
 @asynccontextmanager
@@ -20,24 +24,24 @@ async def lifespan(app: FastAPI):
         try:
             await nats_client.js.stream_info(stream_name)
             logger.info("Stream '%s' already exists", stream_name)
-        except Exception as exc:  # TODO: narrow to JetStream not-found once available
-            logger.warning("Stream '%s' missing, creating. Cause: %s", stream_name, exc)
-            # Only create stream if it doesn't exist
-            # Production limits: retain for ~180 days and cap messages
+        except NotFoundError:
+            logger.info("Creating '%s' stream", stream_name)
+            # Production limits: retain for ~180 days and cap messages (seconds per nats.py).
             retention_cfg = StreamConfig(
                 storage=StorageType.FILE,
                 retention=RetentionPolicy.LIMITS,
                 discard=DiscardPolicy.OLD,
-                # 180 days retention
-                max_age=float(180 * 24 * 60 * 60),
-                # Additional bounds (0 means unlimited). Keep a generous cap to prevent unbounded growth.
-                max_msgs=2_000_000,
+                max_age=STREAM_MAX_AGE_SECONDS,
+                max_msgs=STREAM_MAX_MSGS,
             )
             await nats_client.js.add_stream(
                 name=stream_name,
                 subjects=[f"{stream_name}.>"],
                 config=retention_cfg,
             )
+        except Exception as exc:
+            logger.error("Failed to inspect/create stream '%s': %s", stream_name, exc)
+            raise
 
     yield
     await nats_client.close()
@@ -115,7 +119,8 @@ def build_gitlab_subject(payload: dict) -> str:
             # Example: https://gitlab.lrz.de/ga84xah/codereviewtest/-/merge_requests/1#note_4108500
             # Remove the protocol and domain and everything including /-/ and after
             path = url.split("://")[-1].split("/", 1)[-1]
-            path = path.split("/-/")[0]
+            if "/-/" in path:
+                path = path.split("/-/")[0]
             parts = sanitize_parts(path)
 
             if has_project and len(parts) > 1:
@@ -190,21 +195,20 @@ async def gitlab_webhook(
     request: Request,
     token: str = Header(
         None,
-        alias="X-Gitlab-Token",
+        alias="X-GitLab-Token",
         description="Secret token configured in GitLab, used for validating webhook authenticity",
     ),
     body=Body(...),
 ):
     body = await request.body()
 
-    expected_token = settings.WEBHOOK_SECRET or None
-    if not expected_token:
+    if not settings.WEBHOOK_SECRET:
         raise HTTPException(
             status_code=401, detail="GitLab webhook secret not configured"
         )
 
     # Constant-time compare to avoid timing attacks
-    if not hmac.compare_digest(token or "", expected_token):
+    if not hmac.compare_digest(token or "", settings.WEBHOOK_SECRET):
         raise HTTPException(status_code=401, detail="Invalid token")
 
     payload = await request.json()

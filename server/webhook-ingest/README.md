@@ -36,11 +36,9 @@ validated against `X-Hub-Signature-256` (or `X-Hub-Signature` as a fallback).
 
 ## Webhook endpoints
 
-- GitHub: `POST /github`
-- GitLab: `POST /gitlab`
 
 The service verifies GitHub webhooks via `X-Hub-Signature-256` (preferred) or `X-Hub-Signature`, and the
-GitLab secret token via `X-Gitlab-Token`. Requests without the correct secret are rejected with `401 Unauthorized`.
+GitLab secret token via `X-GitLab-Token`. Requests without the correct secret are rejected with `401 Unauthorized`.
 
 ## NATS subjects
 
