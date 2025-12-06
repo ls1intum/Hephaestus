@@ -151,9 +151,9 @@ When you run `docker/compose.core.yaml` or the `server/webhook-ingest/compose.ya
 
 ```bash
 cp docker/.env.example docker/.env
-WEBHOOK_SECRET=$(openssl rand -base64 32)
+WEBHOOK_SECRET=$(openssl rand -hex 32)
 ```
-The value must match the secret configured on your GitHub and GitLab webhooks.
+The value must match the secret configured on your GitHub and GitLab webhooks (validated via `X-Hub-Signature-256` when available).
 
 ## Web client (`webapp`)
 

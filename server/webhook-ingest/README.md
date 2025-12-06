@@ -8,7 +8,7 @@ payload to NATS JetStream.
 Provide the following environment variables when running the service:
 
 - `NATS_URL` – NATS server URL, for example `nats://nats-server:4222`
-- `WEBHOOK_SECRET` – HMAC secret configured on your GitHub and GitLab webhooks (`openssl rand -base64 32`)
+- `WEBHOOK_SECRET` – HMAC secret configured on your GitHub and GitLab webhooks (prefer SHA-256; e.g., `openssl rand -hex 32`)
 
 ### Local development
 
@@ -31,7 +31,8 @@ The compose file exposes the webhook service on port `4200` and the embedded
 NATS server on port `4222`.
 
 Set `WEBHOOK_SECRET` in your shell or a `.env` file before starting the compose
-stack so the service can validate incoming requests.
+stack so the service can validate incoming requests. GitHub webhooks are
+validated against `X-Hub-Signature-256` (or `X-Hub-Signature` as a fallback).
 
 ## Webhook endpoints
 

@@ -46,10 +46,26 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 
 
-def verify_github_signature(signature, secret, body):
-    mac = hmac.new(secret.encode(), body, hashlib.sha1)
-    expected_signature = "sha1=" + mac.hexdigest()
-    return hmac.compare_digest(signature, expected_signature)
+def verify_github_signature(
+    signature_header: str | None, secret: str, body: bytes
+) -> bool:
+    """Verify GitHub webhook signature supporting sha256 and sha1."""
+
+    if not signature_header or not secret:
+        return False
+
+    if signature_header.startswith("sha256="):
+        algo = hashlib.sha256
+        prefix = "sha256="
+    elif signature_header.startswith("sha1="):
+        algo = hashlib.sha1
+        prefix = "sha1="
+    else:
+        return False
+
+    mac = hmac.new(secret.encode(), body, algo)
+    expected = prefix + mac.hexdigest()
+    return hmac.compare_digest(signature_header, expected)
 
 
 def build_gitlab_subject(payload: dict) -> str:
@@ -70,7 +86,11 @@ def build_gitlab_subject(payload: dict) -> str:
             path_with_namespace = project["path_with_namespace"]
         else:
             path_with_namespace = payload["path_with_namespace"]
-        parts = [str(part).replace(".", "~") for part in path_with_namespace.split("/") if part]
+        parts = [
+            str(part).replace(".", "~")
+            for part in path_with_namespace.split("/")
+            if part
+        ]
         namespace_segment = "/".join(parts[:-1])
         project_segment = parts[-1]
 
@@ -81,18 +101,21 @@ def build_gitlab_subject(payload: dict) -> str:
         parts = [str(part).replace(".", "~") for part in group_path.split("/") if part]
         namespace_segment = "/".join(parts)
         project_segment = "?"
-    
+
     # 3) Parse from object_attributes
     elif "object_attributes" in payload:
         object_attributes = payload["object_attributes"]
-        has_project = "project_id" in object_attributes and object_attributes["project_id"] is not None
+        has_project = (
+            "project_id" in object_attributes
+            and object_attributes["project_id"] is not None
+        )
         url = object_attributes["url"]
         # Example: https://gitlab.lrz.de/ga84xah/codereviewtest/-/merge_requests/1#note_4108500
         # Remove the protocol and domain and everything including /-/ and after
         path = url.split("://")[-1].split("/", 1)[-1]
         path = path.split("/-/")[0]
         parts = [str(part).replace(".", "~") for part in path.split("/") if part]
-        
+
         if has_project and len(parts) > 1:
             namespace_segment = "/".join(parts[:-1])
             project_segment = parts[-1]
@@ -105,7 +128,7 @@ def build_gitlab_subject(payload: dict) -> str:
         namespace_segment = "?"
     if not project_segment:
         project_segment = "?"
-    
+
     subject_parts = ["gitlab", namespace_segment, project_segment, event_segment]
 
     return ".".join(subject_parts)
@@ -114,20 +137,23 @@ def build_gitlab_subject(payload: dict) -> str:
 @app.post("/github")
 async def github_webhook(
     request: Request,
-    signature: str = Header(
-        None,
-        alias="X-Hub-Signature",
-        description="GitHub's HMAC hex digest of the payload, used for verifying the webhook's authenticity",
-    ),
+    signature_sha1: str | None = Header(None, alias="X-Hub-Signature"),
+    signature_sha256: str | None = Header(None, alias="X-Hub-Signature-256"),
     event_type: str = Header(
         None,
-        alias="X-Github-Event",
+        alias="X-GitHub-Event",
         description="The type of event that triggered the webhook, such as 'push', 'pull_request', etc.",
     ),
     body=Body(...),
 ):
     body = await request.body()
 
+    if not settings.WEBHOOK_SECRET:
+        raise HTTPException(
+            status_code=500, detail="GitHub webhook secret not configured"
+        )
+
+    signature = signature_sha256 or signature_sha1
     if not verify_github_signature(signature, settings.WEBHOOK_SECRET, body):
         raise HTTPException(status_code=401, detail="Invalid signature")
 
@@ -170,13 +196,14 @@ async def gitlab_webhook(
     body = await request.body()
 
     expected_token = settings.WEBHOOK_SECRET or None
-    if expected_token:
-        if token != expected_token:
-            raise HTTPException(status_code=401, detail="Invalid token")
-    elif token:
-        raise HTTPException(status_code=401, detail="Unexpected token provided")
-    else:
-        raise HTTPException(status_code=500, detail="GitLab webhook secret not configured")
+    if not expected_token:
+        raise HTTPException(
+            status_code=500, detail="GitLab webhook secret not configured"
+        )
+
+    # Constant-time compare to avoid timing attacks
+    if not hmac.compare_digest(token or "", expected_token):
+        raise HTTPException(status_code=401, detail="Invalid token")
 
     payload = await request.json()
 
