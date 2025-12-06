@@ -235,10 +235,10 @@ public class WorkspaceService {
         List<RepositoryToMonitor> repositoriesToMonitor = repositoryToMonitorRepository.findByWorkspaceId(
             workspace.getId()
         );
-            var eligibleRepositories = repositoriesToMonitor
-                .stream()
-                .filter(monitoringScopeFilter::isRepositoryAllowed)
-                .toList();
+        var eligibleRepositories = repositoriesToMonitor
+            .stream()
+            .filter(monitoringScopeFilter::isRepositoryAllowed)
+            .toList();
 
         if (runMonitoringOnStartup) {
             logger.info("Running monitoring on startup for workspace id={}", workspace.getId());
@@ -1493,7 +1493,9 @@ public class WorkspaceService {
     }
 
     private void pruneSlugHistory(Workspace workspace) {
-        List<WorkspaceSlugHistory> history = workspaceSlugHistoryRepository.findByWorkspaceOrderByChangedAtDesc(workspace);
+        List<WorkspaceSlugHistory> history = workspaceSlugHistoryRepository.findByWorkspaceOrderByChangedAtDesc(
+            workspace
+        );
         if (history.size() <= SLUG_HISTORY_RETENTION) {
             return;
         }
@@ -1585,8 +1587,10 @@ public class WorkspaceService {
 
     private boolean hasActiveHistory(String slug) {
         Instant now = Instant.now();
-        return workspaceSlugHistoryRepository.existsByOldSlugAndRedirectExpiresAtIsNull(slug) ||
-            workspaceSlugHistoryRepository.existsByOldSlugAndRedirectExpiresAtAfter(slug, now);
+        return (
+            workspaceSlugHistoryRepository.existsByOldSlugAndRedirectExpiresAtIsNull(slug) ||
+            workspaceSlugHistoryRepository.existsByOldSlugAndRedirectExpiresAtAfter(slug, now)
+        );
     }
 
     /**

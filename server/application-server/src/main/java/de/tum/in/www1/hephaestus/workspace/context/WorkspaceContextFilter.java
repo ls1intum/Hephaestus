@@ -1,9 +1,9 @@
 package de.tum.in.www1.hephaestus.workspace.context;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import de.tum.in.www1.hephaestus.core.LoggingUtils;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
-import de.tum.in.www1.hephaestus.core.LoggingUtils;
 import de.tum.in.www1.hephaestus.workspace.Workspace.WorkspaceStatus;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceMembership.WorkspaceRole;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceMembershipRepository;
@@ -262,12 +262,13 @@ public class WorkspaceContextFilter implements Filter {
             response.getWriter().write(objectMapper.writeValueAsString(problem));
             return true;
         }
-        var workspace = workspaceRepository
-            .findById(history.getWorkspace().getId())
-            .orElse(null);
+        var workspace = workspaceRepository.findById(history.getWorkspace().getId()).orElse(null);
 
         if (workspace == null) {
-            log.warn("Slug redirect history points to missing workspace for oldSlug={}", LoggingUtils.sanitizeForLog(oldSlug));
+            log.warn(
+                "Slug redirect history points to missing workspace for oldSlug={}",
+                LoggingUtils.sanitizeForLog(oldSlug)
+            );
             return false;
         }
 
@@ -275,8 +276,7 @@ public class WorkspaceContextFilter implements Filter {
         boolean isPublic = Boolean.TRUE.equals(workspace.getIsPubliclyViewable());
         boolean hasMembership = userRepository
             .getCurrentUser()
-            .flatMap(user ->
-                workspaceMembershipRepository.findByWorkspace_IdAndUser_Id(workspace.getId(), user.getId())
+            .flatMap(user -> workspaceMembershipRepository.findByWorkspace_IdAndUser_Id(workspace.getId(), user.getId())
             )
             .isPresent();
 

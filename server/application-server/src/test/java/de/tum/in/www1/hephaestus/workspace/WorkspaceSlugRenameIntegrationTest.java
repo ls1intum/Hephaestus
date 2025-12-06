@@ -5,8 +5,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.testconfig.TestAuthUtils;
 import de.tum.in.www1.hephaestus.testconfig.WithAdminUser;
-import org.kohsuke.github.GHRepositorySelection;
-
 import de.tum.in.www1.hephaestus.workspace.dto.CreateWorkspaceRequestDTO;
 import de.tum.in.www1.hephaestus.workspace.dto.RenameWorkspaceSlugRequestDTO;
 import java.time.Instant;
@@ -14,6 +12,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.kohsuke.github.GHRepositorySelection;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.reactive.AutoConfigureWebTestClient;
 import org.springframework.http.HttpStatus;
@@ -62,7 +61,9 @@ class WorkspaceSlugRenameIntegrationTest extends AbstractWorkspaceIntegrationTes
         assertThat(updated.getWorkspaceSlug()).isEqualTo("new-slug");
         assertThat(persisted.getWorkspaceSlug()).isEqualTo("new-slug");
 
-        List<WorkspaceSlugHistory> history = workspaceSlugHistoryRepository.findByWorkspaceOrderByChangedAtDesc(persisted);
+        List<WorkspaceSlugHistory> history = workspaceSlugHistoryRepository.findByWorkspaceOrderByChangedAtDesc(
+            persisted
+        );
         assertThat(history).hasSize(1);
         assertThat(history.getFirst().getOldSlug()).isEqualTo("old-slug");
         assertThat(history.getFirst().getNewSlug()).isEqualTo("new-slug");
@@ -94,7 +95,9 @@ class WorkspaceSlugRenameIntegrationTest extends AbstractWorkspaceIntegrationTes
         }
 
         Workspace persisted = workspaceRepository.findById(workspace.getId()).orElseThrow();
-        List<WorkspaceSlugHistory> history = workspaceSlugHistoryRepository.findByWorkspaceOrderByChangedAtDesc(persisted);
+        List<WorkspaceSlugHistory> history = workspaceSlugHistoryRepository.findByWorkspaceOrderByChangedAtDesc(
+            persisted
+        );
 
         assertThat(history).hasSize(5);
         assertThat(history.getFirst().getNewSlug()).isEqualTo("slug-6");
