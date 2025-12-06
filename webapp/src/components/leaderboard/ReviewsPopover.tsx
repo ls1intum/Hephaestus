@@ -104,7 +104,7 @@ export function ReviewsPopover({
 						"flex items-center gap-1",
 						!highlight
 							? "text-github-muted-foreground"
-							: "border-primary bg-accent hover:bg-primary hover:text-primary-foreground",
+							: "border-primary bg-accent hover:bg-foreground hover:text-background",
 					)}
 					onClick={(e) => e.stopPropagation()}
 				>
