@@ -69,8 +69,9 @@ def verify_github_signature(
 
 
 def build_gitlab_subject(payload: dict) -> str:
-    event_name = payload.get("object_kind") or payload.get("event_name")
-    event_segment = (event_name or "unknown").lower()
+    event_name = (
+        payload.get("object_kind") or payload.get("event_name") or "unknown"
+    ).lower()
 
     # We will try to detect project-scoped details first, then group-scoped, then object_attributes,
     # and only if nothing can be determined, fall back to instance (?.?).
@@ -78,50 +79,51 @@ def build_gitlab_subject(payload: dict) -> str:
     namespace_segment: str | None = None
     project_segment: str | None = None
 
-    # 1) Project-scoped: common GitLab payloads include a `project` dict
-    if "project" in payload or "path_with_namespace" in payload:
-        # project.path_with_namespace is the most reliable source
-        if "path_with_namespace" not in payload and "project" in payload:
-            project = payload["project"]
-            path_with_namespace = project["path_with_namespace"]
-        else:
-            path_with_namespace = payload["path_with_namespace"]
-        parts = [
-            str(part).replace(".", "~")
-            for part in path_with_namespace.split("/")
-            if part
-        ]
-        namespace_segment = "/".join(parts[:-1])
-        project_segment = parts[-1]
+    def sanitize_parts(path: str) -> list[str]:
+        # Replace dots to avoid extra NATS tokens; flatten with "~"
+        return [str(part).replace(".", "~") for part in path.split("/") if part]
+
+    # 1) Project-scoped: common GitLab payloads include a `project` dict or path_with_namespace
+    project = payload.get("project") or {}
+    path_with_namespace = payload.get("path_with_namespace") or project.get(
+        "path_with_namespace"
+    )
+    if path_with_namespace:
+        parts = sanitize_parts(path_with_namespace)
+        if len(parts) >= 2:
+            namespace_segment = "~".join(parts[:-1])
+            project_segment = parts[-1]
 
     # 2) Group-scoped: common GitLab payloads include a `group` dict
-    elif "group" in payload:
-        group = payload["group"]
-        group_path = group["group_path"]
-        parts = [str(part).replace(".", "~") for part in group_path.split("/") if part]
-        namespace_segment = "/".join(parts)
-        project_segment = "?"
+    if not namespace_segment:
+        group = payload.get("group") or {}
+        group_path = (
+            group.get("full_path") or group.get("path") or group.get("group_path")
+        )
+        if group_path:
+            parts = sanitize_parts(group_path)
+            if parts:
+                namespace_segment = "~".join(parts)
+                project_segment = "?"
 
     # 3) Parse from object_attributes
-    elif "object_attributes" in payload:
-        object_attributes = payload["object_attributes"]
-        has_project = (
-            "project_id" in object_attributes
-            and object_attributes["project_id"] is not None
-        )
-        url = object_attributes["url"]
-        # Example: https://gitlab.lrz.de/ga84xah/codereviewtest/-/merge_requests/1#note_4108500
-        # Remove the protocol and domain and everything including /-/ and after
-        path = url.split("://")[-1].split("/", 1)[-1]
-        path = path.split("/-/")[0]
-        parts = [str(part).replace(".", "~") for part in path.split("/") if part]
+    if not namespace_segment:
+        object_attributes = payload.get("object_attributes") or {}
+        has_project = object_attributes.get("project_id") is not None
+        url = object_attributes.get("url") or ""
+        if "://" in url:
+            # Example: https://gitlab.lrz.de/ga84xah/codereviewtest/-/merge_requests/1#note_4108500
+            # Remove the protocol and domain and everything including /-/ and after
+            path = url.split("://")[-1].split("/", 1)[-1]
+            path = path.split("/-/")[0]
+            parts = sanitize_parts(path)
 
-        if has_project and len(parts) > 1:
-            namespace_segment = "/".join(parts[:-1])
-            project_segment = parts[-1]
-        elif len(parts) > 0:
-            namespace_segment = "/".join(parts)
-            project_segment = "?"
+            if has_project and len(parts) > 1:
+                namespace_segment = "~".join(parts[:-1])
+                project_segment = parts[-1]
+            elif parts:
+                namespace_segment = "~".join(parts)
+                project_segment = "?"
 
     # 4) Fallback to instance-level
     if not namespace_segment:
@@ -129,7 +131,7 @@ def build_gitlab_subject(payload: dict) -> str:
     if not project_segment:
         project_segment = "?"
 
-    subject_parts = ["gitlab", namespace_segment, project_segment, event_segment]
+    subject_parts = ["gitlab", namespace_segment, project_segment, event_name]
 
     return ".".join(subject_parts)
 
