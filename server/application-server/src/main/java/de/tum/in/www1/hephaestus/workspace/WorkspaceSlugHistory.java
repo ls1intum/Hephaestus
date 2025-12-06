@@ -43,11 +43,11 @@ public class WorkspaceSlugHistory {
     @ToString.Exclude
     private Workspace workspace;
 
-    @Column(name = "old_slug", nullable = false, length = 255)
+    @Column(name = "old_slug", nullable = false, length = 64)
     @NotBlank(message = "Old slug is required")
     private String oldSlug;
 
-    @Column(name = "new_slug", nullable = false, length = 255)
+    @Column(name = "new_slug", nullable = false, length = 64)
     @NotBlank(message = "New slug is required")
     private String newSlug;
 

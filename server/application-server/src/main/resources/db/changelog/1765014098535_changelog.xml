@@ -8,10 +8,10 @@
             <column name="changed_at" type="TIMESTAMP(6) WITH TIME ZONE">
                 <constraints nullable="false"/>
             </column>
-            <column name="new_slug" type="VARCHAR(255)">
+            <column name="new_slug" type="VARCHAR(64)">
                 <constraints nullable="false"/>
             </column>
-            <column name="old_slug" type="VARCHAR(255)">
+            <column name="old_slug" type="VARCHAR(64)">
                 <constraints nullable="false"/>
             </column>
             <column name="redirect_expires_at" type="TIMESTAMP(6) WITH TIME ZONE">
