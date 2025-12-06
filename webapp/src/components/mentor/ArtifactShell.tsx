@@ -2,6 +2,7 @@ import type { UseChatHelpers } from "@ai-sdk/react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useWindowSize } from "usehooks-ts";
 import type { ChatMessageVote } from "@/api/types.gen";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useScrollToBottom } from "@/hooks/use-scroll-to-bottom";
 import type { Attachment, ChatMessage } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -254,7 +255,7 @@ export function ArtifactShell({
 											{headerMeta.subtitle}
 										</div>
 									) : (
-										<div className="w-32 h-3 mt-2 bg-muted-foreground/20 rounded-md animate-pulse" />
+										<Skeleton className="w-32 h-3 mt-2" />
 									)}
 								</div>
 							</div>

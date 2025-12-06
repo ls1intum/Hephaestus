@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.10.0-rc.44](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.43...v0.10.0-rc.44) (2025-12-06)
+
+### 🐛 Bug Fixes
+
+* **webapp:** standardize skeleton loading states to eliminate color inconsistencies ([#559](https://github.com/ls1intum/Hephaestus/issues/559)) ([2ac9491](https://github.com/ls1intum/Hephaestus/commit/2ac9491e1ee4be58fcd9e51d55e03e2c67751ca9))
+
 ## [0.10.0-rc.43](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.42...v0.10.0-rc.43) (2025-12-05)
 
 ## [0.10.0-rc.42](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.41...v0.10.0-rc.42) (2025-12-05)
