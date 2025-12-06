@@ -97,40 +97,55 @@ class ContributionEventSyncServiceIntegrationTest extends BaseIntegrationTest {
         assertThat(updated.getOccurredAt()).isEqualTo(review.getSubmittedAt());
     }
 
-//    @Test
-//    void processPullRequestReviewContribution_ignoresReviewWithNullAuthor() {
-//        PullRequestReview review = new PullRequestReview();
-//        review.setId(300L);
-//        review.setAuthor(null);
-//        review.setSubmittedAt(ZonedDateTime.now());
-//
-//        long before = contributionEventRepository.count();
-//        contributionEventSyncService.processPullRequestReviewContribution(review);
-//        long after = contributionEventRepository.count();
-//
-//        assertThat(after).isEqualTo(before);
-//        Optional<ContributionEvent> maybe = contributionEventRepository.findBySourceTypeAndSourceId(
-//            ContributionSourceType.PULL_REQUEST_REVIEW, review.getId());
-//        assertThat(maybe).isEmpty();
-//    }
-//
-//    @Test
-//    void processPullRequestReviewContribution_handlesServiceErrorsWithoutPersisting() {
-//        User author = new User();
-//        author.setId(9L);
-//        author.setLogin("mnemosyne");
-//
-//        PullRequestReview review = new PullRequestReview();
-//        // Intentionally leave id null to simulate malformed input that should not persist an event
-//        review.setId(null);
-//        review.setAuthor(author);
-//        review.setSubmittedAt(ZonedDateTime.now());
-//
-//        long before = contributionEventRepository.count();
-//        // Should not throw, should not persist a new event
-//        contributionEventSyncService.processPullRequestReviewContribution(review);
-//        long after = contributionEventRepository.count();
-//
-//        assertThat(after).isEqualTo(before);
-//    }
+    /**
+     * Given a pull request review with a null author,<br>
+     * When processed by processPullRequestReviewContribution,<br>
+     * Then no ContributionEvent is persisted.<br>
+     */
+    @Test
+    @DisplayName("processPullRequestReviewContribution ignores review with null author")
+    void processPullRequestReviewContribution_ignoresReviewWithNullAuthor() {
+        Instant submittedAt = Instant.parse("2025-01-03T10:00:00Z");
+
+        PullRequestReview review = new PullRequestReview();
+        review.setId(3L);
+        review.setAuthor(null);
+        review.setSubmittedAt(submittedAt);
+
+        long before = contributionEventRepository.count();
+        contributionEventSyncService.processPullRequestReviewContribution(review);
+        long after = contributionEventRepository.count();
+
+        assertThat(after).isEqualTo(before);
+        Optional<ContributionEvent> maybe = contributionEventRepository.findBySourceTypeAndSourceId(
+            ContributionSourceType.PULL_REQUEST_REVIEW, review.getId());
+        assertThat(maybe).isEmpty();
+    }
+
+    /**
+     * Given a pull request review with a null id,<br>
+     * When processed by processPullRequestReviewContribution,<br>
+     * Then no ContributionEvent is persisted.<br>
+     */
+    @Test
+    @DisplayName("processPullRequestReviewContribution ignores review with null id")
+    void processPullRequestReviewContribution_ignoresReviewWithNullId() {
+        User author = new User();
+        author.setId(9L);
+        author.setLogin("mnemosyne");
+
+        Instant submittedAt = Instant.parse("2025-01-04T10:00:00Z");
+
+        PullRequestReview review = new PullRequestReview();
+        // Intentionally leave id null to simulate malformed input that should not persist an event
+        review.setId(null);
+        review.setAuthor(author);
+        review.setSubmittedAt(submittedAt);
+
+        long before = contributionEventRepository.count();
+        contributionEventSyncService.processPullRequestReviewContribution(review);
+        long after = contributionEventRepository.count();
+
+        assertThat(after).isEqualTo(before);
+    }
 }
