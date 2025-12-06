@@ -1,6 +1,7 @@
 import { FileText, Maximize } from "lucide-react";
 import type { MouseEvent } from "react";
 import type { Document } from "@/api/types.gen";
+import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { InlineDocumentSkeleton } from "./DocumentSkeleton";
 import { LoaderIcon } from "./LoaderIcon";
@@ -50,7 +51,7 @@ const LoadingSkeleton = () => (
 				<div className="text-muted-foreground">
 					<LoaderIcon />
 				</div>
-				<div className="h-4 w-32 bg-muted-foreground/20 rounded animate-pulse" />
+				<Skeleton className="h-4 w-32" />
 			</div>
 			<div className="text-muted-foreground">
 				<Maximize />
