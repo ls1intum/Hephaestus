@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.10.0-rc.49](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.48...v0.10.0-rc.49) (2025-12-06)
+
+### 🚀 Features
+
+* **application-server:** add contribution event entity ([#557](https://github.com/ls1intum/Hephaestus/issues/557)) ([f1d4de5](https://github.com/ls1intum/Hephaestus/commit/f1d4de5b839cbd0f6b7825c2aadafabc38d4dc87))
+
 ## [0.10.0-rc.48](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.47...v0.10.0-rc.48) (2025-12-06)
 
 ### 🚀 Features
