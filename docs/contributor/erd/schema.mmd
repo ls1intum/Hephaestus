@@ -62,7 +62,7 @@ erDiagram
         BIGINT id PK
         TIMESTAMPTZ occurred_at "NOT NULL"
         BIGINT source_id UK "NOT NULL"
-        VARCHAR(20) source_type UK "NOT NULL"
+        VARCHAR(32) source_type UK "NOT NULL"
         INTEGER xp_awarded "NOT NULL"
         BIGINT actor_id FK "NOT NULL"
     }

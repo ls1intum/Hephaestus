@@ -492,7 +492,7 @@ class ContributionEvent(Base):
     )
     occurred_at: Mapped[datetime.datetime] = mapped_column(TIMESTAMP(True, 6))
     source_id: Mapped[int] = mapped_column(BigInteger)
-    source_type: Mapped[str] = mapped_column(String(20))
+    source_type: Mapped[str] = mapped_column(String(32))
     xp_awarded: Mapped[int] = mapped_column(Integer)
     actor_id: Mapped[int] = mapped_column(BigInteger)
     actor: Mapped["User"] = relationship("User", back_populates="contribution_event")
