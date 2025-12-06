@@ -118,7 +118,7 @@ hephaestus:
         # Set to false in production when using GitHub App installations
         init-default: true
         slug:
-            # TTL (in days) for slug redirects; set to 0 for permanent redirects
+            # TTL (in days) for slug redirects; set to 0 to disable redirects while preserving history
             redirect:
                 ttl-days: 30
         default:
