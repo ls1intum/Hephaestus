@@ -40,9 +40,6 @@ RUN apk update && \
     apk add --no-cache bash grep sed perl libxml2>=2.13.4-r6 && \
     rm -rf /var/cache/apk/*
 
-# Build argument to control whether to include Storybook
-ARG BUILD_STORYBOOK=false
-
 # Copy built React app from the build stage 
 COPY --from=build /app/dist /usr/share/nginx/html
 
