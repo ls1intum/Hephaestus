@@ -28,8 +28,9 @@ public class ContributionEvent {
     @Column(nullable = false)
     private Long sourceId;
 
+    @NotNull
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "actor_id")
+    @JoinColumn(name = "actor_id", nullable = false)
     private User actor;
 
     @NotNull
