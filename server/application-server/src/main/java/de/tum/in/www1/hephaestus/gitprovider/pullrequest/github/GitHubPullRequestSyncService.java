@@ -10,17 +10,17 @@ import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
-import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
-import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserConverter;
-import jakarta.transaction.Transactional;
+import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserSyncService;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import org.kohsuke.github.GHDirection;
 import org.kohsuke.github.GHIssueState;
+import org.kohsuke.github.GHLabel;
 import org.kohsuke.github.GHPullRequest;
 import org.kohsuke.github.GHPullRequestQueryBuilder.Sort;
 import org.kohsuke.github.GHRepository;
@@ -28,6 +28,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class GitHubPullRequestSyncService {
@@ -47,9 +48,6 @@ public class GitHubPullRequestSyncService {
     private MilestoneRepository milestoneRepository;
 
     @Autowired
-    private UserRepository userRepository;
-
-    @Autowired
     private GitHubPullRequestConverter pullRequestConverter;
 
     @Autowired
@@ -59,7 +57,7 @@ public class GitHubPullRequestSyncService {
     private GitHubMilestoneConverter milestoneConverter;
 
     @Autowired
-    private GitHubUserConverter userConverter;
+    private GitHubUserSyncService userSyncService;
 
     @Autowired
     private BadPracticeDetectorScheduler badPracticeDetectorScheduler;
@@ -188,6 +186,33 @@ public class GitHubPullRequestSyncService {
      */
     @Transactional
     public PullRequest processPullRequest(GHPullRequest ghPullRequest) {
+        return processPullRequestInternal(ghPullRequest, collectLabels(ghPullRequest));
+    }
+
+    @Transactional
+    public PullRequest processPullRequest(GHPullRequest ghPullRequest, GHLabel changedLabel, boolean added) {
+        var effectiveLabels = adjustLabels(collectLabels(ghPullRequest), changedLabel, added);
+        return processPullRequestInternal(ghPullRequest, effectiveLabels);
+    }
+
+    private List<GHLabel> collectLabels(GHPullRequest ghPullRequest) {
+        return new ArrayList<>(ghPullRequest.getLabels());
+    }
+
+    private List<GHLabel> adjustLabels(List<GHLabel> labels, GHLabel changedLabel, boolean added) {
+        if (changedLabel == null) {
+            return labels;
+        }
+
+        var adjusted = new ArrayList<>(labels);
+        adjusted.removeIf(label -> Objects.equals(label.getId(), changedLabel.getId()));
+        if (added) {
+            adjusted.add(changedLabel);
+        }
+        return adjusted;
+    }
+
+    private PullRequest processPullRequestInternal(GHPullRequest ghPullRequest, List<GHLabel> effectiveLabels) {
         var result = pullRequestRepository
             .findById(ghPullRequest.getId())
             .map(pullRequest -> {
@@ -219,9 +244,9 @@ public class GitHubPullRequestSyncService {
         }
 
         // Link new labels and remove labels that are not present anymore
-        var ghLabels = ghPullRequest.getLabels();
+        var previousLabels = new HashSet<>(result.getLabels());
         var resultLabels = new HashSet<Label>();
-        ghLabels.forEach(ghLabel -> {
+        effectiveLabels.forEach(ghLabel -> {
             var resultLabel = labelRepository
                 .findById(ghLabel.getId())
                 .orElseGet(() -> {
@@ -231,7 +256,7 @@ public class GitHubPullRequestSyncService {
                 });
             resultLabels.add(resultLabel);
         });
-        badPracticeDetectorScheduler.detectBadPracticeForPrIfReadyLabels(result, result.getLabels(), resultLabels);
+        badPracticeDetectorScheduler.detectBadPracticeForPrIfReadyLabels(result, previousLabels, resultLabels);
         result.getLabels().clear();
         result.getLabels().addAll(resultLabels);
 
@@ -247,18 +272,14 @@ public class GitHubPullRequestSyncService {
 
         // Link author
         var author = ghPullRequest.getUser();
-        var resultAuthor = userRepository
-            .findById(author.getId())
-            .orElseGet(() -> userRepository.save(userConverter.convert(author)));
+        var resultAuthor = userSyncService.getOrCreateUser(author);
         result.setAuthor(resultAuthor);
 
         // Link assignees
         var assignees = ghPullRequest.getAssignees();
         var resultAssignees = new HashSet<User>();
         assignees.forEach(assignee -> {
-            var resultAssignee = userRepository
-                .findById(assignee.getId())
-                .orElseGet(() -> userRepository.save(userConverter.convert(assignee)));
+            var resultAssignee = userSyncService.getOrCreateUser(assignee);
             resultAssignees.add(resultAssignee);
         });
         result.getAssignees().clear();
@@ -268,9 +289,7 @@ public class GitHubPullRequestSyncService {
         try {
             var mergedByUser = ghPullRequest.getMergedBy();
             if (mergedByUser != null) {
-                var resultMergedBy = userRepository
-                    .findById(ghPullRequest.getMergedBy().getId())
-                    .orElseGet(() -> userRepository.save(userConverter.convert(mergedByUser)));
+                var resultMergedBy = userSyncService.getOrCreateUser(mergedByUser);
                 result.setMergedBy(resultMergedBy);
             } else {
                 result.setMergedBy(null);
@@ -288,9 +307,7 @@ public class GitHubPullRequestSyncService {
             var requestedReviewers = ghPullRequest.getRequestedReviewers();
             var resultRequestedReviewers = new HashSet<User>();
             requestedReviewers.forEach(requestedReviewer -> {
-                var resultRequestedReviewer = userRepository
-                    .findById(requestedReviewer.getId())
-                    .orElseGet(() -> userRepository.save(userConverter.convert(requestedReviewer)));
+                var resultRequestedReviewer = userSyncService.getOrCreateUser(requestedReviewer);
                 resultRequestedReviewers.add(resultRequestedReviewer);
             });
             result.getRequestedReviewers().clear();

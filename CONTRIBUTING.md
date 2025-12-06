@@ -1,6 +1,6 @@
 # Contribution Guidelines for Hephaestus
 
-Read the [setup guide](https://ls1intum.github.io/Hephaestus/dev/setup_guide/) on how to set up your local development environment.
+Read the [local development guide](https://ls1intum.github.io/Hephaestus/contributor/local-development) on how to set up your environment.
 
 ## Identity and Transparency
 

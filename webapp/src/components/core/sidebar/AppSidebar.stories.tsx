@@ -22,6 +22,26 @@ const meta = {
 	args: {
 		username: "johnDoe",
 		isAdmin: false,
+		hasMentorAccess: false,
+		context: "main",
+		workspaces: [
+			{
+				displayName: "AET",
+				accountLogin: "aet-org",
+				workspaceSlug: "aet",
+				id: 1,
+				status: "ACTIVE",
+				createdAt: new Date(),
+			},
+		],
+		activeWorkspace: {
+			displayName: "AET",
+			accountLogin: "aet-org",
+			workspaceSlug: "aet",
+			id: 1,
+			status: "ACTIVE",
+			createdAt: new Date(),
+		},
 	},
 	argTypes: {
 		username: {
@@ -31,6 +51,10 @@ const meta = {
 		isAdmin: {
 			control: "boolean",
 			description: "Whether the user has administrative privileges",
+		},
+		workspacesLoading: {
+			control: "boolean",
+			description: "Shows loading skeletons while workspaces are being fetched",
 		},
 	},
 	decorators: [
@@ -54,6 +78,14 @@ export const RegularUser: Story = {
 		isAdmin: false,
 		hasMentorAccess: false,
 		context: "main",
+		activeWorkspace: {
+			displayName: "AET",
+			accountLogin: "aet-org",
+			workspaceSlug: "aet",
+			id: 1,
+			status: "ACTIVE",
+			createdAt: new Date(),
+		},
 	},
 };
 
@@ -66,6 +98,14 @@ export const AdminUser: Story = {
 		isAdmin: true,
 		hasMentorAccess: true,
 		context: "main",
+		activeWorkspace: {
+			displayName: "AET",
+			accountLogin: "aet-org",
+			workspaceSlug: "aet",
+			id: 1,
+			status: "ACTIVE",
+			createdAt: new Date(),
+		},
 	},
 };
 
@@ -119,5 +159,26 @@ export const MentorLoading: Story = {
 		hasMentorAccess: true,
 		context: "mentor",
 		mentorThreadsLoading: true,
+	},
+};
+
+/**
+ * Sidebar state when the user is not in any workspace.
+ */
+export const NoWorkspace: Story = {
+	args: {
+		workspaces: [],
+		activeWorkspace: undefined,
+	},
+};
+
+/**
+ * Sidebar while workspaces are being fetched (skeletons only).
+ */
+export const LoadingWorkspaces: Story = {
+	args: {
+		workspaces: [],
+		activeWorkspace: undefined,
+		workspacesLoading: true,
 	},
 };

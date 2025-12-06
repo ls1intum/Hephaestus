@@ -4,9 +4,7 @@ import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.github.GitHubPullRequestConverter;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReview;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReviewRepository;
-import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
-import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserConverter;
-import jakarta.transaction.Transactional;
+import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserSyncService;
 import java.io.IOException;
 import java.util.List;
 import org.kohsuke.github.GHPullRequest;
@@ -15,6 +13,7 @@ import org.kohsuke.github.GHUser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class GitHubPullRequestReviewSyncService {
@@ -23,25 +22,22 @@ public class GitHubPullRequestReviewSyncService {
 
     private final PullRequestReviewRepository pullRequestReviewRepository;
     private final PullRequestRepository pullRequestRepository;
-    private final UserRepository userRepository;
     private final GitHubPullRequestReviewConverter pullRequestReviewConverter;
     private final GitHubPullRequestConverter pullRequestConverter;
-    private final GitHubUserConverter userConverter;
+    private final GitHubUserSyncService userSyncService;
 
     public GitHubPullRequestReviewSyncService(
         PullRequestReviewRepository pullRequestReviewRepository,
         PullRequestRepository pullRequestRepository,
-        UserRepository userRepository,
         GitHubPullRequestReviewConverter pullRequestReviewConverter,
         GitHubPullRequestConverter pullRequestConverter,
-        GitHubUserConverter userConverter
+        GitHubUserSyncService userSyncService
     ) {
         this.pullRequestReviewRepository = pullRequestReviewRepository;
         this.pullRequestRepository = pullRequestRepository;
-        this.userRepository = userRepository;
         this.pullRequestReviewConverter = pullRequestReviewConverter;
         this.pullRequestConverter = pullRequestConverter;
-        this.userConverter = userConverter;
+        this.userSyncService = userSyncService;
     }
 
     /**
@@ -73,6 +69,15 @@ public class GitHubPullRequestReviewSyncService {
      */
     @Transactional
     public PullRequestReview processPullRequestReview(GHPullRequestReview ghPullRequestReview) {
+        return processPullRequestReview(ghPullRequestReview, null, null);
+    }
+
+    @Transactional
+    public PullRequestReview processPullRequestReview(
+        GHPullRequestReview ghPullRequestReview,
+        GHPullRequest fallbackPullRequest,
+        GHUser fallbackUser
+    ) {
         var result = pullRequestReviewRepository
             .findById(ghPullRequestReview.getId())
             .map(pullRequestReview -> {
@@ -85,25 +90,55 @@ public class GitHubPullRequestReviewSyncService {
         }
 
         // Link pull request
-        var pullRequest = ghPullRequestReview.getParent();
-        var resultPullRequest = pullRequestRepository
-            .findById(pullRequest.getId())
-            .orElseGet(() -> pullRequestRepository.save(pullRequestConverter.convert(pullRequest)));
+        GHPullRequest pullRequest = null;
+        try {
+            pullRequest = ghPullRequestReview.getParent();
+        } catch (NullPointerException ignored) {
+            logger.warn(
+                "Hub4j pull request review {} missing parent reference; falling back to event payload.",
+                ghPullRequestReview.getId()
+            );
+        }
+        if (pullRequest == null) {
+            pullRequest = fallbackPullRequest;
+        }
+        if (pullRequest == null) {
+            logger.error(
+                "Failed to link pull request for pull request review {}: {}",
+                ghPullRequestReview.getId(),
+                "Parent pull request not available"
+            );
+            return null;
+        }
+        var resultPullRequest = pullRequestRepository.findById(pullRequest.getId()).orElse(null);
+        if (resultPullRequest == null) {
+            resultPullRequest = pullRequestRepository.save(pullRequestConverter.convert(pullRequest));
+        }
         result.setPullRequest(resultPullRequest);
 
         // Link author
+        GHUser user = null;
         try {
-            GHUser user = ghPullRequestReview.getUser();
-            var resultAuthor = userRepository
-                .findById(user.getId())
-                .orElseGet(() -> userRepository.save(userConverter.convert(user)));
-            result.setAuthor(resultAuthor);
+            user = ghPullRequestReview.getUser();
         } catch (IOException | NullPointerException e) {
             logger.error(
                 "Failed to link author for pull request review {}: {}",
                 ghPullRequestReview.getId(),
                 e.getMessage()
             );
+        }
+        if (user == null) {
+            user = fallbackUser;
+        }
+        if (user != null) {
+            var resultAuthor = userSyncService.getOrCreateUser(user);
+            result.setAuthor(resultAuthor);
+        } else {
+            logger.warn(
+                "No author information available for pull request review {}; leaving review without author.",
+                ghPullRequestReview.getId()
+            );
+            result.setAuthor(null);
         }
 
         return pullRequestReviewRepository.save(result);

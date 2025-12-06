@@ -2,23 +2,34 @@ package de.tum.in.www1.hephaestus.activity.badpracticedetector;
 
 import de.tum.in.www1.hephaestus.gitprovider.label.Label;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
+import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.notification.MailService;
+import de.tum.in.www1.hephaestus.workspace.RepositoryToMonitorRepository;
+import de.tum.in.www1.hephaestus.workspace.Workspace;
+import de.tum.in.www1.hephaestus.workspace.WorkspaceRepository;
+import jakarta.ws.rs.NotAuthorizedException;
+import jakarta.ws.rs.ProcessingException;
 import java.time.Instant;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.keycloak.admin.client.Keycloak;
 import org.keycloak.representations.idm.RoleRepresentation;
 import org.keycloak.representations.idm.UserRepresentation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.TaskScheduler;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+/**
+ * Scheduler for bad practice detection tasks.
+ * Schedules detection based on PR events (opened, labeled, closed) and user roles.
+ */
 @Component
 public class BadPracticeDetectorScheduler {
 
@@ -28,26 +39,37 @@ public class BadPracticeDetectorScheduler {
     private static final String READY_FOR_REVIEW = "ready for review";
     private static final String READY_TO_MERGE = "ready to merge";
 
-    @Qualifier("taskScheduler")
-    @Autowired
-    TaskScheduler taskScheduler;
+    private final TaskScheduler taskScheduler;
+    private final PullRequestBadPracticeDetector pullRequestBadPracticeDetector;
+    private final MailService mailService;
+    private final Keycloak keycloak;
+    private final RepositoryToMonitorRepository repositoryToMonitorRepository;
+    private final WorkspaceRepository workspaceRepository;
+    private final boolean runAutomaticDetectionForAll;
+    private final String realm;
 
-    @Autowired
-    PullRequestBadPracticeDetector pullRequestBadPracticeDetector;
+    private final Map<Long, List<ScheduledFuture<?>>> scheduledTasks = new ConcurrentHashMap<>();
+    private final AtomicBoolean keycloakRoleChecksHealthy = new AtomicBoolean(true);
 
-    @Autowired
-    MailService mailService;
-
-    @Autowired
-    Keycloak keycloak;
-
-    @Value("${hephaestus.detection.run-automatic-detection-for-all}")
-    private boolean runAutomaticDetectionForAll;
-
-    @Value("${keycloak.realm}")
-    private String realm;
-
-    private final Map<Long, List<ScheduledFuture<?>>> scheduledTasks = new HashMap<>();
+    public BadPracticeDetectorScheduler(
+        TaskScheduler taskScheduler,
+        PullRequestBadPracticeDetector pullRequestBadPracticeDetector,
+        MailService mailService,
+        Keycloak keycloak,
+        RepositoryToMonitorRepository repositoryToMonitorRepository,
+        WorkspaceRepository workspaceRepository,
+        @Value("${hephaestus.detection.run-automatic-detection-for-all}") boolean runAutomaticDetectionForAll,
+        @Value("${keycloak.realm}") String realm
+    ) {
+        this.taskScheduler = taskScheduler;
+        this.pullRequestBadPracticeDetector = pullRequestBadPracticeDetector;
+        this.mailService = mailService;
+        this.keycloak = keycloak;
+        this.repositoryToMonitorRepository = repositoryToMonitorRepository;
+        this.workspaceRepository = workspaceRepository;
+        this.runAutomaticDetectionForAll = runAutomaticDetectionForAll;
+        this.realm = realm;
+    }
 
     public void detectBadPracticeForPrWhenOpenedOrReadyForReviewEvent(PullRequest pullRequest) {
         Instant timeInOneHour = Instant.now().plusSeconds(3600);
@@ -98,6 +120,14 @@ public class BadPracticeDetectorScheduler {
             return;
         }
 
+        if (!keycloakRoleChecksHealthy.get()) {
+            logger.debug(
+                "Skipping Keycloak role check for PR {} because the Keycloak client is marked unhealthy",
+                pullRequest.getId()
+            );
+            return;
+        }
+
         try {
             UserRepresentation keyCloakUser = keycloak
                 .realm(realm)
@@ -124,6 +154,16 @@ public class BadPracticeDetectorScheduler {
             } else {
                 logger.info("User {} has the run_automatic_detection role. Scheduling detection.", assignee.getLogin());
                 scheduleDetectionAtTime(pullRequest, scheduledTime, sendBadPracticeDetectionEmail);
+            }
+        } catch (ProcessingException | NotAuthorizedException e) {
+            if (keycloakRoleChecksHealthy.compareAndSet(true, false)) {
+                logger.info(
+                    "Disabling automatic detection role checks after Keycloak responded with {}. " +
+                    "Set KEYCLOAK credentials or restart the server to re-enable.",
+                    e.getMessage()
+                );
+            } else {
+                logger.debug("Keycloak role check skipped due to previous authorization failure: {}", e.getMessage());
             }
         } catch (Exception e) {
             logger.error("Error while checking user role: {}", e.toString());
@@ -158,7 +198,7 @@ public class BadPracticeDetectorScheduler {
             });
             scheduledTasksList.removeAll(tasksToRemove);
         } else {
-            scheduledTasks.put(pullRequest.getId(), new ArrayList<>());
+            scheduledTasks.put(pullRequest.getId(), new CopyOnWriteArrayList<>());
         }
 
         ScheduledFuture<?> scheduledTask = taskScheduler.schedule(badPracticeDetectorTask, scheduledTime);
@@ -174,7 +214,31 @@ public class BadPracticeDetectorScheduler {
         badPracticeDetectorTask.setMailService(mailService);
         badPracticeDetectorTask.setPullRequest(pullRequest);
         badPracticeDetectorTask.setSendBadPracticeDetectionEmail(sendBadPracticeDetectionEmail);
+        resolveWorkspaceSlugForRepository(pullRequest.getRepository()).ifPresent(
+            badPracticeDetectorTask::setWorkspaceSlug
+        );
         return badPracticeDetectorTask;
+    }
+
+    /**
+     * Resolve workspace slug for a repository without depending on WorkspaceService to avoid circular dependencies.
+     * Prefers repository monitor mapping; falls back to account login match.
+     */
+    private Optional<String> resolveWorkspaceSlugForRepository(Repository repository) {
+        if (repository == null || repository.getNameWithOwner() == null) {
+            return Optional.empty();
+        }
+        String nameWithOwner = repository.getNameWithOwner();
+        var monitor = repositoryToMonitorRepository.findByNameWithOwner(nameWithOwner);
+        if (monitor.isPresent()) {
+            Workspace workspace = monitor.get().getWorkspace();
+            return workspace != null ? Optional.ofNullable(workspace.getWorkspaceSlug()) : Optional.empty();
+        }
+        String owner = nameWithOwner.contains("/") ? nameWithOwner.substring(0, nameWithOwner.indexOf("/")) : null;
+        if (owner != null) {
+            return workspaceRepository.findByAccountLoginIgnoreCase(owner).map(Workspace::getWorkspaceSlug);
+        }
+        return Optional.empty();
     }
 
     @Scheduled(cron = "0 0 */12 * * *")

@@ -8,6 +8,7 @@ import {
 } from "@primer/octicons-react";
 import { AwardIcon } from "lucide-react";
 import type { LeaderboardEntry, UserInfo } from "@/api/types.gen";
+import type { LeaderboardVariant } from "@/components/leaderboard/LeaderboardPage";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -27,18 +28,28 @@ import { cn } from "@/lib/utils";
 import { LeagueIcon } from "./LeagueIcon";
 import { ReviewsPopover } from "./ReviewsPopover";
 
+type TeamLeaderboardEntry = LeaderboardEntry & {
+	team: NonNullable<LeaderboardEntry["team"]>;
+};
+
 export interface LeaderboardTableProps {
-	leaderboard?: LeaderboardEntry[];
+	leaderboard?: LeaderboardEntry[] | TeamLeaderboardEntry[];
 	isLoading: boolean;
+	variant: LeaderboardVariant;
 	currentUser?: UserInfo;
 	onUserClick?: (username: string) => void;
+	onTeamClick?: (teamId: number) => void;
+	teamLabelsById?: Record<number, string>;
 }
 
 export function LeaderboardTable({
 	leaderboard = [],
 	isLoading,
+	variant,
 	currentUser,
 	onUserClick,
+	onTeamClick,
+	teamLabelsById,
 }: LeaderboardTableProps) {
 	if (isLoading) {
 		return <LeaderboardTableSkeleton />;
@@ -56,13 +67,19 @@ export function LeaderboardTable({
 		);
 	}
 
+	const isTeam = variant === "TEAM";
+
 	return (
 		<Table>
 			<TableHeader>
 				<TableRow>
 					<TableHead className="text-center w-10">Rank</TableHead>
-					<TableHead className="text-center w-20">League</TableHead>
-					<TableHead className="w-56">Contributor</TableHead>
+					{!isTeam && (
+						<TableHead className="text-center w-20">League</TableHead>
+					)}
+					<TableHead className="w-56">
+						{isTeam ? "Team" : "Contributor"}
+					</TableHead>
 					<TableHead className="text-center">
 						<div className="flex justify-center items-center gap-1 text-github-done-foreground">
 							<span className="flex items-center gap-0.5">
@@ -74,16 +91,115 @@ export function LeaderboardTable({
 				</TableRow>
 			</TableHeader>
 			<TableBody>
-				{leaderboard.map((entry) => {
+				{(leaderboard as LeaderboardEntry[]).map((entry) => {
+					if (isTeam) {
+						const team = (entry as TeamLeaderboardEntry).team;
+						if (!team) return null;
+						const displayName = teamLabelsById?.[team.id] ?? team.name;
+						return (
+							<TableRow
+								key={team.id}
+								id={`team-${team.id}`}
+								className="cursor-pointer"
+								onClick={() => onTeamClick?.(team.id)}
+							>
+								<TableCell className="text-center">{entry.rank}</TableCell>
+								<TableCell>
+									<div className="flex items-center gap-2 font-medium">
+										<Avatar className="size-9">
+											<AvatarImage
+												src={`https://avatars.githubusercontent.com/t/${team.id}?s=512&v=4`}
+												alt={`${displayName}'s avatar`}
+											/>
+											<AvatarFallback>
+												{displayName.slice(0, 2).toUpperCase()}
+											</AvatarFallback>
+										</Avatar>
+										<span className="text-muted-foreground text-wrap">
+											{displayName}
+										</span>
+									</div>
+								</TableCell>
+								<TableCell className="text-center font-medium">
+									{entry.score}
+								</TableCell>
+								<TableCell>
+									<div className="flex items-center gap-2">
+										{entry.numberOfReviewedPRs > 0 && (
+											<>
+												<ReviewsPopover
+													reviewedPRs={entry.reviewedPullRequests}
+												/>
+												<div className="flex items-center text-github-muted-foreground">
+													<ChevronLeftIcon className="h-4 w-4" />
+												</div>
+											</>
+										)}
+										{entry.numberOfChangeRequests > 0 && (
+											<Tooltip>
+												<TooltipTrigger asChild>
+													<div className="flex items-center gap-1 text-github-danger-foreground">
+														<FileDiffIcon className="h-4 w-4" />
+														<span>{entry.numberOfChangeRequests}</span>
+													</div>
+												</TooltipTrigger>
+												<TooltipContent>Changes Requested</TooltipContent>
+											</Tooltip>
+										)}
+										{entry.numberOfApprovals > 0 && (
+											<Tooltip>
+												<TooltipTrigger asChild>
+													<div className="flex items-center gap-1 text-github-success-foreground">
+														<CheckIcon className="h-4 w-4" />
+														<span>{entry.numberOfApprovals}</span>
+													</div>
+												</TooltipTrigger>
+												<TooltipContent>Approvals</TooltipContent>
+											</Tooltip>
+										)}
+										{entry.numberOfComments + entry.numberOfUnknowns > 0 && (
+											<Tooltip>
+												<TooltipTrigger asChild>
+													<div className="flex items-center gap-1 text-github-muted-foreground">
+														<CommentIcon className="h-4 w-4" />
+														<span>
+															{entry.numberOfComments + entry.numberOfUnknowns}
+														</span>
+													</div>
+												</TooltipTrigger>
+												<TooltipContent>Comments</TooltipContent>
+											</Tooltip>
+										)}
+										{entry.numberOfCodeComments > 0 && (
+											<Tooltip>
+												<TooltipTrigger asChild>
+													<div className="flex items-center gap-1 text-github-muted-foreground">
+														<CommentDiscussionIcon className="h-4 w-4" />
+														<span>{entry.numberOfCodeComments}</span>
+													</div>
+												</TooltipTrigger>
+												<TooltipContent>Code comments</TooltipContent>
+											</Tooltip>
+										)}
+									</div>
+								</TableCell>
+							</TableRow>
+						);
+					}
+
+					const user = entry.user;
+					if (!user) {
+						return null;
+					}
+
 					const currentUserLogin = currentUser?.login
 						? currentUser.login.toLowerCase()
 						: undefined;
-					const isCurrentUser =
-						currentUserLogin === entry.user.login.toLowerCase();
+					const isCurrentUser = currentUserLogin === user.login.toLowerCase();
 
 					return (
 						<TableRow
-							key={entry.user.login}
+							key={user.login}
 							id={`rank-${entry.rank}`}
 							className={cn(
 								"cursor-pointer",
@@ -91,31 +207,28 @@ export function LeaderboardTable({
 									"bg-accent dark:bg-accent/30 dark:hover:bg-accent/50",
 							)}
 							onClick={() => {
-								onUserClick?.(entry.user.login);
+								onUserClick?.(user.login);
 							}}
 						>
 							<TableCell className="text-center">{entry.rank}</TableCell>
 							<TableCell className="px-0">
 								<div className="flex flex-col justify-center items-center">
-									<LeagueIcon
-										leaguePoints={entry.user.leaguePoints}
-										showPoints
-									/>
+									<LeagueIcon leaguePoints={user.leaguePoints} showPoints />
 								</div>
 							</TableCell>
 							<TableCell>
 								<div className="flex items-center gap-2 font-medium">
 									<Avatar className="size-9">
 										<AvatarImage
-											src={entry.user.avatarUrl}
-											alt={`${entry.user.name}'s avatar`}
+											src={user.avatarUrl}
+											alt={`${user.name}'s avatar`}
 										/>
 										<AvatarFallback>
-											{entry.user.name.slice(0, 2).toUpperCase()}
+											{user.name.slice(0, 2).toUpperCase()}
 										</AvatarFallback>
 									</Avatar>
 									<span className="text-muted-foreground text-wrap">
-										{entry.user.name}
+										{user.name}
 									</span>
 								</div>
 							</TableCell>
@@ -205,7 +318,6 @@ function LeaderboardTableSkeleton() {
 			</TableHeader>
 			<TableBody>
 				{Array.from({ length: 10 }).map((_, idx) => (
-					// biome-ignore lint/suspicious/noArrayIndexKey: Data is static and not user-generated
 					<TableRow key={`skeleton-${idx}`}>
 						<TableCell>
 							<Skeleton

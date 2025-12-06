@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { getContributorsOptions } from "@/api/@tanstack/react-query.gen";
+import { listGlobalContributorsOptions } from "@/api/@tanstack/react-query.gen";
 import { AboutPage } from "@/components/info/about/AboutPage";
 import type { ProjectManager } from "@/components/info/about/ProjectManagerCard";
 
@@ -26,7 +26,7 @@ function AboutContainer() {
 		isPending,
 		isError,
 	} = useQuery({
-		...getContributorsOptions({}),
+		...listGlobalContributorsOptions(),
 		gcTime: Number.POSITIVE_INFINITY,
 	});
 

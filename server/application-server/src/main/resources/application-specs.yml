@@ -1,8 +1,34 @@
 nats:
     enabled: false
 
+spring:
+    datasource:
+        url: jdbc:h2:mem:hephaestus-specs;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;DATABASE_TO_LOWER=TRUE
+        username: sa
+        password: ""
+        driver-class-name: org.h2.Driver
+    jpa:
+        hibernate:
+            ddl-auto: none
+        properties:
+            hibernate:
+                dialect: org.hibernate.dialect.H2Dialect
+    liquibase:
+        enabled: false
+    docker:
+        compose:
+            enabled: ${SPRING_DOCKER_COMPOSE_ENABLED:false}
+
 monitoring:
     run-on-startup: false
 
 github:
+    app:
+        id: 0
+        privateKey: ""
+        privateKeyLocation: ""
     auth-token: ""
+
+hephaestus:
+    workspace:
+        init-default: false

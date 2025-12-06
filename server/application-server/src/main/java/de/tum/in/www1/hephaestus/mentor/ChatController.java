@@ -6,6 +6,10 @@ import de.tum.in.www1.hephaestus.intelligenceservice.model.ChatRequest;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.StreamErrorPart;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.StreamFinishPart;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.UIMessage;
+import de.tum.in.www1.hephaestus.workspace.Workspace;
+import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContext;
+import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContextResolver;
+import de.tum.in.www1.hephaestus.workspace.context.WorkspaceScopedController;
 import io.swagger.v3.oas.annotations.Hidden;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -16,9 +20,9 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -30,28 +34,23 @@ import reactor.core.publisher.Flux;
  * REST controller for the chat functionality.
  * Handles streaming chat responses, message persistence, and thread management.
  */
-@RestController
+@WorkspaceScopedController
 @RequestMapping("/mentor")
+@RequiredArgsConstructor
 public class ChatController {
 
     private static final Logger logger = LoggerFactory.getLogger(ChatController.class);
 
-    @Autowired
-    private UserRepository userRepository;
-
-    @Autowired
-    private IntelligenceServiceWebClient intelligenceServiceWebClient;
-
-    @Autowired
-    private ChatPersistenceService chatPersistenceService;
-
-    @Autowired
-    private ChatThreadService chatThreadService;
+    private final UserRepository userRepository;
+    private final IntelligenceServiceWebClient intelligenceServiceWebClient;
+    private final ChatPersistenceService chatPersistenceService;
+    private final ChatThreadService chatThreadService;
+    private final WorkspaceContextResolver workspaceResolver;
 
     @Hidden
     @PostMapping(value = "/chat", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public Flux<String> chat(@RequestBody ChatRequestDTO chatRequest) {
-        logger.info("Processing chat request");
+    public Flux<String> chat(WorkspaceContext workspaceContext, @RequestBody ChatRequestDTO chatRequest) {
+        logger.info("Processing chat request in workspace {}", workspaceContext.slug());
 
         // Validate message size and content
         try {
@@ -87,6 +86,7 @@ public class ChatController {
         logger.debug("Forwarding chat request to intelligence service for user: {}", userOptional.get().getLogin());
 
         var user = userOptional.get();
+        Workspace workspace = workspaceResolver.requireWorkspace(workspaceContext);
 
         // Build full context for the intelligence service from the thread ID BEFORE persisting the new message
         // We only receive the latest user message from the client now; reconstruct the prior path here
@@ -94,13 +94,21 @@ public class ChatController {
         boolean isValidThreadId = true;
         try {
             UUID threadUuid = UUID.fromString(chatRequest.id());
-            Optional<ChatThreadDetailDTO> threadDetail = chatThreadService.getThreadDetailForUser(threadUuid, user);
+            Optional<ChatThreadDetailDTO> threadDetail = chatThreadService.getThreadDetailForUser(
+                threadUuid,
+                user,
+                workspace
+            );
 
             if (threadDetail.isPresent() && threadDetail.get().getMessages() != null) {
                 // If editing (previousMessageId provided), build path up to that message; if null, start from scratch
                 if (chatRequest.previousMessageId() != null) {
                     fullMessages = new ArrayList<>(
-                        chatThreadService.getConversationPathForMessage(chatRequest.previousMessageId(), user)
+                        chatThreadService.getConversationPathForMessage(
+                            chatRequest.previousMessageId(),
+                            user,
+                            workspace
+                        )
                     );
                 } else {
                     fullMessages = new ArrayList<>();
@@ -129,7 +137,11 @@ public class ChatController {
             logger.debug("Generated new thread ID {} for invalid request id '{}'", newId, chatRequest.id());
         }
 
-        StreamPartProcessor processor = chatPersistenceService.createProcessorForRequest(user, effectiveRequest);
+        StreamPartProcessor processor = chatPersistenceService.createProcessorForRequest(
+            user,
+            effectiveRequest,
+            workspace
+        );
 
         ChatRequest intelligenceRequest = new ChatRequest();
         // Forward full message history as-is (including tool parts) to the intelligence service
@@ -199,8 +211,8 @@ public class ChatController {
         }
     )
     @GetMapping("/threads")
-    public ResponseEntity<List<ChatThreadSummaryDTO>> getThreads() {
-        logger.debug("Getting threads for authenticated user");
+    public ResponseEntity<List<ChatThreadSummaryDTO>> getThreads(WorkspaceContext workspaceContext) {
+        logger.debug("Getting threads for authenticated user in workspace {}", workspaceContext.slug());
 
         var currentUserLogin = SecurityUtils.getCurrentUserLoginOrThrow();
         var userOptional = userRepository.findByLogin(currentUserLogin);
@@ -211,7 +223,8 @@ public class ChatController {
         }
 
         var user = userOptional.get();
-        List<ChatThreadSummaryDTO> threads = chatThreadService.getThreadSummariesForUser(user);
+        Workspace workspace = workspaceResolver.requireWorkspace(workspaceContext);
+        List<ChatThreadSummaryDTO> threads = chatThreadService.getThreadSummariesForUser(user, workspace);
 
         logger.debug("Retrieved {} threads for user: {}", threads.size(), user.getLogin());
         return ResponseEntity.ok(threads);
@@ -234,8 +247,8 @@ public class ChatController {
         }
     )
     @GetMapping("/threads/grouped")
-    public ResponseEntity<List<ChatThreadGroupDTO>> getGroupedThreads() {
-        logger.debug("Getting grouped threads for authenticated user");
+    public ResponseEntity<List<ChatThreadGroupDTO>> getGroupedThreads(WorkspaceContext workspaceContext) {
+        logger.debug("Getting grouped threads for authenticated user in workspace {}", workspaceContext.slug());
 
         var currentUserLogin = SecurityUtils.getCurrentUserLoginOrThrow();
         var userOptional = userRepository.findByLogin(currentUserLogin);
@@ -246,7 +259,8 @@ public class ChatController {
         }
 
         var user = userOptional.get();
-        List<ChatThreadGroupDTO> threadGroups = chatThreadService.getGroupedThreadSummariesForUser(user);
+        Workspace workspace = workspaceResolver.requireWorkspace(workspaceContext);
+        List<ChatThreadGroupDTO> threadGroups = chatThreadService.getGroupedThreadSummariesForUser(user, workspace);
 
         logger.debug("Retrieved {} thread groups for user: {}", threadGroups.size(), user.getLogin());
         return ResponseEntity.ok(threadGroups);
@@ -269,9 +283,10 @@ public class ChatController {
     )
     @GetMapping("/thread/{threadId}")
     public ResponseEntity<ChatThreadDetailDTO> getThread(
+        WorkspaceContext workspaceContext,
         @Parameter(description = "Thread ID", required = true) @PathVariable UUID threadId
     ) {
-        logger.debug("Getting thread detail for threadId: {}", threadId);
+        logger.debug("Getting thread detail for threadId: {} in workspace {}", threadId, workspaceContext.slug());
 
         var currentUserLogin = SecurityUtils.getCurrentUserLoginOrThrow();
         var userOptional = userRepository.findByLogin(currentUserLogin);
@@ -282,7 +297,12 @@ public class ChatController {
         }
 
         var user = userOptional.get();
-        Optional<ChatThreadDetailDTO> threadDetail = chatThreadService.getThreadDetailForUser(threadId, user);
+        Workspace workspace = workspaceResolver.requireWorkspace(workspaceContext);
+        Optional<ChatThreadDetailDTO> threadDetail = chatThreadService.getThreadDetailForUser(
+            threadId,
+            user,
+            workspace
+        );
 
         if (threadDetail.isEmpty()) {
             logger.warn("Thread {} not found or not owned by user: {}", threadId, user.getLogin());

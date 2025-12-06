@@ -5,11 +5,15 @@ import {
 	Link,
 	Outlet,
 	useLocation,
+	useNavigate,
 	useRouter,
 } from "@tanstack/react-router";
 import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
 import { Toaster } from "sonner";
-import { getGroupedThreadsOptions } from "@/api/@tanstack/react-query.gen";
+import {
+	getGroupedThreadsOptions,
+	getUserSettingsOptions,
+} from "@/api/@tanstack/react-query.gen";
 import Footer from "@/components/core/Footer";
 import Header from "@/components/core/Header";
 import {
@@ -20,17 +24,26 @@ import { ArtifactOverlayContainer } from "@/components/mentor/ArtifactOverlayCon
 import { Chat } from "@/components/mentor/Chat";
 import { Copilot } from "@/components/mentor/Copilot";
 import { defaultPartRenderers } from "@/components/mentor/renderers";
+import { PostHogSurveyWidget } from "@/components/surveys/posthog-survey-widget";
 import {
 	SidebarInset,
 	SidebarProvider,
 	SidebarTrigger,
 } from "@/components/ui/sidebar";
 import environment from "@/environment";
+import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
+import { useWorkspaceAccess } from "@/hooks/use-workspace-access";
 import { useMentorChat } from "@/hooks/useMentorChat";
 import { type AuthContextType, useAuth } from "@/integrations/auth/AuthContext";
+import {
+	isPosthogEnabled,
+	sanitizeBoolean,
+} from "@/integrations/posthog/config";
 import { useTheme } from "@/integrations/theme";
 import type { ChatMessage } from "@/lib/types";
 import TanstackQueryLayout from "../integrations/tanstack-query/layout";
+
+const enableTanstackDevtools = sanitizeBoolean(environment.devtools?.tanstack);
 
 interface MyRouterContext {
 	queryClient: QueryClient;
@@ -42,7 +55,17 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 		const { theme } = useTheme();
 		const { pathname } = useLocation();
 		const { isAuthenticated, hasRole, isLoading } = useAuth();
-		const isMentorRoute = pathname.startsWith("/mentor");
+		const { data: userSettings, isError: userSettingsError } = useQuery({
+			...getUserSettingsOptions({}),
+			enabled: isAuthenticated && isPosthogEnabled,
+			retry: 1,
+		});
+		const allowSurveys =
+			isPosthogEnabled &&
+			!userSettingsError &&
+			(userSettings?.participateInResearch ?? true);
+		const isMentorRoute =
+			pathname === "/mentor" || /^\/w\/[^/]+\/mentor/.test(pathname);
 
 		// Exclude routes where Copilot should not appear
 		const isExcludedRoute =
@@ -78,10 +101,17 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 					</SidebarInset>
 				</SidebarProvider>
 				<Toaster theme={theme} />
-				<TanStackRouterDevtools />
-				<TanstackQueryLayout />
+				{enableTanstackDevtools ? (
+					<>
+						<TanStackRouterDevtools position="bottom-right" />
+						<TanstackQueryLayout />
+					</>
+				) : null}
 
 				{showCopilot && <GlobalCopilot />}
+				{!isLoading && isAuthenticated && allowSurveys && (
+					<PostHogSurveyWidget />
+				)}
 			</>
 		);
 	},
@@ -110,6 +140,7 @@ function GlobalCopilot() {
 
 	const router = useRouter();
 	const { isAuthenticated, hasRole, isLoading } = useAuth();
+	const { workspaceSlug } = useActiveWorkspaceSlug();
 
 	const handleMessageSubmit = ({ text }: { text: string }) => {
 		if (!text.trim()) return;
@@ -149,8 +180,11 @@ function GlobalCopilot() {
 			}}
 			onOpenFullChat={() => {
 				const threadId = mentorChat.currentThreadId || mentorChat.id;
-				if (threadId) {
-					router.navigate({ to: "/mentor/$threadId", params: { threadId } });
+				if (threadId && workspaceSlug) {
+					router.navigate({
+						to: "/w/$workspaceSlug/mentor/$threadId",
+						params: { threadId, workspaceSlug },
+					});
 				}
 			}}
 		>
@@ -196,6 +230,7 @@ function HeaderContainer() {
 	const { pathname } = useLocation();
 	const { isAuthenticated, isLoading, username, userProfile, login, logout } =
 		useAuth();
+
 	return (
 		<Header
 			sidebarTrigger={
@@ -217,10 +252,19 @@ function HeaderContainer() {
 function AppSidebarContainer() {
 	const { pathname } = useLocation();
 	const { isAuthenticated, username, hasRole } = useAuth();
+	const navigate = useNavigate();
+	const workspaceAccess = useWorkspaceAccess();
+	const { workspaceSlug, workspaces, selectWorkspace } = workspaceAccess;
+	const hasWorkspace = Boolean(workspaceSlug);
+	const workspaceList = Array.isArray(workspaces) ? workspaces : [];
+	const activeWorkspace = workspaceList.find(
+		(ws) => ws.workspaceSlug === workspaceSlug,
+	);
 
-	const sidebarContext: SidebarContext = pathname.startsWith("/mentor")
-		? "mentor"
-		: "main";
+	const sidebarContext: SidebarContext =
+		pathname === "/mentor" || /^\/w\/[^/]+\/mentor/.test(pathname)
+			? "mentor"
+			: "main";
 
 	// Always call useQuery but only enable when in mentor context and authenticated
 	const {
@@ -228,20 +272,42 @@ function AppSidebarContainer() {
 		isLoading: mentorThreadsLoading,
 		error: mentorThreadsError,
 	} = useQuery({
-		...getGroupedThreadsOptions(),
-		enabled: sidebarContext === "mentor" && isAuthenticated,
+		...getGroupedThreadsOptions({
+			path: { workspaceSlug: workspaceSlug ?? "" },
+		}),
+		enabled: sidebarContext === "mentor" && isAuthenticated && hasWorkspace,
 	});
 
 	if (pathname === "/landing" || !isAuthenticated || username === undefined) {
 		return null;
 	}
 
+	const handleWorkspaceChange = (ws: typeof activeWorkspace) => {
+		if (!ws) return;
+		selectWorkspace(ws.workspaceSlug);
+		const remainder = pathname.replace(/^\/w\/[^/]+/, "");
+		const target = `/w/${ws.workspaceSlug}${remainder || "/"}`;
+		navigate({ to: target as never, replace: true });
+	};
+
+	const handleAddWorkspace = () => {
+		// TODO: Replace with actual GitHub App installation URL or a proper dialog
+		alert(
+			"To create a workspace, please install the Hephaestus GitHub App on your repository. Contact your administrator for the installation URL.",
+		);
+	};
+
 	return (
 		<AppSidebar
 			username={username}
-			isAdmin={hasRole("admin")}
+			isAdmin={workspaceAccess.isAdmin}
 			hasMentorAccess={hasRole("mentor_access")}
 			context={sidebarContext}
+			workspaces={workspaceList}
+			activeWorkspace={activeWorkspace}
+			onWorkspaceChange={handleWorkspaceChange}
+			onAddWorkspace={handleAddWorkspace}
+			workspacesLoading={workspaceAccess.isLoading}
 			mentorThreadGroups={
 				sidebarContext === "mentor" ? threadGroups : undefined
 			}

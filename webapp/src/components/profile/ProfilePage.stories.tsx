@@ -49,6 +49,10 @@ const meta = {
 				type: { summary: "object" },
 			},
 		},
+		workspaceSlug: {
+			description: "Active workspace slug for routing",
+			control: "text",
+		},
 	},
 	tags: ["autodocs"],
 } satisfies Meta<typeof ProfilePage>;
@@ -65,6 +69,7 @@ export const Default: Story = {
 		error: false,
 		username: "johndoe",
 		currUserIsDashboardUser: true,
+		workspaceSlug: "aet",
 		profileData: {
 			userInfo: {
 				id: 1,
@@ -82,6 +87,7 @@ export const Default: Story = {
 					nameWithOwner: "ls1intum/Hephaestus",
 					description: "A GitHub contribution tracking tool",
 					htmlUrl: "https://github.com/ls1intum/Hephaestus",
+					hiddenFromContributions: false,
 				},
 				{
 					id: 2,
@@ -89,6 +95,7 @@ export const Default: Story = {
 					nameWithOwner: "ls1intum/Artemis",
 					description: "Interactive learning platform",
 					htmlUrl: "https://github.com/ls1intum/Artemis",
+					hiddenFromContributions: false,
 				},
 			],
 			reviewActivity: [
@@ -110,6 +117,7 @@ export const Default: Story = {
 							name: "Hephaestus",
 							nameWithOwner: "ls1intum/Hephaestus",
 							htmlUrl: "https://github.com/ls1intum/Hephaestus",
+							hiddenFromContributions: false,
 						},
 					},
 					score: 5,
@@ -134,6 +142,7 @@ export const Default: Story = {
 							name: "Artemis",
 							nameWithOwner: "ls1intum/Artemis",
 							htmlUrl: "https://github.com/ls1intum/Artemis",
+							hiddenFromContributions: false,
 						},
 					},
 					score: 3,
@@ -158,6 +167,7 @@ export const Default: Story = {
 							name: "Athena",
 							nameWithOwner: "ls1intum/Athena",
 							htmlUrl: "https://github.com/ls1intum/Athena",
+							hiddenFromContributions: false,
 						},
 					},
 					score: 1,
@@ -183,6 +193,7 @@ export const Default: Story = {
 						name: "Hephaestus",
 						nameWithOwner: "ls1intum/Hephaestus",
 						htmlUrl: "https://github.com/ls1intum/Hephaestus",
+						hiddenFromContributions: false,
 					},
 					labels: [
 						{ id: 1, name: "enhancement", color: "0E8A16" },
@@ -206,6 +217,7 @@ export const Default: Story = {
 						name: "Artemis",
 						nameWithOwner: "ls1intum/Artemis",
 						htmlUrl: "https://github.com/ls1intum/Artemis",
+						hiddenFromContributions: false,
 					},
 					labels: [
 						{ id: 3, name: "refactoring", color: "D93F0B" },
@@ -227,6 +239,7 @@ export const Loading: Story = {
 		username: "johndoe",
 		profileData: undefined,
 		currUserIsDashboardUser: true,
+		workspaceSlug: "aet",
 	},
 };
 
@@ -240,6 +253,7 @@ export const ErrorState: Story = {
 		username: "johndoe",
 		profileData: undefined,
 		currUserIsDashboardUser: true,
+		workspaceSlug: "aet",
 	},
 };
 
@@ -252,6 +266,7 @@ export const Empty: Story = {
 		error: false,
 		username: "emptydoe",
 		currUserIsDashboardUser: true,
+		workspaceSlug: "aet",
 		profileData: {
 			userInfo: {
 				id: 3,

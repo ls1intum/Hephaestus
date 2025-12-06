@@ -3,6 +3,7 @@ import type { LeaderboardEntry, PullRequestInfo } from "@/api/types.gen";
 import aliceAvatar from "@/assets/alice_developer.jpg";
 import bobAvatar from "@/assets/bob_builder.jpg";
 import charlieAvatar from "@/assets/charlie_coder.jpg";
+import { GitHubSignInButton } from "@/components/auth/GitHubSignInButton";
 import { LeaderboardTable } from "@/components/leaderboard/LeaderboardTable";
 import { MentorIcon } from "@/components/mentor/MentorIcon";
 import { Button } from "@/components/ui/button";
@@ -29,6 +30,7 @@ function createMockReviewedPullRequest(amount: number) {
 					name: "example/repo",
 					nameWithOwner: "example/repo",
 					htmlUrl: "https://example.com/repo",
+					hiddenFromContributions: false,
 				},
 			}) satisfies PullRequestInfo,
 	);
@@ -97,12 +99,14 @@ const SAMPLE_LEADERBOARD_ENTRIES: LeaderboardEntry[] = [
 
 interface LandingHeroSectionProps {
 	onSignIn: () => void;
+	onGoToDashboard?: () => void;
 	isSignedIn: boolean;
 	onLearnMoreClick: () => void;
 }
 
 export function LandingHeroSection({
 	onSignIn,
+	onGoToDashboard,
 	isSignedIn,
 	onLearnMoreClick,
 }: LandingHeroSectionProps) {
@@ -120,11 +124,18 @@ export function LandingHeroSection({
 							rituals.
 						</p>
 					</div>
-					<div className="flex gap-4 sm:gap-6">
-						<Button onClick={onSignIn} size="lg" className="gap-2">
-							{isSignedIn ? "Go to Dashboard" : "Get Started"}{" "}
-							<ArrowRight className="h-4 w-4" />
-						</Button>
+					<div className="flex flex-col items-center gap-4 sm:flex-row sm:gap-6">
+						{isSignedIn ? (
+							<Button onClick={onGoToDashboard} size="lg" className="gap-2">
+								Go to Dashboard <ArrowRight className="h-4 w-4" />
+							</Button>
+						) : (
+							<GitHubSignInButton
+								onClick={onSignIn}
+								size="lg"
+								className="w-full justify-center sm:w-auto"
+							/>
+						)}
 						<Button
 							variant="outline"
 							size="lg"
@@ -158,6 +169,7 @@ export function LandingHeroSection({
 						<LeaderboardTable
 							leaderboard={SAMPLE_LEADERBOARD_ENTRIES}
 							isLoading={false}
+							variant="INDIVIDUAL"
 						/>
 					</div>
 				</div>

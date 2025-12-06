@@ -18,6 +18,7 @@ on:
         default: false
         type: boolean
         description: (Re-)deploys the proxy components. Usually not necessary and might cause downtime.
+
   workflow_call:
     inputs:
       image-tag:

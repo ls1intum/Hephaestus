@@ -10,8 +10,8 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="allow")
 
     # Model to use prefixed by provider, i.e. "openai:gpt-4o"
-    MODEL_NAME: str = ""
-    DETECTION_MODEL_NAME: str = ""
+    MODEL_NAME: str = "fake:model"
+    DETECTION_MODEL_NAME: str = "fake:model"
 
     # Non-Azure OpenAI
     OPENAI_API_KEY: str = ""

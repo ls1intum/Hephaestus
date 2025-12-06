@@ -8,6 +8,7 @@ import java.util.stream.Stream;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.convert.converter.Converter;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AbstractAuthenticationToken;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -74,7 +75,12 @@ public class SecurityConfig {
             .cors(cors -> cors.configurationSource(corsConfigurationSource()));
 
         http.authorizeHttpRequests(requests -> {
-            requests.requestMatchers("/workspace/**").hasAuthority("admin");
+            // Public read for slugged workspace paths (filter enforces membership/public visibility).
+            requests.requestMatchers(HttpMethod.GET, "/workspaces/*/**").permitAll();
+            // Registry/listing stays authenticated to avoid leaking tenant directory.
+            requests.requestMatchers(HttpMethod.GET, "/workspaces", "/workspaces/").authenticated();
+            // Non-GET workspace operations still require authentication.
+            requests.requestMatchers("/workspaces/**").authenticated();
             requests.requestMatchers("/mentor/**").hasAuthority("mentor_access");
             requests.anyRequest().permitAll();
         });

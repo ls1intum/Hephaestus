@@ -1,4 +1,4 @@
-export default {
+const environment = {
 	version: "DEV",
 	clientUrl: "http://localhost:4200",
 	serverUrl: "http://localhost:8080",
@@ -10,9 +10,9 @@ export default {
 		url: "http://localhost:8081",
 		realm: "hephaestus",
 		clientId: "hephaestus",
-		skipLoginPage: true, // If true, it will directly use github IDP for login
 	},
 	posthog: {
+		enabled: false,
 		projectApiKey: "",
 		apiHost: "",
 	},
@@ -20,4 +20,9 @@ export default {
 		imprintHtml: "<p>This is the imprint.</p>",
 		privacyHtml: "<p>This is the privacy policy.</p>",
 	},
+	devtools: {
+		tanstack: true,
+	},
 };
+
+export default environment;

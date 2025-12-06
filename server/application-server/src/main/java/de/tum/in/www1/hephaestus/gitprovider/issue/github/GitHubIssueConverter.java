@@ -4,6 +4,7 @@ import de.tum.in.www1.hephaestus.gitprovider.common.BaseGitServiceEntityConverte
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import org.kohsuke.github.GHIssue;
 import org.kohsuke.github.GHIssueState;
+import org.kohsuke.github.GHIssueStateReason;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
 
@@ -20,13 +21,14 @@ public class GitHubIssueConverter extends BaseGitServiceEntityConverter<GHIssue,
         convertBaseFields(source, issue);
         issue.setNumber(source.getNumber());
         issue.setState(convertState(source.getState()));
-        issue.setTitle(source.getTitle());
-        issue.setBody(source.getBody());
+        issue.setTitle(sanitizeForPostgres(source.getTitle()));
+        issue.setBody(sanitizeForPostgres(source.getBody()));
         issue.setHtmlUrl(source.getHtmlUrl().toString());
         issue.setLocked(source.isLocked());
         issue.setClosedAt(source.getClosedAt());
-        issue.setCommentsCount(issue.getCommentsCount());
+        issue.setCommentsCount(source.getCommentsCount());
         issue.setHasPullRequest(source.getPullRequest() != null);
+        issue.setStateReason(convertStateReason(source.getStateReason()));
         return issue;
     }
 
@@ -39,5 +41,18 @@ public class GitHubIssueConverter extends BaseGitServiceEntityConverter<GHIssue,
             default:
                 return Issue.State.CLOSED;
         }
+    }
+
+    Issue.StateReason convertStateReason(GHIssueStateReason stateReason) {
+        if (stateReason == null) {
+            return null;
+        }
+
+        return switch (stateReason) {
+            case COMPLETED -> Issue.StateReason.COMPLETED;
+            case NOT_PLANNED -> Issue.StateReason.NOT_PLANNED;
+            case REOPENED -> Issue.StateReason.REOPENED;
+            case UNKNOWN -> Issue.StateReason.UNKNOWN;
+        };
     }
 }

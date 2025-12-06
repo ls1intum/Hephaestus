@@ -1,0 +1,227 @@
+---
+id: local-development
+sidebar_position: 2
+title: Local Development
+description: Prepare your workstation and run each Hephaestus service locally.
+---
+
+Hephaestus supports full-stack development across Java, TypeScript, and Python. This guide focuses on the development environment; production operations are covered in the [Admin Guide](/admin/production-setup).
+
+## Prerequisites
+
+Install and configure the following tools before you attempt a local build:
+
+1. **Java JDK 21** – Required for the Spring Boot application server.
+2. **Docker Desktop** – Used for PostgreSQL, Keycloak, and NATS containers.
+3. **Node.js LTS (>= 22.10)** and **npm (>= 10.8)** – For the React client.
+4. **Python (>= 3.13)** and **Poetry (>= 2.0)** – For the FastAPI intelligence service.
+5. **NATS CLI (optional)** – Helpful when debugging webhook messages.
+
+## Recommended IDE setup
+
+Open the repository using the `project.code-workspace` file in VS Code and install the workspace recommendations (`@recommended` in the Extensions view). Key extensions include:
+
+- Java Extension Pack
+- Spring Boot tools
+- Python and Poetry support
+- ESLint + Prettier
+- Tailwind CSS IntelliSense
+
+JetBrains alternatives such as IntelliJ (Java), WebStorm (React), and PyCharm (Python) work equally well.
+
+## Application server
+
+### Maven profiles and local configuration
+
+We ship three Maven profiles: `local` (default), `prod`, and `spec`. For development stick to the `local` profile.
+
+Create `application-server/src/main/resources/application-local.yml` to override defaults. This file is gitignored.
+
+:::caution Keep it local
+Never commit `application-local.yml`. It may contain secrets and machine-specific configuration.
+:::
+
+### Running the server
+
+1. Start Docker Desktop.
+2. From `server/application-server`, run:
+
+   ```bash
+   ./mvnw spring-boot:run
+   ```
+
+3. Access the API at `http://localhost:8080` or explore `http://localhost:8080/swagger-ui/index.html`.
+
+### GitHub configuration
+
+Hephaestus supports two GitHub authentication modes. Pick the one that fits your workflow:
+
+| Mode | Best for | Workspace creation | Repository monitors |
+|------|----------|-------------------|---------------------|
+| **PAT** | Quick local development | Manual (from config) | Manual (you list them) |
+| **GitHub App** | Testing webhooks, production | Automatic (from installations) | Automatic (from installation events) |
+
+#### Option A: Personal Access Token (simpler)
+
+1. [Create a Personal Access Token](https://github.com/settings/tokens) with scopes: `repo`, `read:org`, `read:user`.
+
+2. Create `application-local.yml`:
+
+   ```yaml
+   hephaestus:
+     workspace:
+       init-default: true
+       default:
+         login: your-github-org      # e.g., "ls1intum" or "HephaestusTest"
+         token: ghp_your_token
+         repositories-to-monitor:
+           - your-github-org/repo1
+           - your-github-org/repo2
+   ```
+
+3. Leave `github.app.id` unset or set to `0`.
+
+#### Option B: GitHub App
+
+1. [Create a GitHub App](https://docs.github.com/en/apps/creating-github-apps) with appropriate permissions.
+
+2. Create `application-local.yml`:
+
+   ```yaml
+   github:
+     app:
+       id: 12345
+       privateKey: |
+         -----BEGIN RSA PRIVATE KEY-----
+         ...
+         -----END RSA PRIVATE KEY-----
+
+   hephaestus:
+     workspace:
+       init-default: false   # Workspaces created from installations
+   ```
+
+3. Install the app on your organization. Workspaces and monitors are created automatically.
+
+### Limiting sync scope (development filters)
+
+When using GitHub App mode, your app might have access to hundreds of repositories. Use filters to focus on specific orgs/repos during development:
+
+```yaml
+monitoring:
+  filters:
+    allowed-organizations:
+      - ls1intum
+      - HephaestusTest
+    allowed-repositories:
+      - ls1intum/Hephaestus
+      - ls1intum/Artemis
+      - HephaestusTest/demo-repository
+```
+
+Empty lists = no filtering (production behavior). Non-empty = only sync matching items.
+
+:::tip
+Filters don't delete data—they just skip sync operations. Workspace and organization metadata is still created for all installations.
+:::
+
+### Keycloak integration
+
+Keycloak runs in Docker as part of the development compose stack. The bundled realm import no longer ships test users—authentication always flows through GitHub and mirrors production.
+
+#### Configure the GitHub identity provider
+
+1. [Create a new GitHub OAuth application](https://github.com/settings/developers) with the callback URL `http://localhost:8081/realms/hephaestus/broker/github/endpoint`.
+2. Export the generated **Client ID** and **Client secret**, then copy `server/application-server/.env.example` to `server/application-server/.env` and update the placeholders:
+
+   ```bash
+   cp server/application-server/.env.example server/application-server/.env
+   KEYCLOAK_GITHUB_CLIENT_ID=<github-client-id>
+   KEYCLOAK_GITHUB_CLIENT_SECRET=<github-client-secret>
+   KEYCLOAK_GITHUB_ADMIN_USERNAME=<github-handle-with-admin-access>
+   ```
+
+   The Keycloak container resolves these placeholders during realm import, as documented in the [Keycloak import guide](https://www.keycloak.org/server/importExport#_using_environment_variables_within_the_realm_configuration_files).
+3. (Re)start the local stack: `docker compose up keycloak postgres`. On first boot Keycloak imports `keycloak-hephaestus-realm-example-config.json` and wires the GitHub provider automatically.
+4. Sign in via GitHub using the account referenced by `KEYCLOAK_GITHUB_ADMIN_USERNAME`. During the first brokered login Keycloak automatically grants that account the `admin` realm role and the `realm-management` → `realm-admin` client role, unlocking the administrative views in the application server and Keycloak console.
+
+## Web client (`webapp`)
+
+1. Install dependencies:
+
+   ```bash
+   npm install
+   ```
+
+2. Start Vite on port 4200:
+
+   ```bash
+   npm run dev
+   ```
+
+3. Visit `http://localhost:4200`.
+
+### UI foundations
+
+- We ship Tailwind CSS 4 in JIT mode. Keep utility classes in JSX and rely on design tokens defined in `src/styles.css`.
+- Ensure Tailwind IntelliSense is enabled in your IDE—typeahead prevents typos and invalid compositions.
+- Avoid premature abstractions with `@apply`; duplication is fine when it keeps components readable.
+
+### Component workflow (Storybook + Chromatic)
+
+Storybook is the source of truth for presentational components.
+
+```bash
+npm run storybook           # Local playground on http://localhost:6006
+npm run build-storybook     # Static bundle for Chromatic
+npm run chromatic:ci        # Visual regression in CI
+```
+
+- Every new UI component ships with at least one story covering empty, loading, and error states.
+- Chromatic runs on every pull request—review visual diffs before merging.
+- Reference [ui.shadcn.com](https://ui.shadcn.com/) for composition patterns; stick to headless Radix primitives when you need new widgets.
+
+### OpenAPI client
+
+The generated client in `src/api` is the only way the webapp talks to backend services.
+
+```bash
+npm run openapi-ts
+```
+
+- Generated types drop the `Dto` suffix and mirror the Spring Boot API responses.
+- Pair every new endpoint with a typed TanStack Query hook for caching and invalidation.
+- Never hand-roll fetch calls—shared interceptors handle auth tokens and error telemetry.
+
+## Intelligence service (`server/intelligence-service`)
+
+1. Create and activate a virtual environment:
+
+   ```bash
+   python3 -m venv .venv
+   source .venv/bin/activate
+   ```
+
+2. Install dependencies with Poetry:
+
+   ```bash
+   poetry install
+   ```
+
+3. Start FastAPI:
+
+   ```bash
+   fastapi dev
+   ```
+
+   The service is available at [http://127.0.0.1:8000](http://127.0.0.1:8000) with interactive docs at `/docs`.
+
+### GenAI integrations
+
+Copy `.env.example` to `.env` and add credentials for the GenAI providers (e.g., Ollama, OpenAI) plus optional LangSmith/Langfuse instrumentation.
+
+### FastAPI fundamentals
+
+- Routes live in `app/routers`. Keep dependencies minimal and favour dependency injection for shared services.
+- LangGraph flows sit in `app/mentor`. Regenerate the shared state definitions whenever you introduce new slots.
+- Auto-generated SQLAlchemy models (`app/db/models_gen.py`) must not be edited manually—use `npm run db:generate-models:intelligence-service` after schema changes.

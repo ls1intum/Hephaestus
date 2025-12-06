@@ -38,6 +38,11 @@ const meta = {
 			control: "boolean",
 			description: "Whether leagues are currently being reset",
 		},
+		isAppInstallationWorkspace: {
+			control: "boolean",
+			description:
+				"Whether repository management is disabled (for GitHub App Installation workspaces)",
+		},
 		onAddRepository: {
 			description: "Function called when adding a repository",
 		},
@@ -60,6 +65,7 @@ const meta = {
 		isAddingRepository: false,
 		isRemovingRepository: false,
 		isResettingLeagues: false,
+		isAppInstallationWorkspace: false,
 		onAddRepository: fn(),
 		onRemoveRepository: fn(),
 		onResetLeagues: fn(),
@@ -109,5 +115,15 @@ export const AddingRepository: Story = {
 export const ResettingLeagues: Story = {
 	args: {
 		isResettingLeagues: true,
+	},
+};
+
+/**
+ * GitHub App Installation workspace with read-only repository management.
+ * Repository add/remove controls are hidden and an info message is shown.
+ */
+export const AppInstallationWorkspace: Story = {
+	args: {
+		isAppInstallationWorkspace: true,
 	},
 };

@@ -1,0 +1,90 @@
+---
+id: production-setup
+sidebar_position: 1
+title: Production Setup
+description: Checklist for deploying Hephaestus in a production environment.
+---
+
+This guide covers the minimum configuration required to deploy Hephaestus in production. It assumes you are familiar with Docker Compose or Kubernetes and have access to the protected secrets managed by TUM.
+
+## Platform overview
+
+The production stack consists of:
+
+- **Application server** (Spring Boot)
+- **Intelligence service** (FastAPI)
+- **Webhook ingest** (NATS consumers)
+- **React webapp** (served via nginx)
+- **PostgreSQL 16**
+- **Keycloak** (with GitHub as identity provider)
+- **Mail relay** (Postfix)
+
+## Environment variables
+
+Set the following secrets before starting the stack:
+
+| Variable | Purpose |
+| --- | --- |
+| `WEBHOOK_SECRET` | Shared secret for GitHub webhooks (`openssl rand -base64 32`) |
+| `KEYCLOAK_GITHUB_CLIENT_ID` | GitHub OAuth app client ID |
+| `KEYCLOAK_GITHUB_CLIENT_SECRET` | GitHub OAuth app client secret |
+| `KEYCLOAK_GITHUB_ADMIN_USERNAME` | GitHub username that should receive Keycloak admin rights |
+| `KC_BOOTSTRAP_ADMIN_USERNAME` | Keycloak bootstrap admin username |
+| `KC_BOOTSTRAP_ADMIN_PASSWORD` | Keycloak bootstrap admin password (`openssl rand -base64 32`) |
+| `KEYCLOAK_HEPHAESTUS_CONFIDENTIAL_CLIENT_SECRET` | Secret used by the app server to call Keycloak |
+| `POSTFIX_USERNAME` / `POSTFIX_PASSWORD` | Credentials for production SMTP relay |
+| `SLACK_WEBHOOK_URL` | Optional: webhook for weekly leaderboard posts |
+
+### GitHub integration
+
+Hephaestus can connect to GitHub using either a **Personal Access Token (PAT)** or a **GitHub App**:
+
+- **Personal Access Token**: Simpler to set up. Configure tokens through the workspace UI after deployment. No additional environment variables required.
+- **GitHub App** (optional): Provides more granular permissions and better rate limits. If using a GitHub App, set:
+  - `GH_APP_ID`: Your GitHub App ID
+  - `GH_APP_PRIVATE_KEY`: Your GitHub App private key (PEM format)
+  - `GH_APP_PRIVATE_KEY_LOCATION`: Alternative path to private key file (optional)
+
+The application works with either approach. If GitHub App credentials are not provided (defaults to `GH_APP_ID=0`), workspaces will use Personal Access Tokens instead.
+
+### Data sync and backfill
+
+The sync scheduler fetches recent GitHub activity (issues, PRs, reviews) for monitored repositories. Backfill optionally syncs historical data in batches to avoid rate limit exhaustion.
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `MONITORING_RUN_ON_STARTUP` | `true` | Run initial sync when application starts |
+| `MONITORING_TIMEFRAME` | `7` | Days of recent activity to sync each cycle |
+| `MONITORING_SYNC_CRON` | `0 0 * * * *` | Cron schedule for sync (hourly by default) |
+| `MONITORING_SYNC_COOLDOWN_IN_MINUTES` | `60` | Minimum gap between syncs per repository |
+| `MONITORING_BACKFILL_ENABLED` | `true` | Enable historical data backfill |
+| `MONITORING_BACKFILL_BATCH_SIZE` | `50` | Issues/PRs per backfill batch |
+| `MONITORING_BACKFILL_RATE_LIMIT_THRESHOLD` | `500` | Skip backfill if rate limit below this |
+| `MONITORING_BACKFILL_COOLDOWN_MINUTES` | `5` | Gap between backfill batches |
+
+**Backfill behavior:** After recent sync completes, backfill works backwards from the highest issue number, syncing in small batches. It pauses when rate limits drop below the threshold and resumes on the next cycle. Progress is checkpointed per repository.
+
+## Deployment steps
+
+1. **Provision infrastructure:** Ensure PostgreSQL, Redis (if used), and storage volumes are ready.
+2. **Configure Keycloak:**
+   - Import the `keycloak-hephaestus-realm-example-config.json` from the repository.
+   - Copy `server/application-server/.env.example` to `server/application-server/.env`, then populate `KEYCLOAK_GITHUB_CLIENT_ID`, `KEYCLOAK_GITHUB_CLIENT_SECRET`, `KEYCLOAK_GITHUB_ADMIN_USERNAME`, and `KEYCLOAK_HEPHAESTUS_CONFIDENTIAL_CLIENT_SECRET` so the realm import can resolve them using [Keycloak's environment variable placeholders](https://www.keycloak.org/server/importExport#_using_environment_variables_within_the_realm_configuration_files).
+   - Confirm the GitHub identity provider requests the `user:email` scopes and disable username/password login flows to keep authentication SSO-only.
+3. **Bootstrap secrets:** Load environment variables into your secret manager or `.env` files consumed by Docker/Kubernetes.
+4. **Deploy services:** Use the provided Compose files (`docker/compose.app.yaml`, `docker/compose.core.yaml`, `docker/compose.proxy.yaml`) or your Kubernetes manifests.
+5. **Run database migrations:** The application server runs Liquibase migrations on startup; monitor logs to confirm success.
+6. **Verify integrations:**
+   - Sign in via GitHub with the account configured in `KEYCLOAK_GITHUB_ADMIN_USERNAME` and confirm it lands in Keycloak with both the `admin` realm role and the `realm-management` → `realm-admin` client role automatically applied.
+   - Trigger a test webhook from GitHub to validate the ingest pipeline.
+   - Send a test best-practice email using the application server.
+
+## Operational tips
+
+- Monitor services with the central Prometheus/Loki stack; ensure trace IDs appear in logs.
+- Schedule regular backups for PostgreSQL and Keycloak.
+- Review weekly leaderboard Slack posts to ensure the automation is active.
+
+## Support
+
+Contact the Hephaestus core team if you need to rotate secrets or migrate infrastructure. Document any deviations from this checklist in the deployment runbook.

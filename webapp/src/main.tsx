@@ -14,6 +14,12 @@ import { StrictMode } from "react";
 
 import environment from "@/environment";
 import { AuthProvider, keycloakService, useAuth } from "@/integrations/auth";
+import { PostHogIdentity } from "@/integrations/posthog";
+import {
+	isPosthogEnabled,
+	posthogApiHost,
+	posthogProjectApiKey,
+} from "@/integrations/posthog/config";
 import { ThemeProvider } from "@/integrations/theme";
 import reportWebVitals from "./reportWebVitals";
 
@@ -92,16 +98,18 @@ if (rootElement && !rootElement.innerHTML) {
 	});
 	root.render(
 		<StrictMode>
-			{environment.posthog?.projectApiKey ? (
+			{isPosthogEnabled ? (
 				<PostHogProvider
-					apiKey={environment.posthog.projectApiKey}
+					apiKey={posthogProjectApiKey}
 					options={{
-						api_host: environment.posthog.apiHost,
+						api_host: posthogApiHost || undefined,
 						cross_subdomain_cookie: false,
+						opt_out_capturing_by_default: true,
 					}}
 				>
 					<TanstackQuery.Provider>
 						<AuthProvider>
+							<PostHogIdentity />
 							<ThemeProvider defaultTheme="dark" storageKey="theme">
 								<WrappedRouterProvider />
 							</ThemeProvider>

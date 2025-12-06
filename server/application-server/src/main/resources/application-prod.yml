@@ -11,6 +11,7 @@ spring:
     oauth2:
       resourceserver:
         jwt:
+          # Public URL for issuer validation (must match token's iss claim)
           issuer-uri: ${KEYCLOAK_URL}/realms/${KEYCLOAK_REALM}
 
   mail:
@@ -43,7 +44,7 @@ hephaestus:
         channel-id: ${LEADERBOARD_NOTIFICATION_CHANNEL_ID:G6TCVL6HL}
     
     workspace:
-        init-default: false
+      init-default: false
 
     intelligence-service:
         url: ${INTELLIGENCE_SERVICE_URL}
@@ -63,11 +64,20 @@ hephaestus:
         # The secret key of the langfuse server
         secret-key: ${LANGFUSE_SECRET_KEY}
 
+    posthog:
+      enabled: ${POSTHOG_ENABLED:false}
+      api-host: ${POSTHOG_API_HOST:https://app.posthog.com}
+      project-id: ${POSTHOG_PROJECT_ID:}
+      personal-api-key: ${POSTHOG_PERSONAL_API_KEY:}
+
 keycloak:
     url: ${KEYCLOAK_URL}
     realm: ${KEYCLOAK_REALM}
     client-id: ${KEYCLOAK_CLIENT_ID}
     client-secret: ${KEYCLOAK_CLIENT_SECRET}
+    # Internal JWKS endpoint for containerized deployments (optional)
+    # When set, fetches signing keys from this URL instead of discovering via issuer-uri
+    jwk-set-uri: ${KEYCLOAK_JWK_SET_URI:}
 
 nats:
     enabled: ${NATS_ENABLED:false}
@@ -77,14 +87,24 @@ nats:
 
 monitoring:
     run-on-startup: ${MONITORING_RUN_ON_STARTUP:true}
-    # Fetching timeframe in days
     timeframe: ${MONITORING_TIMEFRAME:7}
     sync-cron: ${MONITORING_SYNC_CRON:0 0 * * * *}
-    sync-cooldown-in-minutes: ${MONITORING_SYNC_COOLDOWN_IN_MINUTES:0}
+    sync-cooldown-in-minutes: ${MONITORING_SYNC_COOLDOWN_IN_MINUTES:60}
     sync-all-issues-and-pull-requests: ${MONITORING_SYNC_ALL_ISSUES_AND_PULL_REQUESTS:true}
+    backfill:
+        enabled: ${MONITORING_BACKFILL_ENABLED:true}
+        batch-size: ${MONITORING_BACKFILL_BATCH_SIZE:50}
+        rate-limit-threshold: ${MONITORING_BACKFILL_RATE_LIMIT_THRESHOLD:500}
+        cooldown-minutes: ${MONITORING_BACKFILL_COOLDOWN_MINUTES:5}
 
 github:
-  auth-token: ${GITHUB_AUTH_TOKEN}
+    app:
+        # Set to 0 to disable GitHub App mode and use Personal Access Tokens instead
+        id: ${GH_APP_ID:0}
+        privateKeyLocation: ${GH_APP_PRIVATE_KEY_LOCATION:}
+        privateKey: ${GH_APP_PRIVATE_KEY:}
+    meta:
+        auth-token: ${GH_AUTH_TOKEN:}
 
 slack:
     token: ${SLACK_BOT_TOKEN}

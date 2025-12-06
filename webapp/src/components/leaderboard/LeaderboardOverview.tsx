@@ -32,6 +32,7 @@ export function LeaderboardOverview({
 }: LeaderboardOverviewProps) {
 	const [leagueInfoOpen, setLeagueInfoOpen] = useState(false);
 	const [countdown, setCountdown] = useState<string>("Calculating...");
+	const user = leaderboardEntry.user;
 
 	// Use an effect to update the countdown timer every second
 	useEffect(() => {
@@ -79,6 +80,10 @@ export function LeaderboardOverview({
 		return () => clearInterval(timer);
 	}, [leaderboardEnd]);
 
+	if (!user) {
+		return null;
+	}
+
 	// Scroll to the user's rank in the leaderboard table
 	const scrollToRank = (rank: number) => {
 		const element = document.getElementById(`rank-${rank}`);
@@ -107,22 +112,20 @@ export function LeaderboardOverview({
 									</span>
 								</span>
 								<div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center overflow-hidden">
-									{leaderboardEntry.user.avatarUrl ? (
+									{user.avatarUrl ? (
 										<img
-											src={leaderboardEntry.user.avatarUrl}
-											alt={`${leaderboardEntry.user.name}'s avatar`}
+											src={user.avatarUrl}
+											alt={`${user.name}'s avatar`}
 											className="h-full w-full object-cover"
 										/>
 									) : (
 										<span className="text-sm font-medium">
-											{leaderboardEntry.user.name.slice(0, 2).toUpperCase()}
+											{user.name.slice(0, 2).toUpperCase()}
 										</span>
 									)}
 								</div>
 							</div>
-							<span className="text-muted-foreground">
-								{leaderboardEntry.user.name}
-							</span>
+							<span className="text-muted-foreground">{user.name}</span>
 						</div>
 					</Button>
 

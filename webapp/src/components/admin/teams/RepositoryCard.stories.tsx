@@ -20,6 +20,7 @@ const repo: RepositoryInfo = {
 	nameWithOwner: "org/repo",
 	htmlUrl: "https://github.com/org/repo",
 	description: "A sample repository",
+	hiddenFromContributions: false,
 };
 
 const team: TeamInfo = {

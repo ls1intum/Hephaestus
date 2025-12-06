@@ -15,5 +15,7 @@ jobs:
         with:
           ref: develop
           token: ${{ secrets.GH_PAT }}
+          fetch-depth: 0
 
-      - run: git push origin +develop:main
+      - name: Sync main with develop
+        run: git push origin +develop:main

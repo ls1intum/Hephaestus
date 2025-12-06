@@ -78,8 +78,6 @@ services:
       - shared-network
     volumes:
       - keycloak-data:/opt/keycloak/data
-      # Place keycloakify/dist_keycloak/keycloak-theme-for-kc-all-other-versions.jar into themes folder
-      - ./themes:/opt/keycloak/providers/
     configs:
       - source: realm-import.json
         target: /opt/keycloak/data/realm-import.json
@@ -87,8 +85,8 @@ services:
     entrypoint: [ "sh", "-c", "[ ! -d /opt/keycloak/data/import ] && (rm -f /opt/keycloak/data/import && mkdir -p /opt/keycloak/data/import); [ -f /opt/keycloak/data/realm-import.json ] && mv /opt/keycloak/data/realm-import.json /opt/keycloak/data/import/realm-import.json; exec /opt/keycloak/bin/kc.sh start --import-realm" ]
     environment:
       - TZ=${TIMEZONE:-UTC}
-      - KEYCLOAK_ADMIN=${KEYCLOAK_ADMIN}
-      - KEYCLOAK_ADMIN_PASSWORD=${KEYCLOAK_ADMIN_PASSWORD}
+      - KC_BOOTSTRAP_ADMIN_USERNAME=${KC_BOOTSTRAP_ADMIN_USERNAME}
+      - KC_BOOTSTRAP_ADMIN_PASSWORD=${KC_BOOTSTRAP_ADMIN_PASSWORD}
       - KC_DB=postgres
       - KC_DB_USERNAME=root
       - KC_DB_PASSWORD=root
@@ -99,6 +97,9 @@ services:
       - KC_HTTP_ENABLED=${KC_HTTP_ENABLED:-true}
       - KC_HEALTH_ENABLED=${KC_HEALTH_ENABLED:-true}
       - KC_PROXY_HEADERS=${KC_PROXY_HEADERS:-xforwarded}
+      - KEYCLOAK_GITHUB_CLIENT_ID=${KEYCLOAK_GITHUB_CLIENT_ID}
+      - KEYCLOAK_GITHUB_CLIENT_SECRET=${KEYCLOAK_GITHUB_CLIENT_SECRET}
+      - KEYCLOAK_GITHUB_ADMIN_USERNAME=${KEYCLOAK_GITHUB_ADMIN_USERNAME}
     labels:
       - "traefik.enable=true"
       - "traefik.http.middlewares.gzip.compress=true"
@@ -357,7 +358,7 @@ configs:
             "linkOnly": false,
             "hideOnLogin": false,
             "config": {
-              "syncMode": "LEGACY",
+              "syncMode": "FORCE",
               "clientSecret": "${KEYCLOAK_GITHUB_CLIENT_SECRET}",
               "clientId": "${KEYCLOAK_GITHUB_CLIENT_ID}",
               "guiOrder": "1"

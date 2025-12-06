@@ -1,0 +1,50 @@
+{
+  "action": "renamed",
+  "target_type": "User",
+  "account": {
+    "login": "SoloMaintainerNew",
+    "id": 915361190,
+    "node_id": "MDQ6VXNlcjkxNTM2MTE5MA==",
+    "url": "https://api.github.com/users/SoloMaintainerNew",
+    "repos_url": "https://api.github.com/users/SoloMaintainerNew/repos",
+    "events_url": "https://api.github.com/users/SoloMaintainerNew/events",
+    "followers_url": "https://api.github.com/users/SoloMaintainerNew/followers",
+    "following_url": "https://api.github.com/users/SoloMaintainerNew/following{/other_user}",
+    "gists_url": "https://api.github.com/users/SoloMaintainerNew/gists{/gist_id}",
+    "starred_url": "https://api.github.com/users/SoloMaintainerNew/starred{/owner}{/repo}",
+    "subscriptions_url": "https://api.github.com/users/SoloMaintainerNew/subscriptions",
+    "organizations_url": "https://api.github.com/users/SoloMaintainerNew/orgs",
+    "received_events_url": "https://api.github.com/users/SoloMaintainerNew/received_events",
+    "type": "User"
+  },
+  "changes": {
+    "login": {
+      "from": "SoloMaintainer"
+    }
+  },
+  "sender": {
+    "login": "FelixTJDietrich",
+    "id": 5898705,
+    "node_id": "MDQ6VXNlcjU4OTg3MDU=",
+    "avatar_url": "https://avatars.githubusercontent.com/u/5898705?v=4",
+    "gravatar_id": "",
+    "url": "https://api.github.com/users/FelixTJDietrich",
+    "html_url": "https://github.com/FelixTJDietrich",
+    "followers_url": "https://api.github.com/users/FelixTJDietrich/followers",
+    "following_url": "https://api.github.com/users/FelixTJDietrich/following{/other_user}",
+    "gists_url": "https://api.github.com/users/FelixTJDietrich/gists{/gist_id}",
+    "starred_url": "https://api.github.com/users/FelixTJDietrich/starred{/owner}{/repo}",
+    "subscriptions_url": "https://api.github.com/users/FelixTJDietrich/subscriptions",
+    "organizations_url": "https://api.github.com/users/FelixTJDietrich/orgs",
+    "repos_url": "https://api.github.com/users/FelixTJDietrich/repos",
+    "events_url": "https://api.github.com/users/FelixTJDietrich/events{/privacy}",
+    "received_events_url": "https://api.github.com/users/FelixTJDietrich/received_events",
+    "type": "User",
+    "user_view_type": "public",
+    "site_admin": false
+  },
+  "installation": {
+    "id": 77578432,
+    "node_id": "MDIzOkludGVncmF0aW9uSW5zdGFsbGF0aW9uNzc1Nzg0MzI="
+  }
+}

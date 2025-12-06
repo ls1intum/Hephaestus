@@ -30,6 +30,11 @@ const meta = {
 			control: "boolean",
 			description: "Whether a repository is currently being removed",
 		},
+		isReadOnly: {
+			control: "boolean",
+			description:
+				"Whether repository management is disabled (for GitHub App Installation workspaces)",
+		},
 	},
 	args: {
 		repositories: [
@@ -42,6 +47,7 @@ const meta = {
 		addRepositoryError: null,
 		isAddingRepository: false,
 		isRemovingRepository: false,
+		isReadOnly: false,
 		onAddRepository: fn(),
 		onRemoveRepository: fn(),
 	},
@@ -100,5 +106,15 @@ export const AddingRepository: Story = {
 export const Empty: Story = {
 	args: {
 		repositories: [],
+	},
+};
+
+/**
+ * Read-only state for GitHub App Installation managed workspaces.
+ * Repository add/remove controls are hidden and an info message is shown.
+ */
+export const ReadOnly: Story = {
+	args: {
+		isReadOnly: true,
 	},
 };

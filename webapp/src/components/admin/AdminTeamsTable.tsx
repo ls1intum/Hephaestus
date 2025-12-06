@@ -2,12 +2,18 @@ import { Search, Users } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { LabelInfo, TeamInfo } from "@/api/types.gen";
 import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 import { TeamTree } from "./teams/TeamTree";
 
 export interface TeamsTableProps {
 	teams: TeamInfo[];
 	isLoading?: boolean;
 	onHideTeam: (teamId: number, hidden: boolean) => Promise<void>;
+	onToggleRepositoryVisibility: (
+		teamId: number,
+		repositoryId: number,
+		hidden: boolean,
+	) => Promise<void>;
 	onAddLabelToTeam?: (
 		teamId: number,
 		repositoryId: number,
@@ -20,6 +26,7 @@ export function AdminTeamsTable({
 	teams,
 	isLoading = false,
 	onHideTeam,
+	onToggleRepositoryVisibility,
 	onAddLabelToTeam,
 	onRemoveLabelFromTeam,
 }: TeamsTableProps) {
@@ -127,15 +134,12 @@ export function AdminTeamsTable({
 		return (
 			<div className="space-y-4">
 				<div className="flex items-center justify-between">
-					<div className="h-10 w-64 bg-muted animate-pulse rounded" />
-					<div className="h-10 w-32 bg-muted animate-pulse rounded" />
+					<Skeleton className="h-10 w-64" />
+					<Skeleton className="h-10 w-32" />
 				</div>
 				<div className="space-y-4">
 					{["a", "b", "c", "d"].map((id) => (
-						<div
-							key={`loading-${id}`}
-							className="h-32 bg-muted animate-pulse rounded-lg"
-						/>
+						<Skeleton key={`loading-${id}`} className="h-32" />
 					))}
 				</div>
 			</div>
@@ -177,6 +181,7 @@ export function AdminTeamsTable({
 								onToggleVisibility={(teamId, hidden) =>
 									onHideTeam(teamId, hidden)
 								}
+								onToggleRepositoryVisibility={onToggleRepositoryVisibility}
 								onAddLabel={onAddLabelToTeam}
 								onRemoveLabel={onRemoveLabelFromTeam}
 								getCatalogLabels={getCatalogLabels}

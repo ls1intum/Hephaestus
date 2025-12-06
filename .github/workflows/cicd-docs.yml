@@ -4,64 +4,55 @@ on:
   push:
     branches: ["main"]
     tags: ["v*"]
+  pull_request:
+    branches: ["main"]
 
-  # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
-# Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
 permissions:
   contents: read
   pages: write
   id-token: write
 
-jobs: 
-  build-docs: 
-    name: Build
+jobs:
+  docs-quality:
+    name: Docs / Build (quality gate)
     runs-on: ubuntu-22.04
-
-    permissions:
-      contents: read
-      # Needed to upload the artifact containing the built docs
-      # The 'pages: write' and 'id-token: write' are required for deploying to GitHub Pages
-      pages: write
-      id-token: write
 
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
         with:
-          python-version: '3.12'
+          node-version: 20
+          cache: npm
+          cache-dependency-path: docs/package-lock.json
 
       - name: Install dependencies
-        run: |
-          pip install --upgrade pip
-          pip install -r docs/requirements.txt
+        run: npm ci
+        working-directory: docs
 
-      - name: Setup Graphviz
-        uses: ts-graphviz/setup-graphviz@v2
+      - name: Build documentation
+        run: npm run build
+        working-directory: docs
 
-      - name: Build Sphinx HTML
-        run: |
-          cd docs
-          make html
-
-      - name: Upload generated HTML as artifact
-        id: deployment
+      - name: Upload static site artifact
+        if: github.event_name != 'pull_request'
         uses: actions/upload-pages-artifact@v3
         with:
-          path: docs/_build/html
-  
+          path: docs/build
+
   deploy-docs:
     name: Documentation / Deploy to GitHub Pages
-    if: github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: docs-quality
+    runs-on: ubuntu-22.04
     environment:
       name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    runs-on: ubuntu-22.04
-    needs: build-docs
+      url: ${{ steps.deploy.outputs.page_url }}
     steps:
       - name: Deploy to GitHub Pages
+        id: deploy
         uses: actions/deploy-pages@v4

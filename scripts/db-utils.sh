@@ -14,6 +14,42 @@ SCRIPT_DIR="$(dirname "$0")"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 APP_SERVER_DIR="$PROJECT_ROOT/server/application-server"
 SCRIPTS_DIR="$PROJECT_ROOT/scripts"
+LOCAL_POSTGRES_SCRIPT="$SCRIPTS_DIR/local-postgres.sh"
+
+POSTGRES_HOST="${POSTGRES_HOST:-localhost}"
+POSTGRES_PORT="${POSTGRES_PORT:-5432}"
+
+DOCKER_AVAILABLE_CACHE=""
+
+to_lower() {
+    printf '%s' "$1" | tr '[:upper:]' '[:lower:]'
+}
+
+if [[ -n "${HEPHAESTUS_DB_MODE:-}" ]]; then
+    DB_MODE="$(to_lower "${HEPHAESTUS_DB_MODE}")"
+else
+    DB_MODE="docker"
+fi
+
+if [[ "$DB_MODE" != "docker" && "$DB_MODE" != "local" ]]; then
+    echo "Unsupported database mode '$DB_MODE'. Use 'docker' or 'local'." >&2
+    exit 1
+fi
+
+docker_available() {
+    if [[ -n "$DOCKER_AVAILABLE_CACHE" ]]; then
+        [[ "$DOCKER_AVAILABLE_CACHE" == "true" ]]
+        return
+    fi
+
+    if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
+        DOCKER_AVAILABLE_CACHE="true"
+        return 0
+    fi
+
+    DOCKER_AVAILABLE_CACHE="false"
+    return 1
+}
 
 # Color codes for better output
 RED='\033[0;31m'
@@ -39,6 +75,67 @@ log_error() {
     echo -e "${RED}❌ $1${NC}"
 }
 
+if [[ "$DB_MODE" == "docker" ]] && ! docker_available; then
+    log_warning "Docker is not available; switching database utilities to local mode."
+    DB_MODE="local"
+fi
+
+ensure_local_postgres_script() {
+    if [[ ! -x "$LOCAL_POSTGRES_SCRIPT" ]]; then
+        log_error "Local PostgreSQL helper not found or not executable at '$LOCAL_POSTGRES_SCRIPT'. Run 'scripts/codex-setup.sh' to install prerequisites."
+        exit 1
+    fi
+}
+
+postgres_data_dir() {
+    if [[ "$DB_MODE" == "docker" ]]; then
+        echo "$APP_SERVER_DIR/postgres-data"
+    else
+        echo "$APP_SERVER_DIR/postgres-data-local"
+    fi
+}
+
+wait_for_postgres_ready() {
+    local retries=30
+    local count=0
+
+    while [ $count -lt $retries ]; do
+        if command -v pg_isready >/dev/null 2>&1; then
+            if pg_isready -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" >/dev/null 2>&1; then
+                log_success "PostgreSQL is ready!"
+                return 0
+            fi
+        elif [[ "$DB_MODE" == "docker" ]]; then
+            if (cd "$APP_SERVER_DIR" && docker compose exec postgres pg_isready -h localhost -p "$POSTGRES_PORT" >/dev/null 2>&1); then
+                log_success "PostgreSQL is ready!"
+                return 0
+            fi
+        fi
+
+        count=$((count + 1))
+        echo -n "."
+        sleep 1
+    done
+
+    log_error "PostgreSQL failed to become ready after ${retries} seconds"
+    exit 1
+}
+
+is_postgres_running() {
+    if [[ "${CI:-false}" == "true" ]]; then
+        pg_isready -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" >/dev/null 2>&1
+        return $?
+    fi
+
+    if [[ "$DB_MODE" == "local" ]]; then
+        ensure_local_postgres_script
+        "$LOCAL_POSTGRES_SCRIPT" status >/dev/null 2>&1
+        return $?
+    fi
+
+    (cd "$APP_SERVER_DIR" && docker compose ps postgres 2>/dev/null | grep -q "Up")
+}
+
 # Check if we're in the right directory
 check_environment() {
     if [[ ! -f "$APP_SERVER_DIR/pom.xml" ]]; then
@@ -54,8 +151,12 @@ check_environment() {
 
 # Check if PostgreSQL data directory needs cleanup
 check_postgres_data() {
+    if [[ "$DB_MODE" != "docker" ]]; then
+        return 0
+    fi
+
     cd "$APP_SERVER_DIR"
-    
+
     if [[ -d "postgres-data" ]]; then
         # Check if essential PostgreSQL files exist
         if [[ ! -f "postgres-data/PG_VERSION" ]] || [[ ! -f "postgres-data/postgresql.conf" ]]; then
@@ -72,56 +173,29 @@ start_postgres() {
     # In CI environments, PostgreSQL service is already running
     if [[ "${CI:-false}" == "true" ]]; then
         log_info "CI environment detected, using existing PostgreSQL service..."
-        
-        # Just verify PostgreSQL is ready on localhost
-        local retries=30
-        local count=0
-        
-        while [ $count -lt $retries ]; do
-            if pg_isready -h localhost -p 5432 >/dev/null 2>&1; then
-                log_success "PostgreSQL is ready!"
-                return 0
-            fi
-            
-            count=$((count + 1))
-            echo -n "."
-            sleep 1
-        done
-        
-        log_error "PostgreSQL failed to become ready after ${retries} seconds"
-        exit 1
+        wait_for_postgres_ready
+        return 0
     fi
-    
+
+    if [[ "$DB_MODE" == "local" ]]; then
+        log_info "Starting local PostgreSQL instance..."
+        ensure_local_postgres_script
+        "$LOCAL_POSTGRES_SCRIPT" start
+        wait_for_postgres_ready
+        return 0
+    fi
+
     # Local development environment - use Docker
     log_info "Starting PostgreSQL container..."
     cd "$APP_SERVER_DIR"
-    
+
     # Check and cleanup corrupted data if needed
     check_postgres_data
-    
+
     docker compose up -d postgres
-    
+
     log_info "Waiting for PostgreSQL to be ready..."
-    local retries=30
-    local count=0
-    
-    while [ $count -lt $retries ]; do
-        if docker compose exec postgres pg_isready -h localhost -p 5432 >/dev/null 2>&1; then
-            log_success "PostgreSQL is ready!"
-            return 0
-        fi
-        
-        count=$((count + 1))
-        echo -n "."
-        sleep 1
-    done
-    
-    log_error "PostgreSQL failed to become ready after ${retries} seconds"
-    log_info "Checking container status..."
-    docker compose ps postgres
-    log_info "Recent logs:"
-    docker compose logs --tail=10 postgres
-    exit 1
+    wait_for_postgres_ready
 }
 
 # Stop PostgreSQL
@@ -131,7 +205,13 @@ stop_postgres() {
         log_info "CI environment detected, leaving PostgreSQL service running..."
         return 0
     fi
-    
+
+    if [[ "$DB_MODE" == "local" ]]; then
+        ensure_local_postgres_script
+        "$LOCAL_POSTGRES_SCRIPT" stop
+        return 0
+    fi
+
     log_info "Stopping PostgreSQL container..."
     cd "$APP_SERVER_DIR"
     docker compose down postgres
@@ -141,7 +221,9 @@ stop_postgres() {
 apply_migrations() {
     log_info "Applying Liquibase migrations..."
     cd "$APP_SERVER_DIR"
-    mvn liquibase:update
+    # Explicitly set Spring profiles to avoid specs profile (which uses H2)
+    # Use local,dev profiles for database operations
+    SPRING_PROFILES_ACTIVE=local,dev ./mvnw liquibase:update
 }
 
 # Generate ERD documentation
@@ -159,9 +241,9 @@ generate_erd() {
         jdbc:postgresql://localhost:5432/hephaestus \
         root \
         root \
-        ../docs/dev/database/schema.mmd
+        ../docs/contributor/erd/schema.mmd
     
-    log_success "ERD documentation updated at 'docs/dev/database/schema.mmd'"
+    log_success "ERD documentation updated at 'docs/contributor/erd/schema.mmd'"
 }
 
 # Generate SQLAlchemy models for intelligence service
@@ -211,27 +293,46 @@ generate_changelog_diff() {
         rm "$changelog_file"
     fi
     
-    # Backup current database state
-    log_info "Backing up current database state..."
-    stop_postgres
-    if [[ -d "postgres-data" ]]; then
-        mv postgres-data postgres-data-temp
-    fi
-    
-    # Start fresh database and apply migrations
-    start_postgres
-    apply_migrations
-    
-    # Generate changelog diff
-    log_info "Generating changelog diff..."
-    mvn liquibase:diff
-    
-    # Restore original database state
-    log_info "Restoring original database state..."
-    stop_postgres
-    rm -rf postgres-data
-    if [[ -d "postgres-data-temp" ]]; then
-        mv postgres-data-temp postgres-data
+    # In CI environments with external Docker PostgreSQL, skip backup/restore
+    if [[ "${CI:-false}" == "true" ]]; then
+        log_info "CI environment detected - using external PostgreSQL container"
+        log_info "Ensuring PostgreSQL is ready..."
+        wait_for_postgres_ready
+        
+        # Apply migrations to fresh database
+        apply_migrations
+        
+        # Generate changelog diff
+        log_info "Generating changelog diff..."
+        SPRING_PROFILES_ACTIVE=local,dev ./mvnw liquibase:diff
+    else
+        # Local development - backup and restore database state
+        log_info "Backing up current database state..."
+        stop_postgres
+        local data_dir
+        data_dir="$(postgres_data_dir)"
+        local temp_dir="${data_dir}-temp"
+        if [[ -d "$data_dir" ]]; then
+            mv "$data_dir" "$temp_dir"
+        fi
+
+        # Start fresh database and apply migrations
+        start_postgres
+        apply_migrations
+        
+        # Generate changelog diff
+        log_info "Generating changelog diff..."
+        # Explicitly set Spring profiles to avoid specs profile (which uses H2)
+        # Use local,dev profiles for database operations
+        SPRING_PROFILES_ACTIVE=local,dev ./mvnw liquibase:diff
+        
+        # Restore original database state
+        log_info "Restoring original database state..."
+        stop_postgres
+        rm -rf "$data_dir"
+        if [[ -d "$temp_dir" ]]; then
+            mv "$temp_dir" "$data_dir"
+        fi
     fi
     
     # Check if changelog file was actually generated
@@ -248,17 +349,21 @@ cmd_generate_erd() {
     log_info "🚀 Starting ERD generation..."
     check_environment
     
-    # Ensure PostgreSQL is running
+    # Ensure PostgreSQL is running and ready
     cd "$APP_SERVER_DIR"
-    if ! docker compose ps postgres | grep -q "Up"; then
+    if [[ "${CI:-false}" == "true" ]]; then
+        # In CI, PostgreSQL container is started externally
+        log_info "CI environment detected - using external PostgreSQL container"
+        wait_for_postgres_ready
+        apply_migrations
+    elif ! is_postgres_running; then
         log_warning "PostgreSQL is not running. Starting it now..."
         start_postgres
-    fi
-    # In CI, ensure schema is applied; locally assume DB is already migrated
-    if [[ "${CI:-false}" == "true" ]]; then
+        apply_migrations
+    elif [[ "$DB_MODE" == "local" ]]; then
         apply_migrations
     else
-        log_info "Skipping migrations in local mode (assuming DB is up-to-date)"
+        log_info "Skipping migrations in local Docker mode (assuming DB is up-to-date)"
     fi
 
     generate_erd
@@ -278,18 +383,21 @@ cmd_generate_db_models_intelligence_service() {
     log_info "🚀 Starting SQLAlchemy model generation for intelligence service..."
     check_environment
     
-    # Ensure PostgreSQL is running
+    # Ensure PostgreSQL is running and ready
     cd "$APP_SERVER_DIR"
-    if ! docker compose ps postgres | grep -q "Up"; then
+    if [[ "${CI:-false}" == "true" ]]; then
+        # In CI, PostgreSQL container is started externally
+        log_info "CI environment detected - using external PostgreSQL container"
+        wait_for_postgres_ready
+        apply_migrations
+    elif ! is_postgres_running; then
         log_warning "PostgreSQL is not running. Starting it now..."
         start_postgres
-    fi
-    
-    # In CI, ensure schema is applied; locally assume DB is already migrated
-    if [[ "${CI:-false}" == "true" ]]; then
+        apply_migrations
+    elif [[ "$DB_MODE" == "local" ]]; then
         apply_migrations
     else
-        log_info "Skipping migrations in local mode (assuming DB is up-to-date)"
+        log_info "Skipping migrations in local Docker mode (assuming DB is up-to-date)"
     fi
     
     generate_intelligence_service_models

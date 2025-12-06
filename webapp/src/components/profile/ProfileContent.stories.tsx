@@ -22,6 +22,7 @@ const mockReviewActivity = [
 				name: "Hephaestus",
 				nameWithOwner: "ls1intum/Hephaestus",
 				htmlUrl: "https://github.com/ls1intum/Hephaestus",
+				hiddenFromContributions: false,
 			},
 		},
 		score: 80,
@@ -46,6 +47,7 @@ const mockReviewActivity = [
 				name: "Artemis",
 				nameWithOwner: "ls1intum/Artemis",
 				htmlUrl: "https://github.com/ls1intum/Artemis",
+				hiddenFromContributions: false,
 			},
 		},
 		score: 65,
@@ -70,6 +72,7 @@ const mockReviewActivity = [
 				name: "Athena",
 				nameWithOwner: "ls1intum/Athena",
 				htmlUrl: "https://github.com/ls1intum/Athena",
+				hiddenFromContributions: false,
 			},
 		},
 		score: 50,
@@ -97,6 +100,7 @@ const mockOpenPullRequests = [
 			name: "Hephaestus",
 			nameWithOwner: "ls1intum/Hephaestus",
 			htmlUrl: "https://github.com/ls1intum/Hephaestus",
+			hiddenFromContributions: false,
 		},
 		labels: [
 			{ id: 1, name: "enhancement", color: "0E8A16" },
@@ -120,6 +124,7 @@ const mockOpenPullRequests = [
 			name: "Artemis",
 			nameWithOwner: "ls1intum/Artemis",
 			htmlUrl: "https://github.com/ls1intum/Artemis",
+			hiddenFromContributions: false,
 		},
 		labels: [
 			{ id: 3, name: "refactoring", color: "D93F0B" },
@@ -160,6 +165,10 @@ const meta = {
 			description: "GitHub username of the profile owner",
 			control: "text",
 		},
+		workspaceSlug: {
+			description: "Active workspace slug",
+			control: "text",
+		},
 	},
 	tags: ["autodocs"],
 } satisfies Meta<typeof ProfileContent>;
@@ -177,6 +186,7 @@ export const Default: Story = {
 		isLoading: false,
 		username: "johndoe",
 		currUserIsDashboardUser: true,
+		workspaceSlug: "aet",
 	},
 };
 
@@ -188,6 +198,7 @@ export const Loading: Story = {
 		isLoading: true,
 		username: "johndoe",
 		currUserIsDashboardUser: true,
+		workspaceSlug: "aet",
 	},
 };
 
@@ -201,6 +212,7 @@ export const EmptyReviews: Story = {
 		isLoading: false,
 		username: "johndoe",
 		currUserIsDashboardUser: true,
+		workspaceSlug: "aet",
 	},
 };
 
@@ -214,6 +226,7 @@ export const EmptyPullRequests: Story = {
 		isLoading: false,
 		username: "johndoe",
 		currUserIsDashboardUser: true,
+		workspaceSlug: "aet",
 	},
 };
 
@@ -227,5 +240,6 @@ export const CompletelyEmpty: Story = {
 		isLoading: false,
 		username: "johndoe",
 		currUserIsDashboardUser: true,
+		workspaceSlug: "aet",
 	},
 };

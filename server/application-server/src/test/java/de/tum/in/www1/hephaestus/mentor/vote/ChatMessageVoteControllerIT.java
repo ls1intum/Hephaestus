@@ -8,7 +8,13 @@ import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.mentor.*;
 import de.tum.in.www1.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.in.www1.hephaestus.testconfig.TestAuthUtils;
+import de.tum.in.www1.hephaestus.testconfig.TestUserFactory;
 import de.tum.in.www1.hephaestus.testconfig.WithMentorUser;
+import de.tum.in.www1.hephaestus.testconfig.WorkspaceTestFactory;
+import de.tum.in.www1.hephaestus.workspace.Workspace;
+import de.tum.in.www1.hephaestus.workspace.WorkspaceMembership;
+import de.tum.in.www1.hephaestus.workspace.WorkspaceMembershipRepository;
+import de.tum.in.www1.hephaestus.workspace.WorkspaceRepository;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -43,11 +49,40 @@ public class ChatMessageVoteControllerIT extends BaseIntegrationTest {
     @Autowired
     private ObjectMapper objectMapper;
 
+    @Autowired
+    private WorkspaceRepository workspaceRepository;
+
+    @Autowired
+    private WorkspaceMembershipRepository workspaceMembershipRepository;
+
     private User testUser;
+    private Workspace workspace;
+    private static final String WORKSPACE_SLUG = "mentor-votes";
 
     @BeforeEach
     void setup() {
-        testUser = userRepository.findByLogin("mentor").orElseThrow();
+        testUser = TestUserFactory.ensureUser(userRepository, "mentor", 2L);
+        workspace = workspaceRepository
+            .findByWorkspaceSlug(WORKSPACE_SLUG)
+            .orElseGet(() -> workspaceRepository.save(WorkspaceTestFactory.activeWorkspace(WORKSPACE_SLUG)));
+        ensureWorkspaceMembership(workspace, testUser);
+    }
+
+    private void ensureWorkspaceMembership(Workspace targetWorkspace, User user) {
+        workspaceMembershipRepository
+            .findByWorkspace_IdAndUser_Id(targetWorkspace.getId(), user.getId())
+            .orElseGet(() -> {
+                WorkspaceMembership membership = new WorkspaceMembership();
+                membership.setId(new WorkspaceMembership.Id(targetWorkspace.getId(), user.getId()));
+                membership.setWorkspace(targetWorkspace);
+                membership.setUser(user);
+                membership.setRole(WorkspaceMembership.WorkspaceRole.MEMBER);
+                return workspaceMembershipRepository.save(membership);
+            });
+    }
+
+    private String votePathTemplate() {
+        return "/workspaces/" + workspace.getWorkspaceSlug() + "/api/chat/messages/{messageId}/vote";
     }
 
     @Test
@@ -60,7 +95,7 @@ public class ChatMessageVoteControllerIT extends BaseIntegrationTest {
         // Act: Vote on the message
         var result = webTestClient
             .patch()
-            .uri("/api/chat/messages/{messageId}/vote", messageId)
+            .uri(votePathTemplate(), messageId)
             .headers(TestAuthUtils.withCurrentUser())
             .contentType(MediaType.APPLICATION_JSON)
             .bodyValue(request)
@@ -92,7 +127,7 @@ public class ChatMessageVoteControllerIT extends BaseIntegrationTest {
         // Act: Vote on the message
         var result = webTestClient
             .patch()
-            .uri("/api/chat/messages/{messageId}/vote", messageId)
+            .uri(votePathTemplate(), messageId)
             .headers(TestAuthUtils.withCurrentUser())
             .contentType(MediaType.APPLICATION_JSON)
             .bodyValue(request)
@@ -124,7 +159,7 @@ public class ChatMessageVoteControllerIT extends BaseIntegrationTest {
         // Act: Vote on the message
         var result = webTestClient
             .patch()
-            .uri("/api/chat/messages/{messageId}/vote", messageId)
+            .uri(votePathTemplate(), messageId)
             .headers(TestAuthUtils.withCurrentUser())
             .contentType(MediaType.APPLICATION_JSON)
             .bodyValue(request)
@@ -158,7 +193,7 @@ public class ChatMessageVoteControllerIT extends BaseIntegrationTest {
         // Act: Change vote to downvote
         var result = webTestClient
             .patch()
-            .uri("/api/chat/messages/{messageId}/vote", messageId)
+            .uri(votePathTemplate(), messageId)
             .headers(TestAuthUtils.withCurrentUser())
             .contentType(MediaType.APPLICATION_JSON)
             .bodyValue(request)
@@ -190,7 +225,7 @@ public class ChatMessageVoteControllerIT extends BaseIntegrationTest {
         // Act & Assert: Non-existent message returns 404
         webTestClient
             .patch()
-            .uri("/api/chat/messages/{messageId}/vote", nonExistentId)
+            .uri(votePathTemplate(), nonExistentId)
             .headers(TestAuthUtils.withCurrentUser())
             .contentType(MediaType.APPLICATION_JSON)
             .bodyValue(request)
@@ -209,7 +244,7 @@ public class ChatMessageVoteControllerIT extends BaseIntegrationTest {
         // Act & Assert: Voting on non-existent message should return 404
         webTestClient
             .patch()
-            .uri("/api/chat/messages/{messageId}/vote", nonExistentMessageId)
+            .uri(votePathTemplate(), nonExistentMessageId)
             .headers(TestAuthUtils.withCurrentUser())
             .contentType(MediaType.APPLICATION_JSON)
             .bodyValue(request)
@@ -228,7 +263,7 @@ public class ChatMessageVoteControllerIT extends BaseIntegrationTest {
         // Act & Assert: Null vote returns 400
         webTestClient
             .patch()
-            .uri("/api/chat/messages/{messageId}/vote", messageId)
+            .uri(votePathTemplate(), messageId)
             .headers(TestAuthUtils.withCurrentUser())
             .contentType(MediaType.APPLICATION_JSON)
             .bodyValue(request)
@@ -240,6 +275,28 @@ public class ChatMessageVoteControllerIT extends BaseIntegrationTest {
         assertThat(voteRepository.findById(messageId)).isEmpty();
     }
 
+    @Test
+    @WithMentorUser
+    void voteMessage_DifferentWorkspace_ReturnsNotFound() {
+        UUID messageId = createTestAssistantMessage();
+        Workspace otherWorkspace = workspaceRepository
+            .findByWorkspaceSlug("mentor-votes-iso")
+            .orElseGet(() -> workspaceRepository.save(WorkspaceTestFactory.activeWorkspace("mentor-votes-iso")));
+        ensureWorkspaceMembership(otherWorkspace, testUser);
+
+        var request = new VoteMessageRequestDTO(true);
+
+        webTestClient
+            .patch()
+            .uri("/workspaces/" + otherWorkspace.getWorkspaceSlug() + "/api/chat/messages/{messageId}/vote", messageId)
+            .headers(TestAuthUtils.withCurrentUser())
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue(request)
+            .exchange()
+            .expectStatus()
+            .isNotFound();
+    }
+
     // ==================== Helper Methods ====================
 
     private UUID createTestAssistantMessage() {
@@ -249,6 +306,7 @@ public class ChatMessageVoteControllerIT extends BaseIntegrationTest {
         thread.setCreatedAt(Instant.now());
         thread.setTitle("Test Thread");
         thread.setUser(testUser); // Properly set the user
+        thread.setWorkspace(workspace);
         var savedThread = threadRepository.save(thread);
 
         var message = new ChatMessage();

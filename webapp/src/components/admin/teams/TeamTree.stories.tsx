@@ -19,12 +19,14 @@ const repoA: RepositoryInfo = {
 	name: "api",
 	nameWithOwner: "org/api",
 	htmlUrl: "https://github.com/org/api",
+	hiddenFromContributions: false,
 };
 const repoB: RepositoryInfo = {
 	id: 101,
 	name: "web",
 	nameWithOwner: "org/web",
 	htmlUrl: "https://github.com/org/web",
+	hiddenFromContributions: false,
 };
 const bug: LabelInfo = {
 	id: 1,
@@ -73,5 +75,6 @@ export const Default: Story = {
 		displaySet,
 		getCatalogLabels: (repoId: number) => (repoId === 100 ? [bug] : []),
 		onToggleVisibility: () => {},
+		onToggleRepositoryVisibility: () => {},
 	},
 };

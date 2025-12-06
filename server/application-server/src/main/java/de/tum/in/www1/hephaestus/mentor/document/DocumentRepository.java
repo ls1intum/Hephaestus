@@ -1,6 +1,7 @@
 package de.tum.in.www1.hephaestus.mentor.document;
 
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
+import de.tum.in.www1.hephaestus.workspace.Workspace;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -21,36 +22,52 @@ public interface DocumentRepository extends JpaRepository<Document, DocumentId> 
     /**
      * Find all versions of a document by id, ordered by versionNumber descending
      */
-    @Query("SELECT d FROM Document d WHERE d.id = :id AND d.user = :user ORDER BY d.versionNumber DESC")
-    List<Document> findByIdAndUserOrderByVersionNumberDesc(@Param("id") UUID id, @Param("user") User user);
+    @Query(
+        "SELECT d FROM Document d WHERE d.workspace = :workspace AND d.id = :id AND d.user = :user ORDER BY d.versionNumber DESC"
+    )
+    List<Document> findByWorkspaceAndUserAndIdOrderByVersionNumberDesc(
+        @Param("workspace") Workspace workspace,
+        @Param("id") UUID id,
+        @Param("user") User user
+    );
 
     /**
      * Find latest version of a document (highest versionNumber)
      */
-    Optional<Document> findFirstByIdAndUserOrderByVersionNumberDesc(UUID id, User user);
+    Optional<Document> findFirstByWorkspaceAndUserAndIdOrderByVersionNumberDesc(
+        Workspace workspace,
+        User user,
+        UUID id
+    );
 
     /**
      * Find all versions of a document by ID and user
      */
-    List<Document> findByIdAndUser(UUID id, User user);
+    List<Document> findByWorkspaceAndUserAndId(Workspace workspace, User user, UUID id);
 
     /**
      * Find all versions of a document by ID and user with pagination
      */
-    Page<Document> findByIdAndUser(UUID id, User user, Pageable pageable);
+    Page<Document> findByWorkspaceAndUserAndId(Workspace workspace, User user, UUID id, Pageable pageable);
 
     /**
      * Find specific document version by ID, user and version number
      */
-    Optional<Document> findByIdAndUserAndVersionNumber(UUID id, User user, Integer versionNumber);
+    Optional<Document> findByWorkspaceAndUserAndIdAndVersionNumber(
+        Workspace workspace,
+        User user,
+        UUID id,
+        Integer versionNumber
+    );
 
     /**
      * Find document versions with versionNumber greater than the specified one
      */
     @Query(
-        "SELECT d FROM Document d WHERE d.id = :id AND d.user = :user AND d.versionNumber > :version ORDER BY d.versionNumber DESC"
+        "SELECT d FROM Document d WHERE d.workspace = :workspace AND d.id = :id AND d.user = :user AND d.versionNumber > :version ORDER BY d.versionNumber DESC"
     )
-    List<Document> findByIdAndUserAndVersionNumberGreaterThanOrderByVersionNumberDesc(
+    List<Document> findByWorkspaceAndUserAndIdAndVersionNumberGreaterThanOrderByVersionNumberDesc(
+        @Param("workspace") Workspace workspace,
         @Param("id") UUID id,
         @Param("user") User user,
         @Param("version") Integer version
@@ -61,8 +78,11 @@ public interface DocumentRepository extends JpaRepository<Document, DocumentId> 
      */
     @Modifying
     @Transactional
-    @Query("DELETE FROM Document d WHERE d.id = :id AND d.user = :user AND d.versionNumber > :version")
-    void deleteByIdAndUserAndVersionNumberGreaterThan(
+    @Query(
+        "DELETE FROM Document d WHERE d.workspace = :workspace AND d.id = :id AND d.user = :user AND d.versionNumber > :version"
+    )
+    void deleteByWorkspaceAndUserAndIdAndVersionNumberGreaterThan(
+        @Param("workspace") Workspace workspace,
         @Param("id") UUID id,
         @Param("user") User user,
         @Param("version") Integer version
@@ -71,7 +91,7 @@ public interface DocumentRepository extends JpaRepository<Document, DocumentId> 
     /**
      * Check if document exists for user
      */
-    boolean existsByIdAndUser(UUID id, User user);
+    boolean existsByWorkspaceAndIdAndUser(Workspace workspace, UUID id, User user);
 
     // Timestamp-based queries are deprecated with versionNumber. If needed, reintroduce as non-key filters.
 
@@ -81,7 +101,8 @@ public interface DocumentRepository extends JpaRepository<Document, DocumentId> 
     @Query(
         """
         SELECT d FROM Document d
-        WHERE d.user = :user
+        WHERE d.workspace = :workspace
+        AND d.user = :user
         AND d.versionNumber = (
             SELECT MAX(d2.versionNumber)
             FROM Document d2
@@ -90,7 +111,7 @@ public interface DocumentRepository extends JpaRepository<Document, DocumentId> 
         ORDER BY d.createdAt DESC
         """
     )
-    List<Document> findLatestVersionsByUser(@Param("user") User user);
+    List<Document> findLatestVersionsByUser(@Param("workspace") Workspace workspace, @Param("user") User user);
 
     /**
      * Find latest versions of all documents by user with pagination
@@ -98,7 +119,8 @@ public interface DocumentRepository extends JpaRepository<Document, DocumentId> 
     @Query(
         """
         SELECT d FROM Document d
-        WHERE d.user = :user
+        WHERE d.workspace = :workspace
+        AND d.user = :user
         AND d.versionNumber = (
             SELECT MAX(d2.versionNumber)
             FROM Document d2
@@ -107,5 +129,9 @@ public interface DocumentRepository extends JpaRepository<Document, DocumentId> 
         ORDER BY d.createdAt DESC
         """
     )
-    Page<Document> findLatestVersionsByUser(@Param("user") User user, Pageable pageable);
+    Page<Document> findLatestVersionsByUser(
+        @Param("workspace") Workspace workspace,
+        @Param("user") User user,
+        Pageable pageable
+    );
 }
