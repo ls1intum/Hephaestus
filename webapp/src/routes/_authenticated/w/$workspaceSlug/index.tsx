@@ -103,10 +103,10 @@ function LeaderboardContainer() {
 		query:
 			after || before
 				? {
-					after: after ? new Date(after) : undefined,
-					before: before ? new Date(before) : undefined,
-				}
-			: undefined,
+						after: after ? new Date(after) : undefined,
+						before: before ? new Date(before) : undefined,
+					}
+				: undefined,
 	});
 
 	const userProfileQuery = useQuery({

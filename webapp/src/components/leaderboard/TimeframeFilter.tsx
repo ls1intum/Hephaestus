@@ -151,10 +151,7 @@ export function TimeframeFilter({
 				? parsedAfter.getTime() <= allActivityStart.getTime()
 				: false;
 
-			if (
-				(!initialAfterDate && !initialBeforeDate) ||
-				isAllActivityAfter
-			) {
+			if ((!initialAfterDate && !initialBeforeDate) || isAllActivityAfter) {
 				return "all-activity";
 			}
 		}
@@ -430,7 +427,11 @@ export function TimeframeFilter({
 			setSelectedTimeframe(detectedTimeframe);
 
 			// If custom timeframe is detected, update the dateRange
-			if (detectedTimeframe === "custom" && initialAfterDate && initialBeforeDate) {
+			if (
+				detectedTimeframe === "custom" &&
+				initialAfterDate &&
+				initialBeforeDate
+			) {
 				try {
 					const afterDate = parseISO(initialAfterDate);
 					const beforeDate = parseISO(initialBeforeDate);
