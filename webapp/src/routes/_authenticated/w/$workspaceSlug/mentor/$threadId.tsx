@@ -7,6 +7,7 @@ import { useEffect, useRef } from "react";
 import { ArtifactOverlayContainer } from "@/components/mentor/ArtifactOverlayContainer";
 import { Chat } from "@/components/mentor/Chat";
 import { defaultPartRenderers } from "@/components/mentor/renderers";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useMentorChat } from "@/hooks/useMentorChat";
 import type { ChatMessage } from "@/lib/types";
 
@@ -93,37 +94,37 @@ function ThreadContainer() {
 							{/* User bubble */}
 							<div className="flex items-start gap-3 justify-end">
 								<div className="space-y-2 max-w-[75%] text-right">
-									<div className="h-4 w-56 bg-muted rounded animate-pulse ml-auto" />
-									<div className="h-4 w-28 bg-muted rounded animate-pulse ml-auto" />
+									<Skeleton className="h-4 w-56 ml-auto" />
+									<Skeleton className="h-4 w-28 ml-auto" />
 								</div>
 							</div>
 
 							{/* Assistant bubble */}
 							<div className="flex items-start gap-3">
-								<div className="h-8 w-8 rounded-full bg-muted animate-pulse" />
+								<Skeleton className="h-8 w-8 rounded-full" />
 								<div className="space-y-2 max-w-[75%]">
-									<div className="h-4 w-40 bg-muted rounded animate-pulse" />
-									<div className="h-4 w-64 bg-muted rounded animate-pulse" />
-									<div className="h-4 w-32 bg-muted rounded animate-pulse" />
+									<Skeleton className="h-4 w-40" />
+									<Skeleton className="h-4 w-64" />
+									<Skeleton className="h-4 w-32" />
 								</div>
 							</div>
 
 							{/* User bubble */}
 							<div className="flex items-start gap-3 justify-end">
 								<div className="space-y-2 max-w-[75%] text-right">
-									<div className="h-4 w-75 bg-muted rounded animate-pulse ml-auto" />
-									<div className="h-4 w-34 bg-muted rounded animate-pulse ml-auto" />
-									<div className="h-4 w-53 bg-muted rounded animate-pulse ml-auto" />
+									<Skeleton className="h-4 w-75 ml-auto" />
+									<Skeleton className="h-4 w-34 ml-auto" />
+									<Skeleton className="h-4 w-53 ml-auto" />
 								</div>
 							</div>
 
 							{/* Assistant bubble */}
 							<div className="flex items-start gap-3">
-								<div className="h-8 w-8 rounded-full bg-muted animate-pulse" />
+								<Skeleton className="h-8 w-8 rounded-full" />
 								<div className="space-y-2 max-w-[75%]">
-									<div className="h-4 w-72 bg-muted rounded animate-pulse" />
-									<div className="h-4 w-52 bg-muted rounded animate-pulse" />
-									<div className="h-4 w-24 bg-muted rounded animate-pulse" />
+									<Skeleton className="h-4 w-72" />
+									<Skeleton className="h-4 w-52" />
+									<Skeleton className="h-4 w-24" />
 								</div>
 							</div>
 						</div>
@@ -132,9 +133,9 @@ function ThreadContainer() {
 					{/* Bottom input bar */}
 					<div className="flex flex-col gap-2 items-center w-full px-4 pb-2 -mt-20 relative z-10 bg-gradient-to-t from-muted dark:from-background/30 from-60% to-transparent pt-8">
 						<div className="w-full max-w-3xl space-y-2">
-							<div className="h-20 flex-1 bg-muted rounded-xl animate-pulse" />
+							<Skeleton className="h-20 flex-1" />
 						</div>
-						<div className="h-3 w-64 bg-muted rounded animate-pulse" />
+						<Skeleton className="h-3 w-64" />
 					</div>
 				</div>
 			</div>
