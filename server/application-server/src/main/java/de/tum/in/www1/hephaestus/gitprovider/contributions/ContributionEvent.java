@@ -21,10 +21,11 @@ public class ContributionEvent {
 
     @NotNull
     @Enumerated(EnumType.STRING)
-    @Column(length = 20)
+    @Column(length = 20, nullable = false)
     private ContributionSourceType sourceType;
 
     @NotNull
+    @Column(nullable = false)
     private Long sourceId;
 
     @NotNull
@@ -33,9 +34,11 @@ public class ContributionEvent {
     private User actor;
 
     @NotNull
+    @Column(nullable = false)
     private Instant occurredAt;
 
     @NotNull
+    @Column(nullable = false)
     private Integer xpAwarded;
 
 }
