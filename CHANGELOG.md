@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.10.0-rc.47](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.46...v0.10.0-rc.47) (2025-12-06)
+
+### 🚀 Features
+
+* **application-server:** workspace slug rename with redirect support ([#553](https://github.com/ls1intum/Hephaestus/issues/553)) ([1fd2cef](https://github.com/ls1intum/Hephaestus/commit/1fd2cefe88d315f48b356e46c26b7a95624f527f))
+
 ## [0.10.0-rc.46](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.45...v0.10.0-rc.46) (2025-12-06)
 
 ### 🐛 Bug Fixes
