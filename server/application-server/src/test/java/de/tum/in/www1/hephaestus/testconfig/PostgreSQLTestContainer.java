@@ -148,12 +148,45 @@ public final class PostgreSQLTestContainer {
                     databaseName
                 );
             } catch (SQLException exception) {
-                throw new IllegalStateException(
-                    "Failed to connect to local PostgreSQL instance at " +
-                    jdbcUrl +
-                    ". Run 'scripts/codex-setup.sh' and ensure scripts/local-postgres.sh start completes successfully before running tests.",
-                    exception
+                String dockerAvailability = isDockerAvailable() 
+                    ? "Docker is available but HEPHAESTUS_DB_MODE=local is set." 
+                    : "Docker is not available.";
+                
+                String errorDetails = String.format(
+                    "Failed to connect to local PostgreSQL instance.%n%n" +
+                    "Connection details:%n" +
+                    "  JDBC URL: %s%n" +
+                    "  Username: %s%n" +
+                    "  Database: %s%n%n" +
+                    "Reason: %s%n%n" +
+                    "Context: %s%n%n" +
+                    "To resolve this issue:%n" +
+                    "  1. Run 'scripts/codex-setup.sh' to set up the local PostgreSQL instance%n" +
+                    "  2. Ensure 'scripts/local-postgres.sh start' completes successfully%n" +
+                    "  3. Verify the database is running: scripts/local-postgres.sh status%n%n" +
+                    "Environment variables (if you need custom configuration):%n" +
+                    "  %s: %s (current: %s)%n" +
+                    "  %s: %s (current: %s)%n" +
+                    "  %s: %s%n" +
+                    "  %s: Set to 'local' to force local database mode%n%n" +
+                    "Alternative: Ensure Docker is available and running to use Testcontainers instead.",
+                    jdbcUrl,
+                    username,
+                    databaseName,
+                    exception.getMessage(),
+                    dockerAvailability,
+                    ENV_TEST_JDBC_URL, 
+                    DEFAULT_TEST_JDBC_URL, 
+                    System.getenv(ENV_TEST_JDBC_URL) != null ? "configured" : "using default",
+                    ENV_TEST_DB_USER, 
+                    DEFAULT_TEST_USER, 
+                    System.getenv(ENV_TEST_DB_USER) != null ? "configured" : "using default",
+                    ENV_TEST_DB_PASSWORD,
+                    System.getenv(ENV_TEST_DB_PASSWORD) != null ? "configured" : "using default",
+                    ENV_DB_MODE
                 );
+                
+                throw new IllegalStateException(errorDetails, exception);
             }
         }
 
