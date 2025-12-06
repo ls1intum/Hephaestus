@@ -145,6 +145,17 @@ Keycloak runs in Docker as part of the development compose stack. The bundled re
 3. (Re)start the local stack: `docker compose up keycloak postgres`. On first boot Keycloak imports `keycloak-hephaestus-realm-example-config.json` and wires the GitHub provider automatically.
 4. Sign in via GitHub using the account referenced by `KEYCLOAK_GITHUB_ADMIN_USERNAME`. During the first brokered login Keycloak automatically grants that account the `admin` realm role and the `realm-management` → `realm-admin` client role, unlocking the administrative views in the application server and Keycloak console.
 
+### Webhook ingest service
+
+When you run `docker/compose.core.yaml` or the `server/webhook-ingest/compose.yaml` stack, set the webhook secrets up front so signature checks succeed:
+
+```bash
+cp docker/.env.example docker/.env
+export WEBHOOK_SECRET=$(openssl rand -hex 32)
+echo "WEBHOOK_SECRET=$WEBHOOK_SECRET" >> docker/.env
+```
+The value must match the secret configured on your GitHub and GitLab webhooks (validated via `X-Hub-Signature-256` when available).
+
 ## Web client (`webapp`)
 
 1. Install dependencies:
