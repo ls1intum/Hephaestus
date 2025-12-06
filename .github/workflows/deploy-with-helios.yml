@@ -22,10 +22,6 @@ on:
 # Suggestion: Ensures only one workflow runs at a time for a given environment name
 concurrency: ${{ github.event.inputs.environment_name }}
 
-permissions:
-  contents: read
-  actions: read
-
 jobs:
   deploy-app:
     uses: ls1intum/.github/.github/workflows/deploy-docker-compose.yml@main
