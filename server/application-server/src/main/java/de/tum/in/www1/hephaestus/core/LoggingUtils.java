@@ -31,7 +31,9 @@ public final class LoggingUtils {
             return null;
         }
         return input
-            .replaceAll("[\\r\\n\\t\\u0000-\\u001F\\u007F\\u0085\\u2028\\u2029]", "_")
-            .replaceAll("\\e\\[[0-9;]*[A-Za-z]", "_");
+            // Strip ANSI escape sequences (ESC + '[' + params + final byte)
+            .replaceAll("\u001B\\[[0-9;]*[A-Za-z]", "_")
+            // Then strip remaining control characters
+            .replaceAll("[\\r\\n\\t\\u0000-\\u001F\\u007F\\u0085\\u2028\\u2029]", "_");
     }
 }

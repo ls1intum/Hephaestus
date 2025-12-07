@@ -101,8 +101,8 @@ function LeaderboardContainer() {
 	const userProfileOptions = getUserProfileOptions({
 		path: { workspaceSlug: workspaceSlug ?? "", login: username || "" },
 		query: {
-			after: after ? new Date(after) : undefined,
-			before: before ? new Date(before) : undefined,
+			after: new Date(after),
+			before: new Date(before),
 		},
 	});
 

@@ -157,7 +157,42 @@ export function TimeframeFilter({
 			}
 		}
 
-		if (!initialAfterDate || !initialBeforeDate) return "this-week";
+		if (!initialAfterDate || !initialBeforeDate) {
+			if (openEndedPresets && initialAfterDate) {
+				try {
+					const now = new Date();
+					now.setSeconds(0, 0);
+
+					const scheduledDay = leaderboardSchedule?.day ?? 1;
+					const scheduledHour = leaderboardSchedule?.hour ?? 9;
+					const scheduledMinute = leaderboardSchedule?.minute ?? 0;
+
+					// This week start (open-ended)
+					const thisWeekStart = setToScheduledTime(
+						getISODay(now) >= scheduledDay ? now : subWeeks(now, 1),
+						scheduledDay,
+						scheduledHour,
+						scheduledMinute,
+					);
+					const thisWeekStartStr = formatISO(thisWeekStart);
+
+					if (datesAreClose(initialAfterDate ?? null, thisWeekStartStr)) {
+						return "this-week";
+					}
+
+					// This month start (open-ended)
+					const thisMonthStart = startOfMonth(now);
+					const thisMonthStartStr = formatISO(thisMonthStart);
+					if (datesAreClose(initialAfterDate ?? null, thisMonthStartStr)) {
+						return "this-month";
+					}
+				} catch (e) {
+					console.error("Error detecting open-ended timeframe:", e);
+				}
+			}
+
+			return "this-week";
+		}
 
 		try {
 			// Get current time
@@ -184,11 +219,11 @@ export function TimeframeFilter({
 
 			// Check if the provided dates match this week's range
 			const afterMatchesThisWeekStart = datesAreClose(
-				initialAfterDate,
+				initialAfterDate ?? null,
 				thisWeekStartStr,
 			);
 			const beforeMatchesThisWeekEnd = datesAreClose(
-				initialBeforeDate,
+				initialBeforeDate ?? null,
 				thisWeekEndStr,
 			);
 
@@ -211,11 +246,11 @@ export function TimeframeFilter({
 
 			// Check if the provided dates match last week's range
 			const afterMatchesLastWeekStart = datesAreClose(
-				initialAfterDate,
+				initialAfterDate ?? null,
 				lastWeekStartStr,
 			);
 			const beforeMatchesLastWeekEnd = datesAreClose(
-				initialBeforeDate,
+				initialBeforeDate ?? null,
 				lastWeekEndStr,
 			);
 
@@ -233,11 +268,11 @@ export function TimeframeFilter({
 
 			// Check if the provided dates match this month's range
 			const afterMatchesThisMonthStart = datesAreClose(
-				initialAfterDate,
+				initialAfterDate ?? null,
 				thisMonthStartStr,
 			);
 			const beforeMatchesThisMonthEnd = datesAreClose(
-				initialBeforeDate,
+				initialBeforeDate ?? null,
 				thisMonthEndStr,
 			);
 
@@ -255,11 +290,11 @@ export function TimeframeFilter({
 
 			// Check if the provided dates match last month's range
 			const afterMatchesLastMonthStart = datesAreClose(
-				initialAfterDate,
+				initialAfterDate ?? null,
 				lastMonthStartStr,
 			);
 			const beforeMatchesLastMonthEnd = datesAreClose(
-				initialBeforeDate,
+				initialBeforeDate ?? null,
 				lastMonthEndStr,
 			);
 

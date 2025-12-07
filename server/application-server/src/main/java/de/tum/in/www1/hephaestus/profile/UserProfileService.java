@@ -73,8 +73,8 @@ public class UserProfileService {
      */
     @Transactional(readOnly = true)
     public Optional<UserProfileDTO> getUserProfile(String login, Long workspaceId, Instant after, Instant before) {
-        TimeRange timeRange = resolveTimeRange(login, after, before);
         String safeLogin = LoggingUtils.sanitizeForLog(login);
+        TimeRange timeRange = resolveTimeRange(login, after, before);
         String safeWorkspace = workspaceId == null ? "null" : LoggingUtils.sanitizeForLog(workspaceId.toString());
         String safeAfter = LoggingUtils.sanitizeForLog(timeRange.after().toString());
         String safeBefore = LoggingUtils.sanitizeForLog(timeRange.before().toString());
@@ -127,7 +127,7 @@ public class UserProfileService {
         Instant resolvedAfter = after == null ? resolvedBefore.minus(DEFAULT_ACTIVITY_WINDOW) : after;
 
         if (resolvedAfter.isAfter(resolvedBefore)) {
-            logger.debug("Clamping activity window for user {} because after > before", login);
+            logger.debug("Clamping activity window for user {} because after > before", LoggingUtils.sanitizeForLog(login));
             resolvedAfter = resolvedBefore;
         }
 
