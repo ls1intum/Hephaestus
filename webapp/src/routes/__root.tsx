@@ -1,5 +1,4 @@
-import type { QueryClient } from "@tanstack/react-query";
-import { useQuery } from "@tanstack/react-query";
+import { type QueryClient, useQuery } from "@tanstack/react-query";
 import {
 	createRootRouteWithContext,
 	Link,
@@ -8,8 +7,8 @@ import {
 	useNavigate,
 	useRouter,
 } from "@tanstack/react-router";
-import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
 import { Toaster } from "sonner";
+
 import {
 	getGroupedThreadsOptions,
 	getUserSettingsOptions,
@@ -35,15 +34,9 @@ import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 import { useWorkspaceAccess } from "@/hooks/use-workspace-access";
 import { useMentorChat } from "@/hooks/useMentorChat";
 import { type AuthContextType, useAuth } from "@/integrations/auth/AuthContext";
-import {
-	isPosthogEnabled,
-	sanitizeBoolean,
-} from "@/integrations/posthog/config";
+import { isPosthogEnabled } from "@/integrations/posthog/config";
 import { useTheme } from "@/integrations/theme";
 import type { ChatMessage } from "@/lib/types";
-import TanstackQueryLayout from "../integrations/tanstack-query/layout";
-
-const enableTanstackDevtools = sanitizeBoolean(environment.devtools?.tanstack);
 
 interface MyRouterContext {
 	queryClient: QueryClient;
@@ -101,13 +94,6 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 					</SidebarInset>
 				</SidebarProvider>
 				<Toaster theme={theme} />
-				{enableTanstackDevtools ? (
-					<>
-						<TanStackRouterDevtools position="bottom-right" />
-						<TanstackQueryLayout />
-					</>
-				) : null}
-
 				{showCopilot && <GlobalCopilot />}
 				{!isLoading && isAuthenticated && allowSurveys && (
 					<PostHogSurveyWidget />

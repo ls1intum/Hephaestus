@@ -14,6 +14,7 @@ import { StrictMode } from "react";
 
 import environment from "@/environment";
 import { AuthProvider, keycloakService, useAuth } from "@/integrations/auth";
+import { TanstackDevtools } from "@/integrations/devtools/TanstackDevtools";
 import { PostHogIdentity } from "@/integrations/posthog";
 import {
 	isPosthogEnabled,
@@ -112,6 +113,7 @@ if (rootElement && !rootElement.innerHTML) {
 							<PostHogIdentity />
 							<ThemeProvider defaultTheme="dark" storageKey="theme">
 								<WrappedRouterProvider />
+								<TanstackDevtools router={router} />
 							</ThemeProvider>
 						</AuthProvider>
 					</TanstackQuery.Provider>
@@ -121,6 +123,7 @@ if (rootElement && !rootElement.innerHTML) {
 					<AuthProvider>
 						<ThemeProvider defaultTheme="dark" storageKey="theme">
 							<WrappedRouterProvider />
+							<TanstackDevtools router={router} />
 						</ThemeProvider>
 					</AuthProvider>
 				</TanstackQuery.Provider>
