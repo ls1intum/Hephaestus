@@ -635,10 +635,20 @@ export function TimeframeFilter({
 	const { afterDate, beforeDate } = computeDates();
 
 	// Call onTimeframeChange when relevant values change
-	// Track latest dates to avoid dependency issues
-	const latestDates = useRef({ afterDate, beforeDate });
+	// Track latest dates to avoid redundant emissions
+	const latestDates = useRef<{ afterDate: string; beforeDate?: string } | null>(
+		null,
+	);
 
 	useEffect(() => {
+		const previous = latestDates.current;
+		if (
+			previous?.afterDate === afterDate &&
+			previous?.beforeDate === beforeDate
+		) {
+			return;
+		}
+
 		latestDates.current = { afterDate, beforeDate };
 		onTimeframeChange?.(afterDate, beforeDate, selectedTimeframe);
 	}, [afterDate, beforeDate, onTimeframeChange, selectedTimeframe]);

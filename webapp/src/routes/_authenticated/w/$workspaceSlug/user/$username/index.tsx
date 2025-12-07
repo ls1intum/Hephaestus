@@ -32,6 +32,12 @@ function UserProfile() {
 	const { after, before } = Route.useSearch();
 	const navigate = useNavigate({ from: Route.fullPath });
 
+	const parseDateParam = (value?: string) => {
+		if (!value) return undefined;
+		const parsed = new Date(value);
+		return Number.isNaN(parsed.getTime()) ? undefined : parsed;
+	};
+
 	// Check if current user is the dashboard user
 	const currUserIsDashboardUser = isCurrentUser(username);
 
@@ -40,20 +46,20 @@ function UserProfile() {
 		...getUserProfileOptions({
 			path: { workspaceSlug, login: username },
 			query: {
-				after: after ? new Date(after) : undefined,
-				before: before ? new Date(before) : undefined,
+				after: parseDateParam(after),
+				before: parseDateParam(before),
 			},
 		}),
+		placeholderData: (previousData) => previousData,
 		enabled: Boolean(username) && Boolean(workspaceSlug),
 	});
 
 	const handleTimeframeChange = (nextAfter: string, nextBefore?: string) => {
-		const resolvedBefore = nextBefore ?? formatISO(new Date());
 		navigate({
 			search: (prev) => ({
 				...prev,
 				after: nextAfter,
-				before: resolvedBefore,
+				before: nextBefore,
 			}),
 		});
 	};
@@ -61,7 +67,7 @@ function UserProfile() {
 	return (
 		<ProfilePage
 			profileData={profileQuery.data}
-			isLoading={profileQuery.isLoading || profileQuery.isFetching}
+			isLoading={profileQuery.isPending && !profileQuery.data}
 			error={profileQuery.isError}
 			username={username}
 			currUserIsDashboardUser={currUserIsDashboardUser}

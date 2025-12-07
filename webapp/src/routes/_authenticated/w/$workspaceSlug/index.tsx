@@ -26,14 +26,13 @@ const today = new Date();
 const startOfCurrentWeekDate = startOfISOWeek(today);
 const endOfCurrentWeekDate = endOfISOWeek(today);
 const startOfCurrentWeek = formatISO(startOfCurrentWeekDate);
-const endOfCurrentWeek = formatISO(endOfCurrentWeekDate);
 
 // Define search params schema for validation and types
 const leaderboardSearchSchema = z.object({
 	team: z.string().default("all"),
 	sort: z.enum(["SCORE", "LEAGUE_POINTS"]).default("SCORE"),
 	after: z.string().optional().default(startOfCurrentWeek),
-	before: z.string().optional().default(endOfCurrentWeek),
+	before: z.string().optional(),
 	mode: z.enum(["INDIVIDUAL", "TEAM"]).default("INDIVIDUAL"),
 });
 
@@ -62,6 +61,17 @@ function LeaderboardContainer() {
 	const { team, sort, after, before, mode } = Route.useSearch();
 	const navigate = useNavigate({ from: Route.fullPath });
 
+	const parseDateParam = (value?: string | null) => {
+		if (!value) return undefined;
+		const parsed = new Date(value);
+		return Number.isNaN(parsed.getTime()) ? undefined : parsed;
+	};
+
+	const resolvedAfter = after ?? startOfCurrentWeek;
+	const resolvedBefore = before ?? null;
+	const parsedAfter = parseDateParam(resolvedAfter);
+	const parsedBefore = parseDateParam(resolvedBefore);
+
 	// Query for workspace details (includes schedule info)
 	const workspaceQuery = useQuery({
 		...getWorkspaceOptions({
@@ -78,36 +88,38 @@ function LeaderboardContainer() {
 		enabled: hasWorkspace,
 	});
 
-	// Query for leaderboard data based on filters (API requires before; fall back when missing)
-	const normalizedBefore = before
-		? new Date(before)
-		: new Date(endOfCurrentWeek);
+	const queryAfter = parsedAfter ?? startOfCurrentWeekDate;
+	const queryBefore = parsedBefore ?? endOfCurrentWeekDate;
+
+	// Query for leaderboard data based on filters (before defaults to schedule end when unset)
 	const leaderboardQuery = useQuery({
 		...getLeaderboardOptions({
 			path: { workspaceSlug: slug },
 			query: {
-				after: after ? new Date(after) : new Date(startOfCurrentWeek),
-				before: normalizedBefore,
+				after: queryAfter,
+				before: queryBefore,
 				team,
 				sort,
 				mode,
 			},
 		}),
+		placeholderData: (previousData) => previousData,
 		enabled:
-			hasWorkspace && Boolean((after || startOfCurrentWeek) && teamsQuery.data),
+			hasWorkspace && Boolean((queryAfter || startOfCurrentWeekDate) && teamsQuery.data),
 	});
 
 	// Query for user profile data (mirror leaderboard filters if provided)
 	const userProfileOptions = getUserProfileOptions({
 		path: { workspaceSlug: workspaceSlug ?? "", login: username || "" },
 		query: {
-			after: new Date(after),
-			before: new Date(before),
+			after: parsedAfter,
+			before: parsedBefore,
 		},
 	});
 
 	const userProfileQuery = useQuery({
 		...userProfileOptions,
+		placeholderData: (previousData) => previousData,
 		enabled: hasWorkspace && Boolean(username),
 	});
 	// Find the current user's entry in the leaderboard
@@ -209,7 +221,7 @@ function LeaderboardContainer() {
 	};
 
 	// Calculate leaderboard end date with the correct time
-	const endDate = new Date(before);
+	const endDate = new Date(queryBefore ?? new Date());
 
 	// Adjust the end date to include the schedule time from server metadata
 	endDate.setHours(leaderboardSchedule.hour, leaderboardSchedule.minute, 0, 0);
@@ -318,7 +330,9 @@ function LeaderboardContainer() {
 		<LeaderboardPage
 			leaderboard={leaderboardQuery.data || []}
 			isLoading={
-				isWorkspaceLoading || leaderboardQuery.isPending || teamsQuery.isPending
+				isWorkspaceLoading ||
+				teamsQuery.isPending ||
+				(leaderboardQuery.isPending && !leaderboardQuery.data)
 			}
 			currentUser={userProfileQuery.data?.userInfo}
 			currentUserEntry={currentUserEntry}
