@@ -30,7 +30,8 @@ public final class LoggingUtils {
         if (input == null) {
             return null;
         }
-        // Remove CR, LF, TAB, and all other control characters that could forge log entries
-        return input.replaceAll("[\\r\\n\\t\\u0000-\\u001F\\u007F\\u2028\\u2029]", "_");
+        return input
+            .replaceAll("[\\r\\n\\t\\u0000-\\u001F\\u007F\\u0085\\u2028\\u2029]", "_")
+            .replaceAll("\\e\\[[0-9;]*[A-Za-z]", "_");
     }
 }

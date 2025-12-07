@@ -4,10 +4,7 @@ import {
 	GitPullRequestIcon,
 } from "@primer/octicons-react";
 import { useEffect, useState } from "react";
-import type {
-	PullRequestBaseInfo,
-	PullRequestInfo,
-} from "@/api/types.gen";
+import type { PullRequestBaseInfo, PullRequestInfo } from "@/api/types.gen";
 import { Button } from "@/components/ui/button";
 import { CardTitle } from "@/components/ui/card";
 import {

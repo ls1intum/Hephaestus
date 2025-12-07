@@ -49,7 +49,7 @@ export function ProfileContent({
 
 	const filteredReviewActivity = isLoading
 		? skeletonReviews
-		: reviewActivity ?? [];
+		: (reviewActivity ?? []);
 
 	const displayPullRequests = isLoading
 		? skeletonPullRequests
@@ -95,11 +95,12 @@ export function ProfileContent({
 		},
 	);
 
-	const reviewedPullRequestsForPopover: ReviewedPullRequest[] = reviewStatsSource
-		.map((activity) => activity.pullRequest)
-		.filter(
-			(pullRequest): pullRequest is PullRequestBaseInfo => Boolean(pullRequest),
-		);
+	const reviewedPullRequestsForPopover: ReviewedPullRequest[] =
+		reviewStatsSource
+			.map((activity) => activity.pullRequest)
+			.filter((pullRequest): pullRequest is PullRequestBaseInfo =>
+				Boolean(pullRequest),
+			);
 
 	return (
 		<div className="flex flex-col gap-4">

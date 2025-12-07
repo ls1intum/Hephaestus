@@ -308,11 +308,11 @@ export function TimeframeFilter({
 		};
 	});
 
-		useEffect(() => {
-			if (!dateRange?.from || dateRange?.to) {
-				openEndedCustomCutoffRef.current = null;
-			}
-		}, [dateRange?.from, dateRange?.to]);
+	useEffect(() => {
+		if (!dateRange?.from || dateRange?.to) {
+			openEndedCustomCutoffRef.current = null;
+		}
+	}, [dateRange?.from, dateRange?.to]);
 
 	// Handle timeframe selection change
 	const handleTimeframeChange = (value: string) => {

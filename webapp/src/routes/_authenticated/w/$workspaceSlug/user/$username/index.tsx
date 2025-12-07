@@ -5,20 +5,15 @@ import {
 	useNavigate,
 } from "@tanstack/react-router";
 import { zodValidator } from "@tanstack/zod-adapter";
-import { endOfISOWeek, formatISO, startOfISOWeek } from "date-fns";
+import { formatISO, startOfISOWeek } from "date-fns";
 import { z } from "zod";
 import { getUserProfileOptions } from "@/api/@tanstack/react-query.gen";
 import { ProfilePage } from "@/components/profile/ProfilePage";
 import { useAuth } from "@/integrations/auth/AuthContext";
 
 const profileSearchSchema = z.object({
-	after: z
-		.string()
-		.default(() => formatISO(startOfISOWeek(new Date()))),
-	before: z
-		.string()
-		.optional()
-		.default(() => formatISO(endOfISOWeek(new Date()))),
+	after: z.string().default(() => formatISO(startOfISOWeek(new Date()))),
+	before: z.string().optional(),
 });
 
 export const Route = createFileRoute(

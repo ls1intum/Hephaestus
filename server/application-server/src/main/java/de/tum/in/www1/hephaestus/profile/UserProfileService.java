@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.profile;
 
+import de.tum.in.www1.hephaestus.core.LoggingUtils;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.issuecomment.IssueCommentRepository;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestInfoDTO;
@@ -73,12 +74,16 @@ public class UserProfileService {
     @Transactional(readOnly = true)
     public Optional<UserProfileDTO> getUserProfile(String login, Long workspaceId, Instant after, Instant before) {
         TimeRange timeRange = resolveTimeRange(login, after, before);
+        String safeLogin = LoggingUtils.sanitizeForLog(login);
+        String safeWorkspace = workspaceId == null ? "null" : LoggingUtils.sanitizeForLog(workspaceId.toString());
+        String safeAfter = LoggingUtils.sanitizeForLog(timeRange.after().toString());
+        String safeBefore = LoggingUtils.sanitizeForLog(timeRange.before().toString());
         logger.debug(
             "Getting user profile for login: {} in workspace: {} with timeframe {} - {}",
-            login,
-            workspaceId,
-            timeRange.after(),
-            timeRange.before()
+            safeLogin,
+            safeWorkspace,
+            safeAfter,
+            safeBefore
         );
 
         Optional<User> optionalUser = userRepository.findByLogin(login);

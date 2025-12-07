@@ -100,13 +100,10 @@ function LeaderboardContainer() {
 	// Query for user profile data (mirror leaderboard filters if provided)
 	const userProfileOptions = getUserProfileOptions({
 		path: { workspaceSlug: workspaceSlug ?? "", login: username || "" },
-		query:
-			after || before
-				? {
-						after: after ? new Date(after) : undefined,
-						before: before ? new Date(before) : undefined,
-					}
-				: undefined,
+		query: {
+			after: after ? new Date(after) : undefined,
+			before: before ? new Date(before) : undefined,
+		},
 	});
 
 	const userProfileQuery = useQuery({
