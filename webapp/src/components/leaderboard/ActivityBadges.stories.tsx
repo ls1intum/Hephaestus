@@ -59,6 +59,7 @@ const meta = {
 		changeRequests: 1,
 		comments: 5,
 		codeComments: 2,
+		isLoading: false,
 	},
 } satisfies Meta<typeof ActivityBadges>;
 
@@ -92,6 +93,20 @@ export const Minimal: Story = {
 		reviewedPullRequests: [],
 		approvals: 0,
 		changeRequests: 1,
+		comments: 0,
+		codeComments: 0,
+	},
+};
+
+/**
+ * Skeleton placeholders shown while review stats are still loading.
+ */
+export const Loading: Story = {
+	args: {
+		isLoading: true,
+		reviewedPullRequests: [],
+		approvals: 0,
+		changeRequests: 0,
 		comments: 0,
 		codeComments: 0,
 	},

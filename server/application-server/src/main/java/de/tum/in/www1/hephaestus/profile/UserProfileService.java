@@ -127,7 +127,10 @@ public class UserProfileService {
         Instant resolvedAfter = after == null ? resolvedBefore.minus(DEFAULT_ACTIVITY_WINDOW) : after;
 
         if (resolvedAfter.isAfter(resolvedBefore)) {
-            logger.debug("Clamping activity window for user {} because after > before", LoggingUtils.sanitizeForLog(login));
+            logger.debug(
+                "Clamping activity window for user {} because after > before",
+                LoggingUtils.sanitizeForLog(login)
+            );
             resolvedAfter = resolvedBefore;
         }
 

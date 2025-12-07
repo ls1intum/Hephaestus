@@ -105,7 +105,8 @@ function LeaderboardContainer() {
 		}),
 		placeholderData: (previousData) => previousData,
 		enabled:
-			hasWorkspace && Boolean((queryAfter || startOfCurrentWeekDate) && teamsQuery.data),
+			hasWorkspace &&
+			Boolean((queryAfter || startOfCurrentWeekDate) && teamsQuery.data),
 	});
 
 	// Query for user profile data (mirror leaderboard filters if provided)

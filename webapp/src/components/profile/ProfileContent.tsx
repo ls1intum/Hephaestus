@@ -123,6 +123,7 @@ export function ProfileContent({
 								approvals={reviewStats.approvals}
 								comments={reviewStats.comments}
 								codeComments={reviewStats.codeComments}
+								isLoading={isLoading}
 							/>
 						</div>
 					</div>

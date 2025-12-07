@@ -5,6 +5,7 @@ import {
 	CommentIcon,
 	FileDiffIcon,
 } from "@primer/octicons-react";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
 	Tooltip,
 	TooltipContent,
@@ -22,6 +23,7 @@ export interface ActivityBadgesProps {
 	codeComments: number;
 	highlightReviews?: boolean;
 	className?: string;
+	isLoading?: boolean;
 }
 
 export function ActivityBadges({
@@ -32,6 +34,7 @@ export function ActivityBadges({
 	codeComments,
 	highlightReviews = false,
 	className,
+	isLoading = false,
 }: ActivityBadgesProps) {
 	const hasActivity =
 		reviewedPullRequests.length > 0 ||
@@ -40,7 +43,21 @@ export function ActivityBadges({
 		comments > 0 ||
 		codeComments > 0;
 
-	if (!hasActivity) return null;
+	if (!hasActivity && !isLoading) return null;
+
+	if (isLoading) {
+		return (
+			<div className={cn("flex items-center gap-2", className)}>
+				{[40, 15, 25, 35, 30].map((width, index) => (
+					<Skeleton
+						key={`activity-badge-skeleton-${index}`}
+						className="h-4"
+						style={{ width }}
+					/>
+				))}
+			</div>
+		);
+	}
 
 	return (
 		<div className={cn("flex items-center gap-2", className)}>
