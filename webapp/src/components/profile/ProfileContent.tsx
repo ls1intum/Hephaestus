@@ -1,12 +1,13 @@
 import { CodeReviewIcon, GitPullRequestIcon } from "@primer/octicons-react";
 import { Link } from "@tanstack/react-router";
 import type {
-	LeaderboardEntry,
+	PullRequestBaseInfo,
 	PullRequestInfo,
 	PullRequestReviewInfo,
 } from "@/api/types.gen";
 import { ActivityBadges } from "@/components/leaderboard/ActivityBadges";
 import { Button } from "@/components/ui/button";
+import type { ReviewedPullRequest } from "../leaderboard/ReviewsPopover";
 import { EmptyState } from "../shared/EmptyState";
 import { IssueCard } from "../shared/IssueCard";
 import { ProfileActivityFilter } from "./ProfileActivityFilter";
@@ -25,19 +26,6 @@ export interface ProfileContentProps {
 	onTimeframeChange?: (afterDate: string, beforeDate?: string) => void;
 }
 
-const parseDate = (value?: string) => {
-	if (!value) return undefined;
-	const parsed = new Date(value);
-	return Number.isNaN(parsed.getTime()) ? undefined : parsed;
-};
-
-const isWithinRange = (date?: Date, after?: Date, before?: Date) => {
-	if (!date) return true;
-	if (after && date < after) return false;
-	if (before && date >= before) return false;
-	return true;
-};
-
 export function ProfileContent({
 	reviewActivity = [],
 	openPullRequests = [],
@@ -50,9 +38,6 @@ export function ProfileContent({
 	beforeDate,
 	onTimeframeChange,
 }: ProfileContentProps) {
-	const parsedAfterDate = parseDate(afterDate);
-	const parsedBeforeDate = parseDate(beforeDate);
-
 	// Generate skeleton arrays for loading state
 	const skeletonReviews = isLoading
 		? Array.from({ length: 3 }, (_, i) => ({ id: i }))
@@ -64,17 +49,13 @@ export function ProfileContent({
 
 	const filteredReviewActivity = isLoading
 		? skeletonReviews
-		: (reviewActivity ?? []).filter((activity) =>
-				isWithinRange(activity.submittedAt, parsedAfterDate, parsedBeforeDate),
-			);
+		: reviewActivity ?? [];
 
 	const displayPullRequests = isLoading
 		? skeletonPullRequests
 		: openPullRequests;
 
-	const reviewStatsSource = (reviewActivity ?? []).filter((activity) =>
-		isWithinRange(activity.submittedAt, parsedAfterDate, parsedBeforeDate),
-	);
+	const reviewStatsSource = reviewActivity ?? [];
 
 	const reviewStats = reviewStatsSource.reduce(
 		(acc, activity) => {
@@ -94,6 +75,9 @@ export function ProfileContent({
 				case "CHANGES_REQUESTED":
 					acc.changeRequests += 1;
 					break;
+				case "UNKNOWN":
+					acc.unknowns += 1;
+					break;
 				default:
 					acc.comments += 1;
 			}
@@ -104,17 +88,18 @@ export function ProfileContent({
 			approvals: 0,
 			changeRequests: 0,
 			comments: 0,
+			unknowns: 0,
 			codeComments: 0,
 			totalScore: 0,
 			lastReviewAt: undefined as Date | undefined,
 		},
 	);
 
-	const reviewedPullRequestsForPopover = reviewStatsSource
+	const reviewedPullRequestsForPopover: ReviewedPullRequest[] = reviewStatsSource
 		.map((activity) => activity.pullRequest)
-		.filter((pullRequest): pullRequest is NonNullable<typeof pullRequest> =>
-			Boolean(pullRequest),
-		) as LeaderboardEntry["reviewedPullRequests"];
+		.filter(
+			(pullRequest): pullRequest is PullRequestBaseInfo => Boolean(pullRequest),
+		);
 
 	return (
 		<div className="flex flex-col gap-4">

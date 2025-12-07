@@ -82,6 +82,7 @@ export function TimeframeFilter({
 	// Track whether the user has manually selected a timeframe
 	const [userSelectedTimeframe, setUserSelectedTimeframe] = useState(false);
 	const allActivityStart = startOfDay(new Date(0));
+	const openEndedCustomCutoffRef = useRef<Date | null>(null);
 
 	// Helper function to set a date to a specific day of the week with specific time
 	// day is 1-7 where 1 is Monday (ISO)
@@ -306,6 +307,12 @@ export function TimeframeFilter({
 			to: new Date(),
 		};
 	});
+
+		useEffect(() => {
+			if (!dateRange?.from || dateRange?.to) {
+				openEndedCustomCutoffRef.current = null;
+			}
+		}, [dateRange?.from, dateRange?.to]);
 
 	// Handle timeframe selection change
 	const handleTimeframeChange = (value: string) => {
@@ -560,9 +567,14 @@ export function TimeframeFilter({
 
 				if (dateRange?.from && !dateRange?.to) {
 					const customStartDate = startOfDay(dateRange.from);
+					let cutoff = openEndedCustomCutoffRef.current;
+					if (!cutoff) {
+						cutoff = now;
+						openEndedCustomCutoffRef.current = cutoff;
+					}
 					return {
 						afterDate: formatISO(customStartDate),
-						beforeDate: formatISO(now),
+						beforeDate: formatISO(cutoff),
 					};
 				}
 

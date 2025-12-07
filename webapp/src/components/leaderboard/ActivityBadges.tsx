@@ -5,17 +5,17 @@ import {
 	CommentIcon,
 	FileDiffIcon,
 } from "@primer/octicons-react";
-import type { LeaderboardEntry } from "@/api/types.gen";
 import {
 	Tooltip,
 	TooltipContent,
 	TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import type { ReviewedPullRequest } from "./ReviewsPopover";
 import { ReviewsPopover } from "./ReviewsPopover";
 
 export interface ActivityBadgesProps {
-	reviewedPullRequests?: LeaderboardEntry["reviewedPullRequests"];
+	reviewedPullRequests?: readonly ReviewedPullRequest[];
 	changeRequests: number;
 	approvals: number;
 	comments: number;

@@ -1,8 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import type { LeaderboardEntry } from "@/api/types.gen";
 import { ActivityBadges } from "./ActivityBadges";
+import type { ReviewedPullRequest } from "./ReviewsPopover";
 
-const basePRs: LeaderboardEntry["reviewedPullRequests"] = [
+const basePRs: ReviewedPullRequest[] = [
 	{
 		id: 1,
 		number: 42,
@@ -47,9 +47,12 @@ const basePRs: LeaderboardEntry["reviewedPullRequests"] = [
 	},
 ];
 
+/**
+ * Activity badges summarize review work by showing reviewed pull requests, approvals, change requests, comments, and code comments at a glance.
+ */
 const meta = {
-	title: "Leaderboard/ActivityBadges",
 	component: ActivityBadges,
+	tags: ["autodocs"],
 	args: {
 		reviewedPullRequests: basePRs,
 		approvals: 3,
@@ -62,8 +65,14 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
+/**
+ * Balanced mix of approvals, change requests, comments, and code comments.
+ */
 export const Default: Story = {};
 
+/**
+ * Highlights reviewed pull requests without other activity types.
+ */
 export const ReviewsOnly: Story = {
 	args: {
 		reviewedPullRequests: basePRs,
@@ -75,6 +84,9 @@ export const ReviewsOnly: Story = {
 	},
 };
 
+/**
+ * Minimal activity with a single change request and no reviewed pull requests.
+ */
 export const Minimal: Story = {
 	args: {
 		reviewedPullRequests: [],

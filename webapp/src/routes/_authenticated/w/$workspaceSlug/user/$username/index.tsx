@@ -11,13 +11,14 @@ import { getUserProfileOptions } from "@/api/@tanstack/react-query.gen";
 import { ProfilePage } from "@/components/profile/ProfilePage";
 import { useAuth } from "@/integrations/auth/AuthContext";
 
-const today = new Date();
-const profileDefaultAfter = formatISO(startOfISOWeek(today));
-const profileDefaultBefore = formatISO(endOfISOWeek(today));
-
 const profileSearchSchema = z.object({
-	after: z.string().default(profileDefaultAfter),
-	before: z.string().optional().default(profileDefaultBefore),
+	after: z
+		.string()
+		.default(() => formatISO(startOfISOWeek(new Date()))),
+	before: z
+		.string()
+		.optional()
+		.default(() => formatISO(endOfISOWeek(new Date()))),
 });
 
 export const Route = createFileRoute(
