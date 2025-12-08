@@ -75,9 +75,11 @@ keycloak:
     realm: ${KEYCLOAK_REALM}
     client-id: ${KEYCLOAK_CLIENT_ID}
     client-secret: ${KEYCLOAK_CLIENT_SECRET}
+    # Internal base URL for container-to-container access (defaults to public URL)
+    internal-url: "${KEYCLOAK_INTERNAL_URL:${KEYCLOAK_URL}}"
     # Internal JWKS endpoint for containerized deployments (optional)
-    # When set, fetches signing keys from this URL instead of discovering via issuer-uri
-    jwk-set-uri: ${KEYCLOAK_JWK_SET_URI:}
+    # Defaults to the internal (or public) Keycloak base URL plus the JWKS suffix
+    jwk-set-uri: "${KEYCLOAK_JWK_SET_URI:${keycloak.internal-url}/realms/${KEYCLOAK_REALM}/protocol/openid-connect/certs}"
 
 nats:
     enabled: ${NATS_ENABLED:false}

@@ -2,7 +2,7 @@
 
 import { type Options, listGlobalContributors, deleteUser, getUserSettings, updateUserSettings, listWorkspaces, createWorkspace, purgeWorkspace, getWorkspace, provideFeedbackForBadPractice, resolveBadPractice, detectBadPracticesForPullRequest, detectBadPracticesByUser, getActivityByUser, voteMessage, getUserDocuments, createDocument, deleteDocument, getDocument, updateDocument, deleteVersionsAfterTimestamp, getDocumentVersions, getDocumentVersion, getLeaderboard, getUserLeagueStats, resetAndRecalculateLeagues, listMembers, assignRole, getCurrentUserMembership, removeMember, getMember, getThread, getThreads, getGroupedThreads, updateNotifications, getUserProfile, updatePublicVisibility, getRepositoriesToMonitor, removeRepositoryToMonitor, addRepositoryToMonitor, updateSchedule, updateSlackCredentials, renameSlug, updateStatus, getAllTeams, updateTeamVisibility, updateRepositoryVisibility, removeLabelFromTeam, addLabelToTeam, updateToken, getUsersWithTeams } from '../sdk.gen';
 import { queryOptions, type UseMutationOptions, type DefaultError, infiniteQueryOptions, type InfiniteData } from '@tanstack/react-query';
-import type { ListGlobalContributorsData, DeleteUserData, GetUserSettingsData, UpdateUserSettingsData, UpdateUserSettingsResponse, ListWorkspacesData, CreateWorkspaceData, CreateWorkspaceResponse, PurgeWorkspaceData, PurgeWorkspaceResponse, GetWorkspaceData, ProvideFeedbackForBadPracticeData, ResolveBadPracticeData, DetectBadPracticesForPullRequestData, DetectBadPracticesByUserData, GetActivityByUserData, VoteMessageData, VoteMessageError, VoteMessageResponse, GetUserDocumentsData, GetUserDocumentsResponse, CreateDocumentData, CreateDocumentError, CreateDocumentResponse, DeleteDocumentData, DeleteDocumentResponse, GetDocumentData, UpdateDocumentData, UpdateDocumentError, UpdateDocumentResponse, DeleteVersionsAfterTimestampData, DeleteVersionsAfterTimestampError, DeleteVersionsAfterTimestampResponse, GetDocumentVersionsData, GetDocumentVersionsError, GetDocumentVersionsResponse, GetDocumentVersionData, GetLeaderboardData, GetLeaderboardResponse, GetUserLeagueStatsData, GetUserLeagueStatsResponse, ResetAndRecalculateLeaguesData, ListMembersData, ListMembersResponse, AssignRoleData, AssignRoleResponse, GetCurrentUserMembershipData, RemoveMemberData, GetMemberData, GetThreadData, GetThreadsData, GetGroupedThreadsData, UpdateNotificationsData, UpdateNotificationsResponse, GetUserProfileData, UpdatePublicVisibilityData, UpdatePublicVisibilityResponse, GetRepositoriesToMonitorData, RemoveRepositoryToMonitorData, AddRepositoryToMonitorData, UpdateScheduleData, UpdateScheduleResponse, UpdateSlackCredentialsData, UpdateSlackCredentialsResponse, RenameSlugData, RenameSlugResponse, UpdateStatusData, UpdateStatusResponse, GetAllTeamsData, UpdateTeamVisibilityData, UpdateRepositoryVisibilityData, RemoveLabelFromTeamData, RemoveLabelFromTeamResponse, AddLabelToTeamData, AddLabelToTeamResponse, UpdateTokenData, UpdateTokenResponse, GetUsersWithTeamsData } from '../types.gen';
+import type { ListGlobalContributorsData, DeleteUserData, GetUserSettingsData, UpdateUserSettingsData, UpdateUserSettingsResponse, ListWorkspacesData, CreateWorkspaceData, CreateWorkspaceResponse, PurgeWorkspaceData, PurgeWorkspaceResponse, GetWorkspaceData, ProvideFeedbackForBadPracticeData, ResolveBadPracticeData, DetectBadPracticesForPullRequestData, DetectBadPracticesByUserData, GetActivityByUserData, VoteMessageData, VoteMessageError, VoteMessageResponse, GetUserDocumentsData, GetUserDocumentsResponse, CreateDocumentData, CreateDocumentError, CreateDocumentResponse, DeleteDocumentData, DeleteDocumentResponse, GetDocumentData, UpdateDocumentData, UpdateDocumentError, UpdateDocumentResponse, DeleteVersionsAfterTimestampData, DeleteVersionsAfterTimestampError, DeleteVersionsAfterTimestampResponse, GetDocumentVersionsData, GetDocumentVersionsError, GetDocumentVersionsResponse, GetDocumentVersionData, GetLeaderboardData, GetLeaderboardResponse, GetUserLeagueStatsData, GetUserLeagueStatsResponse, ResetAndRecalculateLeaguesData, ListMembersData, ListMembersResponse, AssignRoleData, AssignRoleResponse, GetCurrentUserMembershipData, RemoveMemberData, GetMemberData, GetThreadData, GetThreadsData, GetGroupedThreadsData, UpdateNotificationsData, UpdateNotificationsResponse, GetUserProfileData, GetUserProfileResponse, UpdatePublicVisibilityData, UpdatePublicVisibilityResponse, GetRepositoriesToMonitorData, RemoveRepositoryToMonitorData, AddRepositoryToMonitorData, UpdateScheduleData, UpdateScheduleResponse, UpdateSlackCredentialsData, UpdateSlackCredentialsResponse, RenameSlugData, RenameSlugResponse, UpdateStatusData, UpdateStatusResponse, GetAllTeamsData, UpdateTeamVisibilityData, UpdateRepositoryVisibilityData, RemoveLabelFromTeamData, RemoveLabelFromTeamResponse, AddLabelToTeamData, AddLabelToTeamResponse, UpdateTokenData, UpdateTokenResponse, GetUsersWithTeamsData } from '../types.gen';
 import { client as _heyApiClient } from '../client.gen';
 
 export type QueryKey<TOptions extends Options> = [
@@ -1011,6 +1011,36 @@ export const getUserProfileOptions = (options: Options<GetUserProfileData>) => {
             return data;
         },
         queryKey: getUserProfileQueryKey(options)
+    });
+};
+
+export const getUserProfileInfiniteQueryKey = (options: Options<GetUserProfileData>): QueryKey<Options<GetUserProfileData>> => createQueryKey('getUserProfile', options, true);
+
+/**
+ * Get user profile
+ * Returns user profile with workspace-scoped activity data including open PRs, review activity, and league points
+ */
+export const getUserProfileInfiniteOptions = (options: Options<GetUserProfileData>) => {
+    return infiniteQueryOptions<GetUserProfileResponse, DefaultError, InfiniteData<GetUserProfileResponse>, QueryKey<Options<GetUserProfileData>>, Date | Pick<QueryKey<Options<GetUserProfileData>>[0], 'body' | 'headers' | 'path' | 'query'>>(
+    // @ts-ignore
+    {
+        queryFn: async ({ pageParam, queryKey, signal }) => {
+            // @ts-ignore
+            const page: Pick<QueryKey<Options<GetUserProfileData>>[0], 'body' | 'headers' | 'path' | 'query'> = typeof pageParam === 'object' ? pageParam : {
+                query: {
+                    after: pageParam
+                }
+            };
+            const params = createInfiniteParams(queryKey, page);
+            const { data } = await getUserProfile({
+                ...options,
+                ...params,
+                signal,
+                throwOnError: true
+            });
+            return data;
+        },
+        queryKey: getUserProfileInfiniteQueryKey(options)
     });
 };
 

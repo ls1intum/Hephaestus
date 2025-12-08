@@ -34,9 +34,23 @@ This project uses [Tailwind CSS](https://tailwindcss.com/) for styling.
 This project uses [Biome](https://biomejs.dev/) for linting and formatting. The following scripts are available:
 
 ```bash
-npm run lint
-npm run format
-npm run check
+# Formatting
+npm run format          # Apply formatting fixes
+npm run format:check    # Check formatting (read-only)
+
+# Linting
+npm run lint            # Run linting checks only
+npm run lint:fix        # Apply lint fixes
+
+# Comprehensive (format + lint + imports)
+npm run check           # Check all (formatting, linting, import organization)
+npm run check:fix       # Apply all fixes
+
+# Type checking
+npm run typecheck       # Run TypeScript type checking
+
+# CI-optimized
+npm run ci              # Run all checks with CI-friendly output
 ```
 
 ## Shadcn

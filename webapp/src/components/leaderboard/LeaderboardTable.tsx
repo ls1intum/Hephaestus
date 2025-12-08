@@ -1,13 +1,7 @@
-import {
-	CheckIcon,
-	ChevronLeftIcon,
-	CommentDiscussionIcon,
-	CommentIcon,
-	FileDiffIcon,
-	NoEntryIcon,
-} from "@primer/octicons-react";
+import { NoEntryIcon } from "@primer/octicons-react";
 import { AwardIcon } from "lucide-react";
 import type { LeaderboardEntry, UserInfo } from "@/api/types.gen";
+import { ActivityBadges } from "@/components/leaderboard/ActivityBadges";
 import type { LeaderboardVariant } from "@/components/leaderboard/LeaderboardPage";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -19,14 +13,8 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
-import {
-	Tooltip,
-	TooltipContent,
-	TooltipTrigger,
-} from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { LeagueIcon } from "./LeagueIcon";
-import { ReviewsPopover } from "./ReviewsPopover";
 
 type TeamLeaderboardEntry = LeaderboardEntry & {
 	team: NonNullable<LeaderboardEntry["team"]>;
@@ -41,7 +29,6 @@ export interface LeaderboardTableProps {
 	onTeamClick?: (teamId: number) => void;
 	teamLabelsById?: Record<number, string>;
 }
-
 export function LeaderboardTable({
 	leaderboard = [],
 	isLoading,
@@ -124,64 +111,13 @@ export function LeaderboardTable({
 									{entry.score}
 								</TableCell>
 								<TableCell>
-									<div className="flex items-center gap-2">
-										{entry.numberOfReviewedPRs > 0 && (
-											<>
-												<ReviewsPopover
-													reviewedPRs={entry.reviewedPullRequests}
-												/>
-												<div className="flex items-center text-github-muted-foreground">
-													<ChevronLeftIcon className="h-4 w-4" />
-												</div>
-											</>
-										)}
-										{entry.numberOfChangeRequests > 0 && (
-											<Tooltip>
-												<TooltipTrigger asChild>
-													<div className="flex items-center gap-1 text-github-danger-foreground">
-														<FileDiffIcon className="h-4 w-4" />
-														<span>{entry.numberOfChangeRequests}</span>
-													</div>
-												</TooltipTrigger>
-												<TooltipContent>Changes Requested</TooltipContent>
-											</Tooltip>
-										)}
-										{entry.numberOfApprovals > 0 && (
-											<Tooltip>
-												<TooltipTrigger asChild>
-													<div className="flex items-center gap-1 text-github-success-foreground">
-														<CheckIcon className="h-4 w-4" />
-														<span>{entry.numberOfApprovals}</span>
-													</div>
-												</TooltipTrigger>
-												<TooltipContent>Approvals</TooltipContent>
-											</Tooltip>
-										)}
-										{entry.numberOfComments + entry.numberOfUnknowns > 0 && (
-											<Tooltip>
-												<TooltipTrigger asChild>
-													<div className="flex items-center gap-1 text-github-muted-foreground">
-														<CommentIcon className="h-4 w-4" />
-														<span>
-															{entry.numberOfComments + entry.numberOfUnknowns}
-														</span>
-													</div>
-												</TooltipTrigger>
-												<TooltipContent>Comments</TooltipContent>
-											</Tooltip>
-										)}
-										{entry.numberOfCodeComments > 0 && (
-											<Tooltip>
-												<TooltipTrigger asChild>
-													<div className="flex items-center gap-1 text-github-muted-foreground">
-														<CommentDiscussionIcon className="h-4 w-4" />
-														<span>{entry.numberOfCodeComments}</span>
-													</div>
-												</TooltipTrigger>
-												<TooltipContent>Code comments</TooltipContent>
-											</Tooltip>
-										)}
-									</div>
+									<ActivityBadges
+										reviewedPullRequests={entry.reviewedPullRequests}
+										changeRequests={entry.numberOfChangeRequests}
+										approvals={entry.numberOfApprovals}
+										comments={entry.numberOfComments + entry.numberOfUnknowns}
+										codeComments={entry.numberOfCodeComments}
+									/>
 								</TableCell>
 							</TableRow>
 						);
@@ -236,65 +172,14 @@ export function LeaderboardTable({
 								{entry.score}
 							</TableCell>
 							<TableCell>
-								<div className="flex items-center gap-2">
-									{entry.numberOfReviewedPRs > 0 && (
-										<>
-											<ReviewsPopover
-												reviewedPRs={entry.reviewedPullRequests}
-												highlight={isCurrentUser}
-											/>
-											<div className="flex items-center text-github-muted-foreground">
-												<ChevronLeftIcon className="h-4 w-4" />
-											</div>
-										</>
-									)}
-									{entry.numberOfChangeRequests > 0 && (
-										<Tooltip>
-											<TooltipTrigger asChild>
-												<div className="flex items-center gap-1 text-github-danger-foreground">
-													<FileDiffIcon className="h-4 w-4" />
-													<span>{entry.numberOfChangeRequests}</span>
-												</div>
-											</TooltipTrigger>
-											<TooltipContent>Changes Requested</TooltipContent>
-										</Tooltip>
-									)}
-									{entry.numberOfApprovals > 0 && (
-										<Tooltip>
-											<TooltipTrigger asChild>
-												<div className="flex items-center gap-1 text-github-success-foreground">
-													<CheckIcon className="h-4 w-4" />
-													<span>{entry.numberOfApprovals}</span>
-												</div>
-											</TooltipTrigger>
-											<TooltipContent>Approvals</TooltipContent>
-										</Tooltip>
-									)}
-									{entry.numberOfComments + entry.numberOfUnknowns > 0 && (
-										<Tooltip>
-											<TooltipTrigger asChild>
-												<div className="flex items-center gap-1 text-github-muted-foreground">
-													<CommentIcon className="h-4 w-4" />
-													<span>
-														{entry.numberOfComments + entry.numberOfUnknowns}
-													</span>
-												</div>
-											</TooltipTrigger>
-											<TooltipContent>Comments</TooltipContent>
-										</Tooltip>
-									)}
-									{entry.numberOfCodeComments > 0 && (
-										<Tooltip>
-											<TooltipTrigger asChild>
-												<div className="flex items-center gap-1 text-github-muted-foreground">
-													<CommentDiscussionIcon className="h-4 w-4" />
-													<span>{entry.numberOfCodeComments}</span>
-												</div>
-											</TooltipTrigger>
-											<TooltipContent>Code comments</TooltipContent>
-										</Tooltip>
-									)}
-								</div>
+								<ActivityBadges
+									reviewedPullRequests={entry.reviewedPullRequests}
+									changeRequests={entry.numberOfChangeRequests}
+									approvals={entry.numberOfApprovals}
+									comments={entry.numberOfComments + entry.numberOfUnknowns}
+									codeComments={entry.numberOfCodeComments}
+									highlightReviews={isCurrentUser}
+								/>
 							</TableCell>
 						</TableRow>
 					);
@@ -317,40 +202,42 @@ function LeaderboardTableSkeleton() {
 				</TableRow>
 			</TableHeader>
 			<TableBody>
-				{Array.from({ length: 10 }).map((_, idx) => (
-					<TableRow key={`skeleton-${idx}`}>
-						<TableCell>
-							<Skeleton
-								className="h-5 w-7"
-								style={{ width: `${20 + 1 * idx}px` }}
-							/>
-						</TableCell>
-						<TableCell>
-							<Skeleton className="h-8 w-8 mx-auto" />
-						</TableCell>
-						<TableCell className="py-2">
-							<div className="flex items-center gap-2">
-								<Skeleton className="w-10 h-10 rounded-full" />
+				{Array.from({ length: 10 }, (_, idx) => `skeleton-${idx}`).map(
+					(key, idx) => (
+						<TableRow key={key}>
+							<TableCell>
+								<Skeleton
+									className="h-5 w-7"
+									style={{ width: `${20 + 1 * idx}px` }}
+								/>
+							</TableCell>
+							<TableCell>
+								<Skeleton className="h-8 w-8 mx-auto" />
+							</TableCell>
+							<TableCell className="py-2">
+								<div className="flex items-center gap-2">
+									<Skeleton className="w-10 h-10 rounded-full" />
+									<Skeleton
+										className="h-5"
+										style={{ width: `${100 + (idx % 3) * 75}px` }}
+									/>
+								</div>
+							</TableCell>
+							<TableCell className="text-center">
+								<Skeleton
+									className="h-5 mx-auto"
+									style={{ width: `${20 + (10 - idx) + (idx % 3) * 4}px` }}
+								/>
+							</TableCell>
+							<TableCell className="py-2">
 								<Skeleton
 									className="h-5"
-									style={{ width: `${100 + (idx % 3) * 75}px` }}
+									style={{ width: `${30 + ((idx % 4) * 20) / (idx + 1)}px` }}
 								/>
-							</div>
-						</TableCell>
-						<TableCell className="text-center">
-							<Skeleton
-								className="h-5 mx-auto"
-								style={{ width: `${20 + (10 - idx) + (idx % 3) * 4}px` }}
-							/>
-						</TableCell>
-						<TableCell className="py-2">
-							<Skeleton
-								className="h-5"
-								style={{ width: `${30 + ((idx % 4) * 20) / (idx + 1)}px` }}
-							/>
-						</TableCell>
-					</TableRow>
-				))}
+							</TableCell>
+						</TableRow>
+					),
+				)}
 			</TableBody>
 		</Table>
 	);

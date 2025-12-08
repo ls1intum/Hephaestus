@@ -1,5 +1,11 @@
 import type { Meta, StoryObj } from "@storybook/react";
+import { fn } from "@storybook/test";
+import { endOfISOWeek, formatISO, startOfISOWeek } from "date-fns";
 import { ProfilePage } from "./ProfilePage";
+
+const now = new Date();
+const defaultAfter = formatISO(startOfISOWeek(now));
+const defaultBefore = formatISO(endOfISOWeek(now));
 
 /**
  * Complete user profile page that combines header and content sections.
@@ -53,6 +59,18 @@ const meta = {
 			description: "Active workspace slug for routing",
 			control: "text",
 		},
+		after: {
+			description: "Start of the activity window (ISO string)",
+			control: "text",
+		},
+		before: {
+			description: "End of the activity window (ISO string)",
+			control: "text",
+		},
+		onTimeframeChange: {
+			description: "Callback when the timeframe is adjusted",
+			table: { type: { summary: "function" } },
+		},
 	},
 	tags: ["autodocs"],
 } satisfies Meta<typeof ProfilePage>;
@@ -70,6 +88,9 @@ export const Default: Story = {
 		username: "johndoe",
 		currUserIsDashboardUser: true,
 		workspaceSlug: "aet",
+		after: defaultAfter,
+		before: defaultBefore,
+		onTimeframeChange: fn(),
 		profileData: {
 			userInfo: {
 				id: 1,
@@ -240,6 +261,9 @@ export const Loading: Story = {
 		profileData: undefined,
 		currUserIsDashboardUser: true,
 		workspaceSlug: "aet",
+		after: defaultAfter,
+		before: defaultBefore,
+		onTimeframeChange: fn(),
 	},
 };
 
@@ -254,6 +278,9 @@ export const ErrorState: Story = {
 		profileData: undefined,
 		currUserIsDashboardUser: true,
 		workspaceSlug: "aet",
+		after: defaultAfter,
+		before: defaultBefore,
+		onTimeframeChange: fn(),
 	},
 };
 
@@ -267,6 +294,9 @@ export const Empty: Story = {
 		username: "emptydoe",
 		currUserIsDashboardUser: true,
 		workspaceSlug: "aet",
+		after: defaultAfter,
+		before: defaultBefore,
+		onTimeframeChange: fn(),
 		profileData: {
 			userInfo: {
 				id: 3,

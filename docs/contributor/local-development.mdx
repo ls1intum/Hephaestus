@@ -167,7 +167,7 @@ The value must match the secret configured on your GitHub and GitLab webhooks (v
 2. Start Vite on port 4200:
 
    ```bash
-   npm run dev
+   npm -w webapp run dev
    ```
 
 3. Visit `http://localhost:4200`.
@@ -183,9 +183,9 @@ The value must match the secret configured on your GitHub and GitLab webhooks (v
 Storybook is the source of truth for presentational components.
 
 ```bash
-npm run storybook           # Local playground on http://localhost:6006
-npm run build-storybook     # Static bundle for Chromatic
-npm run chromatic:ci        # Visual regression in CI
+npm -w webapp run storybook           # Local playground on http://localhost:6006
+npm -w webapp run build-storybook     # Static bundle for Chromatic
+npm -w webapp run chromatic:ci        # Visual regression in CI
 ```
 
 - Every new UI component ships with at least one story covering empty, loading, and error states.
@@ -197,7 +197,7 @@ npm run chromatic:ci        # Visual regression in CI
 The generated client in `src/api` is the only way the webapp talks to backend services.
 
 ```bash
-npm run openapi-ts
+npm -w webapp run openapi-ts
 ```
 
 - Generated types drop the `Dto` suffix and mirror the Spring Boot API responses.

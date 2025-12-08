@@ -4,7 +4,7 @@ import {
 	GitPullRequestIcon,
 } from "@primer/octicons-react";
 import { useEffect, useState } from "react";
-import type { LeaderboardEntry } from "@/api/types.gen";
+import type { PullRequestBaseInfo, PullRequestInfo } from "@/api/types.gen";
 import { Button } from "@/components/ui/button";
 import { CardTitle } from "@/components/ui/card";
 import {
@@ -15,8 +15,10 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 
+export type ReviewedPullRequest = PullRequestInfo | PullRequestBaseInfo;
+
 export interface ReviewsPopoverProps {
-	reviewedPRs: LeaderboardEntry["reviewedPullRequests"];
+	reviewedPRs: readonly ReviewedPullRequest[];
 	highlight?: boolean;
 }
 
@@ -29,13 +31,16 @@ export function ReviewsPopover({
 	const hasReviews = reviewedPRs?.length > 0;
 
 	// Sort reviewed PRs by repository name and PR number
-	const sortedReviewedPRs =
-		reviewedPRs?.sort((a, b) => {
-			if (a.repository?.name === b.repository?.name) {
-				return a.number - b.number;
-			}
-			return (a.repository?.name ?? "").localeCompare(b.repository?.name ?? "");
-		}) || [];
+	const sortedReviewedPRs = reviewedPRs
+		? [...reviewedPRs].sort((a, b) => {
+				if (a.repository?.name === b.repository?.name) {
+					return a.number - b.number;
+				}
+				return (a.repository?.name ?? "").localeCompare(
+					b.repository?.name ?? "",
+				);
+			})
+		: [];
 
 	// Helper function to copy PR URLs to clipboard
 	const copyPullRequests = () => {

@@ -65,8 +65,8 @@ services:
       NATS_SERVER: nats://nats-server:4222
       KEYCLOAK_URL: https://${APP_HOSTNAME}/keycloak
       KEYCLOAK_REALM: hephaestus
-      # Internal URL for fetching JWKS (container-to-container, bypasses public URL)
-      KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/hephaestus/protocol/openid-connect/certs
+      # Internal base URL (includes /keycloak) for container-to-container JWKS fetches
+      KEYCLOAK_INTERNAL_URL: http://keycloak:8080/keycloak
       KEYCLOAK_CLIENT_ID: hephaestus-confidential
       KEYCLOAK_CLIENT_SECRET: ${KEYCLOAK_HEPHAESTUS_CONFIDENTIAL_CLIENT_SECRET}
       GH_APP_ID: ${GH_APP_ID}

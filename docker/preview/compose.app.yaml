@@ -250,8 +250,8 @@ services:
       # Public URL for issuer validation (must match token's iss claim)
       KEYCLOAK_URL: https://${PREVIEW_DOMAIN:?Required}/keycloak
       KEYCLOAK_REALM: hephaestus
-      # Internal URL for fetching JWKS (container-to-container, avoids firewall)
-      KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/hephaestus/protocol/openid-connect/certs
+      # Internal base URL (includes /keycloak) for container-to-container JWKS fetches
+      KEYCLOAK_INTERNAL_URL: http://keycloak:8080/keycloak
       KEYCLOAK_CLIENT_ID: hephaestus-confidential
       KEYCLOAK_CLIENT_SECRET: ${KEYCLOAK_HEPHAESTUS_CONFIDENTIAL_CLIENT_SECRET:?Required}
       # Shared Postfix
