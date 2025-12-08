@@ -125,4 +125,14 @@ public interface IssueCommentRepository extends JpaRepository<IssueComment, Long
         @Param("onlyFromPullRequests") boolean onlyFromPullRequests,
         @Param("workspaceId") Long workspaceId
     );
+
+    @Query(
+        """
+        SELECT MIN(ic.createdAt)
+        FROM IssueComment ic
+        WHERE ic.author.id = :userId
+            AND ic.issue.repository.organization.workspace.id = :workspaceId
+        """
+    )
+    Instant findEarliestCreatedAt(@Param("workspaceId") Long workspaceId, @Param("userId") Long userId);
 }

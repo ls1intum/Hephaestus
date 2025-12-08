@@ -41,9 +41,11 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -103,6 +105,7 @@ public class WorkspaceService {
     private final LeaguePointsCalculationService leaguePointsCalculationService;
     private final OrganizationService organizationService;
     private final WorkspaceMembershipService workspaceMembershipService;
+    private final WorkspaceContributionActivityService workspaceContributionActivityService;
     private final GitHubUserSyncService gitHubUserSyncService;
     private final GitHubAppTokenService gitHubAppTokenService;
 
@@ -134,6 +137,7 @@ public class WorkspaceService {
         LeaguePointsCalculationService leaguePointsCalculationService,
         OrganizationService organizationService,
         WorkspaceMembershipService workspaceMembershipService,
+        WorkspaceContributionActivityService workspaceContributionActivityService,
         GitHubUserSyncService gitHubUserSyncService,
         GitHubAppTokenService gitHubAppTokenService,
         ObjectProvider<GitHubDataSyncService> gitHubDataSyncServiceProvider,
@@ -159,6 +163,7 @@ public class WorkspaceService {
         this.leaguePointsCalculationService = leaguePointsCalculationService;
         this.organizationService = organizationService;
         this.workspaceMembershipService = workspaceMembershipService;
+        this.workspaceContributionActivityService = workspaceContributionActivityService;
         this.gitHubUserSyncService = gitHubUserSyncService;
         this.gitHubAppTokenService = gitHubAppTokenService;
         this.gitHubDataSyncServiceProvider = gitHubDataSyncServiceProvider;
@@ -675,16 +680,20 @@ public class WorkspaceService {
 
         workspaceMembershipService.resetLeaguePoints(workspaceId, LeaguePointsCalculationService.POINTS_DEFAULT);
 
-        // Get all pull request reviews and issue comments to calculate past leaderboards
-        var now = Instant.now();
+        var recalculationAnchor = Instant.now();
+        var now = recalculationAnchor;
         var weekAgo = now.minus(7, ChronoUnit.DAYS);
+
+        Map<Long, Instant> firstContributionByUserId = new HashMap<>();
 
         // While we still have reviews in the past, calculate leaderboard and update points
         do {
+            var windowEnd = now;
+            var windowStart = weekAgo;
             var leaderboard = leaderboardService.createLeaderboard(
                 workspace,
-                weekAgo,
-                now,
+                windowStart,
+                windowEnd,
                 "all",
                 LeaderboardSortType.SCORE,
                 LeaderboardMode.INDIVIDUAL
@@ -701,15 +710,30 @@ public class WorkspaceService {
                 }
                 var user = userRepository.findByLoginWithEagerMergedPullRequests(leaderboardUser.login()).orElseThrow();
                 int currentPoints = workspaceMembershipService.getCurrentLeaguePoints(workspaceId, user);
+
+                Instant firstContributionAt = firstContributionByUserId.computeIfAbsent(user.getId(), id ->
+                    workspaceContributionActivityService.findFirstContributionInstant(workspaceId, id).orElse(null)
+                );
+
+                if (firstContributionAt != null && windowEnd.isBefore(firstContributionAt)) {
+                    logger.debug(
+                        "Skipping recalculation for user {} because window ending at {} is before first contribution {}",
+                        user.getLogin(),
+                        windowEnd,
+                        firstContributionAt
+                    );
+                    return;
+                }
+
                 int newPoints = leaguePointsCalculationService.calculateNewPoints(user, currentPoints, entry);
                 workspaceMembershipService.updateLeaguePoints(workspaceId, user, newPoints);
             });
 
             // Move time window back one week
-            now = weekAgo;
-            weekAgo = weekAgo.minus(7, ChronoUnit.DAYS);
-            // only recalculate points for the last year
-        } while (weekAgo.isAfter(Instant.parse("2024-01-01T00:00:00Z")));
+            now = windowStart;
+            weekAgo = windowStart.minus(7, ChronoUnit.DAYS);
+            // only recalculate points until 22nd April 2024, FelixTJDietrich started ;)
+        } while (weekAgo.isAfter(Instant.parse("2024-04-22T00:00:00Z")));
 
         logger.info("Finished recalculating league points");
     }
