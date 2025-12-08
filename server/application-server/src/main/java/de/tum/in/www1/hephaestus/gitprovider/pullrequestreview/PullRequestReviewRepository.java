@@ -121,4 +121,14 @@ public interface PullRequestReviewRepository extends JpaRepository<PullRequestRe
         @Param("teamIds") Collection<Long> teamIds,
         @Param("workspaceId") Long workspaceId
     );
+
+    @Query(
+        value = """
+        SELECT MIN(prr.submittedAt)
+        FROM PullRequestReview prr
+        WHERE prr.author.id = :userId
+            AND prr.pullRequest.repository.organization.workspace.id = :workspaceId
+        """
+    )
+    Instant findEarliestSubmissionInstant(@Param("workspaceId") Long workspaceId, @Param("userId") Long userId);
 }
