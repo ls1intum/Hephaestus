@@ -37,7 +37,7 @@ These guidelines keep every service aligned. Keep changes focused. Mention any d
 - Subscribe to Zustand stores with selectors (`useDocumentsStore((state) => state.documents[id])`). Keep store actions pure.
 - Respect React Compiler requirements. No conditional hooks. No prop mutation. Check React DevTools for the `Memo ✨` badge or inspect builds for `react/compiler-runtime` when you need assurance. Use `'use no memo'` only while debugging.
 - Stay inside the Tailwind token scale. Reach for shadcn/ui primitives before adding new component libraries. Use `@apply` sparingly and only for wrapper primitives you reuse widely.
-- Co-locate `*.stories.tsx` files. Show default, loading, empty, and error states with realistic data. Run `npm run chromatic:ci` whenever stories change.
+- Co-locate `*.stories.tsx` files. Show default, loading, empty, and error states with realistic data. Run `npm -w webapp run chromatic:ci` whenever stories change.
 - Push heavy routes behind `React.lazy` and Suspense. Virtualise long lists with `@tanstack/react-virtual`. Defer analytics work to effects that run after paint.
 
 ### Quality gates
