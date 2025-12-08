@@ -91,7 +91,7 @@ jobs:
           # Always install to avoid half-restored caches
           npm ci --prefer-offline --no-audit
 
-          if ! npm run format:java; then
+          if ! npm run format:java:check; then
             echo "❌ application-server formatting failed. Run: npm run format:java"
             exit 1
           fi
@@ -192,15 +192,15 @@ jobs:
           echo "🎨 Checking code formatting..."
           if ! poetry run black --check --diff .; then
             echo "❌ Black formatting failed"
-            ISSUES_FOUND+=("Black formatting failed. Run: cd server/intelligence-service && poetry run black .")
+            ISSUES_FOUND+=("Black formatting failed. Run: npm run format:intelligence-service")
           else
             echo "✅ Black formatting passed"
           fi
 
           echo "🔍 Running linting..."
           if ! poetry run flake8 . --statistics --count; then
-            echo "❌ Flake8 linting failed Run: cd server/intelligence-service && poetry run flake8 ."
-            ISSUES_FOUND+=("Flake8 linting failed")
+            echo "❌ Flake8 linting failed. Run: npm run lint:intelligence-service"
+            ISSUES_FOUND+=("Flake8 linting failed. Run: npm run lint:intelligence-service")
           else
             echo "✅ Flake8 linting passed"
           fi
@@ -229,15 +229,15 @@ jobs:
           echo "🎨 Checking code formatting..."
           if ! poetry run black --check --diff .; then
             echo "❌ Black formatting failed"
-            ISSUES_FOUND+=("Black formatting failed. Run: cd server/webhook-ingest && poetry run black .")
+            ISSUES_FOUND+=("Black formatting failed. Run: npm run format:webhook-ingest")
           else
             echo "✅ Black formatting passed"
           fi
 
           echo "🔍 Running linting..."
           if ! poetry run flake8 . --statistics --count; then
-            echo "❌ Flake8 linting failed Run: cd server/webhook-ingest && poetry run flake8 ."
-            ISSUES_FOUND+=("Flake8 linting failed")
+            echo "❌ Flake8 linting failed. Run: npm run lint:webhook-ingest"
+            ISSUES_FOUND+=("Flake8 linting failed. Run: npm run lint:webhook-ingest")
           else
             echo "✅ Flake8 linting passed"
           fi

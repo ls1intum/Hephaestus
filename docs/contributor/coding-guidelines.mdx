@@ -9,11 +9,11 @@ These guidelines keep every service aligned. Keep changes focused. Mention any d
 
 ## Contributor checklist
 
-- Run the formatter and linter for the area you touched. Examples: `npm run -w webapp format`, `npm run lint:server`.
-- Smoke-test the critical scripts. `npm run -w webapp build` must pass. If you changed migrations, run `npm run db:generate-erd-docs`.
+- Run the formatter and linter for the area you touched. Examples: `npm run format:webapp`, `npm run lint:server`.
+- Smoke-test the critical scripts. `npm run build:webapp` must pass. If you changed migrations, run `npm run db:generate-erd-docs`.
 - Update Chromatic snapshots when you change UI components.
 - Regenerate clients and documentation when you change an API contract.
-- Rerun the quality gates that match your changes: `npm run lint`, `npm run generate:api`, or `./mvnw -pl server/application-server test`.
+- Rerun the quality gates that match your changes: `npm run check`, `npm run generate:api`, or `./mvnw -pl server/application-server test`.
 - Document what you verified in the pull request template. Link failing checks to tickets if you must defer.
 
 ## Webapp (`/webapp`)
@@ -43,9 +43,9 @@ These guidelines keep every service aligned. Keep changes focused. Mention any d
 ### Quality gates
 
 - Install dependencies with `npm install` at the repo root so optional binaries resolve.
-- Run `npm run -w webapp check` and `npm run -w webapp build` before opening a pull request.
-- Execute Vitest suites with `npm run -w webapp test`. Add unit tests beside the feature you touched.
-- Keep Storybook stories in sync with design. Launch `npm run -w webapp storybook` when pairing with design reviews.
+- Run `npm run check:webapp` and `npm run build:webapp` before opening a pull request.
+- Execute Vitest suites with `npm run test:webapp`. Add unit tests beside the feature you touched.
+- Keep Storybook stories in sync with design. Launch `npm -w webapp run storybook` when pairing with design reviews.
 - Validate bundle impact by checking the Vite build stats when you add large libraries.
 
 ## Spring Boot application server (`/server/application-server`)

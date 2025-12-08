@@ -23,18 +23,46 @@ This file governs the entire repository. Combine these guardrails with the scope
 
 Run the relevant commands locally before opening a PR:
 
-| Concern | Commands |
-| --- | --- |
-| Format everything | `npm run format` (wraps Java + Python + webapp formatting) |
-| Lint everything | `npm run lint` (runs Prettier check for Java + flake8 for Python + Biome + TypeScript type check) |
-| Webapp build | `npm --workspace webapp run build` (Vite build + `tsc --noEmit`) |
-| Webapp tests | `npm --workspace webapp run test` (Vitest) and add focused unit tests when touching logic. |
-| Storybook | `npm --workspace webapp run build-storybook` (Chromatic depends on a clean build). |
-| Application-server tests | Use Maven groups to mirror CI: `./mvnw test -Dgroups=unit`, `-Dgroups=integration`, `-Dgroups=architecture`. Live GitHub sync tests stay skipped unless you pass `-Dgroups=github-integration`, which activates the `github-integration-tests` profile. |
-| Intelligence service lint/type check | `poetry run black --check .`, `poetry run flake8 .`, `poetry run mypy .` inside `server/intelligence-service`. |
-| Webhook ingest lint | `poetry run black --check .` and `poetry run flake8 .` inside `server/webhook-ingest`. |
+### Aggregate commands (all services)
 
-Document any skipped gate in the PR description with a rationale. Always finish a change set by running `npm run format` followed by `npm run lint` so both styling and type checks reflect the final state.
+| Concern | Command | Description |
+| --- | --- | --- |
+| Format everything | `npm run format` | Apply formatting to Java + Python + webapp |
+| Check formatting | `npm run format:check` | Verify formatting without changes (CI) |
+| Lint everything | `npm run lint` | Format check + flake8 + Biome + typecheck |
+| Full check | `npm run check` | Comprehensive: format + lint + typecheck |
+| CI check | `npm run ci` | CI-optimized check across all services |
+
+### Per-service commands
+
+| Service | Format | Format Check | Lint | Check |
+| --- | --- | --- | --- | --- |
+| **Webapp** | `npm run format:webapp` | `npm run format:webapp:check` | `npm run lint:webapp` | `npm run check:webapp` |
+| **Java** | `npm run format:java` | `npm run format:java:check` | — | — |
+| **Intelligence Service** | `npm run format:intelligence-service` | `npm run format:intelligence-service:check` | `npm run lint:intelligence-service` | `npm run check:intelligence-service` |
+| **Webhook Ingest** | `npm run format:webhook-ingest` | `npm run format:webhook-ingest:check` | `npm run lint:webhook-ingest` | `npm run check:webhook-ingest` |
+
+### Additional commands
+
+| Concern | Command |
+| --- | --- |
+| Webapp build | `npm run build:webapp` |
+| Webapp tests | `npm run test:webapp` |
+| Webapp typecheck | `npm run typecheck:webapp` |
+| Webapp Storybook | `npm -w webapp run build-storybook` |
+| Application-server tests | `./mvnw test -Dgroups=unit`, `-Dgroups=integration`, `-Dgroups=architecture` |
+
+**Script naming conventions:**
+
+- `format` = apply formatting fixes
+- `format:check` = verify formatting (read-only, for CI)
+- `lint` = run linting checks
+- `lint:fix` = apply lint fixes  
+- `check` = comprehensive verification (format + lint + typecheck)
+- `check:fix` = apply all fixes
+- `ci` = CI-optimized output
+
+Document any skipped gate in the PR description with a rationale. Always finish a change set by running `npm run format` followed by `npm run check` so both styling and type checks reflect the final state.
 
 ## 4. Code generation & forbidden edits
 
