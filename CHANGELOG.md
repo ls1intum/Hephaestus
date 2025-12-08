@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.10.1](https://github.com/ls1intum/Hephaestus/compare/v0.10.0...v0.10.1) (2025-12-08)
+
+### 🐛 Bug Fixes
+
+* automatic conversion from pat to github app workspace ([ceb6422](https://github.com/ls1intum/Hephaestus/commit/ceb6422f007fcfe18999f5198986e13c7cba1541))
+
 ## [0.10.1-rc.1](https://github.com/ls1intum/Hephaestus/compare/v0.10.0...v0.10.1-rc.1) (2025-12-08)
 
 ### 🐛 Bug Fixes
