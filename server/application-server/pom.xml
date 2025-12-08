@@ -596,14 +596,15 @@
             
             Runs ONLY live GitHub API tests that require real GitHub App credentials
             and make actual network calls. These tests are tagged with 'live' and
-            protected by @EnabledIfEnvironmentVariable(named = "GH_APP_INSTALLATION_ID").
+            protected by Maven tag filtering (this profile) and by runtime credential
+            checks using assumeGitHubCredentialsConfigured() with JUnit Assumptions.
             
             Usage:
-              GH_APP_INSTALLATION_ID=12345678 mvn test -Plive-tests
+              ./mvnw test -Plive-tests
             
-            Required environment variables:
-              - GH_APP_INSTALLATION_ID: GitHub App installation ID (required for test execution)
+            Required configuration (via environment variables or application-live-local.yml):
               - GH_APP_ID: GitHub App ID
+              - GH_APP_INSTALLATION_ID: GitHub App installation ID
               - GH_APP_PRIVATE_KEY: GitHub App private key (PEM format)
               - GH_APP_PAT: Personal access token (optional, for certain operations)
               - GH_APP_ORGANIZATION: Test organization name (default: HephaestusTest)
@@ -612,9 +613,6 @@
             - mvn test (runs only @Tag("unit") tests)
             - mvn verify (runs @Tag("unit") + @Tag("integration") tests)
             - CI pipelines (unless explicitly activated)
-            
-            The environment variable guard ensures tests are skipped if the installation
-            ID is not set, preventing accidental failures.
         -->
         <profile>
             <id>live-tests</id>
