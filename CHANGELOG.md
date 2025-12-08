@@ -1,5 +1,40 @@
 # Changelog
 
+## [0.10.0](https://github.com/ls1intum/Hephaestus/compare/v0.9.2...v0.10.0) (2025-12-08)
+
+### 🐛 Bug Fixes
+
+* fix app compose environment ([dc2be4b](https://github.com/ls1intum/Hephaestus/commit/dc2be4b014c8763fec4b075177c871e51dc42189))
+* implement atomic workspace membership creation and ensure proper label relationship cleanup before deletion. ([#566](https://github.com/ls1intum/Hephaestus/issues/566)) ([34cd33e](https://github.com/ls1intum/Hephaestus/commit/34cd33e2828fe52a87b1e9d5f494eb2f5ab84524))
+* **webapp:** invert colors on ReviewsPopover hover in dark mode ([#562](https://github.com/ls1intum/Hephaestus/issues/562)) ([4c9423b](https://github.com/ls1intum/Hephaestus/commit/4c9423b718da1b9547a0e1275151429913ca1c20))
+* **webapp:** standardize loading spinners across codebase ([#561](https://github.com/ls1intum/Hephaestus/issues/561)) ([392c955](https://github.com/ls1intum/Hephaestus/commit/392c955b1f72e0e314c319fe4530b42b9c9cd302))
+* **webapp:** standardize skeleton loading states to eliminate color inconsistencies ([#559](https://github.com/ls1intum/Hephaestus/issues/559)) ([2ac9491](https://github.com/ls1intum/Hephaestus/commit/2ac9491e1ee4be58fcd9e51d55e03e2c67751ca9))
+
+### 🚀 Features
+
+* add activity badges with filter on profile ([#564](https://github.com/ls1intum/Hephaestus/issues/564)) ([af2aa9f](https://github.com/ls1intum/Hephaestus/commit/af2aa9f1fbf25cc979b3ea0785e901b139650521))
+* **application-server:** add contribution event entity ([#557](https://github.com/ls1intum/Hephaestus/issues/557)) ([f1d4de5](https://github.com/ls1intum/Hephaestus/commit/f1d4de5b839cbd0f6b7825c2aadafabc38d4dc87))
+* add PostHog survey ([#515](https://github.com/ls1intum/Hephaestus/issues/515)) ([a9ee3b2](https://github.com/ls1intum/Hephaestus/commit/a9ee3b26ba9294b97237e0903dc4f5de49228462))
+* add workspace switching and viewing with backfill and improved GitHub installation management ([#550](https://github.com/ls1intum/Hephaestus/issues/550)) ([75d4998](https://github.com/ls1intum/Hephaestus/commit/75d4998aebaad1267b4f5b215633771852104421))
+* enforce research participation consent ([#524](https://github.com/ls1intum/Hephaestus/issues/524)) ([6531868](https://github.com/ls1intum/Hephaestus/commit/65318683a7a8182c13fe13f2cd32817925d4fcaa))
+* **application-server:** env file support for GitHub-PAT authentication ([#547](https://github.com/ls1intum/Hephaestus/issues/547)) ([1f410bd](https://github.com/ls1intum/Hephaestus/commit/1f410bd0aa55a5d4e7f9c951fb0e4169e9bd7653))
+* **application-server:** implement workspace and organization domain ([#401](https://github.com/ls1intum/Hephaestus/issues/401)) ([cb5b2d4](https://github.com/ls1intum/Hephaestus/commit/cb5b2d4636c1862a2da0c3be90f213a67e55ae2a))
+* **application-server:** implement workspace entity extensions and CRUD API ([#408](https://github.com/ls1intum/Hephaestus/issues/408), [#416](https://github.com/ls1intum/Hephaestus/issues/416)) ([#541](https://github.com/ls1intum/Hephaestus/issues/541)) ([93d0c7d](https://github.com/ls1intum/Hephaestus/commit/93d0c7d99a85f63baa27d3815754d9a42fb8f684))
+* skip Keycloak login page and directly login with Github ([#526](https://github.com/ls1intum/Hephaestus/issues/526)) ([cc83957](https://github.com/ls1intum/Hephaestus/commit/cc83957dfe89cfa55fce3271e617e1fe0c712657))
+* support dockerless postgres workflow ([#517](https://github.com/ls1intum/Hephaestus/issues/517)) ([15acfe2](https://github.com/ls1intum/Hephaestus/commit/15acfe2626dbb28745ff5cb7884dfd270772e374))
+* **webhook-ingest:** support GitLab webhook ingestion ([#402](https://github.com/ls1intum/Hephaestus/issues/402)) ([6d09a0f](https://github.com/ls1intum/Hephaestus/commit/6d09a0f5da3be1b760c73a9fcea73233711c088a))
+* **application-server:** sync pull request review threads ([#522](https://github.com/ls1intum/Hephaestus/issues/522)) ([e5f00d0](https://github.com/ls1intum/Hephaestus/commit/e5f00d057ab74930b2bcd8c97fb870c66592dd97))
+* **application-server:** workspace slug rename with redirect support ([#553](https://github.com/ls1intum/Hephaestus/issues/553)) ([1fd2cef](https://github.com/ls1intum/Hephaestus/commit/1fd2cefe88d315f48b356e46c26b7a95624f527f))
+
+### 📚 Documentation
+
+* add repository agent handbook ([#512](https://github.com/ls1intum/Hephaestus/issues/512)) ([7e21d34](https://github.com/ls1intum/Hephaestus/commit/7e21d3449ea1a0320d22ed3ef4061dc7481ae69d))
+
+### ♻️ Code Refactoring
+
+* **application-server:** improve PostgreSQL connection error diagnostics for tests ([#563](https://github.com/ls1intum/Hephaestus/issues/563)) ([b01aa32](https://github.com/ls1intum/Hephaestus/commit/b01aa32061a06a6a8c4541241d266ae2a7307a73))
+* **application-server:** remove Kotlin Support / Conversion back to Java ([#509](https://github.com/ls1intum/Hephaestus/issues/509)) ([5cf784e](https://github.com/ls1intum/Hephaestus/commit/5cf784e24d7b00c5f7948e0b719bc2c4ec26afe0))
+
 ## [0.10.0-rc.53](https://github.com/ls1intum/Hephaestus/compare/v0.10.0-rc.52...v0.10.0-rc.53) (2025-12-08)
 
 ### 🐛 Bug Fixes
