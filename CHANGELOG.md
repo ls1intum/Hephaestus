@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.10.2](https://github.com/ls1intum/Hephaestus/compare/v0.10.1...v0.10.2) (2025-12-08)
+
+### 🐛 Bug Fixes
+
+* prevent league points calculation to go beyond first contribution of user ([#568](https://github.com/ls1intum/Hephaestus/issues/568)) ([d2e99e7](https://github.com/ls1intum/Hephaestus/commit/d2e99e7e8b8bec2acef31d72da5087f4908387de))
+
 ## [0.10.2-rc.1](https://github.com/ls1intum/Hephaestus/compare/v0.10.1...v0.10.2-rc.1) (2025-12-08)
 
 ### 🐛 Bug Fixes
