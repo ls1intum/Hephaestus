@@ -57,6 +57,14 @@ public class Label {
         this.teams.clear();
     }
 
+    /**
+     * Removes this label from all referencing issues (required before deletion).
+     */
+    public void removeAllIssues() {
+        this.issues.forEach(issue -> issue.getLabels().remove(this));
+        this.issues.clear();
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;

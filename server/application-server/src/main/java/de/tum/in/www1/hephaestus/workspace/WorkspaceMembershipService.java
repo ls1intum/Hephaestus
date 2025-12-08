@@ -6,7 +6,6 @@ import jakarta.persistence.EntityManager;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -25,10 +24,10 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>
  * Handles CRUD operations for workspace memberships, including:
  * <ul>
- *   <li>Creating and removing memberships</li>
- *   <li>Updating member roles</li>
- *   <li>Syncing GitHub organization members with workspace memberships</li>
- *   <li>Managing league points snapshots</li>
+ * <li>Creating and removing memberships</li>
+ * <li>Updating member roles</li>
+ * <li>Syncing GitHub organization members with workspace memberships</li>
+ * <li>Managing league points snapshots</li>
  * </ul>
  */
 @Service
@@ -62,41 +61,40 @@ public class WorkspaceMembershipService {
             return Collections.emptyMap();
         }
 
-        // If no workspace is specified, return default points
         if (workspaceId == null) {
             return userIds
                 .stream()
                 .collect(Collectors.toMap(id -> id, id -> LeaguePointsCalculationService.POINTS_DEFAULT));
         }
 
-        Map<Long, WorkspaceMembership> existing = workspaceMembershipRepository
+        Set<Long> existingUserIds = workspaceMembershipRepository
             .findAllByWorkspace_IdAndUser_IdIn(workspaceId, userIds)
             .stream()
-            .collect(Collectors.toMap(member -> member.getUser().getId(), member -> member));
+            .map(member -> member.getUser().getId())
+            .collect(Collectors.toSet());
 
-        // For new members, we need to fetch the workspace entity to create memberships
-        Workspace workspace = workspaceId != null ? workspaceRepository.findById(workspaceId).orElse(null) : null;
-
-        List<WorkspaceMembership> toPersist = new ArrayList<>();
-        if (workspace != null) {
-            for (User user : users) {
-                Long userId = user.getId();
-                if (userId == null || existing.containsKey(userId)) {
-                    continue;
-                }
-                WorkspaceMembership member = createMembershipInternal(workspace, user);
-                member.setLeaguePoints(LeaguePointsCalculationService.POINTS_DEFAULT);
-                existing.put(userId, member);
-                toPersist.add(member);
+        for (User user : users) {
+            Long userId = user.getId();
+            if (userId == null || existingUserIds.contains(userId)) {
+                continue;
             }
+            workspaceMembershipRepository.insertIfAbsent(
+                workspaceId,
+                userId,
+                WorkspaceMembership.WorkspaceRole.MEMBER.name(),
+                LeaguePointsCalculationService.POINTS_DEFAULT
+            );
         }
 
-        if (!toPersist.isEmpty()) {
-            workspaceMembershipRepository.saveAll(toPersist);
+        Map<Long, Integer> leaguePointsByUserId = workspaceMembershipRepository
+            .findAllByWorkspace_IdAndUser_IdIn(workspaceId, userIds)
+            .stream()
+            .collect(Collectors.toMap(member -> member.getUser().getId(), WorkspaceMembership::getLeaguePoints));
+
+        for (Long userId : userIds) {
+            leaguePointsByUserId.putIfAbsent(userId, LeaguePointsCalculationService.POINTS_DEFAULT);
         }
 
-        Map<Long, Integer> leaguePointsByUserId = new HashMap<>();
-        existing.forEach((userId, member) -> leaguePointsByUserId.put(userId, member.getLeaguePoints()));
         return leaguePointsByUserId;
     }
 
@@ -273,8 +271,8 @@ public class WorkspaceMembershipService {
      * Creates a new membership if the user is not yet a member.
      *
      * @param workspaceId Workspace ID
-     * @param userId User ID
-     * @param role Role to assign
+     * @param userId      User ID
+     * @param role        Role to assign
      * @return Updated or created membership
      */
     @Transactional
@@ -309,7 +307,7 @@ public class WorkspaceMembershipService {
      * Remove a user's membership from a workspace.
      *
      * @param workspaceId Workspace ID
-     * @param userId User ID
+     * @param userId      User ID
      */
     @Transactional
     public void removeMembership(Long workspaceId, Long userId) {
