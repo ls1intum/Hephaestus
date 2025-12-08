@@ -11,7 +11,7 @@ import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
-class GitHubTeamSyncIntegrationTest extends AbstractGitHubSyncIntegrationTest {
+class GitHubLiveTeamSyncIntegrationTest extends AbstractGitHubLiveSyncIntegrationTest {
 
     @Autowired
     private GitHubRepositorySyncService repositorySyncService;

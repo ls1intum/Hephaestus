@@ -64,8 +64,9 @@ public class ChatMessageVoteController {
             workspaceContext.slug()
         );
 
-        // Check if message exists
-        var messageOptional = messageRepository.findById(messageId);
+        // Check if message exists - use eager fetch to avoid lazy loading issues with
+        // thread.user
+        var messageOptional = messageRepository.findWithThreadAndUserById(messageId);
         if (messageOptional.isEmpty()) {
             logger.warn("Message not found: {}", messageId);
             return ResponseEntity.notFound().build();

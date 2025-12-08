@@ -11,7 +11,7 @@ import org.kohsuke.github.GHLabel;
 import org.kohsuke.github.GHRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 
-class GitHubLabelSyncIntegrationTest extends AbstractGitHubSyncIntegrationTest {
+class GitHubLiveLabelSyncIntegrationTest extends AbstractGitHubLiveSyncIntegrationTest {
 
     private static final String LABEL_PREFIX = "it-label";
     private static final String INITIAL_COLOR = "00ffaa";

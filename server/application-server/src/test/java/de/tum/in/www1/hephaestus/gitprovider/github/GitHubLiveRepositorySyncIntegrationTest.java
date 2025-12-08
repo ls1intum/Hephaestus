@@ -31,7 +31,7 @@ import org.junit.jupiter.api.Test;
 import org.kohsuke.github.GHIssueState;
 import org.springframework.beans.factory.annotation.Autowired;
 
-class GitHubRepositorySyncIntegrationTest extends AbstractGitHubSyncIntegrationTest {
+class GitHubLiveRepositorySyncIntegrationTest extends AbstractGitHubLiveSyncIntegrationTest {
 
     @Autowired
     private GitHubDataSyncService dataSyncService;
