@@ -36,7 +36,12 @@
         <maven.test.failure.ignore>false</maven.test.failure.ignore>
         <maven.test.skip>false</maven.test.skip>
         <hephaestus.surefire.timeout>180</hephaestus.surefire.timeout>
-        <hephaestus.githubIntegrationExcludedGroups>github-integration</hephaestus.githubIntegrationExcludedGroups>
+        
+        <!-- Tag filtering: exclude live tests by default, include only specific test types -->
+        <surefire.excludedGroups>live</surefire.excludedGroups>
+        <surefire.includedGroups>unit</surefire.includedGroups>
+        <failsafe.excludedGroups>live</failsafe.excludedGroups>
+        <failsafe.includedGroups>integration</failsafe.includedGroups>
 
         <!-- Coverage Configuration (disabled by default) -->
         <skipCoverage>true</skipCoverage>
@@ -446,7 +451,9 @@
                     <!-- Forked JVM timeout settings to prevent hanging -->
                     <forkedProcessTimeoutInSeconds>${hephaestus.surefire.timeout}</forkedProcessTimeoutInSeconds>
                     <forkedProcessExitTimeoutInSeconds>60</forkedProcessExitTimeoutInSeconds>
-                    <excludedGroups>${hephaestus.githubIntegrationExcludedGroups}</excludedGroups>
+                    <!-- Tag filtering: run unit tests, exclude live tests -->
+                    <groups>${surefire.includedGroups}</groups>
+                    <excludedGroups>${surefire.excludedGroups}</excludedGroups>
                 </configuration>
             </plugin>
 
@@ -456,11 +463,9 @@
                 <artifactId>maven-failsafe-plugin</artifactId>
                 <configuration>
                     <argLine>@{argLine} -Xmx1024m -Dspring.profiles.active=test -Dfile.encoding=UTF-8</argLine>
-                    <includes>
-                        <include>**/*IntegrationTest.java</include>
-                        <include>**/*IT.java</include>
-                    </includes>
-                    <groups>integration</groups>
+                    <!-- Tag filtering: run integration tests, exclude live tests -->
+                    <groups>${failsafe.includedGroups}</groups>
+                    <excludedGroups>${failsafe.excludedGroups}</excludedGroups>
                 </configuration>
                 <executions>
                     <execution>
@@ -476,6 +481,7 @@
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
                 <configuration>
+                    <!-- Default configuration for spring-boot:run -->
                     <profiles>${app.profiles}</profiles>
                     <jvmArguments>-Dspring.application.admin.enabled=true -XX:+EnableDynamicAgentLoading --enable-native-access=ALL-UNNAMED</jvmArguments>
                     <excludes>
@@ -488,9 +494,23 @@
                     <maxAttempts>100</maxAttempts>
                 </configuration>
                 <executions>
+                    <!-- OpenAPI spec generation: start server with 'specs' profile -->
                     <execution>
+                        <id>start-for-openapi</id>
+                        <phase>pre-integration-test</phase>
                         <goals>
                             <goal>start</goal>
+                        </goals>
+                        <configuration>
+                            <!-- Use 'specs' profile for OpenAPI generation - disables WorkspaceStartupListener -->
+                            <profiles>specs</profiles>
+                            <jvmArguments>-Dspring.application.admin.enabled=true -XX:+EnableDynamicAgentLoading --enable-native-access=ALL-UNNAMED -Dspring.devtools.restart.enabled=false</jvmArguments>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>stop-after-openapi</id>
+                        <phase>post-integration-test</phase>
+                        <goals>
                             <goal>stop</goal>
                         </goals>
                     </execution>
@@ -570,26 +590,38 @@
                 <hephaestus.surefire.timeout>180</hephaestus.surefire.timeout>
             </properties>
         </profile>
+        
         <!--
-            GitHub Integration Tests Profile
+            Live Tests Profile
             
-            Activates ONLY when explicitly running live GitHub API tests:
-              ./mvnw test -Dgroups=github-integration
+            Runs ONLY live GitHub API tests that require real GitHub App credentials
+            and make actual network calls. These tests are tagged with 'live' and
+            protected by Maven tag filtering (this profile) and by runtime credential
+            checks using assumeGitHubCredentialsConfigured() with JUnit Assumptions.
             
-            The default behavior excludes github-integration tests when running
-            other test groups (unit, integration, architecture). This profile
-            clears that exclusion for live API testing.
+            Usage:
+              ./mvnw test -Plive-tests
+            
+            Required configuration (via environment variables or application-live-local.yml):
+              - GH_APP_ID: GitHub App ID
+              - GH_APP_INSTALLATION_ID: GitHub App installation ID
+              - GH_APP_PRIVATE_KEY: GitHub App private key (PEM format)
+              - GH_APP_PAT: Personal access token (optional, for certain operations)
+              - GH_APP_ORGANIZATION: Test organization name (default: HephaestusTest)
+            
+            This profile is completely opt-in and will NOT run during:
+            - mvn test (runs only @Tag("unit") tests)
+            - mvn verify (runs @Tag("unit") + @Tag("integration") tests)
+            - CI pipelines (unless explicitly activated)
         -->
         <profile>
-            <id>github-integration-tests</id>
-            <activation>
-                <property>
-                    <name>groups</name>
-                    <value>github-integration</value>
-                </property>
-            </activation>
+            <id>live-tests</id>
             <properties>
-                <hephaestus.githubIntegrationExcludedGroups></hephaestus.githubIntegrationExcludedGroups>
+                <!-- Override defaults to run ONLY live tests -->
+                <surefire.excludedGroups></surefire.excludedGroups>
+                <surefire.includedGroups>live</surefire.includedGroups>
+                <failsafe.excludedGroups></failsafe.excludedGroups>
+                <failsafe.includedGroups></failsafe.includedGroups>
             </properties>
         </profile>
     </profiles>

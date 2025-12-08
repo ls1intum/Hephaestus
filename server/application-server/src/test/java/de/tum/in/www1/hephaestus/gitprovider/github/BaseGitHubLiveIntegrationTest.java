@@ -12,19 +12,37 @@ import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.env.Environment;
+import org.springframework.core.io.ResourceLoader;
 import org.springframework.test.context.ActiveProfiles;
 
 /**
- * Base class for GitHub integration tests. Runs with the {@code github-integration}
- * profile. Each test automatically checks that real credentials have been provided
- * and gets skipped otherwise, which keeps the CI pipeline green while enabling
- * developers to run the suite locally.
+ * Base class for live GitHub API integration tests. These tests make real
+ * network calls
+ * to GitHub's API and require valid GitHub App credentials. They are tagged
+ * with "live"
+ * and will only run when the profile is explicitly activated:
+ *
+ * <pre>
+ *   ./mvnw test -Plive-tests
+ * </pre>
+ *
+ * These tests are excluded from normal mvn test and mvn verify runs to keep CI
+ * fast
+ * and prevent accidental API calls. Use them to validate actual GitHub API
+ * behavior.
+ *
+ * Required configuration (in application-live-local.yml or environment
+ * variables):
+ * - github.app.id: GitHub App ID
+ * - github.app.privateKey: GitHub App private key (PEM format)
+ * - integration-tests.github.installation-id: GitHub App installation ID
+ * - github.meta.auth-token: Personal access token for tests
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-@ActiveProfiles(value = "github-integration", inheritProfiles = true)
+@ActiveProfiles(value = "live", inheritProfiles = true)
 @Execution(ExecutionMode.SAME_THREAD)
-@Tag("github-integration")
-public abstract class BaseGitHubIntegrationTest extends BaseIntegrationTest {
+@Tag("live")
+public abstract class BaseGitHubLiveIntegrationTest extends BaseIntegrationTest {
 
     private static final DateTimeFormatter SUFFIX_FORMATTER = DateTimeFormatter.ofPattern(
         "yyyyMMdd-HHmmss-SSS"
@@ -34,7 +52,7 @@ public abstract class BaseGitHubIntegrationTest extends BaseIntegrationTest {
     private Environment environment;
 
     @Autowired
-    private org.springframework.core.io.ResourceLoader resourceLoader;
+    private ResourceLoader resourceLoader;
 
     @BeforeEach
     void requireGitHubCredentials() {

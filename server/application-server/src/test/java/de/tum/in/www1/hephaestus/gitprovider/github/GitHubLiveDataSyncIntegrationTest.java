@@ -40,7 +40,7 @@ import org.springframework.test.context.TestPropertySource;
         "monitoring.backfill.cooldown-minutes=0", // Disable cooldown for tests
     }
 )
-class GitHubDataSyncIntegrationTest extends AbstractGitHubSyncIntegrationTest {
+class GitHubLiveDataSyncIntegrationTest extends AbstractGitHubLiveSyncIntegrationTest {
 
     @Autowired
     private GitHubDataSyncService dataSyncService;

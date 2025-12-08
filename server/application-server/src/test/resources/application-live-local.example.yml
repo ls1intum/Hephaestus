@@ -1,0 +1,36 @@
+# Copy this file to application-live-local.yml (gitignored) and
+# replace the placeholder values with your real GitHub App credentials.
+#
+# This file is intentionally kept out of version control. Any values defined here
+# override the defaults from application-live.yml when the `live` profile is active.
+#
+# To run live tests:
+#   ./mvnw test -Plive-tests
+#
+# Alternatively, use environment variables instead of this file:
+#   export GH_APP_ID=2250297
+#   export GH_APP_INSTALLATION_ID=93512943
+#   export GH_APP_PRIVATE_KEY="$(cat path/to/private-key.pem)"
+#   export GH_APP_PAT=github_pat_xxx
+#   export GH_APP_ORGANIZATION=HephaestusTest
+#   ./mvnw test -Plive-tests
+
+github:
+  app:
+    id: 2250297  # Your GitHub App ID
+    privateKeyLocation: ""  # Leave empty if using inline key below
+    privateKey: |-
+      -----BEGIN RSA PRIVATE KEY-----
+      PASTE_YOUR_GITHUB_APP_PRIVATE_KEY_HERE
+      -----END RSA PRIVATE KEY-----
+  meta:
+    # Personal access token for GitHub API operations
+    auth-token: github_pat_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+
+integration-tests:
+  github:
+    organization: HephaestusTest
+    installation-id: 93512943
+    sandbox-repository: ""
+  # Prefix used for ephemeral resources; adjust if you share a sandbox.
+  ephemeral-prefix: hephaestus-it

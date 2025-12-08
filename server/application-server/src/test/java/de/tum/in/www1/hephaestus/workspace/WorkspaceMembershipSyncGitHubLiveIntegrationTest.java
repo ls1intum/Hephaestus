@@ -3,22 +3,15 @@ package de.tum.in.www1.hephaestus.workspace;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 
-import de.tum.in.www1.hephaestus.Application;
+import de.tum.in.www1.hephaestus.gitprovider.github.BaseGitHubLiveIntegrationTest;
 import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationMembershipRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
-import de.tum.in.www1.hephaestus.testconfig.BaseIntegrationTest;
 import java.time.Duration;
 import java.util.List;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
 
-@SpringBootTest(classes = Application.class)
-@ActiveProfiles(value = { "test", "github-integration" }, inheritProfiles = true)
-@Tag("github-integration")
-class WorkspaceMembershipSyncIntegrationTest extends BaseIntegrationTest {
+class WorkspaceMembershipSyncGitHubLiveIntegrationTest extends BaseGitHubLiveIntegrationTest {
 
     @Autowired
     private WorkspaceService workspaceService;

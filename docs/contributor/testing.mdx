@@ -137,9 +137,7 @@ Available examples include `label.created`, `repository.created`, `create`, `pus
 ./mvnw test -Dtest=UserServiceTest#methodName # Single test method
 ```
 
-Use the optional `-Dgroups=unit` or `-Dgroups=integration` flags once category support lands.
-
-## GitHub live sync integration tests
+## GitHub live API tests
 
 Some regression scenarios can only be validated against GitHub itself. We ship a focused suite that exercises the live GitHub App installation and verifies end-to-end sync behaviour (repository metadata, labels, milestones, and teams).
 
@@ -154,7 +152,7 @@ Some regression scenarios can only be validated against GitHub itself. We ship a
 
     ```bash
     cd server/application-server/src/test/resources
-    cp application-github-integration-local.example.yml application-github-integration-local.yml
+    cp application-live-local.example.yml application-live-local.yml
     ```
 
     Fill in the placeholders with the sandbox organisation slug, the installation id, and either an inline PEM key (`github.app.privateKey`) or a readable `privateKeyLocation`. Keep this file out of version control—it is already listed in `.gitignore`.
@@ -162,33 +160,35 @@ Some regression scenarios can only be validated against GitHub itself. We ship a
     Alternatively, export the matching environment variables:
 
     ```bash
-    export GH_IT_APP_ID=2250297
-    export GH_IT_APP_PAT=ghp_xxx...      # PAT with the scopes above
-    export GH_IT_INSTALLATION_ID=93512943
-    export GH_IT_ORGANIZATION=HephaestusTest
-    export GH_IT_APP_PRIVATE_KEY_PATH=/absolute/path/to/private-key.pem
+    export GH_APP_ID=2250297
+    export GH_APP_INSTALLATION_ID=93512943
+    export GH_APP_PRIVATE_KEY="$(cat /path/to/private-key.pem)"
+    export GH_APP_PAT=ghp_xxx...             # PAT with the scopes above
+    export GH_APP_ORGANIZATION=HephaestusTest
     ```
 
-    Use either the file _or_ the environment variables; the suite checks both and aborts if key material is missing.
+    Use either the config file _or_ environment variables; the test suite checks both and aborts if key material is missing.
 
 ### Running the suite
 
 From `server/application-server/` run:
 
 ```bash
-./mvnw test -Dgroups=github-integration
+./mvnw test -Plive-tests
 ```
 
-Passing the `groups` system property automatically activates the `github-integration-tests` Maven profile, which clears the default exclusion and runs only the live GitHub scenarios. The regular CI pipeline never sets this flag, so these tests remain skipped unless you opt in locally.
+The `-Plive-tests` profile tells Maven to run only tests tagged with `@Tag("live")`. This is the **single guard** for live tests—if you don't pass the profile, the tests simply won't run.
+
+**Live tests never run during normal CI.** They are explicitly excluded from `mvn test` and `mvn verify` via tag filtering in the Surefire and Failsafe plugins.
 
 The run takes roughly two minutes and prints the GitHub artefacts it provisions. Clean-up is handled automatically, but if a failure interrupts execution you can safely delete any `hephaestus-it-*` repositories, milestones, or teams that remain in the sandbox.
 
 ### Authoring new GitHub sync tests
 
-1. Extend `AbstractGitHubSyncIntegrationTest` (or fall back to `BaseGitHubIntegrationTest` when repositories are not needed). These bases set up credential checks, provide the `workspaceRepository`, and expose helpers such as `createEphemeralRepository`, `registerRepositoryToMonitor`, `createEphemeralTeam`, and `seedOrganizationMembers`.
+1. Extend `AbstractGitHubLiveSyncIntegrationTest` (or fall back to `BaseGitHubLiveIntegrationTest` when repositories are not needed). These bases set up credential checks, provide the `workspaceRepository`, and expose helpers such as `createEphemeralRepository`, `registerRepositoryToMonitor`, `createEphemeralTeam`, and `seedOrganizationMembers`.
 2. Use the supplied helpers to create and track temporary GitHub artefacts. They automatically register clean-up handlers via `@AfterEach`, so add new resources to the provided lists instead of implementing manual deletion logic.
 3. Keep tests deterministic: rely on `databaseTestUtils.cleanDatabase()` in `@BeforeEach` (already invoked by the base), and generate unique slugs via `nextEphemeralSlug("suffix")` when naming repositories, branches, or teams.
-4. If a scenario needs extra Spring configuration, extend `application-github-integration-local.yml` in `server/application-server/src/test/resources/`. The checked-in `.example` file documents every property; copy it on demand and keep secrets out of version control.
+4. If a scenario needs extra Spring configuration, extend `application-live-local.yml` in `server/application-server/src/test/resources/`. The checked-in `.example` file documents every property; copy it on demand and keep secrets out of version control.
 
 ### Troubleshooting
 

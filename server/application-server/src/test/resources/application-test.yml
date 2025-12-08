@@ -48,7 +48,13 @@ github:
   app:
     id: 0
     privateKey: ""
-    privateKeyLocation: ""
+
+# Disable workspace bootstrapping during tests to prevent API calls
+hephaestus:
+  workspace:
+    init-default: false  # Disable PAT workspace bootstrap
+  intelligence-service:
+    url: http://localhost:8080
 
 # NATS configuration for tests (matches actual properties)
 nats:
@@ -56,13 +62,6 @@ nats:
   server: nats://localhost:4222
   timeframe: 1
   durable-consumer-name: test-consumer
-
-# Intelligence service configuration for tests (stub)
-hephaestus:
-  intelligence-service:
-    url: http://localhost:8080
-  workspace:
-    init-default: false
 
 monitoring:
   run-on-startup: false
