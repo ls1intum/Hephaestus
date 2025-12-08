@@ -1,6 +1,7 @@
 import { XCircleIcon } from "lucide-react";
 import type { UserProfile } from "@/api/types.gen";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import type { LeaderboardSchedule } from "@/lib/timeframe";
 import { ProfileContent } from "./ProfileContent";
 import { ProfileHeader } from "./ProfileHeader";
 
@@ -14,6 +15,8 @@ interface ProfileProps {
 	after?: string;
 	before?: string;
 	onTimeframeChange?: (afterDate: string, beforeDate?: string) => void;
+	/** Leaderboard schedule for proper week calculations */
+	schedule?: LeaderboardSchedule;
 }
 
 export function ProfilePage({
@@ -26,6 +29,7 @@ export function ProfilePage({
 	after,
 	before,
 	onTimeframeChange,
+	schedule,
 }: ProfileProps) {
 	if (error) {
 		return (
@@ -61,6 +65,7 @@ export function ProfilePage({
 				afterDate={after}
 				beforeDate={before}
 				onTimeframeChange={onTimeframeChange}
+				schedule={schedule}
 			/>
 		</div>
 	);

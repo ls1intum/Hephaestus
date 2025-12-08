@@ -7,10 +7,11 @@ import type {
 } from "@/api/types.gen";
 import { ActivityBadges } from "@/components/leaderboard/ActivityBadges";
 import { Button } from "@/components/ui/button";
+import type { LeaderboardSchedule } from "@/lib/timeframe";
 import type { ReviewedPullRequest } from "../leaderboard/ReviewsPopover";
 import { EmptyState } from "../shared/EmptyState";
 import { IssueCard } from "../shared/IssueCard";
-import { ProfileActivityFilter } from "./ProfileActivityFilter";
+import { ProfileTimeframePicker } from "./ProfileTimeframePicker";
 import { ReviewActivityCard } from "./ReviewActivityCard";
 
 export interface ProfileContentProps {
@@ -24,6 +25,8 @@ export interface ProfileContentProps {
 	afterDate?: string;
 	beforeDate?: string;
 	onTimeframeChange?: (afterDate: string, beforeDate?: string) => void;
+	/** Leaderboard schedule for proper week calculations */
+	schedule?: LeaderboardSchedule;
 }
 
 export function ProfileContent({
@@ -37,6 +40,7 @@ export function ProfileContent({
 	afterDate,
 	beforeDate,
 	onTimeframeChange,
+	schedule,
 }: ProfileContentProps) {
 	// Generate skeleton arrays for loading state
 	const skeletonReviews = isLoading
@@ -104,13 +108,13 @@ export function ProfileContent({
 
 	return (
 		<div className="flex flex-col gap-4">
-			<div className="self-start">
-				<ProfileActivityFilter
-					initialAfterDate={afterDate}
-					initialBeforeDate={beforeDate}
-					onTimeframeChange={onTimeframeChange}
-				/>
-			</div>
+			<ProfileTimeframePicker
+				afterDate={afterDate}
+				beforeDate={beforeDate}
+				onTimeframeChange={onTimeframeChange}
+				schedule={schedule}
+				enableAllActivity
+			/>
 			<div className="grid grid-cols-1 lg:grid-cols-2 gap-2">
 				{/* Latest Review Activity */}
 				<div className="flex flex-col gap-4">

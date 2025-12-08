@@ -5,7 +5,7 @@ import {
 	useNavigate,
 } from "@tanstack/react-router";
 import { zodValidator } from "@tanstack/zod-adapter";
-import { endOfISOWeek, formatISO, startOfISOWeek } from "date-fns";
+import { formatISO } from "date-fns";
 import { useEffect } from "react";
 import { z } from "zod";
 import {
@@ -20,18 +20,20 @@ import type { LeaderboardSortType } from "@/components/leaderboard/SortFilter";
 import { NoWorkspace } from "@/components/workspace/NoWorkspace";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 import { useAuth } from "@/integrations/auth/AuthContext";
-
-// Calculate default date range with ISO 8601 format including timezone
-const today = new Date();
-const startOfCurrentWeekDate = startOfISOWeek(today);
-const endOfCurrentWeekDate = endOfISOWeek(today);
-const startOfCurrentWeek = formatISO(startOfCurrentWeekDate);
+import {
+	DEFAULT_SCHEDULE,
+	formatDateRangeForApi,
+	getLeaderboardWeekEnd,
+	getLeaderboardWeekStart,
+	type LeaderboardSchedule,
+} from "@/lib/timeframe";
 
 // Define search params schema for validation and types
+// Defaults are computed dynamically using the leaderboard schedule from workspace
 const leaderboardSearchSchema = z.object({
 	team: z.string().default("all"),
 	sort: z.enum(["SCORE", "LEAGUE_POINTS"]).default("SCORE"),
-	after: z.string().optional().default(startOfCurrentWeek),
+	after: z.string().optional(),
 	before: z.string().optional(),
 	mode: z.enum(["INDIVIDUAL", "TEAM"]).default("INDIVIDUAL"),
 });
@@ -61,17 +63,6 @@ function LeaderboardContainer() {
 	const { team, sort, after, before, mode } = Route.useSearch();
 	const navigate = useNavigate({ from: Route.fullPath });
 
-	const parseDateParam = (value?: string | null) => {
-		if (!value) return undefined;
-		const parsed = new Date(value);
-		return Number.isNaN(parsed.getTime()) ? undefined : parsed;
-	};
-
-	const resolvedAfter = after ?? startOfCurrentWeek;
-	const resolvedBefore = before ?? null;
-	const parsedAfter = parseDateParam(resolvedAfter);
-	const parsedBefore = parseDateParam(resolvedBefore);
-
 	// Query for workspace details (includes schedule info)
 	const workspaceQuery = useQuery({
 		...getWorkspaceOptions({
@@ -79,6 +70,47 @@ function LeaderboardContainer() {
 		}),
 		enabled: hasWorkspace,
 	});
+
+	// Extract leaderboard schedule from workspace config
+	const getSchedule = (): LeaderboardSchedule => {
+		if (!workspaceQuery.data) return DEFAULT_SCHEDULE;
+
+		const scheduledTime = workspaceQuery.data.leaderboardScheduleTime || "9:00";
+		const scheduledDay = workspaceQuery.data.leaderboardScheduleDay ?? 2;
+		const [hours, minutes] = scheduledTime
+			.split(":")
+			.map((part: string) => Number.parseInt(part, 10));
+
+		return {
+			day: scheduledDay,
+			hour: hours || 9,
+			minute: minutes || 0,
+		};
+	};
+	const schedule = getSchedule();
+
+	// Compute effective date range - default to "this week" based on schedule
+	// This ensures dates passed to TimeframeFilter align with getLeaderboardWeekStart
+	const getEffectiveDates = () => {
+		if (after) {
+			return { after, before };
+		}
+		// Default to "this week" using the leaderboard schedule (bounded for API)
+		const now = new Date();
+		const weekStart = getLeaderboardWeekStart(now, schedule);
+		const weekEnd = getLeaderboardWeekEnd(weekStart);
+		return formatDateRangeForApi({ after: weekStart, before: weekEnd });
+	};
+	const effectiveDates = getEffectiveDates();
+
+	const parseDateParam = (value?: string | null) => {
+		if (!value) return undefined;
+		const parsed = new Date(value);
+		return Number.isNaN(parsed.getTime()) ? undefined : parsed;
+	};
+
+	const parsedAfter = parseDateParam(effectiveDates.after);
+	const parsedBefore = parseDateParam(effectiveDates.before);
 
 	// Query for teams in the workspace
 	const teamsQuery = useQuery({
@@ -88,25 +120,20 @@ function LeaderboardContainer() {
 		enabled: hasWorkspace,
 	});
 
-	const queryAfter = parsedAfter ?? startOfCurrentWeekDate;
-	const queryBefore = parsedBefore ?? endOfCurrentWeekDate;
-
-	// Query for leaderboard data based on filters (before defaults to schedule end when unset)
+	// Query for leaderboard data based on filters
 	const leaderboardQuery = useQuery({
 		...getLeaderboardOptions({
 			path: { workspaceSlug: slug },
 			query: {
-				after: queryAfter,
-				before: queryBefore,
+				after: parsedAfter ?? new Date(),
+				before: parsedBefore ?? new Date(),
 				team,
 				sort,
 				mode,
 			},
 		}),
 		placeholderData: (previousData) => previousData,
-		enabled:
-			hasWorkspace &&
-			Boolean((queryAfter || startOfCurrentWeekDate) && teamsQuery.data),
+		enabled: hasWorkspace && Boolean(parsedAfter && teamsQuery.data),
 	});
 
 	// Query for user profile data (mirror leaderboard filters if provided)
@@ -209,23 +236,11 @@ function LeaderboardContainer() {
 		}
 	}, [mode, sort, navigate]);
 
-	// Get the leaderboard schedule from workspace config
-	const scheduledTime = workspaceQuery.data?.leaderboardScheduleTime || "9:00";
-	const scheduledDay = workspaceQuery.data?.leaderboardScheduleDay ?? 2;
-	const [hours, minutes] = scheduledTime
-		.split(":")
-		.map((part: string) => Number.parseInt(part, 10));
-	const leaderboardSchedule = {
-		day: scheduledDay,
-		hour: hours || 9,
-		minute: minutes || 0,
-	};
-
 	// Calculate leaderboard end date with the correct time
-	const endDate = new Date(queryBefore ?? new Date());
+	const endDate = parsedBefore ? new Date(parsedBefore) : new Date();
 
 	// Adjust the end date to include the schedule time from server metadata
-	endDate.setHours(leaderboardSchedule.hour, leaderboardSchedule.minute, 0, 0);
+	endDate.setHours(schedule.hour, schedule.minute, 0, 0);
 
 	const leaderboardEnd = formatISO(endDate);
 
@@ -343,10 +358,10 @@ function LeaderboardContainer() {
 			teamLabelsById={teamLabelsById}
 			selectedTeam={team}
 			selectedSort={sort}
-			initialAfterDate={after}
-			initialBeforeDate={before}
+			initialAfterDate={effectiveDates.after}
+			initialBeforeDate={effectiveDates.before}
 			leaderboardEnd={leaderboardEnd}
-			leaderboardSchedule={leaderboardSchedule}
+			leaderboardSchedule={schedule}
 			onTeamChange={handleTeamChange}
 			onSortChange={handleSortChange}
 			onTimeframeChange={handleTimeframeChange}
