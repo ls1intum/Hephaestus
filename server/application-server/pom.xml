@@ -481,9 +481,9 @@
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
                 <configuration>
-                    <!-- Use 'specs' profile for OpenAPI generation - this disables WorkspaceStartupListener -->
-                    <profiles>specs</profiles>
-                    <jvmArguments>-Dspring.application.admin.enabled=true -XX:+EnableDynamicAgentLoading --enable-native-access=ALL-UNNAMED -Dspring.devtools.restart.enabled=false</jvmArguments>
+                    <!-- Default configuration for spring-boot:run -->
+                    <profiles>${app.profiles}</profiles>
+                    <jvmArguments>-Dspring.application.admin.enabled=true -XX:+EnableDynamicAgentLoading --enable-native-access=ALL-UNNAMED</jvmArguments>
                     <excludes>
                         <exclude>
                             <groupId>org.projectlombok</groupId>
@@ -494,13 +494,18 @@
                     <maxAttempts>100</maxAttempts>
                 </configuration>
                 <executions>
-                    <!-- Only run start/stop for OpenAPI spec generation -->
+                    <!-- OpenAPI spec generation: start server with 'specs' profile -->
                     <execution>
                         <id>start-for-openapi</id>
                         <phase>pre-integration-test</phase>
                         <goals>
                             <goal>start</goal>
                         </goals>
+                        <configuration>
+                            <!-- Use 'specs' profile for OpenAPI generation - disables WorkspaceStartupListener -->
+                            <profiles>specs</profiles>
+                            <jvmArguments>-Dspring.application.admin.enabled=true -XX:+EnableDynamicAgentLoading --enable-native-access=ALL-UNNAMED -Dspring.devtools.restart.enabled=false</jvmArguments>
+                        </configuration>
                     </execution>
                     <execution>
                         <id>stop-after-openapi</id>
