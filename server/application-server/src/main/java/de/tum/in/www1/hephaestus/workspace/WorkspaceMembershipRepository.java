@@ -8,12 +8,14 @@ import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 /**
  * Repository for {@link WorkspaceMembership} entities.
- * Manages the relationship between users and workspaces, including role assignments.
+ * Manages the relationship between users and workspaces, including role
+ * assignments.
  */
 public interface WorkspaceMembershipRepository extends JpaRepository<WorkspaceMembership, WorkspaceMembership.Id> {
     List<WorkspaceMembership> findByWorkspace_Id(Long workspaceId);
@@ -57,4 +59,23 @@ public interface WorkspaceMembershipRepository extends JpaRepository<WorkspaceMe
     List<WorkspaceMembership> findByUser_Id(Long userId);
 
     long countByWorkspace_IdAndRole(Long workspaceId, WorkspaceRole role);
+
+    /**
+     * Atomically inserts a membership if absent (race-condition safe).
+     */
+    @Modifying
+    @Query(
+        value = """
+        INSERT INTO workspace_membership (workspace_id, user_id, role, league_points, created_at)
+        VALUES (:workspaceId, :userId, :role, :leaguePoints, CURRENT_TIMESTAMP)
+        ON CONFLICT (workspace_id, user_id) DO NOTHING
+        """,
+        nativeQuery = true
+    )
+    int insertIfAbsent(
+        @Param("workspaceId") Long workspaceId,
+        @Param("userId") Long userId,
+        @Param("role") String role,
+        @Param("leaguePoints") int leaguePoints
+    );
 }

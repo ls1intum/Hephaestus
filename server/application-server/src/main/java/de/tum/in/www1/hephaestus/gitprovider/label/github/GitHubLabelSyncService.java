@@ -74,6 +74,8 @@ public class GitHubLabelSyncService {
         int removed = 0;
         for (Label label : existingLabels) {
             if (!seenLabelIds.contains(label.getId())) {
+                label.removeAllIssues();
+                label.removeAllTeams();
                 labelRepository.delete(label);
                 removed++;
             }
