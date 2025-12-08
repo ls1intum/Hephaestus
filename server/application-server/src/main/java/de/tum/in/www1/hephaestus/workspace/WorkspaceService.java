@@ -728,32 +728,38 @@ public class WorkspaceService {
             Workspace existingByLogin = workspaceRepository.findByAccountLoginIgnoreCase(accountLogin).orElse(null);
 
             if (existingByLogin != null) {
-                // IMPORTANT: Do NOT convert PAT workspaces to GitHub App workspaces!
-                // PAT workspaces are explicitly configured by the admin and may have different
-                // repository access than the GitHub App installation. Converting them would:
-                // 1. Clear the PAT, breaking authentication
-                // 2. Change which repos are accessible (PAT may access private repos the App cannot)
-                if (existingByLogin.getGitProviderMode() == Workspace.GitProviderMode.PAT_ORG) {
+                boolean isPatWorkspace = existingByLogin.getGitProviderMode() == Workspace.GitProviderMode.PAT_ORG;
+                boolean hasPatToken = !isBlank(existingByLogin.getPersonalAccessToken());
+
+                if (isPatWorkspace && hasPatToken) {
                     logger.info(
-                        "Workspace id={} for {} is a PAT workspace; skipping GitHub App installation {} linking. " +
+                        "Workspace id={} for {} is a PAT workspace with a stored token; skipping GitHub App installation {} linking. " +
                         "If you want to use the GitHub App instead, delete the PAT workspace first or set " +
                         "hephaestus.workspace.init-default=false.",
                         existingByLogin.getId(),
                         LoggingUtils.sanitizeForLog(accountLogin),
                         installationId
                     );
-                    // Return the existing PAT workspace without modification
                     return existingByLogin;
                 }
 
-                // It's already a GitHub App workspace or has no mode set - safe to link
+                if (isPatWorkspace) {
+                    logger.info(
+                        "Promoting PAT workspace id={} for {} to GitHub App installation {} because no PAT token is stored.",
+                        existingByLogin.getId(),
+                        LoggingUtils.sanitizeForLog(accountLogin),
+                        installationId
+                    );
+                } else {
+                    logger.info(
+                        "Linking existing workspace id={} login={} to installation {}.",
+                        existingByLogin.getId(),
+                        LoggingUtils.sanitizeForLog(accountLogin),
+                        installationId
+                    );
+                }
+
                 workspace = existingByLogin;
-                logger.info(
-                    "Linking existing workspace id={} login={} to installation {}.",
-                    workspace.getId(),
-                    LoggingUtils.sanitizeForLog(accountLogin),
-                    installationId
-                );
             }
         }
 

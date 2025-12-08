@@ -7,6 +7,7 @@ import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.workspace.exception.WorkspaceLifecycleViolationException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.kohsuke.github.GHRepositorySelection;
 import org.springframework.beans.factory.annotation.Autowired;
 
 @DisplayName("Workspace service integration")
@@ -89,5 +90,29 @@ class WorkspaceServiceIntegrationTest extends AbstractWorkspaceIntegrationTest {
         assertThatThrownBy(() -> workspaceLifecycleService.resumeWorkspace(workspace.getWorkspaceSlug()))
             .isInstanceOf(WorkspaceLifecycleViolationException.class)
             .hasMessageContaining("purged");
+    }
+
+    @Test
+    @DisplayName("PAT workspace without token is promoted to GitHub App installation during provisioning")
+    void patWorkspaceWithoutTokenIsPromoted() {
+        User owner = persistUser("ls1intum-owner");
+        Workspace workspace = createWorkspace("ls1intum", "ls1intum", "ls1intum", AccountType.ORG, owner);
+
+        // Explicitly ensure PAT mode without token to mirror legacy bootstrap behaviour
+        workspace.setGitProviderMode(Workspace.GitProviderMode.PAT_ORG);
+        workspace.setPersonalAccessToken(null);
+        workspaceRepository.save(workspace);
+
+        Workspace promoted = workspaceService.ensureForInstallation(95711017L, "ls1intum", GHRepositorySelection.ALL);
+
+        Workspace persisted = workspaceRepository.findById(promoted.getId()).orElseThrow();
+
+        assertThat(promoted.getGitProviderMode()).isEqualTo(Workspace.GitProviderMode.GITHUB_APP_INSTALLATION);
+        assertThat(promoted.getInstallationId()).isEqualTo(95711017L);
+        assertThat(promoted.getPersonalAccessToken()).isNull();
+        assertThat(promoted.getInstallationLinkedAt()).isNotNull();
+
+        assertThat(persisted.getGitProviderMode()).isEqualTo(Workspace.GitProviderMode.GITHUB_APP_INSTALLATION);
+        assertThat(persisted.getInstallationId()).isEqualTo(95711017L);
     }
 }
