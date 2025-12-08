@@ -4,13 +4,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.GitHubPayload;
 import de.tum.in.www1.hephaestus.gitprovider.common.GitHubPayloadExtension;
+import de.tum.in.www1.hephaestus.gitprovider.contribution.ContributionEventRepository;
+import de.tum.in.www1.hephaestus.gitprovider.contribution.ContributionSourceType;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.github.GitHubPullRequestConverter;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReview;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReviewRepository;
 import de.tum.in.www1.hephaestus.testconfig.BaseIntegrationTest;
-import de.tum.in.www1.hephaestus.gitprovider.contribution.ContributionEventRepository;
-import de.tum.in.www1.hephaestus.gitprovider.contribution.ContributionSourceType;
 import java.time.Instant;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;

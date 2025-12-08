@@ -30,7 +30,7 @@ Run the relevant commands locally before opening a PR:
 | Webapp build | `npm --workspace webapp run build` (Vite build + `tsc --noEmit`) |
 | Webapp tests | `npm --workspace webapp run test` (Vitest) and add focused unit tests when touching logic. |
 | Storybook | `npm --workspace webapp run build-storybook` (Chromatic depends on a clean build). |
-| Application-server tests | Use Maven groups to mirror CI: `./mvnw test -Dgroups=unit`, `-Dgroups=integration`, `-Dgroups=architecture`. Live GitHub sync tests stay skipped unless you pass `-Dgroups=github-integration`, which activates the `github-integration-tests` profile. |
+| Application-server tests | **Three test tiers:** <br>• `./mvnw test` runs unit tests (`@Tag("unit")`) <br>• `./mvnw verify` runs unit + integration tests (`@Tag("integration")`) <br>• `./mvnw test -Plive-tests` runs live GitHub API tests (`@Tag("live")`) <br><br>Live tests require GitHub App credentials configured in `application-live-local.yml` (gitignored). The Maven profile is the single guard—tests only run when explicitly activated. |
 | Intelligence service lint/type check | `poetry run black --check .`, `poetry run flake8 .`, `poetry run mypy .` inside `server/intelligence-service`. |
 | Webhook ingest lint | `poetry run black --check .` and `poetry run flake8 .` inside `server/webhook-ingest`. |
 

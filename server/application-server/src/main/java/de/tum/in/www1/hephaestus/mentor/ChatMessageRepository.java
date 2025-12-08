@@ -19,4 +19,7 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, UUID> 
     @Override
     @EntityGraph(attributePaths = { "parts", "thread", "parentMessage" })
     Optional<ChatMessage> findById(UUID id);
+
+    @EntityGraph(attributePaths = { "thread", "thread.workspace", "thread.user" })
+    Optional<ChatMessage> findWithThreadAndUserById(UUID id);
 }

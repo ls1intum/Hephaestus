@@ -14,7 +14,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 /**
  * Live integration guard to ensure we can still enumerate installation repositories when repository_selection=all.
  */
-class GitHubInstallationRepositorySelectionIntegrationTest extends BaseGitHubIntegrationTest {
+class GitHubLiveInstallationRepositorySelectionIntegrationTest extends BaseGitHubLiveIntegrationTest {
 
     @Autowired
     private GitHubAppTokenService gitHubAppTokenService;

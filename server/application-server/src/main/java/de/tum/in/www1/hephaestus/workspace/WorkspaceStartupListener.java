@@ -9,9 +9,10 @@ import org.springframework.stereotype.Component;
 
 /**
  * Spring lifecycle hook that kicks off workspace provisioning and monitoring once the application is ready.
+ * Disabled during tests and OpenAPI spec generation to prevent GitHub API calls.
  */
 @Component
-@Profile("!specs")
+@Profile("!specs & !test")
 public class WorkspaceStartupListener {
 
     private static final Logger logger = LoggerFactory.getLogger(WorkspaceStartupListener.class);
