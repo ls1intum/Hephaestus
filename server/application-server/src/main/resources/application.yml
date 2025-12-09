@@ -92,6 +92,8 @@ hephaestus:
             enabled: false
             team: "all"
             channel-id: ""
+        self-review-author-logins:
+            - Copilot
     
     # ═══════════════════════════════════════════════════════════════════════════
     # WORKSPACE CONFIGURATION
