@@ -189,11 +189,7 @@ public class SlackWeeklyLeaderboardTask implements Runnable {
 
             List<LayoutBlock> blocks = buildBlocks(workspace, topReviewers, currentDate, after, before);
             try {
-                slackMessageService.sendMessage(
-                    channelId,
-                    blocks,
-                    "Reviews of the last week (" + workspace.getWorkspaceSlug() + ")"
-                );
+                slackMessageService.sendMessage(channelId, blocks, "Weekly review highlights");
             } catch (IOException | SlackApiException e) {
                 logger.error(
                     "Failed to send scheduled message for workspace {}: {}",
@@ -215,7 +211,7 @@ public class SlackWeeklyLeaderboardTask implements Runnable {
         final String workspaceBase = baseUrl + "/w/" + workspace.getWorkspaceSlug();
         String teamFilter = team == null ? "all" : team;
         return asBlocks(
-            header(header -> header.text(plainText(pt -> pt.text(":newspaper: Reviews of the last week :newspaper:")))),
+            header(header -> header.text(plainText(pt -> pt.text(":newspaper: Weekly review highlights :newspaper:")))),
             context(context ->
                 context.elements(
                     List.of(
@@ -229,9 +225,7 @@ public class SlackWeeklyLeaderboardTask implements Runnable {
             section(section ->
                 section.text(
                     markdownText(
-                        "Workspace *" +
-                        workspace.getWorkspaceSlug() +
-                        "*: Another review leaderboard has concluded. You can check out your placement <" +
+                        "Last week's review leaderboard is finalized. See where you landed <" +
                         workspaceBase +
                         "?after=" +
                         encode(formatDateForURL(after)) +
@@ -243,7 +237,7 @@ public class SlackWeeklyLeaderboardTask implements Runnable {
                     )
                 )
             ),
-            section(section -> section.text(markdownText("Special thanks to our top 3 reviewers of last week:"))),
+            section(section -> section.text(markdownText("Congrats to last week's top 3 reviewers:"))),
             section(section ->
                 section.text(
                     markdownText(
@@ -254,7 +248,7 @@ public class SlackWeeklyLeaderboardTask implements Runnable {
                     )
                 )
             ),
-            section(section -> section.text(markdownText("Happy coding and reviewing! :rocket:")))
+            section(section -> section.text(markdownText("Thanks for keeping reviews moving! :rocket:")))
         );
     }
 
