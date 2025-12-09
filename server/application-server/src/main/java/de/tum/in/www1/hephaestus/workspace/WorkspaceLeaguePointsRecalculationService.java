@@ -102,10 +102,14 @@ public class WorkspaceLeaguePointsRecalculationService {
         }
 
         Instant recalculationAnchor = Instant.now();
-        Instant windowEnd = recalculationAnchor;
-        Instant windowStart = windowEnd.minus(7, ChronoUnit.DAYS);
+        Instant windowStart = earliestContribution;
 
-        while (windowEnd.isAfter(earliestContribution)) {
+        while (windowStart.isBefore(recalculationAnchor)) {
+            Instant windowEnd = windowStart.plus(7, ChronoUnit.DAYS);
+            if (windowEnd.isAfter(recalculationAnchor)) {
+                windowEnd = recalculationAnchor;
+            }
+
             List<LeaderboardEntryDTO> leaderboardEntries = leaderboardService.createLeaderboard(
                 workspace,
                 windowStart,
@@ -127,8 +131,11 @@ public class WorkspaceLeaguePointsRecalculationService {
                 )
             );
 
-            windowEnd = windowStart;
-            windowStart = windowEnd.minus(7, ChronoUnit.DAYS);
+            if (!windowEnd.isAfter(windowStart)) {
+                break;
+            }
+
+            windowStart = windowEnd;
         }
 
         logger.info("Finished recalculating league points for workspace id={}", workspaceId);
@@ -153,7 +160,7 @@ public class WorkspaceLeaguePointsRecalculationService {
         }
 
         Instant firstContribution = firstContributionByUserId.get(userId);
-        if (firstContribution == null || windowEnd.isBefore(firstContribution)) {
+        if (firstContribution == null || !windowEnd.isAfter(firstContribution)) {
             return;
         }
 
