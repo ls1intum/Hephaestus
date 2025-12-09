@@ -189,11 +189,7 @@ public class SlackWeeklyLeaderboardTask implements Runnable {
 
             List<LayoutBlock> blocks = buildBlocks(workspace, topReviewers, currentDate, after, before);
             try {
-                slackMessageService.sendMessage(
-                    channelId,
-                    blocks,
-                    "Weekly review highlights"
-                );
+                slackMessageService.sendMessage(channelId, blocks, "Weekly review highlights");
             } catch (IOException | SlackApiException e) {
                 logger.error(
                     "Failed to send scheduled message for workspace {}: {}",
