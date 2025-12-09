@@ -86,6 +86,50 @@ use_local_db() {
     return 1
 }
 
+install_java_maven() {
+    # Check if Java 21 is already available
+    if command -v java >/dev/null 2>&1; then
+        local java_version
+        java_version=$(java -version 2>&1 | head -n1 | cut -d'"' -f2 | cut -d'.' -f1)
+        if [[ "$java_version" -ge 21 ]]; then
+            echo "✅ Java 21+ already installed (version: $(java -version 2>&1 | head -n1))."
+        else
+            echo "ℹ️  Upgrading Java to version 21..."
+            $SUDO apt-get update -y
+            DEBIAN_FRONTEND=noninteractive $SUDO apt-get install -y openjdk-21-jdk
+            echo "✅ Java 21 installation complete."
+        fi
+    else
+        echo "ℹ️  Installing OpenJDK 21..."
+        $SUDO apt-get update -y
+        DEBIAN_FRONTEND=noninteractive $SUDO apt-get install -y openjdk-21-jdk
+        echo "✅ Java 21 installation complete."
+    fi
+
+    # Check if Maven is already available
+    if command -v mvn >/dev/null 2>&1; then
+        echo "✅ Maven already installed (version: $(mvn -version 2>&1 | head -n1))."
+    else
+        echo "ℹ️  Installing Maven..."
+        DEBIAN_FRONTEND=noninteractive $SUDO apt-get install -y maven
+        echo "✅ Maven installation complete."
+    fi
+
+    # Create symlink for mvnw to use system Maven (for network-restricted environments)
+    local mvnw_path="$ROOT_DIR/server/application-server/mvnw"
+    if [[ -f "$mvnw_path" ]] && command -v mvn >/dev/null 2>&1; then
+        local mvn_path
+        mvn_path="$(command -v mvn)"
+        # Backup original mvnw if not already a symlink
+        if [[ ! -L "$mvnw_path" ]]; then
+            mv "$mvnw_path" "${mvnw_path}.original"
+            echo "ℹ️  Backed up original mvnw to mvnw.original"
+        fi
+        ln -sf "$mvn_path" "$mvnw_path"
+        echo "✅ Created symlink: ./mvnw -> $mvn_path"
+    fi
+}
+
 install_postgres() {
     if command -v pg_ctl >/dev/null 2>&1; then
         echo "✅ PostgreSQL already installed."
@@ -121,6 +165,7 @@ initialize_local_postgres() {
     fi
 }
 
+install_java_maven
 install_postgres
 install_node_dependencies
 bootstrap_python

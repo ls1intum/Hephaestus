@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-to_lower() {
 set -euo pipefail
 
 ROOT_DIR=""
