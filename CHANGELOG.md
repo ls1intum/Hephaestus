@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.10.4-rc.1](https://github.com/ls1intum/Hephaestus/compare/v0.10.3...v0.10.4-rc.1) (2025-12-09)
+
+### 🐛 Bug Fixes
+
+* league points calculation actually ([3246b9d](https://github.com/ls1intum/Hephaestus/commit/3246b9d81296032be3a7970bbac77b85ee68e5c3))
+
 ## [0.10.3](https://github.com/ls1intum/Hephaestus/compare/v0.10.2...v0.10.3) (2025-12-09)
 
 ### 🐛 Bug Fixes
