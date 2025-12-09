@@ -1,6 +1,7 @@
 package de.tum.in.www1.hephaestus.workspace;
 
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
+import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.leaderboard.LeaderboardEntryDTO;
 import de.tum.in.www1.hephaestus.leaderboard.LeaderboardMode;
 import de.tum.in.www1.hephaestus.leaderboard.LeaderboardService;
@@ -26,19 +27,22 @@ public class WorkspaceLeaguePointsRecalculationService {
     private final WorkspaceContributionActivityService workspaceContributionActivityService;
     private final LeaderboardService leaderboardService;
     private final LeaguePointsCalculationService leaguePointsCalculationService;
+    private final UserRepository userRepository;
 
     public WorkspaceLeaguePointsRecalculationService(
         WorkspaceMembershipRepository workspaceMembershipRepository,
         WorkspaceMembershipService workspaceMembershipService,
         WorkspaceContributionActivityService workspaceContributionActivityService,
         LeaderboardService leaderboardService,
-        LeaguePointsCalculationService leaguePointsCalculationService
+        LeaguePointsCalculationService leaguePointsCalculationService,
+        UserRepository userRepository
     ) {
         this.workspaceMembershipRepository = workspaceMembershipRepository;
         this.workspaceMembershipService = workspaceMembershipService;
         this.workspaceContributionActivityService = workspaceContributionActivityService;
         this.leaderboardService = leaderboardService;
         this.leaguePointsCalculationService = leaguePointsCalculationService;
+        this.userRepository = userRepository;
     }
 
     public void recalculate(Workspace workspace) {
@@ -52,7 +56,7 @@ public class WorkspaceLeaguePointsRecalculationService {
 
         workspaceMembershipService.resetLeaguePoints(workspaceId, LeaguePointsCalculationService.POINTS_DEFAULT);
 
-        List<WorkspaceMembership> memberships = workspaceMembershipRepository.findByWorkspace_Id(workspaceId);
+        List<WorkspaceMembership> memberships = workspaceMembershipRepository.findAllWithUserByWorkspaceId(workspaceId);
         if (memberships.isEmpty()) {
             logger.info("Workspace id={} has no memberships; nothing to recalculate", workspaceId);
             return;
@@ -69,7 +73,10 @@ public class WorkspaceLeaguePointsRecalculationService {
             }
 
             Long userId = memberUser.getId();
-            memberUsersById.put(userId, memberUser);
+            User hydratedUser = userRepository
+                .findByLoginWithEagerMergedPullRequests(memberUser.getLogin())
+                .orElse(memberUser);
+            memberUsersById.put(userId, hydratedUser);
             currentPointsByUserId.put(userId, LeaguePointsCalculationService.POINTS_DEFAULT);
             Instant firstContribution = workspaceContributionActivityService
                 .findFirstContributionInstant(workspaceId, userId)

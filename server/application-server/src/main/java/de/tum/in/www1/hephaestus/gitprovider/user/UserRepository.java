@@ -22,10 +22,10 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     @Query(
         """
-            SELECT u
+            SELECT DISTINCT u
             FROM User u
-            LEFT JOIN FETCH u.mergedPullRequests
-            WHERE u.login ILIKE :login
+            LEFT JOIN FETCH u.mergedPullRequests mpr
+            WHERE LOWER(u.login) = LOWER(:login)
         """
     )
     Optional<User> findByLoginWithEagerMergedPullRequests(@Param("login") String login);
