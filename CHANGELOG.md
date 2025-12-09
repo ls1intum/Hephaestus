@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.10.5](https://github.com/ls1intum/Hephaestus/compare/v0.10.4...v0.10.5) (2025-12-09)
+
+### 🐛 Bug Fixes
+
+* reverse calculation and exclude correctly from league points recalculation ([b8a894a](https://github.com/ls1intum/Hephaestus/commit/b8a894a35aa6c71e4dc327bc36c587150a75ef6e))
+
 ## [0.10.5-rc.1](https://github.com/ls1intum/Hephaestus/compare/v0.10.4...v0.10.5-rc.1) (2025-12-09)
 
 ### 🐛 Bug Fixes
