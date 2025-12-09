@@ -148,7 +148,7 @@ Ensure each story is INVEST compliant:
 
 **Deployment Model:**  
 
-- **Node 1:** [E.g., "Backend services on cloud/in-house server"]
+- **Node 1:** [E.g., "Server services on cloud/in-house server"]
 - **Node 2:** [E.g., "Mobile client (iOS/Android)"]
 - [Add further nodes as required.]
 

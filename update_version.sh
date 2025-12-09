@@ -174,7 +174,7 @@ if [[ -f server/application-server/pom.xml ]]; then
     # This awk script looks for the line with <artifactId>hephaestus</artifactId>,
     # then updates the next <version> element.
     awk -v new_version="${NEW_VERSION}" '
-        /<artifactId>hephaestus<\/artifactId>/ { print; getline; if ($0 ~ /<version>/) { sub(/<version>[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?(-SNAPSHOT)?<\/version>/, "<version>" new_version "-SNAPSHOT</version>") } }
+        /<artifactId>hephaestus<\/artifactId>/ { print; getline; if ($0 ~ /<version>/) { sub(/<version>[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?(-SNAPSHOT)?<\/version>/, "<version>" new_version "</version>") } }
         { print }
     ' server/application-server/pom.xml > server/application-server/pom.xml.tmp && mv server/application-server/pom.xml.tmp server/application-server/pom.xml
 fi

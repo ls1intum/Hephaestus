@@ -1,3 +1,6 @@
+# Auto-labeler configuration for PRs
+# Labels assigned here are used by .github/release.yml for categorized release notes
+
 documentation:
   - changed-files:
     - any-glob-to-any-file: docs/**
@@ -18,8 +21,54 @@ webhook-ingest:
   - changed-files:
     - any-glob-to-any-file: "server/webhook-ingest/**"
 
+ci:
+  - changed-files:
+    - any-glob-to-any-file:
+      - ".github/**"
+      - "docker/**"
+
+infrastructure:
+  - changed-files:
+    - any-glob-to-any-file:
+      - "docker/**"
+      - "**/Dockerfile"
+      - "**/docker-compose*.yml"
+      - "**/docker-compose*.yaml"
+
+dependencies:
+  - changed-files:
+    - any-glob-to-any-file:
+      - "**/package.json"
+      - "**/package-lock.json"
+      - "**/pom.xml"
+      - "**/pyproject.toml"
+      - "**/poetry.lock"
+      - "renovate.json"
+
 feature:
   - head-branch: ['^feature', 'feature', '^feat', 'feat']
 
 bug:
   - head-branch: ['^fix', 'fix', '^bug', 'bug']
+
+refactor:
+  - head-branch: ['^refactor', 'refactor']
+
+test:
+  - head-branch: ['^test', 'test']
+
+revert:
+  - head-branch: ['^revert', 'revert']
+
+security:
+  - changed-files:
+    - any-glob-to-any-file:
+      - "**/*security*"
+      - "**/*auth*"
+      - "**/keycloak*/**"
+
+performance:
+  - head-branch: ['^perf', 'perf']
+
+maintenance:
+  - head-branch: ['^chore', 'chore', '^build', 'build', '^style', 'style']
