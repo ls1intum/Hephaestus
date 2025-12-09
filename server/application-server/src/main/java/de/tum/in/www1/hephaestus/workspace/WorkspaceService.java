@@ -22,10 +22,6 @@ import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserTeamsDTO;
 import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserSyncService;
-import de.tum.in.www1.hephaestus.leaderboard.LeaderboardMode;
-import de.tum.in.www1.hephaestus.leaderboard.LeaderboardService;
-import de.tum.in.www1.hephaestus.leaderboard.LeaderboardSortType;
-import de.tum.in.www1.hephaestus.leaderboard.LeaguePointsCalculationService;
 import de.tum.in.www1.hephaestus.monitoring.MonitoringScopeFilter;
 import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContextHolder;
@@ -41,11 +37,9 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -101,11 +95,9 @@ public class WorkspaceService {
     private final GitHubInstallationRepositoryEnumerationService installationRepositoryEnumerator;
     private final MonitoringScopeFilter monitoringScopeFilter;
     private final TeamInfoDTOConverter teamInfoDTOConverter;
-    private final LeaderboardService leaderboardService;
-    private final LeaguePointsCalculationService leaguePointsCalculationService;
+    private final WorkspaceLeaguePointsRecalculationService workspaceLeaguePointsRecalculationService;
     private final OrganizationService organizationService;
     private final WorkspaceMembershipService workspaceMembershipService;
-    private final WorkspaceContributionActivityService workspaceContributionActivityService;
     private final GitHubUserSyncService gitHubUserSyncService;
     private final GitHubAppTokenService gitHubAppTokenService;
 
@@ -133,11 +125,9 @@ public class WorkspaceService {
         GitHubInstallationRepositoryEnumerationService installationRepositoryEnumerator,
         MonitoringScopeFilter monitoringScopeFilter,
         TeamInfoDTOConverter teamInfoDTOConverter,
-        LeaderboardService leaderboardService,
-        LeaguePointsCalculationService leaguePointsCalculationService,
+        WorkspaceLeaguePointsRecalculationService workspaceLeaguePointsRecalculationService,
         OrganizationService organizationService,
         WorkspaceMembershipService workspaceMembershipService,
-        WorkspaceContributionActivityService workspaceContributionActivityService,
         GitHubUserSyncService gitHubUserSyncService,
         GitHubAppTokenService gitHubAppTokenService,
         ObjectProvider<GitHubDataSyncService> gitHubDataSyncServiceProvider,
@@ -159,11 +149,9 @@ public class WorkspaceService {
         this.installationRepositoryEnumerator = installationRepositoryEnumerator;
         this.monitoringScopeFilter = monitoringScopeFilter;
         this.teamInfoDTOConverter = teamInfoDTOConverter;
-        this.leaderboardService = leaderboardService;
-        this.leaguePointsCalculationService = leaguePointsCalculationService;
+        this.workspaceLeaguePointsRecalculationService = workspaceLeaguePointsRecalculationService;
         this.organizationService = organizationService;
         this.workspaceMembershipService = workspaceMembershipService;
-        this.workspaceContributionActivityService = workspaceContributionActivityService;
         this.gitHubUserSyncService = gitHubUserSyncService;
         this.gitHubAppTokenService = gitHubAppTokenService;
         this.gitHubDataSyncServiceProvider = gitHubDataSyncServiceProvider;
@@ -645,8 +633,8 @@ public class WorkspaceService {
     }
 
     /**
-     * Reset and recalculate league points for all users until 01/01/2024.
-     * If workspace context is available, only processes users in that workspace.
+     * Reset and recalculate league points for all users by replaying their contributions
+     * from the first recorded activity until now.
      */
     @Transactional
     public void resetAndRecalculateLeagues(String slug) {
@@ -678,64 +666,7 @@ public class WorkspaceService {
             return;
         }
 
-        workspaceMembershipService.resetLeaguePoints(workspaceId, LeaguePointsCalculationService.POINTS_DEFAULT);
-
-        var recalculationAnchor = Instant.now();
-        var now = recalculationAnchor;
-        var weekAgo = now.minus(7, ChronoUnit.DAYS);
-
-        Map<Long, Instant> firstContributionByUserId = new HashMap<>();
-
-        // While we still have reviews in the past, calculate leaderboard and update points
-        do {
-            var windowEnd = now;
-            var windowStart = weekAgo;
-            var leaderboard = leaderboardService.createLeaderboard(
-                workspace,
-                windowStart,
-                windowEnd,
-                "all",
-                LeaderboardSortType.SCORE,
-                LeaderboardMode.INDIVIDUAL
-            );
-            if (leaderboard.isEmpty()) {
-                break;
-            }
-
-            // Update league points for each user
-            leaderboard.forEach(entry -> {
-                var leaderboardUser = entry.user();
-                if (leaderboardUser == null) {
-                    return;
-                }
-                var user = userRepository.findByLoginWithEagerMergedPullRequests(leaderboardUser.login()).orElseThrow();
-                int currentPoints = workspaceMembershipService.getCurrentLeaguePoints(workspaceId, user);
-
-                Instant firstContributionAt = firstContributionByUserId.computeIfAbsent(user.getId(), id ->
-                    workspaceContributionActivityService.findFirstContributionInstant(workspaceId, id).orElse(null)
-                );
-
-                if (firstContributionAt != null && windowEnd.isBefore(firstContributionAt)) {
-                    logger.debug(
-                        "Skipping recalculation for user {} because window ending at {} is before first contribution {}",
-                        user.getLogin(),
-                        windowEnd,
-                        firstContributionAt
-                    );
-                    return;
-                }
-
-                int newPoints = leaguePointsCalculationService.calculateNewPoints(user, currentPoints, entry);
-                workspaceMembershipService.updateLeaguePoints(workspaceId, user, newPoints);
-            });
-
-            // Move time window back one week
-            now = windowStart;
-            weekAgo = windowStart.minus(7, ChronoUnit.DAYS);
-            // only recalculate points until 22nd April 2024, FelixTJDietrich started ;)
-        } while (weekAgo.isAfter(Instant.parse("2024-04-22T00:00:00Z")));
-
-        logger.info("Finished recalculating league points");
+        workspaceLeaguePointsRecalculationService.recalculate(workspace);
     }
 
     @Transactional
