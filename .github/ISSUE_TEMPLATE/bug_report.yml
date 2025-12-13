@@ -3,23 +3,40 @@ description: Something is broken
 title: ""
 labels: ["bug"]
 body:
+  - type: markdown
+    attributes:
+      value: |
+        <!--
+        BEFORE FILING:
+        1. Search existing issues to avoid duplicates
+        2. Use a clear, descriptive title (not "it doesn't work")
+        3. One bug per issue—split multiple problems into separate issues
+        -->
+        Thanks for taking the time to report this bug!
+
   - type: textarea
     id: what
     attributes:
       label: What's broken?
-      placeholder: "X doesn't work when Y. Expected Z."
+      description: Describe what happened vs. what you expected.
+      placeholder: |
+        When I click "Submit" on the leaderboard filter, the page shows a blank screen.
+        Expected: The leaderboard should filter by the selected repository.
     validations:
       required: true
 
   - type: textarea
     id: repro
     attributes:
-      label: Reproduction
-      description: Steps or link to reproduce. No repro = likely won't get fixed.
+      label: Steps to reproduce
+      description: Minimal steps so we can see the bug. No repro = low priority fix.
       placeholder: |
-        1. Go to ...
-        2. Click ...
-        3. See error
+        1. Go to /leaderboard
+        2. Select "Weekly" timeframe
+        3. Click the repository dropdown
+        4. Select any repository
+        5. Click "Apply"
+        6. → Blank screen appears
     validations:
       required: true
 
@@ -27,18 +44,25 @@ body:
     id: component
     attributes:
       label: Component
+      description: Which part of the system is affected?
       options:
-        - Webapp
-        - Server
-        - AI Service
-        - Webhooks
-        - Unknown
+        - Webapp (React UI)
+        - Application Server (Java/Spring)
+        - Intelligence Service (Python/AI)
+        - Webhook Ingest
+        - Don't know
     validations:
       required: true
 
   - type: textarea
     id: context
     attributes:
-      label: Logs / Screenshots
-      description: Console errors, stack traces, or screenshots.
+      label: Error logs / Screenshots
+      description: |
+        Paste console errors, network failures, or stack traces.
+        For UI bugs, attach a screenshot or screen recording.
       render: shell
+      placeholder: |
+        TypeError: Cannot read property 'map' of undefined
+            at LeaderboardTable.tsx:42
+            at renderWithHooks (react-dom.development.js:14985)
