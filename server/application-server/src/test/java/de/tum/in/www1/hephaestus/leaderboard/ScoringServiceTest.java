@@ -148,6 +148,25 @@ class ScoringServiceTest {
 
             assertThat(score).isZero();
         }
+
+        @Test
+        @DisplayName("handles mixed scenarios: filters self-assigned, counts non-assigned")
+        void handlesMixedScenarios() {
+            User copilot = createUser(1L, "Copilot");
+            User assignedReviewer = createUser(2L, "assigned-reviewer");
+            User externalReviewer = createUser(3L, "external-reviewer");
+
+            PullRequest pullRequest = createPullRequest(copilot);
+            pullRequest.getAssignees().add(assignedReviewer); // Only assignedReviewer is excluded
+
+            PullRequestReview excludedReview = createApprovedReview(assignedReviewer, pullRequest);
+            PullRequestReview countedReview = createApprovedReview(externalReviewer, pullRequest);
+
+            double score = scoringService.calculateReviewScore(List.of(excludedReview, countedReview));
+
+            // Only externalReviewer's review should count
+            assertThat(score).isGreaterThan(0.0);
+        }
     }
 
     @Nested
