@@ -1,25 +1,19 @@
 ---
-name: 📖 User Story
-about: A feature from the user's perspective
+name: ✨ Feature
+about: User-facing functionality
 title: ""
-labels: ["user story"]
-assignees: ""
+labels: ["feature"]
 ---
 
-## Story
+## User story
 
-**As a** [role]  
-**I want** [goal]  
-**so that** [benefit]
+**As a** [user type], **I want** [goal] **so that** [benefit].
 
-## Acceptance Criteria
+## Acceptance criteria
 
-<!-- What must be true for this to be done? Use checkboxes. -->
-
-- [ ] 
 - [ ] 
 - [ ] 
 
 ## Design
 
-<!-- Link mockup/wireframe, OR describe the expected UI behavior. Delete if backend-only. -->
+<!-- Sketch, mockup link, or describe the UI. Delete for backend-only features. -->

@@ -1,31 +1,25 @@
-name: 🐞 Bug Report
-description: Something isn't working as expected
-title: "bug: "
+name: 🐞 Bug
+description: Something is broken
+title: ""
 labels: ["bug"]
 body:
-  - type: markdown
-    attributes:
-      value: |
-        Thanks for reporting! Please fill out the sections below to help us fix this quickly.
-
   - type: textarea
-    id: description
+    id: what
     attributes:
-      label: What happened?
-      description: Describe the bug and what you expected instead.
-      placeholder: "When I click X, Y happens. I expected Z."
+      label: What's broken?
+      placeholder: "X doesn't work when Y. Expected Z."
     validations:
       required: true
 
   - type: textarea
-    id: reproduction
+    id: repro
     attributes:
-      label: Steps to reproduce
-      description: Minimal steps to trigger the bug.
+      label: Reproduction
+      description: Steps or link to reproduce. No repro = likely won't get fixed.
       placeholder: |
-        1. Go to /leaderboard
-        2. Click on "Weekly" tab
-        3. See error in console
+        1. Go to ...
+        2. Click ...
+        3. See error
     validations:
       required: true
 
@@ -33,36 +27,18 @@ body:
     id: component
     attributes:
       label: Component
-      description: Which part of Hephaestus is affected?
       options:
-        - Webapp (React frontend)
-        - Application Server (Java/Spring)
-        - Intelligence Service (Python/AI)
-        - Webhook Ingest
-        - Don't know
+        - Webapp
+        - Server
+        - AI Service
+        - Webhooks
+        - Unknown
     validations:
       required: true
 
   - type: textarea
-    id: environment
-    attributes:
-      label: Environment
-      description: Browser, OS, or deployment details if relevant.
-      placeholder: "Chrome 120, macOS 14, production"
-
-  - type: textarea
-    id: logs
+    id: context
     attributes:
       label: Logs / Screenshots
-      description: Paste error messages, console output, or attach screenshots.
+      description: Console errors, stack traces, or screenshots.
       render: shell
-
-  - type: dropdown
-    id: contribute
-    attributes:
-      label: Willing to contribute a fix?
-      options:
-        - "Yes"
-        - "No"
-    validations:
-      required: false
