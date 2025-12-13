@@ -10,10 +10,16 @@ TITLE FORMAT (required):
   ✓ Good: feat(leaderboard): add weekly ranking filter
   ✗ Bad:  Added weekly ranking filter to leaderboard
 
-USEFUL COMMANDS:
-  npm run format && npm run check   # Before pushing
-  npm run generate:api              # After API changes
-  npm run db:draft-changelog        # After entity changes
+BEFORE PUSHING:
+  npm run format && npm run check     # Format + lint + typecheck all services
+
+AFTER API CHANGES:
+  npm run generate:api                # Regenerate all OpenAPI clients
+
+AFTER DATABASE/ENTITY CHANGES:
+  npm run db:draft-changelog          # Generate Liquibase migration
+  npm run db:generate-erd-docs        # Update ERD documentation  
+  npm run db:generate-models:intelligence-service  # Sync SQLAlchemy models
 -->
 
 ## Description
