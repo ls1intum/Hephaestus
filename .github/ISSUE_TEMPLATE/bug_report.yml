@@ -1,43 +1,68 @@
 name: 🐞 Bug Report
-description: Create a bug report to help us improve
+description: Something isn't working as expected
 title: "bug: "
 labels: ["bug"]
 body:
-  - type: textarea
+  - type: markdown
     attributes:
-      label: Describe the bug
-      description: A clear and concise description of what the bug is and what you expected to happen.
+      value: |
+        Thanks for reporting! Please fill out the sections below to help us fix this quickly.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: Describe the bug and what you expected instead.
+      placeholder: "When I click X, Y happens. I expected Z."
     validations:
       required: true
+
   - type: textarea
+    id: reproduction
     attributes:
-      label: To reproduce
-      description: Steps to reproduce the behavior (e.g., 1. Go to '...', 2. Click on '...', 3. See error)
+      label: Steps to reproduce
+      description: Minimal steps to trigger the bug.
+      placeholder: |
+        1. Go to /leaderboard
+        2. Click on "Weekly" tab
+        3. See error in console
     validations:
       required: true
+
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      description: Which part of Hephaestus is affected?
+      options:
+        - Webapp (React frontend)
+        - Application Server (Java/Spring)
+        - Intelligence Service (Python/AI)
+        - Webhook Ingest
+        - Don't know
+    validations:
+      required: true
+
   - type: textarea
+    id: environment
     attributes:
       label: Environment
-      description: |
-        Please share relevant environment details:
-        - Component (webapp, server, etc.)
-        - Browser and version (if applicable)
-        - OS (if relevant)
-      placeholder: |
-        Component: webapp
-        Browser: Chrome 120
-        OS: macOS
+      description: Browser, OS, or deployment details if relevant.
+      placeholder: "Chrome 120, macOS 14, production"
+
   - type: textarea
+    id: logs
     attributes:
-      label: Additional information
-      description: Add screenshots, logs, or any other context about the problem here.
+      label: Logs / Screenshots
+      description: Paste error messages, console output, or attach screenshots.
+      render: shell
+
   - type: dropdown
     id: contribute
     attributes:
-      label: Would you like to contribute a fix?
-      description: If this is confirmed as a bug, we're happy to provide guidance and review support.
+      label: Willing to contribute a fix?
       options:
-        - "No"
         - "Yes"
+        - "No"
     validations:
-      required: true
+      required: false
