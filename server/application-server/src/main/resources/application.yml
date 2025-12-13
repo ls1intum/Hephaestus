@@ -92,6 +92,7 @@ hephaestus:
             enabled: false
             team: "all"
             channel-id: ""
+        # PR authors whose assignee-reviewers don't earn points (e.g., AI bots)
         self-review-author-logins:
             - Copilot
     

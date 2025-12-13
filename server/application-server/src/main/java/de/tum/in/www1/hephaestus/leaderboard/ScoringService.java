@@ -18,19 +18,16 @@ import org.springframework.stereotype.Service;
 @Service
 public class ScoringService {
 
-    private final Logger logger = LoggerFactory.getLogger(ScoringService.class);
+    private static final Logger logger = LoggerFactory.getLogger(ScoringService.class);
 
     private final PullRequestRepository pullRequestRepository;
     private final Set<String> selfReviewAuthorLogins;
 
-    public double WEIGHT_APPROVAL = 2.0;
-    public double WEIGHT_CHANGESREQUESTED = 2.5;
-    public double WEIGHT_COMMENT = 1.5;
+    private static final double WEIGHT_APPROVAL = 2.0;
+    private static final double WEIGHT_CHANGESREQUESTED = 2.5;
+    private static final double WEIGHT_COMMENT = 1.5;
 
-    public ScoringService(
-        PullRequestRepository pullRequestRepository,
-        LeaderboardProperties leaderboardProperties
-    ) {
+    public ScoringService(PullRequestRepository pullRequestRepository, LeaderboardProperties leaderboardProperties) {
         this.pullRequestRepository = pullRequestRepository;
         this.selfReviewAuthorLogins = leaderboardProperties
             .getSelfReviewAuthorLogins()
@@ -140,6 +137,10 @@ public class ScoringService {
         return (codeReviewBonus / 2) * maxBonus;
     }
 
+    /**
+     * Returns true if this review should be excluded because the PR was authored by a
+     * configured bot (e.g., Copilot) and the reviewer is an assignee on that PR.
+     */
     private boolean isSelfAssignedReview(PullRequestReview review) {
         PullRequest pullRequest = review.getPullRequest();
         User reviewer = review.getAuthor();
@@ -172,8 +173,11 @@ public class ScoringService {
                     return assignee.getId().equals(reviewerId);
                 }
 
-                return assignee.getLogin() != null && reviewerLogin != null &&
-                    assignee.getLogin().equalsIgnoreCase(reviewerLogin);
+                return (
+                    assignee.getLogin() != null &&
+                    reviewerLogin != null &&
+                    assignee.getLogin().equalsIgnoreCase(reviewerLogin)
+                );
             });
     }
 
