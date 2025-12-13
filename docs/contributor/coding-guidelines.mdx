@@ -102,7 +102,7 @@ These guidelines keep every service aligned. Keep changes focused. Mention any d
 - Liquibase changesets live in `server/application-server/src/main/resources/config/liquibase`.
 - Prefer `renameColumn` or `modifyDataType` when evolving schemas so data survives deployments.
 - Add indexes before backfilling large tables. Profile long migrations locally.
-- After schema updates, regenerate the ERD, refresh the FastAPI models, and run backend tests that touch the affected tables.
+- After schema updates, regenerate the ERD, refresh the FastAPI models, and run server tests that touch the affected tables.
 
 ## Observability and security
 
@@ -115,7 +115,7 @@ These guidelines keep every service aligned. Keep changes focused. Mention any d
 ## Performance reminders
 
 - Batch network calls and paginate large results.
-- Cache expensive computations when you reuse them. TanStack Query handles client caching. Use memoised services or projections on the backend.
+- Cache expensive computations when you reuse them. TanStack Query handles client caching. Use memoised services or projections on the server.
 - Measure before tuning. Add logging or metrics when you touch critical latency paths.
 - Profile React work with the DevTools profiler and Chrome Performance panel. Profile Java code with JFR and async-profiler.
 

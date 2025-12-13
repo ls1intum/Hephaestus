@@ -11,9 +11,9 @@ labels: ["feature"]
 
 ## Acceptance criteria
 
-- [ ] 
-- [ ] 
+- [ ]
+- [ ]
 
 ## Design
 
-<!-- Sketch, mockup link, or describe the UI. Delete for backend-only features. -->
+<!-- Sketch, mockup link, or describe the UI. Delete for server-only features. -->
