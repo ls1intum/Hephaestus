@@ -34,15 +34,26 @@ jobs:
             ci
             chore
             revert
+          # Service scopes
           scopes: |
             webapp
-            application-server
-            intelligence-service
-            webhook-ingest
+            server
+            ai
+            webhooks
             docs
+            # Infrastructure scopes
             ci
             deps
-            config
+            docker
+            db
+            # Feature scopes
+            leaderboard
+            mentor
+            profile
+            workspace
+            teams
+            github
+            notifications
           requireScope: false
           subjectPattern: ^(?![A-Z]).+$
           subjectPatternError: |
@@ -75,71 +86,9 @@ jobs:
         with:
           configuration-path: .github/labeler.yml
 
-      - name: "Apply size label"
+      - name: "Apply size and semantic labels"
         uses: actions/github-script@v7
         with:
           script: |
-            console.log("Calculating PR size via listFiles pagination...");
-            const files = await github.paginate(
-              github.rest.pulls.listFiles,
-              {
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                pull_number: context.issue.number,
-                per_page: 100,
-              }
-            );
-            const changedLines = files.reduce((sum, f) => sum + (f.additions || 0) + (f.deletions || 0), 0);
-            console.log(`Changed lines (additions+deletions): ${changedLines}`);
-
-            let label = '';
-            if (changedLines > 1000) label = 'size:XXL';
-            else if (changedLines > 499) label = 'size:XL';
-            else if (changedLines > 99) label = 'size:L';
-            else if (changedLines > 29) label = 'size:M';
-            else if (changedLines > 9) label = 'size:S';
-            else label = 'size:XS';
-
-            console.log("Fetching existing labels...");
-            const labels = await github.rest.issues.listLabelsOnIssue({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-            });
-
-            const sizeLabels = labels.data
-              .filter(label => label.name.startsWith('size:'))
-              .map(label => label.name);
-
-            const removeLabels = sizeLabels.filter(sizeLabel => sizeLabel !== label);
-            if (removeLabels.length > 0) {
-              console.log(`Removing existing size labels: ${removeLabels.join(', ')}`);
-              for (const labelToRemove of removeLabels) {
-                await github.rest.issues.removeLabel({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  issue_number: context.issue.number,
-                  name: labelToRemove,
-                });
-              }
-              console.log("Existing size labels removed.");
-            } else {
-              console.log("No size labels to remove.");
-            }
-
-            if (label) {
-              if (sizeLabels.includes(label)) {
-                console.log(`Label "${label}" already applied.`);
-              } else {
-                console.log(`Applying label "${label}" to the pull request...`);
-                await github.rest.issues.addLabels({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  issue_number: context.issue.number,
-                  labels: [label]
-                });
-                console.log(`Label "${label}" applied successfully.`);
-              }
-            } else {
-              console.log("No label to apply.");
-            }
+            const script = require('./.github/scripts/label-pr.js')
+            await script({github, context})

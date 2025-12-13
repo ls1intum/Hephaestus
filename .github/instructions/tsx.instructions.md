@@ -23,7 +23,7 @@ Follow the [general coding guidelines](./general-coding.instructions.md) in addi
 - Prefer named exports for components and hooks so tree shaking stays predictable.
 
 ## Data, state, and networking
-- Fetch data with TanStack Query v5. Spread the generated option helpers from `src/api/@tanstack/react-query.gen.ts` into `useQuery`/`useMutation` so request typing, retries, and query keys stay in sync with the backend. See `useDocumentArtifact.ts` for a full example.
+- Fetch data with TanStack Query v5. Spread the generated option helpers from `src/api/@tanstack/react-query.gen.ts` into `useQuery`/`useMutation` so request typing, retries, and query keys stay in sync with the server. See `useDocumentArtifact.ts` for a full example.
 - Use the shared `QueryClient` provided by `src/integrations/tanstack-query/root-provider.tsx`. Invalidate with the generated `...QueryKey()` helpers instead of literal arrays.
 - Keep feature state in the relevant Zustand store under `src/stores/**` and subscribe with selectors to avoid broad rerenders.
 - Reuse the preconfigured OpenAPI `client` (set up in `main.tsx`) rather than introducing alternative HTTP clients.
