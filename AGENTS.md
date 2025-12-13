@@ -140,15 +140,13 @@ Regeneration is destructive; stash local edits before running these commands. Ch
 - Contributor documentation should stay in `docs/` (GitHub Pages). Keep README/CONTRIBUTING updates concise and actionable.
 - Screenshots or large binary assets belong under `docs/images/` or the Storybook stories, not inside source directories.
 
-## 10. Commit & PR checklist
+## 10. Pull requests
 
-Before marking work ready for review:
+Before opening a PR, run `npm run format && npm run check`. The PR template (`.github/PULL_REQUEST_TEMPLATE.md`) guides you through title format and checklists. Key points:
 
-- [ ] Regenerate and commit any impacted OpenAPI specs, clients, ERD docs, or generated SQLAlchemy models.
-- [ ] Run the formatting/linting/typecheck/test commands relevant to the modified modules; capture output for the PR description if CI cannot run a job locally.
-- [ ] Verify database migrations through `db:draft-changelog` when JPA entities change and inspect the produced XML.
-- [ ] Double-check that no generated files were edited manually.
-- [ ] Follow Conventional Commit semantics for PR titles (`feat(webapp): ...`, etc., see `CONTRIBUTING.md`).
+- **Title**: Follow Conventional Commits—see `CONTRIBUTING.md` for types/scopes.
+- **Generated files**: Regenerate and commit OpenAPI specs, clients, and ERD docs when APIs or entities change.
+- **Database changes**: Run `npm run db:draft-changelog` and prune to minimal deltas.
 
 ## 11. Known command caveats
 

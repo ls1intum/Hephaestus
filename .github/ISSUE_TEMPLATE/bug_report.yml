@@ -1,43 +1,68 @@
-name: 🐞 Bug Report
-description: Create a bug report to help us improve
-title: "bug: "
+name: 🐞 Bug
+description: Something is broken
+title: ""
 labels: ["bug"]
 body:
-  - type: textarea
+  - type: markdown
     attributes:
-      label: Describe the bug
-      description: A clear and concise description of what the bug is and what you expected to happen.
-    validations:
-      required: true
+      value: |
+        <!--
+        BEFORE FILING:
+        1. Search existing issues to avoid duplicates
+        2. Use a clear, descriptive title (not "it doesn't work")
+        3. One bug per issue—split multiple problems into separate issues
+        -->
+        Thanks for taking the time to report this bug!
+
   - type: textarea
+    id: what
     attributes:
-      label: To reproduce
-      description: Steps to reproduce the behavior (e.g., 1. Go to '...', 2. Click on '...', 3. See error)
-    validations:
-      required: true
-  - type: textarea
-    attributes:
-      label: Environment
-      description: |
-        Please share relevant environment details:
-        - Component (webapp, server, etc.)
-        - Browser and version (if applicable)
-        - OS (if relevant)
+      label: What's broken?
+      description: Describe what happened vs. what you expected.
       placeholder: |
-        Component: webapp
-        Browser: Chrome 120
-        OS: macOS
-  - type: textarea
-    attributes:
-      label: Additional information
-      description: Add screenshots, logs, or any other context about the problem here.
-  - type: dropdown
-    id: contribute
-    attributes:
-      label: Would you like to contribute a fix?
-      description: If this is confirmed as a bug, we're happy to provide guidance and review support.
-      options:
-        - "No"
-        - "Yes"
+        When I click "Submit" on the leaderboard filter, the page shows a blank screen.
+        Expected: The leaderboard should filter by the selected repository.
     validations:
       required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: Minimal steps so we can see the bug. No repro = low priority fix.
+      placeholder: |
+        1. Go to /leaderboard
+        2. Select "Weekly" timeframe
+        3. Click the repository dropdown
+        4. Select any repository
+        5. Click "Apply"
+        6. → Blank screen appears
+    validations:
+      required: true
+
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      description: Which part of the system is affected?
+      options:
+        - Webapp (React UI)
+        - Application Server (Java/Spring)
+        - Intelligence Service (Python/AI)
+        - Webhook Ingest
+        - Don't know
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Error logs / Screenshots
+      description: |
+        Paste console errors, network failures, or stack traces.
+        For UI bugs, attach a screenshot or screen recording.
+      render: shell
+      placeholder: |
+        TypeError: Cannot read property 'map' of undefined
+            at LeaderboardTable.tsx:42
+            at renderWithHooks (react-dom.development.js:14985)

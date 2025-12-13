@@ -8,28 +8,19 @@ To ensure a transparent and trustworthy environment, we have established differe
 
 ### For Members of Our Organization
 
-1. **Real Names Required**: As a member of our organization, you must use your full real name in your GitHub profile. This is a prerequisite for joining our organization. Using a real name is crucial for building trust within the team and the broader community. It fosters accountability and transparency, which are essential for collaborative work. When members use their real identities, it encourages open communication and strengthens professional relationships. Furthermore, it aligns with best practices in open-source communities, where transparency is key to ensuring the integrity and reliability of contributions.
-
-2. **Profile Picture**: Members are required to upload an authentic profile picture. Use a clear, professional image and avoid comic-like pictures, memojis, or other non-authentic picture styles. Using a professional and authentic profile picture is essential for establishing credibility and fostering trust within the community. It helps others easily identify and connect with you, which is crucial for effective collaboration. By using a real photo, you present yourself as a serious and committed contributor, which in turn encourages others to take your work and interactions seriously. Avoiding non-authentic images ensures that the focus remains on the substance of your contributions rather than on distractions or misunderstandings that might arise from informal or unprofessional visuals.
-
-3. **Direct Branching and PR Creation**: As a member, you are encourages to create branches and pull requests (PRs) directly within the repository.
+1. **Real Names Required**: Members must use their full real name in their GitHub profile to ensure accountability.
+2. **Profile Picture**: Members must upload an authentic, professional profile picture. Comic-style images or avatars are not permitted.
+3. **Internal Workflow**: Members should create branches and pull requests directly within the repository.
 
 ### For External Contributors
 
-1. **Identity Verification**: External contributions will only be considered if the contributor uses their real name and an authentic profile picture (see above). This ensures accountability and trustworthiness in all external contributions.
+1. **Identity Verification**: Contributions are only accepted from users with real names and authentic profile pictures.
+2. **Forking**: Fork the repository and work on changes in your own branch.
+3. **Pull Request**: Submit a PR from your fork. Ensure your branch is up to date with `main`.
 
-2. **Forking the Repository**: External contributors fork the repository and work on changes in their own branches.
+### Compliance
 
-3. **Submit a Pull Request**: Once your work is complete, submit a pull request for review. Ensure that your branch is up to date with the main branch before submitting.
-
-4. **Compliance**: Contributions from external contributors that do not adhere to these guidelines may not be accepted.
-
-### References and Best Practices
-
-- We align our guidelines with the [GitHub Acceptable Use Policies](https://docs.github.com/en/site-policy/acceptable-use-policies) which stress the importance of authenticity and transparency in user profiles.
-- For more insights on contributing to open-source projects, we recommend reviewing the [Open Source Guides by GitHub](https://opensource.guide/).
-
-By following these guidelines, we foster a collaborative environment built on mutual trust and respect, essential for the success of our project.
+Contributions that do not adhere to these guidelines will be rejected. We align with [GitHub Acceptable Use Policies](https://docs.github.com/en/site-policy/acceptable-use-policies).
 
 ## Contribution Process
 
@@ -64,30 +55,47 @@ We use automated semantic pull request validation to ensure consistent and meani
 
 ### Recommended Scopes
 
-- `webapp`: Changes to the React webapp
-- `application-server`: Changes to the Java application server
-- `intelligence-service`: Changes to the Python intelligence service
-- `webhook-ingest`: Changes to the webhook ingestion service
-- `docs`: Documentation changes
-- `ci`: CI/CD related changes
-- `deps`: Dependency updates
-- `config`: Configuration changes
+**Service scopes** (where the code lives):
+
+- `webapp`: React frontend
+- `server`: Java application server
+- `ai`: Python intelligence service
+- `webhooks`: Webhook ingestion service
+- `docs`: Documentation
+
+**Infrastructure scopes**:
+
+- `ci`: CI/CD workflows
+- `deps`: Dependencies
+- `docker`: Container configuration
+- `db`: Database/Liquibase changes
+
+**Feature scopes** (domain-specific):
+
+- `leaderboard`: Leaderboard and rankings
+- `mentor`: AI mentor (Heph)
+- `profile`: User profiles
+- `workspace`: Workspace management
+- `teams`: Team competitions
+- `github`: GitHub integration
+- `notifications`: Email/notification system
 
 ### Examples
 
 **Valid pull request titles:**
 
-- `fix: correct typo in user authentication`
-- `feat(webapp): add leaderboard sorting functionality`
+- `fix(profile): correct avatar upload logic`
+- `feat(leaderboard): add sorting functionality`
+- `feat(mentor): add conversation history`
+- `feat(server): add user profile endpoint`
 - `docs: update installation instructions`
-- `refactor(intelligence-service): improve code analysis performance`
+- `refactor(ai): improve code analysis performance`
 - `chore(deps): update dependencies to latest versions`
+- `fix(db): add missing index for performance`
 
-**Work-in-progress PRs:**
+**Draft Pull Requests:**
 
-If your pull request is still in progress, you can prefix it with `[WIP]`:
-
-- `[WIP] feat(webapp): add new dashboard component`
+If your pull request is still in progress, please open it as a **Draft Pull Request**. This signals that the work is not yet ready for review without cluttering the title with `[WIP]`.
 
 ### Guidelines
 

@@ -15,11 +15,16 @@ When creating pull requests, follow the [Conventional Commits](https://www.conve
 - `chore`: Maintenance tasks
 - `ci`: CI/CD changes
 
-**Scopes**: `webapp`, `application-server`, `intelligence-service`, `webhook-ingest`, `docs`, `ci`, `deps`, `config`
+**Service scopes**: `webapp`, `server`, `ai`, `webhooks`, `docs`
+
+**Feature scopes**: `leaderboard`, `mentor`, `profile`, `workspace`, `teams`, `github`, `notifications`
+
+**Infrastructure scopes**: `ci`, `deps`, `docker`, `db`
 
 **Examples**:
-- `fix(webapp): correct authentication flow`
-- `feat(application-server): add team sync endpoint`
+- `fix(profile): correct avatar upload logic`
+- `feat(leaderboard): add sorting functionality`
+- `feat(server): add team sync endpoint`
 - `chore(deps): update dependencies`
 
 **Guidelines**:
