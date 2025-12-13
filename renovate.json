@@ -34,7 +34,7 @@
   "configWarningReuseIssue": false,
   "timezone": "Europe/Berlin",
   "schedule": [
-    "before 9am on monday"
+    "before 9am on Monday"
   ],
   "prBodyColumns": [
     "Package",
@@ -65,7 +65,7 @@
   "lockFileMaintenance": {
     "enabled": true,
     "schedule": [
-      "before 9am on monday"
+      "before 9am on Monday"
     ],
     "automerge": true
   },

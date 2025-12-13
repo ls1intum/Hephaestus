@@ -83,7 +83,22 @@ jobs:
 
           for img in "${IMAGES[@]}"; do
             FULL_IMAGE="ghcr.io/ls1intum/hephaestus/$img"
-            echo "Retagging $FULL_IMAGE:$SHA to $FULL_IMAGE:$VERSION"
+            echo "Checking for $FULL_IMAGE:$SHA..."
+            
+            # Retry up to 24 times (2 minutes) with 5s interval
+            RETRIES=24
+            COUNT=0
+            until docker buildx imagetools inspect "$FULL_IMAGE:$SHA" > /dev/null 2>&1; do
+              COUNT=$((COUNT+1))
+              if [ "$COUNT" -ge "$RETRIES" ]; then
+                echo "::error::Image $FULL_IMAGE:$SHA not found after $((RETRIES*5)) seconds"
+                exit 1
+              fi
+              echo "Image not found yet. Retrying in 5s... ($COUNT/$RETRIES)"
+              sleep 5
+            done
+            
+            echo "Retagging $FULL_IMAGE:$SHA → $FULL_IMAGE:$VERSION"
             docker buildx imagetools create -t "$FULL_IMAGE:$VERSION" "$FULL_IMAGE:$SHA"
           done
 

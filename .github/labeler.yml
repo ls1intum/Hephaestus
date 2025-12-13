@@ -5,7 +5,7 @@ documentation:
   - changed-files:
     - any-glob-to-any-file: docs/**
 
-client:
+webapp:
   - changed-files:
     - any-glob-to-any-file: webapp/**
 

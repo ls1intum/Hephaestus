@@ -43,8 +43,9 @@ module.exports = async ({ github, context }) => {
   if (title.match(/^style(\(.*\))?!?:/)) typeLabels.push('maintenance');
   if (title.match(/^revert(\(.*\))?!?:/)) typeLabels.push('revert');
   if (title.match(/^ci(\(.*\))?!?:/)) typeLabels.push('ci');
-  // Breaking change: must have ! before : (e.g., feat!: or feat(scope)!:)
-  if (title.match(/^\w+(\(.*\))?!:/) || title.includes('BREAKING CHANGE')) typeLabels.push('breaking');
+  // Breaking change: must have ! immediately before : (e.g., feat!: or feat(scope)!:)
+  // [^)]* prevents greedy matching inside the scope parentheses
+  if (title.match(/^\w+(\([^)]*\))?!:/) || title.includes('BREAKING CHANGE')) typeLabels.push('breaking');
   
   console.log(`Detected type labels from title "${title}":`, typeLabels);
 
