@@ -102,6 +102,11 @@ services:
       POSTHOG_API_HOST: ${POSTHOG_API_HOST:-https://app.posthog.com}
       POSTHOG_PROJECT_ID: ${POSTHOG_PROJECT_ID:-}
       POSTHOG_PERSONAL_API_KEY: ${POSTHOG_PERSONAL_API_KEY:-}
+      # Slack account linking (optional, requires Keycloak Slack IdP)
+      SLACK_LINKING_ENABLED: ${SLACK_LINKING_ENABLED:-false}
+      # These are passed through so spring can read them directly
+      KEYCLOAK_SLACK_CLIENT_ID: ${KEYCLOAK_SLACK_CLIENT_ID:-}
+      KEYCLOAK_SLACK_CLIENT_SECRET: ${KEYCLOAK_SLACK_CLIENT_SECRET:-}
     depends_on:
       - postgres
     restart: unless-stopped

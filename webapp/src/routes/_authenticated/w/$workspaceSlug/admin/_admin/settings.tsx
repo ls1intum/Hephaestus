@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
+import { z } from "zod";
 import {
 	addRepositoryToMonitorMutation,
 	getRepositoriesToMonitorOptions,
@@ -11,10 +12,15 @@ import { AdminSettingsPage } from "@/components/admin/AdminSettingsPage";
 import { NoWorkspace } from "@/components/workspace/NoWorkspace";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 
+const searchSchema = z.object({
+	slack: z.enum(["success", "error", "cancelled", "invalid"]).optional(),
+});
+
 export const Route = createFileRoute(
 	"/_authenticated/w/$workspaceSlug/admin/_admin/settings",
 )({
 	component: AdminSettings,
+	validateSearch: searchSchema,
 });
 
 // Define the repository item type
@@ -27,6 +33,7 @@ type RepositoryItem = {
  */
 function AdminSettings() {
 	const queryClient = useQueryClient();
+	const { slack: slackStatus } = Route.useSearch();
 	const {
 		workspaceSlug,
 		isLoading: isWorkspaceLoading,
@@ -151,6 +158,9 @@ function AdminSettings() {
 			isRemovingRepository={removeRepository.isPending}
 			isResettingLeagues={resetLeagues.isPending}
 			isAppInstallationWorkspace={isAppInstallationWorkspace}
+			workspaceSlug={workspaceSlug ?? ""}
+			hasSlackToken={workspaceData?.hasSlackToken ?? false}
+			slackStatus={slackStatus}
 			onAddRepository={handleAddRepository}
 			onRemoveRepository={handleRemoveRepository}
 			onResetLeagues={() => {

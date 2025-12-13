@@ -538,6 +538,25 @@ export type RepositoryInfo = {
     nameWithOwner: string;
 };
 
+/**
+ * DTO representing the user's Slack connection status.
+ */
+export type SlackConnection = {
+    /**
+     * Whether the user has linked their Slack account
+     */
+    connected?: boolean;
+    linkUrl?: string;
+    /**
+     * Whether Slack integration is enabled for this instance
+     */
+    slackEnabled?: boolean;
+    /**
+     * The Slack User ID if connected, null otherwise
+     */
+    slackUserId?: string;
+};
+
 export type SortObject = {
     empty?: boolean;
     sorted?: boolean;
@@ -1478,6 +1497,7 @@ export type UserInfo = {
     leaguePoints?: number;
     login: string;
     name: string;
+    slackUserId?: string;
 };
 
 export type UserProfile = {
@@ -1667,6 +1687,23 @@ export type ListGlobalContributorsResponses = {
 
 export type ListGlobalContributorsResponse = ListGlobalContributorsResponses[keyof ListGlobalContributorsResponses];
 
+export type SlackCallbackData = {
+    body?: never;
+    path?: never;
+    query: {
+        code: string;
+        state: string;
+    };
+    url: '/integrations/slack/callback';
+};
+
+export type SlackCallbackResponses = {
+    /**
+     * OK
+     */
+    200: unknown;
+};
+
 export type DeleteUserData = {
     body?: never;
     path?: never;
@@ -1712,6 +1749,54 @@ export type UpdateUserSettingsResponses = {
 };
 
 export type UpdateUserSettingsResponse = UpdateUserSettingsResponses[keyof UpdateUserSettingsResponses];
+
+export type DisconnectSlackData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/user/slack-connection';
+};
+
+export type DisconnectSlackResponses = {
+    /**
+     * OK
+     */
+    200: SlackConnection;
+};
+
+export type DisconnectSlackResponse = DisconnectSlackResponses[keyof DisconnectSlackResponses];
+
+export type GetSlackConnectionData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/user/slack-connection';
+};
+
+export type GetSlackConnectionResponses = {
+    /**
+     * OK
+     */
+    200: SlackConnection;
+};
+
+export type GetSlackConnectionResponse = GetSlackConnectionResponses[keyof GetSlackConnectionResponses];
+
+export type SyncSlackConnectionData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/user/slack-connection/sync';
+};
+
+export type SyncSlackConnectionResponses = {
+    /**
+     * OK
+     */
+    200: SlackConnection;
+};
+
+export type SyncSlackConnectionResponse = SyncSlackConnectionResponses[keyof SyncSlackConnectionResponses];
 
 export type ListWorkspacesData = {
     body?: never;
@@ -2668,6 +2753,25 @@ export type UpdateSlackCredentialsResponses = {
 };
 
 export type UpdateSlackCredentialsResponse = UpdateSlackCredentialsResponses[keyof UpdateSlackCredentialsResponses];
+
+export type InstallSlackBotData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/slack/install';
+};
+
+export type InstallSlackBotResponses = {
+    /**
+     * OK
+     */
+    200: unknown;
+};
 
 export type RenameSlugData = {
     body: RenameWorkspaceSlugRequest;

@@ -273,6 +273,8 @@ services:
       LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-}
       LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-}
       LANGFUSE_HOST: ${LANGFUSE_HOST:-}
+      # Slack account linking (disabled for previews by default)
+      SLACK_LINKING_ENABLED: ${SLACK_LINKING_ENABLED:-false}
     depends_on:
       postgres:
         condition: service_healthy

@@ -99,6 +99,9 @@ services:
       - KEYCLOAK_GITHUB_CLIENT_ID=${KEYCLOAK_GITHUB_CLIENT_ID}
       - KEYCLOAK_GITHUB_CLIENT_SECRET=${KEYCLOAK_GITHUB_CLIENT_SECRET}
       - KEYCLOAK_GITHUB_ADMIN_USERNAME=${KEYCLOAK_GITHUB_ADMIN_USERNAME}
+      - KEYCLOAK_SLACK_ENABLED=${KEYCLOAK_SLACK_ENABLED:-false}
+      - KEYCLOAK_SLACK_CLIENT_ID=${KEYCLOAK_SLACK_CLIENT_ID:-}
+      - KEYCLOAK_SLACK_CLIENT_SECRET=${KEYCLOAK_SLACK_CLIENT_SECRET:-}
     labels:
       - "traefik.enable=true"
       - "traefik.http.middlewares.gzip.compress=true"
@@ -361,6 +364,34 @@ configs:
               "clientSecret": "${KEYCLOAK_GITHUB_CLIENT_SECRET}",
               "clientId": "${KEYCLOAK_GITHUB_CLIENT_ID}",
               "guiOrder": "1"
+            }
+          },
+          {
+            "alias": "slack",
+            "displayName": "Slack",
+            "providerId": "oidc",
+            "enabled": "${KEYCLOAK_SLACK_ENABLED:-false}",
+            "updateProfileFirstLoginMode": "on",
+            "trustEmail": true,
+            "storeToken": false,
+            "addReadTokenRoleOnCreate": false,
+            "authenticateByDefault": false,
+            "linkOnly": true,
+            "hideOnLogin": true,
+            "config": {
+              "syncMode": "FORCE",
+              "clientSecret": "${KEYCLOAK_SLACK_CLIENT_SECRET}",
+              "clientId": "${KEYCLOAK_SLACK_CLIENT_ID}",
+              "tokenUrl": "https://slack.com/api/openid.connect.token",
+              "authorizationUrl": "https://slack.com/openid/connect/authorize",
+              "logoutUrl": "",
+              "userInfoUrl": "https://slack.com/api/openid.connect.userInfo",
+              "jwksUrl": "https://slack.com/openid/connect/keys",
+              "issuer": "https://slack.com",
+              "defaultScope": "openid email profile",
+              "validateSignature": "true",
+              "useJwksUrl": "true",
+              "guiOrder": "2"
             }
           }
         ],
