@@ -1,7 +1,15 @@
-import { AlertCircle, X } from "lucide-react";
+import { AlertCircle, MailCheck, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import {
+	Empty,
+	EmptyContent,
+	EmptyDescription,
+	EmptyHeader,
+	EmptyMedia,
+	EmptyTitle,
+} from "@/components/ui/empty";
 import { Progress } from "@/components/ui/progress";
 
 import type {
@@ -35,10 +43,16 @@ export function SurveyContainer({
 		{},
 	);
 	const [errors, setErrors] = useState<ErrorMap>({});
+	const [isCompleted, setIsCompleted] = useState(false);
+	const [finalResponses, setFinalResponses] = useState<Record<
+		string,
+		SurveyResponse
+	> | null>(null);
 
 	const currentStepIndex = history[history.length - 1] ?? 0;
 	const currentQuestion = survey.questions[currentStepIndex];
 	const totalSteps = survey.questions.length;
+
 	const viewIndex = Math.min(currentStepIndex + 1, totalSteps);
 	const progress = (viewIndex / Math.max(totalSteps, 1)) * 100;
 
@@ -49,6 +63,8 @@ export function SurveyContainer({
 		setHistory([0]);
 		setResponses({});
 		setErrors({});
+		setIsCompleted(false);
+		setFinalResponses(null);
 	}, [surveyId]);
 
 	const handleResponse = (questionId: string, value: SurveyResponse) => {
@@ -67,7 +83,12 @@ export function SurveyContainer({
 	};
 
 	const handleClose = () => {
-		onDismiss(currentStepIndex);
+		if (isCompleted && finalResponses) {
+			// If already completed, treat close as complete
+			onComplete(finalResponses);
+		} else {
+			onDismiss(currentStepIndex);
+		}
 	};
 
 	const handleNext = () => {
@@ -95,7 +116,9 @@ export function SurveyContainer({
 		});
 
 		if (nextStep === null || nextStep >= totalSteps) {
-			onComplete(snapshotResponses);
+			// Show thank you screen instead of immediately closing
+			setFinalResponses(snapshotResponses);
+			setIsCompleted(true);
 			return;
 		}
 
@@ -110,6 +133,51 @@ export function SurveyContainer({
 		!currentQuestion ||
 		currentStepIndex === totalSteps - 1 ||
 		currentQuestion.branching?.type === "end";
+
+	// Render thank you screen when completed
+	if (isCompleted) {
+		return (
+			<div className="flex max-h-[85vh] flex-col sm:max-h-[600px]">
+				<div className="flex items-start justify-between border-b p-4 pb-3">
+					<div className="flex-1 pr-6 sm:pr-8">
+						<h2 className="text-lg font-semibold sm:text-xl text-balance">
+							{survey.name}
+						</h2>
+					</div>
+					<Button
+						variant="ghost"
+						size="icon"
+						className="h-8 w-8 shrink-0"
+						onClick={() => finalResponses && onComplete(finalResponses)}
+						aria-label="Close survey"
+					>
+						<X className="h-4 w-4" />
+					</Button>
+				</div>
+
+				<Empty>
+					<EmptyHeader>
+						<EmptyMedia variant="icon">
+							<MailCheck />
+						</EmptyMedia>
+						<EmptyTitle>Thank you for your participation.</EmptyTitle>
+						<EmptyDescription>
+							Your insights are critical for our research into making
+							collaborative software engineering more effective.
+						</EmptyDescription>
+						<EmptyContent>
+							<Button
+								onClick={() => finalResponses && onComplete(finalResponses)}
+								aria-label="Close survey"
+							>
+								Close survey
+							</Button>
+						</EmptyContent>
+					</EmptyHeader>
+				</Empty>
+			</div>
+		);
+	}
 
 	if (!currentQuestion) {
 		return null;
