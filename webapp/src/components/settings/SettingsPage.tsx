@@ -9,46 +9,26 @@ import {
 	ResearchParticipationSection,
 	type ResearchParticipationSectionProps,
 } from "./ResearchParticipationSection";
+import {
+	SlackConnectionSection,
+	type SlackConnectionSectionProps,
+} from "./SlackConnectionSection";
 
 export interface SettingsPageProps {
-	/**
-	 * Props for the NotificationsSection component
-	 */
 	notificationsProps: NotificationsSectionProps;
-	/**
-	 * Props for the ResearchParticipationSection component
-	 */
 	researchProps: ResearchParticipationSectionProps;
-	/**
-	 * Props for the AccountSection component
-	 */
 	accountProps: AccountSectionProps;
-	/**
-	 * Whether the settings are still loading
-	 */
+	slackProps: SlackConnectionSectionProps;
 	isLoading?: boolean;
 }
 
-/**
- * SettingsPage component combining all settings sections
- * Provides a consistent layout for the settings page
- */
 export function SettingsPage({
 	notificationsProps,
 	researchProps,
+	slackProps,
 	accountProps,
 	isLoading = false,
 }: SettingsPageProps) {
-	const { isLoading: notificationsLoading = false, ...notificationsRest } =
-		notificationsProps;
-	const { isLoading: researchLoading = false, ...researchRest } = researchProps;
-	const { isLoading: accountLoading = false, ...accountRest } = accountProps;
-
-	const notificationsPending = isLoading || notificationsLoading;
-	const researchPending = isLoading || researchLoading;
-	const accountPending = isLoading || accountLoading;
-	const showResearchSection = isPosthogEnabled;
-
 	return (
 		<div className="w-full max-w-3xl mx-auto space-y-8">
 			<div className="space-y-1">
@@ -61,23 +41,31 @@ export function SettingsPage({
 			<Separator />
 
 			<NotificationsSection
-				{...notificationsRest}
-				isLoading={notificationsPending}
+				{...notificationsProps}
+				isLoading={isLoading || notificationsProps.isLoading}
 			/>
 
-			{showResearchSection && (
+			{isPosthogEnabled && (
 				<>
 					<Separator />
 					<ResearchParticipationSection
-						{...researchRest}
-						isLoading={researchPending}
+						{...researchProps}
+						isLoading={isLoading || researchProps.isLoading}
 					/>
 				</>
 			)}
 
 			<Separator />
+			<SlackConnectionSection
+				{...slackProps}
+				isLoading={isLoading || slackProps.isLoading}
+			/>
 
-			<AccountSection {...accountRest} isLoading={accountPending} />
+			<Separator />
+			<AccountSection
+				{...accountProps}
+				isLoading={isLoading || accountProps.isLoading}
+			/>
 		</div>
 	);
 }

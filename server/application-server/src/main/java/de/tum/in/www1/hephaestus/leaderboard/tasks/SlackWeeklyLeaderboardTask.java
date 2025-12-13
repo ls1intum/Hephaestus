@@ -24,7 +24,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.IntStream;
-import org.apache.commons.text.similarity.LevenshteinDistance;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -111,6 +110,30 @@ public class SlackWeeklyLeaderboardTask implements Runnable {
         return top3.stream().map(mapToSlackUser(allSlackUsers)).filter(user -> user != null).toList();
     }
 
+    /**
+     * Maps a leaderboard entry to the corresponding Slack user.
+     *
+     * <p>
+     * Uses a deterministic matching strategy (industry best practice):
+     * <ol>
+     * <li><b>Linked Slack User ID</b>: If the user has linked their Slack account
+     * via Settings → Connect Slack, use that directly (most reliable)</li>
+     * <li><b>Email matching</b>: Fall back to matching by email if no Slack link
+     * exists</li>
+     * </ol>
+     *
+     * <p>
+     * Fuzzy name matching is intentionally NOT used because:
+     * <ul>
+     * <li>Names are not unique identifiers</li>
+     * <li>Similar names (e.g., "Khiem Nguyen" vs "Khoa Nguyen") cause false
+     * matches</li>
+     * </ul>
+     *
+     * @param allSlackUsers list of all Slack workspace members
+     * @return a function that maps leaderboard entries to Slack users (or null if
+     *         no match)
+     */
     private Function<LeaderboardEntryDTO, User> mapToSlackUser(List<User> allSlackUsers) {
         return entry -> {
             UserInfoDTO leaderboardUser = entry.user();
@@ -118,32 +141,65 @@ public class SlackWeeklyLeaderboardTask implements Runnable {
                 return null;
             }
 
-            var exactUser = allSlackUsers
-                .stream()
-                .filter(
-                    user ->
-                        user.getName().equalsIgnoreCase(leaderboardUser.name()) ||
-                        (user.getProfile().getEmail() != null &&
-                            user.getProfile().getEmail().equalsIgnoreCase(leaderboardUser.email()))
-                )
-                .findFirst();
-            if (exactUser.isPresent()) {
-                return exactUser.get();
+            String githubLogin = leaderboardUser.login();
+            String githubName = leaderboardUser.name();
+            String slackUserId = leaderboardUser.slackUserId();
+
+            // Priority 1: Use the linked Slack User ID (explicit user connection)
+            if (slackUserId != null && !slackUserId.isEmpty()) {
+                var linkedMatch = allSlackUsers.stream().filter(user -> slackUserId.equals(user.getId())).findFirst();
+
+                if (linkedMatch.isPresent()) {
+                    logger.debug(
+                        "Matched GitHub user '{}' ({}) to Slack user '{}' by linked Slack ID",
+                        githubLogin,
+                        githubName,
+                        linkedMatch.get().getRealName()
+                    );
+                    return linkedMatch.get();
+                } else {
+                    logger.warn(
+                        "GitHub user '{}' has linked Slack ID '{}' but no matching Slack user found. " +
+                        "The Slack user may have been deactivated or removed.",
+                        githubLogin,
+                        slackUserId
+                    );
+                }
             }
 
-            // find through String edit distance
-            return allSlackUsers
-                .stream()
-                .min((a, b) -> {
-                    String aName = a.getRealName() != null ? a.getRealName() : a.getName();
-                    String bName = b.getRealName() != null ? b.getRealName() : b.getName();
+            // Priority 2: Fall back to email matching
+            String githubEmail = leaderboardUser.email();
+            if (githubEmail != null) {
+                var emailMatch = allSlackUsers
+                    .stream()
+                    .filter(
+                        user ->
+                            user.getProfile() != null &&
+                            user.getProfile().getEmail() != null &&
+                            user.getProfile().getEmail().equalsIgnoreCase(githubEmail)
+                    )
+                    .findFirst();
 
-                    return Integer.compare(
-                        LevenshteinDistance.getDefaultInstance().apply(leaderboardUser.name(), aName),
-                        LevenshteinDistance.getDefaultInstance().apply(leaderboardUser.name(), bName)
+                if (emailMatch.isPresent()) {
+                    logger.debug(
+                        "Matched GitHub user '{}' ({}) to Slack user '{}' by email",
+                        githubLogin,
+                        githubName,
+                        emailMatch.get().getRealName()
                     );
-                })
-                .orElse(null);
+                    return emailMatch.get();
+                }
+            }
+
+            // No match found
+            logger.info(
+                "No Slack user found for GitHub user '{}' ({}). " +
+                "To enable Slack mentions, go to Settings → Connect Slack, " +
+                "or ensure your GitHub email matches your Slack email.",
+                githubLogin,
+                githubName
+            );
+            return null;
         };
     }
 

@@ -19,13 +19,26 @@ tags:
   name: chat-controller
 - description: Global contributor information
   name: Contributors
-- description: Document management with versioning support
-  name: Documents
 - description: |-
     Workspace registry endpoints that operate outside of a specific workspace slug.
      These routes stay under the classic /workspaces base path while slugged routes
      live in {@link WorkspaceController WorkspaceController} via <code>@WorkspaceScopedController</code>.
   name: workspace-registry-controller
+- description: |-
+    Controller for managing Slack integration settings within a workspace
+     context.
+     <p>
+     This controller is workspace-scoped, meaning all endpoints are prefixed with
+     <code>/workspaces/{workspaceSlug</code>}.
+  name: workspace-slack-controller
+- description: |-
+    Controller for managing workspace memberships and roles.
+     Handles CRUD operations for workspace members and role assignments.
+  name: workspace-membership-controller
+- description: Manage external integrations for workspaces
+  name: Workspace Integration
+- description: Document management with versioning support
+  name: Documents
 - description: Team management within workspace
   name: Teams
 - description: Vote on chat messages (upvote/downvote)
@@ -36,14 +49,10 @@ tags:
   name: activity-controller
 - description: User profile and activity data
   name: Profile
-- description: |-
-    Controller for managing workspace memberships and roles.
-     Handles CRUD operations for workspace members and role assignments.
-  name: workspace-membership-controller
+- description: "User account management (settings, deletion, integrations)"
+  name: Account
 - description: Contributor rankings and league statistics
   name: Leaderboard
-- description: "User account management (settings, deletion)"
-  name: Account
 paths:
   /contributors:
     get:
@@ -61,6 +70,40 @@ paths:
       summary: List global contributors
       tags:
       - C
+  /integrations/slack/callback:
+    get:
+      description: Handles the callback from Slack after bot installation. Validates
+        the HMAC-signed state parameter and exchanges the authorization code for an
+        access token.
+      operationId: slackCallback
+      parameters:
+      - description: OAuth authorization code from Slack
+        in: query
+        name: code
+        required: false
+        schema:
+          type: string
+      - description: HMAC-signed state containing workspace slug
+        in: query
+        name: state
+        required: false
+        schema:
+          type: string
+      - description: Error code if user cancelled or Slack returned an error
+        in: query
+        name: error
+        required: false
+        schema:
+          type: string
+      responses:
+        "302":
+          description: Redirect to workspace settings on success or error page on
+            failure
+        "400":
+          description: Missing required OAuth parameters
+      summary: Slack OAuth Callback
+      tags:
+      - 'Workspace '
   /user:
     delete:
       description: Permanently delete the current user's account and all associated
@@ -103,6 +146,48 @@ paths:
                 $ref: "#/components/schemas/UserSettings"
           description: OK
       summary: Update user settings
+      tags: []
+  /user/slack-connection:
+    delete:
+      description: "Clears the stored Slack User ID. Note: To fully disconnect, the\
+        \ user should also unlink Slack in Keycloak Account Management."
+      operationId: disconnectSlack
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SlackConnection"
+          description: OK
+      summary: Disconnect Slack account
+      tags: []
+    get:
+      description: "Check if the current user has linked their Slack account. If Slack\
+        \ is enabled, also returns the URL where users can link their Slack account\
+        \ in Keycloak."
+      operationId: getSlackConnection
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SlackConnection"
+          description: OK
+      summary: Get Slack connection status
+      tags: []
+  /user/slack-connection/sync:
+    post:
+      description: Re-syncs the Slack User ID from Keycloak federated identities.
+        Call this after linking or unlinking Slack in Keycloak Account Management.
+      operationId: syncSlackConnection
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SlackConnection"
+          description: OK
+      summary: Sync Slack connection from Keycloak
       tags: []
   /workspaces:
     get:
@@ -1257,6 +1342,32 @@ paths:
       summary: Update Slack credentials for a workspace
       tags:
       - workspace
+  /workspaces/{workspaceSlug}/slack/install:
+    get:
+      description: Redirects to Slack authorization page to install the Hephaestus
+        bot to this workspace. Requires workspace admin privileges and Slack integration
+        to be enabled.
+      operationId: installSlackBot
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      responses:
+        "302":
+          description: Redirect to Slack authorization page
+        "400":
+          description: Slack integration is not enabled or not configured
+        "401":
+          description: User is not authenticated
+        "403":
+          description: User is not a workspace admin
+      summary: Initiate Slack Bot Installation
+      tags:
+      - workspace-slack
   /workspaces/{workspaceSlug}/slug:
     patch:
       operationId: renameSlug
@@ -2492,6 +2603,21 @@ components:
       - id
       - name
       - nameWithOwner
+    SlackConnection:
+      type: object
+      description: DTO representing the user's Slack connection status.
+      properties:
+        connected:
+          type: boolean
+          description: Whether the user has linked their Slack account
+        linkUrl:
+          type: string
+        slackEnabled:
+          type: boolean
+          description: Whether Slack integration is enabled for this instance
+        slackUserId:
+          type: string
+          description: "The Slack User ID if connected, null otherwise"
     SortObject:
       type: object
       properties:
@@ -3536,6 +3662,8 @@ components:
         login:
           type: string
         name:
+          type: string
+        slackUserId:
           type: string
       required:
       - avatarUrl

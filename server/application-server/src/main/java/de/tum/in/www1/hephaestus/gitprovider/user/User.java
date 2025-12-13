@@ -115,6 +115,9 @@ public class User extends BaseGitServiceEntity {
     // Current ranking points for the leaderboard leagues
     private int leaguePoints;
 
+    // Slack User ID for direct Slack mentions (linked by user via OAuth)
+    private String slackUserId;
+
     public enum Type {
         USER,
         ORGANIZATION,

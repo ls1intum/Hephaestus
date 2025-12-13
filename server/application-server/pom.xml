@@ -490,7 +490,8 @@
                             <artifactId>lombok</artifactId>
                         </exclude>
                     </excludes>
-                    <wait>1000</wait>
+                    <wait>30000</wait>
+                    <jmxPort>9001</jmxPort>
                     <maxAttempts>100</maxAttempts>
                 </configuration>
                 <executions>
@@ -504,7 +505,7 @@
                         <configuration>
                             <!-- Use 'specs' profile for OpenAPI generation - disables WorkspaceStartupListener -->
                             <profiles>specs</profiles>
-                            <jvmArguments>-Dspring.application.admin.enabled=true -XX:+EnableDynamicAgentLoading --enable-native-access=ALL-UNNAMED -Dspring.devtools.restart.enabled=false</jvmArguments>
+                            <jvmArguments>-Dspring.application.admin.enabled=true -XX:+EnableDynamicAgentLoading --enable-native-access=ALL-UNNAMED -Dspring.devtools.restart.enabled=false -Djava.rmi.server.hostname=127.0.0.1 -Dspring.jmx.enabled=true -Dspring.application.admin.jmx-name=org.springframework.boot:type=Admin,name=SpringApplication</jvmArguments>
                         </configuration>
                     </execution>
                     <execution>

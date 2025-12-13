@@ -159,6 +159,13 @@ hephaestus:
         project-id: ${POSTHOG_PROJECT_ID:}
         personal-api-key: ${POSTHOG_PERSONAL_API_KEY:}
 
+    slack:
+        # Whether Slack account linking is enabled (requires Keycloak Slack IdP configuration)
+        enabled: ${SLACK_LINKING_ENABLED:false}
+        # Slack App credentials (same credentials as configured in Keycloak's Slack IdP)
+        # Used for the "Add to Slack" bot installation flow
+        client-id: ${KEYCLOAK_SLACK_CLIENT_ID:}
+        client-secret: ${KEYCLOAK_SLACK_CLIENT_SECRET:}
 
 
 keycloak:

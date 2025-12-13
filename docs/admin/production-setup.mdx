@@ -33,7 +33,19 @@ Set the following secrets before starting the stack:
 | `KC_BOOTSTRAP_ADMIN_PASSWORD` | Keycloak bootstrap admin password (`openssl rand -base64 32`) |
 | `KEYCLOAK_HEPHAESTUS_CONFIDENTIAL_CLIENT_SECRET` | Secret used by the app server to call Keycloak |
 | `POSTFIX_USERNAME` / `POSTFIX_PASSWORD` | Credentials for production SMTP relay |
-| `SLACK_WEBHOOK_URL` | Optional: webhook for weekly leaderboard posts |
+
+### Slack integration (optional)
+
+See the dedicated [Slack Integration guide](./slack-integration) for full setup instructions. Summary of required variables:
+
+| Variable | Purpose |
+| --- | --- |
+| `KEYCLOAK_SLACK_ENABLED` | Enable Slack identity provider in Keycloak |
+| `KEYCLOAK_SLACK_CLIENT_ID` | Slack App Client ID |
+| `KEYCLOAK_SLACK_CLIENT_SECRET` | Slack App Client Secret |
+| `SLACK_BOT_TOKEN` | Bot token for posting messages |
+| `SLACK_SIGNING_SECRET` | Webhook signature verification |
+| `SLACK_LINKING_ENABLED` | Enable user account linking feature |
 
 ### GitHub integration
 

@@ -66,6 +66,8 @@ const meta = {
 		isRemovingRepository: false,
 		isResettingLeagues: false,
 		isAppInstallationWorkspace: false,
+		workspaceSlug: "hephaestus",
+		hasSlackToken: false,
 		onAddRepository: fn(),
 		onRemoveRepository: fn(),
 		onResetLeagues: fn(),
@@ -79,6 +81,15 @@ type Story = StoryObj<typeof meta>;
  * Default state of the admin settings page
  */
 export const Default: Story = {};
+
+/**
+ * Connected to Slack state
+ */
+export const ConnectedToSlack: Story = {
+	args: {
+		hasSlackToken: true,
+	},
+};
 
 /**
  * Loading state while fetching repositories

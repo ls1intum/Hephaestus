@@ -22,6 +22,9 @@ const meta = {
 		researchProps: {
 			description: "Props for the ResearchParticipationSection component",
 		},
+		slackProps: {
+			description: "Props for the SlackConnectionSection component",
+		},
 		isLoading: {
 			control: "boolean",
 			description: "Whether the settings are still loading",
@@ -48,6 +51,13 @@ export const Default: Story = {
 		accountProps: {
 			onDeleteAccount: fn(),
 		},
+		slackProps: {
+			isConnected: false,
+			slackEnabled: true,
+			linkUrl: "https://example.com/link",
+			onDisconnect: fn(),
+			onSync: fn(),
+		},
 		isLoading: false,
 	},
 };
@@ -68,6 +78,12 @@ export const NotificationsDisabled: Story = {
 		accountProps: {
 			onDeleteAccount: fn(),
 		},
+		slackProps: {
+			isConnected: false,
+			slackEnabled: false,
+			onDisconnect: fn(),
+			onSync: fn(),
+		},
 		isLoading: false,
 	},
 };
@@ -87,6 +103,12 @@ export const Loading: Story = {
 		},
 		accountProps: {
 			onDeleteAccount: fn(),
+		},
+		slackProps: {
+			isConnected: false,
+			slackEnabled: true,
+			onDisconnect: fn(),
+			onSync: fn(),
 		},
 		isLoading: true,
 	},

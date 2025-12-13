@@ -8,10 +8,15 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import {
 	deleteUserMutation,
+	disconnectSlackMutation,
+	getSlackConnectionOptions,
+	getSlackConnectionQueryKey,
 	getUserSettingsOptions,
 	getUserSettingsQueryKey,
+	syncSlackConnectionMutation,
 	updateUserSettingsMutation,
 } from "@/api/@tanstack/react-query.gen";
+
 import type { Options } from "@/api/sdk.gen";
 import type {
 	UpdateUserSettingsData,
@@ -27,74 +32,52 @@ export const Route = createFileRoute("/_authenticated/settings")({
 
 function RouteComponent() {
 	const navigate = useNavigate();
-	const queryClient = useQueryClient();
+	const client = useQueryClient();
 	const { logout } = useAuth();
-	const userSettingsQueryKey = getUserSettingsQueryKey();
+	const settingsKey = getUserSettingsQueryKey();
 
-	// Query for user settings
 	const { data: settings, isLoading } = useQuery({
 		...getUserSettingsOptions({}),
 		retry: 1,
 	});
 
-	// Mutation for updating user settings
-	const updateSettingsMutation = useMutation<
+	const updateMutation = useMutation<
 		UpdateUserSettingsResponse,
 		DefaultError,
 		Options<UpdateUserSettingsData>,
-		{ previousSettings?: UserSettings }
+		{ previous?: UserSettings }
 	>({
 		...updateUserSettingsMutation(),
 		onMutate: async (variables) => {
-			await queryClient.cancelQueries({
-				queryKey: userSettingsQueryKey,
-			});
-			const previousSettings =
-				queryClient.getQueryData<UserSettings>(userSettingsQueryKey);
+			await client.cancelQueries({ queryKey: settingsKey });
+			const previous = client.getQueryData<UserSettings>(settingsKey);
 			if (variables.body) {
-				queryClient.setQueryData(userSettingsQueryKey, variables.body);
+				client.setQueryData(settingsKey, variables.body);
 			}
-			return { previousSettings };
+			return { previous };
 		},
-		onError: (error, _variables, context) => {
-			if (context?.previousSettings) {
-				queryClient.setQueryData(
-					userSettingsQueryKey,
-					context.previousSettings,
-				);
+		onError: (_error, _variables, context) => {
+			if (context?.previous) {
+				client.setQueryData(settingsKey, context.previous);
 			}
-			console.error("Failed to update user settings:", error);
-			toast.error("Failed to update settings. Please try again later.");
+			toast.error("Failed to update settings.");
 		},
-		onSuccess: (data) => {
-			queryClient.setQueryData(userSettingsQueryKey, data);
-		},
-		onSettled: () => {
-			queryClient.invalidateQueries({
-				queryKey: userSettingsQueryKey,
-			});
-		},
+		onSuccess: (data) => client.setQueryData(settingsKey, data),
+		onSettled: () => client.invalidateQueries({ queryKey: settingsKey }),
 	});
 
-	// Mutation for deleting account
-	const deleteAccountMutation = useMutation({
+	const deleteMutation = useMutation({
 		...deleteUserMutation(),
 		onSuccess: async () => {
 			await logout();
 			navigate({ to: "/" });
 		},
-		onError: (error) => {
-			console.error("Failed to delete user account:", error);
-			toast.error("Failed to delete account. Please try again later.");
-		},
+		onError: () => toast.error("Failed to delete account."),
 	});
 
-	// Handle toggle change for notifications
 	const handleNotificationToggle = (checked: boolean) => {
-		if (!settings) {
-			return;
-		}
-		updateSettingsMutation.mutate({
+		if (!settings) return;
+		updateMutation.mutate({
 			body: {
 				receiveNotifications: checked,
 				participateInResearch: settings.participateInResearch,
@@ -103,10 +86,8 @@ function RouteComponent() {
 	};
 
 	const handleResearchToggle = (checked: boolean) => {
-		if (!settings) {
-			return;
-		}
-		updateSettingsMutation.mutate({
+		if (!settings) return;
+		updateMutation.mutate({
 			body: {
 				participateInResearch: checked,
 				receiveNotifications: settings.receiveNotifications,
@@ -114,10 +95,27 @@ function RouteComponent() {
 		});
 	};
 
-	// Handle account deletion
-	const handleDeleteAccount = () => {
-		deleteAccountMutation.mutate({});
-	};
+	const { data: slack, isLoading: slackLoading } = useQuery({
+		...getSlackConnectionOptions(),
+	});
+
+	const syncMutation = useMutation({
+		...syncSlackConnectionMutation(),
+		onSuccess: (data) => {
+			client.setQueryData(getSlackConnectionQueryKey(), data);
+			toast.success("Slack synced");
+		},
+		onError: () => toast.error("Failed to sync Slack."),
+	});
+
+	const disconnectMutation = useMutation({
+		...disconnectSlackMutation(),
+		onSuccess: (data) => {
+			client.setQueryData(getSlackConnectionQueryKey(), data);
+			toast.success("Slack disconnected");
+		},
+		onError: () => toast.error("Failed to disconnect Slack."),
+	});
 
 	return (
 		<SettingsPage
@@ -125,16 +123,28 @@ function RouteComponent() {
 			notificationsProps={{
 				receiveNotifications: settings?.receiveNotifications ?? false,
 				onToggleNotifications: handleNotificationToggle,
-				isLoading: updateSettingsMutation.isPending,
+				isLoading: updateMutation.isPending,
 			}}
 			researchProps={{
 				participateInResearch: settings?.participateInResearch ?? true,
 				onToggleResearch: handleResearchToggle,
-				isLoading: updateSettingsMutation.isPending,
+				isLoading: updateMutation.isPending,
+			}}
+			slackProps={{
+				isConnected: slack?.connected ?? false,
+				slackUserId: slack?.slackUserId,
+				slackEnabled: slack?.slackEnabled ?? false,
+				linkUrl: slack?.linkUrl,
+				onDisconnect: () => disconnectMutation.mutate({}),
+				onSync: () => syncMutation.mutate({}),
+				isLoading:
+					slackLoading ||
+					syncMutation.isPending ||
+					disconnectMutation.isPending,
 			}}
 			accountProps={{
-				onDeleteAccount: handleDeleteAccount,
-				isDeleting: deleteAccountMutation.isPending,
+				onDeleteAccount: () => deleteMutation.mutate({}),
+				isDeleting: deleteMutation.isPending,
 			}}
 		/>
 	);

@@ -1,0 +1,81 @@
+---
+id: slack-integration
+sidebar_position: 2
+title: Slack Integration
+description: Configure Slack for leaderboard notifications and user mentions.
+---
+
+# Slack Integration
+
+Enables weekly leaderboard notifications to Slack with @-mentions for linked users.
+
+## Setup
+
+### 1. Create Slack App
+
+Go to [api.slack.com/apps](https://api.slack.com/apps) → **Create New App** → **From scratch** → Name: `Hephaestus`
+
+### 2. Configure OAuth
+
+**Features → OAuth & Permissions → Redirect URLs** (add both):
+
+```
+https://YOUR_DOMAIN/keycloak/realms/hephaestus/broker/slack/endpoint
+https://YOUR_DOMAIN/api/integrations/slack/callback
+```
+
+Replace `YOUR_DOMAIN` with your production domain (e.g., `hephaestus.example.com`).
+
+**Scopes** (Features → OAuth & Permissions):
+
+| Type | Scopes |
+|------|--------|
+| User Token Scopes | `openid`, `profile`, `email` |
+| Bot Token Scopes | `chat:write`, `channels:read`, `users:read`, `team:read` |
+
+### 3. Get Credentials
+
+From **Settings → Basic Information → App Credentials**, copy:
+
+- **Client ID** → `KEYCLOAK_SLACK_CLIENT_ID`
+- **Client Secret** → `KEYCLOAK_SLACK_CLIENT_SECRET`
+- **Signing Secret** → `SLACK_SIGNING_SECRET`
+
+### 4. Install & Get Bot Token
+
+**Features → OAuth & Permissions** → **Install to Workspace** → Copy **Bot User OAuth Token** (`xoxb-...`) → `SLACK_BOT_TOKEN`
+
+### 5. Set Environment Variables
+
+Add to `docker/.env` (or your secret manager):
+
+```bash
+# Required for Slack integration
+KEYCLOAK_SLACK_ENABLED=true
+SLACK_LINKING_ENABLED=true
+KEYCLOAK_SLACK_CLIENT_ID=...
+KEYCLOAK_SLACK_CLIENT_SECRET=...
+SLACK_BOT_TOKEN=xoxb-...
+SLACK_SIGNING_SECRET=...
+
+# Leaderboard notifications (optional)
+LEADERBOARD_NOTIFICATION_ENABLED=true
+LEADERBOARD_NOTIFICATION_CHANNEL_ID=C0123456789
+```
+
+To find channel ID: right-click channel in Slack → **View channel details** → scroll to bottom.
+
+### 6. Restart & Verify
+
+1. Restart the application server
+2. Go to **Workspace Settings → Slack Integration** → **Connect Workspace**
+3. Users link accounts in **Settings → Slack Connection**
+
+## Troubleshooting
+
+| Issue | Solution |
+|-------|----------|
+| "Slack integration is not enabled" | Verify `KEYCLOAK_SLACK_ENABLED=true` and `SLACK_LINKING_ENABLED=true` |
+| "Invalid state" after OAuth | Token expired (10 min). Start the flow again. |
+| Bot not posting | Invite bot: `/invite @Hephaestus`. Verify `SLACK_BOT_TOKEN` and channel ID. |
+| User not @-mentioned | User must link in Settings AND click **I've Linked My Account**. |

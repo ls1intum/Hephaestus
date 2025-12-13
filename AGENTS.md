@@ -1,6 +1,6 @@
 # Hephaestus Agent Handbook
 
-This file governs the entire repository. Combine these guardrails with the scoped instructions under `.github/instructions/**` (general coding, TSX, Storybook, Java tests).
+This file governs the entire repository. Combine these guardrails with the scoped instructions under `.github/instructions/**` (general coding, TSX, Storybook, Java tests) and the [STYLE_GUIDE.md](./STYLE_GUIDE.md) for code style rules.
 
 ## 1. Architecture map
 
