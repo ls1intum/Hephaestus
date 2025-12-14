@@ -5,63 +5,40 @@ import de.tum.in.www1.hephaestus.gitprovider.issuecomment.IssueComment;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReview;
-import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import java.util.List;
-import java.util.Locale;
-import java.util.Objects;
-import java.util.Set;
-import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 @Service
 public class ScoringService {
 
-    private static final Logger logger = LoggerFactory.getLogger(ScoringService.class);
+    private final Logger logger = LoggerFactory.getLogger(ScoringService.class);
 
-    private final PullRequestRepository pullRequestRepository;
-    private final Set<String> selfReviewAuthorLogins;
+    @Autowired
+    private PullRequestRepository pullRequestRepository;
 
-    private static final double WEIGHT_APPROVAL = 2.0;
-    private static final double WEIGHT_CHANGESREQUESTED = 2.5;
-    private static final double WEIGHT_COMMENT = 1.5;
-
-    public ScoringService(PullRequestRepository pullRequestRepository, LeaderboardProperties leaderboardProperties) {
-        this.pullRequestRepository = pullRequestRepository;
-        this.selfReviewAuthorLogins = leaderboardProperties
-            .getSelfReviewAuthorLogins()
-            .stream()
-            .filter(Objects::nonNull)
-            .map(login -> login.toLowerCase(Locale.ROOT))
-            .collect(Collectors.toUnmodifiableSet());
-    }
+    public double WEIGHT_APPROVAL = 2.0;
+    public double WEIGHT_CHANGESREQUESTED = 2.5;
+    public double WEIGHT_COMMENT = 1.5;
 
     public double calculateReviewScore(List<PullRequestReview> pullRequestReviews) {
         return calculateReviewScore(pullRequestReviews, 0);
     }
 
     public double calculateReviewScore(List<PullRequestReview> pullRequestReviews, int numberOfIssueComments) {
-        List<PullRequestReview> eligibleReviews = pullRequestReviews
-            .stream()
-            .filter(review -> !isSelfAssignedReview(review))
-            .toList();
-
-        if (eligibleReviews.isEmpty()) {
-            return 0.0;
-        }
-
         // All reviews are for the same pull request
         int complexityScore = calculateComplexityScore(pullRequestReviews.get(0).getPullRequest());
 
-        double approvalScore = eligibleReviews
+        double approvalScore = pullRequestReviews
             .stream()
             .filter(review -> review.getState() == PullRequestReview.State.APPROVED)
             .filter(review -> review.getAuthor().getId() != review.getPullRequest().getAuthor().getId())
             .map(review -> WEIGHT_APPROVAL * calculateCodeReviewBonus(review.getComments().size(), complexityScore))
             .reduce(0.0, Double::sum);
 
-        double changesRequestedScore = eligibleReviews
+        double changesRequestedScore = pullRequestReviews
             .stream()
             .filter(review -> review.getState() == PullRequestReview.State.CHANGES_REQUESTED)
             .filter(review -> review.getAuthor().getId() != review.getPullRequest().getAuthor().getId())
@@ -71,7 +48,7 @@ public class ScoringService {
             )
             .reduce(0.0, Double::sum);
 
-        double commentScore = eligibleReviews
+        double commentScore = pullRequestReviews
             .stream()
             .filter(
                 review ->
@@ -135,50 +112,6 @@ public class ScoringService {
             codeReviewBonus += 1;
         }
         return (codeReviewBonus / 2) * maxBonus;
-    }
-
-    /**
-     * Returns true if this review should be excluded because the PR was authored by a
-     * configured bot (e.g., Copilot) and the reviewer is an assignee on that PR.
-     */
-    private boolean isSelfAssignedReview(PullRequestReview review) {
-        PullRequest pullRequest = review.getPullRequest();
-        User reviewer = review.getAuthor();
-        if (pullRequest == null || reviewer == null) {
-            return false;
-        }
-
-        User pullRequestAuthor = pullRequest.getAuthor();
-        if (pullRequestAuthor == null || pullRequestAuthor.getLogin() == null) {
-            return false;
-        }
-
-        if (!selfReviewAuthorLogins.contains(pullRequestAuthor.getLogin().toLowerCase(Locale.ROOT))) {
-            return false;
-        }
-
-        Set<User> assignees = pullRequest.getAssignees();
-        if (assignees == null || assignees.isEmpty()) {
-            return false;
-        }
-
-        Long reviewerId = reviewer.getId();
-        String reviewerLogin = reviewer.getLogin();
-
-        return assignees
-            .stream()
-            .filter(Objects::nonNull)
-            .anyMatch(assignee -> {
-                if (assignee.getId() != null && reviewerId != null) {
-                    return assignee.getId().equals(reviewerId);
-                }
-
-                return (
-                    assignee.getLogin() != null &&
-                    reviewerLogin != null &&
-                    assignee.getLogin().equalsIgnoreCase(reviewerLogin)
-                );
-            });
     }
 
     /**

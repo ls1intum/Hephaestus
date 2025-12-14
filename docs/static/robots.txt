@@ -1,8 +1,0 @@
-# Hephaestus Documentation - robots.txt
-# https://ls1intum.github.io/Hephaestus/
-
-User-agent: *
-Allow: /
-
-# Sitemap location
-Sitemap: https://ls1intum.github.io/Hephaestus/sitemap.xml

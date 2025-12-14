@@ -87,7 +87,7 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 							</main>
 							{!isMentorRoute && (
 								<div className="flex justify-end flex-col h-full">
-									<Footer buildInfo={environment.buildInfo} />
+									<Footer />
 								</div>
 							)}
 						</div>
@@ -216,7 +216,6 @@ function HeaderContainer() {
 	const { pathname } = useLocation();
 	const { isAuthenticated, isLoading, username, userProfile, login, logout } =
 		useAuth();
-	const { workspaceSlug } = useActiveWorkspaceSlug();
 
 	return (
 		<Header
@@ -230,7 +229,6 @@ function HeaderContainer() {
 			isLoading={isLoading}
 			name={userProfile && `${userProfile.firstName} ${userProfile.lastName}`}
 			username={username}
-			workspaceSlug={workspaceSlug}
 			onLogin={login}
 			onLogout={logout}
 		/>

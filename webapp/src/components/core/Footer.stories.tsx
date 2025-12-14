@@ -2,74 +2,60 @@ import type { Meta, StoryObj } from "@storybook/react";
 import Footer from "./Footer";
 
 /**
- * Minimal footer with navigation links and attribution.
- * Shows build info (branch, commit, deployed at) only for preview deployments.
- * Version is NOT shown here - it's displayed in the Header.
+ * Footer component displays navigation links and attribution information for the Hephaestus application.
+ * It includes links to About, Releases, Feature requests, Privacy, Imprint, and project information.
  */
 const meta = {
 	component: Footer,
 	parameters: {
 		layout: "fullscreen",
 		viewport: { defaultViewport: "desktop" },
-	},
-	tags: ["autodocs"],
-	argTypes: {
-		buildInfo: {
-			control: "object",
-			description: "Build metadata for preview deployments",
+		docs: {
+			description: {
+				component:
+					"A responsive footer providing navigation and attribution information for the Hephaestus application.",
+			},
 		},
 	},
+	tags: ["autodocs"],
 } satisfies Meta<typeof Footer>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
 
 /**
- * Default production/local state - clean footer with no build info.
+ * Default footer component with all links displayed.
  */
-export const Default: Story = {
-	args: {
-		buildInfo: undefined,
-	},
-};
+export const Default: Story = {};
 
 /**
- * Preview deployment with full build metadata for debugging.
- */
-export const Preview: Story = {
-	args: {
-		buildInfo: {
-			branch: "feat/new-footer-design",
-			commit: "a1b2c3d4e5f6g7h8i9j0",
-			deployedAt: "2024-12-14T17:44:00Z",
-		},
-	},
-};
-
-/**
- * Preview with only branch and commit (no deployment time).
- */
-export const PreviewNoTime: Story = {
-	args: {
-		buildInfo: {
-			branch: "fix/mobile-layout",
-			commit: "9876543",
-		},
-	},
-};
-
-/**
- * Mobile layout - build info hidden on small screens.
+ * Footer component in a mobile viewport.
+ * Links are stacked vertically for better mobile readability.
  */
 export const Mobile: Story = {
-	args: {
-		buildInfo: {
-			branch: "fix/mobile-layout",
-			commit: "9876543",
-			deployedAt: "2024-12-14T10:00:00Z",
-		},
-	},
 	parameters: {
 		viewport: { defaultViewport: "mobile1" },
+		docs: {
+			description: {
+				story:
+					"Footer layout optimized for mobile screens with stacked link presentation.",
+			},
+		},
+	},
+};
+
+/**
+ * Footer component in a desktop viewport.
+ * Links are displayed horizontally for efficient space utilization.
+ */
+export const Desktop: Story = {
+	parameters: {
+		viewport: { defaultViewport: "desktop" },
+		docs: {
+			description: {
+				story:
+					"Footer layout for desktop screens with horizontal link presentation and right-aligned attribution.",
+			},
+		},
 	},
 };

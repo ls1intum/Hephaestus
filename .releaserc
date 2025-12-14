@@ -12,51 +12,11 @@
             "release": "major"
           },
           {
-            "scope": "no-release",
-            "release": false
-          },
-          {
-            "scope": "ci",
-            "release": false
-          },
-          {
-            "scope": "deps",
-            "release": false
-          },
-          {
-            "scope": "deps-dev",
-            "release": false
-          },
-          {
-            "scope": "scripts",
-            "release": false
-          },
-          {
-            "scope": "security",
-            "release": false
-          },
-          {
-            "scope": "docker",
-            "release": false
-          },
-          {
-            "scope": "docs",
-            "release": false
-          },
-          {
             "type": "feat",
             "release": "minor"
           },
           {
             "type": "fix",
-            "release": "patch"
-          },
-          {
-            "type": "perf",
-            "release": "patch"
-          },
-          {
-            "type": "revert",
             "release": "patch"
           },
           {
@@ -72,6 +32,10 @@
             "release": false
           },
           {
+            "type": "perf",
+            "release": "patch"
+          },
+          {
             "type": "test",
             "release": false
           },
@@ -85,6 +49,19 @@
           },
           {
             "type": "chore",
+            "scope": "release",
+            "release": false
+          },
+          {
+            "type": "chore",
+            "release": false
+          },
+          {
+            "type": "revert",
+            "release": "patch"
+          },
+          {
+            "scope": "no-release",
             "release": false
           }
         ],

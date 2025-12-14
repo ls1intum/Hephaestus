@@ -167,7 +167,7 @@ Some regression scenarios can only be validated against GitHub itself. We ship a
     export GH_APP_ORGANIZATION=HephaestusTest
     ```
 
-    Use either the config file *or* environment variables; the test suite checks both and aborts if key material is missing.
+    Use either the config file _or_ environment variables; the test suite checks both and aborts if key material is missing.
 
 ### Running the suite
 
@@ -195,3 +195,4 @@ The run takes roughly two minutes and prints the GitHub artefacts it provisions.
 - **Skipping because of missing credentials** – check the console output; the base test class verifies that the App id, private key, PAT, and installation id are all present before executing.
 - **Hub4j rate-limit failures** – the suite creates several entities per run. Prefer a dedicated sandbox organisation so you do not clash with production automation limits.
 - **Longer runtimes** – each suite bootstraps a Testcontainers PostgreSQL instance and provisions GitHub resources. Expect higher runtimes than the pure Testcontainers integration tests; avoid running them on every PR and instead use them before releases or when touching the GitHub sync layer.
+

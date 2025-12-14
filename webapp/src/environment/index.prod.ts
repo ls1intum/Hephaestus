@@ -1,12 +1,9 @@
+import { version } from "@/../package.json";
+
 // WEB_ENV_<VARIABLE_NAME> will be substituted with `substitute_env_variables.sh` on docker container start
 
 const environment = {
-	version: "WEB_ENV_APPLICATION_VERSION".replace(/^v/, ""),
-	buildInfo: {
-		branch: "WEB_ENV_GIT_BRANCH",
-		commit: "WEB_ENV_GIT_COMMIT",
-		deployedAt: "WEB_ENV_DEPLOYED_AT",
-	},
+	version,
 	clientUrl: "WEB_ENV_APPLICATION_CLIENT_URL",
 	serverUrl: "WEB_ENV_APPLICATION_SERVER_URL",
 	sentry: {

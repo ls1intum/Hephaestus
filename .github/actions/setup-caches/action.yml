@@ -14,10 +14,10 @@ runs:
   steps:
     # Node.js caching
     - name: Setup Node.js
-      if: contains(fromJSON('["application-server-quality", "webapp-quality", "webapp-visual", "openapi-validation", "docs-quality"]'), inputs.cache-type)
+      if: contains(fromJSON('["application-server-quality", "webapp-quality", "webapp-visual", "openapi-validation"]'), inputs.cache-type)
       uses: actions/setup-node@v4
       with:
-        node-version-file: '.node-version'
+        node-version: 22
         cache: "npm"
 
     - name: Cache Node.js dependencies

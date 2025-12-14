@@ -1,10 +1,5 @@
 const environment = {
 	version: "DEV",
-	buildInfo: {
-		branch: "",
-		commit: "",
-		deployedAt: "",
-	},
 	clientUrl: "http://localhost:4200",
 	serverUrl: "http://localhost:8080",
 	sentry: {

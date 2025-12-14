@@ -96,7 +96,6 @@ Before any release, code must pass:
 ## 🔄 Preview Deployments
 
 Coolify handles PR previews:
-
 - Built directly on server (fast!)
 - URL: `pr-{number}.preview.hephaestus.cit.tum.de`
 - Auto-cleanup on PR close
@@ -113,18 +112,15 @@ Coolify handles PR previews:
 ## 🎯 Performance Optimizations
 
 ### Docker Layer Caching
-
 - All images built every run
 - Aggressive caching makes unchanged builds instant
 - Ensures every commit is deployable
 
 ### Parallel Execution
-
 - Quality gates run parallel to tests
 - Docker builds use matrix strategy
 - Fail-fast terminates on first failure
 
 ### Concurrency Control
-
 - Outdated PR runs cancelled automatically
 - Release runs never cancelled

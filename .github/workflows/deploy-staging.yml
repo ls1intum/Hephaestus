@@ -5,8 +5,7 @@ on:
     inputs:
       image-tag:
         type: string
-        required: true
-        description: "Image tag to deploy (e.g., v0.10.7 for releases)"
+        description: "Image tag to deploy (default: pr-<number> if PR exists, latest for default branch)"
       deploy-app:
         type: boolean
         default: true
@@ -19,13 +18,11 @@ on:
         default: false
         type: boolean
         description: (Re-)deploys the proxy components. Usually not necessary and might cause downtime.
-
   workflow_call:
     inputs:
       image-tag:
         type: string
-        required: true
-        description: "Image tag to deploy (e.g., v0.10.7 for releases)"
+        description: "Image tag to deploy (default: pr-<number> if PR exists, latest for default branch)"
       deploy-app:
         type: boolean
         default: true
@@ -39,17 +36,13 @@ on:
         type: boolean
         description: (Re-)deploys the proxy components. Usually not necessary and might cause downtime.
 
-concurrency:
-  group: deploy-staging
-  cancel-in-progress: false
-
-jobs:
+jobs:  
   deploy-app:
     if: ${{ inputs.deploy-app }}
     uses: ls1intum/.github/.github/workflows/deploy-docker-compose.yml@main
     with:
       environment: Staging
-      docker-compose-file: "./docker/compose.app.yaml"
+      docker-compose-file:  "./docker/compose.app.yaml"
       main-image-name: ls1intum/hephaestus/application-server
       image-tag: ${{ inputs.image-tag }}
       deployment-base-path: "/opt/hephaestus/app"
@@ -77,3 +70,4 @@ jobs:
       image-tag: ${{ inputs.image-tag }}
       deployment-base-path: "/opt/hephaestus/proxy"
     secrets: inherit
+  

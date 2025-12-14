@@ -91,13 +91,6 @@ replace_vars() {
 
 # Main execution flow
 main() {
-  # Auto-generate DEPLOYED_AT timestamp at container start
-  # Container start time = deployment time
-  if [[ -z "${DEPLOYED_AT:-}" ]]; then
-    export DEPLOYED_AT=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-    log "📅 Generated DEPLOYED_AT timestamp: ${DEPLOYED_AT}"
-  fi
-
   # Step 1: Find all required environment variables
   placeholders=$(find_env_vars)
 

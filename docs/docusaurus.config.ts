@@ -9,32 +9,17 @@ const config: Config = {
   tagline: 'Process-Aware Mentoring for Agile Software Teams',
   favicon: 'img/favicon.ico',
 
-  // Future flags and performance optimizations
-  // See https://docusaurus.io/docs/api/docusaurus-config#future
+  // Future flags, see https://docusaurus.io/docs/api/docusaurus-config#future
   future: {
     v4: true,
-    // Docusaurus Faster: Uses Rspack, SWC, and LightningCSS for 2-4x faster builds
-    // https://docusaurus.io/blog/releases/3.6#docusaurus-faster
-    experimental_faster: {
-      swcJsLoader: true,
-      swcJsMinimizer: true,
-      swcHtmlMinimizer: true,
-      lightningCssMinimizer: true,
-      rspackBundler: true,
-      mdxCrossCompilerCache: true,
-    },
   },
 
   url: 'https://ls1intum.github.io',
-  // PR previews on Surge.sh need '/', production GitHub Pages needs '/Hephaestus/'
-  baseUrl: process.env.DOCUSAURUS_BASE_URL || '/Hephaestus/',
+  baseUrl: '/Hephaestus/',
   organizationName: 'ls1intum',
   projectName: 'Hephaestus',
 
   onBrokenLinks: 'throw',
-  onBrokenAnchors: 'throw',
-  onDuplicateRoutes: 'throw',
-  trailingSlash: false,
 
   // Even if you don't use internationalization, you can use this field to set
   // useful metadata like html lang. For example, if your site is Chinese, you
@@ -51,10 +36,6 @@ const config: Config = {
 
   markdown: {
     mermaid: true,
-    hooks: {
-      onBrokenMarkdownLinks: 'throw',
-      onBrokenMarkdownImages: 'throw',
-    },
   },
 
   themes: ['@docusaurus/theme-mermaid'],
@@ -64,19 +45,20 @@ const config: Config = {
       'classic',
       {
         docs: false,
-        blog: false,
+        blog: {
+          showReadingTime: true,
+          feedOptions: {
+            type: ['rss', 'atom'],
+            xslt: true,
+          },
+          editUrl: 'https://github.com/ls1intum/Hephaestus/tree/main/docs/blog/',
+          onInlineTags: 'warn',
+          onInlineAuthors: 'warn',
+          onUntruncatedBlogPosts: 'warn',
+        },
         theme: {
           customCss: './src/css/custom.css',
         },
-        // Sitemap generation with lastmod for SEO
-        sitemap: {
-          lastmod: 'datetime',
-          changefreq: 'weekly',
-          priority: 0.5,
-          filename: 'sitemap.xml',
-        },
-        // Google Tag Manager can be configured here if needed
-        // gtag: { trackingID: 'G-XXXXXXXXXX' },
       } satisfies Preset.Options,
     ],
   ],
@@ -189,7 +171,11 @@ const config: Config = {
           position: 'left',
           label: 'Admin Guide',
         },
-
+        {
+          to: '/blog',
+          label: 'Updates',
+          position: 'left',
+        },
         {
           href: 'https://hephaestus.aet.cit.tum.de',
           label: 'Open Hephaestus',
@@ -214,7 +200,7 @@ const config: Config = {
             },
             {
               label: 'Release Notes',
-              href: 'https://github.com/ls1intum/Hephaestus/releases',
+              to: '/blog',
             },
             {
               label: 'Open Hephaestus',
@@ -269,11 +255,6 @@ const config: Config = {
         hideable: true,
         autoCollapseCategories: true,
       },
-    },
-    // Table of contents configuration
-    tableOfContents: {
-      minHeadingLevel: 2,
-      maxHeadingLevel: 4,
     },
     prism: {
       theme: prismThemes.github,

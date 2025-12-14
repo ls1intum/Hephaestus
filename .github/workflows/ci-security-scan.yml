@@ -110,6 +110,6 @@ jobs:
         uses: trufflesecurity/trufflehog@main
         with:
           path: ./
-          base: ${{ github.event_name == 'pull_request' && github.base_ref || '' }}
-          head: ${{ github.event_name == 'pull_request' && 'HEAD' || '' }}
+          base: ${{ github.event.repository.default_branch }}
+          head: HEAD
           extra_args: --debug --only-verified
