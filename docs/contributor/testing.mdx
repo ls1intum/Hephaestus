@@ -1,0 +1,198 @@
+---
+id: testing
+sidebar_position: 4
+title: Testing Guide
+description: Choose the right test type and integrate with the Maven-powered pipeline.
+---
+
+Testing keeps regression risk low across services. The application server uses Maven with dedicated base classes for unit and integration tests.
+
+## Quick start
+
+1. Decide whether you need a fast unit test or a Spring-backed integration test.
+2. Run the appropriate command:
+
+   ```bash
+   # Unit tests only (fast)
+   ./mvnw test
+
+   # Full suite including integration tests
+   ./mvnw verify
+   ```
+
+3. Extend the correct base class:
+
+   ```java
+   // Unit test
+   class UserServiceTest extends BaseUnitTest { }
+
+   // Integration test
+   class UserServiceIntegrationTest extends BaseIntegrationTest { }
+   ```
+
+:::warning Naming matters
+Use `*Test.java` for unit tests and `*IntegrationTest.java` for integration tests. Maven's surefire and failsafe plugins use these patterns.
+:::
+
+## Why testing?
+
+Tests catch regressions before they hit production, document expected behaviour, and unlock safe refactors. Our setup keeps the feedback loop fast—unit tests finish in under a second, while the shared Testcontainers environment limits the cost of integration suites.
+
+## Unit tests
+
+- Extend `BaseUnitTest` for isolated component tests.
+- Use Mockito (`@Mock`, `@InjectMocks`) for dependencies.
+- Expect sub-second runtime—no Spring context is loaded.
+
+```java
+class UserServiceTest extends BaseUnitTest {
+    @Mock private UserRepository repository;
+    @InjectMocks private UserService service;
+
+    @Test
+    @DisplayName("Should validate email format")
+    void shouldValidateEmailFormat() {
+        // Fast isolated test
+    }
+}
+```
+
+## Integration tests
+
+- Extend `BaseIntegrationTest` for cross-component behaviour.
+- Relies on a shared PostgreSQL Testcontainers instance (significantly faster than per-test containers).
+- Provides annotations such as `@GitHubPayload("label.created")` to inject recorded webhook payloads.
+
+Example:
+
+```java
+class GitHubLabelMessageHandlerIntegrationTest extends BaseIntegrationTest {
+    @Test
+    @DisplayName("Should persist label from webhook")
+    void shouldPersistLabel(GHEventPayload.Label payload) {
+        // Test with real webhook data
+    }
+}
+```
+
+## Controller integration tests
+
+Spring's own docs and battle-tested community guides (see [rieckpil.de](https://rieckpil.de/how-to-test-spring-boot-web-controller-the-right-way/) and [Baeldung](https://www.baeldung.com/spring-security-integration-tests)) emphasise two things:
+
+1. Test controllers at the HTTP boundary to catch security misconfigurations.
+2. Keep fixtures reusable so every new endpoint does not need bespoke bootstrapping.
+
+To make that concrete for Hephaestus:
+
+- Extend `AbstractWorkspaceIntegrationTest` (or a service-specific base) so every controller IT automatically cleans the database, provides helper factories such as `persistUser`, and exposes `workspaceService` for setup.
+- Use `WebTestClient` instead of `MockMvc`. We already run the full Spring Boot context, which lets us verify access control rules (`401` unauthenticated vs `403` non-admin) exactly as delivered to the frontend.
+- Reach for the custom security annotations (`@WithAdminUser`, `@WithUser`) together with `TestAuthUtils.withCurrentUser()` so the generated JWT matches our resource-server configuration.
+- Assert on status code, payload shape, and repository side effects. A minimal test covers "happy path", "validation failure", and at least one access-control branch.
+- Keep factories close to the domain: prefer `createWorkspace("slug", "Display", ...)` over manually seeding repositories, which keeps each test focused on behaviour instead of boilerplate.
+
+Example skeleton:
+
+```java
+@AutoConfigureWebTestClient
+class FooControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
+
+    @Autowired
+    private WebTestClient webTestClient;
+
+    @Test
+    @WithAdminUser
+    void endpointHappyPath() {
+        User owner = persistUser("owner");
+        Workspace workspace = createWorkspace("slug", "Display", "login", AccountType.ORG, owner);
+
+        webTestClient
+            .get()
+            .uri("/workspaces/{workspaceSlug}", workspace.getWorkspaceSlug())
+            .headers(TestAuthUtils.withCurrentUser())
+            .exchange()
+            .expectStatus()
+            .isOk();
+    }
+}
+```
+
+Documenting each new controller integration test in this format keeps future work predictable and minimises copy/paste.
+
+## Webhook fixtures and tooling
+
+Reusable webhook JSON lives in `src/test/resources/github`. Use `@GitHubPayload("event.name")` to inject them, or extract new samples with:
+
+```bash
+python3 scripts/nats_extract_examples.py
+```
+
+Available examples include `label.created`, `repository.created`, `create`, `push`, and more—consult the folder before recording new payloads.
+
+## Maven recipes
+
+```bash
+./mvnw test                                   # Unit tests
+./mvnw verify                                 # Full suite + packaging
+./mvnw test -Dtest=UserServiceTest            # Single test class
+./mvnw test -Dtest=UserServiceTest#methodName # Single test method
+```
+
+## GitHub live API tests
+
+Some regression scenarios can only be validated against GitHub itself. We ship a focused suite that exercises the live GitHub App installation and verifies end-to-end sync behaviour (repository metadata, labels, milestones, and teams).
+
+### Prerequisites
+
+1. **Sandbox installation** – the `Hephaestus IntegrationTests` GitHub App must be installed in a sandbox organisation you control. The tests create and delete repositories, milestones, labels, and teams on each run.
+2. **Credentials** – provide both a GitHub App private key and a Personal Access Token with the following scopes:
+    - `repo` (full)
+    - `admin:org`
+    - `read:packages`
+3. **Local config file** – copy the template that lives alongside the tests:
+
+    ```bash
+    cd server/application-server/src/test/resources
+    cp application-live-local.example.yml application-live-local.yml
+    ```
+
+    Fill in the placeholders with the sandbox organisation slug, the installation id, and either an inline PEM key (`github.app.privateKey`) or a readable `privateKeyLocation`. Keep this file out of version control—it is already listed in `.gitignore`.
+
+    Alternatively, export the matching environment variables:
+
+    ```bash
+    export GH_APP_ID=2250297
+    export GH_APP_INSTALLATION_ID=93512943
+    export GH_APP_PRIVATE_KEY="$(cat /path/to/private-key.pem)"
+    export GH_APP_PAT=ghp_xxx...             # PAT with the scopes above
+    export GH_APP_ORGANIZATION=HephaestusTest
+    ```
+
+    Use either the config file _or_ environment variables; the test suite checks both and aborts if key material is missing.
+
+### Running the suite
+
+From `server/application-server/` run:
+
+```bash
+./mvnw test -Plive-tests
+```
+
+The `-Plive-tests` profile tells Maven to run only tests tagged with `@Tag("live")`. This is the **single guard** for live tests—if you don't pass the profile, the tests simply won't run.
+
+**Live tests never run during normal CI.** They are explicitly excluded from `mvn test` and `mvn verify` via tag filtering in the Surefire and Failsafe plugins.
+
+The run takes roughly two minutes and prints the GitHub artefacts it provisions. Clean-up is handled automatically, but if a failure interrupts execution you can safely delete any `hephaestus-it-*` repositories, milestones, or teams that remain in the sandbox.
+
+### Authoring new GitHub sync tests
+
+1. Extend `AbstractGitHubLiveSyncIntegrationTest` (or fall back to `BaseGitHubLiveIntegrationTest` when repositories are not needed). These bases set up credential checks, provide the `workspaceRepository`, and expose helpers such as `createEphemeralRepository`, `registerRepositoryToMonitor`, `createEphemeralTeam`, and `seedOrganizationMembers`.
+2. Use the supplied helpers to create and track temporary GitHub artefacts. They automatically register clean-up handlers via `@AfterEach`, so add new resources to the provided lists instead of implementing manual deletion logic.
+3. Keep tests deterministic: rely on `databaseTestUtils.cleanDatabase()` in `@BeforeEach` (already invoked by the base), and generate unique slugs via `nextEphemeralSlug("suffix")` when naming repositories, branches, or teams.
+4. If a scenario needs extra Spring configuration, extend `application-live-local.yml` in `server/application-server/src/test/resources/`. The checked-in `.example` file documents every property; copy it on demand and keep secrets out of version control.
+
+### Troubleshooting
+
+- **Skipping because of missing credentials** – check the console output; the base test class verifies that the App id, private key, PAT, and installation id are all present before executing.
+- **Hub4j rate-limit failures** – the suite creates several entities per run. Prefer a dedicated sandbox organisation so you do not clash with production automation limits.
+- **Longer runtimes** – each suite bootstraps a Testcontainers PostgreSQL instance and provisions GitHub resources. Expect higher runtimes than the pure Testcontainers integration tests; avoid running them on every PR and instead use them before releases or when touching the GitHub sync layer.
+

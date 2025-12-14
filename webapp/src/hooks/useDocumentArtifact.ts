@@ -1,12 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import {
-	getMentorDocumentsByIdOptions,
-	getMentorDocumentsByIdQueryKey,
-	getMentorDocumentsByIdVersionsByVersionNumberOptions,
-	putMentorDocumentsByIdMutation,
+	getDocumentOptions,
+	getDocumentQueryKey,
+	getDocumentVersionOptions,
+	getDocumentVersionQueryKey,
+	updateDocumentMutation,
 } from "@/api/@tanstack/react-query.gen";
 import type { Document } from "@/api/types.gen";
+import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 import type { DataPart } from "@/lib/types";
 import { useArtifactStore } from "@/stores/artifact-store";
 import { useDocumentsStore } from "@/stores/document-store";
@@ -64,6 +66,8 @@ export function useDocumentArtifact({
 		appendDraftDelta,
 		finishDraft,
 	} = useDocumentsStore.getState();
+	const { workspaceSlug, isLoading: isWorkspaceLoading } =
+		useActiveWorkspaceSlug();
 
 	// Local selection state: -1 = latest
 	const [selectedIndex, setSelectedIndex] = useState<number>(-1);
@@ -81,8 +85,10 @@ export function useDocumentArtifact({
 		isLoading: loadingLatest,
 		error: errorLatest,
 	} = useQuery({
-		...getMentorDocumentsByIdOptions({ path: { id: documentId } }),
-		enabled: !isStreaming && Boolean(documentId),
+		...getDocumentOptions({
+			path: { workspaceSlug: workspaceSlug ?? "", id: documentId },
+		}),
+		enabled: Boolean(workspaceSlug) && !isStreaming && Boolean(documentId),
 	});
 
 	// Build a continuous list from 1..latest-1 for navigation; load selected versions on demand
@@ -113,18 +119,25 @@ export function useDocumentArtifact({
 		error: errorSelectedVersion,
 	} = useQuery({
 		enabled:
+			Boolean(workspaceSlug) &&
 			selectedIndex >= 0 &&
 			selectedVersionNumber != null &&
 			Boolean(documentId),
-		...getMentorDocumentsByIdVersionsByVersionNumberOptions({
-			path: { id: documentId, versionNumber: selectedVersionNumber ?? 0 },
+		...getDocumentVersionOptions({
+			path: {
+				workspaceSlug: workspaceSlug ?? "",
+				id: documentId,
+				versionNumber: selectedVersionNumber ?? 0,
+			},
 		}),
 	});
 
 	// Derived
 	const selectedVersion = isCurrentVersion ? latest : selectedVersionDoc;
 	const isLoading =
-		loadingLatest || (selectedIndex >= 0 && loadingSelectedVersion);
+		isWorkspaceLoading ||
+		loadingLatest ||
+		(selectedIndex >= 0 && loadingSelectedVersion);
 	const error = errorLatest ?? errorSelectedVersion;
 	// Navigation using the sorted navigableNumbersAsc as the source of truth
 	const posInNumbers = selectedIndex >= 0 ? selectedIndex : -1;
@@ -177,39 +190,57 @@ export function useDocumentArtifact({
 
 	// Restore selected version as new latest
 	const { mutate: mutateRestore } = useMutation({
-		...putMentorDocumentsByIdMutation(),
+		...updateDocumentMutation(),
 		onSuccess: () => {
 			queryClient.invalidateQueries({
-				queryKey: getMentorDocumentsByIdQueryKey({ path: { id: documentId } }),
+				queryKey: getDocumentQueryKey({
+					path: { workspaceSlug: workspaceSlug ?? "", id: documentId },
+				}),
 			});
-			queryClient.invalidateQueries({ queryKey: ["getDocumentVersions"] });
+			queryClient.invalidateQueries({
+				queryKey: getDocumentVersionQueryKey({
+					path: {
+						workspaceSlug: workspaceSlug ?? "",
+						id: documentId,
+						versionNumber: selectedVersionNumber ?? 0,
+					},
+				}),
+			});
 			setSelectedIndex(-1);
 		},
 	});
 
+	const handleRestoreSelectedVersion = () => {
+		if (!workspaceSlug || !selectedVersionDoc) {
+			return;
+		}
+		const selectedDoc = selectedVersionDoc;
+		if (!selectedDoc?.content || !selectedDoc?.title) {
+			return;
+		}
+		mutateRestore({
+			path: { workspaceSlug, id: documentId },
+			body: {
+				content: selectedDoc.content,
+				title: selectedDoc.title,
+				kind: selectedDoc.kind,
+			},
+		});
+	};
+
 	const onRestoreSelectedVersion =
 		!isCurrentVersion && selectedVersionDoc
-			? () => {
-					const selectedDoc = selectedVersionDoc;
-					if (selectedDoc?.content && selectedDoc?.title) {
-						mutateRestore({
-							path: { id: documentId },
-							body: {
-								content: selectedDoc.content,
-								title: selectedDoc.title,
-								kind: selectedDoc.kind,
-							},
-						});
-					}
-				}
+			? handleRestoreSelectedVersion
 			: undefined;
 
 	// Save latest content
 	const { mutate: mutateSave } = useMutation({
-		...putMentorDocumentsByIdMutation(),
+		...updateDocumentMutation(),
 		onSuccess: (data) => {
 			queryClient.setQueryData(
-				getMentorDocumentsByIdQueryKey({ path: { id: documentId } }),
+				getDocumentQueryKey({
+					path: { workspaceSlug: workspaceSlug ?? "", id: documentId },
+				}),
 				data,
 			);
 			// Also refresh versions list so the new version appears
@@ -223,7 +254,7 @@ export function useDocumentArtifact({
 	const debouncedRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const saveContent = (newContent: string, debounce = true) => {
 		// Only allow saving when on latest and not streaming
-		if (!isCurrentVersion || isStreaming) {
+		if (!isCurrentVersion || isStreaming || !workspaceSlug) {
 			return;
 		}
 		if (debouncedRef.current) {
@@ -233,8 +264,8 @@ export function useDocumentArtifact({
 		const doSave = () => {
 			const currentTitle = latest?.title ?? "Document";
 			mutateSave({
-				body: { content: newContent, kind: "text", title: currentTitle },
-				path: { id: documentId },
+				body: { content: newContent, kind: "TEXT", title: currentTitle },
+				path: { workspaceSlug, id: documentId },
 			});
 		};
 		// indicate saving as soon as content changes

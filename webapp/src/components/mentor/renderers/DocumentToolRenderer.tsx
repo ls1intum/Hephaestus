@@ -24,7 +24,7 @@ export const DocumentToolRenderer = ({
 				<DocumentTool
 					type="create"
 					isLoading
-					args={{ title: input.title ?? "", kind: "text" }}
+					args={{ title: input.title ?? "", kind: "TEXT" }}
 					onDocumentClick={onDocumentClick}
 				/>
 			);
@@ -55,7 +55,7 @@ export const DocumentToolRenderer = ({
 		return (
 			<DocumentTool
 				type={type}
-				result={{ id: output.id, title: output.title, kind: "text" }}
+				result={{ id: output.id, title: output.title, kind: "TEXT" }}
 				onDocumentClick={onDocumentClick}
 			/>
 		);

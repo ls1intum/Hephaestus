@@ -3,14 +3,16 @@ package de.tum.in.www1.hephaestus.gitprovider.label.github;
 import de.tum.in.www1.hephaestus.gitprovider.label.Label;
 import de.tum.in.www1.hephaestus.gitprovider.label.LabelRepository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
-import jakarta.transaction.Transactional;
 import java.io.IOException;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import org.kohsuke.github.GHLabel;
 import org.kohsuke.github.GHRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class GitHubLabelSyncService {
@@ -48,8 +50,40 @@ public class GitHubLabelSyncService {
      *
      * @param repository the GitHub repository whose labels are to be synchronized
      */
+    @Transactional
     public void syncLabelsOfRepository(GHRepository repository) {
-        repository.listLabels().withPageSize(100).forEach(this::processLabel);
+        if (repository == null) {
+            return;
+        }
+
+        List<GHLabel> remoteLabels;
+        try {
+            remoteLabels = repository.listLabels().withPageSize(100).toList();
+        } catch (IOException listingError) {
+            logger.warn("Failed to list labels for repositoryId={}: {}", repository.getId(), listingError.getMessage());
+            return;
+        }
+        Set<Long> seenLabelIds = new HashSet<>(remoteLabels.size());
+        remoteLabels.forEach(ghLabel -> {
+            seenLabelIds.add(ghLabel.getId());
+            processLabel(ghLabel);
+        });
+
+        var repositoryId = repository.getId();
+        List<Label> existingLabels = labelRepository.findAllByRepository_Id(repositoryId);
+        int removed = 0;
+        for (Label label : existingLabels) {
+            if (!seenLabelIds.contains(label.getId())) {
+                label.removeAllIssues();
+                label.removeAllTeams();
+                labelRepository.delete(label);
+                removed++;
+            }
+        }
+
+        if (removed > 0) {
+            logger.info("Deleted {} stale labels for repositoryId={}", removed, repositoryId);
+        }
     }
 
     /**

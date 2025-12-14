@@ -10,6 +10,7 @@ import jakarta.persistence.ManyToMany;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.util.HashSet;
+import java.util.Objects;
 import java.util.Set;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -54,6 +55,29 @@ public class Label {
     public void removeAllTeams() {
         this.teams.forEach(team -> team.getLabels().remove(this));
         this.teams.clear();
+    }
+
+    /**
+     * Removes this label from all referencing issues (required before deletion).
+     */
+    public void removeAllIssues() {
+        this.issues.forEach(issue -> issue.getLabels().remove(this));
+        this.issues.clear();
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        Label label = (Label) o;
+        return id != null && Objects.equals(id, label.id);
+    }
+
+    @Override
+    public int hashCode() {
+        // Use a constant hashCode to ensure consistency across entity state transitions
+        // (transient -> managed -> detached). The ID may be null before persistence.
+        return getClass().hashCode();
     }
     // Ignored GitHub properties:
     // - default

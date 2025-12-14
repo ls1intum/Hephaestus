@@ -12,6 +12,10 @@ on:
 jobs:
   # Intelligent test execution matrix
   tests:
+    permissions:
+      contents: read
+      checks: write
+      statuses: write
     name: ${{ matrix.test-type }}
     runs-on: ubuntu-latest
     if: inputs.should_skip != 'true'
@@ -70,23 +74,25 @@ jobs:
       # Webapp tests
       - name: "Webapp ${{ matrix.test-type }} execution"
         if: startsWith(matrix.test-type, 'webapp-')
-        working-directory: webapp
         run: |
-          echo "🎨 Running webapp ${{ matrix.test-type }} tests"
+          echo "🧪 Running webapp ${{ matrix.test-type }} tests"
+          
           # Install from repo root for workspace/hoisted optional deps
-          cd ..
           rm -rf node_modules
           npm ci --workspaces --include=dev --include=optional --no-audit --progress=false
-          # Optional: report Rollup native presence (warning only)
+          
+          # Check for rollup native binary (warning only)
           npm ls @rollup/rollup-linux-x64-gnu || echo "⚠️ rollup native not installed yet"
-          # Force-install platform binaries deterministically
+          
+          # Force-install platform binaries
           node scripts/install-platform-binaries.mjs
+          
           cd webapp
-
+          
           case "${{ matrix.test-type }}" in
             "webapp-visual")
               if ! npm run build-storybook; then
-                echo "❌ Storybook build failed (retrying after clean reinstall at root to pull any missed optionals)..."
+                echo "❌ Storybook build failed, retrying..."
                 cd ..
                 rm -rf node_modules
                 npm ci --workspaces --include=dev --include=optional --no-audit --progress=false

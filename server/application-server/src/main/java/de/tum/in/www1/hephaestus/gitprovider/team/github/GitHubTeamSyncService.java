@@ -34,27 +34,24 @@ public class GitHubTeamSyncService {
 
     private static final Logger log = LoggerFactory.getLogger(GitHubTeamSyncService.class);
 
-    private final GitHub gitHub;
     private final TeamRepository teamRepository;
     private final UserRepository userRepository;
     private final RepositoryRepository repositoryRepository;
     private final GitHubTeamConverter teamConverter;
 
     public GitHubTeamSyncService(
-        GitHub gitHub,
         TeamRepository teamRepository,
         UserRepository userRepository,
         RepositoryRepository repositoryRepository,
         GitHubTeamConverter teamConverter
     ) {
-        this.gitHub = gitHub;
         this.teamRepository = teamRepository;
         this.userRepository = userRepository;
         this.repositoryRepository = repositoryRepository;
         this.teamConverter = teamConverter;
     }
 
-    public void syncAndSaveTeams(String orgName) throws IOException {
+    public void syncAndSaveTeams(GitHub gitHub, String orgName) throws IOException {
         GHOrganization org = gitHub.getOrganization(orgName);
         List<GHTeam> teams = org.listTeams().withPageSize(100).toList();
 
@@ -64,11 +61,7 @@ public class GitHubTeamSyncService {
                 // must call via the proxy (self) to trigger @Transactional on processTeam()
                 Team saved = self.processTeam(ghTeam);
                 if (saved == null) {
-                    log.warn(
-                        "Skipped team {} with following id: {} due to an error:",
-                        ghTeam.getName(),
-                        ghTeam.getId()
-                    );
+                    log.warn("Skipped team {} with id {} due to an error", ghTeam.getName(), ghTeam.getId());
                 }
             });
         // parent relationships
@@ -190,7 +183,14 @@ public class GitHubTeamSyncService {
                 ? TeamRepositoryPermission.PermissionLevel.ADMIN
                 : push ? TeamRepositoryPermission.PermissionLevel.WRITE : TeamRepositoryPermission.PermissionLevel.READ;
 
-            fresh.add(new TeamRepositoryPermission(team, repoRef, level));
+            TeamRepositoryPermission permission = team
+                .getRepoPermissions()
+                .stream()
+                .filter(existing -> Objects.equals(existing.getRepository().getId(), repoId))
+                .findFirst()
+                .orElseGet(() -> new TeamRepositoryPermission(team, repoRef, level));
+            permission.setPermission(level);
+            fresh.add(permission);
         }
         team.clearAndAddRepoPermissions(fresh);
     }

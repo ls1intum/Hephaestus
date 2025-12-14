@@ -1,0 +1,37 @@
+---
+id: overview
+sidebar_position: 1
+title: Contributor Guide
+description: Orientation for engineers who build and operate the Hephaestus platform.
+---
+
+Hephaestus is maintained by the Applied Education Technologies (AET) team at TUM. It delivers **process-aware mentoring for agile software teams**, blending repo-grounded AI guidance with real-time review analytics. This guide captures the operational knowledge you need to contribute confidently—from local development to production releases.
+
+## Repository layout
+
+```text
+Hephaestus/
+├── webapp/                    # React + Vite front-end (public UI)
+├── server/
+│   ├── application-server/    # Spring Boot server (GitHub + mentor APIs)
+│   ├── intelligence-service/  # FastAPI + LangGraph mentoring service
+│   └── webhook-ingest/        # NATS-based GitHub webhook adapter
+├── docs/                      # Docusaurus site (this documentation)
+└── scripts/                   # Tooling (ERD generation, migrations, utilities)
+```
+
+## How to use this guide
+
+- Start with **Local development** to prepare your workstation and understand the tooling expectations per service.
+- Review **Release management** and **Testing** before opening a PR—automation enforces the conventions documented there.
+- Dive into **System design** and **Database** when implementing larger features or debugging cross-service flows.
+- Follow the **Coding & design guidelines** to keep the codebase consistent across services.
+
+## Shared principles
+
+1. **Security first** - OAuth scopes are scoped to least privilege; secrets are injected via managed infrastructure.
+2. **Observability by default** - We ship structured logs and OpenTelemetry traces in every service.
+3. **Accessible experiences** - The React webapp targets WCAG 2.1 AA; accessibility regressions must be addressed before release.
+4. **Research friendly** - Experiments and short-lived features sit behind feature flags and are documented for replication.
+
+Continue with [Local development](./local-development) to set up your environment.

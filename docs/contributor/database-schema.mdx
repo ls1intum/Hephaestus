@@ -1,0 +1,14 @@
+---
+id: database-schema
+sidebar_position: 7
+title: Database Schema
+description: Reference entity-relationship diagram generated from the current Liquibase migrations.
+---
+
+import Mermaid from '@theme/Mermaid';
+import databaseSchema from '!!raw-loader!@site/contributor/erd/schema.mmd';
+
+The ERD below is generated automatically via `npm run db:generate-erd-docs`. Regenerate it whenever you change Liquibase migrations; the command rewrites `docs/contributor/erd/schema.mmd`, which this page renders directly.
+
+<Mermaid value={databaseSchema} />
+

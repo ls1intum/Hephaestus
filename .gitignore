@@ -3,6 +3,7 @@
 
 # Idea files
 .idea/
+*.iml
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -132,6 +133,7 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+/server/application-server/src/test/resources/application-github-integration-local.yml
 
 # Spyder project settings
 .spyderproject
@@ -170,6 +172,14 @@ application-local.yml
 
 server/application-server/postgres-data/
 server/application-server/postgres-data-temp/
+server/application-server/postgres-data-local/
+server/application-server/logs/
+
+# Private keys
+*.pem
+
+# Private keys
+*.pem
 
 # Java-Client creation temporary
 tmp

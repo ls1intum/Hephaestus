@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useLayoutEffect, useMemo } from "react";
 import type { TeamInfo } from "@/api/types.gen";
 import {
 	type Contributor,
@@ -142,7 +142,11 @@ export function TeamsPage({ teams, isLoading }: TeamsPageProps) {
 				? emptyStateNode
 				: undefined;
 		return (
-			<Card key={team.id} className="flex flex-col gap-3">
+			<Card
+				key={team.id}
+				id={`team-${team.id}`}
+				className="flex flex-col gap-3"
+			>
 				<CardHeader>
 					<CardTitle>{team.name}</CardTitle>
 				</CardHeader>
@@ -159,6 +163,61 @@ export function TeamsPage({ teams, isLoading }: TeamsPageProps) {
 			</Card>
 		);
 	};
+
+	useLayoutEffect(() => {
+		let observer: MutationObserver | null = null;
+
+		const cleanupObserver = () => {
+			observer?.disconnect();
+			observer = null;
+		};
+
+		const scrollToHash = (): boolean => {
+			const hash = window.location.hash;
+			if (!hash) return false;
+			const id = hash.slice(1);
+			const el = document.getElementById(id);
+			if (el) {
+				el.scrollIntoView({ behavior: "smooth", block: "center" });
+				return true;
+			}
+			requestAnimationFrame(() => {
+				const elNext = document.getElementById(id);
+				if (elNext) {
+					elNext.scrollIntoView({ behavior: "smooth", block: "center" });
+				}
+			});
+			return false;
+		};
+
+		const ensureScroll = () => {
+			if (!window.location.hash) {
+				cleanupObserver();
+				return;
+			}
+
+			if (scrollToHash()) {
+				cleanupObserver();
+				return;
+			}
+
+			if (!observer) {
+				observer = new MutationObserver(() => {
+					if (scrollToHash()) {
+						cleanupObserver();
+					}
+				});
+				observer.observe(document.body, { childList: true, subtree: true });
+			}
+		};
+
+		ensureScroll();
+		window.addEventListener("hashchange", ensureScroll);
+		return () => {
+			cleanupObserver();
+			window.removeEventListener("hashchange", ensureScroll);
+		};
+	}, []);
 
 	return (
 		<>
@@ -186,7 +245,6 @@ export function TeamsPage({ teams, isLoading }: TeamsPageProps) {
 					.fill(null)
 					.map((_, teamIndex) => (
 						<Card
-							// biome-ignore lint/suspicious/noArrayIndexKey: Static array
 							key={`loading-team-${teamIndex}`}
 							className="flex flex-col mb-8 gap-3"
 						>

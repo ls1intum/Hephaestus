@@ -1,12 +1,12 @@
 <div align="center">
-  <img alt="Hephaestus Logo" height="100px" src="./docs/images/hammer_bg.svg">
+  <img alt="Hephaestus Logo" height="100px" src="./docs/static/img/brand/hammer_bg.svg">
 </div>
 
 # Hephaestus — Process-Aware Mentoring for Agile Software Teams
 
 Hephaestus is an open-source platform for process-aware mentoring that scaffolds self-regulated learning and onboarding for agile software teams. The platform focuses on the software process — from issues to pull requests and team rituals — to bridge the theory–practice gap and help novices adopt industry best practices faster with less struggle. Heph is the platform’s conversational AI mentor that delivers repo-grounded guidance.
 
-<img alt="Agile Hephaestus" height="200px" src="./docs/images/agile_hephaestus.png">
+<img alt="Agile Hephaestus" height="200px" src="./docs/user/img/overview/agile_hephaestus.png">
 
 Hephaestus /hɪˈfɛstəs/ is the Greek god of blacksmiths, craftsmen, and artisans, symbolizing the fusion of creativity and technical skill.
 
@@ -42,12 +42,12 @@ Hephaestus /hɪˈfɛstəs/ is the Greek god of blacksmiths, craftsmen, and artis
 
 ## Documentation
 
-Technical/user docs: [Read the Docs](https://ls1intum.github.io/Hephaestus/)
-UI component docs: [Storybook](https://develop--66a8981a27ced8fef3190d41.chromatic.com/)
+Technical & user docs (GitHub Pages): [https://ls1intum.github.io/Hephaestus/](https://ls1intum.github.io/Hephaestus/)
+UI component docs: [Storybook](https://main--66a8981a27ced8fef3190d41.chromatic.com/)
 
 ### Setup
 
-Read the [setup guide](https://ls1intum.github.io/Hephaestus/dev/setup_guide) for server, intelligence service, and the React client in `webapp`.
+Read the [local development guide](https://ls1intum.github.io/Hephaestus/contributor/local-development) for server, intelligence service, and the React client in `webapp`.
 
 ## Contributing
 

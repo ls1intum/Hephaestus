@@ -1,0 +1,29 @@
+spring:
+  config:
+    import:
+      - optional:classpath:application-live-local.yml
+    activate:
+      on-profile: live
+  main:
+    banner-mode: "off"
+    web-application-type: none
+
+# GitHub App configuration for live integration tests.
+# These tests require GH_APP_INSTALLATION_ID to be set to run.
+# Provide credentials via environment variables or application-live-local.yml (gitignored).
+# noinspection SpringBootApplicationProperties
+github:
+  app:
+    id: ${GH_APP_ID:0}
+    privateKeyLocation: ${GH_APP_PRIVATE_KEY_LOCATION:classpath:/noop-github-app.pem}
+    privateKey: ${GH_APP_PRIVATE_KEY:}
+  meta:
+    auth-token: ${GH_APP_PAT:}
+
+# noinspection SpringBootApplicationProperties
+integration-tests:
+  github:
+    organization: ${GH_APP_ORGANIZATION:HephaestusTest}
+    installation-id: ${GH_APP_INSTALLATION_ID:}
+    sandbox-repository: ${GH_APP_SANDBOX_REPO:}
+  ephemeral-prefix: ${GH_APP_TEST_PREFIX:hephaestus-it}

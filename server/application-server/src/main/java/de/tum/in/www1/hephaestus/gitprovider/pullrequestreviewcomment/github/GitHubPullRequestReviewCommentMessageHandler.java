@@ -21,7 +21,7 @@ public class GitHubPullRequestReviewCommentMessageHandler
     private final GitHubPullRequestSyncService pullRequestSyncService;
     private final GitHubRepositorySyncService repositorySyncService;
 
-    private GitHubPullRequestReviewCommentMessageHandler(
+    public GitHubPullRequestReviewCommentMessageHandler(
         PullRequestReviewCommentRepository pullRequestReviewCommentRepository,
         GitHubPullRequestReviewCommentSyncService pullRequestReviewCommentSyncService,
         GitHubPullRequestSyncService pullRequestSyncService,
@@ -51,9 +51,13 @@ public class GitHubPullRequestReviewCommentMessageHandler
         pullRequestSyncService.processPullRequest(pullRequest);
 
         if (action.equals("deleted")) {
-            pullRequestReviewCommentRepository.deleteById(comment.getId());
+            pullRequestReviewCommentSyncService.deletePullRequestReviewComment(comment.getId());
         } else {
-            pullRequestReviewCommentSyncService.processPullRequestReviewComment(comment);
+            pullRequestReviewCommentSyncService.processPullRequestReviewComment(
+                comment,
+                pullRequest,
+                eventPayload.getSender()
+            );
         }
     }
 

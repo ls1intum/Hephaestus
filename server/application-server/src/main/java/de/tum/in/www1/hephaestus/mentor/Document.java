@@ -1,6 +1,7 @@
 package de.tum.in.www1.hephaestus.mentor;
 
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
+import de.tum.in.www1.hephaestus.workspace.Workspace;
 import jakarta.persistence.*;
 import java.time.Instant;
 import java.util.UUID;
@@ -60,7 +61,21 @@ public class Document {
     @ToString.Exclude
     private User user;
 
-    public Document(UUID id, int versionNumber, String title, String content, DocumentKind kind, User user) {
+    @NonNull
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "workspace_id", nullable = false)
+    @ToString.Exclude
+    private Workspace workspace;
+
+    public Document(
+        UUID id,
+        int versionNumber,
+        String title,
+        String content,
+        DocumentKind kind,
+        User user,
+        Workspace workspace
+    ) {
         this.id = id;
         this.versionNumber = versionNumber;
         this.createdAt = Instant.now();
@@ -68,5 +83,6 @@ public class Document {
         this.content = content;
         this.kind = kind;
         this.user = user;
+        this.workspace = workspace;
     }
 }

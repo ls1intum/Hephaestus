@@ -5,6 +5,8 @@ import { LeaderboardOverview } from "./LeaderboardOverview";
 import { LeaderboardTable } from "./LeaderboardTable";
 import type { LeaderboardSortType } from "./SortFilter";
 
+export type LeaderboardVariant = "INDIVIDUAL" | "TEAM";
+
 interface LeaderboardPageProps {
 	leaderboard?: LeaderboardEntry[];
 	isLoading: boolean;
@@ -13,11 +15,12 @@ interface LeaderboardPageProps {
 	leaguePoints?: number;
 	leaguePointsChange?: number;
 	teamOptions: { value: string; label: string }[];
+	teamLabelsById?: Record<number, string>;
 	onTeamChange?: (team: string) => void;
 	onSortChange?: (sort: LeaderboardSortType) => void;
 	onTimeframeChange?: (
 		afterDate: string,
-		beforeDate: string,
+		beforeDate?: string,
 		timeframe?: string,
 	) => void;
 	onUserClick?: (username: string) => void;
@@ -31,6 +34,9 @@ interface LeaderboardPageProps {
 		hour: number;
 		minute: number;
 	};
+	selectedMode: LeaderboardVariant;
+	onModeChange?: (mode: LeaderboardVariant) => void;
+	onTeamClick?: (teamId: number) => void;
 }
 
 export function LeaderboardPage({
@@ -41,6 +47,7 @@ export function LeaderboardPage({
 	leaguePoints = 0,
 	leaguePointsChange = 0,
 	teamOptions,
+	teamLabelsById,
 	onTeamChange,
 	onSortChange,
 	onTimeframeChange,
@@ -51,6 +58,9 @@ export function LeaderboardPage({
 	initialBeforeDate,
 	leaderboardEnd,
 	leaderboardSchedule,
+	selectedMode,
+	onModeChange,
+	onTeamClick,
 }: LeaderboardPageProps) {
 	// Add formatted property to the leaderboardSchedule object if it exists
 	const formattedSchedule = leaderboardSchedule
@@ -68,6 +78,8 @@ export function LeaderboardPage({
 					<div className="space-y-4 col-span-1">
 						<div className="xl:sticky xl:top-4 xl:self-start xl:max-h-[calc(100vh-2rem)] xl:overflow-auto">
 							<LeaderboardFilter
+								selectedMode={selectedMode}
+								onModeChange={onModeChange}
 								teamOptions={teamOptions}
 								onTeamChange={onTeamChange}
 								onSortChange={onSortChange}
@@ -95,8 +107,11 @@ export function LeaderboardPage({
 							<LeaderboardTable
 								leaderboard={leaderboard}
 								isLoading={isLoading}
+								variant={selectedMode}
 								currentUser={currentUser}
 								onUserClick={onUserClick}
+								onTeamClick={onTeamClick}
+								teamLabelsById={teamLabelsById}
 							/>
 						</div>
 					</div>

@@ -176,7 +176,7 @@ if [[ -f server/application-server/pom.xml ]]; then
     # This awk script looks for the line with <artifactId>hephaestus</artifactId>,
     # then updates the next <version> element.
     awk -v new_version="${NEW_VERSION}" '
-        /<artifactId>hephaestus<\/artifactId>/ { print; getline; if ($0 ~ /<version>/) { sub(/<version>[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?(-SNAPSHOT)?<\/version>/, "<version>" new_version "-SNAPSHOT</version>") } }
+        /<artifactId>hephaestus<\/artifactId>/ { print; getline; if ($0 ~ /<version>/) { sub(/<version>[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?(-SNAPSHOT)?<\/version>/, "<version>" new_version "</version>") } }
         { print }
     ' server/application-server/pom.xml > server/application-server/pom.xml.tmp && mv server/application-server/pom.xml.tmp server/application-server/pom.xml
 fi
@@ -216,6 +216,13 @@ if [[ -n "$openapi_files" ]]; then
             sed_inplace "s#(The version of the OpenAPI document: )[0-9]+(\.[0-9]+){2}(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?#\\1${NEW_VERSION}#g" "$file"
         fi
     done
+fi
+
+# Normalize generated Java client headers to avoid release churn when only the version changes
+if command -v node >/dev/null 2>&1; then
+    node scripts/postprocess-openapi-java.mjs || true
+else
+    echo "Warning: Node.js not found; skipping OpenAPI Java client normalization." >&2
 fi
 
 echo "Version update complete. New version: ${NEW_VERSION}"

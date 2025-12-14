@@ -2,6 +2,7 @@ package de.tum.in.www1.hephaestus.gitprovider.user;
 
 import de.tum.in.www1.hephaestus.SecurityUtils;
 import de.tum.in.www1.hephaestus.core.exception.EntityNotFoundException;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -21,10 +22,10 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     @Query(
         """
-            SELECT u
+            SELECT DISTINCT u
             FROM User u
-            LEFT JOIN FETCH u.mergedPullRequests
-            WHERE u.login ILIKE :login
+            LEFT JOIN FETCH u.mergedPullRequests mpr
+            WHERE LOWER(u.login) = LOWER(:login)
         """
     )
     Optional<User> findByLoginWithEagerMergedPullRequests(@Param("login") String login);
@@ -64,13 +65,32 @@ public interface UserRepository extends JpaRepository<User, Long> {
         """
             SELECT DISTINCT u
             FROM User u
+            JOIN FETCH u.teamMemberships m
+            JOIN FETCH m.team t
+            WHERE u.type = 'USER'
+            AND LOWER(t.organization) = LOWER(:organization)
+        """
+    )
+    List<User> findAllHumanInTeamsOfOrganization(@Param("organization") String organization);
+
+    @Query(
+        """
+            SELECT DISTINCT u
+            FROM User u
             JOIN u.teamMemberships m
             JOIN m.team t
-            WHERE t.id = :teamId
+            WHERE t.id IN :teamIds
             AND u.type = 'USER'
         """
     )
-    List<User> findAllByTeamId(@Param("teamId") Long teamId);
+    List<User> findAllByTeamIds(@Param("teamIds") Collection<Long> teamIds);
+
+    default List<User> findAllByTeamId(Long teamId) {
+        if (teamId == null) {
+            return List.of();
+        }
+        return findAllByTeamIds(List.of(teamId));
+    }
 
     @Query(
         """
@@ -78,9 +98,11 @@ public interface UserRepository extends JpaRepository<User, Long> {
             FROM PullRequest pr
             JOIN TeamRepositoryPermission trp ON trp.repository = pr.repository
             JOIN Team t ON trp.team = t
-            WHERE t.id = :teamId
+            WHERE t.id IN :teamIds
+            AND trp.hiddenFromContributions = false
             AND (
-                NOT EXISTS (SELECT l
+                NOT EXISTS (
+                    SELECT l
                     FROM t.labels l
                     WHERE l.repository = pr.repository
                 )
@@ -94,14 +116,21 @@ public interface UserRepository extends JpaRepository<User, Long> {
             )
         """
     )
-    Set<User> findAllContributingToTeam(@Param("teamId") Long teamId);
+    Set<User> findAllContributingToTeams(@Param("teamIds") Collection<Long> teamIds);
+
+    default Set<User> findAllContributingToTeam(Long teamId) {
+        if (teamId == null) {
+            return Set.of();
+        }
+        return findAllContributingToTeams(List.of(teamId));
+    }
 
     /**
      * @return existing user object by current user login
      */
     default Optional<User> getCurrentUser() {
         var currentUserLogin = SecurityUtils.getCurrentUserLogin();
-        return currentUserLogin.map(this::findByLogin).orElse(Optional.empty());
+        return currentUserLogin.flatMap(this::findByLogin);
     }
 
     /**
@@ -110,4 +139,13 @@ public interface UserRepository extends JpaRepository<User, Long> {
     default User getCurrentUserElseThrow() {
         return getCurrentUser().orElseThrow(() -> new EntityNotFoundException("User", "current authenticated user"));
     }
+
+    @Query(
+        """
+            SELECT u
+            FROM User u
+            WHERE LOWER(u.login) IN :logins
+        """
+    )
+    List<User> findAllByLoginLowerIn(@Param("logins") Set<String> logins);
 }

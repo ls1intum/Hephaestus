@@ -27,7 +27,7 @@ public class PullRequestBadPractice {
     @NonNull
     private String title;
 
-    @Column(columnDefinition = "text")
+    @Column(columnDefinition = "TEXT")
     @NonNull
     private String description;
 

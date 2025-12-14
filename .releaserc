@@ -1,9 +1,5 @@
 {
   "branches": [
-    {
-      "name": "develop",
-      "prerelease": "rc"
-    },
     "main"
   ],
   "plugins": [
@@ -25,7 +21,7 @@
           },
           {
             "type": "docs",
-            "release": "patch"
+            "release": false
           },
           {
             "type": "style",
@@ -33,7 +29,7 @@
           },
           {
             "type": "refactor",
-            "release": "patch"
+            "release": false
           },
           {
             "type": "perf",
@@ -45,7 +41,7 @@
           },
           {
             "type": "build",
-            "release": "patch"
+            "release": false
           },
           {
             "type": "ci",
@@ -58,7 +54,7 @@
           },
           {
             "type": "chore",
-            "release": "patch"
+            "release": false
           },
           {
             "type": "revert",
@@ -70,7 +66,11 @@
           }
         ],
         "parserOpts": {
-          "noteKeywords": ["BREAKING CHANGE", "BREAKING CHANGES", "BREAKING"],
+          "noteKeywords": [
+            "BREAKING CHANGE",
+            "BREAKING CHANGES",
+            "BREAKING"
+          ],
           "breakingHeaderPattern": "^(\\w*)(?:\\(([\\w\\$\\.\\-\\*\\s]*)\\))?!: (.*)$",
           "headerPattern": "^(\\w*)(?:\\(([\\w\\$\\.\\-\\*\\s]*)\\))?!?: (.*)$"
         }
@@ -81,12 +81,19 @@
       {
         "preset": "conventionalcommits",
         "parserOpts": {
-          "noteKeywords": ["BREAKING CHANGE", "BREAKING CHANGES", "BREAKING"],
+          "noteKeywords": [
+            "BREAKING CHANGE",
+            "BREAKING CHANGES",
+            "BREAKING"
+          ],
           "breakingHeaderPattern": "^(\\w*)(?:\\(([\\w\\$\\.\\-\\*\\s]*)\\))?!: (.*)$",
           "headerPattern": "^(\\w*)(?:\\(([\\w\\$\\.\\-\\*\\s]*)\\))?!?: (.*)$"
         },
         "writerOpts": {
-          "commitsSort": ["subject", "scope"]
+          "commitsSort": [
+            "subject",
+            "scope"
+          ]
         },
         "presetConfig": {
           "types": [
@@ -160,8 +167,7 @@
       "@semantic-release/exec",
       {
         "prepareCmd": "./update_version.sh ${nextRelease.version}",
-  "publishCmd": "echo 'Version ${nextRelease.version} has been released'",
-  "successCmd": "node scripts/rc_discussion.mjs ${nextRelease.version}"
+        "publishCmd": "echo 'Version ${nextRelease.version} has been released'"
       }
     ],
     [
@@ -176,23 +182,30 @@
           "webapp/src/api/**/*",
           "server/application-server/pom.xml",
           "server/application-server/src/main/java/de/tum/in/www1/hephaestus/OpenAPIConfiguration.java",
-          "server/application-server/src/main/java/de/tum/in/www1/hephaestus/intelligenceservice/**/*", 
+          "server/application-server/src/main/java/de/tum/in/www1/hephaestus/intelligenceservice/**/*",
           "server/application-server/src/main/resources/application.yml",
           "server/application-server/openapi.yaml",
           "server/intelligence-service/package.json",
           "server/intelligence-service/openapi.yaml",
           "server/webhook-ingest/pyproject.toml"
-  ],
-  "message": "chore(release): ${nextRelease.version}"
+        ],
+        "message": "chore(release): ${nextRelease.version} [skip ci]"
       }
     ],
     [
       "@semantic-release/github",
       {
+        "discussionCategoryName": "Announcements",
         "failTitle": "🚨 Automated Release Pipeline Failed",
         "failComment": "## Release Failure Report\n\nThe automated release pipeline for Hephaestus has encountered an error on branch `${branch.name}`.\n\n### Error Details\n${errors.map(err => `- **${err.pluginName}**: ${err.message}`).join('\\n')}\n\n### Next Steps\nOur team has been notified and will investigate this issue. You can track the resolution in this issue.\n\n---\n*This is an automated message from the Hephaestus release system.*",
-  "labels": ["release-failure", "bug"],
-  "addReleases": "bottom"
+        "labels": [
+          "release-failure",
+          "bug"
+        ],
+        "addReleases": "bottom",
+        "releasedLabels": [
+          "released"
+        ]
       }
     ]
   ],

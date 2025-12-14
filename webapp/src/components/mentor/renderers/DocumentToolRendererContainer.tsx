@@ -59,7 +59,7 @@ export const DocumentToolRendererContainer: PartRenderer<
 			({
 				id: documentId,
 				title: currentDoc?.title ?? "Document",
-				kind: "text",
+				kind: "TEXT",
 				content: currentDoc?.content ?? "",
 				createdAt: new Date(),
 				userId: 0,

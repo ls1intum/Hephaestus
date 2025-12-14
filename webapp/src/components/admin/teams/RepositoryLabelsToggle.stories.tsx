@@ -19,6 +19,7 @@ const mockRepo: RepositoryInfo = {
 	name: "repo",
 	nameWithOwner: "org/repo",
 	htmlUrl: "https://github.com/org/repo",
+	hiddenFromContributions: false,
 };
 
 const mockTeam: TeamInfo = {

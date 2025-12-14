@@ -3,17 +3,18 @@ package de.tum.in.www1.hephaestus.gitprovider.milestone.github;
 import de.tum.in.www1.hephaestus.gitprovider.milestone.Milestone;
 import de.tum.in.www1.hephaestus.gitprovider.milestone.MilestoneRepository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
-import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
-import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserConverter;
-import jakarta.transaction.Transactional;
+import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserSyncService;
 import java.io.IOException;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import org.kohsuke.github.GHIssueState;
 import org.kohsuke.github.GHMilestone;
 import org.kohsuke.github.GHRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class GitHubMilestoneSyncService {
@@ -22,22 +23,19 @@ public class GitHubMilestoneSyncService {
 
     private final MilestoneRepository milestoneRepository;
     private final RepositoryRepository repositoryRepository;
-    private final UserRepository userRepository;
     private final GitHubMilestoneConverter milestoneConverter;
-    private final GitHubUserConverter userConverter;
+    private final GitHubUserSyncService userSyncService;
 
     public GitHubMilestoneSyncService(
         MilestoneRepository milestoneRepository,
         RepositoryRepository repositoryRepository,
-        UserRepository userRepository,
         GitHubMilestoneConverter milestoneConverter,
-        GitHubUserConverter userConverter
+        GitHubUserSyncService userSyncService
     ) {
         this.milestoneRepository = milestoneRepository;
         this.repositoryRepository = repositoryRepository;
-        this.userRepository = userRepository;
         this.milestoneConverter = milestoneConverter;
-        this.userConverter = userConverter;
+        this.userSyncService = userSyncService;
     }
 
     /**
@@ -58,8 +56,43 @@ public class GitHubMilestoneSyncService {
      * @param repository the GitHub repository whose milestones are to be
      *                   synchronized
      */
+    @Transactional
     public void syncMilestonesOfRepository(GHRepository repository) {
-        repository.listMilestones(GHIssueState.ALL).withPageSize(100).forEach(this::processMilestone);
+        if (repository == null) {
+            return;
+        }
+
+        List<GHMilestone> remoteMilestones;
+        try {
+            remoteMilestones = repository.listMilestones(GHIssueState.ALL).withPageSize(100).toList();
+        } catch (IOException listingError) {
+            logger.warn(
+                "Failed to list milestones for repositoryId={}: {}",
+                repository.getId(),
+                listingError.getMessage()
+            );
+            return;
+        }
+
+        Set<Long> seenMilestoneIds = new HashSet<>(remoteMilestones.size());
+        remoteMilestones.forEach(ghMilestone -> {
+            seenMilestoneIds.add(ghMilestone.getId());
+            processMilestone(ghMilestone);
+        });
+
+        var repositoryId = repository.getId();
+        List<Milestone> existingMilestones = milestoneRepository.findAllByRepository_Id(repositoryId);
+        int removed = 0;
+        for (Milestone milestone : existingMilestones) {
+            if (!seenMilestoneIds.contains(milestone.getId())) {
+                milestoneRepository.delete(milestone);
+                removed++;
+            }
+        }
+
+        if (removed > 0) {
+            logger.info("Deleted {} stale milestones for repositoryId={}", removed, repositoryId);
+        }
     }
 
     /**
@@ -91,10 +124,12 @@ public class GitHubMilestoneSyncService {
 
         // Link creator
         var creator = ghMilestone.getCreator();
-        var resultCreator = userRepository
-            .findById(creator.getId())
-            .orElseGet(() -> userRepository.save(userConverter.convert(creator)));
-        result.setCreator(resultCreator);
+        if (creator != null) {
+            var resultCreator = userSyncService.getOrCreateUser(creator);
+            result.setCreator(resultCreator);
+        } else {
+            result.setCreator(null);
+        }
 
         return milestoneRepository.save(result);
     }

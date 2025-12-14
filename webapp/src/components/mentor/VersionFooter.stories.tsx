@@ -50,7 +50,7 @@ const sampleDocuments: Document[] = [
 		content: "Latest version content",
 		createdAt: new Date("2024-01-15T10:30:00Z"),
 		kind: "text",
-		userId: 1,
+		userId: "1",
 		versionNumber: 3,
 	},
 	{
@@ -59,7 +59,7 @@ const sampleDocuments: Document[] = [
 		content: "Previous version content",
 		createdAt: new Date("2024-01-15T09:15:00Z"),
 		kind: "text",
-		userId: 1,
+		userId: "1",
 		versionNumber: 2,
 	},
 	{
@@ -68,7 +68,7 @@ const sampleDocuments: Document[] = [
 		content: "Even older version content",
 		createdAt: new Date("2024-01-15T08:00:00Z"),
 		kind: "text",
-		userId: 1,
+		userId: "1",
 		versionNumber: 1,
 	},
 ];

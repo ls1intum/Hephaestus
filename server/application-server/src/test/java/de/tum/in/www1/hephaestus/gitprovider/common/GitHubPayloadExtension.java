@@ -1,8 +1,11 @@
 package de.tum.in.www1.hephaestus.gitprovider.common;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import de.tum.in.www1.hephaestus.config.GitHubApiPatches;
+import java.io.IOException;
+import java.io.InputStream;
 import java.io.StringReader;
-import java.nio.file.Files;
-import java.nio.file.Paths;
+import java.nio.charset.StandardCharsets;
 import org.junit.jupiter.api.extension.ExtensionContext;
 import org.junit.jupiter.api.extension.ParameterContext;
 import org.junit.jupiter.api.extension.ParameterResolutionException;
@@ -29,14 +32,38 @@ public class GitHubPayloadExtension implements ParameterResolver {
 
         try {
             String fileName = annotation.value() + ".json";
-            return loadPayload(fileName, parameterType.asSubclass(GHEventPayload.class));
+            if (GHEventPayload.class.isAssignableFrom(parameterType)) {
+                return loadGhPayload(fileName, parameterType.asSubclass(GHEventPayload.class));
+            }
+            return loadPojoPayload(fileName, parameterType);
         } catch (Exception e) {
             throw new ParameterResolutionException("Failed to load GitHub payload", e);
         }
     }
 
-    private <T extends GHEventPayload> T loadPayload(String fileName, Class<T> payloadType) throws Exception {
-        String jsonPayload = Files.readString(Paths.get("src/test/resources/github/" + fileName));
-        return GitHub.offline().parseEventPayload(new StringReader(jsonPayload), payloadType);
+    private <T extends GHEventPayload> T loadGhPayload(String fileName, Class<T> payloadType) throws IOException {
+        String resourcePath = "github/" + fileName;
+        try (InputStream inputStream = getClass().getClassLoader().getResourceAsStream(resourcePath)) {
+            if (inputStream == null) {
+                throw new IOException("GitHub payload not found on classpath: " + resourcePath);
+            }
+            String jsonPayload = new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
+            GitHubApiPatches.ensureApplied();
+            try (StringReader reader = new StringReader(jsonPayload)) {
+                return GitHub.offline().parseEventPayload(reader, payloadType);
+            }
+        }
+    }
+
+    private Object loadPojoPayload(String fileName, Class<?> payloadType) throws IOException {
+        String resourcePath = "github/" + fileName;
+        try (InputStream inputStream = getClass().getClassLoader().getResourceAsStream(resourcePath)) {
+            if (inputStream == null) {
+                throw new IOException("GitHub payload not found on classpath: " + resourcePath);
+            }
+            String jsonPayload = new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
+            ObjectMapper mapper = new ObjectMapper();
+            return mapper.readValue(jsonPayload, payloadType);
+        }
     }
 }

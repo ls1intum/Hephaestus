@@ -14,6 +14,7 @@ export interface NavMentorThreadsProps {
 	threadGroups: ChatThreadGroup[];
 	isLoading?: boolean;
 	error?: string;
+	workspaceSlug: string;
 }
 
 /**
@@ -24,6 +25,7 @@ export function NavMentorThreads({
 	threadGroups,
 	isLoading,
 	error,
+	workspaceSlug,
 }: NavMentorThreadsProps) {
 	if (isLoading) {
 		return (
@@ -67,6 +69,7 @@ export function NavMentorThreads({
 					key={group.groupName}
 					title={group.groupName}
 					threads={group.threads}
+					workspaceSlug={workspaceSlug}
 				/>
 			))}
 		</>
@@ -76,9 +79,11 @@ export function NavMentorThreads({
 function ThreadGroup({
 	title,
 	threads,
+	workspaceSlug,
 }: {
 	title: string;
 	threads: ChatThreadSummary[];
+	workspaceSlug: string;
 }) {
 	const location = useLocation();
 
@@ -92,13 +97,16 @@ function ThreadGroup({
 			<SidebarGroupContent>
 				<SidebarMenu>
 					{threads.map((thread) => {
-						const threadPath = `/mentor/${thread.id}`;
+						const threadPath = `/w/${workspaceSlug}/mentor/${thread.id}`;
 						const isActive = location.pathname === threadPath;
 
 						return (
 							<SidebarMenuItem key={thread.id}>
 								<SidebarMenuButton asChild isActive={isActive}>
-									<Link to="/mentor/$threadId" params={{ threadId: thread.id }}>
+									<Link
+										to="/w/$workspaceSlug/mentor/$threadId"
+										params={{ workspaceSlug, threadId: thread.id }}
+									>
 										{thread.title}
 									</Link>
 								</SidebarMenuButton>

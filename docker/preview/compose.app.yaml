@@ -1,0 +1,338 @@
+# =============================================================================
+# PER-PR APPLICATION STACK FOR PREVIEW DEPLOYMENTS (Coolify)
+# =============================================================================
+#
+# Coolify deploys this for each Pull Request automatically.
+# Each PR gets its own isolated stack with its own Postgres database.
+#
+# Coolify Setup (ONE-TIME on main application):
+#   1. Create Application → Docker Compose (from Git repository)
+#   2. Point to: docker/preview/compose.app.yaml
+#   3. Enable "Connect to Predefined Network" to access shared infra
+#   4. Enable Preview Deployments in the application settings
+#   5. Configure environment variables (see .env.example)
+#   6. Configure domains in Coolify UI (General tab) on the MAIN application:
+#      - webapp: https://hephaestus.example.com
+#      - application-server: https://api.hephaestus.example.com
+#
+#   Preview deployments will AUTOMATICALLY get domains like:
+#      - webapp: https://{{pr_id}}.hephaestus.example.com
+#      - application-server: https://{{pr_id}}.api.hephaestus.example.com
+#
+# GitHub Actions Variables (set in repo settings):
+#   - PREVIEW_HOSTNAME: e.g., hephaestus.example.com
+#   - PREVIEW_API_HOSTNAME: e.g., api.hephaestus.example.com
+#
+# Coolify Auto-Generated Variables:
+#   - SERVICE_FQDN_WEBAPP: Domain for webapp (host only, no scheme)
+#   - SERVICE_URL_WEBAPP: Full URL for webapp (with https://)
+#   - SERVICE_FQDN_APPLICATION_SERVER: Domain for API (host only)  
+#   - SERVICE_URL_APPLICATION_SERVER: Full URL for API (with https://)
+#   - SERVICE_NAME_<SERVICE>: Container name (e.g., postgres-wg44k0c-pr-557)
+#   - COOLIFY_CONTAINER_NAME: Unique container identifier
+#
+# Connects to shared infrastructure services (from compose.shared-infra.yaml):
+#   - nats-server: Message queue
+#   - keycloak: Authentication  
+#   - postfix: Email relay
+#
+# =============================================================================
+
+services:
+  # ---------------------------------------------------------------------------
+  # PostgreSQL - Per-PR database (isolated data per preview)
+  # 
+  # SEEDING HACK: Uses init container to populate via psql commands
+  # after postgres starts, rather than relying on /docker-entrypoint-initdb.d
+  # ---------------------------------------------------------------------------
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: hephaestus
+      POSTGRES_USER: hephaestus
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-hephaestus-preview}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hephaestus -d hephaestus"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "3"
+
+  # ---------------------------------------------------------------------------
+  # Seed Loader - Restores database from external named volume
+  # 
+  # Loads SQL dump from `hephaestus-seed` external named volume.
+  # This volume is created/managed on the HOST and shared across deployments.
+  # Uses standard psql restore - no security issues.
+  # If dump not found, postgres starts empty and Liquibase creates schema.
+  # ---------------------------------------------------------------------------
+  seed-loader:
+    image: postgres:17-alpine
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD:-hephaestus-preview}
+      SERVICE_NAME_POSTGRES: ${SERVICE_NAME_POSTGRES:-}
+      SERVICE_FQDN_APPLICATION_SERVER: ${SERVICE_FQDN_APPLICATION_SERVER:-}
+      SERVICE_FQDN_WEBAPP: ${SERVICE_FQDN_WEBAPP:-}
+    command: |
+      sh -c '
+        set -e
+        apk add --no-cache docker-cli >/tmp/apk.log 2>&1
+
+        APP_FQDN="${SERVICE_FQDN_APPLICATION_SERVER:-${SERVICE_FQDN_WEBAPP:-}}"
+        if ! echo "$$APP_FQDN" | grep -Eq "^pr[0-9]+"; then
+          echo "Skipping seed-loader: non-PR deployment detected"
+          exit 0
+        fi
+
+        PR_ID=$$(echo "$$APP_FQDN" | sed -n "s/^pr\\([0-9]\\+\\).*/\\1/p")
+        PROJECT_NAME=${COMPOSE_PROJECT_NAME:-}
+
+        BASE_VOL=$$(docker volume ls --format "{{.Name}}" | grep "postgres-data" | grep -v "pr-" | head -1 || true)
+        if [ -z "$$BASE_VOL" ]; then
+          echo "✗ No base postgres volume found; Liquibase will initialize schema"
+          exit 0
+        fi
+        echo "Using base volume: $$BASE_VOL"
+
+        BASE_CTN=$$(docker ps --format "{{.Names}}" | grep "^postgres-" | grep -v "pr-" | head -1 || true)
+        TEMP_STARTED=0
+        if [ -z "$$BASE_CTN" ]; then
+          BASE_CTN="seed-base-$$RANDOM"
+          echo "Starting temporary postgres from base volume: $$BASE_CTN"
+          docker run -d --name "$$BASE_CTN" -v "$$BASE_VOL":/var/lib/postgresql/data postgres:17-alpine >/tmp/base-start.log 2>/tmp/base-start.err || {
+            echo "✗ Failed to start temporary base container; falling back to Liquibase"
+            cat /tmp/base-start.err || true
+            exit 0
+          }
+          TEMP_STARTED=1
+          for i in $$(seq 1 10); do
+            if docker exec "$$BASE_CTN" pg_isready -U hephaestus -d hephaestus >/dev/null 2>&1; then break; fi
+            sleep 2
+          done
+        else
+          echo "Using running base container: $$BASE_CTN"
+        fi
+
+        PREVIEW_PG=${SERVICE_NAME_POSTGRES:-}
+        if [ -n "$$PREVIEW_PG" ] && ! docker ps --format "{{.Names}}" | grep -qx "$$PREVIEW_PG"; then
+          PREVIEW_PG=""
+        fi
+
+        if [ -z "$$PREVIEW_PG" ] && [ -n "$$PR_ID" ]; then
+          CANDIDATE="postgres-$$PROJECT_NAME-pr-$$PR_ID"
+          if docker ps --format "{{.Names}}" | grep -qx "$$CANDIDATE"; then
+            PREVIEW_PG="$$CANDIDATE"
+          fi
+        fi
+
+        if [ -z "$$PREVIEW_PG" ]; then
+          PREVIEW_PG=$$(docker ps --format "{{.Names}}" | grep "^postgres-" | grep "pr-" | head -1 || true)
+        fi
+
+        if [ -z "$$PREVIEW_PG" ]; then
+          echo "✗ Could not resolve preview postgres container (expected SERVICE_NAME_POSTGRES or postgres-*pr-*)."
+          exit 1
+        fi
+
+        if docker exec "$$BASE_CTN" pg_dump -U hephaestus -d hephaestus --clean --if-exists > /tmp/dump.sql 2>/tmp/dump.err; then
+          if [ -s /tmp/dump.sql ]; then
+            echo "Loading seed from base into preview DB via docker exec to $$PREVIEW_PG..."
+            if cat /tmp/dump.sql | docker exec -i "$$PREVIEW_PG" psql -U hephaestus -d hephaestus; then
+              echo "✓ Seed loaded successfully"
+            else
+              echo "✗ Failed to restore database (Liquibase will create schema)"
+            fi
+          else
+            echo "✓ Dump was empty; Liquibase will initialize schema"
+          fi
+        else
+          echo "✗ Dump failed; see error log below"
+          cat /tmp/dump.err || true
+          echo "✓ Database will be initialized by Liquibase"
+        fi
+
+        if [ "$$TEMP_STARTED" -eq 1 ]; then
+          echo "Stopping temporary base container: $$BASE_CTN"
+          docker rm -f "$$BASE_CTN" >/tmp/base-stop.log 2>/tmp/base-stop.err || {
+            echo "! Warning: failed to stop temporary base container; check /tmp/base-stop.err"
+            cat /tmp/base-stop.err || true
+          }
+        fi
+        exit 0
+      '
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    restart: "no"
+
+  # ---------------------------------------------------------------------------
+  # Intelligence Service - AI analysis backend (internal only)
+  # ---------------------------------------------------------------------------
+  intelligence-service:
+    build:
+      context: ./server/intelligence-service
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      # Database - Coolify provides SERVICE_NAME_POSTGRES with the correct container name
+      DATABASE_URL: postgresql://${SERVICE_NAME_POSTGRES:-postgres}:5432/hephaestus
+      DATABASE_USERNAME: hephaestus
+      DATABASE_PASSWORD: ${POSTGRES_PASSWORD:-hephaestus-preview}
+      # AI Models
+      MODEL_NAME: ${MODEL_NAME:?Required}
+      DETECTION_MODEL_NAME: ${DETECTION_MODEL_NAME:?Required}
+      # OpenAI
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_API_VERSION: ${OPENAI_API_VERSION:-}
+      # Azure OpenAI
+      AZURE_OPENAI_ENDPOINT: ${AZURE_OPENAI_ENDPOINT:-}
+      AZURE_OPENAI_API_KEY: ${AZURE_OPENAI_API_KEY:-}
+      # Ollama
+      OLLAMA_HOST: ${OLLAMA_HOST:-}
+      OLLAMA_BASIC_AUTH_USERNAME: ${OLLAMA_BASIC_AUTH_USERNAME:-}
+      OLLAMA_BASIC_AUTH_PASSWORD: ${OLLAMA_BASIC_AUTH_PASSWORD:-}
+      # Observability (optional)
+      LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-}
+      LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-}
+      LANGFUSE_HOST: ${LANGFUSE_HOST:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      seed-loader:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:5000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "3"
+
+  # ---------------------------------------------------------------------------
+  # Application Server - Spring Boot backend
+  # Main app domain (set once): https://api.hephaestus.example.com
+  # Previews auto-generate: https://{{pr_id}}.api.hephaestus.example.com
+  # ---------------------------------------------------------------------------
+  application-server:
+    build:
+      context: ./server/application-server
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      # URL - Coolify provides SERVICE_FQDN_WEBAPP
+      APPLICATION_HOST_URL: https://${SERVICE_FQDN_WEBAPP}
+      # Database - Coolify provides SERVICE_NAME_POSTGRES with the correct container name
+      DATABASE_URL: postgresql://${SERVICE_NAME_POSTGRES:-postgres}:5432/hephaestus
+      DATABASE_USERNAME: hephaestus
+      DATABASE_PASSWORD: ${POSTGRES_PASSWORD:-hephaestus-preview}
+      # Internal service - Coolify provides SERVICE_NAME_INTELLIGENCE_SERVICE
+      INTELLIGENCE_SERVICE_URL: http://${SERVICE_NAME_INTELLIGENCE_SERVICE:-intelligence-service}:5000
+      # Shared infrastructure (must match shared-infra service names with UUID suffix)
+      # When "Connect to Predefined Network" is enabled, use the full container names
+      NATS_SERVER: nats://nats-server:4222
+      NATS_ENABLED: ${NATS_ENABLED:-true}
+      NATS_DURABLE_CONSUMER_NAME: ${COOLIFY_CONTAINER_NAME:-preview}-consumer
+      # Shared Keycloak
+      # Public URL for issuer validation (must match token's iss claim)
+      KEYCLOAK_URL: https://${PREVIEW_DOMAIN:?Required}/keycloak
+      KEYCLOAK_REALM: hephaestus
+      # Internal URL for direct container-to-container JWKS fetches (no /keycloak - Keycloak serves at root)
+      KEYCLOAK_INTERNAL_URL: http://keycloak:8080
+      KEYCLOAK_CLIENT_ID: hephaestus-confidential
+      KEYCLOAK_CLIENT_SECRET: ${KEYCLOAK_HEPHAESTUS_CONFIDENTIAL_CLIENT_SECRET:?Required}
+      # Shared Postfix
+      POSTFIX_HOST: postfix
+      POSTFIX_PORT: 25
+      # GitHub integration
+      GH_APP_ID: ${GH_APP_ID:?Required}
+      GH_APP_PRIVATE_KEY: ${GH_APP_PRIVATE_KEY:?Required}
+      GH_AUTH_TOKEN: ${GH_AUTH_TOKEN:?Required}
+      # Monitoring (relaxed for previews)
+      MONITORING_TIMEFRAME: ${MONITORING_TIMEFRAME:-14}
+      MONITORING_RUN_ON_STARTUP: ${MONITORING_RUN_ON_STARTUP:-false}
+      MONITORING_SYNC_CRON: ${MONITORING_SYNC_CRON:-0 0 2 * * *}
+      MONITORING_BACKFILL_ENABLED: "false"
+      # Notifications disabled for previews
+      LEADERBOARD_NOTIFICATION_ENABLED: "false"
+      # Observability (optional)
+      SENTRY_DSN: ${SENTRY_DSN:-}
+      LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-}
+      LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-}
+      LANGFUSE_HOST: ${LANGFUSE_HOST:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      intelligence-service:
+        condition: service_healthy
+      seed-loader:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "--quiet", "http://127.0.0.1:8080/actuator/health"]
+      interval: 10s
+      timeout: 10s
+      retries: 20
+      start_period: 90s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+  # ---------------------------------------------------------------------------
+  # Webapp - React frontend served by nginx
+  # Assign domain in Coolify: pr-{id}.preview.example.com → port 80
+  # ---------------------------------------------------------------------------
+  webapp:
+    build:
+      context: ./webapp
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      # Coolify provides SERVICE_FQDN_WEBAPP automatically
+      APPLICATION_CLIENT_URL: https://${SERVICE_FQDN_WEBAPP}
+      # Coolify provides SERVICE_FQDN_APPLICATION_SERVER (e.g., {{pr_id}}.api.example.com)
+      APPLICATION_SERVER_URL: https://${SERVICE_FQDN_APPLICATION_SERVER}
+      # Shared Keycloak
+      KEYCLOAK_URL: https://${PREVIEW_DOMAIN:?Required}/keycloak
+      KEYCLOAK_REALM: hephaestus
+      KEYCLOAK_CLIENT_ID: hephaestus
+      KEYCLOAK_SKIP_LOGIN: ${KEYCLOAK_SKIP_LOGIN:-false}
+      TANSTACK_DEVTOOLS_ENABLED: ${TANSTACK_DEVTOOLS_ENABLED:-true}
+      # Optional
+      SENTRY_ENVIRONMENT: preview
+      SENTRY_DSN: ${SENTRY_DSN:-}
+      POSTHOG_ENABLED: "false"
+    depends_on:
+      application-server:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:80/"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "3"
+
+# =============================================================================
+# VOLUMES (per-deployment, isolated)
+# =============================================================================
+volumes:
+  postgres-data:

@@ -1,22 +1,43 @@
 name: Release
 
+# Trunk-based continuous deployment
+# Every push to main with feat:/fix:/perf: triggers a release
+# Staging deploys immediately, Production requires approval
+
 on:
-  push:
-    branches: [develop, main]
+  workflow_run:
+    workflows: ["CI/CD"]
+    types: [completed]
+    branches: [main]
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+  packages: write
 
 jobs:
   release:
-    if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
+    outputs:
+      new_version: ${{ steps.release.outputs.new_release_version }}
+      released: ${{ steps.release.outputs.new_release_published }}
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          token: ${{ secrets.GH_PAT }}
           persist-credentials: false
-          fetch-depth: 0 # required so semantic-release and our scripts can access tags and history
+          fetch-depth: 0
 
-      - uses: cycjimmy/semantic-release-action@v4
+      - name: Create Release
+        id: release
+        uses: cycjimmy/semantic-release-action@v4
         with:
           extra_plugins: |
             @semantic-release/commit-analyzer
@@ -28,7 +49,100 @@ jobs:
             conventional-changelog-conventionalcommits
         env:
           GITHUB_TOKEN: ${{ secrets.GH_PAT }}
-          GIT_AUTHOR_NAME: "Felix T.J. Dietrich"
-          GIT_AUTHOR_EMAIL: "felixtj.dietrich@tum.de"
-          GIT_COMMITTER_NAME: "Felix T.J. Dietrich"
-          GIT_COMMITTER_EMAIL: "felixtj.dietrich@tum.de"
+          GIT_AUTHOR_NAME: "github-actions[bot]"
+          GIT_AUTHOR_EMAIL: "github-actions[bot]@users.noreply.github.com"
+          GIT_COMMITTER_NAME: "github-actions[bot]"
+          GIT_COMMITTER_EMAIL: "github-actions[bot]@users.noreply.github.com"
+
+      - name: Summary
+        if: steps.release.outputs.new_release_published == 'true'
+        run: |
+          echo "## 🚀 Released v${{ steps.release.outputs.new_release_version }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Staging**: Deploying automatically" >> $GITHUB_STEP_SUMMARY
+          echo "- **Production**: Waiting for approval" >> $GITHUB_STEP_SUMMARY
+
+  # Staging deploys immediately (no approval required)
+  tag-images:
+    needs: release
+    if: needs.release.outputs.released == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Retag Images
+        run: |
+          VERSION="${{ needs.release.outputs.new_version }}"
+          SHA="${{ github.event.workflow_run.head_sha }}"
+          IMAGES=("webapp" "application-server" "intelligence-service" "webhook-ingest")
+
+          for img in "${IMAGES[@]}"; do
+            FULL_IMAGE="ghcr.io/ls1intum/hephaestus/$img"
+            echo "Checking for $FULL_IMAGE:$SHA..."
+            
+            # Retry up to 24 times (2 minutes) with 5s interval
+            RETRIES=24
+            COUNT=0
+            until docker buildx imagetools inspect "$FULL_IMAGE:$SHA" > /dev/null 2>&1; do
+              COUNT=$((COUNT+1))
+              if [ "$COUNT" -ge "$RETRIES" ]; then
+                echo "::error::Image $FULL_IMAGE:$SHA not found after $((RETRIES*5)) seconds"
+                exit 1
+              fi
+              echo "Image not found yet. Retrying in 5s... ($COUNT/$RETRIES)"
+              sleep 5
+            done
+            
+            echo "Retagging $FULL_IMAGE:$SHA → $FULL_IMAGE:$VERSION"
+            docker buildx imagetools create -t "$FULL_IMAGE:$VERSION" "$FULL_IMAGE:$SHA"
+          done
+
+  deploy-staging:
+    needs: [release, tag-images]
+    if: needs.release.outputs.released == 'true'
+    uses: ./.github/workflows/deploy-staging.yml
+    with:
+      image-tag: ${{ needs.release.outputs.new_version }}
+      deploy-app: true
+      deploy-core: false
+      deploy-proxy: false
+    secrets: inherit
+
+  # Production requires manual approval via GitHub Environment
+  deploy-production:
+    needs: [release, deploy-staging]
+    if: needs.release.outputs.released == 'true'
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://hephaestus.cit.tum.de
+    steps:
+      - name: Trigger Production Deploy
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GH_PAT }}
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'deploy-prod.yml',
+              ref: 'main',
+              inputs: {
+                'image-tag': '${{ needs.release.outputs.new_version }}',
+                'deploy-app': 'true',
+                'deploy-core': 'false',
+                'deploy-proxy': 'false'
+              }
+            });
+            console.log('✅ Production deployment triggered for v${{ needs.release.outputs.new_version }}');
+
+      - name: Summary
+        run: |
+          echo "## 🚀 Production Deployment Approved" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Version **v${{ needs.release.outputs.new_version }}** deployment to production has been triggered." >> $GITHUB_STEP_SUMMARY

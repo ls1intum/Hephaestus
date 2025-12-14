@@ -4,10 +4,12 @@ export type Activity = {
     pullRequests: Array<PullRequestWithBadPractices>;
 };
 
-export type BadPractice = {
-    description: string;
-    status: 'Good Practice' | 'Fixed' | 'Critical Issue' | 'Normal Issue' | 'Minor Issue' | "Won't Fix" | 'Wrong';
-    title: string;
+/**
+ * DTO for assigning or updating a role for a workspace member.
+ */
+export type AssignRoleRequest = {
+    role: 'OWNER' | 'ADMIN' | 'MEMBER';
+    userId: number;
 };
 
 export type BadPracticeFeedback = {
@@ -15,29 +17,86 @@ export type BadPracticeFeedback = {
     type: string;
 };
 
-export type BadPracticeResult = {
-    bad_practice_summary: string;
-    bad_practices: Array<BadPractice>;
-};
-
+/**
+ * DTO for returning vote information.
+ */
 export type ChatMessageVote = {
-    createdAt: Date;
-    isUpvoted: boolean;
-    messageId: string;
-    updatedAt: Date;
+    createdAt?: Date;
+    isUpvoted?: boolean;
+    messageId?: string;
+    updatedAt?: Date;
 };
 
+/**
+ * DTO for chat thread with full message content.
+ * Used for initializing useChat in the frontend.
+ */
+export type ChatThreadDetail = {
+    /**
+     * When the thread was created
+     */
+    createdAt?: Date;
+    /**
+     * Unique identifier for the thread
+     */
+    id?: string;
+    /**
+     * All messages in the conversation path (as JSON objects for useChat initialization)
+     * As exception, we do not use a DTO here since we included those intelligece-service models in the OpenAPI spec.
+     */
+    messages?: Array<UiMessage>;
+    /**
+     * ID of the currently selected leaf message (end of active conversation path)
+     */
+    selectedLeafMessageId?: string;
+    /**
+     * Thread title (may be null for untitled threads)
+     */
+    title?: string;
+    /**
+     * Votes for messages in this thread
+     */
+    votes?: Array<ChatMessageVote>;
+};
+
+/**
+ * DTO for grouped chat threads.
+ * Used for organizing threads by time periods (today, yesterday, etc.).
+ */
 export type ChatThreadGroup = {
+    /**
+     * Group name (e.g., "Today", "Yesterday", "Last 7 Days", "Last 30 Days")
+     */
     groupName: string;
+    /**
+     * List of thread summaries in this group
+     */
     threads: Array<ChatThreadSummary>;
 };
 
+/**
+ * DTO for chat thread summary information.
+ * Used for listing threads without loading full message content.
+ */
 export type ChatThreadSummary = {
-    createdAt?: Date;
+    /**
+     * When the thread was created
+     */
+    createdAt: Date;
+    /**
+     * Unique identifier for the thread
+     */
     id: string;
+    /**
+     * Thread title (may be null for untitled threads)
+     */
     title: string;
 };
 
+/**
+ * Data transfer object representing a GitHub contributor.
+ * Used to display contributor information on the public about page.
+ */
 export type Contributor = {
     avatarUrl: string;
     contributions?: number;
@@ -47,57 +106,264 @@ export type Contributor = {
     name: string;
 };
 
+/**
+ * CreateDocumentInput
+ * Input for createDocument tool.
+ */
+export type CreateDocumentInput = {
+    /**
+     * Document Id
+     * Do not populate this field, will automatically be set by the system
+     */
+    document_id: string;
+    /**
+     * Kind
+     */
+    kind: 'text';
+    /**
+     * Title
+     */
+    title: string;
+};
+
+/**
+ * CreateDocumentOutput
+ * Output for createDocument tool.
+ */
+export type CreateDocumentOutput = {
+    /**
+     * Content
+     */
+    content: string;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Kind
+     */
+    kind: 'TEXT';
+    /**
+     * Title
+     */
+    title: string;
+};
+
+/**
+ * DTO for creating a new document.
+ * Server generates UUID and timestamps.
+ */
 export type CreateDocumentRequest = {
     content: string;
-    kind: DocumentKind;
+    kind: 'TEXT';
     title: string;
 };
 
-export type DetectorRequest = {
-    bad_practice_summary: string;
-    bad_practices: Array<BadPractice>;
-    description: string;
-    lifecycle_state: string;
-    pull_request_number: number;
-    pull_request_template: string;
-    repository_name: string;
-    title: string;
+/**
+ * DTO for creating a new workspace.
+ */
+export type CreateWorkspaceRequest = {
+    accountLogin: string;
+    accountType: 'ORG' | 'USER';
+    displayName: string;
+    ownerUserId: number;
+    workspaceSlug: string;
 };
 
-export type DetectorResponse = BadPracticeResult & {
-    trace_id: string;
+/**
+ * DataUIPart
+ * A data part with dynamic type.
+ *
+ * Note: In UI messages, data can be of any JSON type (object, array, string, number, etc.).
+ */
+export type DataUiPart = {
+    /**
+     * Data
+     */
+    data: unknown;
+    /**
+     * Id
+     */
+    id?: string | null;
+    /**
+     * Type
+     */
+    type: string;
 };
 
+/**
+ * DTO for complete document responses.
+ * Used when returning full document details (includes content).
+ */
 export type Document = {
     content: string;
     createdAt: Date;
     id: string;
-    kind: DocumentKind;
+    kind: 'TEXT';
     title: string;
-    userId: number;
+    userId: string;
     versionNumber: number;
 };
 
-export type DocumentKind = 'text';
+/**
+ * DocumentCreateData
+ */
+export type DocumentCreateData = {
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Kind
+     */
+    kind: 'text';
+    /**
+     * Title
+     */
+    title: string;
+};
 
+/**
+ * DocumentDeltaData
+ */
+export type DocumentDeltaData = {
+    /**
+     * Delta
+     */
+    delta: string;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Kind
+     */
+    kind: 'text';
+};
+
+/**
+ * DocumentFinishData
+ */
+export type DocumentFinishData = {
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Kind
+     */
+    kind: 'text';
+};
+
+/**
+ * DTO for document summary in list views.
+ * Excludes content for performance - only metadata.
+ */
 export type DocumentSummary = {
     createdAt: Date;
     id: string;
-    kind: DocumentKind;
+    kind: 'TEXT';
     title: string;
-    userId: number;
+    userId: string;
 };
 
-export type HealthCheck = {
+/**
+ * DocumentUpdateData
+ */
+export type DocumentUpdateData = {
     /**
-     * Health status
+     * Id
      */
-    status: 'OK';
+    id: string;
+    /**
+     * Kind
+     */
+    kind: 'text';
 };
 
-export type InsertTask = {
-    done?: boolean;
-    name: string;
+/**
+ * FileUIPart
+ * A file part of a message.
+ */
+export type FileUiPart = {
+    /**
+     * Filename
+     */
+    filename?: string | null;
+    /**
+     * Mediatype
+     */
+    mediaType: string;
+    /**
+     * Providermetadata
+     */
+    providerMetadata?: {
+        [key: string]: unknown;
+    } | null;
+    /**
+     * Type
+     */
+    type?: 'file';
+    /**
+     * Url
+     */
+    url: string;
+};
+
+/**
+ * GetWeatherInput
+ * Input for getWeather tool.
+ */
+export type GetWeatherInput = {
+    /**
+     * Latitude
+     */
+    latitude: number;
+    /**
+     * Longitude
+     */
+    longitude: number;
+};
+
+/**
+ * GetWeatherOutput
+ * Output for getWeather tool, aligned with WeatherTool.tsx expectations.
+ */
+export type GetWeatherOutput = {
+    current?: WeatherCurrent | null;
+    current_units?: WeatherCurrentUnits | null;
+    daily?: WeatherDaily | null;
+    daily_units?: WeatherDailyUnits | null;
+    /**
+     * Elevation
+     */
+    elevation?: number | null;
+    /**
+     * Generationtime Ms
+     */
+    generationtime_ms?: number | null;
+    hourly?: WeatherHourly | null;
+    hourly_units?: WeatherHourlyUnits | null;
+    /**
+     * Latitude
+     */
+    latitude?: number | null;
+    /**
+     * Longitude
+     */
+    longitude?: number | null;
+    /**
+     * Timezone
+     */
+    timezone?: string | null;
+    /**
+     * Timezone Abbreviation
+     */
+    timezone_abbreviation?: string | null;
+    /**
+     * Utc Offset Seconds
+     */
+    utc_offset_seconds?: number | null;
 };
 
 export type LabelInfo = {
@@ -117,7 +383,8 @@ export type LeaderboardEntry = {
     rank: number;
     reviewedPullRequests: Array<PullRequestInfo>;
     score: number;
-    user: UserInfo;
+    team?: TeamInfo;
+    user?: UserInfo;
 };
 
 export type LeagueChange = {
@@ -125,26 +392,41 @@ export type LeagueChange = {
     login: string;
 };
 
-export type MetaData = {
-    scheduledDay: string;
-    scheduledTime: string;
-    teams: Array<TeamInfo>;
+export type PageDocument = {
+    content?: Array<Document>;
+    empty?: boolean;
+    first?: boolean;
+    last?: boolean;
+    number?: number;
+    numberOfElements?: number;
+    pageable?: PageableObject;
+    size?: number;
+    sort?: SortObject;
+    totalElements?: number;
+    totalPages?: number;
 };
 
-export type PatchTask = {
-    done?: boolean;
-    name?: string;
+export type PageDocumentSummary = {
+    content?: Array<DocumentSummary>;
+    empty?: boolean;
+    first?: boolean;
+    last?: boolean;
+    number?: number;
+    numberOfElements?: number;
+    pageable?: PageableObject;
+    size?: number;
+    sort?: SortObject;
+    totalElements?: number;
+    totalPages?: number;
 };
 
-export type PoemRequest = {
-    /**
-     * Optional poem style
-     */
-    style?: string;
-    /**
-     * Topic of the poem
-     */
-    topic: string;
+export type PageableObject = {
+    offset?: number;
+    pageNumber?: number;
+    pageSize?: number;
+    paged?: boolean;
+    sort?: SortObject;
+    unpaged?: boolean;
 };
 
 export type PullRequestBadPractice = {
@@ -217,8 +499,38 @@ export type PullRequestWithBadPractices = {
     updatedAt: Date;
 };
 
+/**
+ * ReasoningUIPart
+ * A reasoning part of a message.
+ */
+export type ReasoningUiPart = {
+    /**
+     * Providermetadata
+     */
+    providerMetadata?: {
+        [key: string]: unknown;
+    } | null;
+    /**
+     * State
+     */
+    state?: ('streaming' | 'done') | null;
+    /**
+     * Text
+     */
+    text: string;
+    /**
+     * Type
+     */
+    type?: 'reasoning';
+};
+
+export type RenameWorkspaceSlugRequest = {
+    newSlug: string;
+};
+
 export type RepositoryInfo = {
     description?: string;
+    hiddenFromContributions: boolean;
     htmlUrl: string;
     id: number;
     labels?: Array<LabelInfo>;
@@ -226,163 +538,610 @@ export type RepositoryInfo = {
     nameWithOwner: string;
 };
 
-export type StreamAbortPart = {
-    type: 'abort';
+export type SortObject = {
+    empty?: boolean;
+    sorted?: boolean;
+    unsorted?: boolean;
 };
 
+/**
+ * SourceDocumentUIPart
+ * A document source part of a message.
+ */
+export type SourceDocumentUiPart = {
+    /**
+     * Filename
+     */
+    filename?: string | null;
+    /**
+     * Mediatype
+     */
+    mediaType: string;
+    /**
+     * Providermetadata
+     */
+    providerMetadata?: {
+        [key: string]: unknown;
+    } | null;
+    /**
+     * Sourceid
+     */
+    sourceId: string;
+    /**
+     * Title
+     */
+    title: string;
+    /**
+     * Type
+     */
+    type?: 'source-document';
+};
+
+/**
+ * SourceUrlUIPart
+ * A URL source part of a message.
+ */
+export type SourceUrlUiPart = {
+    /**
+     * Providermetadata
+     */
+    providerMetadata?: {
+        [key: string]: unknown;
+    } | null;
+    /**
+     * Sourceid
+     */
+    sourceId: string;
+    /**
+     * Title
+     */
+    title?: string | null;
+    /**
+     * Type
+     */
+    type?: 'source-url';
+    /**
+     * Url
+     */
+    url: string;
+};
+
+/**
+ * StepStartUIPart
+ * A step boundary part of a message.
+ */
+export type StepStartUiPart = {
+    /**
+     * Type
+     */
+    type?: 'step-start';
+};
+
+/**
+ * StreamDataPart
+ * Data part with dynamic type.
+ *
+ * AI SDK v5 stream chunks support a `transient` flag that indicates the data
+ * should not be added to the persisted message state.
+ */
 export type StreamDataPart = {
-    data?: unknown;
-    id?: string;
-    transient?: boolean;
+    /**
+     * Data
+     */
+    data: unknown;
+    /**
+     * Id
+     */
+    id?: string | null;
+    /**
+     * Transient
+     */
+    transient?: boolean | null;
+    /**
+     * Type
+     */
     type: string;
 };
 
+/**
+ * StreamErrorPart
+ * Error stream part.
+ */
 export type StreamErrorPart = {
+    /**
+     * Errortext
+     */
     errorText: string;
-    type: 'error';
+    /**
+     * Type
+     */
+    type?: 'error';
 };
 
+/**
+ * StreamFilePart
+ * File part of a message.
+ */
 export type StreamFilePart = {
+    /**
+     * Mediatype
+     */
     mediaType: string;
-    providerMetadata?: unknown;
-    type: 'file';
+    /**
+     * Providermetadata
+     */
+    providerMetadata?: {
+        [key: string]: unknown;
+    } | null;
+    /**
+     * Type
+     */
+    type?: 'file';
+    /**
+     * Url
+     */
     url: string;
 };
 
+/**
+ * StreamFinishPart
+ * End of stream event.
+ */
 export type StreamFinishPart = {
-    messageMetadata?: unknown;
-    type: 'finish';
+    /**
+     * Messagemetadata
+     */
+    messageMetadata?: {
+        [key: string]: unknown;
+    } | null;
+    /**
+     * Type
+     */
+    type?: 'finish';
 };
 
+/**
+ * StreamMessageMetadataPart
+ * Message metadata part.
+ */
 export type StreamMessageMetadataPart = {
-    messageMetadata?: unknown;
-    type: 'message-metadata';
+    /**
+     * Messagemetadata
+     */
+    messageMetadata: {
+        [key: string]: unknown;
+    };
+    /**
+     * Type
+     */
+    type?: 'message-metadata';
 };
 
+/**
+ * StreamReasoningDeltaPart
+ * Reasoning stream delta part.
+ */
 export type StreamReasoningDeltaPart = {
+    /**
+     * Delta
+     */
     delta: string;
+    /**
+     * Id
+     */
     id: string;
-    providerMetadata?: unknown;
-    type: 'reasoning-delta';
+    /**
+     * Providermetadata
+     */
+    providerMetadata?: {
+        [key: string]: unknown;
+    } | null;
+    /**
+     * Type
+     */
+    type?: 'reasoning-delta';
 };
 
+/**
+ * StreamReasoningEndPart
+ * Reasoning stream end part.
+ */
 export type StreamReasoningEndPart = {
+    /**
+     * Id
+     */
     id: string;
-    providerMetadata?: unknown;
-    type: 'reasoning-end';
+    /**
+     * Providermetadata
+     */
+    providerMetadata?: {
+        [key: string]: unknown;
+    } | null;
+    /**
+     * Type
+     */
+    type?: 'reasoning-end';
 };
 
+/**
+ * StreamReasoningStartPart
+ * Reasoning stream start part.
+ */
 export type StreamReasoningStartPart = {
+    /**
+     * Id
+     */
     id: string;
-    providerMetadata?: unknown;
-    type: 'reasoning-start';
+    /**
+     * Providermetadata
+     */
+    providerMetadata?: {
+        [key: string]: unknown;
+    } | null;
+    /**
+     * Type
+     */
+    type?: 'reasoning-start';
 };
 
+/**
+ * StreamSourceDocumentPart
+ * Source document part of a message.
+ */
 export type StreamSourceDocumentPart = {
-    filename?: string;
+    /**
+     * Filename
+     */
+    filename?: string | null;
+    /**
+     * Mediatype
+     */
     mediaType: string;
-    providerMetadata?: unknown;
+    /**
+     * Providermetadata
+     */
+    providerMetadata?: {
+        [key: string]: unknown;
+    } | null;
+    /**
+     * Sourceid
+     */
     sourceId: string;
+    /**
+     * Title
+     */
     title: string;
-    type: 'source-document';
+    /**
+     * Type
+     */
+    type?: 'source-document';
 };
 
+/**
+ * StreamSourceUrlPart
+ * Source URL part of a message.
+ */
 export type StreamSourceUrlPart = {
-    providerMetadata?: unknown;
+    /**
+     * Providermetadata
+     */
+    providerMetadata?: {
+        [key: string]: unknown;
+    } | null;
+    /**
+     * Sourceid
+     */
     sourceId: string;
-    title?: string;
-    type: 'source-url';
+    /**
+     * Title
+     */
+    title?: string | null;
+    /**
+     * Type
+     */
+    type?: 'source-url';
+    /**
+     * Url
+     */
     url: string;
 };
 
+/**
+ * StreamStartPart
+ * Start of stream event.
+ */
 export type StreamStartPart = {
-    messageId?: string;
-    messageMetadata?: unknown;
-    type: 'start';
+    /**
+     * Messageid
+     */
+    messageId?: string | null;
+    /**
+     * Messagemetadata
+     */
+    messageMetadata?: {
+        [key: string]: unknown;
+    } | null;
+    /**
+     * Type
+     */
+    type?: 'start';
 };
 
+/**
+ * StreamStepFinishPart
+ * Step finish event.
+ */
 export type StreamStepFinishPart = {
-    type: 'finish-step';
+    /**
+     * Type
+     */
+    type?: 'finish-step';
 };
 
+/**
+ * StreamStepStartPart
+ * Step start event.
+ */
 export type StreamStepStartPart = {
-    type: 'start-step';
+    /**
+     * Type
+     */
+    type?: 'start-step';
 };
 
+/**
+ * StreamTextDeltaPart
+ * Text stream delta part.
+ */
 export type StreamTextDeltaPart = {
+    /**
+     * Delta
+     */
     delta: string;
+    /**
+     * Id
+     */
     id: string;
-    providerMetadata?: unknown;
-    type: 'text-delta';
+    /**
+     * Providermetadata
+     */
+    providerMetadata?: {
+        [key: string]: unknown;
+    } | null;
+    /**
+     * Type
+     */
+    type?: 'text-delta';
 };
 
+/**
+ * StreamTextEndPart
+ * Text stream end part.
+ */
 export type StreamTextEndPart = {
+    /**
+     * Id
+     */
     id: string;
-    providerMetadata?: unknown;
-    type: 'text-end';
+    /**
+     * Providermetadata
+     */
+    providerMetadata?: {
+        [key: string]: unknown;
+    } | null;
+    /**
+     * Type
+     */
+    type?: 'text-end';
 };
 
+/**
+ * StreamTextStartPart
+ * Text stream start part.
+ */
 export type StreamTextStartPart = {
+    /**
+     * Id
+     */
     id: string;
-    providerMetadata?: unknown;
-    type: 'text-start';
+    /**
+     * Providermetadata
+     */
+    providerMetadata?: {
+        [key: string]: unknown;
+    } | null;
+    /**
+     * Type
+     */
+    type?: 'text-start';
 };
 
+/**
+ * StreamToolInputAvailablePart
+ * Tool input available event.
+ *
+ * AI SDK v5 uses `providerMetadata` on the stream chunk; the UI part maps this
+ * to `callProviderMetadata` when persisting tool invocation parts.
+ */
 export type StreamToolInputAvailablePart = {
-    dynamic?: boolean;
-    input?: unknown;
-    providerExecuted?: boolean;
-    providerMetadata?: unknown;
+    /**
+     * Dynamic
+     */
+    dynamic?: boolean | null;
+    /**
+     * Input
+     */
+    input: {
+        [key: string]: unknown;
+    };
+    /**
+     * Providerexecuted
+     */
+    providerExecuted?: boolean | null;
+    /**
+     * Providermetadata
+     */
+    providerMetadata?: {
+        [key: string]: unknown;
+    } | null;
+    /**
+     * Toolcallid
+     */
     toolCallId: string;
+    /**
+     * Toolname
+     */
     toolName: string;
-    type: 'tool-input-available';
+    /**
+     * Type
+     */
+    type?: 'tool-input-available';
 };
 
+/**
+ * StreamToolInputDeltaPart
+ * Tool input delta event.
+ */
 export type StreamToolInputDeltaPart = {
+    /**
+     * Inputtextdelta
+     */
     inputTextDelta: string;
+    /**
+     * Toolcallid
+     */
     toolCallId: string;
-    type: 'tool-input-delta';
+    /**
+     * Type
+     */
+    type?: 'tool-input-delta';
 };
 
+/**
+ * StreamToolInputErrorPart
+ * Tool input error event (signals an error occurred while preparing input).
+ *
+ * Mirrors AI SDK 'tool-input-error' chunk. For non-dynamic tools, the server should
+ * record an 'output-error' tool UI part where rawInput may be used for diagnostics.
+ */
 export type StreamToolInputErrorPart = {
-    dynamic?: boolean;
+    /**
+     * Dynamic
+     */
+    dynamic?: boolean | null;
+    /**
+     * Errortext
+     */
     errorText: string;
-    input?: unknown;
-    providerExecuted?: boolean;
-    providerMetadata?: unknown;
+    /**
+     * Input
+     */
+    input: unknown;
+    /**
+     * Providerexecuted
+     */
+    providerExecuted?: boolean | null;
+    /**
+     * Providermetadata
+     */
+    providerMetadata?: {
+        [key: string]: unknown;
+    } | null;
+    /**
+     * Toolcallid
+     */
     toolCallId: string;
+    /**
+     * Toolname
+     */
     toolName: string;
-    type: 'tool-input-error';
+    /**
+     * Type
+     */
+    type?: 'tool-input-error';
 };
 
+/**
+ * StreamToolInputStartPart
+ * Tool input start event.
+ */
 export type StreamToolInputStartPart = {
-    dynamic?: boolean;
-    providerExecuted?: boolean;
+    /**
+     * Dynamic
+     */
+    dynamic?: boolean | null;
+    /**
+     * Providerexecuted
+     */
+    providerExecuted?: boolean | null;
+    /**
+     * Toolcallid
+     */
     toolCallId: string;
+    /**
+     * Toolname
+     */
     toolName: string;
-    type: 'tool-input-start';
+    /**
+     * Type
+     */
+    type?: 'tool-input-start';
 };
 
+/**
+ * StreamToolOutputAvailablePart
+ * Tool output available event.
+ */
 export type StreamToolOutputAvailablePart = {
-    dynamic?: boolean;
-    output?: unknown;
-    providerExecuted?: boolean;
+    /**
+     * Dynamic
+     */
+    dynamic?: boolean | null;
+    /**
+     * Output
+     */
+    output: {
+        [key: string]: unknown;
+    };
+    /**
+     * Providerexecuted
+     */
+    providerExecuted?: boolean | null;
+    /**
+     * Toolcallid
+     */
     toolCallId: string;
-    type: 'tool-output-available';
+    /**
+     * Type
+     */
+    type?: 'tool-output-available';
 };
 
+/**
+ * StreamToolOutputErrorPart
+ * Tool output error event.
+ */
 export type StreamToolOutputErrorPart = {
-    dynamic?: boolean;
+    /**
+     * Dynamic
+     */
+    dynamic?: boolean | null;
+    /**
+     * Errortext
+     */
     errorText: string;
-    providerExecuted?: boolean;
+    /**
+     * Providerexecuted
+     */
+    providerExecuted?: boolean | null;
+    /**
+     * Toolcallid
+     */
     toolCallId: string;
-    type: 'tool-output-error';
-};
-
-export type Task = {
-    done?: boolean;
-    id: number;
-    name: string;
+    /**
+     * Type
+     */
+    type?: 'tool-output-error';
 };
 
 export type TeamInfo = {
@@ -399,6 +1158,316 @@ export type TeamInfo = {
     privacy?: 'SECRET' | 'CLOSED';
     repoPermissionCount: number;
     repositories: Array<RepositoryInfo>;
+};
+
+/**
+ * A lightweight DTO for team data that only contains basic information.
+ * This is used in contexts where full team details (repositories, labels, members) are not needed,
+ * avoiding expensive JOINs and lazy loading issues.
+ */
+export type TeamSummary = {
+    description?: string;
+    hidden: boolean;
+    htmlUrl?: string;
+    id: number;
+    name: string;
+    organization?: string;
+    parentId?: number;
+    privacy?: 'SECRET' | 'CLOSED';
+};
+
+/**
+ * TextUIPart
+ * A text part of a message.
+ */
+export type TextUiPart = {
+    /**
+     * Providermetadata
+     */
+    providerMetadata?: {
+        [key: string]: unknown;
+    } | null;
+    /**
+     * State
+     */
+    state?: ('streaming' | 'done') | null;
+    /**
+     * Text
+     */
+    text: string;
+    /**
+     * Type
+     */
+    type?: 'text';
+};
+
+/**
+ * ToolInputAvailablePart
+ * Tool part with input available.
+ */
+export type ToolInputAvailablePart = {
+    /**
+     * Callprovidermetadata
+     */
+    callProviderMetadata?: {
+        [key: string]: unknown;
+    } | null;
+    /**
+     * Input
+     */
+    input: {
+        [key: string]: unknown;
+    };
+    /**
+     * Providerexecuted
+     */
+    providerExecuted?: boolean | null;
+    /**
+     * State
+     */
+    state: 'input-available';
+    /**
+     * Toolcallid
+     */
+    toolCallId: string;
+    /**
+     * Type
+     */
+    type: string;
+};
+
+/**
+ * ToolInputStreamingPart
+ * Tool part with input being streamed.
+ */
+export type ToolInputStreamingPart = {
+    /**
+     * Input
+     */
+    input?: {
+        [key: string]: unknown;
+    } | null;
+    /**
+     * Providerexecuted
+     */
+    providerExecuted?: boolean | null;
+    /**
+     * State
+     */
+    state: 'input-streaming';
+    /**
+     * Toolcallid
+     */
+    toolCallId: string;
+    /**
+     * Type
+     */
+    type: string;
+};
+
+/**
+ * ToolOutputAvailablePart
+ * Tool part with output available.
+ */
+export type ToolOutputAvailablePart = {
+    /**
+     * Callprovidermetadata
+     */
+    callProviderMetadata?: {
+        [key: string]: unknown;
+    } | null;
+    /**
+     * Input
+     */
+    input: {
+        [key: string]: unknown;
+    };
+    /**
+     * Output
+     */
+    output: {
+        [key: string]: unknown;
+    };
+    /**
+     * Providerexecuted
+     */
+    providerExecuted?: boolean | null;
+    /**
+     * State
+     */
+    state: 'output-available';
+    /**
+     * Toolcallid
+     */
+    toolCallId: string;
+    /**
+     * Type
+     */
+    type: string;
+};
+
+/**
+ * ToolOutputErrorPart
+ * Tool part with output error.
+ */
+export type ToolOutputErrorPart = {
+    /**
+     * Callprovidermetadata
+     */
+    callProviderMetadata?: {
+        [key: string]: unknown;
+    } | null;
+    /**
+     * Errortext
+     */
+    errorText: string;
+    /**
+     * Input
+     */
+    input: {
+        [key: string]: unknown;
+    };
+    /**
+     * Providerexecuted
+     */
+    providerExecuted?: boolean | null;
+    /**
+     * State
+     */
+    state: 'output-error';
+    /**
+     * Toolcallid
+     */
+    toolCallId: string;
+    /**
+     * Type
+     */
+    type: string;
+};
+
+/**
+ * UIMessage
+ * Message model that matches the TypeScript interface.
+ */
+export type UiMessage = {
+    /**
+     * Id
+     * A unique identifier for the message
+     */
+    id: string;
+    /**
+     * Metadata
+     */
+    metadata?: {
+        [key: string]: unknown;
+    } | null;
+    /**
+     * Parts
+     */
+    parts: Array<TextUiPart | ReasoningUiPart | ToolInputStreamingPart | ToolInputAvailablePart | ToolOutputAvailablePart | ToolOutputErrorPart | SourceUrlUiPart | SourceDocumentUiPart | FileUiPart | DataUiPart | StepStartUiPart>;
+    /**
+     * Role
+     */
+    role: 'system' | 'user' | 'assistant';
+};
+
+/**
+ * UpdateDocumentInput
+ * Input for updateDocument tool.
+ */
+export type UpdateDocumentInput = {
+    /**
+     * Description
+     * The description of changes that need to be made
+     */
+    description: string;
+    /**
+     * Id
+     * The ID of the document to update
+     */
+    id: string;
+};
+
+/**
+ * UpdateDocumentOutput
+ * Output for updateDocument tool.
+ */
+export type UpdateDocumentOutput = {
+    /**
+     * Content
+     */
+    content: string;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Kind
+     */
+    kind: 'TEXT';
+    /**
+     * Title
+     */
+    title: string;
+};
+
+/**
+ * DTO for updating an existing document.
+ * Creates a new version with the updated content.
+ */
+export type UpdateDocumentRequest = {
+    content: string;
+    kind: 'TEXT';
+    title: string;
+};
+
+/**
+ * DTO for updating workspace leaderboard notification preferences.
+ */
+export type UpdateWorkspaceNotificationsRequest = {
+    channelId?: string;
+    enabled?: boolean;
+    team?: string;
+};
+
+/**
+ * DTO for updating workspace public visibility.
+ */
+export type UpdateWorkspacePublicVisibilityRequest = {
+    isPubliclyViewable: boolean;
+};
+
+/**
+ * DTO for updating workspace leaderboard schedule configuration.
+ * Day: 1=Monday, 2=Tuesday, ..., 7=Sunday
+ * Time: Format "HH:mm" (24-hour format)
+ */
+export type UpdateWorkspaceScheduleRequest = {
+    day: number;
+    time: string;
+};
+
+/**
+ * Request DTO for updating Slack credentials (token and signing secret) for a workspace.
+ * These credentials are used for Slack API integration and webhook signature verification.
+ */
+export type UpdateWorkspaceSlackCredentialsRequest = {
+    slackSigningSecret: string;
+    slackToken: string;
+};
+
+/**
+ * DTO for updating a workspace lifecycle status.
+ */
+export type UpdateWorkspaceStatusRequest = {
+    status: 'ACTIVE' | 'SUSPENDED' | 'PURGED';
+};
+
+/**
+ * DTO for updating workspace Personal Access Token (PAT).
+ */
+export type UpdateWorkspaceTokenRequest = {
+    personalAccessToken: string;
 };
 
 export type UserInfo = {
@@ -420,7 +1489,8 @@ export type UserProfile = {
 };
 
 export type UserSettings = {
-    receiveNotifications?: boolean;
+    participateInResearch: boolean;
+    receiveNotifications: boolean;
 };
 
 export type UserTeams = {
@@ -428,624 +1498,174 @@ export type UserTeams = {
     id: number;
     login: string;
     name: string;
-    teams: Array<TeamInfo>;
+    teams: Array<TeamSummary>;
     url: string;
 };
 
+/**
+ * Request DTO for voting on a message.
+ */
 export type VoteMessageRequest = {
     isUpvoted: boolean;
 };
 
-export type ProvideFeedbackForBadPracticeData = {
-    body: BadPracticeFeedback;
-    path: {
-        badPracticeId: number;
-    };
-    query?: never;
-    url: '/activity/badpractice/{badPracticeId}/feedback';
-};
-
-export type ProvideFeedbackForBadPracticeResponses = {
+/**
+ * WeatherCurrent
+ */
+export type WeatherCurrent = {
     /**
-     * OK
+     * Interval
      */
-    200: unknown;
-};
-
-export type ResolveBadPracticeData = {
-    body?: never;
-    path: {
-        badPracticeId: number;
-    };
-    query: {
-        state: 'GOOD_PRACTICE' | 'FIXED' | 'CRITICAL_ISSUE' | 'NORMAL_ISSUE' | 'MINOR_ISSUE' | 'WONT_FIX' | 'WRONG';
-    };
-    url: '/activity/badpractice/{badPracticeId}/resolve';
-};
-
-export type ResolveBadPracticeResponses = {
+    interval?: number | null;
     /**
-     * OK
+     * Temperature 2M
      */
-    200: unknown;
-};
-
-export type DetectBadPracticesForPullRequestData = {
-    body?: never;
-    path: {
-        pullRequestId: number;
-    };
-    query?: never;
-    url: '/activity/pullrequest/{pullRequestId}/badpractices';
-};
-
-export type DetectBadPracticesForPullRequestResponses = {
+    temperature_2m?: number | null;
     /**
-     * OK
+     * Time
      */
-    200: unknown;
+    time?: string | null;
 };
 
-export type DetectBadPracticesByUserData = {
-    body?: never;
-    path: {
-        login: string;
-    };
-    query?: never;
-    url: '/activity/user/{login}/badpractices';
-};
-
-export type DetectBadPracticesByUserResponses = {
+/**
+ * WeatherCurrentUnits
+ */
+export type WeatherCurrentUnits = {
     /**
-     * OK
+     * Interval
      */
-    200: unknown;
-};
-
-export type GetActivityByUserData = {
-    body?: never;
-    path: {
-        login: string;
-    };
-    query?: never;
-    url: '/activity/{login}';
-};
-
-export type GetActivityByUserResponses = {
+    interval?: string | null;
     /**
-     * OK
+     * Temperature 2M
      */
-    200: Activity;
-};
-
-export type GetActivityByUserResponse = GetActivityByUserResponses[keyof GetActivityByUserResponses];
-
-export type GetLeaderboardData = {
-    body?: never;
-    path?: never;
-    query: {
-        after: Date;
-        before: Date;
-        team?: string;
-        sort?: 'SCORE' | 'LEAGUE_POINTS';
-    };
-    url: '/leaderboard';
-};
-
-export type GetLeaderboardResponses = {
+    temperature_2m?: string | null;
     /**
-     * OK
+     * Time
      */
-    200: Array<LeaderboardEntry>;
+    time?: string | null;
 };
 
-export type GetLeaderboardResponse = GetLeaderboardResponses[keyof GetLeaderboardResponses];
-
-export type GetUserLeagueStatsData = {
-    body: LeaderboardEntry;
-    path?: never;
-    query: {
-        login: string;
-    };
-    url: '/leaderboard';
-};
-
-export type GetUserLeagueStatsResponses = {
+/**
+ * WeatherDaily
+ */
+export type WeatherDaily = {
     /**
-     * OK
+     * Sunrise
      */
-    200: LeagueChange;
+    sunrise?: Array<string>;
+    /**
+     * Sunset
+     */
+    sunset?: Array<string>;
+    /**
+     * Time
+     */
+    time?: Array<string>;
 };
 
-export type GetUserLeagueStatsResponse = GetUserLeagueStatsResponses[keyof GetUserLeagueStatsResponses];
-
-export type PostMentorChatData = {
+/**
+ * WeatherDailyUnits
+ */
+export type WeatherDailyUnits = {
     /**
-     * Chat request body
+     * Sunrise
      */
-    body: {
-        id: string;
-        message: {
-            id: string;
-            parts: Array<{
-                text: string;
-                type: 'text';
-            } | {
-                mediaType: 'image/jpeg' | 'image/png';
-                name: string;
-                type: 'file';
-                url: string;
-            }>;
-            role: 'user';
-        };
-        previousMessageId?: string;
-    };
-    path?: never;
-    query?: never;
-    url: '/mentor/chat';
+    sunrise?: string | null;
+    /**
+     * Sunset
+     */
+    sunset?: string | null;
+    /**
+     * Time
+     */
+    time?: string | null;
 };
 
-export type PostMentorChatResponses = {
+/**
+ * WeatherHourly
+ */
+export type WeatherHourly = {
     /**
-     * Event stream of chat updates.
+     * Temperature 2M
      */
-    200: StreamTextStartPart | StreamTextDeltaPart | StreamTextEndPart | StreamErrorPart | StreamToolInputStartPart | StreamToolInputDeltaPart | StreamToolInputAvailablePart | StreamToolInputErrorPart | StreamToolOutputAvailablePart | StreamToolOutputErrorPart | StreamReasoningStartPart | StreamReasoningDeltaPart | StreamReasoningEndPart | StreamSourceUrlPart | StreamSourceDocumentPart | StreamFilePart | StreamDataPart | StreamStepStartPart | StreamStepFinishPart | StreamStartPart | StreamFinishPart | StreamMessageMetadataPart | StreamAbortPart;
+    temperature_2m?: Array<number>;
+    /**
+     * Time
+     */
+    time?: Array<string>;
 };
 
-export type PostMentorChatResponse = PostMentorChatResponses[keyof PostMentorChatResponses];
-
-export type PostMentorChatMessagesByMessageIdVoteData = {
+/**
+ * WeatherHourlyUnits
+ */
+export type WeatherHourlyUnits = {
     /**
-     * Vote request body
+     * Temperature 2M
      */
-    body: VoteMessageRequest;
-    path: {
-        messageId: string;
-    };
-    query?: never;
-    url: '/mentor/chat/messages/{messageId}/vote';
+    temperature_2m?: string | null;
+    /**
+     * Time
+     */
+    time?: string | null;
 };
 
-export type PostMentorChatMessagesByMessageIdVoteErrors = {
-    /**
-     * Message not found
-     */
-    404: {
-        error: string;
-    };
-    /**
-     * Internal error
-     */
-    500: {
-        error: string;
-    };
+export type Workspace = {
+    accountLogin: string;
+    createdAt: Date;
+    displayName: string;
+    gitProviderMode?: string;
+    hasSlackSigningSecret: boolean;
+    hasSlackToken: boolean;
+    id: number;
+    installationId?: number;
+    installationLinkedAt?: Date;
+    isPubliclyViewable: boolean;
+    leaderboardNotificationChannelId?: string;
+    leaderboardNotificationEnabled?: boolean;
+    leaderboardNotificationTeam?: string;
+    leaderboardScheduleDay?: number;
+    leaderboardScheduleTime?: string;
+    status: string;
+    updatedAt: Date;
+    workspaceSlug: string;
 };
 
-export type PostMentorChatMessagesByMessageIdVoteError = PostMentorChatMessagesByMessageIdVoteErrors[keyof PostMentorChatMessagesByMessageIdVoteErrors];
-
-export type PostMentorChatMessagesByMessageIdVoteResponses = {
-    /**
-     * Vote recorded
-     */
-    200: ChatMessageVote;
+export type WorkspaceListItem = {
+    accountLogin: string;
+    createdAt: Date;
+    displayName: string;
+    id: number;
+    status: string;
+    workspaceSlug: string;
 };
 
-export type PostMentorChatMessagesByMessageIdVoteResponse = PostMentorChatMessagesByMessageIdVoteResponses[keyof PostMentorChatMessagesByMessageIdVoteResponses];
-
-export type GetMentorDocumentsData = {
-    body?: never;
-    path?: never;
-    query?: {
-        page?: number | null;
-        size?: number;
-    };
-    url: '/mentor/documents';
+/**
+ * DTO representing a workspace membership with user information.
+ */
+export type WorkspaceMembership = {
+    createdAt?: Date;
+    leaguePoints?: number;
+    role?: 'OWNER' | 'ADMIN' | 'MEMBER';
+    userId?: number;
+    userLogin?: string;
+    userName?: string;
 };
 
-export type GetMentorDocumentsErrors = {
-    /**
-     * Internal error
-     */
-    500: {
-        error: string;
-    };
-};
-
-export type GetMentorDocumentsError = GetMentorDocumentsErrors[keyof GetMentorDocumentsErrors];
-
-export type GetMentorDocumentsResponses = {
-    /**
-     * Document summaries
-     */
-    200: Array<DocumentSummary>;
-};
-
-export type GetMentorDocumentsResponse = GetMentorDocumentsResponses[keyof GetMentorDocumentsResponses];
-
-export type PostMentorDocumentsData = {
-    /**
-     * Create document
-     */
-    body: CreateDocumentRequest;
-    path?: never;
-    query?: never;
-    url: '/mentor/documents';
-};
-
-export type PostMentorDocumentsErrors = {
-    /**
-     * Internal error
-     */
-    500: {
-        error: string;
-    };
-};
-
-export type PostMentorDocumentsError = PostMentorDocumentsErrors[keyof PostMentorDocumentsErrors];
-
-export type PostMentorDocumentsResponses = {
-    /**
-     * Created document
-     */
-    201: Document;
-};
-
-export type PostMentorDocumentsResponse = PostMentorDocumentsResponses[keyof PostMentorDocumentsResponses];
-
-export type DeleteMentorDocumentsByIdData = {
-    body?: never;
-    path: {
-        id: string;
-    };
-    query?: never;
-    url: '/mentor/documents/{id}';
-};
-
-export type DeleteMentorDocumentsByIdErrors = {
-    /**
-     * Not found
-     */
-    404: {
-        error: string;
-    };
-    /**
-     * Internal error
-     */
-    500: {
-        error: string;
-    };
-};
-
-export type DeleteMentorDocumentsByIdError = DeleteMentorDocumentsByIdErrors[keyof DeleteMentorDocumentsByIdErrors];
-
-export type DeleteMentorDocumentsByIdResponses = {
-    /**
-     * Deleted
-     */
-    204: void;
-};
-
-export type DeleteMentorDocumentsByIdResponse = DeleteMentorDocumentsByIdResponses[keyof DeleteMentorDocumentsByIdResponses];
-
-export type GetMentorDocumentsByIdData = {
-    body?: never;
-    path: {
-        id: string;
-    };
-    query?: never;
-    url: '/mentor/documents/{id}';
-};
-
-export type GetMentorDocumentsByIdErrors = {
-    /**
-     * Not found
-     */
-    404: {
-        error: string;
-    };
-    /**
-     * Internal error
-     */
-    500: {
-        error: string;
-    };
-};
-
-export type GetMentorDocumentsByIdError = GetMentorDocumentsByIdErrors[keyof GetMentorDocumentsByIdErrors];
-
-export type GetMentorDocumentsByIdResponses = {
-    /**
-     * Document
-     */
-    200: Document;
-};
-
-export type GetMentorDocumentsByIdResponse = GetMentorDocumentsByIdResponses[keyof GetMentorDocumentsByIdResponses];
-
-export type PutMentorDocumentsByIdData = {
-    /**
-     * Update document
-     */
-    body: CreateDocumentRequest;
-    path: {
-        id: string;
-    };
-    query?: never;
-    url: '/mentor/documents/{id}';
-};
-
-export type PutMentorDocumentsByIdErrors = {
-    /**
-     * Not found
-     */
-    404: {
-        error: string;
-    };
-    /**
-     * Internal error
-     */
-    500: {
-        error: string;
-    };
-};
-
-export type PutMentorDocumentsByIdError = PutMentorDocumentsByIdErrors[keyof PutMentorDocumentsByIdErrors];
-
-export type PutMentorDocumentsByIdResponses = {
-    /**
-     * Updated document
-     */
-    200: Document;
-};
-
-export type PutMentorDocumentsByIdResponse = PutMentorDocumentsByIdResponses[keyof PutMentorDocumentsByIdResponses];
-
-export type DeleteMentorDocumentsByIdVersionsData = {
-    body?: never;
-    path: {
-        id: string;
-    };
-    query: {
-        after: Date;
-    };
-    url: '/mentor/documents/{id}/versions';
-};
-
-export type DeleteMentorDocumentsByIdVersionsErrors = {
-    /**
-     * Not found
-     */
-    404: {
-        error: string;
-    };
-    /**
-     * Internal error
-     */
-    500: {
-        error: string;
-    };
-};
-
-export type DeleteMentorDocumentsByIdVersionsError = DeleteMentorDocumentsByIdVersionsErrors[keyof DeleteMentorDocumentsByIdVersionsErrors];
-
-export type DeleteMentorDocumentsByIdVersionsResponses = {
-    /**
-     * Deleted versions
-     */
-    200: Array<Document>;
-};
-
-export type DeleteMentorDocumentsByIdVersionsResponse = DeleteMentorDocumentsByIdVersionsResponses[keyof DeleteMentorDocumentsByIdVersionsResponses];
-
-export type GetMentorDocumentsByIdVersionsData = {
-    body?: never;
-    path: {
-        id: string;
-    };
-    query?: {
-        page?: number | null;
-        size?: number;
-    };
-    url: '/mentor/documents/{id}/versions';
-};
-
-export type GetMentorDocumentsByIdVersionsErrors = {
-    /**
-     * Not found
-     */
-    404: {
-        error: string;
-    };
-    /**
-     * Internal error
-     */
-    500: {
-        error: string;
-    };
-};
-
-export type GetMentorDocumentsByIdVersionsError = GetMentorDocumentsByIdVersionsErrors[keyof GetMentorDocumentsByIdVersionsErrors];
-
-export type GetMentorDocumentsByIdVersionsResponses = {
-    /**
-     * Document versions
-     */
-    200: Array<Document>;
-};
-
-export type GetMentorDocumentsByIdVersionsResponse = GetMentorDocumentsByIdVersionsResponses[keyof GetMentorDocumentsByIdVersionsResponses];
-
-export type GetMentorDocumentsByIdVersionsByVersionNumberData = {
-    body?: never;
-    path: {
-        id: string;
-        versionNumber?: number | null;
-    };
-    query?: never;
-    url: '/mentor/documents/{id}/versions/{versionNumber}';
-};
-
-export type GetMentorDocumentsByIdVersionsByVersionNumberErrors = {
-    /**
-     * Not found
-     */
-    404: {
-        error: string;
-    };
-    /**
-     * Internal error
-     */
-    500: {
-        error: string;
-    };
-};
-
-export type GetMentorDocumentsByIdVersionsByVersionNumberError = GetMentorDocumentsByIdVersionsByVersionNumberErrors[keyof GetMentorDocumentsByIdVersionsByVersionNumberErrors];
-
-export type GetMentorDocumentsByIdVersionsByVersionNumberResponses = {
-    /**
-     * Document
-     */
-    200: Document;
-};
-
-export type GetMentorDocumentsByIdVersionsByVersionNumberResponse = GetMentorDocumentsByIdVersionsByVersionNumberResponses[keyof GetMentorDocumentsByIdVersionsByVersionNumberResponses];
-
-export type GetGroupedThreadsData = {
+export type ListGlobalContributorsData = {
     body?: never;
     path?: never;
     query?: never;
-    url: '/mentor/threads/grouped';
+    url: '/contributors';
 };
 
-export type GetGroupedThreadsResponses = {
+export type ListGlobalContributorsResponses = {
     /**
-     * Grouped chat threads
-     */
-    200: Array<ChatThreadGroup>;
-};
-
-export type GetGroupedThreadsResponse = GetGroupedThreadsResponses[keyof GetGroupedThreadsResponses];
-
-export type GetMentorThreadsByThreadIdData = {
-    body?: never;
-    path: {
-        threadId: string;
-    };
-    query?: never;
-    url: '/mentor/threads/{threadId}';
-};
-
-export type GetMentorThreadsByThreadIdErrors = {
-    /**
-     * Thread not found
-     */
-    404: {
-        error: string;
-    };
-    /**
-     * Internal error
-     */
-    500: {
-        error: string;
-    };
-};
-
-export type GetMentorThreadsByThreadIdError = GetMentorThreadsByThreadIdErrors[keyof GetMentorThreadsByThreadIdErrors];
-
-export type GetMentorThreadsByThreadIdResponses = {
-    /**
-     * Thread detail with messages
-     */
-    200: {
-        id: string;
-        messages: Array<{
-            createdAt?: Date;
-            id: string;
-            parentMessageId?: string | null;
-            parts: Array<{
-                text: string;
-                type: 'text';
-            } | {
-                mediaType: 'image/jpeg' | 'image/png';
-                name?: string;
-                type: 'file';
-                url: string;
-            }>;
-            role: 'system' | 'user' | 'assistant';
-        }>;
-        selectedLeafMessageId?: string | null;
-        title?: string | null;
-    };
-};
-
-export type GetMentorThreadsByThreadIdResponse = GetMentorThreadsByThreadIdResponses[keyof GetMentorThreadsByThreadIdResponses];
-
-export type GetMetaDataData = {
-    body?: never;
-    path?: never;
-    query?: never;
-    url: '/meta';
-};
-
-export type GetMetaDataResponses = {
-    /**
-     * OK
-     */
-    200: MetaData;
-};
-
-export type GetMetaDataResponse = GetMetaDataResponses[keyof GetMetaDataResponses];
-
-export type GetContributorsData = {
-    body?: never;
-    path?: never;
-    query?: never;
-    url: '/meta/contributors';
-};
-
-export type GetContributorsResponses = {
-    /**
-     * OK
+     * list of contributors sorted by contribution count
      */
     200: Array<Contributor>;
 };
 
-export type GetContributorsResponse = GetContributorsResponses[keyof GetContributorsResponses];
-
-export type GetAllTeamsData = {
-    body?: never;
-    path?: never;
-    query?: never;
-    url: '/team';
-};
-
-export type GetAllTeamsResponses = {
-    /**
-     * OK
-     */
-    200: Array<TeamInfo>;
-};
-
-export type GetAllTeamsResponse = GetAllTeamsResponses[keyof GetAllTeamsResponses];
-
-export type UpdateTeamVisibilityData = {
-    body?: boolean;
-    path: {
-        id: number;
-    };
-    query?: {
-        hidden?: boolean;
-    };
-    url: '/team/{id}/visibility';
-};
-
-export type UpdateTeamVisibilityResponses = {
-    /**
-     * OK
-     */
-    200: unknown;
-};
+export type ListGlobalContributorsResponse = ListGlobalContributorsResponses[keyof ListGlobalContributorsResponses];
 
 export type DeleteUserData = {
     body?: never;
@@ -1093,29 +1713,557 @@ export type UpdateUserSettingsResponses = {
 
 export type UpdateUserSettingsResponse = UpdateUserSettingsResponses[keyof UpdateUserSettingsResponses];
 
-export type GetUserProfileData = {
-    body?: never;
-    path: {
-        login: string;
-    };
-    query?: never;
-    url: '/user/{login}/profile';
-};
-
-export type GetUserProfileResponses = {
-    /**
-     * OK
-     */
-    200: UserProfile;
-};
-
-export type GetUserProfileResponse = GetUserProfileResponses[keyof GetUserProfileResponses];
-
-export type ResetAndRecalculateLeaguesData = {
+export type ListWorkspacesData = {
     body?: never;
     path?: never;
     query?: never;
-    url: '/workspace/league/reset';
+    url: '/workspaces';
+};
+
+export type ListWorkspacesResponses = {
+    /**
+     * Workspace list
+     */
+    200: Array<WorkspaceListItem>;
+};
+
+export type ListWorkspacesResponse = ListWorkspacesResponses[keyof ListWorkspacesResponses];
+
+export type CreateWorkspaceData = {
+    body: CreateWorkspaceRequest;
+    path?: never;
+    query?: never;
+    url: '/workspaces';
+};
+
+export type CreateWorkspaceResponses = {
+    /**
+     * Workspace created
+     */
+    201: Workspace;
+};
+
+export type CreateWorkspaceResponse = CreateWorkspaceResponses[keyof CreateWorkspaceResponses];
+
+export type PurgeWorkspaceData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}';
+};
+
+export type PurgeWorkspaceResponses = {
+    /**
+     * Workspace purged
+     */
+    204: void;
+};
+
+export type PurgeWorkspaceResponse = PurgeWorkspaceResponses[keyof PurgeWorkspaceResponses];
+
+export type GetWorkspaceData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}';
+};
+
+export type GetWorkspaceResponses = {
+    /**
+     * Workspace returned
+     */
+    200: Workspace;
+};
+
+export type GetWorkspaceResponse = GetWorkspaceResponses[keyof GetWorkspaceResponses];
+
+export type ProvideFeedbackForBadPracticeData = {
+    body: BadPracticeFeedback;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        badPracticeId: number;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/activity/badpractice/{badPracticeId}/feedback';
+};
+
+export type ProvideFeedbackForBadPracticeResponses = {
+    /**
+     * OK
+     */
+    200: unknown;
+};
+
+export type ResolveBadPracticeData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        badPracticeId: number;
+    };
+    query: {
+        state: 'GOOD_PRACTICE' | 'FIXED' | 'CRITICAL_ISSUE' | 'NORMAL_ISSUE' | 'MINOR_ISSUE' | 'WONT_FIX' | 'WRONG';
+    };
+    url: '/workspaces/{workspaceSlug}/activity/badpractice/{badPracticeId}/resolve';
+};
+
+export type ResolveBadPracticeResponses = {
+    /**
+     * OK
+     */
+    200: unknown;
+};
+
+export type DetectBadPracticesForPullRequestData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        pullRequestId: number;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/activity/pullrequest/{pullRequestId}/badpractices';
+};
+
+export type DetectBadPracticesForPullRequestResponses = {
+    /**
+     * OK
+     */
+    200: unknown;
+};
+
+export type DetectBadPracticesByUserData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        login: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/activity/user/{login}/badpractices';
+};
+
+export type DetectBadPracticesByUserResponses = {
+    /**
+     * OK
+     */
+    200: unknown;
+};
+
+export type GetActivityByUserData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        login: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/activity/{login}';
+};
+
+export type GetActivityByUserResponses = {
+    /**
+     * OK
+     */
+    200: Activity;
+};
+
+export type GetActivityByUserResponse = GetActivityByUserResponses[keyof GetActivityByUserResponses];
+
+export type VoteMessageData = {
+    body: VoteMessageRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        /**
+         * Message ID to vote on
+         */
+        messageId: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/api/chat/messages/{messageId}/vote';
+};
+
+export type VoteMessageErrors = {
+    /**
+     * Invalid vote type or message not found
+     */
+    400: ChatMessageVote;
+    /**
+     * Message not found
+     */
+    404: ChatMessageVote;
+};
+
+export type VoteMessageError = VoteMessageErrors[keyof VoteMessageErrors];
+
+export type VoteMessageResponses = {
+    /**
+     * Vote successfully recorded
+     */
+    200: ChatMessageVote;
+};
+
+export type VoteMessageResponse = VoteMessageResponses[keyof VoteMessageResponses];
+
+export type GetUserDocumentsData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: {
+        page?: number;
+        size?: number;
+        sortBy?: string;
+        sortDir?: string;
+    };
+    url: '/workspaces/{workspaceSlug}/api/documents';
+};
+
+export type GetUserDocumentsResponses = {
+    /**
+     * Documents retrieved successfully
+     */
+    200: PageDocumentSummary;
+};
+
+export type GetUserDocumentsResponse = GetUserDocumentsResponses[keyof GetUserDocumentsResponses];
+
+export type CreateDocumentData = {
+    body: CreateDocumentRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/api/documents';
+};
+
+export type CreateDocumentErrors = {
+    /**
+     * Invalid request data
+     */
+    400: Document;
+};
+
+export type CreateDocumentError = CreateDocumentErrors[keyof CreateDocumentErrors];
+
+export type CreateDocumentResponses = {
+    /**
+     * Document created successfully
+     */
+    201: Document;
+};
+
+export type CreateDocumentResponse = CreateDocumentResponses[keyof CreateDocumentResponses];
+
+export type DeleteDocumentData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        id: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/api/documents/{id}';
+};
+
+export type DeleteDocumentErrors = {
+    /**
+     * Document not found
+     */
+    404: unknown;
+};
+
+export type DeleteDocumentResponses = {
+    /**
+     * Document deleted successfully
+     */
+    204: void;
+};
+
+export type DeleteDocumentResponse = DeleteDocumentResponses[keyof DeleteDocumentResponses];
+
+export type GetDocumentData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        id: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/api/documents/{id}';
+};
+
+export type GetDocumentErrors = {
+    /**
+     * Document not found
+     */
+    404: Document;
+};
+
+export type GetDocumentError = GetDocumentErrors[keyof GetDocumentErrors];
+
+export type GetDocumentResponses = {
+    /**
+     * Document retrieved successfully
+     */
+    200: Document;
+};
+
+export type GetDocumentResponse = GetDocumentResponses[keyof GetDocumentResponses];
+
+export type UpdateDocumentData = {
+    body: UpdateDocumentRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        id: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/api/documents/{id}';
+};
+
+export type UpdateDocumentErrors = {
+    /**
+     * Invalid request data
+     */
+    400: Document;
+    /**
+     * Document not found
+     */
+    404: Document;
+};
+
+export type UpdateDocumentError = UpdateDocumentErrors[keyof UpdateDocumentErrors];
+
+export type UpdateDocumentResponses = {
+    /**
+     * Document updated successfully
+     */
+    200: Document;
+};
+
+export type UpdateDocumentResponse = UpdateDocumentResponses[keyof UpdateDocumentResponses];
+
+export type DeleteVersionsAfterTimestampData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        id: string;
+    };
+    query: {
+        after: Date;
+    };
+    url: '/workspaces/{workspaceSlug}/api/documents/{id}/versions';
+};
+
+export type DeleteVersionsAfterTimestampErrors = {
+    /**
+     * Invalid timestamp parameter
+     */
+    400: Array<Document>;
+    /**
+     * Document not found
+     */
+    404: Array<Document>;
+};
+
+export type DeleteVersionsAfterTimestampError = DeleteVersionsAfterTimestampErrors[keyof DeleteVersionsAfterTimestampErrors];
+
+export type DeleteVersionsAfterTimestampResponses = {
+    /**
+     * Document versions deleted successfully
+     */
+    200: Array<Document>;
+};
+
+export type DeleteVersionsAfterTimestampResponse = DeleteVersionsAfterTimestampResponses[keyof DeleteVersionsAfterTimestampResponses];
+
+export type GetDocumentVersionsData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        id: string;
+    };
+    query?: {
+        page?: number;
+        size?: number;
+    };
+    url: '/workspaces/{workspaceSlug}/api/documents/{id}/versions';
+};
+
+export type GetDocumentVersionsErrors = {
+    /**
+     * Document not found
+     */
+    404: PageDocument;
+};
+
+export type GetDocumentVersionsError = GetDocumentVersionsErrors[keyof GetDocumentVersionsErrors];
+
+export type GetDocumentVersionsResponses = {
+    /**
+     * Document versions retrieved successfully
+     */
+    200: PageDocument;
+};
+
+export type GetDocumentVersionsResponse = GetDocumentVersionsResponses[keyof GetDocumentVersionsResponses];
+
+export type GetDocumentVersionData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        id: string;
+        versionNumber: number;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/api/documents/{id}/versions/{versionNumber}';
+};
+
+export type GetDocumentVersionErrors = {
+    /**
+     * Document version not found
+     */
+    404: Document;
+};
+
+export type GetDocumentVersionError = GetDocumentVersionErrors[keyof GetDocumentVersionErrors];
+
+export type GetDocumentVersionResponses = {
+    /**
+     * Document version retrieved successfully
+     */
+    200: Document;
+};
+
+export type GetDocumentVersionResponse = GetDocumentVersionResponses[keyof GetDocumentVersionResponses];
+
+export type GetLeaderboardData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query: {
+        /**
+         * start of the time range (inclusive)
+         */
+        after: Date;
+        /**
+         * end of the time range (inclusive)
+         */
+        before: Date;
+        /**
+         * Team filter to apply in INDIVIDUAL mode; ignored when mode is TEAM.
+         */
+        team: string;
+        /**
+         * Determines the ranking metric. In TEAM mode SCORE uses summed contribution scores; LEAGUE_POINTS uses total league points.
+         */
+        sort: 'SCORE' | 'LEAGUE_POINTS';
+        /**
+         * aggregation mode (INDIVIDUAL or TEAM)
+         */
+        mode: 'INDIVIDUAL' | 'TEAM';
+    };
+    url: '/workspaces/{workspaceSlug}/leaderboard';
+};
+
+export type GetLeaderboardResponses = {
+    /**
+     * ranked list of leaderboard entries
+     */
+    200: Array<LeaderboardEntry>;
+};
+
+export type GetLeaderboardResponse = GetLeaderboardResponses[keyof GetLeaderboardResponses];
+
+export type GetUserLeagueStatsData = {
+    /**
+     * the user's current leaderboard entry for comparison
+     */
+    body: LeaderboardEntry;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query: {
+        /**
+         * the user's GitHub login
+         */
+        login: string;
+    };
+    url: '/workspaces/{workspaceSlug}/leaderboard';
+};
+
+export type GetUserLeagueStatsResponses = {
+    /**
+     * league change statistics including promotion/demotion info
+     */
+    200: LeagueChange;
+};
+
+export type GetUserLeagueStatsResponse = GetUserLeagueStatsResponses[keyof GetUserLeagueStatsResponses];
+
+export type ResetAndRecalculateLeaguesData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/league/reset';
 };
 
 export type ResetAndRecalculateLeaguesResponses = {
@@ -1125,16 +2273,312 @@ export type ResetAndRecalculateLeaguesResponses = {
     200: unknown;
 };
 
+export type ListMembersData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: {
+        /**
+         * Page number (0-indexed)
+         */
+        page?: number;
+        /**
+         * Page size (default 50, max 100)
+         */
+        size?: number;
+    };
+    url: '/workspaces/{workspaceSlug}/members';
+};
+
+export type ListMembersResponses = {
+    /**
+     * List of workspace memberships
+     */
+    200: Array<WorkspaceMembership>;
+};
+
+export type ListMembersResponse = ListMembersResponses[keyof ListMembersResponses];
+
+export type AssignRoleData = {
+    /**
+     * Role assignment request
+     */
+    body: AssignRoleRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/members/assign';
+};
+
+export type AssignRoleResponses = {
+    /**
+     * Updated membership
+     */
+    200: WorkspaceMembership;
+};
+
+export type AssignRoleResponse = AssignRoleResponses[keyof AssignRoleResponses];
+
+export type GetCurrentUserMembershipData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/members/me';
+};
+
+export type GetCurrentUserMembershipResponses = {
+    /**
+     * the current user's membership details
+     */
+    200: WorkspaceMembership;
+};
+
+export type GetCurrentUserMembershipResponse = GetCurrentUserMembershipResponses[keyof GetCurrentUserMembershipResponses];
+
+export type RemoveMemberData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        /**
+         * User ID to remove
+         */
+        userId: number;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/members/{userId}';
+};
+
+export type RemoveMemberResponses = {
+    /**
+     * 204 No Content on success
+     */
+    200: unknown;
+};
+
+export type GetMemberData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        /**
+         * User ID
+         */
+        userId: number;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/members/{userId}';
+};
+
+export type GetMemberResponses = {
+    /**
+     * Workspace membership details
+     */
+    200: WorkspaceMembership;
+};
+
+export type GetMemberResponse = GetMemberResponses[keyof GetMemberResponses];
+
+export type GetThreadData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        /**
+         * Thread ID
+         */
+        threadId: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/mentor/thread/{threadId}';
+};
+
+export type GetThreadErrors = {
+    /**
+     * User not authenticated
+     */
+    401: ChatThreadDetail;
+    /**
+     * Thread not found or not owned by user
+     */
+    404: ChatThreadDetail;
+};
+
+export type GetThreadError = GetThreadErrors[keyof GetThreadErrors];
+
+export type GetThreadResponses = {
+    /**
+     * Successfully retrieved thread
+     */
+    200: ChatThreadDetail;
+};
+
+export type GetThreadResponse = GetThreadResponses[keyof GetThreadResponses];
+
+export type GetThreadsData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/mentor/threads';
+};
+
+export type GetThreadsErrors = {
+    /**
+     * User not authenticated
+     */
+    401: Array<ChatThreadSummary>;
+};
+
+export type GetThreadsError = GetThreadsErrors[keyof GetThreadsErrors];
+
+export type GetThreadsResponses = {
+    /**
+     * Successfully retrieved threads
+     */
+    200: Array<ChatThreadSummary>;
+};
+
+export type GetThreadsResponse = GetThreadsResponses[keyof GetThreadsResponses];
+
+export type GetGroupedThreadsData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/mentor/threads/grouped';
+};
+
+export type GetGroupedThreadsErrors = {
+    /**
+     * User not authenticated
+     */
+    401: Array<ChatThreadGroup>;
+};
+
+export type GetGroupedThreadsError = GetGroupedThreadsErrors[keyof GetGroupedThreadsErrors];
+
+export type GetGroupedThreadsResponses = {
+    /**
+     * Successfully retrieved grouped threads
+     */
+    200: Array<ChatThreadGroup>;
+};
+
+export type GetGroupedThreadsResponse = GetGroupedThreadsResponses[keyof GetGroupedThreadsResponses];
+
+export type UpdateNotificationsData = {
+    body: UpdateWorkspaceNotificationsRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/notifications';
+};
+
+export type UpdateNotificationsResponses = {
+    /**
+     * Workspace updated
+     */
+    200: Workspace;
+};
+
+export type UpdateNotificationsResponse = UpdateNotificationsResponses[keyof UpdateNotificationsResponses];
+
+export type GetUserProfileData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        /**
+         * the user's GitHub login
+         */
+        login: string;
+    };
+    query?: {
+        after?: Date;
+        before?: Date;
+    };
+    url: '/workspaces/{workspaceSlug}/profile/{login}';
+};
+
+export type GetUserProfileResponses = {
+    /**
+     * user profile with open PRs, review activity, league points, etc.
+     */
+    200: UserProfile;
+};
+
+export type GetUserProfileResponse = GetUserProfileResponses[keyof GetUserProfileResponses];
+
+export type UpdatePublicVisibilityData = {
+    body: UpdateWorkspacePublicVisibilityRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/public-visibility';
+};
+
+export type UpdatePublicVisibilityResponses = {
+    /**
+     * Workspace updated
+     */
+    200: Workspace;
+};
+
+export type UpdatePublicVisibilityResponse = UpdatePublicVisibilityResponses[keyof UpdatePublicVisibilityResponses];
+
 export type GetRepositoriesToMonitorData = {
     body?: never;
-    path?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
     query?: never;
-    url: '/workspace/repositories';
+    url: '/workspaces/{workspaceSlug}/repositories';
 };
 
 export type GetRepositoriesToMonitorResponses = {
     /**
-     * OK
+     * Repository list
      */
     200: Array<string>;
 };
@@ -1144,11 +2588,15 @@ export type GetRepositoriesToMonitorResponse = GetRepositoriesToMonitorResponses
 export type RemoveRepositoryToMonitorData = {
     body?: never;
     path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
         owner: string;
         name: string;
     };
     query?: never;
-    url: '/workspace/repositories/{owner}/{name}';
+    url: '/workspaces/{workspaceSlug}/repositories/{owner}/{name}';
 };
 
 export type RemoveRepositoryToMonitorResponses = {
@@ -1161,11 +2609,15 @@ export type RemoveRepositoryToMonitorResponses = {
 export type AddRepositoryToMonitorData = {
     body?: never;
     path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
         owner: string;
         name: string;
     };
     query?: never;
-    url: '/workspace/repositories/{owner}/{name}';
+    url: '/workspaces/{workspaceSlug}/repositories/{owner}/{name}';
 };
 
 export type AddRepositoryToMonitorResponses = {
@@ -1175,14 +2627,177 @@ export type AddRepositoryToMonitorResponses = {
     200: unknown;
 };
 
+export type UpdateScheduleData = {
+    body: UpdateWorkspaceScheduleRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/schedule';
+};
+
+export type UpdateScheduleResponses = {
+    /**
+     * Workspace updated
+     */
+    200: Workspace;
+};
+
+export type UpdateScheduleResponse = UpdateScheduleResponses[keyof UpdateScheduleResponses];
+
+export type UpdateSlackCredentialsData = {
+    body: UpdateWorkspaceSlackCredentialsRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/slack-credentials';
+};
+
+export type UpdateSlackCredentialsResponses = {
+    /**
+     * Workspace updated
+     */
+    200: Workspace;
+};
+
+export type UpdateSlackCredentialsResponse = UpdateSlackCredentialsResponses[keyof UpdateSlackCredentialsResponses];
+
+export type RenameSlugData = {
+    body: RenameWorkspaceSlugRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/slug';
+};
+
+export type RenameSlugResponses = {
+    /**
+     * Workspace renamed
+     */
+    200: Workspace;
+};
+
+export type RenameSlugResponse = RenameSlugResponses[keyof RenameSlugResponses];
+
+export type UpdateStatusData = {
+    body: UpdateWorkspaceStatusRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/status';
+};
+
+export type UpdateStatusResponses = {
+    /**
+     * Workspace updated
+     */
+    200: Workspace;
+};
+
+export type UpdateStatusResponse = UpdateStatusResponses[keyof UpdateStatusResponses];
+
+export type GetAllTeamsData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/team';
+};
+
+export type GetAllTeamsResponses = {
+    /**
+     * list of teams with their members and permissions
+     */
+    200: Array<TeamInfo>;
+};
+
+export type GetAllTeamsResponse = GetAllTeamsResponses[keyof GetAllTeamsResponses];
+
+export type UpdateTeamVisibilityData = {
+    /**
+     * whether to hide the team (body parameter, preferred)
+     */
+    body?: boolean;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        /**
+         * the team ID
+         */
+        id: number;
+    };
+    query?: {
+        /**
+         * whether to hide the team (query parameter, fallback)
+         */
+        hidden?: boolean;
+    };
+    url: '/workspaces/{workspaceSlug}/team/{id}/visibility';
+};
+
+export type UpdateTeamVisibilityResponses = {
+    /**
+     * 200 OK on success, 404 if team not found
+     */
+    200: unknown;
+};
+
+export type UpdateRepositoryVisibilityData = {
+    body?: boolean;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        teamId: number;
+        repositoryId: number;
+    };
+    query?: {
+        hiddenFromContributions?: boolean;
+    };
+    url: '/workspaces/{workspaceSlug}/team/{teamId}/repositories/{repositoryId}/visibility';
+};
+
+export type UpdateRepositoryVisibilityResponses = {
+    /**
+     * OK
+     */
+    200: unknown;
+};
+
 export type RemoveLabelFromTeamData = {
     body?: never;
     path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
         teamId: number;
         labelId: number;
     };
     query?: never;
-    url: '/workspace/team/{teamId}/label/{labelId}';
+    url: '/workspaces/{workspaceSlug}/teams/{teamId}/labels/{labelId}';
 };
 
 export type RemoveLabelFromTeamResponses = {
@@ -1197,12 +2812,16 @@ export type RemoveLabelFromTeamResponse = RemoveLabelFromTeamResponses[keyof Rem
 export type AddLabelToTeamData = {
     body?: never;
     path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
         teamId: number;
         repositoryId: number;
         label: string;
     };
     query?: never;
-    url: '/workspace/team/{teamId}/label/{repositoryId}/{label}';
+    url: '/workspaces/{workspaceSlug}/teams/{teamId}/labels/{repositoryId}/{label}';
 };
 
 export type AddLabelToTeamResponses = {
@@ -1214,11 +2833,37 @@ export type AddLabelToTeamResponses = {
 
 export type AddLabelToTeamResponse = AddLabelToTeamResponses[keyof AddLabelToTeamResponses];
 
+export type UpdateTokenData = {
+    body: UpdateWorkspaceTokenRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/token';
+};
+
+export type UpdateTokenResponses = {
+    /**
+     * Workspace updated
+     */
+    200: Workspace;
+};
+
+export type UpdateTokenResponse = UpdateTokenResponses[keyof UpdateTokenResponses];
+
 export type GetUsersWithTeamsData = {
     body?: never;
-    path?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
     query?: never;
-    url: '/workspace/users';
+    url: '/workspaces/{workspaceSlug}/users';
 };
 
 export type GetUsersWithTeamsResponses = {

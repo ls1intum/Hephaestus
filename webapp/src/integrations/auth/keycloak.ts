@@ -218,7 +218,11 @@ class KeycloakService {
 	 * Redirect to the login page
 	 */
 	public login(): Promise<void> {
-		return this.keycloak?.login() || Promise.resolve();
+		return (
+			this.keycloak?.login({
+				idpHint: "github",
+			}) || Promise.resolve()
+		);
 	}
 
 	/**

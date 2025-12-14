@@ -86,7 +86,6 @@ export function PracticesPage({
 								// Loading states
 								Array.from({ length: 2 }).map((_, idx) => (
 									<PullRequestBadPracticeCard
-										// biome-ignore lint/suspicious/noArrayIndexKey: fine for skeletons
 										key={`skeleton-${idx}`}
 										id={idx}
 										isLoading={true}

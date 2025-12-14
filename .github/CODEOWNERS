@@ -1,0 +1,30 @@
+# CODEOWNERS - Defines code ownership for automatic review assignment
+# Docs: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Default owners for everything in the repo
+* @ls1intum/hephaestus-maintainers
+
+# Release management and CI/CD
+.github/                         @ls1intum/hephaestus-maintainers
+.releaserc                       @ls1intum/hephaestus-maintainers
+renovate.json                    @ls1intum/hephaestus-maintainers
+
+# Application Server (Java/Spring)
+server/application-server/       @ls1intum/hephaestus-maintainers
+
+# Intelligence Service (Python/FastAPI)
+server/intelligence-service/     @ls1intum/hephaestus-maintainers
+
+# Webhook Ingest (Python)
+server/webhook-ingest/           @ls1intum/hephaestus-maintainers
+
+# Webapp (React/TypeScript)
+webapp/                          @ls1intum/hephaestus-maintainers
+
+# Documentation
+docs/                            @ls1intum/hephaestus-maintainers
+
+# Infrastructure
+docker/                          @ls1intum/hephaestus-maintainers
+**/Dockerfile                    @ls1intum/hephaestus-maintainers
+**/docker-compose*.yml           @ls1intum/hephaestus-maintainers

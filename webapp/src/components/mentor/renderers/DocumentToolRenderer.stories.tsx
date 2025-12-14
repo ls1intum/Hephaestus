@@ -23,7 +23,7 @@ export const CreateInput: Story = {
 			type: "tool-createDocument",
 			state: "input-available",
 			toolCallId: "tc1",
-			input: { title: "Project Plan", kind: "text" },
+			input: { title: "Project Plan", kind: "TEXT" },
 		} as ToolPart<"createDocument">,
 	},
 };

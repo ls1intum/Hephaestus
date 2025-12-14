@@ -25,6 +25,11 @@ const meta = {
 				"Callback function triggered when the sign-in button is clicked",
 			action: "signed in",
 		},
+		onGoToDashboard: {
+			description:
+				"Callback function triggered when the 'Go to Dashboard' button is clicked (for signed-in users)",
+			action: "go to dashboard",
+		},
 		isSignedIn: {
 			description: "Whether the user is currently signed in",
 			control: "boolean",
@@ -32,6 +37,7 @@ const meta = {
 	},
 	args: {
 		onSignIn: fn(),
+		onGoToDashboard: fn(),
 	},
 } satisfies Meta<typeof LandingPage>;
 

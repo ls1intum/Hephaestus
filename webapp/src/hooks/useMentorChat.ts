@@ -7,19 +7,20 @@ import { v4 as uuidv4 } from "uuid";
 import {
 	getGroupedThreadsOptions,
 	getGroupedThreadsQueryKey,
-	getMentorThreadsByThreadIdOptions,
-	getMentorThreadsByThreadIdQueryKey,
-	postMentorChatMessagesByMessageIdVoteMutation,
+	getThreadOptions,
+	getThreadQueryKey,
+	voteMessageMutation,
 } from "@/api/@tanstack/react-query.gen";
 import type {
 	ChatMessageVote,
+	ChatThreadDetail,
 	ChatThreadGroup,
 	Document,
-	GetMentorThreadsByThreadIdResponse,
 } from "@/api/types.gen";
 import environment from "@/environment";
+import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 import { keycloakService } from "@/integrations/auth";
-import type { ChatMessage, DataPart } from "@/lib/types";
+import type { ChatMessage } from "@/lib/types";
 import { useArtifactStore } from "@/stores/artifact-store";
 import { useDocumentArtifact } from "./useDocumentArtifact";
 
@@ -30,15 +31,10 @@ interface UseMentorChatOptions {
 	onError?: (error: Error) => void;
 }
 
-// Use server-defined vote type for consistency
-
 interface UseMentorChatReturn
-	extends Omit<
-		UseChatHelpers<ChatMessage>,
-		"sendMessage" | "addToolApprovalResponse"
-	> {
+	extends Omit<UseChatHelpers<ChatMessage>, "sendMessage"> {
 	sendMessage: (text: string) => void;
-	threadDetail: GetMentorThreadsByThreadIdResponse | undefined;
+	threadDetail: ChatThreadDetail | undefined;
 	isThreadLoading: boolean;
 	threadError: Error | null;
 	groupedThreads: ChatThreadGroup[] | undefined;
@@ -60,20 +56,25 @@ export function useMentorChat({
 	onError,
 }: UseMentorChatOptions): UseMentorChatReturn {
 	const queryClient = useQueryClient();
+	const { workspaceSlug, isLoading: isWorkspaceLoading } =
+		useActiveWorkspaceSlug();
+	const slug = workspaceSlug ?? "";
+	const hasWorkspace = Boolean(workspaceSlug);
 
 	// Generate a stable chat ID for this hook lifecycle
 	const [stableThreadId] = useState(() => threadId || uuidv4());
 
 	// Fetch thread detail if threadId is provided; avoid immediate refetch on mount
-	const threadQueryKey = getMentorThreadsByThreadIdQueryKey({
-		path: { threadId: threadId || "" },
+	const threadQueryKey = getThreadQueryKey({
+		path: { workspaceSlug: slug, threadId: threadId || "" },
 	});
 	const threadQuery = useQuery({
-		...getMentorThreadsByThreadIdOptions({
-			path: { threadId: threadId || "" },
+		...getThreadOptions({
+			path: { workspaceSlug: slug, threadId: threadId || "" },
 		}),
-		enabled: !!threadId,
-		initialData: () => queryClient.getQueryData(threadQueryKey),
+		enabled: Boolean(threadId) && hasWorkspace,
+		initialData: () =>
+			hasWorkspace ? queryClient.getQueryData(threadQueryKey) : undefined,
 		initialDataUpdatedAt: Date.now(),
 		staleTime: 60_000,
 		refetchOnMount: false,
@@ -88,10 +89,15 @@ export function useMentorChat({
 	} = threadQuery;
 
 	// Fetch grouped threads for sidebar/navigation; avoid immediate refetch on mount
+	const groupedThreadsKey = getGroupedThreadsQueryKey({
+		path: { workspaceSlug: slug },
+	});
 	const { data: groupedThreads, isLoading: isGroupedThreadsLoading } = useQuery(
 		{
-			...getGroupedThreadsOptions(),
-			initialData: () => queryClient.getQueryData(getGroupedThreadsQueryKey()),
+			...getGroupedThreadsOptions({ path: { workspaceSlug: slug } }),
+			enabled: hasWorkspace,
+			initialData: () =>
+				hasWorkspace ? queryClient.getQueryData(groupedThreadsKey) : undefined,
 			initialDataUpdatedAt: Date.now(),
 			staleTime: 60_000,
 			refetchOnMount: false,
@@ -101,22 +107,18 @@ export function useMentorChat({
 	);
 
 	// Vote message mutation
-	const voteMessageMut = useMutation(
-		postMentorChatMessagesByMessageIdVoteMutation(),
-	);
+	const voteMessageMut = useMutation(voteMessageMutation());
 
 	// Optimistic votes state: messageId -> isUpvoted
 	const [voteState, setVoteState] = useState<
 		Record<string, boolean | undefined>
 	>({});
-	const votes: ChatMessageVote[] = Object.entries(voteState)
-		.filter(([, isUpvoted]) => typeof isUpvoted === "boolean")
-		.map(([messageId, isUpvoted]) => ({
+	const votes: ChatMessageVote[] = Object.entries(voteState).map(
+		([messageId, isUpvoted]) => ({
 			messageId,
-			isUpvoted: Boolean(isUpvoted),
-			createdAt: new Date(),
-			updatedAt: new Date(),
-		}));
+			isUpvoted,
+		}),
+	);
 
 	// ---------------------------
 	// Artifact/document state
@@ -155,8 +157,9 @@ export function useMentorChat({
 	// No save/version APIs exposed; handled in TextArtifactContainer
 
 	// Create stable transport configuration
+	const mentorChatApi = `${environment.serverUrl}/workspaces/${slug}/mentor/chat`;
 	const stableTransport = new DefaultChatTransport({
-		api: `${environment.serverUrl}/mentor/chat`,
+		api: mentorChatApi,
 		// Always attach a fresh token per request
 		prepareSendMessagesRequest: ({ id, messages }) => {
 			const effectiveId = id || stableThreadId;
@@ -180,11 +183,18 @@ export function useMentorChat({
 
 	// Create stable onFinish callback
 	const stableOnFinish = (_options: { message: ChatMessage }) => {
-		queryClient.invalidateQueries({ queryKey: getGroupedThreadsQueryKey() });
+		if (hasWorkspace) {
+			queryClient.invalidateQueries({
+				queryKey: getGroupedThreadsQueryKey({ path: { workspaceSlug: slug } }),
+			});
+		}
 		if (threadId || stableThreadId) {
 			queryClient.invalidateQueries({
-				queryKey: getMentorThreadsByThreadIdQueryKey({
-					path: { threadId: threadId || stableThreadId || "" },
+				queryKey: getThreadQueryKey({
+					path: {
+						workspaceSlug: slug,
+						threadId: threadId || stableThreadId || "",
+					},
 				}),
 			});
 		}
@@ -207,7 +217,6 @@ export function useMentorChat({
 		setMessages,
 		resumeStream,
 		addToolResult,
-		addToolOutput,
 		id,
 	} = useChat<ChatMessage>({
 		id: stableThreadId, // Use stable ID that never changes
@@ -218,14 +227,13 @@ export function useMentorChat({
 		onFinish: stableOnFinish,
 		onError: stableOnError,
 		onData: (dataPart) => {
-			const part = dataPart as DataPart;
 			if (
-				part.type === "data-document-create" ||
-				part.type === "data-document-update" ||
-				part.type === "data-document-delta" ||
-				part.type === "data-document-finish"
+				dataPart.type === "data-document-create" ||
+				dataPart.type === "data-document-update" ||
+				dataPart.type === "data-document-delta" ||
+				dataPart.type === "data-document-finish"
 			) {
-				artifactDoc.onStreamPart(part);
+				artifactDoc.onStreamPart(dataPart);
 			}
 		},
 	});
@@ -264,18 +272,21 @@ export function useMentorChat({
 
 	// Send message function
 	const sendMessage = (text: string) => {
-		if (!text.trim()) {
+		if (!text.trim() || !hasWorkspace) {
 			return;
 		}
 
 		originalSendMessage({ text });
 	}; // Vote message function
 	const voteMessage = (messageId: string, isUpvoted: boolean) => {
+		if (!hasWorkspace) {
+			return;
+		}
 		// Optimistically set local vote state
 		setVoteState((prev) => ({ ...prev, [messageId]: isUpvoted }));
 		voteMessageMut.mutate(
 			{
-				path: { messageId },
+				path: { workspaceSlug: slug, messageId },
 				body: { isUpvoted },
 			},
 			{
@@ -290,8 +301,11 @@ export function useMentorChat({
 				onSettled: () => {
 					if (threadId || stableThreadId) {
 						queryClient.invalidateQueries({
-							queryKey: getMentorThreadsByThreadIdQueryKey({
-								path: { threadId: threadId || stableThreadId || "" },
+							queryKey: getThreadQueryKey({
+								path: {
+									workspaceSlug: slug,
+									threadId: threadId || stableThreadId || "",
+								},
 							}),
 						});
 					}
@@ -302,6 +316,7 @@ export function useMentorChat({
 
 	// Compute loading states
 	const isLoading =
+		isWorkspaceLoading ||
 		status === "submitted" ||
 		(status === "streaming" && messages.length === 0) ||
 		(!!threadId && isThreadLoading);
@@ -317,7 +332,6 @@ export function useMentorChat({
 		setMessages,
 		resumeStream,
 		addToolResult,
-		addToolOutput,
 		id,
 		clearError,
 

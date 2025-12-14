@@ -1,5 +1,8 @@
 package de.tum.in.www1.hephaestus.mentor;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonValue;
+
 /**
  * Document kinds supported by the application.
  */
@@ -12,10 +15,12 @@ public enum DocumentKind {
         this.value = value;
     }
 
+    @JsonValue
     public String getValue() {
         return value;
     }
 
+    @JsonCreator
     public static DocumentKind fromValue(String value) {
         for (DocumentKind kind : DocumentKind.values()) {
             if (kind.value.equals(value)) {

@@ -17,24 +17,24 @@ spring:
       validation-timeout: 5000  # 5 seconds
       leak-detection-threshold: 10000  # 10 seconds for leak detection
       connection-test-query: SELECT 1
-  
+
   # JPA configuration for tests
   jpa:
     hibernate:
       ddl-auto: create-drop
     show-sql: false
-  
+
   # Test-specific configurations for faster shutdown
   task:
     execution:
       shutdown:
         await-termination: true
         await-termination-period: 5s
-  
+
   # Disable liquibase for tests (use JPA auto DDL instead)
   liquibase:
     enabled: false
-  
+
   # Security configuration for tests (minimal config)
   security:
     oauth2:
@@ -45,6 +45,16 @@ spring:
 # GitHub configuration for tests (matches actual property)
 github:
   auth-token: test-token-not-real
+  app:
+    id: 0
+    privateKey: ""
+
+# Disable workspace bootstrapping during tests to prevent API calls
+hephaestus:
+  workspace:
+    init-default: false  # Disable PAT workspace bootstrap
+  intelligence-service:
+    url: http://localhost:8080
 
 # NATS configuration for tests (matches actual properties)
 nats:
@@ -53,13 +63,15 @@ nats:
   timeframe: 1
   durable-consumer-name: test-consumer
 
-# Intelligence service configuration for tests (stub)
-hephaestus:
-  intelligence-service:
-    url: http://localhost:8080
+monitoring:
+  run-on-startup: false
 
 # Logging configuration for tests
 logging:
   level:
-    de.tum.in.www1.hephaestus: INFO
     root: WARN
+    de:
+      tum:
+        in:
+          www1:
+            hephaestus: INFO
