@@ -19,11 +19,21 @@ jobs:
   teardown:
     name: Teardown Preview
     runs-on: ubuntu-latest
+    env:
+      PREVIEW_URL: ls1intum-hephaestus-docs-pr-${{ github.event.number }}.surge.sh
     steps:
+      - name: Install Surge
+        run: npm install -g surge
+
       - name: Teardown Surge.sh preview
-        uses: afc163/surge-preview@v1
+        run: surge teardown ${{ env.PREVIEW_URL }} --token ${{ secrets.SURGE_TOKEN }}
+        continue-on-error: true
+
+      - name: Update PR comment
+        uses: marocchino/sticky-pull-request-comment@v2
         with:
-          surge_token: ${{ secrets.SURGE_TOKEN }}
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          teardown: true
-          build: echo "Teardown only"
+          header: docs-preview
+          message: |
+            ## 📚 Documentation Preview
+
+            ~~Preview has been removed~~ (PR closed)
