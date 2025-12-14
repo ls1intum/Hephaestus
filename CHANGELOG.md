@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.10.6](https://github.com/ls1intum/Hephaestus/compare/v0.10.5...v0.10.6) (2025-12-14)
+
+### 🐛 Bug Fixes
+
+* ignore self-assigned copilot reviews ([#576](https://github.com/ls1intum/Hephaestus/issues/576)) ([8d99fbd](https://github.com/ls1intum/Hephaestus/commit/8d99fbd9f5d250e18f35b0fe69caf3ba24d008bd))
+
+### ♻️ Code Refactoring
+
+* separate Keycloak relative paths ([#579](https://github.com/ls1intum/Hephaestus/issues/579)) ([4e63ce4](https://github.com/ls1intum/Hephaestus/commit/4e63ce4dd34080b9814fd32ac86183f3f1cedb31))
+
 ## [0.10.6-rc.2](https://github.com/ls1intum/Hephaestus/compare/v0.10.6-rc.1...v0.10.6-rc.2) (2025-12-09)
 
 ## [0.10.6-rc.1](https://github.com/ls1intum/Hephaestus/compare/v0.10.5...v0.10.6-rc.1) (2025-12-09)

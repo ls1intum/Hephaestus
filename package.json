@@ -35,7 +35,11 @@
     "typecheck": "npm run typecheck:ts && npm run typecheck:intelligence-service",
     "db:draft-changelog": "scripts/db-utils.sh draft-changelog",
     "db:generate-erd-docs": "scripts/db-utils.sh generate-erd",
-    "db:generate-models:intelligence-service": "npm -w server/intelligence-service run db:introspect"
+    "db:generate-models:intelligence-service": "npm -w server/intelligence-service run db:introspect",
+    "docs:dev": "cd docs && npm run start",
+    "docs:build": "cd docs && npm run build",
+    "docs:serve": "cd docs && npm run serve",
+    "docs:lint": "cd docs && npm run lint"
   },
   "devDependencies": {
     "@openapitools/openapi-generator-cli": "2.16.3",
@@ -43,5 +47,8 @@
     "prettier": "3.5.1",
     "prettier-plugin-java": "2.6.7",
     "shx": "0.3.4"
+  },
+  "engines": {
+    "node": ">=22.0"
   }
 }
