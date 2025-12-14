@@ -26,7 +26,8 @@ const config: Config = {
   },
 
   url: 'https://ls1intum.github.io',
-  baseUrl: '/Hephaestus/',
+  // PR previews on Surge.sh need '/', production GitHub Pages needs '/Hephaestus/'
+  baseUrl: process.env.DOCUSAURUS_BASE_URL || '/Hephaestus/',
   organizationName: 'ls1intum',
   projectName: 'Hephaestus',
 

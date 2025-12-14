@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.10.9](https://github.com/ls1intum/Hephaestus/compare/v0.10.8...v0.10.9) (2025-12-14)
+
+### 🐛 Bug Fixes
+
+* **docs:** configure dynamic base url for surge.sh previews ([#585](https://github.com/ls1intum/Hephaestus/issues/585)) ([8767566](https://github.com/ls1intum/Hephaestus/commit/876756656d8b98c3f59b447206091217c9e60044))
+
 ## [0.10.8](https://github.com/ls1intum/Hephaestus/compare/v0.10.7...v0.10.8) (2025-12-14)
 
 ### 🐛 Bug Fixes
