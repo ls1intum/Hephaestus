@@ -3,10 +3,13 @@ FROM node:22-alpine AS build
 
 WORKDIR /app
 
-# Copy and install dependencies early to leverage Docker layer caching
-COPY package.json package-lock.json* /app/
+# Copy package.json for dependency installation
+COPY package.json /app/
 
-RUN npm ci
+# Install dependencies
+# Note: Using npm install instead of npm ci because this is a workspace package
+# and the package-lock.json is at the monorepo root, not in this folder
+RUN npm install --ignore-scripts
 
 # Copy the rest of the application code
 COPY ./ /app/

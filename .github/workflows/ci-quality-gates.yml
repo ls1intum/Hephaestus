@@ -284,6 +284,11 @@ jobs:
       # OpenAPI validation with intelligent auto-commit
       - name: OpenAPI validation & synchronization
         if: matrix.check == 'openapi-validation'
+        env:
+          # Required for intelligence-service OpenAPI export (uses fake provider, no actual API calls)
+          DATABASE_URL: postgresql://fake:fake@localhost:5432/fake
+          MODEL_NAME: fake:model
+          DETECTION_MODEL_NAME: fake:model
         run: |
           echo "🔍 Validating OpenAPI specifications and clients..."
 
