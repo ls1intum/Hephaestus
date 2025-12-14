@@ -8,6 +8,7 @@ const __dirname = dirname(__filename);
 export default defineConfig({
 	test: {
 		environment: "node",
+		passWithNoTests: true,
 	},
 	resolve: {
 		alias: {
