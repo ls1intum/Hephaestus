@@ -12,15 +12,15 @@ import {
 	voteMessageMutation,
 } from "@/api/@tanstack/react-query.gen";
 import type {
+	ChatMessage,
 	ChatMessageVote,
 	ChatThreadDetail,
 	ChatThreadGroup,
 	Document,
-} from "@/api/types.gen";
+} from "@/lib/types";
 import environment from "@/environment";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 import { keycloakService } from "@/integrations/auth";
-import type { ChatMessage } from "@/lib/types";
 import { useArtifactStore } from "@/stores/artifact-store";
 import { useDocumentArtifact } from "./useDocumentArtifact";
 

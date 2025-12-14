@@ -22,12 +22,25 @@ export type {
 	UpdateDocumentOutput,
 } from "@intelligence-service/chat/chat.shared";
 
-export type {
-	ChatThreadGroup,
-	ChatThreadSummary,
-} from "@intelligence-service/threads/threads.schemas";
+// Chat thread types (matching intelligence-service schemas)
+export interface ChatThreadSummary {
+	id: string;
+	title: string;
+	createdAt?: string | Date;
+}
 
-export type { ChatMessageVote } from "@intelligence-service/vote/vote.schemas";
+export interface ChatThreadGroup {
+	groupName: string;
+	threads: ChatThreadSummary[];
+}
+
+// Vote types
+export interface ChatMessageVote {
+	messageId: string;
+	isUpvoted: boolean;
+	createdAt: string | Date;
+	updatedAt: string | Date;
+}
 
 // Artifact typing
 export type ArtifactKind = "text" | (string & {});
@@ -81,6 +94,16 @@ export interface Document {
 	content: string;
 	kind: "text";
 	userId: number;
+}
+
+/**
+ * Chat thread detail with messages.
+ */
+export interface ChatThreadDetail {
+	id: string;
+	title?: string | null;
+	createdAt: Date;
+	messages: ChatMessage[];
 }
 
 export interface Attachment {

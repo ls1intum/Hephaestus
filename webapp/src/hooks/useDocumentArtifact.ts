@@ -1,5 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
+// TODO: These query hooks need to be created manually or endpoints proxied through app-server
+// Currently the document endpoints are only in the intelligence-service
 import {
 	getDocumentOptions,
 	getDocumentQueryKey,
@@ -7,9 +9,8 @@ import {
 	getDocumentVersionQueryKey,
 	updateDocumentMutation,
 } from "@/api/@tanstack/react-query.gen";
-import type { Document } from "@/api/types.gen";
+import type { DataPart, Document } from "@/lib/types";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
-import type { DataPart } from "@/lib/types";
 import { useArtifactStore } from "@/stores/artifact-store";
 import { useDocumentsStore } from "@/stores/document-store";
 
