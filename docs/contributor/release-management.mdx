@@ -123,6 +123,7 @@ We use GitHub Environment protection rules:
 ### Setting up environments
 
 In your repository settings:
+
 1. Go to **Settings → Environments**
 2. Create `staging` environment (no protection rules)
 3. Create `production` environment with **Required reviewers** (add yourself)
@@ -130,6 +131,7 @@ In your repository settings:
 ## Preview deployments
 
 Coolify handles PR preview deployments:
+
 - Every PR gets an isolated preview environment
 - Built directly on the server (fast)
 - Automatically cleaned up when PR is closed
@@ -137,6 +139,7 @@ Coolify handles PR preview deployments:
 ## Dependency management
 
 Dependencies are automatically updated via [Renovate Bot](https://docs.renovatebot.com/):
+
 - Runs Monday mornings
 - Patches/minors automerge after 3 days
 - Majors require manual review
@@ -144,6 +147,7 @@ Dependencies are automatically updated via [Renovate Bot](https://docs.renovateb
 ## Version synchronization
 
 `semantic-release` automatically updates version numbers in:
+
 - `package.json` files
 - `pom.xml` files  
 - `pyproject.toml` files

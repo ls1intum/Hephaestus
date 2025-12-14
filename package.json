@@ -51,7 +51,11 @@
     "ci": "run-s check:server ci:webapp typecheck:webapp",
     "db:draft-changelog": "scripts/db-utils.sh draft-changelog",
     "db:generate-erd-docs": "scripts/db-utils.sh generate-erd",
-    "db:generate-models:intelligence-service": "scripts/db-utils.sh generate-models-intelligence-service"
+    "db:generate-models:intelligence-service": "scripts/db-utils.sh generate-models-intelligence-service",
+    "docs:dev": "cd docs && npm run start",
+    "docs:build": "cd docs && npm run build",
+    "docs:serve": "cd docs && npm run serve",
+    "docs:lint": "cd docs && npm run lint"
   },
   "devDependencies": {
     "@openapitools/openapi-generator-cli": "2.16.3",
@@ -61,5 +65,8 @@
     "prettier-plugin-java": "2.6.7",
     "prettier-plugin-kotlin": "2.1.0",
     "shx": "0.3.4"
+  },
+  "engines": {
+    "node": ">=22.0"
   }
 }
