@@ -287,13 +287,9 @@ jobs:
         run: |
           echo "🔍 Validating OpenAPI specifications and clients..."
 
-          # Install all dependencies (always, to avoid cache drift)
+          # Install all dependencies including workspaces (always, to avoid cache drift)
+          # The root npm ci handles all workspaces including intelligence-service
           npm ci --prefer-offline --no-audit
-
-          # Install intelligence-service dependencies (TypeScript)
-          cd server/intelligence-service
-          npm ci --no-audit --progress=false
-          cd ../..
 
           # Setup application-server environment
           cd server/application-server
@@ -441,11 +437,14 @@ jobs:
             echo "✅ ERD documentation validation passed (up-to-date with committed migrations)"
           fi
 
-      # Database models validation - SQLAlchemy models match committed migrations
+      # Database models validation - Drizzle ORM models match committed migrations
       - name: Database models validation
         if: matrix.check == 'database-models-validation'
         run: |
           echo "🔍 Validating intelligence-service DB models match committed migrations..."
+
+          # Install all dependencies including workspaces for intelligence-service tooling
+          npm ci --prefer-offline --no-audit
 
           # Start PostgreSQL service for model operations
           echo "🐘 Starting PostgreSQL service..."

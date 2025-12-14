@@ -7,13 +7,15 @@ RUN apk add --no-cache gcompat
 WORKDIR /app
 
 # Copy minimal files needed for install and build
-COPY package*.json tsconfig.json drizzle.config.ts vitest.config.ts ./
+COPY package.json tsconfig.json drizzle.config.ts vitest.config.ts ./
 COPY scripts ./scripts
 COPY test ./test
 COPY src ./src
 
 # Install deps, build, and prune dev deps for smaller runtime
-RUN npm ci \
+# Note: Using npm install instead of npm ci because this is a workspace package
+# and the package-lock.json is at the monorepo root, not in this folder
+RUN npm install --ignore-scripts \
 	&& npm run build \
 	&& npm prune --production
 
