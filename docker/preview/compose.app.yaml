@@ -250,8 +250,8 @@ services:
       # Public URL for issuer validation (must match token's iss claim)
       KEYCLOAK_URL: https://${PREVIEW_DOMAIN:?Required}/keycloak
       KEYCLOAK_REALM: hephaestus
-      # Internal base URL (includes /keycloak) for container-to-container JWKS fetches
-      KEYCLOAK_INTERNAL_URL: http://keycloak:8080/keycloak
+      # Internal URL for direct container-to-container JWKS fetches (no /keycloak - Keycloak serves at root)
+      KEYCLOAK_INTERNAL_URL: http://keycloak:8080
       KEYCLOAK_CLIENT_ID: hephaestus-confidential
       KEYCLOAK_CLIENT_SECRET: ${KEYCLOAK_HEPHAESTUS_CONFIDENTIAL_CLIENT_SECRET:?Required}
       # Shared Postfix
@@ -302,6 +302,9 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     environment:
+      APPLICATION_VERSION: preview
+      GIT_BRANCH: ${COOLIFY_BRANCH:-}
+      GIT_COMMIT: ${SOURCE_COMMIT:-}
       # Coolify provides SERVICE_FQDN_WEBAPP automatically
       APPLICATION_CLIENT_URL: https://${SERVICE_FQDN_WEBAPP}
       # Coolify provides SERVICE_FQDN_APPLICATION_SERVER (e.g., {{pr_id}}.api.example.com)

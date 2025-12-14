@@ -154,6 +154,7 @@ cp docker/.env.example docker/.env
 export WEBHOOK_SECRET=$(openssl rand -hex 32)
 echo "WEBHOOK_SECRET=$WEBHOOK_SECRET" >> docker/.env
 ```
+
 The value must match the secret configured on your GitHub and GitLab webhooks (validated via `X-Hub-Signature-256` when available).
 
 ## Web client (`webapp`)

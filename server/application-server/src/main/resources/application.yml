@@ -1,7 +1,7 @@
 spring:
     application:
         name: Hephaestus
-        version: "0.10.6-rc.2"
+        version: "0.10.9"
 
     config:
         import: optional:file:.env[.properties]
@@ -92,6 +92,9 @@ hephaestus:
             enabled: false
             team: "all"
             channel-id: ""
+        # PR authors whose assignee-reviewers don't earn points (e.g., AI bots)
+        self-review-author-logins:
+            - Copilot
     
     # ═══════════════════════════════════════════════════════════════════════════
     # WORKSPACE CONFIGURATION

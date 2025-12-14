@@ -1,0 +1,39 @@
+# Documentation Preview Teardown
+#
+# Separate workflow for tearing down Surge.sh previews when PRs close.
+# This is in a separate file because:
+# 1. Path filters are unreliable for 'closed' events
+# 2. Keeping deployment and teardown separate is cleaner
+# 3. Teardown is a no-op if no preview exists (safe to run always)
+
+name: CD / Docs Teardown
+
+on:
+  pull_request:
+    types: [closed]
+
+permissions:
+  pull-requests: write
+
+jobs:
+  teardown:
+    name: Teardown Preview
+    runs-on: ubuntu-latest
+    env:
+      PREVIEW_URL: ls1intum-hephaestus-docs-pr-${{ github.event.number }}.surge.sh
+    steps:
+      - name: Install Surge
+        run: npm install -g surge
+
+      - name: Teardown Surge.sh preview
+        run: surge teardown ${{ env.PREVIEW_URL }} --token ${{ secrets.SURGE_TOKEN }}
+        continue-on-error: true
+
+      - name: Update PR comment
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: docs-preview
+          message: |
+            ## 📚 Documentation Preview
+
+            ~~Preview has been removed~~ (PR closed)
