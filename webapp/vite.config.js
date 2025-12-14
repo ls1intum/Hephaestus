@@ -40,7 +40,11 @@ export default defineConfig(({ command }) => {
 				// Alias to share TS sources from the intelligence-service project
 				"@intelligence-service": resolve(
 					__dirname,
-					"../server/intelligence-service/src/routes/mentor",
+					"../server/intelligence-service/src/mentor",
+				),
+				"@intelligence-service-utils": resolve(
+					__dirname,
+					"../server/intelligence-service/src/shared",
 				),
 			},
 		},

@@ -24,7 +24,8 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"],
-      "@intelligence-service/*": ["../server/intelligence-service/src/routes/mentor/*"]
+      "@intelligence-service/*": ["../server/intelligence-service/src/mentor/*"],
+      "@intelligence-service-utils/*": ["../server/intelligence-service/src/shared/*"]
     }
   }
 }

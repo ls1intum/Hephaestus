@@ -43,7 +43,12 @@ if (!content.startsWith("// @ts-nocheck")) {
 const importRegex = /import\s*\{([^}]+)\}\s*from\s*"drizzle-orm\/pg-core"/;
 const match = content.match(importRegex);
 if (match) {
-	const imported = match[1]
+	const importedRaw = match[1];
+	if (!importedRaw) {
+		console.log("No imports found in drizzle-orm/pg-core import");
+		process.exit(0);
+	}
+	const imported = importedRaw
 		.split(",")
 		.map((s) => s.trim())
 		.filter(Boolean);
@@ -51,12 +56,12 @@ if (match) {
 	for (const name of imported) {
 		const bare = name.replace(/^type\s+/, "");
 		const re = new RegExp(`\\b${bare}\\b`, "m");
-		if (re.test(content)) used.add(name);
+		if (re.test(content)) {
+			used.add(name);
+		}
 	}
-	const cleaned = imported
-		.filter((n) => used.has(n))
-		.sort((a, b) => a.localeCompare(b));
-	if (cleaned.length && cleaned.length !== imported.length) {
+	const cleaned = imported.filter((n) => used.has(n)).sort((a, b) => a.localeCompare(b));
+	if (cleaned.length > 0 && cleaned.length !== imported.length) {
 		content = content.replace(
 			importRegex,
 			`import { ${cleaned.join(", ")} } from "drizzle-orm/pg-core"`,
@@ -72,14 +77,8 @@ content = content
 	.replace(/maxValue:\s*[^,}\n]+,\s*/g, "");
 
 // Always remove `import { sql } from "drizzle-orm"` in generated schema; drizzle rarely uses it and it trips linters
-content = content.replace(
-	/\n?import\s*\{\s*sql\s*\}\s*from\s*"drizzle-orm"\s*;?\s*\n?/g,
-	"\n",
-);
-content = content.replace(
-	/\n?import\s*\{\s*sql\s*\}\s*from\s*'drizzle-orm'\s*;?\s*\n?/g,
-	"\n",
-);
+content = content.replace(/\n?import\s*\{\s*sql\s*\}\s*from\s*"drizzle-orm"\s*;?\s*\n?/g, "\n");
+content = content.replace(/\n?import\s*\{\s*sql\s*\}\s*from\s*'drizzle-orm'\s*;?\s*\n?/g, "\n");
 content = content.replace(
 	/^\s*import\s*\{\s*sql\s*\}\s*from\s*["']drizzle-orm["']\s*;?\s*$(?:\r?\n)?/gm,
 	"",

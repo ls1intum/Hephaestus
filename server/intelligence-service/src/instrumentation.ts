@@ -16,9 +16,7 @@ import env from "@/env";
 let started = false;
 
 function isLangfuseConfigured() {
-	return Boolean(
-		env.LANGFUSE_SECRET_KEY && env.LANGFUSE_PUBLIC_KEY && env.LANGFUSE_BASE_URL,
-	);
+	return Boolean(env.LANGFUSE_SECRET_KEY && env.LANGFUSE_PUBLIC_KEY && env.LANGFUSE_BASE_URL);
 }
 
 if (!started && isLangfuseConfigured()) {

@@ -1,14 +1,100 @@
-import { defineConfig } from "vitest/config";
-import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { defineConfig } from "vitest/config";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 export default defineConfig({
 	test: {
+		// ═══════════════════════════════════════════════════════════════════════════
+		// Test Environment
+		// ═══════════════════════════════════════════════════════════════════════════
 		environment: "node",
-		passWithNoTests: true,
+		passWithNoTests: false, // FAIL if no tests - forces test coverage
+
+		// ═══════════════════════════════════════════════════════════════════════════
+		// Test Organization
+		// ═══════════════════════════════════════════════════════════════════════════
+		include: ["test/**/*.test.ts", "src/**/*.test.ts"],
+		exclude: ["node_modules", "dist"],
+
+		// ═══════════════════════════════════════════════════════════════════════════
+		// Globals for cleaner tests
+		// ═══════════════════════════════════════════════════════════════════════════
+		globals: true,
+
+		// ═══════════════════════════════════════════════════════════════════════════
+		// Coverage Configuration - STRICT ENFORCEMENT
+		// ═══════════════════════════════════════════════════════════════════════════
+		coverage: {
+			enabled: false, // Enable via --coverage flag
+			provider: "v8",
+			reporter: ["text", "html", "lcov", "json"],
+			reportsDirectory: "./coverage",
+			include: ["src/**/*.ts"],
+			exclude: [
+				// Generated files
+				"src/db/schema.ts",
+				"src/db/relations.ts",
+				// Entry points (minimal logic)
+				"src/index.ts",
+				"src/app.ts",
+				// Instrumentation
+				"src/instrumentation.ts",
+				// Type definitions
+				"src/**/*.d.ts",
+				// Route index files (just exports)
+				"src/**/index.ts",
+			],
+			// STRICT thresholds - CI will FAIL if not met
+			thresholds: {
+				statements: 50,
+				branches: 50,
+				functions: 50,
+				lines: 50,
+				// Per-file thresholds prevent hiding low coverage
+				perFile: true,
+			},
+			// Clean start every run
+			clean: true,
+			// Skip files with no executable code
+			skipFull: false,
+		},
+
+		// ═══════════════════════════════════════════════════════════════════════════
+		// Performance & Isolation
+		// ═══════════════════════════════════════════════════════════════════════════
+		pool: "threads",
+		isolate: true,
+
+		// ═══════════════════════════════════════════════════════════════════════════
+		// Timeouts - Fail fast, don't hang
+		// ═══════════════════════════════════════════════════════════════════════════
+		testTimeout: 10000,
+		hookTimeout: 10000,
+
+		// ═══════════════════════════════════════════════════════════════════════════
+		// Watch mode disabled for CI
+		// ═══════════════════════════════════════════════════════════════════════════
+		watch: false,
+
+		// ═══════════════════════════════════════════════════════════════════════════
+		// Reporter - verbose for debugging
+		// ═══════════════════════════════════════════════════════════════════════════
+		reporters: ["verbose"],
+
+		// ═══════════════════════════════════════════════════════════════════════════
+		// Setup files
+		// ═══════════════════════════════════════════════════════════════════════════
+		setupFiles: ["./test/setup.ts"],
+
+		// ═══════════════════════════════════════════════════════════════════════════
+		// Strict mode settings
+		// ═══════════════════════════════════════════════════════════════════════════
+		allowOnly: false, // Fail if .only is used (prevents accidental commits)
+		bail: 1, // Stop on first failure in CI
+		retry: 0, // No retries - tests should be deterministic
 	},
 	resolve: {
 		alias: {

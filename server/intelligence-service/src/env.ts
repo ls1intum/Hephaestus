@@ -2,7 +2,7 @@ import path from "node:path";
 import { config } from "dotenv";
 import { expand } from "dotenv-expand";
 import { z } from "zod";
-import { getModel, SUPPORTED_PROVIDERS } from "./lib/ai-model";
+import { getModel, SUPPORTED_PROVIDERS } from "@/shared/ai/model";
 
 const ENV_FILE_PATH = process.env.NODE_ENV === "test" ? ".env.test" : ".env";
 
@@ -55,7 +55,7 @@ const EnvSchema = z
 		for (const [field, modelName] of modelPairs) {
 			const { provider, model } = parseProvider(modelName);
 
-			if (!provider || !model) {
+			if (!(provider && model)) {
 				ctx.addIssue({
 					code: z.ZodIssueCode.custom,
 					message: `Invalid model format: ${modelName}. Expected <provider>:<model>`,
@@ -64,11 +64,7 @@ const EnvSchema = z
 				continue;
 			}
 
-			if (
-				!SUPPORTED_PROVIDERS.includes(
-					provider as (typeof SUPPORTED_PROVIDERS)[number],
-				)
-			) {
+			if (!SUPPORTED_PROVIDERS.includes(provider as (typeof SUPPORTED_PROVIDERS)[number])) {
 				ctx.addIssue({
 					code: z.ZodIssueCode.custom,
 					message: `Unsupported provider: ${provider}. Supported providers: ${SUPPORTED_PROVIDERS.join(", ")}`,

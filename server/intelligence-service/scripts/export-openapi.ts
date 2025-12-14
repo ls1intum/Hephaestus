@@ -1,8 +1,8 @@
 import { writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import YAML from "yaml";
-import { openAPIConfig } from "@/lib/configure-open-api";
-import { EXPORTED_TAG } from "@/lib/openapi-export";
+import { EXPORTED_TAG } from "@/shared/http/exported-tag";
+import { openAPIConfig } from "@/shared/http/openapi";
 import app from "../src/app";
 
 type OpenAPISpec = {
@@ -14,10 +14,7 @@ type Operation = {
 	tags?: string[];
 	operationId?: string;
 	requestBody?: { content?: Record<string, { schema?: SchemaRef }> };
-	responses?: Record<
-		string,
-		{ content?: Record<string, { schema?: SchemaRef }> }
-	>;
+	responses?: Record<string, { content?: Record<string, { schema?: SchemaRef }> }>;
 	[key: string]: unknown;
 };
 
@@ -52,7 +49,9 @@ function collectReferencedSchemas(
 	schemas: Record<string, Schema>,
 	collected: Set<string>,
 ): void {
-	if (!schema) return;
+	if (!schema) {
+		return;
+	}
 
 	if ("$ref" in schema && schema.$ref) {
 		const name = extractSchemaName(schema.$ref);
@@ -99,15 +98,13 @@ function processExportedRoutes(spec: OpenAPISpec): {
 
 	for (const pathItem of Object.values(spec.paths ?? {})) {
 		for (const operation of Object.values(pathItem)) {
-			if (typeof operation !== "object" || !operation) continue;
+			if (typeof operation !== "object" || !operation) {
+				continue;
+			}
 
 			// Check if operation has the exported tag
 			const tags = operation.tags ?? [];
-			if (
-				!tags.some((tag) =>
-					EXPORTED_TAG.includes(tag as (typeof EXPORTED_TAG)[number]),
-				)
-			) {
+			if (!tags.some((tag) => EXPORTED_TAG.includes(tag as (typeof EXPORTED_TAG)[number]))) {
 				continue;
 			}
 
@@ -174,16 +171,12 @@ function addExportTags(spec: OpenAPISpec): {
 	};
 }
 
-async function main() {
-	const spec = app.getOpenAPI31Document(
-		openAPIConfig,
-	) as unknown as OpenAPISpec;
+function main() {
+	const spec = app.getOpenAPI31Document(openAPIConfig) as unknown as OpenAPISpec;
 
 	// Add export tags for application-server integration
 	const { opCount, schemaCount } = addExportTags(spec);
-	console.log(
-		`Tagged ${opCount} operations and ${schemaCount} schemas for export`,
-	);
+	console.log(`Tagged ${opCount} operations and ${schemaCount} schemas for export`);
 
 	const yaml = YAML.stringify(spec);
 	const outPath = resolve(process.cwd(), "openapi.yaml");
@@ -191,7 +184,9 @@ async function main() {
 	console.log(`OpenAPI spec written to ${outPath}`);
 }
 
-main().catch((err) => {
+try {
+	main();
+} catch (err) {
 	console.error("Failed to export OpenAPI spec:", err);
 	process.exit(1);
-});
+}

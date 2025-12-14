@@ -1,4 +1,4 @@
-import { toolCallIdToUuid } from "@intelligence-service/chat/tool-call-id";
+import { toolCallIdToUuid } from "@intelligence-service-utils/tool-call-id";
 import type { Document } from "@/api/types.gen";
 import { useDocumentArtifact } from "@/hooks/useDocumentArtifact";
 import {
