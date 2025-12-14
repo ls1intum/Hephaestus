@@ -1,5 +1,7 @@
+import pino from "pino";
 import { langfuse } from "@/lib/telemetry";
 
+const logger = pino({ name: "detector-prompts" });
 const PROMPT_NAME = "bad-practice-detector" as const;
 
 const initialPrompt = `You are a bad practice detector reviewing pull requests for bad practices.
@@ -103,7 +105,7 @@ export async function getBadPracticePrompt() {
 		.get(PROMPT_NAME)
 		.catch(async (e: Error) => {
 			if (e.message.includes("LangfuseNotFoundError")) {
-				console.log(
+				logger.info(
 					`Prompt "${PROMPT_NAME}" not found on LangFuse. Creating...`,
 				);
 				return await langfuse.prompt.create({

@@ -211,10 +211,6 @@ export const mentorChatHandler: AppRouteHandler<HandleMentorChatRoute> = async (
 
 	const stream = createUIMessageStream({
 		async execute({ writer }) {
-			// Diagnostics: log model presence in non-production
-			if (process.env.NODE_ENV !== "production" && env.defaultModel) {
-				console.log("[mentor] model configured");
-			}
 			try {
 				const result = streamText({
 					model: env.defaultModel,

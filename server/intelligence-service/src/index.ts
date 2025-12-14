@@ -1,10 +1,12 @@
 import "./instrumentation"; // must be first import to initialize OTEL
 import { serve } from "@hono/node-server";
+import pino from "pino";
 import app from "./app";
 import env from "./env";
 
+const logger = pino({ level: env.LOG_LEVEL });
 const port = env.PORT;
-console.log(`Server is running on port http://localhost:${port}`);
+logger.info(`Server is running on http://localhost:${port}`);
 
 serve({
 	fetch: app.fetch,
