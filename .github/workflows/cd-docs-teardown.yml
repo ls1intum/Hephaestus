@@ -1,0 +1,29 @@
+# Documentation Preview Teardown
+#
+# Separate workflow for tearing down Surge.sh previews when PRs close.
+# This is in a separate file because:
+# 1. Path filters are unreliable for 'closed' events
+# 2. Keeping deployment and teardown separate is cleaner
+# 3. Teardown is a no-op if no preview exists (safe to run always)
+
+name: CD / Docs Teardown
+
+on:
+  pull_request:
+    types: [closed]
+
+permissions:
+  pull-requests: write
+
+jobs:
+  teardown:
+    name: Teardown Preview
+    runs-on: ubuntu-latest
+    steps:
+      - name: Teardown Surge.sh preview
+        uses: afc163/surge-preview@v1
+        with:
+          surge_token: ${{ secrets.SURGE_TOKEN }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          teardown: true
+          build: echo "Teardown only"
