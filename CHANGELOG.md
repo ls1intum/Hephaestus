@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.10.10](https://github.com/ls1intum/Hephaestus/compare/v0.10.9...v0.10.10) (2025-12-14)
+
+### 🐛 Bug Fixes
+
+* **webapp:** display a thank you screen upon survey completion ([#587](https://github.com/ls1intum/Hephaestus/issues/587)) ([e417711](https://github.com/ls1intum/Hephaestus/commit/e41771112560a61b7609ec6d2a3c4267b8591bf3))
+
 ## [0.10.9](https://github.com/ls1intum/Hephaestus/compare/v0.10.8...v0.10.9) (2025-12-14)
 
 ### 🐛 Bug Fixes
