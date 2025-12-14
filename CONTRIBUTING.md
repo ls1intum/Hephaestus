@@ -39,14 +39,42 @@ We use automated semantic pull request validation to ensure consistent and meani
 <type>[optional scope]: <description>
 ```
 
+### Release Behavior (Important)
+
+We use **Semantic Release** to automatically version and release our application based on commit messages.
+
+**❌ Will NOT Trigger Release** (Scope Overrides):
+
+| Pattern | Example | Why |
+|---------|---------|-----|
+| `*(ci):` | `fix(ci): update workflow` | `ci` scope blocks release |
+| `*(deps):` | `fix(deps): update library` | `deps` scope blocks release |
+| `*(docker):` | `fix(docker): update base image` | `docker` scope blocks release |
+| `*(scripts):` | `fix(scripts): fix db backup` | `scripts` scope blocks release |
+| `*(security):` | `chore(security): update policy` | `security` scope blocks release |
+| `*(no-release):`| `feat(no-release): internal feature` | Explicit block |
+
+**✅ WILL Trigger Release**:
+
+| Type | Version | Example |
+|------|---------|---------|
+| `feat:` | **Minor** | `feat(webapp): add dark mode` |
+| `fix:` | **Patch** | `fix(api): handle null response` |
+| `perf:` | **Patch** | `perf: optimize query` |
+| `revert:` | **Patch** | `revert: undo change` |
+| `!:` | **Major** | `feat!: new api structure` |
+
+**❌ Will NOT Trigger Release** (Type-Based):
+`docs:`, `style:`, `refactor:`, `test:`, `build:`, `chore:`, `ci:`
+
 ### Allowed Types
 
-- `fix`: A bug fix
-- `feat`: A new feature
+- `fix`: A bug fix (triggers patch release)
+- `feat`: A new feature (triggers minor release)
 - `docs`: Documentation only changes
-- `style`: Changes that do not affect the meaning of the code (white-space, formatting, missing semi-colons, etc.)
+- `style`: Changes that do not affect the meaning of the code
 - `refactor`: A code change that neither fixes a bug nor adds a feature
-- `perf`: A code change that improves performance
+- `perf`: A code change that improves performance (triggers patch release)
 - `test`: Adding missing tests or correcting existing tests
 - `build`: Changes that affect the build system or external dependencies
 - `ci`: Changes to our CI configuration files and scripts
@@ -63,22 +91,26 @@ We use automated semantic pull request validation to ensure consistent and meani
 - `webhooks`: Webhook ingestion service
 - `docs`: Documentation
 
-**Infrastructure scopes**:
+**Infrastructure scopes** (⚠️ These prevent releases):
 
 - `ci`: CI/CD workflows
 - `deps`: Dependencies
+- `deps-dev`: Dev dependencies
 - `docker`: Container configuration
+- `scripts`: Helper scripts
+- `security`: Security policies and config
 - `db`: Database/Liquibase changes
+- `no-release`: Explicit release prevention
 
 **Feature scopes** (domain-specific):
 
+- `gitprovider`: Git integration module
 - `leaderboard`: Leaderboard and rankings
 - `mentor`: AI mentor (Heph)
-- `profile`: User profiles
-- `workspace`: Workspace management
-- `teams`: Team competitions
-- `github`: GitHub integration
 - `notifications`: Email/notification system
+- `profile`: User profiles
+- `teams`: Team competitions
+- `workspace`: Workspace management
 
 ### Examples
 

@@ -7,25 +7,25 @@ When creating pull requests, follow the [Conventional Commits](https://www.conve
 **Format**: `<type>[optional scope]: <description>`
 
 **Common types**:
-- `fix`: Bug fixes
-- `feat`: New features
+- `fix`: Bug fixes (PATCH release)
+- `feat`: New features (MINOR release)
 - `docs`: Documentation changes
 - `refactor`: Code refactoring
 - `test`: Test changes
-- `chore`: Maintenance tasks
 - `ci`: CI/CD changes
+- `chore`: Maintenance tasks
 
-**Service scopes**: `webapp`, `server`, `ai`, `webhooks`, `docs`
+**Service scopes** (where the code lives): `webapp`, `server`, `ai`, `webhooks`, `docs`
 
-**Feature scopes**: `leaderboard`, `mentor`, `profile`, `workspace`, `teams`, `github`, `notifications`
+**Infrastructure scopes** (⚠️ NO RELEASE): `ci`, `deps`, `deps-dev`, `docker`, `scripts`, `security`, `db`, `no-release`
 
-**Infrastructure scopes**: `ci`, `deps`, `docker`, `db`
+**Feature scopes**: `gitprovider`, `leaderboard`, `mentor`, `notifications`, `profile`, `teams`, `workspace`
 
 **Examples**:
-- `fix(profile): correct avatar upload logic`
-- `feat(leaderboard): add sorting functionality`
-- `feat(server): add team sync endpoint`
-- `chore(deps): update dependencies`
+- `fix(profile): correct avatar upload logic` (Releases v0.0.1)
+- `feat(leaderboard): add sorting functionality` (Releases v0.1.0)
+- `fix(ci): update workflow configuration` (NO release)
+- `chore(deps): update dependencies` (NO release)
 
 **Guidelines**:
 - Use lowercase for description

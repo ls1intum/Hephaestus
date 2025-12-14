@@ -29,31 +29,35 @@ export default {
         'revert', // Revert previous commit (triggers patch release)
       ],
     ],
-    // Scopes are optional but should match project structure when used
-    // We use 'warn' (1) to allow flexibility while encouraging consistency
+    // Scopes are strictly enforced to ensure correct release behavior
+    // Infrastructure scopes (ci, deps, docker) prevent accidental releases
     'scope-enum': [
-      1, // Warning level - guides but doesn't block
+      2, // Error level - blocking
       'always',
       [
-        // Service scopes (where code lives)
+        // Service scopes (where the code lives)
         'webapp',
         'server',
         'ai',
         'webhooks',
         'docs',
-        // Infrastructure scopes
+        // Infrastructure scopes (will NOT trigger release)
         'ci',
         'deps',
+        'deps-dev',
         'docker',
+        'scripts',
+        'security',
         'db',
+        'no-release',
         // Feature scopes (domain-specific)
+        'gitprovider', // Server module for Git integration
         'leaderboard',
         'mentor',
-        'profile',
-        'workspace',
-        'teams',
-        'github',
         'notifications',
+        'profile',
+        'teams',
+        'workspace',
       ],
     ],
     // Allow empty scope (scope is optional per CONTRIBUTING.md)

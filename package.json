@@ -56,7 +56,7 @@
     "docs:build": "cd docs && npm run build",
     "docs:serve": "cd docs && npm run serve",
     "docs:lint": "cd docs && npm run lint",
-    "prepare": "husky"
+    "prepare": "husky || true"
   },
   "devDependencies": {
     "@commitlint/cli": "19.8.1",
