@@ -4,7 +4,7 @@ import de.tum.in.www1.hephaestus.intelligenceservice.ApiClient;
 import de.tum.in.www1.hephaestus.intelligenceservice.BaseApi;
 
 import de.tum.in.www1.hephaestus.intelligenceservice.model.ChatThreadGroup;
-import de.tum.in.www1.hephaestus.intelligenceservice.model.GetGroupedThreads500Response;
+import de.tum.in.www1.hephaestus.intelligenceservice.model.GetThread404Response;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.MentorChat200Response;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.MentorChatRequest;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.ThreadDetail;
@@ -81,7 +81,7 @@ public class MentorApi extends BaseApi {
         String[] localVarAuthNames = new String[] {  };
 
         ParameterizedTypeReference<List<ChatThreadGroup>> localReturnType = new ParameterizedTypeReference<List<ChatThreadGroup>>() {};
-        return apiClient.invokeAPI("/mentor/threads/grouped", HttpMethod.GET, Collections.<String, Object>emptyMap(), localVarQueryParams, localVarPostBody, localVarHeaderParams, localVarCookieParams, localVarFormParams, localVarAccept, localVarContentType, localVarAuthNames, localReturnType);
+        return apiClient.invokeAPI("/mentor/threads/threads/grouped", HttpMethod.GET, Collections.<String, Object>emptyMap(), localVarQueryParams, localVarPostBody, localVarHeaderParams, localVarCookieParams, localVarFormParams, localVarAccept, localVarContentType, localVarAuthNames, localReturnType);
     }
     /**
      * Get mentor chat thread detail

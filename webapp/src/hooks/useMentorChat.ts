@@ -14,9 +14,9 @@ import {
 } from "@/api/@tanstack/react-query.gen";
 import type {
 	ChatMessageVote,
-	ChatThreadDetail,
 	ChatThreadGroup,
 	Document,
+	ThreadDetail,
 } from "@/api/types.gen";
 import environment from "@/environment";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
@@ -51,7 +51,7 @@ interface UseMentorChatOptions {
 interface UseMentorChatReturn
 	extends Omit<UseChatHelpers<ChatMessage>, "sendMessage"> {
 	sendMessage: (text: string) => void;
-	threadDetail: ChatThreadDetail | undefined;
+	threadDetail: ThreadDetail | undefined;
 	isThreadLoading: boolean;
 	threadError: Error | null;
 	groupedThreads: ChatThreadGroup[] | undefined;

@@ -8,7 +8,7 @@ import de.tum.in.www1.hephaestus.intelligenceservice.model.ChatThreadGroup;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.CreateDocumentRequest;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.Document;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.DocumentSummary;
-import de.tum.in.www1.hephaestus.intelligenceservice.model.GetGroupedThreads500Response;
+import de.tum.in.www1.hephaestus.intelligenceservice.model.GetThread404Response;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.MentorChat200Response;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.MentorChatRequest;
 import java.time.OffsetDateTime;
@@ -96,7 +96,7 @@ public class ExportedApi extends BaseApi {
         String[] localVarAuthNames = new String[] {  };
 
         ParameterizedTypeReference<Document> localReturnType = new ParameterizedTypeReference<Document>() {};
-        return apiClient.invokeAPI("/mentor/documents", HttpMethod.POST, Collections.<String, Object>emptyMap(), localVarQueryParams, localVarPostBody, localVarHeaderParams, localVarCookieParams, localVarFormParams, localVarAccept, localVarContentType, localVarAuthNames, localReturnType);
+        return apiClient.invokeAPI("/mentor/documents/documents", HttpMethod.POST, Collections.<String, Object>emptyMap(), localVarQueryParams, localVarPostBody, localVarHeaderParams, localVarCookieParams, localVarFormParams, localVarAccept, localVarContentType, localVarAuthNames, localReturnType);
     }
     /**
      * Delete a document and all versions
@@ -148,7 +148,7 @@ public class ExportedApi extends BaseApi {
         String[] localVarAuthNames = new String[] {  };
 
         ParameterizedTypeReference<Void> localReturnType = new ParameterizedTypeReference<Void>() {};
-        return apiClient.invokeAPI("/mentor/documents/{id}", HttpMethod.DELETE, uriVariables, localVarQueryParams, localVarPostBody, localVarHeaderParams, localVarCookieParams, localVarFormParams, localVarAccept, localVarContentType, localVarAuthNames, localReturnType);
+        return apiClient.invokeAPI("/mentor/documents/documents/{id}", HttpMethod.DELETE, uriVariables, localVarQueryParams, localVarPostBody, localVarHeaderParams, localVarCookieParams, localVarFormParams, localVarAccept, localVarContentType, localVarAuthNames, localReturnType);
     }
     /**
      * Delete versions after timestamp
@@ -211,7 +211,7 @@ public class ExportedApi extends BaseApi {
         String[] localVarAuthNames = new String[] {  };
 
         ParameterizedTypeReference<List<Document>> localReturnType = new ParameterizedTypeReference<List<Document>>() {};
-        return apiClient.invokeAPI("/mentor/documents/{id}/versions", HttpMethod.DELETE, uriVariables, localVarQueryParams, localVarPostBody, localVarHeaderParams, localVarCookieParams, localVarFormParams, localVarAccept, localVarContentType, localVarAuthNames, localReturnType);
+        return apiClient.invokeAPI("/mentor/documents/documents/{id}/versions", HttpMethod.DELETE, uriVariables, localVarQueryParams, localVarPostBody, localVarHeaderParams, localVarCookieParams, localVarFormParams, localVarAccept, localVarContentType, localVarAuthNames, localReturnType);
     }
     /**
      * Get latest version of a document
@@ -264,7 +264,7 @@ public class ExportedApi extends BaseApi {
         String[] localVarAuthNames = new String[] {  };
 
         ParameterizedTypeReference<Document> localReturnType = new ParameterizedTypeReference<Document>() {};
-        return apiClient.invokeAPI("/mentor/documents/{id}", HttpMethod.GET, uriVariables, localVarQueryParams, localVarPostBody, localVarHeaderParams, localVarCookieParams, localVarFormParams, localVarAccept, localVarContentType, localVarAuthNames, localReturnType);
+        return apiClient.invokeAPI("/mentor/documents/documents/{id}", HttpMethod.GET, uriVariables, localVarQueryParams, localVarPostBody, localVarHeaderParams, localVarCookieParams, localVarFormParams, localVarAccept, localVarContentType, localVarAuthNames, localReturnType);
     }
     /**
      * List chat threads grouped by time buckets
@@ -305,7 +305,7 @@ public class ExportedApi extends BaseApi {
         String[] localVarAuthNames = new String[] {  };
 
         ParameterizedTypeReference<List<ChatThreadGroup>> localReturnType = new ParameterizedTypeReference<List<ChatThreadGroup>>() {};
-        return apiClient.invokeAPI("/mentor/threads/grouped", HttpMethod.GET, Collections.<String, Object>emptyMap(), localVarQueryParams, localVarPostBody, localVarHeaderParams, localVarCookieParams, localVarFormParams, localVarAccept, localVarContentType, localVarAuthNames, localReturnType);
+        return apiClient.invokeAPI("/mentor/threads/threads/grouped", HttpMethod.GET, Collections.<String, Object>emptyMap(), localVarQueryParams, localVarPostBody, localVarHeaderParams, localVarCookieParams, localVarFormParams, localVarAccept, localVarContentType, localVarAuthNames, localReturnType);
     }
     /**
      * Get mentor chat thread detail
@@ -421,7 +421,7 @@ public class ExportedApi extends BaseApi {
         String[] localVarAuthNames = new String[] {  };
 
         ParameterizedTypeReference<Document> localReturnType = new ParameterizedTypeReference<Document>() {};
-        return apiClient.invokeAPI("/mentor/documents/{id}/versions/{versionNumber}", HttpMethod.GET, uriVariables, localVarQueryParams, localVarPostBody, localVarHeaderParams, localVarCookieParams, localVarFormParams, localVarAccept, localVarContentType, localVarAuthNames, localReturnType);
+        return apiClient.invokeAPI("/mentor/documents/documents/{id}/versions/{versionNumber}", HttpMethod.GET, uriVariables, localVarQueryParams, localVarPostBody, localVarHeaderParams, localVarCookieParams, localVarFormParams, localVarAccept, localVarContentType, localVarAuthNames, localReturnType);
     }
     /**
      * List latest version of documents (no auth; all users)
@@ -470,7 +470,7 @@ public class ExportedApi extends BaseApi {
         String[] localVarAuthNames = new String[] {  };
 
         ParameterizedTypeReference<List<DocumentSummary>> localReturnType = new ParameterizedTypeReference<List<DocumentSummary>>() {};
-        return apiClient.invokeAPI("/mentor/documents", HttpMethod.GET, Collections.<String, Object>emptyMap(), localVarQueryParams, localVarPostBody, localVarHeaderParams, localVarCookieParams, localVarFormParams, localVarAccept, localVarContentType, localVarAuthNames, localReturnType);
+        return apiClient.invokeAPI("/mentor/documents/documents", HttpMethod.GET, Collections.<String, Object>emptyMap(), localVarQueryParams, localVarPostBody, localVarHeaderParams, localVarCookieParams, localVarFormParams, localVarAccept, localVarContentType, localVarAuthNames, localReturnType);
     }
     /**
      * List versions of a document
@@ -531,7 +531,7 @@ public class ExportedApi extends BaseApi {
         String[] localVarAuthNames = new String[] {  };
 
         ParameterizedTypeReference<List<Document>> localReturnType = new ParameterizedTypeReference<List<Document>>() {};
-        return apiClient.invokeAPI("/mentor/documents/{id}/versions", HttpMethod.GET, uriVariables, localVarQueryParams, localVarPostBody, localVarHeaderParams, localVarCookieParams, localVarFormParams, localVarAccept, localVarContentType, localVarAuthNames, localReturnType);
+        return apiClient.invokeAPI("/mentor/documents/documents/{id}/versions", HttpMethod.GET, uriVariables, localVarQueryParams, localVarPostBody, localVarHeaderParams, localVarCookieParams, localVarFormParams, localVarAccept, localVarContentType, localVarAuthNames, localReturnType);
     }
     /**
      * Handle mentor chat
@@ -641,7 +641,7 @@ public class ExportedApi extends BaseApi {
         String[] localVarAuthNames = new String[] {  };
 
         ParameterizedTypeReference<Document> localReturnType = new ParameterizedTypeReference<Document>() {};
-        return apiClient.invokeAPI("/mentor/documents/{id}", HttpMethod.PUT, uriVariables, localVarQueryParams, localVarPostBody, localVarHeaderParams, localVarCookieParams, localVarFormParams, localVarAccept, localVarContentType, localVarAuthNames, localReturnType);
+        return apiClient.invokeAPI("/mentor/documents/documents/{id}", HttpMethod.PUT, uriVariables, localVarQueryParams, localVarPostBody, localVarHeaderParams, localVarCookieParams, localVarFormParams, localVarAccept, localVarContentType, localVarAuthNames, localReturnType);
     }
     /**
      * Vote on a chat message (upvote/downvote)
@@ -703,7 +703,7 @@ public class ExportedApi extends BaseApi {
         String[] localVarAuthNames = new String[] {  };
 
         ParameterizedTypeReference<ChatMessageVote> localReturnType = new ParameterizedTypeReference<ChatMessageVote>() {};
-        return apiClient.invokeAPI("/mentor/chat/messages/{messageId}/vote", HttpMethod.POST, uriVariables, localVarQueryParams, localVarPostBody, localVarHeaderParams, localVarCookieParams, localVarFormParams, localVarAccept, localVarContentType, localVarAuthNames, localReturnType);
+        return apiClient.invokeAPI("/mentor/messages/chat/messages/{messageId}/vote", HttpMethod.POST, uriVariables, localVarQueryParams, localVarPostBody, localVarHeaderParams, localVarCookieParams, localVarFormParams, localVarAccept, localVarContentType, localVarAuthNames, localReturnType);
     }
 
     @Override

@@ -1,49 +1,81 @@
 openapi: 3.1.0
 info:
-  version: 0.10.6
+  version: 0.10.8
   title: Hephaestus Intelligence Service API
 components:
   schemas:
-    HealthCheck:
+    BadPractice:
       type: object
       properties:
+        title:
+          type: string
+        description:
+          type: string
         status:
           type: string
           enum:
-            - OK
-          description: Health status
-          example: OK
+            - Good Practice
+            - Fixed
+            - Critical Issue
+            - Normal Issue
+            - Minor Issue
+            - Won't Fix
+            - Wrong
       required:
-        - status
-    ChatThreadSummary:
-      type: object
-      properties:
-        id:
-          type: string
-          format: uuid
-        title:
-          type: string
-        createdAt:
-          type: string
-          format: date-time
-      required:
-        - id
         - title
-      x-hephaestus: &a1
-        export: true
-    ChatThreadGroup:
+        - description
+        - status
+    BadPracticeResult:
       type: object
       properties:
-        groupName:
+        bad_practice_summary:
           type: string
-        threads:
+        bad_practices:
           type: array
           items:
-            $ref: "#/components/schemas/ChatThreadSummary"
+            $ref: "#/components/schemas/BadPractice"
       required:
-        - groupName
-        - threads
-      x-hephaestus: *a1
+        - bad_practice_summary
+        - bad_practices
+    DetectorResponse:
+      allOf:
+        - $ref: "#/components/schemas/BadPracticeResult"
+        - type: object
+          properties:
+            trace_id:
+              type: string
+          required:
+            - trace_id
+    DetectorRequest:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        lifecycle_state:
+          type: string
+        repository_name:
+          type: string
+        pull_request_number:
+          type: number
+        bad_practice_summary:
+          type: string
+        bad_practices:
+          type: array
+          items:
+            $ref: "#/components/schemas/BadPractice"
+        pull_request_template:
+          type: string
+      required:
+        - title
+        - description
+        - lifecycle_state
+        - repository_name
+        - pull_request_number
+        - bad_practice_summary
+        - bad_practices
+        - pull_request_template
     StreamTextStartPart:
       type: object
       properties:
@@ -57,7 +89,8 @@ components:
       required:
         - type
         - id
-      x-hephaestus: *a1
+      x-hephaestus: &a1
+        export: true
     StreamTextDeltaPart:
       type: object
       properties:
@@ -545,6 +578,34 @@ components:
         - id
         - messages
       x-hephaestus: *a1
+    ChatThreadSummary:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - title
+      x-hephaestus: *a1
+    ChatThreadGroup:
+      type: object
+      properties:
+        groupName:
+          type: string
+        threads:
+          type: array
+          items:
+            $ref: "#/components/schemas/ChatThreadSummary"
+      required:
+        - groupName
+        - threads
+      x-hephaestus: *a1
     DocumentKind:
       type: string
       enum:
@@ -645,125 +706,28 @@ components:
       required:
         - isUpvoted
       x-hephaestus: *a1
-    BadPractice:
-      type: object
-      properties:
-        title:
-          type: string
-        description:
-          type: string
-        status:
-          type: string
-          enum:
-            - Good Practice
-            - Fixed
-            - Critical Issue
-            - Normal Issue
-            - Minor Issue
-            - Won't Fix
-            - Wrong
-      required:
-        - title
-        - description
-        - status
-    BadPracticeResult:
-      type: object
-      properties:
-        bad_practice_summary:
-          type: string
-        bad_practices:
-          type: array
-          items:
-            $ref: "#/components/schemas/BadPractice"
-      required:
-        - bad_practice_summary
-        - bad_practices
-    DetectorResponse:
-      allOf:
-        - $ref: "#/components/schemas/BadPracticeResult"
-        - type: object
-          properties:
-            trace_id:
-              type: string
-          required:
-            - trace_id
-    DetectorRequest:
-      type: object
-      properties:
-        title:
-          type: string
-        description:
-          type: string
-        lifecycle_state:
-          type: string
-        repository_name:
-          type: string
-        pull_request_number:
-          type: number
-        bad_practice_summary:
-          type: string
-        bad_practices:
-          type: array
-          items:
-            $ref: "#/components/schemas/BadPractice"
-        pull_request_template:
-          type: string
-      required:
-        - title
-        - description
-        - lifecycle_state
-        - repository_name
-        - pull_request_number
-        - bad_practice_summary
-        - bad_practices
-        - pull_request_template
   parameters: {}
 paths:
-  /health:
-    get:
+  /detector/detector:
+    post:
+      operationId: detectBadPractices
       tags:
-        - healthcheck
-      summary: Perform a Health Check
-      description: Endpoint to perform a healthcheck on. This endpoint can primarily
-        be used by Docker to ensure robust container orchestration and
-        management. Other services which rely on proper functioning of the API
-        service will not deploy if this endpoint returns any other HTTP status
-        code except 200 (OK).
+        - Detector
+      summary: Detect bad practices for a pull request
+      requestBody:
+        description: Detector request
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DetectorRequest"
       responses:
         "200":
-          description: Return HTTP Status Code 200 (OK)
+          description: Detection response
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/HealthCheck"
-  /mentor/threads/grouped:
-    get:
-      tags:
-        - mentor
-        - exported
-      summary: List chat threads grouped by time buckets
-      operationId: getGroupedThreads
-      responses:
-        "200":
-          description: Grouped chat threads
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/ChatThreadGroup"
-        "500":
-          description: Internal error
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                required:
-                  - error
-      x-hephaestus: *a1
+                $ref: "#/components/schemas/DetectorResponse"
   /mentor/chat:
     post:
       tags:
@@ -927,7 +891,35 @@ paths:
                 required:
                   - error
       x-hephaestus: *a1
-  /mentor/documents:
+  /mentor/threads/threads/grouped:
+    get:
+      tags:
+        - mentor
+        - exported
+      summary: List chat threads grouped by time buckets
+      operationId: getGroupedThreads
+      responses:
+        "200":
+          description: Grouped chat threads
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ChatThreadGroup"
+        "500":
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                  - error
+      x-hephaestus: *a1
+  /mentor/documents/documents:
     post:
       tags:
         - documents
@@ -1005,7 +997,7 @@ paths:
                 required:
                   - error
       x-hephaestus: *a1
-  /mentor/documents/{id}:
+  /mentor/documents/documents/{id}:
     get:
       tags:
         - documents
@@ -1138,7 +1130,7 @@ paths:
                 required:
                   - error
       x-hephaestus: *a1
-  /mentor/documents/{id}/versions:
+  /mentor/documents/documents/{id}/versions:
     get:
       tags:
         - documents
@@ -1252,7 +1244,7 @@ paths:
                 required:
                   - error
       x-hephaestus: *a1
-  /mentor/documents/{id}/versions/{versionNumber}:
+  /mentor/documents/documents/{id}/versions/{versionNumber}:
     get:
       tags:
         - documents
@@ -1303,7 +1295,7 @@ paths:
                 required:
                   - error
       x-hephaestus: *a1
-  /mentor/chat/messages/{messageId}/vote:
+  /mentor/messages/chat/messages/{messageId}/vote:
     post:
       tags:
         - vote
@@ -1354,24 +1346,4 @@ paths:
                 required:
                   - error
       x-hephaestus: *a1
-  /detector:
-    post:
-      operationId: detectBadPractices
-      tags:
-        - Detector
-      summary: Detect bad practices for a pull request
-      requestBody:
-        description: Detector request
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/DetectorRequest"
-      responses:
-        "200":
-          description: Detection response
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/DetectorResponse"
 webhooks: {}

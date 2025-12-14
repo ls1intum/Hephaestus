@@ -6,8 +6,8 @@ import { useEffect, useRef, useState } from "react";
 import {
 	getDocumentOptions,
 	getDocumentQueryKey,
-	getDocumentVersionOptions,
-	getDocumentVersionQueryKey,
+	getVersionOptions,
+	getVersionQueryKey,
 	updateDocumentMutation,
 } from "@/api/@tanstack/react-query.gen";
 import type { Document } from "@/api/types.gen";
@@ -148,7 +148,7 @@ export function useDocumentArtifact({
 			selectedIndex >= 0 &&
 			selectedVersionNumber != null &&
 			Boolean(documentId),
-		...getDocumentVersionOptions({
+		...getVersionOptions({
 			path: {
 				workspaceSlug: workspaceSlug ?? "",
 				id: documentId,
@@ -223,7 +223,7 @@ export function useDocumentArtifact({
 				}),
 			});
 			queryClient.invalidateQueries({
-				queryKey: getDocumentVersionQueryKey({
+				queryKey: getVersionQueryKey({
 					path: {
 						workspaceSlug: workspaceSlug ?? "",
 						id: documentId,

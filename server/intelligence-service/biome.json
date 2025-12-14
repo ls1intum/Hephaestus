@@ -161,7 +161,7 @@
 			}
 		},
 		{
-			"includes": ["src/db/schema.ts", "src/db/relations.ts"],
+			"includes": ["src/shared/db/schema.ts", "src/shared/db/relations.ts"],
 			"linter": {
 				"enabled": false
 			}

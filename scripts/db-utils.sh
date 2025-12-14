@@ -260,7 +260,7 @@ generate_intelligence_service_models() {
     log_info "Generating Drizzle schema for intelligence service..."
     cd "$PROJECT_ROOT"
     npm run db:generate-models:intelligence-service
-    log_success "Drizzle schema generated for intelligence service (see server/intelligence-service/src/db)"
+    log_success "Drizzle schema generated for intelligence service (see server/intelligence-service/src/shared/db)"
 }
 
 # Generate changelog diff with database backup/restore

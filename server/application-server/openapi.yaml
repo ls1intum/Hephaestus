@@ -22,8 +22,6 @@ tags:
   name: workspace-registry-controller
 - description: Team management within workspace
   name: Teams
-- description: AI Mentor chat and document operations
-  name: mentor-controller
 - description: |-
     Controller for activity-related operations within a workspace context.
      All endpoints require workspace membership via {@link WorkspaceScopedController WorkspaceScopedController}.
@@ -54,7 +52,7 @@ paths:
           description: list of contributors sorted by contribution count
       summary: List global contributors
       tags:
-      - C
+      - Contributors
   /user:
     delete:
       description: Permanently delete the current user's account and all associated
@@ -64,7 +62,8 @@ paths:
         "200":
           description: OK
       summary: Delete user account
-      tags: []
+      tags:
+      - Account
   /user/settings:
     get:
       description: Get the current user's notification and research participation
@@ -78,7 +77,8 @@ paths:
                 $ref: "#/components/schemas/UserSettings"
           description: OK
       summary: Get user settings
-      tags: []
+      tags:
+      - Account
     post:
       description: Update the current user's notification and research participation
         preferences
@@ -97,7 +97,8 @@ paths:
                 $ref: "#/components/schemas/UserSettings"
           description: OK
       summary: Update user settings
-      tags: []
+      tags:
+      - Account
   /workspaces:
     get:
       operationId: listWorkspaces
@@ -361,7 +362,8 @@ paths:
                   $ref: "#/components/schemas/LeaderboardEntry"
           description: ranked list of leaderboard entries
       summary: Generate leaderboard
-      tags: []
+      tags:
+      - Leaderboard
     post:
       description: Calculates league changes for a specific user
       operationId: getUserLeagueStats
@@ -394,7 +396,8 @@ paths:
                 $ref: "#/components/schemas/LeagueChange"
           description: league change statistics including promotion/demotion info
       summary: Get user league stats
-      tags: []
+      tags:
+      - Leaderboard
   /workspaces/{workspaceSlug}/league/reset:
     put:
       operationId: resetAndRecalculateLeagues
@@ -567,8 +570,9 @@ paths:
       - workspace-membership
   /workspaces/{workspaceSlug}/mentor/chat:
     post:
-      description: Send a message to the AI mentor and receive a streaming response
-      operationId: chat
+      x-hephaestus:
+        export: true
+      operationId: mentorChat
       parameters:
       - description: Workspace slug
         in: path
@@ -582,56 +586,110 @@ paths:
           application/json:
             schema:
               type: object
-              additionalProperties:
-                type: object
+              properties:
+                id:
+                  type: string
+                  format: uuid
+                message:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                      format: uuid
+                    parts:
+                      type: array
+                      items:
+                        anyOf:
+                        - type: object
+                          properties:
+                            text:
+                              type: string
+                              maxLength: 2000
+                              minLength: 1
+                            type:
+                              type: string
+                              enum:
+                              - text
+                          required:
+                          - text
+                          - type
+                        - type: object
+                          properties:
+                            mediaType:
+                              type: string
+                              enum:
+                              - image/jpeg
+                              - image/png
+                            name:
+                              type: string
+                              maxLength: 100
+                              minLength: 1
+                            type:
+                              type: string
+                              enum:
+                              - file
+                            url:
+                              type: string
+                              format: uri
+                          required:
+                          - mediaType
+                          - name
+                          - type
+                          - url
+                    role:
+                      type: string
+                      enum:
+                      - user
+                  required:
+                  - id
+                  - parts
+                  - role
+                previousMessageId:
+                  type: string
+              required:
+              - id
+              - message
+        description: Chat request body
         required: true
       responses:
         "200":
           content:
-            text/event-stream: {}
-          description: Event stream of chat updates
-      summary: Send chat message
-      tags:
-      - mentor
-  /workspaces/{workspaceSlug}/mentor/chat/messages/{messageId}/vote:
-    post:
-      description: Upvote or downvote a chat message
-      operationId: voteMessage
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      - description: Message ID
-        in: path
-        name: messageId
-        required: true
-        schema:
-          type: string
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/VoteMessageRequest"
-        required: true
-      responses:
-        "200":
-          content:
-            application/json:
+            text/event-stream:
               schema:
-                $ref: "#/components/schemas/ChatMessageVote"
-          description: Vote recorded successfully
-      summary: Vote on a message
+                anyOf:
+                - $ref: "#/components/schemas/StreamTextStartPart"
+                - $ref: "#/components/schemas/StreamTextDeltaPart"
+                - $ref: "#/components/schemas/StreamTextEndPart"
+                - $ref: "#/components/schemas/StreamErrorPart"
+                - $ref: "#/components/schemas/StreamToolInputStartPart"
+                - $ref: "#/components/schemas/StreamToolInputDeltaPart"
+                - $ref: "#/components/schemas/StreamToolInputAvailablePart"
+                - $ref: "#/components/schemas/StreamToolInputErrorPart"
+                - $ref: "#/components/schemas/StreamToolOutputAvailablePart"
+                - $ref: "#/components/schemas/StreamToolOutputErrorPart"
+                - $ref: "#/components/schemas/StreamReasoningStartPart"
+                - $ref: "#/components/schemas/StreamReasoningDeltaPart"
+                - $ref: "#/components/schemas/StreamReasoningEndPart"
+                - $ref: "#/components/schemas/StreamSourceUrlPart"
+                - $ref: "#/components/schemas/StreamSourceDocumentPart"
+                - $ref: "#/components/schemas/StreamFilePart"
+                - $ref: "#/components/schemas/StreamDataPart"
+                - $ref: "#/components/schemas/StreamStepStartPart"
+                - $ref: "#/components/schemas/StreamStepFinishPart"
+                - $ref: "#/components/schemas/StreamStartPart"
+                - $ref: "#/components/schemas/StreamFinishPart"
+                - $ref: "#/components/schemas/StreamMessageMetadataPart"
+                - $ref: "#/components/schemas/StreamAbortPart"
+          description: Event stream of chat updates.
+      summary: Handle mentor chat
       tags:
       - mentor
-  /workspaces/{workspaceSlug}/mentor/documents:
+      - exported
+  /workspaces/{workspaceSlug}/mentor/documents/documents:
     get:
-      description: Retrieve all documents (latest versions only) for the authenticated
-        user
-      operationId: getDocuments
+      x-hephaestus:
+        export: true
+      operationId: listDocuments
       parameters:
       - description: Workspace slug
         in: path
@@ -640,6 +698,27 @@ paths:
         schema:
           type: string
           pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - explode: true
+        in: query
+        name: page
+        required: false
+        schema:
+          type:
+          - integer
+          - "null"
+          default: 0
+          minimum: 0
+        style: form
+      - explode: true
+        in: query
+        name: size
+        required: false
+        schema:
+          type: integer
+          default: 20
+          maximum: 100
+          minimum: 1
+        style: form
       responses:
         "200":
           content:
@@ -648,12 +727,25 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/DocumentSummary"
-          description: Successfully retrieved documents
-      summary: Get all user documents
+          description: Document summaries
+        "500":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                - error
+          description: Internal error
+      summary: List latest version of documents (no auth; all users)
       tags:
-      - mentor
+      - documents
+      - exported
     post:
-      description: Create a new document for the authenticated user
+      x-hephaestus:
+        export: true
       operationId: createDocument
       parameters:
       - description: Workspace slug
@@ -668,6 +760,7 @@ paths:
           application/json:
             schema:
               $ref: "#/components/schemas/CreateDocumentRequest"
+        description: Create document
         required: true
       responses:
         "201":
@@ -675,13 +768,26 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Document"
-          description: Document created successfully
+          description: Created document
+        "500":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                - error
+          description: Internal error
       summary: Create a new document
       tags:
-      - mentor
-  /workspaces/{workspaceSlug}/mentor/documents/{id}:
+      - documents
+      - exported
+  /workspaces/{workspaceSlug}/mentor/documents/documents/{id}:
     delete:
-      description: Delete a document and all its versions
+      x-hephaestus:
+        export: true
       operationId: deleteDocument
       parameters:
       - description: Workspace slug
@@ -691,22 +797,46 @@ paths:
         schema:
           type: string
           pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      - description: Document ID
+      - explode: false
         in: path
         name: id
         required: true
         schema:
           type: string
+          format: uuid
+        style: simple
       responses:
         "204":
-          description: Document deleted successfully
+          description: Deleted
         "404":
-          description: Document not found
-      summary: Delete document
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                - error
+          description: Not found
+        "500":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                - error
+          description: Internal error
+      summary: Delete a document and all versions
       tags:
-      - mentor
+      - documents
+      - exported
     get:
-      description: Retrieve a specific document
+      x-hephaestus:
+        export: true
       operationId: getDocument
       parameters:
       - description: Workspace slug
@@ -716,30 +846,50 @@ paths:
         schema:
           type: string
           pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      - description: Document ID
+      - explode: false
         in: path
         name: id
         required: true
         schema:
           type: string
+          format: uuid
+        style: simple
       responses:
         "200":
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Document"
-          description: Successfully retrieved document
+          description: Document
         "404":
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Document"
-          description: Document not found
-      summary: Get document by ID
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                - error
+          description: Not found
+        "500":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                - error
+          description: Internal error
+      summary: Get latest version of a document
       tags:
-      - mentor
+      - documents
+      - exported
     put:
-      description: Update an existing document
+      x-hephaestus:
+        export: true
       operationId: updateDocument
       parameters:
       - description: Workspace slug
@@ -749,17 +899,20 @@ paths:
         schema:
           type: string
           pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      - description: Document ID
+      - explode: false
         in: path
         name: id
         required: true
         schema:
           type: string
+          format: uuid
+        style: simple
       requestBody:
         content:
           application/json:
             schema:
               $ref: "#/components/schemas/CreateDocumentRequest"
+        description: Update document
         required: true
       responses:
         "200":
@@ -767,20 +920,38 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Document"
-          description: Document updated successfully
+          description: Updated document
         "404":
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Document"
-          description: Document not found
-      summary: Update document
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                - error
+          description: Not found
+        "500":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                - error
+          description: Internal error
+      summary: Update a document (creates new version)
       tags:
-      - mentor
-  /workspaces/{workspaceSlug}/mentor/documents/{id}/versions:
+      - documents
+      - exported
+  /workspaces/{workspaceSlug}/mentor/documents/documents/{id}/versions:
     delete:
-      description: Delete document versions created after a specified timestamp
-      operationId: deleteVersionsAfterTimestamp
+      x-hephaestus:
+        export: true
+      operationId: deleteDocumentVersionsAfter
       parameters:
       - description: Workspace slug
         in: path
@@ -789,27 +960,61 @@ paths:
         schema:
           type: string
           pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      - description: Document ID
+      - explode: false
         in: path
         name: id
         required: true
         schema:
           type: string
-      - description: Timestamp after which versions should be deleted
+          format: uuid
+        style: simple
+      - explode: true
         in: query
-        name: timestamp
+        name: after
         required: true
         schema:
           type: string
+          format: date-time
+        style: form
       responses:
-        "204":
-          description: Versions deleted successfully
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Document"
+          description: Deleted versions
+        "404":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                - error
+          description: Not found
+        "500":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                - error
+          description: Internal error
       summary: Delete versions after timestamp
       tags:
-      - mentor
+      - documents
+      - exported
     get:
-      description: Retrieve all versions of a document
-      operationId: getDocumentVersions
+      x-hephaestus:
+        export: true
+      operationId: listVersions
       parameters:
       - description: Workspace slug
         in: path
@@ -818,12 +1023,35 @@ paths:
         schema:
           type: string
           pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      - description: Document ID
+      - explode: false
         in: path
         name: id
         required: true
         schema:
           type: string
+          format: uuid
+        style: simple
+      - explode: true
+        in: query
+        name: page
+        required: false
+        schema:
+          type:
+          - integer
+          - "null"
+          default: 0
+          minimum: 0
+        style: form
+      - explode: true
+        in: query
+        name: size
+        required: false
+        schema:
+          type: integer
+          default: 20
+          maximum: 100
+          minimum: 1
+        style: form
       responses:
         "200":
           content:
@@ -832,22 +1060,38 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/Document"
-          description: Successfully retrieved document versions
+          description: Document versions
         "404":
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/Document"
-          description: Document not found
-      summary: Get document versions
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                - error
+          description: Not found
+        "500":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                - error
+          description: Internal error
+      summary: List versions of a document
       tags:
-      - mentor
-  /workspaces/{workspaceSlug}/mentor/documents/{id}/versions/{versionNumber}:
+      - documents
+      - exported
+  /workspaces/{workspaceSlug}/mentor/documents/documents/{id}/versions/{versionNumber}:
     get:
-      description: Retrieve a specific version of a document
-      operationId: getDocumentVersion
+      x-hephaestus:
+        export: true
+      operationId: getVersion
       parameters:
       - description: Workspace slug
         in: path
@@ -856,39 +1100,121 @@ paths:
         schema:
           type: string
           pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      - description: Document ID
+      - explode: false
         in: path
         name: id
         required: true
         schema:
           type: string
-      - description: Version number
+          format: uuid
+        style: simple
+      - explode: false
         in: path
         name: versionNumber
         required: true
         schema:
-          type: integer
-          format: int32
+          type:
+          - integer
+          - "null"
+        style: simple
       responses:
         "200":
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Document"
-          description: Successfully retrieved document version
+          description: Document
         "404":
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Document"
-          description: Document or version not found
-      summary: Get specific document version
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                - error
+          description: Not found
+        "500":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                - error
+          description: Internal error
+      summary: Get specific version
       tags:
-      - mentor
-  /workspaces/{workspaceSlug}/mentor/threads/grouped:
+      - documents
+      - exported
+  /workspaces/{workspaceSlug}/mentor/messages/chat/messages/{messageId}/vote:
+    post:
+      x-hephaestus:
+        export: true
+      operationId: voteMessage
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - explode: false
+        in: path
+        name: messageId
+        required: true
+        schema:
+          type: string
+          format: uuid
+        style: simple
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VoteMessageRequest"
+        description: Vote request body
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatMessageVote"
+          description: Vote recorded
+        "404":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                - error
+          description: Message not found
+        "500":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                - error
+          description: Internal error
+      summary: Vote on a chat message (upvote/downvote)
+      tags:
+      - vote
+      - exported
+  /workspaces/{workspaceSlug}/mentor/threads/threads/grouped:
     get:
-      description: Retrieve all chat threads for the authenticated user grouped by
-        time periods
+      x-hephaestus:
+        export: true
       operationId: getGroupedThreads
       parameters:
       - description: Workspace slug
@@ -906,13 +1232,26 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/ChatThreadGroup"
-          description: Successfully retrieved grouped threads
-      summary: Get grouped chat threads
+          description: Grouped chat threads
+        "500":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                - error
+          description: Internal error
+      summary: List chat threads grouped by time buckets
       tags:
       - mentor
+      - exported
   /workspaces/{workspaceSlug}/mentor/threads/{threadId}:
     get:
-      description: Retrieve a specific chat thread with all its messages
+      x-hephaestus:
+        export: true
       operationId: getThread
       parameters:
       - description: Workspace slug
@@ -922,28 +1261,58 @@ paths:
         schema:
           type: string
           pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      - description: Thread ID
+      - explode: false
         in: path
         name: threadId
         required: true
         schema:
           type: string
+          format: uuid
+        style: simple
       responses:
         "200":
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ChatThreadDetail"
-          description: Successfully retrieved thread detail
+                $ref: "#/components/schemas/ThreadDetail"
+          description: Thread detail with messages
         "404":
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ChatThreadDetail"
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                - error
           description: Thread not found
-      summary: Get thread detail
+        "500":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                - error
+          description: Internal error
+        "503":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                - error
+          description: Service temporarily unavailable
+      summary: Get mentor chat thread detail
       tags:
       - mentor
+      - exported
   /workspaces/{workspaceSlug}/notifications:
     patch:
       operationId: updateNotifications
@@ -1011,7 +1380,8 @@ paths:
           description: "user profile with open PRs, review activity, league points,\
             \ etc."
       summary: Get user profile
-      tags: []
+      tags:
+      - Profile
   /workspaces/{workspaceSlug}/public-visibility:
     patch:
       operationId: updatePublicVisibility
@@ -1245,7 +1615,8 @@ paths:
                   $ref: "#/components/schemas/TeamInfo"
           description: list of teams with their members and permissions
       summary: List teams
-      tags: []
+      tags:
+      - Teams
   /workspaces/{workspaceSlug}/team/{id}/visibility:
     post:
       description: Show or hide a team in leaderboard calculations
@@ -1281,7 +1652,8 @@ paths:
         "200":
           description: "200 OK on success, 404 if team not found"
       summary: Update team visibility
-      tags: []
+      tags:
+      - Teams
   /workspaces/{workspaceSlug}/team/{teamId}/repositories/{repositoryId}/visibility:
     post:
       operationId: updateRepositoryVisibility
@@ -1318,7 +1690,8 @@ paths:
       responses:
         "200":
           description: OK
-      tags: []
+      tags:
+      - Teams
   /workspaces/{workspaceSlug}/teams/{teamId}/labels/{labelId}:
     delete:
       operationId: removeLabelFromTeam
@@ -1477,37 +1850,9 @@ components:
       required:
       - explanation
       - type
-    ChatMessage:
-      type: object
-      description: Chat message
-      properties:
-        createdAt:
-          type: string
-          description: Message creation timestamp
-        id:
-          type: string
-          description: Message ID
-        parentMessageId:
-          type: string
-          description: Parent message ID for conversation branching
-        parts:
-          type: array
-          description: Message parts
-          items:
-            type: object
-        role:
-          type: string
-          description: Message role
-          enum:
-          - system
-          - user
-          - assistant
-      required:
-      - id
-      - parts
-      - role
     ChatMessageVote:
       type: object
+      x-hephaestus: a1
       properties:
         createdAt:
           type: string
@@ -1525,29 +1870,9 @@ components:
       - isUpvoted
       - messageId
       - updatedAt
-    ChatThreadDetail:
-      type: object
-      description: Chat thread detail with full message content
-      properties:
-        id:
-          type: string
-          description: Thread ID
-        messages:
-          type: array
-          description: Thread messages
-          items:
-            $ref: "#/components/schemas/ChatMessage"
-        selectedLeafMessageId:
-          type: string
-          description: Selected leaf message ID for conversation branching
-        title:
-          type: string
-          description: Thread title
-      required:
-      - id
-      - messages
     ChatThreadGroup:
       type: object
+      x-hephaestus: a1
       properties:
         groupName:
           type: string
@@ -1560,6 +1885,7 @@ components:
       - threads
     ChatThreadSummary:
       type: object
+      x-hephaestus: a1
       properties:
         createdAt:
           type: string
@@ -1600,6 +1926,7 @@ components:
       - name
     CreateDocumentRequest:
       type: object
+      x-hephaestus: a1
       properties:
         content:
           type: string
@@ -1641,6 +1968,7 @@ components:
       - workspaceSlug
     Document:
       type: object
+      x-hephaestus: a1
       properties:
         content:
           type: string
@@ -1670,8 +1998,10 @@ components:
       type: string
       enum:
       - text
+      x-hephaestus: a1
     DocumentSummary:
       type: object
+      x-hephaestus: a1
       properties:
         createdAt:
           type: string
@@ -2026,6 +2356,7 @@ components:
       - nameWithOwner
     StreamAbortPart:
       type: object
+      x-hephaestus: a1
       properties:
         type:
           type: string
@@ -2035,6 +2366,7 @@ components:
       - type
     StreamDataPart:
       type: object
+      x-hephaestus: a1
       properties:
         data: {}
         id:
@@ -2048,6 +2380,7 @@ components:
       - type
     StreamErrorPart:
       type: object
+      x-hephaestus: a1
       properties:
         errorText:
           type: string
@@ -2060,6 +2393,7 @@ components:
       - type
     StreamFilePart:
       type: object
+      x-hephaestus: a1
       properties:
         mediaType:
           type: string
@@ -2076,6 +2410,7 @@ components:
       - url
     StreamFinishPart:
       type: object
+      x-hephaestus: a1
       properties:
         messageMetadata: {}
         type:
@@ -2086,6 +2421,7 @@ components:
       - type
     StreamMessageMetadataPart:
       type: object
+      x-hephaestus: a1
       properties:
         messageMetadata: {}
         type:
@@ -2096,6 +2432,7 @@ components:
       - type
     StreamReasoningDeltaPart:
       type: object
+      x-hephaestus: a1
       properties:
         delta:
           type: string
@@ -2112,6 +2449,7 @@ components:
       - type
     StreamReasoningEndPart:
       type: object
+      x-hephaestus: a1
       properties:
         id:
           type: string
@@ -2125,6 +2463,7 @@ components:
       - type
     StreamReasoningStartPart:
       type: object
+      x-hephaestus: a1
       properties:
         id:
           type: string
@@ -2138,6 +2477,7 @@ components:
       - type
     StreamSourceDocumentPart:
       type: object
+      x-hephaestus: a1
       properties:
         filename:
           type: string
@@ -2159,6 +2499,7 @@ components:
       - type
     StreamSourceUrlPart:
       type: object
+      x-hephaestus: a1
       properties:
         providerMetadata: {}
         sourceId:
@@ -2177,6 +2518,7 @@ components:
       - url
     StreamStartPart:
       type: object
+      x-hephaestus: a1
       properties:
         messageId:
           type: string
@@ -2189,6 +2531,7 @@ components:
       - type
     StreamStepFinishPart:
       type: object
+      x-hephaestus: a1
       properties:
         type:
           type: string
@@ -2198,6 +2541,7 @@ components:
       - type
     StreamStepStartPart:
       type: object
+      x-hephaestus: a1
       properties:
         type:
           type: string
@@ -2207,6 +2551,7 @@ components:
       - type
     StreamTextDeltaPart:
       type: object
+      x-hephaestus: a1
       properties:
         delta:
           type: string
@@ -2223,6 +2568,7 @@ components:
       - type
     StreamTextEndPart:
       type: object
+      x-hephaestus: a1
       properties:
         id:
           type: string
@@ -2236,6 +2582,8 @@ components:
       - type
     StreamTextStartPart:
       type: object
+      x-hephaestus:
+        export: true
       properties:
         id:
           type: string
@@ -2249,6 +2597,7 @@ components:
       - type
     StreamToolInputAvailablePart:
       type: object
+      x-hephaestus: a1
       properties:
         dynamic:
           type: boolean
@@ -2270,6 +2619,7 @@ components:
       - type
     StreamToolInputDeltaPart:
       type: object
+      x-hephaestus: a1
       properties:
         inputTextDelta:
           type: string
@@ -2285,6 +2635,7 @@ components:
       - type
     StreamToolInputErrorPart:
       type: object
+      x-hephaestus: a1
       properties:
         dynamic:
           type: boolean
@@ -2309,6 +2660,7 @@ components:
       - type
     StreamToolInputStartPart:
       type: object
+      x-hephaestus: a1
       properties:
         dynamic:
           type: boolean
@@ -2328,6 +2680,7 @@ components:
       - type
     StreamToolOutputAvailablePart:
       type: object
+      x-hephaestus: a1
       properties:
         dynamic:
           type: boolean
@@ -2345,6 +2698,7 @@ components:
       - type
     StreamToolOutputErrorPart:
       type: object
+      x-hephaestus: a1
       properties:
         dynamic:
           type: boolean
@@ -2445,6 +2799,146 @@ components:
       - hidden
       - id
       - name
+    ThreadDetail:
+      type: object
+      x-hephaestus: a1
+      properties:
+        id:
+          type: string
+          format: uuid
+        messages:
+          type: array
+          items:
+            type: object
+            properties:
+              createdAt:
+                type: string
+                format: date-time
+              id:
+                type: string
+                format: uuid
+              parentMessageId:
+                type:
+                - string
+                - "null"
+                format: uuid
+              parts:
+                type: array
+                items:
+                  anyOf:
+                  - type: object
+                    properties:
+                      text:
+                        type: string
+                      type:
+                        type: string
+                        enum:
+                        - text
+                    required:
+                    - text
+                    - type
+                  - type: object
+                    properties:
+                      providerMetadata: {}
+                      text:
+                        type: string
+                      type:
+                        type: string
+                        enum:
+                        - reasoning
+                    required:
+                    - text
+                    - type
+                  - type: object
+                    properties:
+                      mediaType:
+                        type: string
+                        enum:
+                        - image/jpeg
+                        - image/png
+                      name:
+                        type: string
+                      type:
+                        type: string
+                        enum:
+                        - file
+                      url:
+                        type: string
+                        format: uri
+                    required:
+                    - mediaType
+                    - type
+                    - url
+                  - type: object
+                    additionalProperties: {}
+                    properties:
+                      type:
+                        type: string
+                        pattern: ^tool-
+                    required:
+                    - type
+                  - type: object
+                    properties:
+                      providerMetadata: {}
+                      sourceId:
+                        type: string
+                      title:
+                        type: string
+                      type:
+                        type: string
+                        enum:
+                        - source-url
+                      url:
+                        type: string
+                    required:
+                    - type
+                    - url
+                  - type: object
+                    properties:
+                      filename:
+                        type: string
+                      mediaType:
+                        type: string
+                      providerMetadata: {}
+                      title:
+                        type: string
+                      type:
+                        type: string
+                        enum:
+                        - source-document
+                    required:
+                    - mediaType
+                    - title
+                    - type
+                  - type: object
+                    additionalProperties: {}
+                    properties:
+                      type:
+                        type: string
+                    required:
+                    - type
+              role:
+                type: string
+                enum:
+                - system
+                - user
+                - assistant
+            required:
+            - id
+            - parts
+            - role
+        selectedLeafMessageId:
+          type:
+          - string
+          - "null"
+          format: uuid
+        title:
+          type:
+          - string
+          - "null"
+      required:
+      - id
+      - messages
     UpdateWorkspaceNotificationsRequest:
       type: object
       description: DTO for updating workspace leaderboard notification preferences.
@@ -2601,6 +3095,7 @@ components:
       - url
     VoteMessageRequest:
       type: object
+      x-hephaestus: a1
       properties:
         isUpvoted:
           type: boolean

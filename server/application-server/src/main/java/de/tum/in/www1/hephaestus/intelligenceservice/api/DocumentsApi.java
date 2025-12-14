@@ -6,7 +6,7 @@ import de.tum.in.www1.hephaestus.intelligenceservice.BaseApi;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.CreateDocumentRequest;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.Document;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.DocumentSummary;
-import de.tum.in.www1.hephaestus.intelligenceservice.model.GetGroupedThreads500Response;
+import de.tum.in.www1.hephaestus.intelligenceservice.model.GetThread404Response;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
@@ -90,7 +90,7 @@ public class DocumentsApi extends BaseApi {
         String[] localVarAuthNames = new String[] {  };
 
         ParameterizedTypeReference<Document> localReturnType = new ParameterizedTypeReference<Document>() {};
-        return apiClient.invokeAPI("/mentor/documents", HttpMethod.POST, Collections.<String, Object>emptyMap(), localVarQueryParams, localVarPostBody, localVarHeaderParams, localVarCookieParams, localVarFormParams, localVarAccept, localVarContentType, localVarAuthNames, localReturnType);
+        return apiClient.invokeAPI("/mentor/documents/documents", HttpMethod.POST, Collections.<String, Object>emptyMap(), localVarQueryParams, localVarPostBody, localVarHeaderParams, localVarCookieParams, localVarFormParams, localVarAccept, localVarContentType, localVarAuthNames, localReturnType);
     }
     /**
      * Delete a document and all versions
@@ -142,7 +142,7 @@ public class DocumentsApi extends BaseApi {
         String[] localVarAuthNames = new String[] {  };
 
         ParameterizedTypeReference<Void> localReturnType = new ParameterizedTypeReference<Void>() {};
-        return apiClient.invokeAPI("/mentor/documents/{id}", HttpMethod.DELETE, uriVariables, localVarQueryParams, localVarPostBody, localVarHeaderParams, localVarCookieParams, localVarFormParams, localVarAccept, localVarContentType, localVarAuthNames, localReturnType);
+        return apiClient.invokeAPI("/mentor/documents/documents/{id}", HttpMethod.DELETE, uriVariables, localVarQueryParams, localVarPostBody, localVarHeaderParams, localVarCookieParams, localVarFormParams, localVarAccept, localVarContentType, localVarAuthNames, localReturnType);
     }
     /**
      * Delete versions after timestamp
@@ -205,7 +205,7 @@ public class DocumentsApi extends BaseApi {
         String[] localVarAuthNames = new String[] {  };
 
         ParameterizedTypeReference<List<Document>> localReturnType = new ParameterizedTypeReference<List<Document>>() {};
-        return apiClient.invokeAPI("/mentor/documents/{id}/versions", HttpMethod.DELETE, uriVariables, localVarQueryParams, localVarPostBody, localVarHeaderParams, localVarCookieParams, localVarFormParams, localVarAccept, localVarContentType, localVarAuthNames, localReturnType);
+        return apiClient.invokeAPI("/mentor/documents/documents/{id}/versions", HttpMethod.DELETE, uriVariables, localVarQueryParams, localVarPostBody, localVarHeaderParams, localVarCookieParams, localVarFormParams, localVarAccept, localVarContentType, localVarAuthNames, localReturnType);
     }
     /**
      * Get latest version of a document
@@ -258,7 +258,7 @@ public class DocumentsApi extends BaseApi {
         String[] localVarAuthNames = new String[] {  };
 
         ParameterizedTypeReference<Document> localReturnType = new ParameterizedTypeReference<Document>() {};
-        return apiClient.invokeAPI("/mentor/documents/{id}", HttpMethod.GET, uriVariables, localVarQueryParams, localVarPostBody, localVarHeaderParams, localVarCookieParams, localVarFormParams, localVarAccept, localVarContentType, localVarAuthNames, localReturnType);
+        return apiClient.invokeAPI("/mentor/documents/documents/{id}", HttpMethod.GET, uriVariables, localVarQueryParams, localVarPostBody, localVarHeaderParams, localVarCookieParams, localVarFormParams, localVarAccept, localVarContentType, localVarAuthNames, localReturnType);
     }
     /**
      * Get specific version
@@ -319,7 +319,7 @@ public class DocumentsApi extends BaseApi {
         String[] localVarAuthNames = new String[] {  };
 
         ParameterizedTypeReference<Document> localReturnType = new ParameterizedTypeReference<Document>() {};
-        return apiClient.invokeAPI("/mentor/documents/{id}/versions/{versionNumber}", HttpMethod.GET, uriVariables, localVarQueryParams, localVarPostBody, localVarHeaderParams, localVarCookieParams, localVarFormParams, localVarAccept, localVarContentType, localVarAuthNames, localReturnType);
+        return apiClient.invokeAPI("/mentor/documents/documents/{id}/versions/{versionNumber}", HttpMethod.GET, uriVariables, localVarQueryParams, localVarPostBody, localVarHeaderParams, localVarCookieParams, localVarFormParams, localVarAccept, localVarContentType, localVarAuthNames, localReturnType);
     }
     /**
      * List latest version of documents (no auth; all users)
@@ -368,7 +368,7 @@ public class DocumentsApi extends BaseApi {
         String[] localVarAuthNames = new String[] {  };
 
         ParameterizedTypeReference<List<DocumentSummary>> localReturnType = new ParameterizedTypeReference<List<DocumentSummary>>() {};
-        return apiClient.invokeAPI("/mentor/documents", HttpMethod.GET, Collections.<String, Object>emptyMap(), localVarQueryParams, localVarPostBody, localVarHeaderParams, localVarCookieParams, localVarFormParams, localVarAccept, localVarContentType, localVarAuthNames, localReturnType);
+        return apiClient.invokeAPI("/mentor/documents/documents", HttpMethod.GET, Collections.<String, Object>emptyMap(), localVarQueryParams, localVarPostBody, localVarHeaderParams, localVarCookieParams, localVarFormParams, localVarAccept, localVarContentType, localVarAuthNames, localReturnType);
     }
     /**
      * List versions of a document
@@ -429,7 +429,7 @@ public class DocumentsApi extends BaseApi {
         String[] localVarAuthNames = new String[] {  };
 
         ParameterizedTypeReference<List<Document>> localReturnType = new ParameterizedTypeReference<List<Document>>() {};
-        return apiClient.invokeAPI("/mentor/documents/{id}/versions", HttpMethod.GET, uriVariables, localVarQueryParams, localVarPostBody, localVarHeaderParams, localVarCookieParams, localVarFormParams, localVarAccept, localVarContentType, localVarAuthNames, localReturnType);
+        return apiClient.invokeAPI("/mentor/documents/documents/{id}/versions", HttpMethod.GET, uriVariables, localVarQueryParams, localVarPostBody, localVarHeaderParams, localVarCookieParams, localVarFormParams, localVarAccept, localVarContentType, localVarAuthNames, localReturnType);
     }
     /**
      * Update a document (creates new version)
@@ -491,7 +491,7 @@ public class DocumentsApi extends BaseApi {
         String[] localVarAuthNames = new String[] {  };
 
         ParameterizedTypeReference<Document> localReturnType = new ParameterizedTypeReference<Document>() {};
-        return apiClient.invokeAPI("/mentor/documents/{id}", HttpMethod.PUT, uriVariables, localVarQueryParams, localVarPostBody, localVarHeaderParams, localVarCookieParams, localVarFormParams, localVarAccept, localVarContentType, localVarAuthNames, localReturnType);
+        return apiClient.invokeAPI("/mentor/documents/documents/{id}", HttpMethod.PUT, uriVariables, localVarQueryParams, localVarPostBody, localVarHeaderParams, localVarCookieParams, localVarFormParams, localVarAccept, localVarContentType, localVarAuthNames, localReturnType);
     }
 
     @Override

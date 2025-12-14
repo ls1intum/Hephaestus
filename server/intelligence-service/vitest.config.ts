@@ -35,8 +35,8 @@ export default defineConfig({
 			include: ["src/**/*.ts"],
 			exclude: [
 				// Generated files
-				"src/db/schema.ts",
-				"src/db/relations.ts",
+				"src/shared/db/schema.ts",
+				"src/shared/db/relations.ts",
 				// Entry points (minimal logic)
 				"src/index.ts",
 				"src/app.ts",

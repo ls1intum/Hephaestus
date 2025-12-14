@@ -4,7 +4,7 @@ import de.tum.in.www1.hephaestus.intelligenceservice.ApiClient;
 import de.tum.in.www1.hephaestus.intelligenceservice.BaseApi;
 
 import de.tum.in.www1.hephaestus.intelligenceservice.model.ChatMessageVote;
-import de.tum.in.www1.hephaestus.intelligenceservice.model.GetGroupedThreads500Response;
+import de.tum.in.www1.hephaestus.intelligenceservice.model.GetThread404Response;
 import java.util.UUID;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.VoteMessageRequest;
 
@@ -100,7 +100,7 @@ public class VoteApi extends BaseApi {
         String[] localVarAuthNames = new String[] {  };
 
         ParameterizedTypeReference<ChatMessageVote> localReturnType = new ParameterizedTypeReference<ChatMessageVote>() {};
-        return apiClient.invokeAPI("/mentor/chat/messages/{messageId}/vote", HttpMethod.POST, uriVariables, localVarQueryParams, localVarPostBody, localVarHeaderParams, localVarCookieParams, localVarFormParams, localVarAccept, localVarContentType, localVarAuthNames, localReturnType);
+        return apiClient.invokeAPI("/mentor/messages/chat/messages/{messageId}/vote", HttpMethod.POST, uriVariables, localVarQueryParams, localVarPostBody, localVarHeaderParams, localVarCookieParams, localVarFormParams, localVarAccept, localVarContentType, localVarAuthNames, localReturnType);
     }
 
     @Override

@@ -431,9 +431,9 @@ jobs:
           docker stop postgres-erd && docker rm postgres-erd
 
           # Check if ERD documentation is up to date
-          git add docs/dev/database/schema.mmd
+          git add docs/contributor/erd/schema.mmd
 
-          if ! git diff --cached --quiet docs/dev/database/schema.mmd; then
+          if ! git diff --cached --quiet docs/contributor/erd/schema.mmd; then
             echo "❌ ERD documentation validation failed - outdated ERD"
             echo "Fix: npm run db:generate-erd-docs"
             exit 1
@@ -445,7 +445,7 @@ jobs:
       - name: Database models validation
         if: matrix.check == 'database-models-validation'
         run: |
-          echo "🔍 Validating SQLAlchemy models match committed migrations..."
+          echo "🔍 Validating intelligence-service DB models match committed migrations..."
 
           # Start PostgreSQL service for model operations
           echo "🐘 Starting PostgreSQL service..."
@@ -482,10 +482,10 @@ jobs:
           fi
           cd ../..
 
-          # Generate SQLAlchemy models from committed migration-based schema
-          echo "📊 Generating SQLAlchemy models from committed migration-based schema..."
+          # Generate intelligence-service DB models from committed migration-based schema
+          echo "📊 Generating intelligence-service DB models from committed migration-based schema..."
           if ! scripts/db-utils.sh generate-models-intelligence-service; then
-            echo "❌ Failed to generate SQLAlchemy models"
+            echo "❌ Failed to generate intelligence-service DB models"
             docker stop postgres-models && docker rm postgres-models
             exit 1
           fi
@@ -494,13 +494,15 @@ jobs:
           docker stop postgres-models && docker rm postgres-models
 
           # Check if generated models match committed versions
-          if ! git diff --quiet server/intelligence-service/app/db/models_gen.py; then
-            echo "❌ SQLAlchemy models validation failed - models are out of sync"
+          git add server/intelligence-service/src/shared/db/schema.ts server/intelligence-service/src/shared/db/relations.ts
+
+          if ! git diff --cached --quiet server/intelligence-service/src/shared/db/schema.ts server/intelligence-service/src/shared/db/relations.ts; then
+            echo "❌ Intelligence-service DB models validation failed - models are out of sync"
             echo "Generated models differ from committed version:"
-            git diff server/intelligence-service/app/db/models_gen.py
+            git diff --cached server/intelligence-service/src/shared/db/schema.ts server/intelligence-service/src/shared/db/relations.ts
             echo ""
             echo "Fix: npm run db:generate-models:intelligence-service"
             exit 1
           else
-            echo "✅ SQLAlchemy models validation passed (models are up-to-date)"
+            echo "✅ Intelligence-service DB models validation passed (models are up-to-date)"
           fi

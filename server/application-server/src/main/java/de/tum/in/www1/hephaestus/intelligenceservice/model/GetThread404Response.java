@@ -25,75 +25,43 @@ import com.fasterxml.jackson.annotation.JsonTypeName;
 import org.hibernate.validator.constraints.*;
 
 /**
- * HealthCheck
+ * GetThread404Response
  */
 @JsonPropertyOrder({
-  HealthCheck.JSON_PROPERTY_STATUS
+  GetThread404Response.JSON_PROPERTY_ERROR
 })
+@JsonTypeName("getThread_404_response")
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
-public class HealthCheck {
-  /**
-   * Health status
-   */
-  public enum StatusEnum {
-    OK("OK");
+public class GetThread404Response {
+  public static final String JSON_PROPERTY_ERROR = "error";
+  private String error;
 
-    private String value;
-
-    StatusEnum(String value) {
-      this.value = value;
-    }
-
-    @JsonValue
-    public String getValue() {
-      return value;
-    }
-
-    @Override
-    public String toString() {
-      return String.valueOf(value);
-    }
-
-    @JsonCreator
-    public static StatusEnum fromValue(String value) {
-      for (StatusEnum b : StatusEnum.values()) {
-        if (b.value.equals(value)) {
-          return b;
-        }
-      }
-      throw new IllegalArgumentException("Unexpected value '" + value + "'");
-    }
+  public GetThread404Response() {
   }
 
-  public static final String JSON_PROPERTY_STATUS = "status";
-  private StatusEnum status;
-
-  public HealthCheck() {
-  }
-
-  public HealthCheck status(StatusEnum status) {
+  public GetThread404Response error(String error) {
     
-    this.status = status;
+    this.error = error;
     return this;
   }
 
   /**
-   * Health status
-   * @return status
+   * Get error
+   * @return error
    */
   @jakarta.annotation.Nonnull
-  @JsonProperty(JSON_PROPERTY_STATUS)
+  @JsonProperty(JSON_PROPERTY_ERROR)
   @JsonInclude(value = JsonInclude.Include.ALWAYS)
 
-  public StatusEnum getStatus() {
-    return status;
+  public String getError() {
+    return error;
   }
 
 
-  @JsonProperty(JSON_PROPERTY_STATUS)
+  @JsonProperty(JSON_PROPERTY_ERROR)
   @JsonInclude(value = JsonInclude.Include.ALWAYS)
-  public void setStatus(StatusEnum status) {
-    this.status = status;
+  public void setError(String error) {
+    this.error = error;
   }
 
   @Override
@@ -104,20 +72,20 @@ public class HealthCheck {
     if (o == null || getClass() != o.getClass()) {
       return false;
     }
-    HealthCheck healthCheck = (HealthCheck) o;
-    return Objects.equals(this.status, healthCheck.status);
+    GetThread404Response getThread404Response = (GetThread404Response) o;
+    return Objects.equals(this.error, getThread404Response.error);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(status);
+    return Objects.hash(error);
   }
 
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder();
-    sb.append("class HealthCheck {\n");
-    sb.append("    status: ").append(toIndentedString(status)).append("\n");
+    sb.append("class GetThread404Response {\n");
+    sb.append("    error: ").append(toIndentedString(error)).append("\n");
     sb.append("}");
     return sb.toString();
   }

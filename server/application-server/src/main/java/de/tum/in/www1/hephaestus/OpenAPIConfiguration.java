@@ -105,6 +105,7 @@ public class OpenAPIConfiguration {
     /**
      * Import schemas and paths from intelligence-service that are tagged for export.
      */
+    @SuppressWarnings("unchecked")
     private void importIntelligenceServiceSpec(OpenAPI openApi) {
         File specFile = new File(INTELLIGENCE_SERVICE_SPEC);
         if (!specFile.exists()) {
@@ -118,82 +119,101 @@ public class OpenAPIConfiguration {
             return;
         }
 
-        // Import tagged schemas
-        Set<String> importedSchemas = importTaggedSchemas(openApi, intelligenceSpec);
-        logger.info("Imported {} schemas from intelligence-service", importedSchemas.size());
+        if (intelligenceSpec.getComponents() == null || intelligenceSpec.getComponents().getSchemas() == null) {
+            logger.warn("No schemas found in intelligence-service spec");
+            return;
+        }
 
-        // Import tagged paths (rewritten to workspace scope)
-        int importedPaths = importTaggedPaths(openApi, intelligenceSpec);
+        Map<String, Schema<?>> allIntelligenceSchemas = (Map<String, Schema<?>>) (Map<?, ?>) intelligenceSpec
+            .getComponents()
+            .getSchemas();
+
+        // Collect all schema names we need to import (from tagged schemas AND from path references)
+        Set<String> schemasToImport = new HashSet<>();
+
+        // 1. Find schemas explicitly tagged for export
+        for (var entry : allIntelligenceSchemas.entrySet()) {
+            if (isTaggedForExport(entry.getValue())) {
+                schemasToImport.add(entry.getKey());
+            }
+        }
+
+        // 2. Import tagged paths and collect all schemas they reference
+        int importedPaths = 0;
+        if (intelligenceSpec.getPaths() != null) {
+            for (var entry : intelligenceSpec.getPaths().entrySet()) {
+                String path = entry.getKey();
+                PathItem pathItem = entry.getValue();
+
+                boolean shouldExport = pathItem.readOperations().stream().anyMatch(this::isTaggedForExport);
+
+                if (shouldExport) {
+                    // Collect all schemas referenced by this path's operations
+                    for (var operation : pathItem.readOperations()) {
+                        collectSchemasFromOperation(operation, schemasToImport);
+                    }
+
+                    // Rewrite path to include workspace prefix
+                    String newPath = WORKSPACE_PATH_PREFIX + path;
+                    openApi.getPaths().addPathItem(newPath, pathItem);
+                    importedPaths++;
+                }
+            }
+        }
+
+        // 3. Recursively include all schemas referenced by the schemas we're importing
+        Set<String> visited = new HashSet<>();
+        for (String name : new HashSet<>(schemasToImport)) {
+            collectReferencedSchemas(name, allIntelligenceSchemas, schemasToImport, visited);
+        }
+
+        // 4. Add all collected schemas to openApi
+        var targetSchemas = openApi.getComponents().getSchemas();
+        for (String name : schemasToImport) {
+            Schema<?> schema = allIntelligenceSchemas.get(name);
+            if (schema != null) {
+                targetSchemas.put(name, schema);
+            }
+        }
+
+        logger.info("Imported {} schemas from intelligence-service", schemasToImport.size());
         logger.info("Imported {} paths from intelligence-service", importedPaths);
     }
 
     /**
-     * Import schemas tagged with x-hephaestus.export: true
+     * Collect all schema names referenced in an operation's request/response bodies.
      */
-    @SuppressWarnings("unchecked")
-    private Set<String> importTaggedSchemas(OpenAPI openApi, OpenAPI intelligenceSpec) {
-        Set<String> imported = new HashSet<>();
+    private void collectSchemasFromOperation(io.swagger.v3.oas.models.Operation operation, Set<String> out) {
+        if (operation == null) return;
 
-        if (intelligenceSpec.getComponents() == null || intelligenceSpec.getComponents().getSchemas() == null) {
-            return imported;
+        // Collect from responses
+        if (operation.getResponses() != null) {
+            operation
+                .getResponses()
+                .forEach((code, response) -> {
+                    if (response.getContent() != null) {
+                        response
+                            .getContent()
+                            .forEach((type, media) -> {
+                                if (media.getSchema() != null) {
+                                    collectRefs(media.getSchema(), out);
+                                }
+                            });
+                    }
+                });
         }
 
-        Map<String, Schema<?>> allSchemas = (Map<String, Schema<?>>) (Map<?, ?>) intelligenceSpec
-            .getComponents()
-            .getSchemas();
-        Set<String> toImport = new HashSet<>();
-
-        // Find schemas tagged for export
-        for (var entry : allSchemas.entrySet()) {
-            if (isTaggedForExport(entry.getValue())) {
-                toImport.add(entry.getKey());
-            }
+        // Collect from request body
+        if (operation.getRequestBody() != null && operation.getRequestBody().getContent() != null) {
+            operation
+                .getRequestBody()
+                .getContent()
+                .forEach((type, media) -> {
+                    if (media.getSchema() != null) {
+                        collectRefs(media.getSchema(), out);
+                    }
+                });
         }
-
-        // Recursively include referenced schemas
-        Set<String> visited = new HashSet<>();
-        for (String name : new HashSet<>(toImport)) {
-            collectReferencedSchemas(name, allSchemas, toImport, visited);
-        }
-
-        // Add to openApi
-        var schemas = openApi.getComponents().getSchemas();
-        for (String name : toImport) {
-            Schema<?> schema = allSchemas.get(name);
-            if (schema != null) {
-                schemas.put(name, schema);
-                imported.add(name);
-            }
-        }
-
-        return imported;
-    }
-
-    /**
-     * Import paths tagged with x-hephaestus.export: true, rewriting to workspace scope.
-     */
-    private int importTaggedPaths(OpenAPI openApi, OpenAPI intelligenceSpec) {
-        if (intelligenceSpec.getPaths() == null) {
-            return 0;
-        }
-
-        int count = 0;
-        for (var entry : intelligenceSpec.getPaths().entrySet()) {
-            String path = entry.getKey();
-            PathItem pathItem = entry.getValue();
-
-            // Check if any operation is tagged for export
-            boolean shouldExport = pathItem.readOperations().stream().anyMatch(this::isTaggedForExport);
-
-            if (shouldExport) {
-                // Rewrite path to include workspace prefix
-                String newPath = WORKSPACE_PATH_PREFIX + path;
-                openApi.getPaths().addPathItem(newPath, pathItem);
-                count++;
-            }
-        }
-
-        return count;
     }
 
     /**
@@ -333,7 +353,11 @@ public class OpenAPIConfiguration {
                     // Filter out WorkspaceContext parameter
                     if (operation.getParameters() != null) {
                         operation.setParameters(
-                            operation.getParameters().stream().filter(p -> !isWorkspaceContextParam(p)).toList()
+                            operation
+                                .getParameters()
+                                .stream()
+                                .filter(p -> !isWorkspaceContextParam(p))
+                                .collect(Collectors.toCollection(ArrayList::new))
                         );
                     }
 
@@ -343,6 +367,11 @@ public class OpenAPIConfiguration {
                     }
                 });
         });
+
+        // Also normalize refs inside component schemas (not only request/response bodies)
+        if (openApi.getComponents() != null && openApi.getComponents().getSchemas() != null) {
+            openApi.getComponents().getSchemas().values().forEach(this::removeDtoSuffixFromRefs);
+        }
     }
 
     private boolean isWorkspaceContextParam(Parameter param) {
@@ -358,6 +387,11 @@ public class OpenAPIConfiguration {
         var params = operation.getParameters();
         if (params == null) {
             params = new ArrayList<>();
+            operation.setParameters(params);
+        } else {
+            // `Stream#toList()` returns an unmodifiable list; also external sources may provide immutable lists.
+            // Ensure we can safely insert the workspaceSlug parameter.
+            params = new ArrayList<>(params);
             operation.setParameters(params);
         }
 
@@ -376,7 +410,7 @@ public class OpenAPIConfiguration {
         }
     }
 
-    @SuppressWarnings("rawtypes")
+    @SuppressWarnings({ "rawtypes", "unchecked" })
     private void removeDtoSuffixFromRefs(Schema schema) {
         if (schema == null) return;
 
@@ -384,8 +418,32 @@ public class OpenAPIConfiguration {
             schema.set$ref(schema.get$ref().substring(0, schema.get$ref().length() - 3));
         }
 
+        Map<String, Schema> props = schema.getProperties();
+        if (props != null) {
+            props.values().forEach(this::removeDtoSuffixFromRefs);
+        }
+
         if (schema.getItems() != null) {
             removeDtoSuffixFromRefs(schema.getItems());
+        }
+
+        if (schema.getAllOf() != null) {
+            schema.getAllOf().forEach(s -> removeDtoSuffixFromRefs((Schema) s));
+        }
+        if (schema.getAnyOf() != null) {
+            schema.getAnyOf().forEach(s -> removeDtoSuffixFromRefs((Schema) s));
+        }
+        if (schema.getOneOf() != null) {
+            schema.getOneOf().forEach(s -> removeDtoSuffixFromRefs((Schema) s));
+        }
+
+        Object additional = schema.getAdditionalProperties();
+        if (additional instanceof Schema additionalSchema) {
+            removeDtoSuffixFromRefs(additionalSchema);
+        }
+
+        if (schema.getNot() != null) {
+            removeDtoSuffixFromRefs(schema.getNot());
         }
     }
 }
