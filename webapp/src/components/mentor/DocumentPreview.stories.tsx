@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { fn } from "@storybook/test";
-import type { Document } from "@/lib/types";
+import type { Document } from "@/api/types.gen";
 import { DocumentPreview } from "./DocumentPreview";
 
 /**

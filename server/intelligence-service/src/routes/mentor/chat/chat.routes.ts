@@ -1,6 +1,7 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import * as HttpStatusCodes from "stoker/http-status-codes";
 import { jsonContent, jsonContentRequired } from "stoker/openapi/helpers";
+import { EXPORTED_TAG } from "@/lib/openapi-export";
 import {
 	chatRequestBodySchema,
 	streamPartSchema,
@@ -11,8 +12,9 @@ import {
 export const mentorChatRoute = createRoute({
 	path: "/chat",
 	method: "post",
-	tags: ["mentor"],
+	tags: ["mentor", ...EXPORTED_TAG],
 	summary: "Handle mentor chat",
+	operationId: "mentorChat",
 	request: {
 		body: jsonContentRequired(chatRequestBodySchema, "Chat request body"),
 	},
@@ -33,8 +35,9 @@ export type HandleMentorChatRoute = typeof mentorChatRoute;
 export const getThreadRoute = createRoute({
 	path: "/threads/{threadId}",
 	method: "get",
-	tags: ["mentor"],
+	tags: ["mentor", ...EXPORTED_TAG],
 	summary: "Get mentor chat thread detail",
+	operationId: "getThread",
 	request: {
 		params: ThreadIdParamsSchema,
 	},

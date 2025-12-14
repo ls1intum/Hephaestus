@@ -1,5 +1,5 @@
 import { Copy, PencilIcon, ThumbsDown, ThumbsUp } from "lucide-react";
-import type { ChatMessageVote } from "@/lib/types";
+import type { ChatMessageVote } from "@/api/types.gen";
 import { Button } from "@/components/ui/button";
 import {
 	Tooltip,

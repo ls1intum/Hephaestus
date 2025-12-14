@@ -38,6 +38,8 @@ const leaderboardSearchSchema = z.object({
 	mode: z.enum(["INDIVIDUAL", "TEAM"]).default("INDIVIDUAL"),
 });
 
+type LeaderboardSearchParams = z.infer<typeof leaderboardSearchSchema>;
+
 // Export route with search param validation
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/")({
 	component: LeaderboardContainer,
@@ -206,7 +208,7 @@ function LeaderboardContainer() {
 	useEffect(() => {
 		if (team && team !== "all" && !visibleTeams.includes(team)) {
 			navigate({
-				search: (prev) => ({
+				search: (prev: LeaderboardSearchParams) => ({
 					...prev,
 					team: "all",
 				}),
@@ -217,7 +219,7 @@ function LeaderboardContainer() {
 	useEffect(() => {
 		if (mode === "TEAM" && team !== "all") {
 			navigate({
-				search: (prev) => ({
+				search: (prev: LeaderboardSearchParams) => ({
 					...prev,
 					team: "all",
 				}),
@@ -228,7 +230,7 @@ function LeaderboardContainer() {
 	useEffect(() => {
 		if (mode === "TEAM" && sort !== "SCORE") {
 			navigate({
-				search: (prev) => ({
+				search: (prev: LeaderboardSearchParams) => ({
 					...prev,
 					sort: "SCORE" as LeaderboardSortType,
 				}),
@@ -280,7 +282,7 @@ function LeaderboardContainer() {
 	// Handle team filter changes
 	const handleTeamChange = (team: string) => {
 		navigate({
-			search: (prev) => ({
+			search: (prev: LeaderboardSearchParams) => ({
 				...prev,
 				team,
 			}),
@@ -290,7 +292,7 @@ function LeaderboardContainer() {
 	// Handle sort changes with the correct type
 	const handleSortChange = (sort: LeaderboardSortType) => {
 		navigate({
-			search: (prev) => ({
+			search: (prev: LeaderboardSearchParams) => ({
 				...prev,
 				sort,
 			}),
@@ -300,7 +302,7 @@ function LeaderboardContainer() {
 	// Handle timeframe changes - note we're not passing timeframe in URL anymore
 	const handleTimeframeChange = (afterDate: string, beforeDate?: string) => {
 		navigate({
-			search: (prev) => ({
+			search: (prev: LeaderboardSearchParams) => ({
 				...prev,
 				after: afterDate,
 				before: beforeDate,
@@ -319,7 +321,7 @@ function LeaderboardContainer() {
 
 	const handleModeChange = (newMode: "INDIVIDUAL" | "TEAM") => {
 		navigate({
-			search: (prev) => ({
+			search: (prev: LeaderboardSearchParams) => ({
 				...prev,
 				mode: newMode,
 				team: newMode === "TEAM" ? "all" : prev.team,
@@ -333,7 +335,7 @@ function LeaderboardContainer() {
 		if (!label) return;
 		// Expand the team path and navigate to INDIVIDUAL mode with that team filter
 		navigate({
-			search: (prev) => ({
+			search: (prev: LeaderboardSearchParams) => ({
 				...prev,
 				mode: "INDIVIDUAL",
 				sort: "SCORE",

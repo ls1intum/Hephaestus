@@ -1,6 +1,5 @@
 import { Link, useLocation } from "@tanstack/react-router";
-import type { ChatThreadGroup, ChatThreadSummary } from "@/lib/types";
-
+import type { ChatThreadGroup, ChatThreadSummary } from "@/api/types.gen";
 import {
 	SidebarGroup,
 	SidebarGroupContent,

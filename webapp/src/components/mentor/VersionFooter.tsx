@@ -1,8 +1,6 @@
 import { motion } from "framer-motion";
 import { useWindowSize } from "usehooks-ts";
-
-import type { Document } from "@/lib/types";
-
+import type { Document } from "@/api/types.gen";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 

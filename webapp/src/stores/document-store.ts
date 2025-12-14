@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { Document } from "@/lib/types";
+import type { Document } from "@/api/types.gen";
 
 type DocumentState = {
 	isStreaming: boolean;

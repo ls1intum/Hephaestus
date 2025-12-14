@@ -27,6 +27,9 @@
 		{
 			"name": "docs",
 			"path": "./docs"
+		},
+		{
+			"path": "../ai"
 		}
 	],
 	"settings": {

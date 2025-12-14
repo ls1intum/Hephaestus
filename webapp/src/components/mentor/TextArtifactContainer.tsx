@@ -1,8 +1,8 @@
 import type { UseChatHelpers } from "@ai-sdk/react";
 import { useDebounceCallback } from "usehooks-ts";
-import type { ChatMessageVote } from "@/lib/types";
+import type { ChatMessageVote, Document } from "@/api/types.gen";
 import { useDocumentArtifact } from "@/hooks/useDocumentArtifact";
-import type { Attachment, ChatMessage, Document } from "@/lib/types";
+import type { Attachment, ChatMessage } from "@/lib/types";
 import type { ArtifactOverlayMeta } from "./ArtifactShell";
 import type { ArtifactShellModel, TextContentModel } from "./artifact-model";
 import type { PartRendererMap } from "./renderers/types";

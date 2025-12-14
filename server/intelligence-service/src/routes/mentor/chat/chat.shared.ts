@@ -93,6 +93,12 @@ export type CustomUIDataTypes = {
 	usage: AppUsage;
 };
 
+/**
+ * Document-specific data types (excludes usage).
+ * Use this for handlers that only care about document streaming events.
+ */
+export type DocumentDataTypes = Omit<CustomUIDataTypes, "usage">;
+
 export interface MessageMetadata {
 	createdAt: string;
 }

@@ -1,5 +1,9 @@
-package de.tum.in.www1.hephaestus.proxy;
+package de.tum.in.www1.hephaestus.mentor;
 
+import io.netty.channel.ChannelOption;
+import io.netty.handler.timeout.ReadTimeoutHandler;
+import io.netty.handler.timeout.WriteTimeoutHandler;
+import java.time.Duration;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -8,13 +12,12 @@ import org.springframework.web.reactive.function.client.ExchangeStrategies;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.netty.http.client.HttpClient;
 import reactor.netty.resources.ConnectionProvider;
-import io.netty.channel.ChannelOption;
-import io.netty.handler.timeout.ReadTimeoutHandler;
-import io.netty.handler.timeout.WriteTimeoutHandler;
-import java.time.Duration;
 
+/**
+ * Configuration for the WebClient used to proxy requests to the intelligence service.
+ */
 @Configuration
-public class ProxyConfig {
+public class MentorWebClientConfig {
 
     @Bean
     public WebClient mentorWebClient(@Value("${hephaestus.intelligence-service.url}") String intelligenceServiceUrl) {
@@ -27,9 +30,9 @@ public class ProxyConfig {
         HttpClient httpClient = HttpClient.create(provider)
             .responseTimeout(Duration.ofSeconds(60))
             .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 10_000)
-            .doOnConnected(conn -> conn
-                .addHandlerLast(new ReadTimeoutHandler(60))
-                .addHandlerLast(new WriteTimeoutHandler(60)));
+            .doOnConnected(conn ->
+                conn.addHandlerLast(new ReadTimeoutHandler(60)).addHandlerLast(new WriteTimeoutHandler(60))
+            );
 
         ExchangeStrategies strategies = ExchangeStrategies.builder()
             .codecs(cfg -> cfg.defaultCodecs().maxInMemorySize(50 * 1024 * 1024)) // 50MB buffers

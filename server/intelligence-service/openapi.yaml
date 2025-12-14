@@ -29,6 +29,8 @@ components:
       required:
         - id
         - title
+      x-hephaestus: &a1
+        export: true
     ChatThreadGroup:
       type: object
       properties:
@@ -41,6 +43,7 @@ components:
       required:
         - groupName
         - threads
+      x-hephaestus: *a1
     StreamTextStartPart:
       type: object
       properties:
@@ -54,6 +57,7 @@ components:
       required:
         - type
         - id
+      x-hephaestus: *a1
     StreamTextDeltaPart:
       type: object
       properties:
@@ -70,6 +74,7 @@ components:
         - type
         - id
         - delta
+      x-hephaestus: *a1
     StreamTextEndPart:
       type: object
       properties:
@@ -83,6 +88,7 @@ components:
       required:
         - type
         - id
+      x-hephaestus: *a1
     StreamErrorPart:
       type: object
       properties:
@@ -95,6 +101,7 @@ components:
       required:
         - type
         - errorText
+      x-hephaestus: *a1
     StreamToolInputStartPart:
       type: object
       properties:
@@ -114,6 +121,7 @@ components:
         - type
         - toolCallId
         - toolName
+      x-hephaestus: *a1
     StreamToolInputDeltaPart:
       type: object
       properties:
@@ -129,6 +137,7 @@ components:
         - type
         - toolCallId
         - inputTextDelta
+      x-hephaestus: *a1
     StreamToolInputAvailablePart:
       type: object
       properties:
@@ -150,6 +159,7 @@ components:
         - type
         - toolCallId
         - toolName
+      x-hephaestus: *a1
     StreamToolInputErrorPart:
       type: object
       properties:
@@ -174,6 +184,7 @@ components:
         - toolCallId
         - toolName
         - errorText
+      x-hephaestus: *a1
     StreamToolOutputAvailablePart:
       type: object
       properties:
@@ -191,6 +202,7 @@ components:
       required:
         - type
         - toolCallId
+      x-hephaestus: *a1
     StreamToolOutputErrorPart:
       type: object
       properties:
@@ -210,6 +222,7 @@ components:
         - type
         - toolCallId
         - errorText
+      x-hephaestus: *a1
     StreamReasoningStartPart:
       type: object
       properties:
@@ -223,6 +236,7 @@ components:
       required:
         - type
         - id
+      x-hephaestus: *a1
     StreamReasoningDeltaPart:
       type: object
       properties:
@@ -239,6 +253,7 @@ components:
         - type
         - id
         - delta
+      x-hephaestus: *a1
     StreamReasoningEndPart:
       type: object
       properties:
@@ -252,6 +267,7 @@ components:
       required:
         - type
         - id
+      x-hephaestus: *a1
     StreamSourceUrlPart:
       type: object
       properties:
@@ -270,6 +286,7 @@ components:
         - type
         - sourceId
         - url
+      x-hephaestus: *a1
     StreamSourceDocumentPart:
       type: object
       properties:
@@ -291,6 +308,7 @@ components:
         - sourceId
         - mediaType
         - title
+      x-hephaestus: *a1
     StreamFilePart:
       type: object
       properties:
@@ -307,6 +325,7 @@ components:
         - type
         - url
         - mediaType
+      x-hephaestus: *a1
     StreamDataPart:
       type: object
       properties:
@@ -320,6 +339,7 @@ components:
           type: boolean
       required:
         - type
+      x-hephaestus: *a1
     StreamStepStartPart:
       type: object
       properties:
@@ -329,6 +349,7 @@ components:
             - start-step
       required:
         - type
+      x-hephaestus: *a1
     StreamStepFinishPart:
       type: object
       properties:
@@ -338,6 +359,7 @@ components:
             - finish-step
       required:
         - type
+      x-hephaestus: *a1
     StreamStartPart:
       type: object
       properties:
@@ -350,6 +372,7 @@ components:
         messageMetadata: {}
       required:
         - type
+      x-hephaestus: *a1
     StreamFinishPart:
       type: object
       properties:
@@ -360,6 +383,7 @@ components:
         messageMetadata: {}
       required:
         - type
+      x-hephaestus: *a1
     StreamMessageMetadataPart:
       type: object
       properties:
@@ -370,6 +394,7 @@ components:
         messageMetadata: {}
       required:
         - type
+      x-hephaestus: *a1
     StreamAbortPart:
       type: object
       properties:
@@ -379,10 +404,152 @@ components:
             - abort
       required:
         - type
+      x-hephaestus: *a1
+    ThreadDetail:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type:
+            - string
+            - "null"
+        selectedLeafMessageId:
+          type:
+            - string
+            - "null"
+          format: uuid
+        messages:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                format: uuid
+              role:
+                type: string
+                enum:
+                  - system
+                  - user
+                  - assistant
+              parts:
+                type: array
+                items:
+                  anyOf:
+                    - type: object
+                      properties:
+                        type:
+                          type: string
+                          enum:
+                            - text
+                        text:
+                          type: string
+                      required:
+                        - type
+                        - text
+                    - type: object
+                      properties:
+                        type:
+                          type: string
+                          enum:
+                            - reasoning
+                        text:
+                          type: string
+                        providerMetadata: {}
+                      required:
+                        - type
+                        - text
+                    - type: object
+                      properties:
+                        type:
+                          type: string
+                          enum:
+                            - file
+                        url:
+                          type: string
+                          format: uri
+                        mediaType:
+                          type: string
+                          enum:
+                            - image/jpeg
+                            - image/png
+                        name:
+                          type: string
+                      required:
+                        - type
+                        - url
+                        - mediaType
+                    - type: object
+                      properties:
+                        type:
+                          type: string
+                          pattern: ^tool-
+                      required:
+                        - type
+                      additionalProperties: {}
+                    - type: object
+                      properties:
+                        type:
+                          type: string
+                          enum:
+                            - source-url
+                        url:
+                          type: string
+                        title:
+                          type: string
+                        sourceId:
+                          type: string
+                        providerMetadata: {}
+                      required:
+                        - type
+                        - url
+                    - type: object
+                      properties:
+                        type:
+                          type: string
+                          enum:
+                            - source-document
+                        mediaType:
+                          type: string
+                        title:
+                          type: string
+                        filename:
+                          type: string
+                        providerMetadata: {}
+                      required:
+                        - type
+                        - mediaType
+                        - title
+                    - type: object
+                      properties:
+                        type:
+                          type: string
+                      required:
+                        - type
+                      additionalProperties: {}
+              createdAt:
+                type: string
+                format: date-time
+              parentMessageId:
+                type:
+                  - string
+                  - "null"
+                format: uuid
+            required:
+              - id
+              - role
+              - parts
+      required:
+        - id
+        - messages
+      x-hephaestus: *a1
     DocumentKind:
       type: string
       enum:
         - text
+      x-hephaestus: *a1
     Document:
       type: object
       properties:
@@ -410,6 +577,7 @@ components:
         - content
         - kind
         - userId
+      x-hephaestus: *a1
     CreateDocumentRequest:
       type: object
       properties:
@@ -426,6 +594,7 @@ components:
         - title
         - content
         - kind
+      x-hephaestus: *a1
     DocumentSummary:
       type: object
       properties:
@@ -447,6 +616,7 @@ components:
         - kind
         - createdAt
         - userId
+      x-hephaestus: *a1
     ChatMessageVote:
       type: object
       properties:
@@ -466,6 +636,7 @@ components:
         - isUpvoted
         - createdAt
         - updatedAt
+      x-hephaestus: *a1
     VoteMessageRequest:
       type: object
       properties:
@@ -473,6 +644,7 @@ components:
           type: boolean
       required:
         - isUpvoted
+      x-hephaestus: *a1
     BadPractice:
       type: object
       properties:
@@ -568,6 +740,7 @@ paths:
     get:
       tags:
         - mentor
+        - exported
       summary: List chat threads grouped by time buckets
       operationId: getGroupedThreads
       responses:
@@ -579,11 +752,14 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/ChatThreadGroup"
+      x-hephaestus: *a1
   /mentor/chat:
     post:
       tags:
         - mentor
+        - exported
       summary: Handle mentor chat
+      operationId: mentorChat
       requestBody:
         description: Chat request body
         required: true
@@ -684,11 +860,14 @@ paths:
                   - $ref: "#/components/schemas/StreamFinishPart"
                   - $ref: "#/components/schemas/StreamMessageMetadataPart"
                   - $ref: "#/components/schemas/StreamAbortPart"
+      x-hephaestus: *a1
   /mentor/threads/{threadId}:
     get:
       tags:
         - mentor
+        - exported
       summary: Get mentor chat thread detail
+      operationId: getThread
       parameters:
         - schema:
             type: string
@@ -702,144 +881,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  id:
-                    type: string
-                    format: uuid
-                  title:
-                    type:
-                      - string
-                      - "null"
-                  selectedLeafMessageId:
-                    type:
-                      - string
-                      - "null"
-                    format: uuid
-                  messages:
-                    type: array
-                    items:
-                      type: object
-                      properties:
-                        id:
-                          type: string
-                          format: uuid
-                        role:
-                          type: string
-                          enum:
-                            - system
-                            - user
-                            - assistant
-                        parts:
-                          type: array
-                          items:
-                            anyOf:
-                              - type: object
-                                properties:
-                                  type:
-                                    type: string
-                                    enum:
-                                      - text
-                                  text:
-                                    type: string
-                                required:
-                                  - type
-                                  - text
-                              - type: object
-                                properties:
-                                  type:
-                                    type: string
-                                    enum:
-                                      - reasoning
-                                  text:
-                                    type: string
-                                  providerMetadata: {}
-                                required:
-                                  - type
-                                  - text
-                              - type: object
-                                properties:
-                                  type:
-                                    type: string
-                                    enum:
-                                      - file
-                                  url:
-                                    type: string
-                                    format: uri
-                                  mediaType:
-                                    type: string
-                                    enum:
-                                      - image/jpeg
-                                      - image/png
-                                  name:
-                                    type: string
-                                required:
-                                  - type
-                                  - url
-                                  - mediaType
-                              - type: object
-                                properties:
-                                  type:
-                                    type: string
-                                    pattern: ^tool-
-                                required:
-                                  - type
-                                additionalProperties: {}
-                              - type: object
-                                properties:
-                                  type:
-                                    type: string
-                                    enum:
-                                      - source-url
-                                  url:
-                                    type: string
-                                  title:
-                                    type: string
-                                  sourceId:
-                                    type: string
-                                  providerMetadata: {}
-                                required:
-                                  - type
-                                  - url
-                              - type: object
-                                properties:
-                                  type:
-                                    type: string
-                                    enum:
-                                      - source-document
-                                  mediaType:
-                                    type: string
-                                  title:
-                                    type: string
-                                  filename:
-                                    type: string
-                                  providerMetadata: {}
-                                required:
-                                  - type
-                                  - mediaType
-                                  - title
-                              - type: object
-                                properties:
-                                  type:
-                                    type: string
-                                required:
-                                  - type
-                                additionalProperties: {}
-                        createdAt:
-                          type: string
-                          format: date-time
-                        parentMessageId:
-                          type:
-                            - string
-                            - "null"
-                          format: uuid
-                      required:
-                        - id
-                        - role
-                        - parts
-                required:
-                  - id
-                  - messages
+                $ref: "#/components/schemas/ThreadDetail"
         "404":
           description: Thread not found
           content:
@@ -873,11 +915,14 @@ paths:
                     type: string
                 required:
                   - error
+      x-hephaestus: *a1
   /mentor/documents:
     post:
       tags:
         - documents
+        - exported
       summary: Create a new document
+      operationId: createDocument
       requestBody:
         description: Create document
         required: true
@@ -903,10 +948,13 @@ paths:
                     type: string
                 required:
                   - error
+      x-hephaestus: *a1
     get:
       tags:
         - documents
+        - exported
       summary: List latest version of documents (no auth; all users)
+      operationId: listDocuments
       parameters:
         - schema:
             type:
@@ -945,11 +993,14 @@ paths:
                     type: string
                 required:
                   - error
+      x-hephaestus: *a1
   /mentor/documents/{id}:
     get:
       tags:
         - documents
+        - exported
       summary: Get latest version of a document
+      operationId: getDocument
       parameters:
         - schema:
             type: string
@@ -986,10 +1037,13 @@ paths:
                     type: string
                 required:
                   - error
+      x-hephaestus: *a1
     put:
       tags:
         - documents
+        - exported
       summary: Update a document (creates new version)
+      operationId: updateDocument
       parameters:
         - schema:
             type: string
@@ -1033,10 +1087,13 @@ paths:
                     type: string
                 required:
                   - error
+      x-hephaestus: *a1
     delete:
       tags:
         - documents
+        - exported
       summary: Delete a document and all versions
+      operationId: deleteDocument
       parameters:
         - schema:
             type: string
@@ -1069,11 +1126,14 @@ paths:
                     type: string
                 required:
                   - error
+      x-hephaestus: *a1
   /mentor/documents/{id}/versions:
     get:
       tags:
         - documents
+        - exported
       summary: List versions of a document
+      operationId: listVersions
       parameters:
         - schema:
             type: string
@@ -1129,9 +1189,11 @@ paths:
                     type: string
                 required:
                   - error
+      x-hephaestus: *a1
     delete:
       tags:
         - documents
+        - exported
       summary: Delete versions after timestamp
       parameters:
         - schema:
@@ -1181,7 +1243,9 @@ paths:
     get:
       tags:
         - documents
+        - exported
       summary: Get specific version
+      operationId: getVersion
       parameters:
         - schema:
             type: string
@@ -1225,11 +1289,14 @@ paths:
                     type: string
                 required:
                   - error
+      x-hephaestus: *a1
   /mentor/chat/messages/{messageId}/vote:
     post:
       tags:
         - vote
+        - exported
       summary: Vote on a chat message (upvote/downvote)
+      operationId: voteMessage
       parameters:
         - schema:
             type: string
@@ -1273,6 +1340,7 @@ paths:
                     type: string
                 required:
                   - error
+      x-hephaestus: *a1
   /detector:
     post:
       tags:

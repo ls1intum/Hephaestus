@@ -22,48 +22,55 @@ import org.springframework.lang.NonNull;
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
 public class ChatMessagePart {
 
-	@EmbeddedId
-	@EqualsAndHashCode.Include
-	private ChatMessagePartId id;
+    @EmbeddedId
+    @EqualsAndHashCode.Include
+    private ChatMessagePartId id;
 
-	@NonNull
-	@ManyToOne(fetch = FetchType.LAZY, optional = false)
-	@JoinColumn(name = "messageId", nullable = false, insertable = false, updatable = false)
-	@ToString.Exclude
-	@JsonIgnore
-	private ChatMessage message;
+    @NonNull
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "messageId", nullable = false, insertable = false, updatable = false)
+    @ToString.Exclude
+    @JsonIgnore
+    private ChatMessage message;
 
-	@NonNull
-	@Enumerated(EnumType.STRING)
-	@Column(nullable = false, length = 32)
-	private PartType type;
+    @NonNull
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 32)
+    private PartType type;
 
-	@Column(length = 128)
-	private String originalType;
+    @Column(length = 128)
+    private String originalType;
 
-	@Type(JsonType.class)
-	@Column(columnDefinition = "jsonb")
-	private JsonNode content;
+    @Type(JsonType.class)
+    @Column(columnDefinition = "jsonb")
+    private JsonNode content;
 
-	public enum PartType {
-		TEXT("text"),
-		REASONING("reasoning"),
-		TOOL("tool"),
-		SOURCE_URL("source-url"),
-		SOURCE_DOCUMENT("source-document"),
-		FILE("file"),
-		DATA("data"),
-		STEP_START("step-start");
+    public enum PartType {
+        TEXT("text"),
+        REASONING("reasoning"),
+        TOOL("tool"),
+        SOURCE_URL("source-url"),
+        SOURCE_DOCUMENT("source-document"),
+        FILE("file"),
+        DATA("data"),
+        STEP_START("step-start");
 
-		private final String value;
-		PartType(String value) { this.value = value; }
-		public String getValue() { return value; }
-		public static PartType fromValue(String typeString) {
-			if (typeString == null) throw new IllegalArgumentException("Type cannot be null");
-			if (typeString.startsWith("tool-") && typeString.length() > 5) return TOOL;
-			if (typeString.startsWith("data-") && typeString.length() > 5) return DATA;
-			for (PartType t : values()) if (t.value.equals(typeString)) return t;
-			throw new IllegalArgumentException("Unknown message part type: " + typeString);
-		}
-	}
+        private final String value;
+
+        PartType(String value) {
+            this.value = value;
+        }
+
+        public String getValue() {
+            return value;
+        }
+
+        public static PartType fromValue(String typeString) {
+            if (typeString == null) throw new IllegalArgumentException("Type cannot be null");
+            if (typeString.startsWith("tool-") && typeString.length() > 5) return TOOL;
+            if (typeString.startsWith("data-") && typeString.length() > 5) return DATA;
+            for (PartType t : values()) if (t.value.equals(typeString)) return t;
+            throw new IllegalArgumentException("Unknown message part type: " + typeString);
+        }
+    }
 }

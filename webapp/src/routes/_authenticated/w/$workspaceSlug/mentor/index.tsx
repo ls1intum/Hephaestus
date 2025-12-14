@@ -6,7 +6,7 @@ import {
 	getGroupedThreadsQueryKey,
 	getThreadQueryKey,
 } from "@/api/@tanstack/react-query.gen";
-import type { ChatThreadGroup, ChatThreadSummary } from "@/lib/types";
+import type { ChatThreadGroup, ChatThreadSummary } from "@/api/types.gen";
 import type { ChatProps } from "@/components/mentor/Chat";
 import { Chat } from "@/components/mentor/Chat";
 import { defaultPartRenderers } from "@/components/mentor/renderers";

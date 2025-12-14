@@ -1,16 +1,16 @@
-import type { ZodEnum, ZodObject, ZodTypeAny } from "zod";
+import "zod";
 
 declare module "zod" {
 	interface ZodTypeAny {
 		openapi(...args: unknown[]): this;
 	}
-	interface ZodEnum<T> {
+	interface ZodEnum<_T> {
 		openapi(...args: unknown[]): this;
 	}
 	interface ZodObject<
-		T extends Record<string, ZodTypeAny>,
-		UnknownKeys extends import("zod").UnknownKeysParam = "strip",
-		Catchall extends ZodTypeAny = ZodTypeAny,
+		_T extends Record<string, import("zod").ZodTypeAny>,
+		_UnknownKeys extends import("zod").UnknownKeysParam = "strip",
+		_Catchall extends import("zod").ZodTypeAny = import("zod").ZodTypeAny,
 	> {
 		openapi(...args: unknown[]): this;
 	}

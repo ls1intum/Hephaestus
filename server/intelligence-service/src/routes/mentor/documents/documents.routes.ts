@@ -1,6 +1,7 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import * as HttpStatusCodes from "stoker/http-status-codes";
 import { jsonContent, jsonContentRequired } from "stoker/openapi/helpers";
+import { EXPORTED_TAG } from "@/lib/openapi-export";
 import {
 	CreateDocumentRequestSchema,
 	DeleteAfterQuerySchema,
@@ -15,8 +16,9 @@ import {
 export const createDocumentRoute = createRoute({
 	path: "/documents",
 	method: "post",
-	tags: ["documents"],
+	tags: ["documents", ...EXPORTED_TAG],
 	summary: "Create a new document",
+	operationId: "createDocument",
 	request: {
 		body: jsonContentRequired(CreateDocumentRequestSchema, "Create document"),
 	},
@@ -32,8 +34,9 @@ export const createDocumentRoute = createRoute({
 export const getDocumentRoute = createRoute({
 	path: "/documents/{id}",
 	method: "get",
-	tags: ["documents"],
+	tags: ["documents", ...EXPORTED_TAG],
 	summary: "Get latest version of a document",
+	operationId: "getDocument",
 	request: { params: DocumentIdParamsSchema },
 	responses: {
 		[HttpStatusCodes.OK]: jsonContent(DocumentSchema, "Document"),
@@ -51,8 +54,9 @@ export const getDocumentRoute = createRoute({
 export const updateDocumentRoute = createRoute({
 	path: "/documents/{id}",
 	method: "put",
-	tags: ["documents"],
+	tags: ["documents", ...EXPORTED_TAG],
 	summary: "Update a document (creates new version)",
+	operationId: "updateDocument",
 	request: {
 		params: DocumentIdParamsSchema,
 		body: jsonContentRequired(UpdateDocumentRequestSchema, "Update document"),
@@ -73,8 +77,9 @@ export const updateDocumentRoute = createRoute({
 export const deleteDocumentRoute = createRoute({
 	path: "/documents/{id}",
 	method: "delete",
-	tags: ["documents"],
+	tags: ["documents", ...EXPORTED_TAG],
 	summary: "Delete a document and all versions",
+	operationId: "deleteDocument",
 	request: { params: DocumentIdParamsSchema },
 	responses: {
 		[HttpStatusCodes.NO_CONTENT]: { description: "Deleted" },
@@ -92,8 +97,9 @@ export const deleteDocumentRoute = createRoute({
 export const listDocumentsRoute = createRoute({
 	path: "/documents",
 	method: "get",
-	tags: ["documents"],
+	tags: ["documents", ...EXPORTED_TAG],
 	summary: "List latest version of documents (no auth; all users)",
+	operationId: "listDocuments",
 	request: { query: PaginationQuerySchema },
 	responses: {
 		[HttpStatusCodes.OK]: jsonContent(
@@ -110,8 +116,9 @@ export const listDocumentsRoute = createRoute({
 export const listVersionsRoute = createRoute({
 	path: "/documents/{id}/versions",
 	method: "get",
-	tags: ["documents"],
+	tags: ["documents", ...EXPORTED_TAG],
 	summary: "List versions of a document",
+	operationId: "listVersions",
 	request: { params: DocumentIdParamsSchema, query: PaginationQuerySchema },
 	responses: {
 		[HttpStatusCodes.OK]: jsonContent(
@@ -132,8 +139,9 @@ export const listVersionsRoute = createRoute({
 export const getVersionRoute = createRoute({
 	path: "/documents/{id}/versions/{versionNumber}",
 	method: "get",
-	tags: ["documents"],
+	tags: ["documents", ...EXPORTED_TAG],
 	summary: "Get specific version",
+	operationId: "getVersion",
 	request: { params: VersionParamsSchema },
 	responses: {
 		[HttpStatusCodes.OK]: jsonContent(DocumentSchema, "Document"),
@@ -151,7 +159,7 @@ export const getVersionRoute = createRoute({
 export const deleteAfterRoute = createRoute({
 	path: "/documents/{id}/versions",
 	method: "delete",
-	tags: ["documents"],
+	tags: ["documents", ...EXPORTED_TAG],
 	summary: "Delete versions after timestamp",
 	request: { params: DocumentIdParamsSchema, query: DeleteAfterQuerySchema },
 	responses: {

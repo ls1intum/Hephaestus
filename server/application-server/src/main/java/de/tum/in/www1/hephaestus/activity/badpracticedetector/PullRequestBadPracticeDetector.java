@@ -2,10 +2,10 @@ package de.tum.in.www1.hephaestus.activity.badpracticedetector;
 
 import de.tum.in.www1.hephaestus.activity.BadPracticeDetectionRepository;
 import de.tum.in.www1.hephaestus.activity.model.*;
-import de.tum.in.www1.hephaestus.intelligenceservice.api.DetectorApi;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
+import de.tum.in.www1.hephaestus.intelligenceservice.api.DetectorApi;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.BadPractice;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.DetectorRequest;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.DetectorResponse;
@@ -100,15 +100,15 @@ public class PullRequestBadPracticeDetector {
         detectorRequest.setTitle(pullRequest.getTitle());
         detectorRequest.setLifecycleState(lifecycleState.getState());
         detectorRequest.setRepositoryName(pullRequest.getRepository().getName());
-    detectorRequest.setPullRequestNumber(java.math.BigDecimal.valueOf(pullRequest.getNumber()));
+        detectorRequest.setPullRequestNumber(java.math.BigDecimal.valueOf(pullRequest.getNumber()));
         detectorRequest.setBadPracticeSummary(summary);
         detectorRequest.setBadPractices(
             existingBadPractices.stream().map(this::convertToIntelligenceBadPractice).toList()
         );
         detectorRequest.setPullRequestTemplate(template);
 
-    // Adjust to new generated client method name from Hono OpenAPI
-    DetectorResponse detectorResponse = detectorApi.detectorPost(detectorRequest).block();
+        // Adjust to new generated client method name from Hono OpenAPI
+        DetectorResponse detectorResponse = detectorApi.detectorPost(detectorRequest).block();
 
         pullRequest.setLastDetectionTime(Instant.now());
         pullRequest.setBadPracticeSummary(detectorResponse.getBadPracticeSummary());

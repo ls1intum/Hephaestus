@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "@hono/zod-openapi";
 
 export const DocumentKindEnum = z.enum(["text"]).openapi("DocumentKind");
 

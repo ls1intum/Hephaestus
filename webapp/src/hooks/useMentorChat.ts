@@ -1,6 +1,7 @@
 import type { UseChatHelpers } from "@ai-sdk/react";
 import { useChat } from "@ai-sdk/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import type { DataUIPart } from "ai";
 import { DefaultChatTransport } from "ai";
 import { useEffect, useRef, useState } from "react";
 import { v4 as uuidv4 } from "uuid";
@@ -12,17 +13,33 @@ import {
 	voteMessageMutation,
 } from "@/api/@tanstack/react-query.gen";
 import type {
-	ChatMessage,
 	ChatMessageVote,
 	ChatThreadDetail,
 	ChatThreadGroup,
 	Document,
-} from "@/lib/types";
+} from "@/api/types.gen";
 import environment from "@/environment";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 import { keycloakService } from "@/integrations/auth";
+import type { ChatMessage, DocumentDataTypes } from "@/lib/types";
 import { useArtifactStore } from "@/stores/artifact-store";
 import { useDocumentArtifact } from "./useDocumentArtifact";
+
+/**
+ * Type guard that filters data parts to only document-related ones.
+ * Returns a properly typed DocumentDataPart for use with useDocumentArtifact.
+ */
+function isDocumentDataPart(part: {
+	type: string;
+	data?: unknown;
+}): part is DataUIPart<DocumentDataTypes> {
+	return (
+		part.type === "data-document-create" ||
+		part.type === "data-document-update" ||
+		part.type === "data-document-delta" ||
+		part.type === "data-document-finish"
+	);
+}
 
 interface UseMentorChatOptions {
 	threadId?: string;
@@ -113,12 +130,14 @@ export function useMentorChat({
 	const [voteState, setVoteState] = useState<
 		Record<string, boolean | undefined>
 	>({});
-	const votes: ChatMessageVote[] = Object.entries(voteState).map(
-		([messageId, isUpvoted]) => ({
+	const votes: ChatMessageVote[] = Object.entries(voteState)
+		.filter((entry): entry is [string, boolean] => entry[1] !== undefined)
+		.map(([messageId, isUpvoted]) => ({
 			messageId,
 			isUpvoted,
-		}),
-	);
+			createdAt: new Date(),
+			updatedAt: new Date(),
+		}));
 
 	// ---------------------------
 	// Artifact/document state
@@ -229,14 +248,13 @@ export function useMentorChat({
 		onFinish: stableOnFinish,
 		onError: stableOnError,
 		onData: (dataPart) => {
-			if (
-				dataPart.type === "data-document-create" ||
-				dataPart.type === "data-document-update" ||
-				dataPart.type === "data-document-delta" ||
-				dataPart.type === "data-document-finish"
-			) {
+			// Filter and forward document-related data parts to the artifact handler
+			// The AI SDK provides fully typed dataPart based on ChatMessage's CustomUIDataTypes
+			if (isDocumentDataPart(dataPart)) {
+				// TypeScript narrows dataPart to document types; onStreamPart accepts DocumentDataPart
 				artifactDoc.onStreamPart(dataPart);
 			}
+			// data-usage and other parts are ignored (not needed on client)
 		},
 	});
 

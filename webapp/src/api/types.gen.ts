@@ -18,6 +18,74 @@ export type BadPracticeFeedback = {
 };
 
 /**
+ * Chat message
+ */
+export type ChatMessage = {
+    /**
+     * Message creation timestamp
+     */
+    createdAt?: string;
+    /**
+     * Message ID
+     */
+    id: string;
+    /**
+     * Parent message ID for conversation branching
+     */
+    parentMessageId?: string;
+    /**
+     * Message parts
+     */
+    parts: Array<{
+        [key: string]: unknown;
+    }>;
+    /**
+     * Message role
+     */
+    role: 'system' | 'user' | 'assistant';
+};
+
+export type ChatMessageVote = {
+    createdAt: Date;
+    isUpvoted: boolean;
+    messageId: string;
+    updatedAt: Date;
+};
+
+/**
+ * Chat thread detail with full message content
+ */
+export type ChatThreadDetail = {
+    /**
+     * Thread ID
+     */
+    id: string;
+    /**
+     * Thread messages
+     */
+    messages: Array<ChatMessage>;
+    /**
+     * Selected leaf message ID for conversation branching
+     */
+    selectedLeafMessageId?: string;
+    /**
+     * Thread title
+     */
+    title?: string;
+};
+
+export type ChatThreadGroup = {
+    groupName: string;
+    threads: Array<ChatThreadSummary>;
+};
+
+export type ChatThreadSummary = {
+    createdAt?: Date;
+    id: string;
+    title: string;
+};
+
+/**
  * Data transfer object representing a GitHub contributor.
  * Used to display contributor information on the public about page.
  */
@@ -30,6 +98,12 @@ export type Contributor = {
     name: string;
 };
 
+export type CreateDocumentRequest = {
+    content: string;
+    kind: DocumentKind;
+    title: string;
+};
+
 /**
  * DTO for creating a new workspace.
  */
@@ -39,6 +113,26 @@ export type CreateWorkspaceRequest = {
     displayName: string;
     ownerUserId: number;
     workspaceSlug: string;
+};
+
+export type Document = {
+    content: string;
+    createdAt: Date;
+    id: string;
+    kind: DocumentKind;
+    title: string;
+    userId: number;
+    versionNumber: number;
+};
+
+export type DocumentKind = 'text';
+
+export type DocumentSummary = {
+    createdAt: Date;
+    id: string;
+    kind: DocumentKind;
+    title: string;
+    userId: number;
 };
 
 export type LabelInfo = {
@@ -415,6 +509,10 @@ export type UserTeams = {
     name: string;
     teams: Array<TeamSummary>;
     url: string;
+};
+
+export type VoteMessageRequest = {
+    isUpvoted: boolean;
 };
 
 export type Workspace = {
@@ -911,6 +1009,353 @@ export type GetMemberResponses = {
 };
 
 export type GetMemberResponse = GetMemberResponses[keyof GetMemberResponses];
+
+export type ChatData = {
+    body: {
+        [key: string]: {
+            [key: string]: unknown;
+        };
+    };
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/mentor/chat';
+};
+
+export type ChatResponses = {
+    /**
+     * Event stream of chat updates
+     */
+    200: unknown;
+};
+
+export type VoteMessageData = {
+    body: VoteMessageRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        /**
+         * Message ID
+         */
+        messageId: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/mentor/chat/messages/{messageId}/vote';
+};
+
+export type VoteMessageResponses = {
+    /**
+     * Vote recorded successfully
+     */
+    200: ChatMessageVote;
+};
+
+export type VoteMessageResponse = VoteMessageResponses[keyof VoteMessageResponses];
+
+export type GetDocumentsData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/mentor/documents';
+};
+
+export type GetDocumentsResponses = {
+    /**
+     * Successfully retrieved documents
+     */
+    200: Array<DocumentSummary>;
+};
+
+export type GetDocumentsResponse = GetDocumentsResponses[keyof GetDocumentsResponses];
+
+export type CreateDocumentData = {
+    body: CreateDocumentRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/mentor/documents';
+};
+
+export type CreateDocumentResponses = {
+    /**
+     * Document created successfully
+     */
+    201: Document;
+};
+
+export type CreateDocumentResponse = CreateDocumentResponses[keyof CreateDocumentResponses];
+
+export type DeleteDocumentData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        /**
+         * Document ID
+         */
+        id: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/mentor/documents/{id}';
+};
+
+export type DeleteDocumentErrors = {
+    /**
+     * Document not found
+     */
+    404: unknown;
+};
+
+export type DeleteDocumentResponses = {
+    /**
+     * Document deleted successfully
+     */
+    204: void;
+};
+
+export type DeleteDocumentResponse = DeleteDocumentResponses[keyof DeleteDocumentResponses];
+
+export type GetDocumentData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        /**
+         * Document ID
+         */
+        id: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/mentor/documents/{id}';
+};
+
+export type GetDocumentErrors = {
+    /**
+     * Document not found
+     */
+    404: Document;
+};
+
+export type GetDocumentError = GetDocumentErrors[keyof GetDocumentErrors];
+
+export type GetDocumentResponses = {
+    /**
+     * Successfully retrieved document
+     */
+    200: Document;
+};
+
+export type GetDocumentResponse = GetDocumentResponses[keyof GetDocumentResponses];
+
+export type UpdateDocumentData = {
+    body: CreateDocumentRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        /**
+         * Document ID
+         */
+        id: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/mentor/documents/{id}';
+};
+
+export type UpdateDocumentErrors = {
+    /**
+     * Document not found
+     */
+    404: Document;
+};
+
+export type UpdateDocumentError = UpdateDocumentErrors[keyof UpdateDocumentErrors];
+
+export type UpdateDocumentResponses = {
+    /**
+     * Document updated successfully
+     */
+    200: Document;
+};
+
+export type UpdateDocumentResponse = UpdateDocumentResponses[keyof UpdateDocumentResponses];
+
+export type DeleteVersionsAfterTimestampData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        /**
+         * Document ID
+         */
+        id: string;
+    };
+    query: {
+        /**
+         * Timestamp after which versions should be deleted
+         */
+        timestamp: string;
+    };
+    url: '/workspaces/{workspaceSlug}/mentor/documents/{id}/versions';
+};
+
+export type DeleteVersionsAfterTimestampResponses = {
+    /**
+     * Versions deleted successfully
+     */
+    204: void;
+};
+
+export type DeleteVersionsAfterTimestampResponse = DeleteVersionsAfterTimestampResponses[keyof DeleteVersionsAfterTimestampResponses];
+
+export type GetDocumentVersionsData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        /**
+         * Document ID
+         */
+        id: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/mentor/documents/{id}/versions';
+};
+
+export type GetDocumentVersionsErrors = {
+    /**
+     * Document not found
+     */
+    404: Array<Document>;
+};
+
+export type GetDocumentVersionsError = GetDocumentVersionsErrors[keyof GetDocumentVersionsErrors];
+
+export type GetDocumentVersionsResponses = {
+    /**
+     * Successfully retrieved document versions
+     */
+    200: Array<Document>;
+};
+
+export type GetDocumentVersionsResponse = GetDocumentVersionsResponses[keyof GetDocumentVersionsResponses];
+
+export type GetDocumentVersionData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        /**
+         * Document ID
+         */
+        id: string;
+        /**
+         * Version number
+         */
+        versionNumber: number;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/mentor/documents/{id}/versions/{versionNumber}';
+};
+
+export type GetDocumentVersionErrors = {
+    /**
+     * Document or version not found
+     */
+    404: Document;
+};
+
+export type GetDocumentVersionError = GetDocumentVersionErrors[keyof GetDocumentVersionErrors];
+
+export type GetDocumentVersionResponses = {
+    /**
+     * Successfully retrieved document version
+     */
+    200: Document;
+};
+
+export type GetDocumentVersionResponse = GetDocumentVersionResponses[keyof GetDocumentVersionResponses];
+
+export type GetGroupedThreadsData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/mentor/threads/grouped';
+};
+
+export type GetGroupedThreadsResponses = {
+    /**
+     * Successfully retrieved grouped threads
+     */
+    200: Array<ChatThreadGroup>;
+};
+
+export type GetGroupedThreadsResponse = GetGroupedThreadsResponses[keyof GetGroupedThreadsResponses];
+
+export type GetThreadData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        /**
+         * Thread ID
+         */
+        threadId: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/mentor/threads/{threadId}';
+};
+
+export type GetThreadErrors = {
+    /**
+     * Thread not found
+     */
+    404: ChatThreadDetail;
+};
+
+export type GetThreadError = GetThreadErrors[keyof GetThreadErrors];
+
+export type GetThreadResponses = {
+    /**
+     * Successfully retrieved thread detail
+     */
+    200: ChatThreadDetail;
+};
+
+export type GetThreadResponse = GetThreadResponses[keyof GetThreadResponses];
 
 export type UpdateNotificationsData = {
     body: UpdateWorkspaceNotificationsRequest;

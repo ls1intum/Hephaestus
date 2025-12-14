@@ -2,4 +2,3 @@ tabWidth: 4
 printWidth: 120
 plugins:
   - prettier-plugin-java
-  - prettier-plugin-kotlin

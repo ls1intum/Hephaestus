@@ -1,7 +1,7 @@
 import type { UseChatHelpers } from "@ai-sdk/react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useWindowSize } from "usehooks-ts";
-import type { ChatMessageVote } from "@/lib/types";
+import type { ChatMessageVote } from "@/api/types.gen";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useScrollToBottom } from "@/hooks/use-scroll-to-bottom";
 import type { Attachment, ChatMessage } from "@/lib/types";

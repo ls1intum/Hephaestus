@@ -1,5 +1,5 @@
 import { toolCallIdToUuid } from "@intelligence-service/chat/tool-call-id";
-import type { Document } from "@/lib/types";
+import type { Document } from "@/api/types.gen";
 import { useDocumentArtifact } from "@/hooks/useDocumentArtifact";
 import type { CreateDocumentOutput, UpdateDocumentOutput } from "@/lib/types";
 import { DocumentPreview } from "../DocumentPreview";

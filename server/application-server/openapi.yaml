@@ -22,6 +22,8 @@ tags:
   name: workspace-registry-controller
 - description: Team management within workspace
   name: Teams
+- description: AI Mentor chat and document operations
+  name: mentor-controller
 - description: |-
     Controller for activity-related operations within a workspace context.
      All endpoints require workspace membership via {@link WorkspaceScopedController WorkspaceScopedController}.
@@ -563,6 +565,385 @@ paths:
       summary: Get a specific member's details.
       tags:
       - workspace-membership
+  /workspaces/{workspaceSlug}/mentor/chat:
+    post:
+      description: Send a message to the AI mentor and receive a streaming response
+      operationId: chat
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties:
+                type: object
+        required: true
+      responses:
+        "200":
+          content:
+            text/event-stream: {}
+          description: Event stream of chat updates
+      summary: Send chat message
+      tags:
+      - mentor
+  /workspaces/{workspaceSlug}/mentor/chat/messages/{messageId}/vote:
+    post:
+      description: Upvote or downvote a chat message
+      operationId: voteMessage
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - description: Message ID
+        in: path
+        name: messageId
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VoteMessageRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatMessageVote"
+          description: Vote recorded successfully
+      summary: Vote on a message
+      tags:
+      - mentor
+  /workspaces/{workspaceSlug}/mentor/documents:
+    get:
+      description: Retrieve all documents (latest versions only) for the authenticated
+        user
+      operationId: getDocuments
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DocumentSummary"
+          description: Successfully retrieved documents
+      summary: Get all user documents
+      tags:
+      - mentor
+    post:
+      description: Create a new document for the authenticated user
+      operationId: createDocument
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateDocumentRequest"
+        required: true
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Document"
+          description: Document created successfully
+      summary: Create a new document
+      tags:
+      - mentor
+  /workspaces/{workspaceSlug}/mentor/documents/{id}:
+    delete:
+      description: Delete a document and all its versions
+      operationId: deleteDocument
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - description: Document ID
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+      responses:
+        "204":
+          description: Document deleted successfully
+        "404":
+          description: Document not found
+      summary: Delete document
+      tags:
+      - mentor
+    get:
+      description: Retrieve a specific document
+      operationId: getDocument
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - description: Document ID
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Document"
+          description: Successfully retrieved document
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Document"
+          description: Document not found
+      summary: Get document by ID
+      tags:
+      - mentor
+    put:
+      description: Update an existing document
+      operationId: updateDocument
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - description: Document ID
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateDocumentRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Document"
+          description: Document updated successfully
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Document"
+          description: Document not found
+      summary: Update document
+      tags:
+      - mentor
+  /workspaces/{workspaceSlug}/mentor/documents/{id}/versions:
+    delete:
+      description: Delete document versions created after a specified timestamp
+      operationId: deleteVersionsAfterTimestamp
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - description: Document ID
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+      - description: Timestamp after which versions should be deleted
+        in: query
+        name: timestamp
+        required: true
+        schema:
+          type: string
+      responses:
+        "204":
+          description: Versions deleted successfully
+      summary: Delete versions after timestamp
+      tags:
+      - mentor
+    get:
+      description: Retrieve all versions of a document
+      operationId: getDocumentVersions
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - description: Document ID
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Document"
+          description: Successfully retrieved document versions
+        "404":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Document"
+          description: Document not found
+      summary: Get document versions
+      tags:
+      - mentor
+  /workspaces/{workspaceSlug}/mentor/documents/{id}/versions/{versionNumber}:
+    get:
+      description: Retrieve a specific version of a document
+      operationId: getDocumentVersion
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - description: Document ID
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+      - description: Version number
+        in: path
+        name: versionNumber
+        required: true
+        schema:
+          type: integer
+          format: int32
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Document"
+          description: Successfully retrieved document version
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Document"
+          description: Document or version not found
+      summary: Get specific document version
+      tags:
+      - mentor
+  /workspaces/{workspaceSlug}/mentor/threads/grouped:
+    get:
+      description: Retrieve all chat threads for the authenticated user grouped by
+        time periods
+      operationId: getGroupedThreads
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ChatThreadGroup"
+          description: Successfully retrieved grouped threads
+      summary: Get grouped chat threads
+      tags:
+      - mentor
+  /workspaces/{workspaceSlug}/mentor/threads/{threadId}:
+    get:
+      description: Retrieve a specific chat thread with all its messages
+      operationId: getThread
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - description: Thread ID
+        in: path
+        name: threadId
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatThreadDetail"
+          description: Successfully retrieved thread detail
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatThreadDetail"
+          description: Thread not found
+      summary: Get thread detail
+      tags:
+      - mentor
   /workspaces/{workspaceSlug}/notifications:
     patch:
       operationId: updateNotifications
@@ -1096,6 +1477,101 @@ components:
       required:
       - explanation
       - type
+    ChatMessage:
+      type: object
+      description: Chat message
+      properties:
+        createdAt:
+          type: string
+          description: Message creation timestamp
+        id:
+          type: string
+          description: Message ID
+        parentMessageId:
+          type: string
+          description: Parent message ID for conversation branching
+        parts:
+          type: array
+          description: Message parts
+          items:
+            type: object
+        role:
+          type: string
+          description: Message role
+          enum:
+          - system
+          - user
+          - assistant
+      required:
+      - id
+      - parts
+      - role
+    ChatMessageVote:
+      type: object
+      properties:
+        createdAt:
+          type: string
+          format: date-time
+        isUpvoted:
+          type: boolean
+        messageId:
+          type: string
+          format: uuid
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+      - createdAt
+      - isUpvoted
+      - messageId
+      - updatedAt
+    ChatThreadDetail:
+      type: object
+      description: Chat thread detail with full message content
+      properties:
+        id:
+          type: string
+          description: Thread ID
+        messages:
+          type: array
+          description: Thread messages
+          items:
+            $ref: "#/components/schemas/ChatMessage"
+        selectedLeafMessageId:
+          type: string
+          description: Selected leaf message ID for conversation branching
+        title:
+          type: string
+          description: Thread title
+      required:
+      - id
+      - messages
+    ChatThreadGroup:
+      type: object
+      properties:
+        groupName:
+          type: string
+        threads:
+          type: array
+          items:
+            $ref: "#/components/schemas/ChatThreadSummary"
+      required:
+      - groupName
+      - threads
+    ChatThreadSummary:
+      type: object
+      properties:
+        createdAt:
+          type: string
+          format: date-time
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+      required:
+      - id
+      - title
     Contributor:
       type: object
       description: |-
@@ -1122,6 +1598,22 @@ components:
       - id
       - login
       - name
+    CreateDocumentRequest:
+      type: object
+      properties:
+        content:
+          type: string
+          minLength: 1
+        kind:
+          $ref: "#/components/schemas/DocumentKind"
+        title:
+          type: string
+          maxLength: 255
+          minLength: 1
+      required:
+      - content
+      - kind
+      - title
     CreateWorkspaceRequest:
       type: object
       description: DTO for creating a new workspace.
@@ -1147,6 +1639,58 @@ components:
       - displayName
       - ownerUserId
       - workspaceSlug
+    Document:
+      type: object
+      properties:
+        content:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        id:
+          type: string
+          format: uuid
+        kind:
+          $ref: "#/components/schemas/DocumentKind"
+        title:
+          type: string
+        userId:
+          type: integer
+        versionNumber:
+          type: integer
+      required:
+      - content
+      - createdAt
+      - id
+      - kind
+      - title
+      - userId
+      - versionNumber
+    DocumentKind:
+      type: string
+      enum:
+      - text
+    DocumentSummary:
+      type: object
+      properties:
+        createdAt:
+          type: string
+          format: date-time
+        id:
+          type: string
+          format: uuid
+        kind:
+          $ref: "#/components/schemas/DocumentKind"
+        title:
+          type: string
+        userId:
+          type: integer
+      required:
+      - createdAt
+      - id
+      - kind
+      - title
+      - userId
     LabelInfo:
       type: object
       properties:
@@ -2055,6 +2599,13 @@ components:
       - name
       - teams
       - url
+    VoteMessageRequest:
+      type: object
+      properties:
+        isUpvoted:
+          type: boolean
+      required:
+      - isUpvoted
     Workspace:
       type: object
       properties:

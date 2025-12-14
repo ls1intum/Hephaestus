@@ -26,6 +26,8 @@ const profileSearchSchema = z.object({
 	before: z.string().optional(),
 });
 
+type ProfileSearchParams = z.infer<typeof profileSearchSchema>;
+
 export const Route = createFileRoute(
 	"/_authenticated/w/$workspaceSlug/user/$username/",
 )({
@@ -104,7 +106,7 @@ function UserProfile() {
 
 	const handleTimeframeChange = (nextAfter: string, nextBefore?: string) => {
 		navigate({
-			search: (prev) => ({
+			search: (prev: ProfileSearchParams) => ({
 				...prev,
 				after: nextAfter,
 				before: nextBefore,

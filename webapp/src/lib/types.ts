@@ -1,46 +1,38 @@
-import type {
-	DocumentCreateData,
-	DocumentDeltaData,
-	DocumentFinishData,
-	DocumentUpdateData,
-} from "@intelligence-service/chat/chat.shared";
-import { z } from "zod";
+import type { CustomUIDataTypes } from "@intelligence-service/chat/chat.shared";
+import type { DataUIPart } from "ai";
 
+// Re-export types from intelligence-service that are used for AI SDK chat UI
+// These are different from the simple API types in @/api/types.gen
 export type {
+	// Chat message with AI SDK UI parts (tool invocations, reasoning, etc.)
 	ChatMessage,
+	// Tool type definitions for typed tool parts
 	ChatTools,
+	// Tool input/output types
 	CreateDocumentInput,
 	CreateDocumentOutput,
+	// Custom data types registry
+	CustomUIDataTypes,
+	// Streaming data types for custom document operations
 	DocumentCreateData,
+	// Document-specific data types (for handlers that only care about documents)
+	DocumentDataTypes,
 	DocumentDeltaData,
 	DocumentFinishData,
 	DocumentUpdateData,
 	GetWeatherInput,
 	GetWeatherOutput,
+	// Message metadata
 	MessageMetadata,
 	UpdateDocumentInput,
 	UpdateDocumentOutput,
 } from "@intelligence-service/chat/chat.shared";
 
-// Chat thread types (matching intelligence-service schemas)
-export interface ChatThreadSummary {
-	id: string;
-	title: string;
-	createdAt?: string | Date;
-}
-
-export interface ChatThreadGroup {
-	groupName: string;
-	threads: ChatThreadSummary[];
-}
-
-// Vote types
-export interface ChatMessageVote {
-	messageId: string;
-	isUpvoted: boolean;
-	createdAt: string | Date;
-	updatedAt: string | Date;
-}
+/**
+ * Type-safe data part derived from AI SDK's DataUIPart.
+ * Automatically includes all CustomUIDataTypes with proper `data-` prefixes.
+ */
+export type DataPart = DataUIPart<CustomUIDataTypes>;
 
 // Artifact typing
 export type ArtifactKind = "text" | (string & {});
@@ -61,49 +53,7 @@ export function parseArtifactId(id: string | null | undefined): {
 	if (!id) return { kind: null, payload: null };
 	const [k, ...rest] = id.split(":");
 	const payload = rest.length > 0 ? rest.join(":") : null;
-	// We accept any string as extensible ArtifactKind (open union)
 	return { kind: (k as ArtifactKind) ?? null, payload };
-}
-
-export const messageMetadataSchema = z.object({
-	createdAt: z.string(),
-});
-
-/**
- * Union type for custom streaming data parts.
- * Maps CustomUIDataTypes keys to `{ type: "data-{key}", data: T[key] }` format.
- */
-export type DataPart =
-	| { type: "data-document-create"; data: DocumentCreateData }
-	| { type: "data-document-update"; data: DocumentUpdateData }
-	| { type: "data-document-delta"; data: DocumentDeltaData }
-	| { type: "data-document-finish"; data: DocumentFinishData }
-	| { type: "data-usage"; data: unknown };
-
-// Typed tools mapping for automatic tool part typing in UIMessage
-
-/**
- * Document type matching the intelligence-service schema.
- * Used for mentor document artifacts.
- */
-export interface Document {
-	id: string;
-	versionNumber: number;
-	createdAt: Date;
-	title: string;
-	content: string;
-	kind: "text";
-	userId: number;
-}
-
-/**
- * Chat thread detail with messages.
- */
-export interface ChatThreadDetail {
-	id: string;
-	title?: string | null;
-	createdAt: Date;
-	messages: ChatMessage[];
 }
 
 export interface Attachment {

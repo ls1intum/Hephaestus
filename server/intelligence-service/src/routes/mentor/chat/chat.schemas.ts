@@ -336,12 +336,14 @@ export const threadMessageSchema = z.object({
 	parentMessageId: z.string().uuid().nullable().optional(),
 });
 
-export const threadDetailSchema = z.object({
-	id: z.string().uuid(),
-	title: z.string().nullable().optional(),
-	selectedLeafMessageId: z.string().uuid().nullable().optional(),
-	messages: z.array(threadMessageSchema),
-});
+export const threadDetailSchema = z
+	.object({
+		id: z.string().uuid(),
+		title: z.string().nullable().optional(),
+		selectedLeafMessageId: z.string().uuid().nullable().optional(),
+		messages: z.array(threadMessageSchema),
+	})
+	.openapi("ThreadDetail");
 
 export type ThreadDetail = z.infer<typeof threadDetailSchema>;
 

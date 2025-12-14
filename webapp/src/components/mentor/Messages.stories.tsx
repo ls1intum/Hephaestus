@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { fn } from "@storybook/test";
 import { useEffect, useState } from "react";
-import type { ChatMessageVote } from "@/lib/types";
+import type { ChatMessageVote } from "@/api/types.gen";
 import type { ChatMessage } from "@/lib/types";
 import { Messages } from "./Messages";
 

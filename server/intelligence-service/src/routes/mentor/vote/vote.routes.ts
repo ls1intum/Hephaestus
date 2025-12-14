@@ -1,6 +1,7 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import * as HttpStatusCodes from "stoker/http-status-codes";
 import { jsonContent, jsonContentRequired } from "stoker/openapi/helpers";
+import { EXPORTED_TAG } from "@/lib/openapi-export";
 import {
 	ChatMessageVoteSchema,
 	VoteMessageParamsSchema,
@@ -10,8 +11,9 @@ import {
 export const voteMessageRoute = createRoute({
 	path: "/chat/messages/{messageId}/vote",
 	method: "post",
-	tags: ["vote"],
+	tags: ["vote", ...EXPORTED_TAG],
 	summary: "Vote on a chat message (upvote/downvote)",
+	operationId: "voteMessage",
 	request: {
 		params: VoteMessageParamsSchema,
 		body: jsonContentRequired(VoteMessageRequestSchema, "Vote request body"),
