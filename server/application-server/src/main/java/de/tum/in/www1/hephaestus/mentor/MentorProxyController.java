@@ -1,13 +1,13 @@
 package de.tum.in.www1.hephaestus.mentor;
 
+import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContext;
+import de.tum.in.www1.hephaestus.workspace.context.WorkspaceScopedController;
 import io.swagger.v3.oas.annotations.Hidden;
 import jakarta.servlet.http.HttpServletRequest;
 import java.net.URI;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.http.HttpHeaders;
@@ -19,7 +19,6 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 import reactor.core.publisher.Flux;
@@ -27,18 +26,22 @@ import reactor.core.publisher.Flux;
 /**
  * Transparent proxy for mentor endpoints to the intelligence service.
  *
- * This controller is hidden from OpenAPI generation - the schemas and paths
+ * <p>This controller is hidden from OpenAPI generation - the schemas and paths
  * are imported directly from the intelligence service's OpenAPI spec via
- * {@link de.tum.in.www1.hephaestus.OpenAPIConfiguration}.
+ * {@link de.tum.in.www1.hephaestus.OpenAPIConfiguration}.</p>
+ *
+ * <p>Uses {@link WorkspaceScopedController} to ensure proper workspace
+ * authorization and context injection.</p>
  */
-@RestController
+@WorkspaceScopedController
 @Hidden
-@RequestMapping("/workspaces/{workspaceSlug}/mentor")
+@RequestMapping("/mentor")
 public class MentorProxyController {
 
+    /** Header used to pass workspace ID to the intelligence service. */
+    public static final String WORKSPACE_ID_HEADER = "X-Workspace-Id";
+    /** Header used to pass workspace slug to the intelligence service. */
     public static final String WORKSPACE_SLUG_HEADER = "X-Workspace-Slug";
-
-    private static final Pattern WORKSPACE_SLUG_PATTERN = Pattern.compile("^/workspaces/([^/]+)/mentor");
 
     private static final Set<String> HOP_BY_HOP_HEADERS = Set.of(
         HttpHeaders.CONNECTION,
@@ -65,9 +68,12 @@ public class MentorProxyController {
     /**
      * Catch-all proxy that forwards all /mentor/** requests to the intelligence service.
      * Automatically handles SSE streaming for chat responses.
+     *
+     * @param workspaceContext The resolved workspace context from the request path
      */
     @RequestMapping("/**")
     public ResponseEntity<?> proxy(
+        WorkspaceContext workspaceContext,
         HttpServletRequest request,
         @RequestHeader HttpHeaders incomingHeaders,
         @AuthenticationPrincipal Jwt jwt,
@@ -75,15 +81,14 @@ public class MentorProxyController {
     ) {
         HttpMethod method = HttpMethod.valueOf(request.getMethod());
 
-        // Extract the workspace slug and mentor-relative path
+        // Extract the mentor-relative path (workspace prefix is already handled)
         String fullPath = request.getRequestURI();
-        String workspaceSlug = extractWorkspaceSlug(fullPath);
         String mentorPath = fullPath.replaceFirst("/workspaces/[^/]+", "");
 
         String query = request.getQueryString();
         String target = intelligenceServiceBaseUrl + mentorPath + (query != null ? ("?" + query) : "");
 
-        HttpHeaders outHeaders = prepareOutgoingHeaders(incomingHeaders, jwt, workspaceSlug);
+        HttpHeaders outHeaders = prepareOutgoingHeaders(incomingHeaders, jwt, workspaceContext);
         byte[] safeBody = body != null ? body : new byte[0];
 
         return mentorWebClient
@@ -131,19 +136,11 @@ public class MentorProxyController {
             .block();
     }
 
-    /**
-     * Extracts the workspace slug from the request URI.
-     * Expected format: /workspaces/{workspaceSlug}/mentor/...
-     */
-    private String extractWorkspaceSlug(String fullPath) {
-        Matcher matcher = WORKSPACE_SLUG_PATTERN.matcher(fullPath);
-        if (matcher.find()) {
-            return matcher.group(1);
-        }
-        return null;
-    }
-
-    private HttpHeaders prepareOutgoingHeaders(HttpHeaders incomingHeaders, Jwt jwt, String workspaceSlug) {
+    private HttpHeaders prepareOutgoingHeaders(
+        HttpHeaders incomingHeaders,
+        Jwt jwt,
+        WorkspaceContext workspaceContext
+    ) {
         HttpHeaders outHeaders = new HttpHeaders();
         for (Map.Entry<String, List<String>> e : incomingHeaders.entrySet()) {
             if (!HOP_BY_HOP_HEADERS.contains(e.getKey())) {
@@ -155,8 +152,13 @@ public class MentorProxyController {
         if (jwt != null) {
             outHeaders.setBearerAuth(jwt.getTokenValue());
         }
-        if (workspaceSlug != null) {
-            outHeaders.set(WORKSPACE_SLUG_HEADER, workspaceSlug);
+        if (workspaceContext != null) {
+            if (workspaceContext.id() != null) {
+                outHeaders.set(WORKSPACE_ID_HEADER, String.valueOf(workspaceContext.id()));
+            }
+            if (workspaceContext.slug() != null) {
+                outHeaders.set(WORKSPACE_SLUG_HEADER, workspaceContext.slug());
+            }
         }
         return outHeaders;
     }

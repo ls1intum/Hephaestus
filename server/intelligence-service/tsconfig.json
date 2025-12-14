@@ -29,15 +29,14 @@
 		"strict": true,
 		"allowUnusedLabels": false,
 		"allowUnreachableCode": false,
-		// exactOptionalPropertyTypes: requires distinguishing between undefined and missing properties
-		// This is the gold standard but requires refactoring all optional interfaces
-		// TODO: Enable after initial migration: "exactOptionalPropertyTypes": true,
+		// exactOptionalPropertyTypes: distinguishes between undefined and missing properties
+		// Enable after refactoring optional interfaces if needed
+		"exactOptionalPropertyTypes": false,
 		"noFallthroughCasesInSwitch": true,
 		"noImplicitOverride": true,
 		"noImplicitReturns": true,
 		// noPropertyAccessFromIndexSignature: forces bracket notation for index signatures
-		// This prevents accidental property access on objects with index signatures
-		// TODO: Enable after initial migration: "noPropertyAccessFromIndexSignature": true,
+		"noPropertyAccessFromIndexSignature": false,
 		"noUncheckedIndexedAccess": true,
 		"noUnusedLocals": true,
 		"noUnusedParameters": true,
@@ -50,9 +49,8 @@
 		"allowSyntheticDefaultImports": true,
 		"resolveJsonModule": true,
 		"isolatedModules": true,
-		// verbatimModuleSyntax: more strict than isolatedModules
-		// Requires explicit type-only imports. Enable after initial migration.
-		// TODO: Enable after initial migration: "verbatimModuleSyntax": true,
+		// verbatimModuleSyntax: stricter than isolatedModules, requires explicit type-only imports
+		"verbatimModuleSyntax": false,
 
 		// ═══════════════════════════════════════════════════════════════════════════
 		// Output

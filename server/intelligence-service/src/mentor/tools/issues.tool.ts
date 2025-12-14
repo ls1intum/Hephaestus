@@ -11,7 +11,7 @@ import {
 	repository,
 	user,
 } from "@/shared/db/schema";
-import { findIssueOrPR } from "@/shared/issue-queries";
+import { findIssueOrPR } from "@/shared/repositories/issue.repository";
 
 const inputSchema = z.object({
 	issueId: z.number().optional().describe("The database ID of the issue (preferred if known)"),

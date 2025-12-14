@@ -7,7 +7,7 @@ import {
 	badPracticeFeedback,
 	pullrequestbadpractice,
 } from "@/shared/db/schema";
-import { findIssueOrPR } from "@/shared/issue-queries";
+import { findIssueOrPR } from "@/shared/repositories/issue.repository";
 
 const inputSchema = z.object({
 	pullRequestId: z
