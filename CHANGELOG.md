@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.10.8](https://github.com/ls1intum/Hephaestus/compare/v0.10.7...v0.10.8) (2025-12-14)
+
+### 🐛 Bug Fixes
+
+* **ci:** remove redundant production approval gate ([ccc4541](https://github.com/ls1intum/Hephaestus/commit/ccc45416759d39d3822ad9e20b1e0f8d8ca048fd))
+* **ci:** strictly enforce commit scopes and refine release overrides ([41de9cb](https://github.com/ls1intum/Hephaestus/commit/41de9cbb0cebcb7097978652bd69437b6efdb99b))
+
+## [0.10.7](https://github.com/ls1intum/Hephaestus/compare/v0.10.6...v0.10.7) (2025-12-14)
+
+### 🐛 Bug Fixes
+
+* release management and improve header and footer ([ec46a44](https://github.com/ls1intum/Hephaestus/commit/ec46a44ff226d0f562b732c8852c90ff7c1ceedc))
+
+### 📚 Documentation
+
+* **ci:** overhaul documentation system, strict validation & perf upgrade ([deb760f](https://github.com/ls1intum/Hephaestus/commit/deb760fcfbf962d06b611869dd66d8c09d8dbabc))
+* **ci:** overhaul documentation system, strict validation & perf upgrade ([9abec47](https://github.com/ls1intum/Hephaestus/commit/9abec47f7710a12d45e117a5160cac5f753c65f8))
+
+### 🛠 Build System
+
+* **deps:** resolve mermaid theme peer dependency conflict ([02fb7b4](https://github.com/ls1intum/Hephaestus/commit/02fb7b46f011e63ddb2043a44e5660db77fb3718))
+
 ## [0.10.6](https://github.com/ls1intum/Hephaestus/compare/v0.10.5...v0.10.6) (2025-12-14)
 
 ### 🐛 Bug Fixes
