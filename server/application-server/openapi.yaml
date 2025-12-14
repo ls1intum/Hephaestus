@@ -13,14 +13,8 @@ servers:
 - description: Default Server URL
   url: /
 tags:
-- description: |-
-    REST controller for the chat functionality.
-     Handles streaming chat responses, message persistence, and thread management.
-  name: chat-controller
 - description: Global contributor information
   name: Contributors
-- description: Document management with versioning support
-  name: Documents
 - description: |-
     Workspace registry endpoints that operate outside of a specific workspace slug.
      These routes stay under the classic /workspaces base path while slugged routes
@@ -28,8 +22,6 @@ tags:
   name: workspace-registry-controller
 - description: Team management within workspace
   name: Teams
-- description: Vote on chat messages (upvote/downvote)
-  name: Chat Message Voting
 - description: |-
     Controller for activity-related operations within a workspace context.
      All endpoints require workspace membership via {@link WorkspaceScopedController WorkspaceScopedController}.
@@ -305,361 +297,6 @@ paths:
           description: OK
       tags:
       - activity
-  /workspaces/{workspaceSlug}/api/chat/messages/{messageId}/vote:
-    patch:
-      description: Cast an upvote or downvote on a chat message
-      operationId: voteMessage
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      - description: Message ID to vote on
-        in: path
-        name: messageId
-        required: true
-        schema:
-          type: string
-          format: uuid
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/VoteMessageRequest"
-        required: true
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ChatMessageVote"
-          description: Vote successfully recorded
-        "400":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ChatMessageVote"
-          description: Invalid vote type or message not found
-        "404":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ChatMessageVote"
-          description: Message not found
-      summary: Vote on a message
-      tags:
-      - Chat Mes
-  /workspaces/{workspaceSlug}/api/documents:
-    get:
-      operationId: getUserDocuments
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      - in: query
-        name: page
-        required: false
-        schema:
-          type: integer
-          format: int32
-          default: 0
-      - in: query
-        name: size
-        required: false
-        schema:
-          type: integer
-          format: int32
-          default: 20
-      - in: query
-        name: sortBy
-        required: false
-        schema:
-          type: string
-          default: createdAt
-      - in: query
-        name: sortDir
-        required: false
-        schema:
-          type: string
-          default: desc
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/PageDocumentSummary"
-          description: Documents retrieved successfully
-      summary: Get all user documents (latest versions only)
-      tags: []
-    post:
-      operationId: createDocument
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/CreateDocumentRequest"
-        required: true
-      responses:
-        "201":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Document"
-          description: Document created successfully
-        "400":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Document"
-          description: Invalid request data
-      summary: Create a new document
-      tags: []
-  /workspaces/{workspaceSlug}/api/documents/{id}:
-    delete:
-      operationId: deleteDocument
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      - in: path
-        name: id
-        required: true
-        schema:
-          type: string
-          format: uuid
-      responses:
-        "204":
-          description: Document deleted successfully
-        "404":
-          description: Document not found
-      summary: Delete a document and all its versions
-      tags: []
-    get:
-      operationId: getDocument
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      - in: path
-        name: id
-        required: true
-        schema:
-          type: string
-          format: uuid
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Document"
-          description: Document retrieved successfully
-        "404":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Document"
-          description: Document not found
-      summary: Get latest version of a document
-      tags: []
-    put:
-      operationId: updateDocument
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      - in: path
-        name: id
-        required: true
-        schema:
-          type: string
-          format: uuid
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/UpdateDocumentRequest"
-        required: true
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Document"
-          description: Document updated successfully
-        "400":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Document"
-          description: Invalid request data
-        "404":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Document"
-          description: Document not found
-      summary: Update a document (creates new version)
-      tags: []
-  /workspaces/{workspaceSlug}/api/documents/{id}/versions:
-    delete:
-      operationId: deleteVersionsAfterTimestamp
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      - in: path
-        name: id
-        required: true
-        schema:
-          type: string
-          format: uuid
-      - in: query
-        name: after
-        required: true
-        schema:
-          type: string
-          format: date-time
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/Document"
-          description: Document versions deleted successfully
-        "400":
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/Document"
-          description: Invalid timestamp parameter
-        "404":
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/Document"
-          description: Document not found
-      summary: Delete document versions after specified timestamp
-      tags: []
-    get:
-      operationId: getDocumentVersions
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      - in: path
-        name: id
-        required: true
-        schema:
-          type: string
-          format: uuid
-      - in: query
-        name: page
-        required: false
-        schema:
-          type: integer
-          format: int32
-          default: 0
-      - in: query
-        name: size
-        required: false
-        schema:
-          type: integer
-          format: int32
-          default: 20
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/PageDocument"
-          description: Document versions retrieved successfully
-        "404":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/PageDocument"
-          description: Document not found
-      summary: Get all versions of a document
-      tags: []
-  /workspaces/{workspaceSlug}/api/documents/{id}/versions/{versionNumber}:
-    get:
-      operationId: getDocumentVersion
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      - in: path
-        name: id
-        required: true
-        schema:
-          type: string
-          format: uuid
-      - in: path
-        name: versionNumber
-        required: true
-        schema:
-          type: integer
-          format: int32
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Document"
-          description: Document version retrieved successfully
-        "404":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Document"
-          description: Document version not found
-      summary: Get specific version of a document by version number
-      tags: []
   /workspaces/{workspaceSlug}/leaderboard:
     get:
       description: Creates a ranked contributor list for the specified time range
@@ -926,112 +563,6 @@ paths:
       summary: Get a specific member's details.
       tags:
       - workspace-membership
-  /workspaces/{workspaceSlug}/mentor/thread/{threadId}:
-    get:
-      description: Retrieve a specific chat thread with all messages
-      operationId: getThread
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      - description: Thread ID
-        in: path
-        name: threadId
-        required: true
-        schema:
-          type: string
-          format: uuid
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ChatThreadDetail"
-          description: Successfully retrieved thread
-        "401":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ChatThreadDetail"
-          description: User not authenticated
-        "404":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ChatThreadDetail"
-          description: Thread not found or not owned by user
-      summary: Get chat thread detail
-      tags:
-      - chat
-  /workspaces/{workspaceSlug}/mentor/threads:
-    get:
-      description: Retrieve all chat threads for the authenticated user
-      operationId: getThreads
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/ChatThreadSummary"
-          description: Successfully retrieved threads
-        "401":
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/ChatThreadSummary"
-          description: User not authenticated
-      summary: Get user's chat threads
-      tags:
-      - chat
-  /workspaces/{workspaceSlug}/mentor/threads/grouped:
-    get:
-      description: Retrieve all chat threads for the authenticated user grouped by
-        time periods
-      operationId: getGroupedThreads
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/ChatThreadGroup"
-          description: Successfully retrieved grouped threads
-        "401":
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/ChatThreadGroup"
-          description: User not authenticated
-      summary: Get user's grouped chat threads
-      tags:
-      - chat
   /workspaces/{workspaceSlug}/notifications:
     patch:
       operationId: updateNotifications
@@ -1565,94 +1096,6 @@ components:
       required:
       - explanation
       - type
-    ChatMessageVote:
-      type: object
-      description: DTO for returning vote information.
-      properties:
-        createdAt:
-          type: string
-          format: date-time
-        isUpvoted:
-          type: boolean
-        messageId:
-          type: string
-          format: uuid
-        updatedAt:
-          type: string
-          format: date-time
-    ChatThreadDetail:
-      type: object
-      description: |-
-        DTO for chat thread with full message content.
-         Used for initializing useChat in the frontend.
-      properties:
-        createdAt:
-          type: string
-          format: date-time
-          description: When the thread was created
-        id:
-          type: string
-          format: uuid
-          description: Unique identifier for the thread
-        messages:
-          type: array
-          description: |-
-            All messages in the conversation path (as JSON objects for useChat initialization)
-             As exception, we do not use a DTO here since we included those intelligece-service models in the OpenAPI spec.
-          items:
-            $ref: "#/components/schemas/UIMessage"
-        selectedLeafMessageId:
-          type: string
-          format: uuid
-          description: ID of the currently selected leaf message (end of active conversation
-            path)
-        title:
-          type: string
-          description: Thread title (may be null for untitled threads)
-        votes:
-          type: array
-          description: Votes for messages in this thread
-          items:
-            $ref: "#/components/schemas/ChatMessageVote"
-    ChatThreadGroup:
-      type: object
-      description: |-
-        DTO for grouped chat threads.
-         Used for organizing threads by time periods (today, yesterday, etc.).
-      properties:
-        groupName:
-          type: string
-          description: "Group name (e.g., \"Today\", \"Yesterday\", \"Last 7 Days\"\
-            , \"Last 30 Days\")"
-        threads:
-          type: array
-          description: List of thread summaries in this group
-          items:
-            $ref: "#/components/schemas/ChatThreadSummary"
-      required:
-      - groupName
-      - threads
-    ChatThreadSummary:
-      type: object
-      description: |-
-        DTO for chat thread summary information.
-         Used for listing threads without loading full message content.
-      properties:
-        createdAt:
-          type: string
-          format: date-time
-          description: When the thread was created
-        id:
-          type: string
-          format: uuid
-          description: Unique identifier for the thread
-        title:
-          type: string
-          description: Thread title (may be null for untitled threads)
-      required:
-      - createdAt
-      - id
-      - title
     Contributor:
       type: object
       description: |-
@@ -1679,74 +1122,6 @@ components:
       - id
       - login
       - name
-    CreateDocumentInput:
-      type: object
-      description: Input for createDocument tool.
-      x-hephaestus:
-        toolModel: true
-      properties:
-        document_id:
-          type: string
-          description: "Do not populate this field, will automatically be set by the\
-            \ system"
-          title: Document Id
-        kind:
-          type: string
-          const: text
-          title: Kind
-        title:
-          type: string
-          title: Title
-      required:
-      - document_id
-      - kind
-      - title
-      title: CreateDocumentInput
-    CreateDocumentOutput:
-      type: object
-      description: Output for createDocument tool.
-      x-hephaestus:
-        toolModel: true
-      properties:
-        content:
-          type: string
-          title: Content
-        id:
-          type: string
-          title: Id
-        kind:
-          type: string
-          const: TEXT
-          title: Kind
-        title:
-          type: string
-          title: Title
-      required:
-      - content
-      - id
-      - kind
-      - title
-      title: CreateDocumentOutput
-    CreateDocumentRequest:
-      type: object
-      description: |-
-        DTO for creating a new document.
-         Server generates UUID and timestamps.
-      properties:
-        content:
-          type: string
-        kind:
-          type: string
-          enum:
-          - TEXT
-        title:
-          type: string
-          maxLength: 255
-          minLength: 0
-      required:
-      - content
-      - kind
-      - title
     CreateWorkspaceRequest:
       type: object
       description: DTO for creating a new workspace.
@@ -1772,283 +1147,6 @@ components:
       - displayName
       - ownerUserId
       - workspaceSlug
-    DataUIPart:
-      type: object
-      description: |-
-        A data part with dynamic type.
-
-        Note: In UI messages, data can be of any JSON type (object, array, string, number, etc.).
-      properties:
-        data:
-          title: Data
-        id:
-          anyOf:
-          - type: string
-          - type: "null"
-          title: Id
-        type:
-          type: string
-          pattern: ^data-.*
-          title: Type
-      required:
-      - data
-      - type
-      title: DataUIPart
-    Document:
-      type: object
-      description: |-
-        DTO for complete document responses.
-         Used when returning full document details (includes content).
-      properties:
-        content:
-          type: string
-        createdAt:
-          type: string
-          format: date-time
-        id:
-          type: string
-          format: uuid
-        kind:
-          type: string
-          enum:
-          - TEXT
-        title:
-          type: string
-        userId:
-          type: string
-        versionNumber:
-          type: integer
-          format: int32
-      required:
-      - content
-      - createdAt
-      - id
-      - kind
-      - title
-      - userId
-      - versionNumber
-    DocumentCreateData:
-      type: object
-      x-hephaestus:
-        dataModel: true
-      properties:
-        id:
-          type: string
-          title: Id
-        kind:
-          type: string
-          const: text
-          title: Kind
-        title:
-          type: string
-          title: Title
-      required:
-      - id
-      - kind
-      - title
-      title: DocumentCreateData
-    DocumentDeltaData:
-      type: object
-      x-hephaestus:
-        dataModel: true
-      properties:
-        delta:
-          type: string
-          title: Delta
-        id:
-          type: string
-          title: Id
-        kind:
-          type: string
-          const: text
-          title: Kind
-      required:
-      - delta
-      - id
-      - kind
-      title: DocumentDeltaData
-    DocumentFinishData:
-      type: object
-      x-hephaestus:
-        dataModel: true
-      properties:
-        id:
-          type: string
-          title: Id
-        kind:
-          type: string
-          const: text
-          title: Kind
-      required:
-      - id
-      - kind
-      title: DocumentFinishData
-    DocumentSummary:
-      type: object
-      description: |-
-        DTO for document summary in list views.
-         Excludes content for performance - only metadata.
-      properties:
-        createdAt:
-          type: string
-          format: date-time
-        id:
-          type: string
-          format: uuid
-        kind:
-          type: string
-          enum:
-          - TEXT
-        title:
-          type: string
-        userId:
-          type: string
-      required:
-      - createdAt
-      - id
-      - kind
-      - title
-      - userId
-    DocumentUpdateData:
-      type: object
-      x-hephaestus:
-        dataModel: true
-      properties:
-        id:
-          type: string
-          title: Id
-        kind:
-          type: string
-          const: text
-          title: Kind
-      required:
-      - id
-      - kind
-      title: DocumentUpdateData
-    FileUIPart:
-      type: object
-      description: A file part of a message.
-      properties:
-        filename:
-          anyOf:
-          - type: string
-          - type: "null"
-          title: Filename
-        mediaType:
-          type: string
-          title: Mediatype
-        providerMetadata:
-          anyOf:
-          - type: object
-          - type: "null"
-          title: Providermetadata
-        type:
-          type: string
-          const: file
-          default: file
-          title: Type
-        url:
-          type: string
-          title: Url
-      required:
-      - mediaType
-      - url
-      title: FileUIPart
-    GetWeatherInput:
-      type: object
-      description: Input for getWeather tool.
-      x-hephaestus:
-        toolModel: true
-      properties:
-        latitude:
-          type: number
-          title: Latitude
-        longitude:
-          type: number
-          title: Longitude
-      required:
-      - latitude
-      - longitude
-      title: GetWeatherInput
-    GetWeatherOutput:
-      type: object
-      description: "Output for getWeather tool, aligned with WeatherTool.tsx expectations."
-      x-hephaestus:
-        toolModel: true
-      properties:
-        current:
-          anyOf:
-          - $ref: "#/components/schemas/WeatherCurrent"
-          - type: "null"
-          default: null
-        current_units:
-          anyOf:
-          - $ref: "#/components/schemas/WeatherCurrentUnits"
-          - type: "null"
-          default: null
-        daily:
-          anyOf:
-          - $ref: "#/components/schemas/WeatherDaily"
-          - type: "null"
-          default: null
-        daily_units:
-          anyOf:
-          - $ref: "#/components/schemas/WeatherDailyUnits"
-          - type: "null"
-          default: null
-        elevation:
-          anyOf:
-          - type: number
-          - type: "null"
-          default: null
-          title: Elevation
-        generationtime_ms:
-          anyOf:
-          - type: number
-          - type: "null"
-          default: null
-          title: Generationtime Ms
-        hourly:
-          anyOf:
-          - $ref: "#/components/schemas/WeatherHourly"
-          - type: "null"
-          default: null
-        hourly_units:
-          anyOf:
-          - $ref: "#/components/schemas/WeatherHourlyUnits"
-          - type: "null"
-          default: null
-        latitude:
-          anyOf:
-          - type: number
-          - type: "null"
-          default: null
-          title: Latitude
-        longitude:
-          anyOf:
-          - type: number
-          - type: "null"
-          default: null
-          title: Longitude
-        timezone:
-          anyOf:
-          - type: string
-          - type: "null"
-          default: null
-          title: Timezone
-        timezone_abbreviation:
-          anyOf:
-          - type: string
-          - type: "null"
-          default: null
-          title: Timezone Abbreviation
-        utc_offset_seconds:
-          anyOf:
-          - type: integer
-          - type: "null"
-          default: null
-          title: Utc Offset Seconds
-      title: GetWeatherOutput
     LabelInfo:
       type: object
       properties:
@@ -2121,88 +1219,6 @@ components:
       required:
       - leaguePointsChange
       - login
-    PageDocument:
-      type: object
-      properties:
-        content:
-          type: array
-          items:
-            $ref: "#/components/schemas/Document"
-        empty:
-          type: boolean
-        first:
-          type: boolean
-        last:
-          type: boolean
-        number:
-          type: integer
-          format: int32
-        numberOfElements:
-          type: integer
-          format: int32
-        pageable:
-          $ref: "#/components/schemas/PageableObject"
-        size:
-          type: integer
-          format: int32
-        sort:
-          $ref: "#/components/schemas/SortObject"
-        totalElements:
-          type: integer
-          format: int64
-        totalPages:
-          type: integer
-          format: int32
-    PageDocumentSummary:
-      type: object
-      properties:
-        content:
-          type: array
-          items:
-            $ref: "#/components/schemas/DocumentSummary"
-        empty:
-          type: boolean
-        first:
-          type: boolean
-        last:
-          type: boolean
-        number:
-          type: integer
-          format: int32
-        numberOfElements:
-          type: integer
-          format: int32
-        pageable:
-          $ref: "#/components/schemas/PageableObject"
-        size:
-          type: integer
-          format: int32
-        sort:
-          $ref: "#/components/schemas/SortObject"
-        totalElements:
-          type: integer
-          format: int64
-        totalPages:
-          type: integer
-          format: int32
-    PageableObject:
-      type: object
-      properties:
-        offset:
-          type: integer
-          format: int64
-        pageNumber:
-          type: integer
-          format: int32
-        pageSize:
-          type: integer
-          format: int32
-        paged:
-          type: boolean
-        sort:
-          $ref: "#/components/schemas/SortObject"
-        unpaged:
-          type: boolean
     PullRequestBadPractice:
       type: object
       properties:
@@ -2430,34 +1446,6 @@ components:
       - state
       - title
       - updatedAt
-    ReasoningUIPart:
-      type: object
-      description: A reasoning part of a message.
-      properties:
-        providerMetadata:
-          anyOf:
-          - type: object
-          - type: "null"
-          title: Providermetadata
-        state:
-          anyOf:
-          - type: string
-            enum:
-            - streaming
-            - done
-          - type: "null"
-          title: State
-        text:
-          type: string
-          title: Text
-        type:
-          type: string
-          const: reasoning
-          default: reasoning
-          title: Type
-      required:
-      - text
-      title: ReasoningUIPart
     RenameWorkspaceSlugRequest:
       type: object
       properties:
@@ -2492,607 +1480,344 @@ components:
       - id
       - name
       - nameWithOwner
-    SortObject:
+    StreamAbortPart:
       type: object
       properties:
-        empty:
-          type: boolean
-        sorted:
-          type: boolean
-        unsorted:
-          type: boolean
-    SourceDocumentUIPart:
-      type: object
-      description: A document source part of a message.
-      properties:
-        filename:
-          anyOf:
-          - type: string
-          - type: "null"
-          title: Filename
-        mediaType:
-          type: string
-          title: Mediatype
-        providerMetadata:
-          anyOf:
-          - type: object
-          - type: "null"
-          title: Providermetadata
-        sourceId:
-          type: string
-          title: Sourceid
-        title:
-          type: string
-          title: Title
         type:
           type: string
-          const: source-document
-          default: source-document
-          title: Type
+          enum:
+          - abort
       required:
-      - mediaType
-      - sourceId
-      - title
-      title: SourceDocumentUIPart
-    SourceUrlUIPart:
-      type: object
-      description: A URL source part of a message.
-      properties:
-        providerMetadata:
-          anyOf:
-          - type: object
-          - type: "null"
-          title: Providermetadata
-        sourceId:
-          type: string
-          title: Sourceid
-        title:
-          anyOf:
-          - type: string
-          - type: "null"
-          title: Title
-        type:
-          type: string
-          const: source-url
-          default: source-url
-          title: Type
-        url:
-          type: string
-          title: Url
-      required:
-      - sourceId
-      - url
-      title: SourceUrlUIPart
-    StepStartUIPart:
-      type: object
-      description: A step boundary part of a message.
-      properties:
-        type:
-          type: string
-          const: step-start
-          default: step-start
-          title: Type
-      title: StepStartUIPart
+      - type
     StreamDataPart:
       type: object
-      description: |-
-        Data part with dynamic type.
-
-        AI SDK v5 stream chunks support a `transient` flag that indicates the data
-        should not be added to the persisted message state.
       properties:
-        data:
-          title: Data
+        data: {}
         id:
-          anyOf:
-          - type: string
-          - type: "null"
-          title: Id
+          type: string
         transient:
-          anyOf:
-          - type: boolean
-          - type: "null"
-          title: Transient
+          type: boolean
         type:
           type: string
-          pattern: ^data-.*
-          title: Type
+          pattern: ^data-.+
       required:
-      - data
       - type
-      title: StreamDataPart
     StreamErrorPart:
       type: object
-      description: Error stream part.
       properties:
         errorText:
           type: string
-          title: Errortext
         type:
           type: string
-          const: error
-          default: error
-          title: Type
+          enum:
+          - error
       required:
       - errorText
-      title: StreamErrorPart
+      - type
     StreamFilePart:
       type: object
-      description: File part of a message.
       properties:
         mediaType:
           type: string
-          title: Mediatype
-        providerMetadata:
-          anyOf:
-          - type: object
-          - type: "null"
-          title: Providermetadata
+        providerMetadata: {}
         type:
           type: string
-          const: file
-          default: file
-          title: Type
+          enum:
+          - file
         url:
           type: string
-          title: Url
       required:
       - mediaType
+      - type
       - url
-      title: StreamFilePart
     StreamFinishPart:
       type: object
-      description: End of stream event.
       properties:
-        messageMetadata:
-          anyOf:
-          - type: object
-          - type: "null"
-          title: Messagemetadata
+        messageMetadata: {}
         type:
           type: string
-          const: finish
-          default: finish
-          title: Type
-      title: StreamFinishPart
+          enum:
+          - finish
+      required:
+      - type
     StreamMessageMetadataPart:
       type: object
-      description: Message metadata part.
       properties:
-        messageMetadata:
-          type: object
-          title: Messagemetadata
+        messageMetadata: {}
         type:
           type: string
-          const: message-metadata
-          default: message-metadata
-          title: Type
+          enum:
+          - message-metadata
       required:
-      - messageMetadata
-      title: StreamMessageMetadataPart
+      - type
     StreamReasoningDeltaPart:
       type: object
-      description: Reasoning stream delta part.
       properties:
         delta:
           type: string
-          title: Delta
         id:
           type: string
-          title: Id
-        providerMetadata:
-          anyOf:
-          - type: object
-          - type: "null"
-          title: Providermetadata
+        providerMetadata: {}
         type:
           type: string
-          const: reasoning-delta
-          default: reasoning-delta
-          title: Type
+          enum:
+          - reasoning-delta
       required:
       - delta
       - id
-      title: StreamReasoningDeltaPart
+      - type
     StreamReasoningEndPart:
       type: object
-      description: Reasoning stream end part.
       properties:
         id:
           type: string
-          title: Id
-        providerMetadata:
-          anyOf:
-          - type: object
-          - type: "null"
-          title: Providermetadata
+        providerMetadata: {}
         type:
           type: string
-          const: reasoning-end
-          default: reasoning-end
-          title: Type
+          enum:
+          - reasoning-end
       required:
       - id
-      title: StreamReasoningEndPart
+      - type
     StreamReasoningStartPart:
       type: object
-      description: Reasoning stream start part.
       properties:
         id:
           type: string
-          title: Id
-        providerMetadata:
-          anyOf:
-          - type: object
-          - type: "null"
-          title: Providermetadata
+        providerMetadata: {}
         type:
           type: string
-          const: reasoning-start
-          default: reasoning-start
-          title: Type
+          enum:
+          - reasoning-start
       required:
       - id
-      title: StreamReasoningStartPart
+      - type
     StreamSourceDocumentPart:
       type: object
-      description: Source document part of a message.
       properties:
         filename:
-          anyOf:
-          - type: string
-          - type: "null"
-          title: Filename
+          type: string
         mediaType:
           type: string
-          title: Mediatype
-        providerMetadata:
-          anyOf:
-          - type: object
-          - type: "null"
-          title: Providermetadata
+        providerMetadata: {}
         sourceId:
           type: string
-          title: Sourceid
         title:
           type: string
-          title: Title
         type:
           type: string
-          const: source-document
-          default: source-document
-          title: Type
+          enum:
+          - source-document
       required:
       - mediaType
       - sourceId
       - title
-      title: StreamSourceDocumentPart
+      - type
     StreamSourceUrlPart:
       type: object
-      description: Source URL part of a message.
       properties:
-        providerMetadata:
-          anyOf:
-          - type: object
-          - type: "null"
-          title: Providermetadata
+        providerMetadata: {}
         sourceId:
           type: string
-          title: Sourceid
         title:
-          anyOf:
-          - type: string
-          - type: "null"
-          title: Title
+          type: string
         type:
           type: string
-          const: source-url
-          default: source-url
-          title: Type
+          enum:
+          - source-url
         url:
           type: string
-          title: Url
       required:
       - sourceId
+      - type
       - url
-      title: StreamSourceUrlPart
     StreamStartPart:
       type: object
-      description: Start of stream event.
       properties:
         messageId:
-          anyOf:
-          - type: string
-          - type: "null"
-          title: Messageid
-        messageMetadata:
-          anyOf:
-          - type: object
-          - type: "null"
-          title: Messagemetadata
+          type: string
+        messageMetadata: {}
         type:
           type: string
-          const: start
-          default: start
-          title: Type
-      title: StreamStartPart
+          enum:
+          - start
+      required:
+      - type
     StreamStepFinishPart:
       type: object
-      description: Step finish event.
       properties:
         type:
           type: string
-          const: finish-step
-          default: finish-step
-          title: Type
-      title: StreamStepFinishPart
+          enum:
+          - finish-step
+      required:
+      - type
     StreamStepStartPart:
       type: object
-      description: Step start event.
       properties:
         type:
           type: string
-          const: start-step
-          default: start-step
-          title: Type
-      title: StreamStepStartPart
+          enum:
+          - start-step
+      required:
+      - type
     StreamTextDeltaPart:
       type: object
-      description: Text stream delta part.
       properties:
         delta:
           type: string
-          title: Delta
         id:
           type: string
-          title: Id
-        providerMetadata:
-          anyOf:
-          - type: object
-          - type: "null"
-          title: Providermetadata
+        providerMetadata: {}
         type:
           type: string
-          const: text-delta
-          default: text-delta
-          title: Type
+          enum:
+          - text-delta
       required:
       - delta
       - id
-      title: StreamTextDeltaPart
+      - type
     StreamTextEndPart:
       type: object
-      description: Text stream end part.
       properties:
         id:
           type: string
-          title: Id
-        providerMetadata:
-          anyOf:
-          - type: object
-          - type: "null"
-          title: Providermetadata
+        providerMetadata: {}
         type:
           type: string
-          const: text-end
-          default: text-end
-          title: Type
+          enum:
+          - text-end
       required:
       - id
-      title: StreamTextEndPart
+      - type
     StreamTextStartPart:
       type: object
-      description: Text stream start part.
       properties:
         id:
           type: string
-          title: Id
-        providerMetadata:
-          anyOf:
-          - type: object
-          - type: "null"
-          title: Providermetadata
+        providerMetadata: {}
         type:
           type: string
-          const: text-start
-          default: text-start
-          title: Type
+          enum:
+          - text-start
       required:
       - id
-      title: StreamTextStartPart
+      - type
     StreamToolInputAvailablePart:
       type: object
-      description: |-
-        Tool input available event.
-
-        AI SDK v5 uses `providerMetadata` on the stream chunk; the UI part maps this
-        to `callProviderMetadata` when persisting tool invocation parts.
       properties:
         dynamic:
-          anyOf:
-          - type: boolean
-          - type: "null"
-          title: Dynamic
-        input:
-          type: object
-          title: Input
+          type: boolean
+        input: {}
         providerExecuted:
-          anyOf:
-          - type: boolean
-          - type: "null"
-          title: Providerexecuted
-        providerMetadata:
-          anyOf:
-          - type: object
-          - type: "null"
-          title: Providermetadata
+          type: boolean
+        providerMetadata: {}
         toolCallId:
           type: string
-          title: Toolcallid
         toolName:
           type: string
-          title: Toolname
         type:
           type: string
-          const: tool-input-available
-          default: tool-input-available
-          title: Type
+          enum:
+          - tool-input-available
       required:
-      - input
       - toolCallId
       - toolName
-      title: StreamToolInputAvailablePart
+      - type
     StreamToolInputDeltaPart:
       type: object
-      description: Tool input delta event.
       properties:
         inputTextDelta:
           type: string
-          title: Inputtextdelta
         toolCallId:
           type: string
-          title: Toolcallid
         type:
           type: string
-          const: tool-input-delta
-          default: tool-input-delta
-          title: Type
+          enum:
+          - tool-input-delta
       required:
       - inputTextDelta
       - toolCallId
-      title: StreamToolInputDeltaPart
+      - type
     StreamToolInputErrorPart:
       type: object
-      description: |-
-        Tool input error event (signals an error occurred while preparing input).
-
-        Mirrors AI SDK 'tool-input-error' chunk. For non-dynamic tools, the server should
-        record an 'output-error' tool UI part where rawInput may be used for diagnostics.
       properties:
         dynamic:
-          anyOf:
-          - type: boolean
-          - type: "null"
-          title: Dynamic
+          type: boolean
         errorText:
           type: string
-          title: Errortext
-        input:
-          title: Input
+        input: {}
         providerExecuted:
-          anyOf:
-          - type: boolean
-          - type: "null"
-          title: Providerexecuted
-        providerMetadata:
-          anyOf:
-          - type: object
-          - type: "null"
-          title: Providermetadata
+          type: boolean
+        providerMetadata: {}
         toolCallId:
           type: string
-          title: Toolcallid
         toolName:
           type: string
-          title: Toolname
         type:
           type: string
-          const: tool-input-error
-          default: tool-input-error
-          title: Type
+          enum:
+          - tool-input-error
       required:
       - errorText
-      - input
       - toolCallId
       - toolName
-      title: StreamToolInputErrorPart
+      - type
     StreamToolInputStartPart:
       type: object
-      description: Tool input start event.
       properties:
         dynamic:
-          anyOf:
-          - type: boolean
-          - type: "null"
-          title: Dynamic
+          type: boolean
         providerExecuted:
-          anyOf:
-          - type: boolean
-          - type: "null"
-          title: Providerexecuted
+          type: boolean
         toolCallId:
           type: string
-          title: Toolcallid
         toolName:
           type: string
-          title: Toolname
         type:
           type: string
-          const: tool-input-start
-          default: tool-input-start
-          title: Type
+          enum:
+          - tool-input-start
       required:
       - toolCallId
       - toolName
-      title: StreamToolInputStartPart
+      - type
     StreamToolOutputAvailablePart:
       type: object
-      description: Tool output available event.
       properties:
         dynamic:
-          anyOf:
-          - type: boolean
-          - type: "null"
-          title: Dynamic
-        output:
-          type: object
-          title: Output
+          type: boolean
+        output: {}
         providerExecuted:
-          anyOf:
-          - type: boolean
-          - type: "null"
-          title: Providerexecuted
+          type: boolean
         toolCallId:
           type: string
-          title: Toolcallid
         type:
           type: string
-          const: tool-output-available
-          default: tool-output-available
-          title: Type
+          enum:
+          - tool-output-available
       required:
-      - output
       - toolCallId
-      title: StreamToolOutputAvailablePart
+      - type
     StreamToolOutputErrorPart:
       type: object
-      description: Tool output error event.
       properties:
         dynamic:
-          anyOf:
-          - type: boolean
-          - type: "null"
-          title: Dynamic
+          type: boolean
         errorText:
           type: string
-          title: Errortext
         providerExecuted:
-          anyOf:
-          - type: boolean
-          - type: "null"
-          title: Providerexecuted
+          type: boolean
         toolCallId:
           type: string
-          title: Toolcallid
         type:
           type: string
-          const: tool-output-error
-          default: tool-output-error
-          title: Type
+          enum:
+          - tool-output-error
       required:
       - errorText
       - toolCallId
-      title: StreamToolOutputErrorPart
+      - type
     TeamInfo:
       type: object
       properties:
@@ -3176,278 +1901,6 @@ components:
       - hidden
       - id
       - name
-    TextUIPart:
-      type: object
-      description: A text part of a message.
-      properties:
-        providerMetadata:
-          anyOf:
-          - type: object
-          - type: "null"
-          title: Providermetadata
-        state:
-          anyOf:
-          - type: string
-            enum:
-            - streaming
-            - done
-          - type: "null"
-          title: State
-        text:
-          type: string
-          title: Text
-        type:
-          type: string
-          const: text
-          default: text
-          title: Type
-      required:
-      - text
-      title: TextUIPart
-    ToolInputAvailablePart:
-      type: object
-      description: Tool part with input available.
-      properties:
-        callProviderMetadata:
-          anyOf:
-          - type: object
-          - type: "null"
-          title: Callprovidermetadata
-        input:
-          type: object
-          title: Input
-        providerExecuted:
-          anyOf:
-          - type: boolean
-          - type: "null"
-          title: Providerexecuted
-        state:
-          type: string
-          const: input-available
-          title: State
-        toolCallId:
-          type: string
-          title: Toolcallid
-        type:
-          type: string
-          pattern: ^tool-.*
-          title: Type
-      required:
-      - input
-      - state
-      - toolCallId
-      - type
-      title: ToolInputAvailablePart
-    ToolInputStreamingPart:
-      type: object
-      description: Tool part with input being streamed.
-      properties:
-        input:
-          anyOf:
-          - type: object
-          - type: "null"
-          title: Input
-        providerExecuted:
-          anyOf:
-          - type: boolean
-          - type: "null"
-          title: Providerexecuted
-        state:
-          type: string
-          const: input-streaming
-          title: State
-        toolCallId:
-          type: string
-          title: Toolcallid
-        type:
-          type: string
-          pattern: ^tool-.*
-          title: Type
-      required:
-      - state
-      - toolCallId
-      - type
-      title: ToolInputStreamingPart
-    ToolOutputAvailablePart:
-      type: object
-      description: Tool part with output available.
-      properties:
-        callProviderMetadata:
-          anyOf:
-          - type: object
-          - type: "null"
-          title: Callprovidermetadata
-        input:
-          type: object
-          title: Input
-        output:
-          type: object
-          title: Output
-        providerExecuted:
-          anyOf:
-          - type: boolean
-          - type: "null"
-          title: Providerexecuted
-        state:
-          type: string
-          const: output-available
-          title: State
-        toolCallId:
-          type: string
-          title: Toolcallid
-        type:
-          type: string
-          pattern: ^tool-.*
-          title: Type
-      required:
-      - input
-      - output
-      - state
-      - toolCallId
-      - type
-      title: ToolOutputAvailablePart
-    ToolOutputErrorPart:
-      type: object
-      description: Tool part with output error.
-      properties:
-        callProviderMetadata:
-          anyOf:
-          - type: object
-          - type: "null"
-          title: Callprovidermetadata
-        errorText:
-          type: string
-          title: Errortext
-        input:
-          type: object
-          title: Input
-        providerExecuted:
-          anyOf:
-          - type: boolean
-          - type: "null"
-          title: Providerexecuted
-        state:
-          type: string
-          const: output-error
-          title: State
-        toolCallId:
-          type: string
-          title: Toolcallid
-        type:
-          type: string
-          pattern: ^tool-.*
-          title: Type
-      required:
-      - errorText
-      - input
-      - state
-      - toolCallId
-      - type
-      title: ToolOutputErrorPart
-    UIMessage:
-      type: object
-      description: Message model that matches the TypeScript interface.
-      properties:
-        id:
-          type: string
-          description: A unique identifier for the message
-          title: Id
-        metadata:
-          anyOf:
-          - type: object
-          - type: "null"
-          title: Metadata
-        parts:
-          type: array
-          items:
-            anyOf:
-            - $ref: "#/components/schemas/TextUIPart"
-            - $ref: "#/components/schemas/ReasoningUIPart"
-            - $ref: "#/components/schemas/ToolInputStreamingPart"
-            - $ref: "#/components/schemas/ToolInputAvailablePart"
-            - $ref: "#/components/schemas/ToolOutputAvailablePart"
-            - $ref: "#/components/schemas/ToolOutputErrorPart"
-            - $ref: "#/components/schemas/SourceUrlUIPart"
-            - $ref: "#/components/schemas/SourceDocumentUIPart"
-            - $ref: "#/components/schemas/FileUIPart"
-            - $ref: "#/components/schemas/DataUIPart"
-            - $ref: "#/components/schemas/StepStartUIPart"
-          title: Parts
-        role:
-          type: string
-          enum:
-          - system
-          - user
-          - assistant
-          title: Role
-      required:
-      - id
-      - parts
-      - role
-      title: UIMessage
-    UpdateDocumentInput:
-      type: object
-      description: Input for updateDocument tool.
-      x-hephaestus:
-        toolModel: true
-      properties:
-        description:
-          type: string
-          description: The description of changes that need to be made
-          title: Description
-        id:
-          type: string
-          description: The ID of the document to update
-          title: Id
-      required:
-      - description
-      - id
-      title: UpdateDocumentInput
-    UpdateDocumentOutput:
-      type: object
-      description: Output for updateDocument tool.
-      x-hephaestus:
-        toolModel: true
-      properties:
-        content:
-          type: string
-          title: Content
-        id:
-          type: string
-          title: Id
-        kind:
-          type: string
-          const: TEXT
-          title: Kind
-        title:
-          type: string
-          title: Title
-      required:
-      - content
-      - id
-      - kind
-      - title
-      title: UpdateDocumentOutput
-    UpdateDocumentRequest:
-      type: object
-      description: |-
-        DTO for updating an existing document.
-         Creates a new version with the updated content.
-      properties:
-        content:
-          type: string
-        kind:
-          type: string
-          enum:
-          - TEXT
-        title:
-          type: string
-          maxLength: 255
-          minLength: 0
-      required:
-      - content
-      - kind
-      - title
     UpdateWorkspaceNotificationsRequest:
       type: object
       description: DTO for updating workspace leaderboard notification preferences.
@@ -3602,123 +2055,6 @@ components:
       - name
       - teams
       - url
-    VoteMessageRequest:
-      type: object
-      description: Request DTO for voting on a message.
-      properties:
-        isUpvoted:
-          type: boolean
-      required:
-      - isUpvoted
-    WeatherCurrent:
-      type: object
-      properties:
-        interval:
-          anyOf:
-          - type: integer
-          - type: "null"
-          title: Interval
-        temperature_2m:
-          anyOf:
-          - type: number
-          - type: "null"
-          title: Temperature 2M
-        time:
-          anyOf:
-          - type: string
-          - type: "null"
-          title: Time
-      title: WeatherCurrent
-    WeatherCurrentUnits:
-      type: object
-      properties:
-        interval:
-          anyOf:
-          - type: string
-          - type: "null"
-          title: Interval
-        temperature_2m:
-          anyOf:
-          - type: string
-          - type: "null"
-          title: Temperature 2M
-        time:
-          anyOf:
-          - type: string
-          - type: "null"
-          title: Time
-      title: WeatherCurrentUnits
-    WeatherDaily:
-      type: object
-      properties:
-        sunrise:
-          type: array
-          default: []
-          items:
-            type: string
-          title: Sunrise
-        sunset:
-          type: array
-          default: []
-          items:
-            type: string
-          title: Sunset
-        time:
-          type: array
-          default: []
-          items:
-            type: string
-          title: Time
-      title: WeatherDaily
-    WeatherDailyUnits:
-      type: object
-      properties:
-        sunrise:
-          anyOf:
-          - type: string
-          - type: "null"
-          title: Sunrise
-        sunset:
-          anyOf:
-          - type: string
-          - type: "null"
-          title: Sunset
-        time:
-          anyOf:
-          - type: string
-          - type: "null"
-          title: Time
-      title: WeatherDailyUnits
-    WeatherHourly:
-      type: object
-      properties:
-        temperature_2m:
-          type: array
-          default: []
-          items:
-            type: number
-          title: Temperature 2M
-        time:
-          type: array
-          default: []
-          items:
-            type: string
-          title: Time
-      title: WeatherHourly
-    WeatherHourlyUnits:
-      type: object
-      properties:
-        temperature_2m:
-          anyOf:
-          - type: string
-          - type: "null"
-          title: Temperature 2M
-        time:
-          anyOf:
-          - type: string
-          - type: "null"
-          title: Time
-      title: WeatherHourlyUnits
     Workspace:
       type: object
       properties:

@@ -217,6 +217,8 @@ export function useMentorChat({
 		setMessages,
 		resumeStream,
 		addToolResult,
+		addToolOutput,
+		addToolApprovalResponse,
 		id,
 	} = useChat<ChatMessage>({
 		id: stableThreadId, // Use stable ID that never changes
@@ -332,6 +334,8 @@ export function useMentorChat({
 		setMessages,
 		resumeStream,
 		addToolResult,
+		addToolOutput,
+		addToolApprovalResponse,
 		id,
 		clearError,
 

@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { fn } from "@storybook/test";
-import type { Document } from "@/api/types.gen";
+import type { Document } from "@/lib/types";
 import { DocumentPreview } from "./DocumentPreview";
 
 /**
@@ -52,7 +52,7 @@ The goal is to create a user-friendly application that meets all stakeholder nee
 Expected completion: Q2 2024`,
 	kind: "text",
 	createdAt: new Date("2024-01-15"),
-	userId: "456",
+	userId: 456,
 	versionNumber: 1,
 };
 
@@ -121,7 +121,7 @@ The system follows a microservices architecture with the following components:
 The application will be deployed using Docker containers on AWS ECS.`,
 	kind: "text",
 	createdAt: new Date("2024-02-01"),
-	userId: "789",
+	userId: 789,
 	versionNumber: 1,
 };
 
@@ -177,7 +177,7 @@ export const EmptyDocument: Story = {
 			content: "",
 			kind: "text",
 			createdAt: new Date(),
-			userId: "123",
+			userId: 123,
 			versionNumber: 1,
 		},
 	},
@@ -212,7 +212,7 @@ export const MarkdownDocument: Story = {
 > Remember to bring laptops for the demo!`,
 			kind: "text",
 			createdAt: new Date("2024-03-15"),
-			userId: "456",
+			userId: 456,
 			versionNumber: 1,
 		},
 	},
@@ -260,7 +260,7 @@ The API returns standard HTTP status codes:
 - **500** - Internal Server Error`,
 			kind: "text",
 			createdAt: new Date("2024-02-20"),
-			userId: "789",
+			userId: 789,
 			versionNumber: 1,
 		},
 	},

@@ -1,6 +1,6 @@
 import type { UseChatHelpers } from "@ai-sdk/react";
 import type { ReactNode } from "react";
-import type { ChatMessageVote, Document } from "@/api/types.gen";
+import type { ChatMessageVote, Document } from "@/lib/types";
 import type { Attachment, ChatMessage } from "@/lib/types";
 import type { ArtifactOverlayMeta } from "./ArtifactShell";
 import type { PartRendererMap } from "./renderers/types";

@@ -29,21 +29,23 @@ import com.fasterxml.jackson.annotation.JsonTypeName;
 import org.hibernate.validator.constraints.*;
 
 /**
- * StreamReasoningDeltaPart
+ * MentorThreadsThreadIdGet200ResponseMessagesInnerPartsInnerAnyOf5
  */
 @JsonPropertyOrder({
-  StreamReasoningDeltaPart.JSON_PROPERTY_TYPE,
-  StreamReasoningDeltaPart.JSON_PROPERTY_ID,
-  StreamReasoningDeltaPart.JSON_PROPERTY_DELTA,
-  StreamReasoningDeltaPart.JSON_PROPERTY_PROVIDER_METADATA
+  MentorThreadsThreadIdGet200ResponseMessagesInnerPartsInnerAnyOf5.JSON_PROPERTY_TYPE,
+  MentorThreadsThreadIdGet200ResponseMessagesInnerPartsInnerAnyOf5.JSON_PROPERTY_MEDIA_TYPE,
+  MentorThreadsThreadIdGet200ResponseMessagesInnerPartsInnerAnyOf5.JSON_PROPERTY_TITLE,
+  MentorThreadsThreadIdGet200ResponseMessagesInnerPartsInnerAnyOf5.JSON_PROPERTY_FILENAME,
+  MentorThreadsThreadIdGet200ResponseMessagesInnerPartsInnerAnyOf5.JSON_PROPERTY_PROVIDER_METADATA
 })
+@JsonTypeName("_mentor_threads__threadId__get_200_response_messages_inner_parts_inner_anyOf_5")
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
-public class StreamReasoningDeltaPart {
+public class MentorThreadsThreadIdGet200ResponseMessagesInnerPartsInnerAnyOf5 {
   /**
    * Gets or Sets type
    */
   public enum TypeEnum {
-    REASONING_DELTA("reasoning-delta");
+    SOURCE_DOCUMENT("source-document");
 
     private String value;
 
@@ -75,19 +77,22 @@ public class StreamReasoningDeltaPart {
   public static final String JSON_PROPERTY_TYPE = "type";
   private TypeEnum type;
 
-  public static final String JSON_PROPERTY_ID = "id";
-  private String id;
+  public static final String JSON_PROPERTY_MEDIA_TYPE = "mediaType";
+  private String mediaType;
 
-  public static final String JSON_PROPERTY_DELTA = "delta";
-  private String delta;
+  public static final String JSON_PROPERTY_TITLE = "title";
+  private String title;
+
+  public static final String JSON_PROPERTY_FILENAME = "filename";
+  private String filename;
 
   public static final String JSON_PROPERTY_PROVIDER_METADATA = "providerMetadata";
   private JsonNullable<Object> providerMetadata = JsonNullable.<Object>of(null);
 
-  public StreamReasoningDeltaPart() {
+  public MentorThreadsThreadIdGet200ResponseMessagesInnerPartsInnerAnyOf5() {
   }
 
-  public StreamReasoningDeltaPart type(TypeEnum type) {
+  public MentorThreadsThreadIdGet200ResponseMessagesInnerPartsInnerAnyOf5 type(TypeEnum type) {
     
     this.type = type;
     return this;
@@ -112,57 +117,82 @@ public class StreamReasoningDeltaPart {
     this.type = type;
   }
 
-  public StreamReasoningDeltaPart id(String id) {
+  public MentorThreadsThreadIdGet200ResponseMessagesInnerPartsInnerAnyOf5 mediaType(String mediaType) {
     
-    this.id = id;
+    this.mediaType = mediaType;
     return this;
   }
 
   /**
-   * Get id
-   * @return id
+   * Get mediaType
+   * @return mediaType
    */
   @jakarta.annotation.Nonnull
-  @JsonProperty(JSON_PROPERTY_ID)
+  @JsonProperty(JSON_PROPERTY_MEDIA_TYPE)
   @JsonInclude(value = JsonInclude.Include.ALWAYS)
 
-  public String getId() {
-    return id;
+  public String getMediaType() {
+    return mediaType;
   }
 
 
-  @JsonProperty(JSON_PROPERTY_ID)
+  @JsonProperty(JSON_PROPERTY_MEDIA_TYPE)
   @JsonInclude(value = JsonInclude.Include.ALWAYS)
-  public void setId(String id) {
-    this.id = id;
+  public void setMediaType(String mediaType) {
+    this.mediaType = mediaType;
   }
 
-  public StreamReasoningDeltaPart delta(String delta) {
+  public MentorThreadsThreadIdGet200ResponseMessagesInnerPartsInnerAnyOf5 title(String title) {
     
-    this.delta = delta;
+    this.title = title;
     return this;
   }
 
   /**
-   * Get delta
-   * @return delta
+   * Get title
+   * @return title
    */
   @jakarta.annotation.Nonnull
-  @JsonProperty(JSON_PROPERTY_DELTA)
+  @JsonProperty(JSON_PROPERTY_TITLE)
   @JsonInclude(value = JsonInclude.Include.ALWAYS)
 
-  public String getDelta() {
-    return delta;
+  public String getTitle() {
+    return title;
   }
 
 
-  @JsonProperty(JSON_PROPERTY_DELTA)
+  @JsonProperty(JSON_PROPERTY_TITLE)
   @JsonInclude(value = JsonInclude.Include.ALWAYS)
-  public void setDelta(String delta) {
-    this.delta = delta;
+  public void setTitle(String title) {
+    this.title = title;
   }
 
-  public StreamReasoningDeltaPart providerMetadata(Object providerMetadata) {
+  public MentorThreadsThreadIdGet200ResponseMessagesInnerPartsInnerAnyOf5 filename(String filename) {
+    
+    this.filename = filename;
+    return this;
+  }
+
+  /**
+   * Get filename
+   * @return filename
+   */
+  @jakarta.annotation.Nullable
+  @JsonProperty(JSON_PROPERTY_FILENAME)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+
+  public String getFilename() {
+    return filename;
+  }
+
+
+  @JsonProperty(JSON_PROPERTY_FILENAME)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+  public void setFilename(String filename) {
+    this.filename = filename;
+  }
+
+  public MentorThreadsThreadIdGet200ResponseMessagesInnerPartsInnerAnyOf5 providerMetadata(Object providerMetadata) {
     this.providerMetadata = JsonNullable.<Object>of(providerMetadata);
     
     return this;
@@ -203,11 +233,12 @@ public class StreamReasoningDeltaPart {
     if (o == null || getClass() != o.getClass()) {
       return false;
     }
-    StreamReasoningDeltaPart streamReasoningDeltaPart = (StreamReasoningDeltaPart) o;
-    return Objects.equals(this.type, streamReasoningDeltaPart.type) &&
-        Objects.equals(this.id, streamReasoningDeltaPart.id) &&
-        Objects.equals(this.delta, streamReasoningDeltaPart.delta) &&
-        equalsNullable(this.providerMetadata, streamReasoningDeltaPart.providerMetadata);
+    MentorThreadsThreadIdGet200ResponseMessagesInnerPartsInnerAnyOf5 mentorThreadsThreadIdGet200ResponseMessagesInnerPartsInnerAnyOf5 = (MentorThreadsThreadIdGet200ResponseMessagesInnerPartsInnerAnyOf5) o;
+    return Objects.equals(this.type, mentorThreadsThreadIdGet200ResponseMessagesInnerPartsInnerAnyOf5.type) &&
+        Objects.equals(this.mediaType, mentorThreadsThreadIdGet200ResponseMessagesInnerPartsInnerAnyOf5.mediaType) &&
+        Objects.equals(this.title, mentorThreadsThreadIdGet200ResponseMessagesInnerPartsInnerAnyOf5.title) &&
+        Objects.equals(this.filename, mentorThreadsThreadIdGet200ResponseMessagesInnerPartsInnerAnyOf5.filename) &&
+        equalsNullable(this.providerMetadata, mentorThreadsThreadIdGet200ResponseMessagesInnerPartsInnerAnyOf5.providerMetadata);
   }
 
   private static <T> boolean equalsNullable(JsonNullable<T> a, JsonNullable<T> b) {
@@ -216,7 +247,7 @@ public class StreamReasoningDeltaPart {
 
   @Override
   public int hashCode() {
-    return Objects.hash(type, id, delta, hashCodeNullable(providerMetadata));
+    return Objects.hash(type, mediaType, title, filename, hashCodeNullable(providerMetadata));
   }
 
   private static <T> int hashCodeNullable(JsonNullable<T> a) {
@@ -229,10 +260,11 @@ public class StreamReasoningDeltaPart {
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder();
-    sb.append("class StreamReasoningDeltaPart {\n");
+    sb.append("class MentorThreadsThreadIdGet200ResponseMessagesInnerPartsInnerAnyOf5 {\n");
     sb.append("    type: ").append(toIndentedString(type)).append("\n");
-    sb.append("    id: ").append(toIndentedString(id)).append("\n");
-    sb.append("    delta: ").append(toIndentedString(delta)).append("\n");
+    sb.append("    mediaType: ").append(toIndentedString(mediaType)).append("\n");
+    sb.append("    title: ").append(toIndentedString(title)).append("\n");
+    sb.append("    filename: ").append(toIndentedString(filename)).append("\n");
     sb.append("    providerMetadata: ").append(toIndentedString(providerMetadata)).append("\n");
     sb.append("}");
     return sb.toString();

@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { fn } from "@storybook/test";
-import type { Document } from "@/api/types.gen";
+import type { Document } from "@/lib/types";
 import type { ChatMessage } from "@/lib/types";
 import { PreviewMessage, ThinkingMessage } from "./Message";
 
@@ -164,7 +164,7 @@ export const Button: React.FC<ButtonProps> = ({
 
 Always write tests for your components using Jest and React Testing Library.`,
 	kind: "text",
-	userId: "1",
+	userId: 1,
 	versionNumber: 1,
 	createdAt: new Date(),
 };

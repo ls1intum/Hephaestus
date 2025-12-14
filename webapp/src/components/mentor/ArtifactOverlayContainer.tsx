@@ -3,7 +3,7 @@ import type { ReactElement } from "react";
 import { useEffect } from "react";
 import { createPortal } from "react-dom";
 import { useWindowSize } from "usehooks-ts";
-import type { ChatMessageVote } from "@/api/types.gen";
+import type { ChatMessageVote } from "@/lib/types";
 import type { ArtifactKind, Attachment, ChatMessage } from "@/lib/types";
 import { parseArtifactId } from "@/lib/types";
 import { useArtifactStore } from "@/stores/artifact-store";

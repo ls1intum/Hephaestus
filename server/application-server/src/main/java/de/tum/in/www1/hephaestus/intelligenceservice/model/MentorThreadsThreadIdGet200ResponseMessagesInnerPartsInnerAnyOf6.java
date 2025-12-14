@@ -20,76 +20,51 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import com.fasterxml.jackson.annotation.JsonValue;
+import java.util.HashMap;
+import java.util.Map;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import org.hibernate.validator.constraints.*;
 
 /**
- * PoemRequest
+ * MentorThreadsThreadIdGet200ResponseMessagesInnerPartsInnerAnyOf6
  */
 @JsonPropertyOrder({
-  PoemRequest.JSON_PROPERTY_TOPIC,
-  PoemRequest.JSON_PROPERTY_STYLE
+  MentorThreadsThreadIdGet200ResponseMessagesInnerPartsInnerAnyOf6.JSON_PROPERTY_TYPE
 })
+@JsonTypeName("_mentor_threads__threadId__get_200_response_messages_inner_parts_inner_anyOf_6")
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
-public class PoemRequest {
-  public static final String JSON_PROPERTY_TOPIC = "topic";
-  private String topic;
+public class MentorThreadsThreadIdGet200ResponseMessagesInnerPartsInnerAnyOf6 extends HashMap<String, Object> {
+  public static final String JSON_PROPERTY_TYPE = "type";
+  private String type;
 
-  public static final String JSON_PROPERTY_STYLE = "style";
-  private String style = "";
+  public MentorThreadsThreadIdGet200ResponseMessagesInnerPartsInnerAnyOf6() {
 
-  public PoemRequest() {
   }
 
-  public PoemRequest topic(String topic) {
+  public MentorThreadsThreadIdGet200ResponseMessagesInnerPartsInnerAnyOf6 type(String type) {
     
-    this.topic = topic;
+    this.type = type;
     return this;
   }
 
   /**
-   * Topic of the poem
-   * @return topic
+   * Get type
+   * @return type
    */
   @jakarta.annotation.Nonnull
-  @JsonProperty(JSON_PROPERTY_TOPIC)
+  @JsonProperty(JSON_PROPERTY_TYPE)
   @JsonInclude(value = JsonInclude.Include.ALWAYS)
 
-  public String getTopic() {
-    return topic;
+  public String getType() {
+    return type;
   }
 
 
-  @JsonProperty(JSON_PROPERTY_TOPIC)
+  @JsonProperty(JSON_PROPERTY_TYPE)
   @JsonInclude(value = JsonInclude.Include.ALWAYS)
-  public void setTopic(String topic) {
-    this.topic = topic;
-  }
-
-  public PoemRequest style(String style) {
-    
-    this.style = style;
-    return this;
-  }
-
-  /**
-   * Optional poem style
-   * @return style
-   */
-  @jakarta.annotation.Nullable
-  @JsonProperty(JSON_PROPERTY_STYLE)
-  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
-
-  public String getStyle() {
-    return style;
-  }
-
-
-  @JsonProperty(JSON_PROPERTY_STYLE)
-  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
-  public void setStyle(String style) {
-    this.style = style;
+  public void setType(String type) {
+    this.type = type;
   }
 
   @Override
@@ -100,22 +75,22 @@ public class PoemRequest {
     if (o == null || getClass() != o.getClass()) {
       return false;
     }
-    PoemRequest poemRequest = (PoemRequest) o;
-    return Objects.equals(this.topic, poemRequest.topic) &&
-        Objects.equals(this.style, poemRequest.style);
+    MentorThreadsThreadIdGet200ResponseMessagesInnerPartsInnerAnyOf6 mentorThreadsThreadIdGet200ResponseMessagesInnerPartsInnerAnyOf6 = (MentorThreadsThreadIdGet200ResponseMessagesInnerPartsInnerAnyOf6) o;
+    return Objects.equals(this.type, mentorThreadsThreadIdGet200ResponseMessagesInnerPartsInnerAnyOf6.type) &&
+        super.equals(o);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(topic, style);
+    return Objects.hash(type, super.hashCode());
   }
 
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder();
-    sb.append("class PoemRequest {\n");
-    sb.append("    topic: ").append(toIndentedString(topic)).append("\n");
-    sb.append("    style: ").append(toIndentedString(style)).append("\n");
+    sb.append("class MentorThreadsThreadIdGet200ResponseMessagesInnerPartsInnerAnyOf6 {\n");
+    sb.append("    ").append(toIndentedString(super.toString())).append("\n");
+    sb.append("    type: ").append(toIndentedString(type)).append("\n");
     sb.append("}");
     return sb.toString();
   }

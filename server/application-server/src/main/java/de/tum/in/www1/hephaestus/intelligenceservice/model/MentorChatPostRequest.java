@@ -44,7 +44,7 @@ public class MentorChatPostRequest {
   private MentorChatPostRequestMessage message;
 
   public static final String JSON_PROPERTY_PREVIOUS_MESSAGE_ID = "previousMessageId";
-  private UUID previousMessageId;
+  private String previousMessageId;
 
   public MentorChatPostRequest() {
   }
@@ -99,7 +99,7 @@ public class MentorChatPostRequest {
     this.message = message;
   }
 
-  public MentorChatPostRequest previousMessageId(UUID previousMessageId) {
+  public MentorChatPostRequest previousMessageId(String previousMessageId) {
     
     this.previousMessageId = previousMessageId;
     return this;
@@ -113,14 +113,14 @@ public class MentorChatPostRequest {
   @JsonProperty(JSON_PROPERTY_PREVIOUS_MESSAGE_ID)
   @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
 
-  public UUID getPreviousMessageId() {
+  public String getPreviousMessageId() {
     return previousMessageId;
   }
 
 
   @JsonProperty(JSON_PROPERTY_PREVIOUS_MESSAGE_ID)
   @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
-  public void setPreviousMessageId(UUID previousMessageId) {
+  public void setPreviousMessageId(String previousMessageId) {
     this.previousMessageId = previousMessageId;
   }
 

@@ -1,7 +1,8 @@
 import { Link } from "@tanstack/react-router";
 import { SquarePen } from "lucide-react";
 import type { ReactNode } from "react";
-import type { ChatThreadGroup, WorkspaceListItem } from "@/api/types.gen";
+import type { WorkspaceListItem } from "@/api/types.gen";
+import type { ChatThreadGroup } from "@/lib/types";
 import {
 	Sidebar,
 	SidebarContent,

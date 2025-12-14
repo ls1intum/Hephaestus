@@ -22,7 +22,15 @@ import com.fasterxml.jackson.annotation.JsonTypeName;
 import com.fasterxml.jackson.annotation.JsonValue;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.MentorThreadsThreadIdGet200ResponseMessagesInnerPartsInnerAnyOf;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.MentorThreadsThreadIdGet200ResponseMessagesInnerPartsInnerAnyOf1;
-import java.net.URI;
+import de.tum.in.www1.hephaestus.intelligenceservice.model.MentorThreadsThreadIdGet200ResponseMessagesInnerPartsInnerAnyOf2;
+import de.tum.in.www1.hephaestus.intelligenceservice.model.MentorThreadsThreadIdGet200ResponseMessagesInnerPartsInnerAnyOf3;
+import de.tum.in.www1.hephaestus.intelligenceservice.model.MentorThreadsThreadIdGet200ResponseMessagesInnerPartsInnerAnyOf4;
+import de.tum.in.www1.hephaestus.intelligenceservice.model.MentorThreadsThreadIdGet200ResponseMessagesInnerPartsInnerAnyOf5;
+import de.tum.in.www1.hephaestus.intelligenceservice.model.MentorThreadsThreadIdGet200ResponseMessagesInnerPartsInnerAnyOf6;
+import org.openapitools.jackson.nullable.JsonNullable;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import org.openapitools.jackson.nullable.JsonNullable;
+import java.util.NoSuchElementException;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import org.hibernate.validator.constraints.*;
@@ -33,102 +41,48 @@ import org.hibernate.validator.constraints.*;
 @JsonPropertyOrder({
   MentorThreadsThreadIdGet200ResponseMessagesInnerPartsInner.JSON_PROPERTY_TYPE,
   MentorThreadsThreadIdGet200ResponseMessagesInnerPartsInner.JSON_PROPERTY_TEXT,
+  MentorThreadsThreadIdGet200ResponseMessagesInnerPartsInner.JSON_PROPERTY_PROVIDER_METADATA,
   MentorThreadsThreadIdGet200ResponseMessagesInnerPartsInner.JSON_PROPERTY_URL,
   MentorThreadsThreadIdGet200ResponseMessagesInnerPartsInner.JSON_PROPERTY_MEDIA_TYPE,
-  MentorThreadsThreadIdGet200ResponseMessagesInnerPartsInner.JSON_PROPERTY_NAME
+  MentorThreadsThreadIdGet200ResponseMessagesInnerPartsInner.JSON_PROPERTY_NAME,
+  MentorThreadsThreadIdGet200ResponseMessagesInnerPartsInner.JSON_PROPERTY_TITLE,
+  MentorThreadsThreadIdGet200ResponseMessagesInnerPartsInner.JSON_PROPERTY_SOURCE_ID,
+  MentorThreadsThreadIdGet200ResponseMessagesInnerPartsInner.JSON_PROPERTY_FILENAME
 })
 @JsonTypeName("_mentor_threads__threadId__get_200_response_messages_inner_parts_inner")
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
 public class MentorThreadsThreadIdGet200ResponseMessagesInnerPartsInner {
-  /**
-   * Gets or Sets type
-   */
-  public enum TypeEnum {
-    TEXT("text"),
-    
-    FILE("file");
-
-    private String value;
-
-    TypeEnum(String value) {
-      this.value = value;
-    }
-
-    @JsonValue
-    public String getValue() {
-      return value;
-    }
-
-    @Override
-    public String toString() {
-      return String.valueOf(value);
-    }
-
-    @JsonCreator
-    public static TypeEnum fromValue(String value) {
-      for (TypeEnum b : TypeEnum.values()) {
-        if (b.value.equals(value)) {
-          return b;
-        }
-      }
-      throw new IllegalArgumentException("Unexpected value '" + value + "'");
-    }
-  }
-
   public static final String JSON_PROPERTY_TYPE = "type";
-  private TypeEnum type;
+  private String type;
 
   public static final String JSON_PROPERTY_TEXT = "text";
   private String text;
 
+  public static final String JSON_PROPERTY_PROVIDER_METADATA = "providerMetadata";
+  private JsonNullable<Object> providerMetadata = JsonNullable.<Object>of(null);
+
   public static final String JSON_PROPERTY_URL = "url";
-  private URI url;
-
-  /**
-   * Gets or Sets mediaType
-   */
-  public enum MediaTypeEnum {
-    JPEG("image/jpeg"),
-    
-    PNG("image/png");
-
-    private String value;
-
-    MediaTypeEnum(String value) {
-      this.value = value;
-    }
-
-    @JsonValue
-    public String getValue() {
-      return value;
-    }
-
-    @Override
-    public String toString() {
-      return String.valueOf(value);
-    }
-
-    @JsonCreator
-    public static MediaTypeEnum fromValue(String value) {
-      for (MediaTypeEnum b : MediaTypeEnum.values()) {
-        if (b.value.equals(value)) {
-          return b;
-        }
-      }
-      throw new IllegalArgumentException("Unexpected value '" + value + "'");
-    }
-  }
+  private String url;
 
   public static final String JSON_PROPERTY_MEDIA_TYPE = "mediaType";
-  private MediaTypeEnum mediaType;
+  private String mediaType;
 
   public static final String JSON_PROPERTY_NAME = "name";
   private String name;
 
+  public static final String JSON_PROPERTY_TITLE = "title";
+  private String title;
+
+  public static final String JSON_PROPERTY_SOURCE_ID = "sourceId";
+  private String sourceId;
+
+  public static final String JSON_PROPERTY_FILENAME = "filename";
+  private String filename;
+
   public MentorThreadsThreadIdGet200ResponseMessagesInnerPartsInner() {
   }
 
-  public MentorThreadsThreadIdGet200ResponseMessagesInnerPartsInner type(TypeEnum type) {
+  public MentorThreadsThreadIdGet200ResponseMessagesInnerPartsInner type(String type) {
     
     this.type = type;
     return this;
@@ -142,14 +96,14 @@ public class MentorThreadsThreadIdGet200ResponseMessagesInnerPartsInner {
   @JsonProperty(JSON_PROPERTY_TYPE)
   @JsonInclude(value = JsonInclude.Include.ALWAYS)
 
-  public TypeEnum getType() {
+  public String getType() {
     return type;
   }
 
 
   @JsonProperty(JSON_PROPERTY_TYPE)
   @JsonInclude(value = JsonInclude.Include.ALWAYS)
-  public void setType(TypeEnum type) {
+  public void setType(String type) {
     this.type = type;
   }
 
@@ -178,7 +132,40 @@ public class MentorThreadsThreadIdGet200ResponseMessagesInnerPartsInner {
     this.text = text;
   }
 
-  public MentorThreadsThreadIdGet200ResponseMessagesInnerPartsInner url(URI url) {
+  public MentorThreadsThreadIdGet200ResponseMessagesInnerPartsInner providerMetadata(Object providerMetadata) {
+    this.providerMetadata = JsonNullable.<Object>of(providerMetadata);
+    
+    return this;
+  }
+
+  /**
+   * Get providerMetadata
+   * @return providerMetadata
+   */
+  @jakarta.annotation.Nullable
+  @JsonIgnore
+
+  public Object getProviderMetadata() {
+        return providerMetadata.orElse(null);
+  }
+
+  @JsonProperty(JSON_PROPERTY_PROVIDER_METADATA)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+
+  public JsonNullable<Object> getProviderMetadata_JsonNullable() {
+    return providerMetadata;
+  }
+  
+  @JsonProperty(JSON_PROPERTY_PROVIDER_METADATA)
+  public void setProviderMetadata_JsonNullable(JsonNullable<Object> providerMetadata) {
+    this.providerMetadata = providerMetadata;
+  }
+
+  public void setProviderMetadata(Object providerMetadata) {
+    this.providerMetadata = JsonNullable.<Object>of(providerMetadata);
+  }
+
+  public MentorThreadsThreadIdGet200ResponseMessagesInnerPartsInner url(String url) {
     
     this.url = url;
     return this;
@@ -192,18 +179,18 @@ public class MentorThreadsThreadIdGet200ResponseMessagesInnerPartsInner {
   @JsonProperty(JSON_PROPERTY_URL)
   @JsonInclude(value = JsonInclude.Include.ALWAYS)
 
-  public URI getUrl() {
+  public String getUrl() {
     return url;
   }
 
 
   @JsonProperty(JSON_PROPERTY_URL)
   @JsonInclude(value = JsonInclude.Include.ALWAYS)
-  public void setUrl(URI url) {
+  public void setUrl(String url) {
     this.url = url;
   }
 
-  public MentorThreadsThreadIdGet200ResponseMessagesInnerPartsInner mediaType(MediaTypeEnum mediaType) {
+  public MentorThreadsThreadIdGet200ResponseMessagesInnerPartsInner mediaType(String mediaType) {
     
     this.mediaType = mediaType;
     return this;
@@ -217,14 +204,14 @@ public class MentorThreadsThreadIdGet200ResponseMessagesInnerPartsInner {
   @JsonProperty(JSON_PROPERTY_MEDIA_TYPE)
   @JsonInclude(value = JsonInclude.Include.ALWAYS)
 
-  public MediaTypeEnum getMediaType() {
+  public String getMediaType() {
     return mediaType;
   }
 
 
   @JsonProperty(JSON_PROPERTY_MEDIA_TYPE)
   @JsonInclude(value = JsonInclude.Include.ALWAYS)
-  public void setMediaType(MediaTypeEnum mediaType) {
+  public void setMediaType(String mediaType) {
     this.mediaType = mediaType;
   }
 
@@ -253,6 +240,81 @@ public class MentorThreadsThreadIdGet200ResponseMessagesInnerPartsInner {
     this.name = name;
   }
 
+  public MentorThreadsThreadIdGet200ResponseMessagesInnerPartsInner title(String title) {
+    
+    this.title = title;
+    return this;
+  }
+
+  /**
+   * Get title
+   * @return title
+   */
+  @jakarta.annotation.Nonnull
+  @JsonProperty(JSON_PROPERTY_TITLE)
+  @JsonInclude(value = JsonInclude.Include.ALWAYS)
+
+  public String getTitle() {
+    return title;
+  }
+
+
+  @JsonProperty(JSON_PROPERTY_TITLE)
+  @JsonInclude(value = JsonInclude.Include.ALWAYS)
+  public void setTitle(String title) {
+    this.title = title;
+  }
+
+  public MentorThreadsThreadIdGet200ResponseMessagesInnerPartsInner sourceId(String sourceId) {
+    
+    this.sourceId = sourceId;
+    return this;
+  }
+
+  /**
+   * Get sourceId
+   * @return sourceId
+   */
+  @jakarta.annotation.Nullable
+  @JsonProperty(JSON_PROPERTY_SOURCE_ID)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+
+  public String getSourceId() {
+    return sourceId;
+  }
+
+
+  @JsonProperty(JSON_PROPERTY_SOURCE_ID)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+  public void setSourceId(String sourceId) {
+    this.sourceId = sourceId;
+  }
+
+  public MentorThreadsThreadIdGet200ResponseMessagesInnerPartsInner filename(String filename) {
+    
+    this.filename = filename;
+    return this;
+  }
+
+  /**
+   * Get filename
+   * @return filename
+   */
+  @jakarta.annotation.Nullable
+  @JsonProperty(JSON_PROPERTY_FILENAME)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+
+  public String getFilename() {
+    return filename;
+  }
+
+
+  @JsonProperty(JSON_PROPERTY_FILENAME)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+  public void setFilename(String filename) {
+    this.filename = filename;
+  }
+
   @Override
   public boolean equals(Object o) {
     if (this == o) {
@@ -264,14 +326,29 @@ public class MentorThreadsThreadIdGet200ResponseMessagesInnerPartsInner {
     MentorThreadsThreadIdGet200ResponseMessagesInnerPartsInner mentorThreadsThreadIdGet200ResponseMessagesInnerPartsInner = (MentorThreadsThreadIdGet200ResponseMessagesInnerPartsInner) o;
     return Objects.equals(this.type, mentorThreadsThreadIdGet200ResponseMessagesInnerPartsInner.type) &&
         Objects.equals(this.text, mentorThreadsThreadIdGet200ResponseMessagesInnerPartsInner.text) &&
+        equalsNullable(this.providerMetadata, mentorThreadsThreadIdGet200ResponseMessagesInnerPartsInner.providerMetadata) &&
         Objects.equals(this.url, mentorThreadsThreadIdGet200ResponseMessagesInnerPartsInner.url) &&
         Objects.equals(this.mediaType, mentorThreadsThreadIdGet200ResponseMessagesInnerPartsInner.mediaType) &&
-        Objects.equals(this.name, mentorThreadsThreadIdGet200ResponseMessagesInnerPartsInner.name);
+        Objects.equals(this.name, mentorThreadsThreadIdGet200ResponseMessagesInnerPartsInner.name) &&
+        Objects.equals(this.title, mentorThreadsThreadIdGet200ResponseMessagesInnerPartsInner.title) &&
+        Objects.equals(this.sourceId, mentorThreadsThreadIdGet200ResponseMessagesInnerPartsInner.sourceId) &&
+        Objects.equals(this.filename, mentorThreadsThreadIdGet200ResponseMessagesInnerPartsInner.filename);
+  }
+
+  private static <T> boolean equalsNullable(JsonNullable<T> a, JsonNullable<T> b) {
+    return a == b || (a != null && b != null && a.isPresent() && b.isPresent() && Objects.deepEquals(a.get(), b.get()));
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(type, text, url, mediaType, name);
+    return Objects.hash(type, text, hashCodeNullable(providerMetadata), url, mediaType, name, title, sourceId, filename);
+  }
+
+  private static <T> int hashCodeNullable(JsonNullable<T> a) {
+    if (a == null) {
+      return 1;
+    }
+    return a.isPresent() ? Arrays.deepHashCode(new Object[]{a.get()}) : 31;
   }
 
   @Override
@@ -280,9 +357,13 @@ public class MentorThreadsThreadIdGet200ResponseMessagesInnerPartsInner {
     sb.append("class MentorThreadsThreadIdGet200ResponseMessagesInnerPartsInner {\n");
     sb.append("    type: ").append(toIndentedString(type)).append("\n");
     sb.append("    text: ").append(toIndentedString(text)).append("\n");
+    sb.append("    providerMetadata: ").append(toIndentedString(providerMetadata)).append("\n");
     sb.append("    url: ").append(toIndentedString(url)).append("\n");
     sb.append("    mediaType: ").append(toIndentedString(mediaType)).append("\n");
     sb.append("    name: ").append(toIndentedString(name)).append("\n");
+    sb.append("    title: ").append(toIndentedString(title)).append("\n");
+    sb.append("    sourceId: ").append(toIndentedString(sourceId)).append("\n");
+    sb.append("    filename: ").append(toIndentedString(filename)).append("\n");
     sb.append("}");
     return sb.toString();
   }

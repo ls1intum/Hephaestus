@@ -1,7 +1,7 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { useState } from "react";
 import { Streamdown } from "streamdown";
-import type { ChatMessageVote } from "@/api/types.gen";
+import type { ChatMessageVote } from "@/lib/types";
 import type { ChatMessage } from "@/lib/types";
 import { cn, sanitizeText } from "@/lib/utils";
 import { MentorAvatar } from "./MentorAvatar";

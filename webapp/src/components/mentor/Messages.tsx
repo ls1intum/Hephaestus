@@ -1,7 +1,7 @@
 import type { UseChatHelpers } from "@ai-sdk/react";
 import { motion } from "framer-motion";
 import type { RefObject } from "react";
-import type { ChatMessageVote } from "@/api/types.gen";
+import type { ChatMessageVote } from "@/lib/types";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type { ChatMessage } from "@/lib/types";
 import { cn } from "@/lib/utils";

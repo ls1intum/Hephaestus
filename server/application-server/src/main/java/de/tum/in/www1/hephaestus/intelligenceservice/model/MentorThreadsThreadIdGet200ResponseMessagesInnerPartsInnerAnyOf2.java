@@ -20,25 +20,23 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import com.fasterxml.jackson.annotation.JsonValue;
-import org.openapitools.jackson.nullable.JsonNullable;
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import org.openapitools.jackson.nullable.JsonNullable;
-import java.util.NoSuchElementException;
+import java.net.URI;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import org.hibernate.validator.constraints.*;
 
 /**
- * StreamFilePart
+ * MentorThreadsThreadIdGet200ResponseMessagesInnerPartsInnerAnyOf2
  */
 @JsonPropertyOrder({
-  StreamFilePart.JSON_PROPERTY_TYPE,
-  StreamFilePart.JSON_PROPERTY_URL,
-  StreamFilePart.JSON_PROPERTY_MEDIA_TYPE,
-  StreamFilePart.JSON_PROPERTY_PROVIDER_METADATA
+  MentorThreadsThreadIdGet200ResponseMessagesInnerPartsInnerAnyOf2.JSON_PROPERTY_TYPE,
+  MentorThreadsThreadIdGet200ResponseMessagesInnerPartsInnerAnyOf2.JSON_PROPERTY_URL,
+  MentorThreadsThreadIdGet200ResponseMessagesInnerPartsInnerAnyOf2.JSON_PROPERTY_MEDIA_TYPE,
+  MentorThreadsThreadIdGet200ResponseMessagesInnerPartsInnerAnyOf2.JSON_PROPERTY_NAME
 })
+@JsonTypeName("_mentor_threads__threadId__get_200_response_messages_inner_parts_inner_anyOf_2")
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
-public class StreamFilePart {
+public class MentorThreadsThreadIdGet200ResponseMessagesInnerPartsInnerAnyOf2 {
   /**
    * Gets or Sets type
    */
@@ -76,18 +74,53 @@ public class StreamFilePart {
   private TypeEnum type;
 
   public static final String JSON_PROPERTY_URL = "url";
-  private String url;
+  private URI url;
 
-  public static final String JSON_PROPERTY_MEDIA_TYPE = "mediaType";
-  private String mediaType;
+  /**
+   * Gets or Sets mediaType
+   */
+  public enum MediaTypeEnum {
+    JPEG("image/jpeg"),
+    
+    PNG("image/png");
 
-  public static final String JSON_PROPERTY_PROVIDER_METADATA = "providerMetadata";
-  private JsonNullable<Object> providerMetadata = JsonNullable.<Object>of(null);
+    private String value;
 
-  public StreamFilePart() {
+    MediaTypeEnum(String value) {
+      this.value = value;
+    }
+
+    @JsonValue
+    public String getValue() {
+      return value;
+    }
+
+    @Override
+    public String toString() {
+      return String.valueOf(value);
+    }
+
+    @JsonCreator
+    public static MediaTypeEnum fromValue(String value) {
+      for (MediaTypeEnum b : MediaTypeEnum.values()) {
+        if (b.value.equals(value)) {
+          return b;
+        }
+      }
+      throw new IllegalArgumentException("Unexpected value '" + value + "'");
+    }
   }
 
-  public StreamFilePart type(TypeEnum type) {
+  public static final String JSON_PROPERTY_MEDIA_TYPE = "mediaType";
+  private MediaTypeEnum mediaType;
+
+  public static final String JSON_PROPERTY_NAME = "name";
+  private String name;
+
+  public MentorThreadsThreadIdGet200ResponseMessagesInnerPartsInnerAnyOf2() {
+  }
+
+  public MentorThreadsThreadIdGet200ResponseMessagesInnerPartsInnerAnyOf2 type(TypeEnum type) {
     
     this.type = type;
     return this;
@@ -112,7 +145,7 @@ public class StreamFilePart {
     this.type = type;
   }
 
-  public StreamFilePart url(String url) {
+  public MentorThreadsThreadIdGet200ResponseMessagesInnerPartsInnerAnyOf2 url(URI url) {
     
     this.url = url;
     return this;
@@ -126,18 +159,18 @@ public class StreamFilePart {
   @JsonProperty(JSON_PROPERTY_URL)
   @JsonInclude(value = JsonInclude.Include.ALWAYS)
 
-  public String getUrl() {
+  public URI getUrl() {
     return url;
   }
 
 
   @JsonProperty(JSON_PROPERTY_URL)
   @JsonInclude(value = JsonInclude.Include.ALWAYS)
-  public void setUrl(String url) {
+  public void setUrl(URI url) {
     this.url = url;
   }
 
-  public StreamFilePart mediaType(String mediaType) {
+  public MentorThreadsThreadIdGet200ResponseMessagesInnerPartsInnerAnyOf2 mediaType(MediaTypeEnum mediaType) {
     
     this.mediaType = mediaType;
     return this;
@@ -151,48 +184,40 @@ public class StreamFilePart {
   @JsonProperty(JSON_PROPERTY_MEDIA_TYPE)
   @JsonInclude(value = JsonInclude.Include.ALWAYS)
 
-  public String getMediaType() {
+  public MediaTypeEnum getMediaType() {
     return mediaType;
   }
 
 
   @JsonProperty(JSON_PROPERTY_MEDIA_TYPE)
   @JsonInclude(value = JsonInclude.Include.ALWAYS)
-  public void setMediaType(String mediaType) {
+  public void setMediaType(MediaTypeEnum mediaType) {
     this.mediaType = mediaType;
   }
 
-  public StreamFilePart providerMetadata(Object providerMetadata) {
-    this.providerMetadata = JsonNullable.<Object>of(providerMetadata);
+  public MentorThreadsThreadIdGet200ResponseMessagesInnerPartsInnerAnyOf2 name(String name) {
     
+    this.name = name;
     return this;
   }
 
   /**
-   * Get providerMetadata
-   * @return providerMetadata
+   * Get name
+   * @return name
    */
   @jakarta.annotation.Nullable
-  @JsonIgnore
-
-  public Object getProviderMetadata() {
-        return providerMetadata.orElse(null);
-  }
-
-  @JsonProperty(JSON_PROPERTY_PROVIDER_METADATA)
+  @JsonProperty(JSON_PROPERTY_NAME)
   @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
 
-  public JsonNullable<Object> getProviderMetadata_JsonNullable() {
-    return providerMetadata;
-  }
-  
-  @JsonProperty(JSON_PROPERTY_PROVIDER_METADATA)
-  public void setProviderMetadata_JsonNullable(JsonNullable<Object> providerMetadata) {
-    this.providerMetadata = providerMetadata;
+  public String getName() {
+    return name;
   }
 
-  public void setProviderMetadata(Object providerMetadata) {
-    this.providerMetadata = JsonNullable.<Object>of(providerMetadata);
+
+  @JsonProperty(JSON_PROPERTY_NAME)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+  public void setName(String name) {
+    this.name = name;
   }
 
   @Override
@@ -203,37 +228,26 @@ public class StreamFilePart {
     if (o == null || getClass() != o.getClass()) {
       return false;
     }
-    StreamFilePart streamFilePart = (StreamFilePart) o;
-    return Objects.equals(this.type, streamFilePart.type) &&
-        Objects.equals(this.url, streamFilePart.url) &&
-        Objects.equals(this.mediaType, streamFilePart.mediaType) &&
-        equalsNullable(this.providerMetadata, streamFilePart.providerMetadata);
-  }
-
-  private static <T> boolean equalsNullable(JsonNullable<T> a, JsonNullable<T> b) {
-    return a == b || (a != null && b != null && a.isPresent() && b.isPresent() && Objects.deepEquals(a.get(), b.get()));
+    MentorThreadsThreadIdGet200ResponseMessagesInnerPartsInnerAnyOf2 mentorThreadsThreadIdGet200ResponseMessagesInnerPartsInnerAnyOf2 = (MentorThreadsThreadIdGet200ResponseMessagesInnerPartsInnerAnyOf2) o;
+    return Objects.equals(this.type, mentorThreadsThreadIdGet200ResponseMessagesInnerPartsInnerAnyOf2.type) &&
+        Objects.equals(this.url, mentorThreadsThreadIdGet200ResponseMessagesInnerPartsInnerAnyOf2.url) &&
+        Objects.equals(this.mediaType, mentorThreadsThreadIdGet200ResponseMessagesInnerPartsInnerAnyOf2.mediaType) &&
+        Objects.equals(this.name, mentorThreadsThreadIdGet200ResponseMessagesInnerPartsInnerAnyOf2.name);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(type, url, mediaType, hashCodeNullable(providerMetadata));
-  }
-
-  private static <T> int hashCodeNullable(JsonNullable<T> a) {
-    if (a == null) {
-      return 1;
-    }
-    return a.isPresent() ? Arrays.deepHashCode(new Object[]{a.get()}) : 31;
+    return Objects.hash(type, url, mediaType, name);
   }
 
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder();
-    sb.append("class StreamFilePart {\n");
+    sb.append("class MentorThreadsThreadIdGet200ResponseMessagesInnerPartsInnerAnyOf2 {\n");
     sb.append("    type: ").append(toIndentedString(type)).append("\n");
     sb.append("    url: ").append(toIndentedString(url)).append("\n");
     sb.append("    mediaType: ").append(toIndentedString(mediaType)).append("\n");
-    sb.append("    providerMetadata: ").append(toIndentedString(providerMetadata)).append("\n");
+    sb.append("    name: ").append(toIndentedString(name)).append("\n");
     sb.append("}");
     return sb.toString();
   }

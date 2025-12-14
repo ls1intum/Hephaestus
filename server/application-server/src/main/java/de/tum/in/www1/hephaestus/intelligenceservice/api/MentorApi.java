@@ -195,6 +195,7 @@ public class MentorApi {
      * <p><b>200</b> - Thread detail with messages
      * <p><b>404</b> - Thread not found
      * <p><b>500</b> - Internal error
+     * <p><b>503</b> - Service temporarily unavailable
      * @param threadId The threadId parameter
      * @return MentorThreadsThreadIdGet200Response
      * @throws WebClientResponseException if an error occurs while attempting to invoke the API
@@ -234,6 +235,7 @@ public class MentorApi {
      * <p><b>200</b> - Thread detail with messages
      * <p><b>404</b> - Thread not found
      * <p><b>500</b> - Internal error
+     * <p><b>503</b> - Service temporarily unavailable
      * @param threadId The threadId parameter
      * @return MentorThreadsThreadIdGet200Response
      * @throws WebClientResponseException if an error occurs while attempting to invoke the API
@@ -249,6 +251,7 @@ public class MentorApi {
      * <p><b>200</b> - Thread detail with messages
      * <p><b>404</b> - Thread not found
      * <p><b>500</b> - Internal error
+     * <p><b>503</b> - Service temporarily unavailable
      * @param threadId The threadId parameter
      * @return ResponseEntity&lt;MentorThreadsThreadIdGet200Response&gt;
      * @throws WebClientResponseException if an error occurs while attempting to invoke the API
@@ -264,6 +267,7 @@ public class MentorApi {
      * <p><b>200</b> - Thread detail with messages
      * <p><b>404</b> - Thread not found
      * <p><b>500</b> - Internal error
+     * <p><b>503</b> - Service temporarily unavailable
      * @param threadId The threadId parameter
      * @return ResponseSpec
      * @throws WebClientResponseException if an error occurs while attempting to invoke the API

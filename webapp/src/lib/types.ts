@@ -22,6 +22,13 @@ export type {
 	UpdateDocumentOutput,
 } from "@intelligence-service/chat/chat.shared";
 
+export type {
+	ChatThreadGroup,
+	ChatThreadSummary,
+} from "@intelligence-service/threads/threads.schemas";
+
+export type { ChatMessageVote } from "@intelligence-service/vote/vote.schemas";
+
 // Artifact typing
 export type ArtifactKind = "text" | (string & {});
 export type ArtifactId<K extends ArtifactKind = ArtifactKind> =
@@ -61,6 +68,20 @@ export type DataPart =
 	| { type: "data-usage"; data: unknown };
 
 // Typed tools mapping for automatic tool part typing in UIMessage
+
+/**
+ * Document type matching the intelligence-service schema.
+ * Used for mentor document artifacts.
+ */
+export interface Document {
+	id: string;
+	versionNumber: number;
+	createdAt: Date;
+	title: string;
+	content: string;
+	kind: "text";
+	userId: number;
+}
 
 export interface Attachment {
 	name: string;

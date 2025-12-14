@@ -1,4 +1,4 @@
-import type { GetWeatherOutput } from "@/api/types.gen";
+import type { GetWeatherOutput } from "@/lib/types";
 import { Skeleton } from "@/components/ui/skeleton";
 import { WeatherTool } from "../WeatherTool";
 import type { PartRenderer } from "./types";

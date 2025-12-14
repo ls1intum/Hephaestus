@@ -20,7 +20,10 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import com.fasterxml.jackson.annotation.JsonValue;
-import java.net.URI;
+import org.openapitools.jackson.nullable.JsonNullable;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import org.openapitools.jackson.nullable.JsonNullable;
+import java.util.NoSuchElementException;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import org.hibernate.validator.constraints.*;
@@ -30,9 +33,8 @@ import org.hibernate.validator.constraints.*;
  */
 @JsonPropertyOrder({
   MentorThreadsThreadIdGet200ResponseMessagesInnerPartsInnerAnyOf1.JSON_PROPERTY_TYPE,
-  MentorThreadsThreadIdGet200ResponseMessagesInnerPartsInnerAnyOf1.JSON_PROPERTY_URL,
-  MentorThreadsThreadIdGet200ResponseMessagesInnerPartsInnerAnyOf1.JSON_PROPERTY_MEDIA_TYPE,
-  MentorThreadsThreadIdGet200ResponseMessagesInnerPartsInnerAnyOf1.JSON_PROPERTY_NAME
+  MentorThreadsThreadIdGet200ResponseMessagesInnerPartsInnerAnyOf1.JSON_PROPERTY_TEXT,
+  MentorThreadsThreadIdGet200ResponseMessagesInnerPartsInnerAnyOf1.JSON_PROPERTY_PROVIDER_METADATA
 })
 @JsonTypeName("_mentor_threads__threadId__get_200_response_messages_inner_parts_inner_anyOf_1")
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
@@ -41,7 +43,7 @@ public class MentorThreadsThreadIdGet200ResponseMessagesInnerPartsInnerAnyOf1 {
    * Gets or Sets type
    */
   public enum TypeEnum {
-    FILE("file");
+    REASONING("reasoning");
 
     private String value;
 
@@ -73,49 +75,11 @@ public class MentorThreadsThreadIdGet200ResponseMessagesInnerPartsInnerAnyOf1 {
   public static final String JSON_PROPERTY_TYPE = "type";
   private TypeEnum type;
 
-  public static final String JSON_PROPERTY_URL = "url";
-  private URI url;
+  public static final String JSON_PROPERTY_TEXT = "text";
+  private String text;
 
-  /**
-   * Gets or Sets mediaType
-   */
-  public enum MediaTypeEnum {
-    JPEG("image/jpeg"),
-    
-    PNG("image/png");
-
-    private String value;
-
-    MediaTypeEnum(String value) {
-      this.value = value;
-    }
-
-    @JsonValue
-    public String getValue() {
-      return value;
-    }
-
-    @Override
-    public String toString() {
-      return String.valueOf(value);
-    }
-
-    @JsonCreator
-    public static MediaTypeEnum fromValue(String value) {
-      for (MediaTypeEnum b : MediaTypeEnum.values()) {
-        if (b.value.equals(value)) {
-          return b;
-        }
-      }
-      throw new IllegalArgumentException("Unexpected value '" + value + "'");
-    }
-  }
-
-  public static final String JSON_PROPERTY_MEDIA_TYPE = "mediaType";
-  private MediaTypeEnum mediaType;
-
-  public static final String JSON_PROPERTY_NAME = "name";
-  private String name;
+  public static final String JSON_PROPERTY_PROVIDER_METADATA = "providerMetadata";
+  private JsonNullable<Object> providerMetadata = JsonNullable.<Object>of(null);
 
   public MentorThreadsThreadIdGet200ResponseMessagesInnerPartsInnerAnyOf1() {
   }
@@ -145,79 +109,62 @@ public class MentorThreadsThreadIdGet200ResponseMessagesInnerPartsInnerAnyOf1 {
     this.type = type;
   }
 
-  public MentorThreadsThreadIdGet200ResponseMessagesInnerPartsInnerAnyOf1 url(URI url) {
+  public MentorThreadsThreadIdGet200ResponseMessagesInnerPartsInnerAnyOf1 text(String text) {
     
-    this.url = url;
+    this.text = text;
     return this;
   }
 
   /**
-   * Get url
-   * @return url
+   * Get text
+   * @return text
    */
   @jakarta.annotation.Nonnull
-  @JsonProperty(JSON_PROPERTY_URL)
+  @JsonProperty(JSON_PROPERTY_TEXT)
   @JsonInclude(value = JsonInclude.Include.ALWAYS)
 
-  public URI getUrl() {
-    return url;
+  public String getText() {
+    return text;
   }
 
 
-  @JsonProperty(JSON_PROPERTY_URL)
+  @JsonProperty(JSON_PROPERTY_TEXT)
   @JsonInclude(value = JsonInclude.Include.ALWAYS)
-  public void setUrl(URI url) {
-    this.url = url;
+  public void setText(String text) {
+    this.text = text;
   }
 
-  public MentorThreadsThreadIdGet200ResponseMessagesInnerPartsInnerAnyOf1 mediaType(MediaTypeEnum mediaType) {
+  public MentorThreadsThreadIdGet200ResponseMessagesInnerPartsInnerAnyOf1 providerMetadata(Object providerMetadata) {
+    this.providerMetadata = JsonNullable.<Object>of(providerMetadata);
     
-    this.mediaType = mediaType;
     return this;
   }
 
   /**
-   * Get mediaType
-   * @return mediaType
-   */
-  @jakarta.annotation.Nonnull
-  @JsonProperty(JSON_PROPERTY_MEDIA_TYPE)
-  @JsonInclude(value = JsonInclude.Include.ALWAYS)
-
-  public MediaTypeEnum getMediaType() {
-    return mediaType;
-  }
-
-
-  @JsonProperty(JSON_PROPERTY_MEDIA_TYPE)
-  @JsonInclude(value = JsonInclude.Include.ALWAYS)
-  public void setMediaType(MediaTypeEnum mediaType) {
-    this.mediaType = mediaType;
-  }
-
-  public MentorThreadsThreadIdGet200ResponseMessagesInnerPartsInnerAnyOf1 name(String name) {
-    
-    this.name = name;
-    return this;
-  }
-
-  /**
-   * Get name
-   * @return name
+   * Get providerMetadata
+   * @return providerMetadata
    */
   @jakarta.annotation.Nullable
-  @JsonProperty(JSON_PROPERTY_NAME)
-  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+  @JsonIgnore
 
-  public String getName() {
-    return name;
+  public Object getProviderMetadata() {
+        return providerMetadata.orElse(null);
   }
 
-
-  @JsonProperty(JSON_PROPERTY_NAME)
+  @JsonProperty(JSON_PROPERTY_PROVIDER_METADATA)
   @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
-  public void setName(String name) {
-    this.name = name;
+
+  public JsonNullable<Object> getProviderMetadata_JsonNullable() {
+    return providerMetadata;
+  }
+  
+  @JsonProperty(JSON_PROPERTY_PROVIDER_METADATA)
+  public void setProviderMetadata_JsonNullable(JsonNullable<Object> providerMetadata) {
+    this.providerMetadata = providerMetadata;
+  }
+
+  public void setProviderMetadata(Object providerMetadata) {
+    this.providerMetadata = JsonNullable.<Object>of(providerMetadata);
   }
 
   @Override
@@ -230,14 +177,24 @@ public class MentorThreadsThreadIdGet200ResponseMessagesInnerPartsInnerAnyOf1 {
     }
     MentorThreadsThreadIdGet200ResponseMessagesInnerPartsInnerAnyOf1 mentorThreadsThreadIdGet200ResponseMessagesInnerPartsInnerAnyOf1 = (MentorThreadsThreadIdGet200ResponseMessagesInnerPartsInnerAnyOf1) o;
     return Objects.equals(this.type, mentorThreadsThreadIdGet200ResponseMessagesInnerPartsInnerAnyOf1.type) &&
-        Objects.equals(this.url, mentorThreadsThreadIdGet200ResponseMessagesInnerPartsInnerAnyOf1.url) &&
-        Objects.equals(this.mediaType, mentorThreadsThreadIdGet200ResponseMessagesInnerPartsInnerAnyOf1.mediaType) &&
-        Objects.equals(this.name, mentorThreadsThreadIdGet200ResponseMessagesInnerPartsInnerAnyOf1.name);
+        Objects.equals(this.text, mentorThreadsThreadIdGet200ResponseMessagesInnerPartsInnerAnyOf1.text) &&
+        equalsNullable(this.providerMetadata, mentorThreadsThreadIdGet200ResponseMessagesInnerPartsInnerAnyOf1.providerMetadata);
+  }
+
+  private static <T> boolean equalsNullable(JsonNullable<T> a, JsonNullable<T> b) {
+    return a == b || (a != null && b != null && a.isPresent() && b.isPresent() && Objects.deepEquals(a.get(), b.get()));
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(type, url, mediaType, name);
+    return Objects.hash(type, text, hashCodeNullable(providerMetadata));
+  }
+
+  private static <T> int hashCodeNullable(JsonNullable<T> a) {
+    if (a == null) {
+      return 1;
+    }
+    return a.isPresent() ? Arrays.deepHashCode(new Object[]{a.get()}) : 31;
   }
 
   @Override
@@ -245,9 +202,8 @@ public class MentorThreadsThreadIdGet200ResponseMessagesInnerPartsInnerAnyOf1 {
     StringBuilder sb = new StringBuilder();
     sb.append("class MentorThreadsThreadIdGet200ResponseMessagesInnerPartsInnerAnyOf1 {\n");
     sb.append("    type: ").append(toIndentedString(type)).append("\n");
-    sb.append("    url: ").append(toIndentedString(url)).append("\n");
-    sb.append("    mediaType: ").append(toIndentedString(mediaType)).append("\n");
-    sb.append("    name: ").append(toIndentedString(name)).append("\n");
+    sb.append("    text: ").append(toIndentedString(text)).append("\n");
+    sb.append("    providerMetadata: ").append(toIndentedString(providerMetadata)).append("\n");
     sb.append("}");
     return sb.toString();
   }
