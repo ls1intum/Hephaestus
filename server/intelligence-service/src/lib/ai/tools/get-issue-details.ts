@@ -11,7 +11,7 @@ import {
 	repository,
 	user,
 } from "@/db/schema";
-import { findIssueOrPR } from "@/lib/db-utils";
+import { findIssueOrPR } from "@/lib/issue-repo";
 
 const inputSchema = z.object({
 	issueId: z

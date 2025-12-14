@@ -40,7 +40,13 @@ export const DocumentIdParamsSchema = z
 export type DocumentIdParams = z.infer<typeof DocumentIdParamsSchema>;
 
 export const VersionParamsSchema = z
-	.object({ id: z.string().uuid(), versionNumber: z.coerce.number().int() })
+	.object({
+		id: z.string().uuid(),
+		versionNumber: z.coerce
+			.number()
+			.int()
+			.openapi({ param: { required: true } }),
+	})
 	.openapi("DocumentVersionParams");
 export type VersionParams = z.infer<typeof VersionParamsSchema>;
 

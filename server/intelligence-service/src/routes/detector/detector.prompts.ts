@@ -1,4 +1,4 @@
-import { langfuse } from "@/lib/langfuse";
+import { langfuse } from "@/lib/telemetry";
 
 const PROMPT_NAME = "bad-practice-detector" as const;
 

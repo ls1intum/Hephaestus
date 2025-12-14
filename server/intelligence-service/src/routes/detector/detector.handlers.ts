@@ -7,7 +7,6 @@ import {
 import { generateObject } from "ai";
 import env from "@/env";
 import { buildTelemetryOptions } from "@/lib/telemetry";
-import { asTyped } from "@/lib/typed";
 import type { AppRouteHandler } from "@/lib/types";
 import { getBadPracticePrompt } from "./detector.prompts";
 import type { DetectBadPracticesRoute } from "./detector.routes";
@@ -74,7 +73,7 @@ export const detectBadPracticesHandler: AppRouteHandler<DetectBadPracticesRoute>
 			updateActiveObservation({ output: response });
 			updateActiveTrace({ output: response });
 
-			return asTyped<typeof response, 200, "json">(c.json(response));
+			return c.json(response);
 		},
 		{ name: "bad-practice-detect" },
 	);

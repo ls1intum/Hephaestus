@@ -30,13 +30,10 @@ jobs:
           # Always install to avoid half-restored caches
           npm ci --prefer-offline --no-audit
 
-      - name: Install Python dependencies
+      - name: Install intelligence-service dependencies
         working-directory: server/intelligence-service
         run: |
-          # Install dependencies if not cached
-          if [ ! -d ".venv" ]; then
-            poetry install --no-interaction --no-root
-          fi
+          npm ci --no-audit --progress=false
 
       - name: Setup Application Server directories
         working-directory: server/application-server

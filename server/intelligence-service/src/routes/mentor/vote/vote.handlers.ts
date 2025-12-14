@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import db from "@/db";
 import { chatMessage, chatMessageVote } from "@/db/schema";
+import { ERROR_MESSAGES, HTTP_STATUS } from "@/lib/constants";
 import type { AppRouteHandler } from "@/lib/types";
 import type { HandleVoteMessageRoute } from "./vote.routes";
 
@@ -11,16 +12,21 @@ export const voteMessageHandler: AppRouteHandler<
 	const { messageId } = c.req.valid("param");
 	const { isUpvoted } = c.req.valid("json");
 
-	try {
-		const existing = await db
-			.select({ id: chatMessage.id })
-			.from(chatMessage)
-			.where(eq(chatMessage.id, messageId))
-			.limit(1);
-		if (!existing[0]) {
-			return c.json({ error: "Message not found" }, { status: 404 });
-		}
+	// Check message exists (guard clause)
+	const existing = await db
+		.select({ id: chatMessage.id })
+		.from(chatMessage)
+		.where(eq(chatMessage.id, messageId))
+		.limit(1);
 
+	if (!existing[0]) {
+		return c.json(
+			{ error: ERROR_MESSAGES.MESSAGE_NOT_FOUND },
+			{ status: HTTP_STATUS.NOT_FOUND },
+		);
+	}
+
+	try {
 		const now = new Date().toISOString();
 		// Upsert semantics: if exists update, else insert
 		const current = await db
@@ -52,7 +58,10 @@ export const voteMessageHandler: AppRouteHandler<
 		)[0];
 
 		if (!row) {
-			return c.json({ error: "Vote retrieval failed" }, { status: 500 });
+			return c.json(
+				{ error: ERROR_MESSAGES.VOTE_RETRIEVAL_FAILED },
+				{ status: HTTP_STATUS.INTERNAL_SERVER_ERROR },
+			);
 		}
 
 		return c.json(
@@ -62,10 +71,13 @@ export const voteMessageHandler: AppRouteHandler<
 				createdAt: row.createdAt ?? new Date().toISOString(),
 				updatedAt: row.updatedAt ?? new Date().toISOString(),
 			},
-			{ status: 200 },
+			{ status: HTTP_STATUS.OK },
 		);
 	} catch (err) {
 		logger.error({ err }, "Vote message failed");
-		return c.json({ error: "Internal error" }, { status: 500 });
+		return c.json(
+			{ error: ERROR_MESSAGES.INTERNAL_ERROR },
+			{ status: HTTP_STATUS.INTERNAL_SERVER_ERROR },
+		);
 	}
 };

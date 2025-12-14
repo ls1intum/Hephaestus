@@ -3,12 +3,18 @@ package de.tum.in.www1.hephaestus.intelligenceservice.api;
 import de.tum.in.www1.hephaestus.intelligenceservice.ApiClient;
 import de.tum.in.www1.hephaestus.intelligenceservice.BaseApi;
 
+import de.tum.in.www1.hephaestus.intelligenceservice.model.ChatMessageVote;
+import de.tum.in.www1.hephaestus.intelligenceservice.model.ChatThreadGroup;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.CreateDocumentRequest;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.Document;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.DocumentSummary;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.GetGroupedThreads500Response;
+import de.tum.in.www1.hephaestus.intelligenceservice.model.MentorChat200Response;
+import de.tum.in.www1.hephaestus.intelligenceservice.model.MentorChatRequest;
 import java.time.OffsetDateTime;
+import de.tum.in.www1.hephaestus.intelligenceservice.model.ThreadDetail;
 import java.util.UUID;
+import de.tum.in.www1.hephaestus.intelligenceservice.model.VoteMessageRequest;
 
 import java.util.Collections;
 import java.util.HashMap;
@@ -32,13 +38,13 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
-public class DocumentsApi extends BaseApi {
+public class ExportedApi extends BaseApi {
 
-    public DocumentsApi() {
+    public ExportedApi() {
         super(new ApiClient());
     }
 
-    public DocumentsApi(ApiClient apiClient) {
+    public ExportedApi(ApiClient apiClient) {
         super(apiClient);
     }
 
@@ -261,6 +267,102 @@ public class DocumentsApi extends BaseApi {
         return apiClient.invokeAPI("/mentor/documents/{id}", HttpMethod.GET, uriVariables, localVarQueryParams, localVarPostBody, localVarHeaderParams, localVarCookieParams, localVarFormParams, localVarAccept, localVarContentType, localVarAuthNames, localReturnType);
     }
     /**
+     * List chat threads grouped by time buckets
+     * 
+     * <p><b>200</b> - Grouped chat threads
+     * <p><b>500</b> - Internal error
+     * @return List&lt;ChatThreadGroup&gt;
+     * @throws RestClientException if an error occurs while attempting to invoke the API
+     */
+    public List<ChatThreadGroup> getGroupedThreads() throws RestClientException {
+        return getGroupedThreadsWithHttpInfo().getBody();
+    }
+
+    /**
+     * List chat threads grouped by time buckets
+     * 
+     * <p><b>200</b> - Grouped chat threads
+     * <p><b>500</b> - Internal error
+     * @return ResponseEntity&lt;List&lt;ChatThreadGroup&gt;&gt;
+     * @throws RestClientException if an error occurs while attempting to invoke the API
+     */
+    public ResponseEntity<List<ChatThreadGroup>> getGroupedThreadsWithHttpInfo() throws RestClientException {
+        Object localVarPostBody = null;
+        
+
+        final MultiValueMap<String, String> localVarQueryParams = new LinkedMultiValueMap<String, String>();
+        final HttpHeaders localVarHeaderParams = new HttpHeaders();
+        final MultiValueMap<String, String> localVarCookieParams = new LinkedMultiValueMap<String, String>();
+        final MultiValueMap<String, Object> localVarFormParams = new LinkedMultiValueMap<String, Object>();
+
+        final String[] localVarAccepts = { 
+            "application/json"
+         };
+        final List<MediaType> localVarAccept = apiClient.selectHeaderAccept(localVarAccepts);
+        final String[] localVarContentTypes = {  };
+        final MediaType localVarContentType = apiClient.selectHeaderContentType(localVarContentTypes);
+
+        String[] localVarAuthNames = new String[] {  };
+
+        ParameterizedTypeReference<List<ChatThreadGroup>> localReturnType = new ParameterizedTypeReference<List<ChatThreadGroup>>() {};
+        return apiClient.invokeAPI("/mentor/threads/grouped", HttpMethod.GET, Collections.<String, Object>emptyMap(), localVarQueryParams, localVarPostBody, localVarHeaderParams, localVarCookieParams, localVarFormParams, localVarAccept, localVarContentType, localVarAuthNames, localReturnType);
+    }
+    /**
+     * Get mentor chat thread detail
+     * 
+     * <p><b>200</b> - Thread detail with messages
+     * <p><b>404</b> - Thread not found
+     * <p><b>500</b> - Internal error
+     * <p><b>503</b> - Service temporarily unavailable
+     * @param threadId  (required)
+     * @return ThreadDetail
+     * @throws RestClientException if an error occurs while attempting to invoke the API
+     */
+    public ThreadDetail getThread(UUID threadId) throws RestClientException {
+        return getThreadWithHttpInfo(threadId).getBody();
+    }
+
+    /**
+     * Get mentor chat thread detail
+     * 
+     * <p><b>200</b> - Thread detail with messages
+     * <p><b>404</b> - Thread not found
+     * <p><b>500</b> - Internal error
+     * <p><b>503</b> - Service temporarily unavailable
+     * @param threadId  (required)
+     * @return ResponseEntity&lt;ThreadDetail&gt;
+     * @throws RestClientException if an error occurs while attempting to invoke the API
+     */
+    public ResponseEntity<ThreadDetail> getThreadWithHttpInfo(UUID threadId) throws RestClientException {
+        Object localVarPostBody = null;
+        
+        // verify the required parameter 'threadId' is set
+        if (threadId == null) {
+            throw new HttpClientErrorException(HttpStatus.BAD_REQUEST, "Missing the required parameter 'threadId' when calling getThread");
+        }
+        
+        // create path and map variables
+        final Map<String, Object> uriVariables = new HashMap<String, Object>();
+        uriVariables.put("threadId", threadId);
+
+        final MultiValueMap<String, String> localVarQueryParams = new LinkedMultiValueMap<String, String>();
+        final HttpHeaders localVarHeaderParams = new HttpHeaders();
+        final MultiValueMap<String, String> localVarCookieParams = new LinkedMultiValueMap<String, String>();
+        final MultiValueMap<String, Object> localVarFormParams = new LinkedMultiValueMap<String, Object>();
+
+        final String[] localVarAccepts = { 
+            "application/json"
+         };
+        final List<MediaType> localVarAccept = apiClient.selectHeaderAccept(localVarAccepts);
+        final String[] localVarContentTypes = {  };
+        final MediaType localVarContentType = apiClient.selectHeaderContentType(localVarContentTypes);
+
+        String[] localVarAuthNames = new String[] {  };
+
+        ParameterizedTypeReference<ThreadDetail> localReturnType = new ParameterizedTypeReference<ThreadDetail>() {};
+        return apiClient.invokeAPI("/mentor/threads/{threadId}", HttpMethod.GET, uriVariables, localVarQueryParams, localVarPostBody, localVarHeaderParams, localVarCookieParams, localVarFormParams, localVarAccept, localVarContentType, localVarAuthNames, localReturnType);
+    }
+    /**
      * Get specific version
      * 
      * <p><b>200</b> - Document
@@ -432,6 +534,54 @@ public class DocumentsApi extends BaseApi {
         return apiClient.invokeAPI("/mentor/documents/{id}/versions", HttpMethod.GET, uriVariables, localVarQueryParams, localVarPostBody, localVarHeaderParams, localVarCookieParams, localVarFormParams, localVarAccept, localVarContentType, localVarAuthNames, localReturnType);
     }
     /**
+     * Handle mentor chat
+     * 
+     * <p><b>200</b> - Event stream of chat updates.
+     * @param mentorChatRequest Chat request body (required)
+     * @return MentorChat200Response
+     * @throws RestClientException if an error occurs while attempting to invoke the API
+     */
+    public MentorChat200Response mentorChat(MentorChatRequest mentorChatRequest) throws RestClientException {
+        return mentorChatWithHttpInfo(mentorChatRequest).getBody();
+    }
+
+    /**
+     * Handle mentor chat
+     * 
+     * <p><b>200</b> - Event stream of chat updates.
+     * @param mentorChatRequest Chat request body (required)
+     * @return ResponseEntity&lt;MentorChat200Response&gt;
+     * @throws RestClientException if an error occurs while attempting to invoke the API
+     */
+    public ResponseEntity<MentorChat200Response> mentorChatWithHttpInfo(MentorChatRequest mentorChatRequest) throws RestClientException {
+        Object localVarPostBody = mentorChatRequest;
+        
+        // verify the required parameter 'mentorChatRequest' is set
+        if (mentorChatRequest == null) {
+            throw new HttpClientErrorException(HttpStatus.BAD_REQUEST, "Missing the required parameter 'mentorChatRequest' when calling mentorChat");
+        }
+        
+
+        final MultiValueMap<String, String> localVarQueryParams = new LinkedMultiValueMap<String, String>();
+        final HttpHeaders localVarHeaderParams = new HttpHeaders();
+        final MultiValueMap<String, String> localVarCookieParams = new LinkedMultiValueMap<String, String>();
+        final MultiValueMap<String, Object> localVarFormParams = new LinkedMultiValueMap<String, Object>();
+
+        final String[] localVarAccepts = { 
+            "text/event-stream"
+         };
+        final List<MediaType> localVarAccept = apiClient.selectHeaderAccept(localVarAccepts);
+        final String[] localVarContentTypes = { 
+            "application/json"
+         };
+        final MediaType localVarContentType = apiClient.selectHeaderContentType(localVarContentTypes);
+
+        String[] localVarAuthNames = new String[] {  };
+
+        ParameterizedTypeReference<MentorChat200Response> localReturnType = new ParameterizedTypeReference<MentorChat200Response>() {};
+        return apiClient.invokeAPI("/mentor/chat", HttpMethod.POST, Collections.<String, Object>emptyMap(), localVarQueryParams, localVarPostBody, localVarHeaderParams, localVarCookieParams, localVarFormParams, localVarAccept, localVarContentType, localVarAuthNames, localReturnType);
+    }
+    /**
      * Update a document (creates new version)
      * 
      * <p><b>200</b> - Updated document
@@ -492,6 +642,68 @@ public class DocumentsApi extends BaseApi {
 
         ParameterizedTypeReference<Document> localReturnType = new ParameterizedTypeReference<Document>() {};
         return apiClient.invokeAPI("/mentor/documents/{id}", HttpMethod.PUT, uriVariables, localVarQueryParams, localVarPostBody, localVarHeaderParams, localVarCookieParams, localVarFormParams, localVarAccept, localVarContentType, localVarAuthNames, localReturnType);
+    }
+    /**
+     * Vote on a chat message (upvote/downvote)
+     * 
+     * <p><b>200</b> - Vote recorded
+     * <p><b>404</b> - Message not found
+     * <p><b>500</b> - Internal error
+     * @param messageId  (required)
+     * @param voteMessageRequest Vote request body (required)
+     * @return ChatMessageVote
+     * @throws RestClientException if an error occurs while attempting to invoke the API
+     */
+    public ChatMessageVote voteMessage(UUID messageId, VoteMessageRequest voteMessageRequest) throws RestClientException {
+        return voteMessageWithHttpInfo(messageId, voteMessageRequest).getBody();
+    }
+
+    /**
+     * Vote on a chat message (upvote/downvote)
+     * 
+     * <p><b>200</b> - Vote recorded
+     * <p><b>404</b> - Message not found
+     * <p><b>500</b> - Internal error
+     * @param messageId  (required)
+     * @param voteMessageRequest Vote request body (required)
+     * @return ResponseEntity&lt;ChatMessageVote&gt;
+     * @throws RestClientException if an error occurs while attempting to invoke the API
+     */
+    public ResponseEntity<ChatMessageVote> voteMessageWithHttpInfo(UUID messageId, VoteMessageRequest voteMessageRequest) throws RestClientException {
+        Object localVarPostBody = voteMessageRequest;
+        
+        // verify the required parameter 'messageId' is set
+        if (messageId == null) {
+            throw new HttpClientErrorException(HttpStatus.BAD_REQUEST, "Missing the required parameter 'messageId' when calling voteMessage");
+        }
+        
+        // verify the required parameter 'voteMessageRequest' is set
+        if (voteMessageRequest == null) {
+            throw new HttpClientErrorException(HttpStatus.BAD_REQUEST, "Missing the required parameter 'voteMessageRequest' when calling voteMessage");
+        }
+        
+        // create path and map variables
+        final Map<String, Object> uriVariables = new HashMap<String, Object>();
+        uriVariables.put("messageId", messageId);
+
+        final MultiValueMap<String, String> localVarQueryParams = new LinkedMultiValueMap<String, String>();
+        final HttpHeaders localVarHeaderParams = new HttpHeaders();
+        final MultiValueMap<String, String> localVarCookieParams = new LinkedMultiValueMap<String, String>();
+        final MultiValueMap<String, Object> localVarFormParams = new LinkedMultiValueMap<String, Object>();
+
+        final String[] localVarAccepts = { 
+            "application/json"
+         };
+        final List<MediaType> localVarAccept = apiClient.selectHeaderAccept(localVarAccepts);
+        final String[] localVarContentTypes = { 
+            "application/json"
+         };
+        final MediaType localVarContentType = apiClient.selectHeaderContentType(localVarContentTypes);
+
+        String[] localVarAuthNames = new String[] {  };
+
+        ParameterizedTypeReference<ChatMessageVote> localReturnType = new ParameterizedTypeReference<ChatMessageVote>() {};
+        return apiClient.invokeAPI("/mentor/chat/messages/{messageId}/vote", HttpMethod.POST, uriVariables, localVarQueryParams, localVarPostBody, localVarHeaderParams, localVarCookieParams, localVarFormParams, localVarAccept, localVarContentType, localVarAuthNames, localReturnType);
     }
 
     @Override

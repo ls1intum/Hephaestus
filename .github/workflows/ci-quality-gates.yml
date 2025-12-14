@@ -290,11 +290,9 @@ jobs:
           # Install all dependencies (always, to avoid cache drift)
           npm ci --prefer-offline --no-audit
 
-          # Setup Python environments
+          # Install intelligence-service dependencies (TypeScript)
           cd server/intelligence-service
-          if [ ! -d ".venv" ]; then
-            poetry install --no-interaction --no-root
-          fi
+          npm ci --no-audit --progress=false
           cd ../..
 
           # Setup application-server environment

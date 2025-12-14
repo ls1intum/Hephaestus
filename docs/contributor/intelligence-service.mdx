@@ -1,0 +1,194 @@
+---
+id: intelligence-service
+sidebar_position: 11
+title: Intelligence Service
+description: AI-powered mentor chat and detection API development guide.
+---
+
+The Intelligence Service provides AI-powered features including the mentor chat assistant and bad practice detection. It's built with Node.js, Hono, and AI SDK v6 (Vercel).
+
+## Architecture Overview
+
+The service is a pure backend API that:
+- Uses [Hono](https://hono.dev/) for HTTP routing with OpenAPI support
+- Leverages [AI SDK v6](https://ai-sdk.dev/) (beta) for LLM interactions
+- Connects to the shared PostgreSQL database via [Drizzle ORM](https://orm.drizzle.team/)
+- Supports multiple LLM providers (OpenAI, Azure OpenAI)
+
+## Local Development
+
+### Prerequisites
+
+- Node.js >= 22.10.0
+- Access to the shared PostgreSQL database (via Docker or [dockerless setup](/contributor/dockerless-postgres))
+- API keys for at least one LLM provider
+
+### Setup
+
+1. Navigate to the service directory:
+
+   ```bash
+   cd server/intelligence-service
+   ```
+
+2. Install dependencies:
+
+   ```bash
+   npm install
+   ```
+
+3. Configure environment variables:
+
+   ```bash
+   cp .env.example .env
+   ```
+
+   Edit `.env` with your credentials:
+
+   ```bash
+   DATABASE_URL=postgresql://root:root@localhost:5432/hephaestus
+   
+   # Choose one LLM provider
+   OPENAI_API_KEY=sk-...
+   # or
+   AZURE_RESOURCE_NAME=your-resource
+   AZURE_API_KEY=your-key
+   
+   # Model configuration (provider:model format)
+   MODEL_NAME=openai:gpt-4o-mini
+   DETECTION_MODEL_NAME=openai:gpt-4o-mini
+   ```
+
+4. Start the development server:
+
+   ```bash
+   npm run dev
+   ```
+
+   The service runs at [http://localhost:8000](http://localhost:8000) with:
+   - `/docs` — Interactive API documentation
+   - `/openapi.yaml` — OpenAPI v3.1 specification
+
+## AI Observability with Langfuse
+
+The intelligence service integrates with [Langfuse](https://langfuse.com/) for production-grade AI observability. This provides:
+
+- **Trace visualization** — See the full execution flow of AI requests
+- **Token usage tracking** — Monitor costs across providers
+- **Performance metrics** — Response times, latency analysis
+- **Prompt management** — Version and compare prompt effectiveness
+- **Error tracking** — Debug failed AI calls with full context
+
+### Enabling Langfuse
+
+Add the following to your `.env` file:
+
+```bash
+LANGFUSE_SECRET_KEY=sk-lf-...
+LANGFUSE_PUBLIC_KEY=pk-lf-...
+LANGFUSE_BASE_URL=https://cloud.langfuse.com  # or self-hosted URL
+```
+
+When these variables are set, the service automatically:
+1. Initializes OpenTelemetry with the Langfuse span processor
+2. Traces all AI SDK calls (streaming, tool calls, generations)
+3. Sends telemetry to your Langfuse project
+
+### Self-Hosted Langfuse
+
+For local development without cloud dependencies, you can run Langfuse locally:
+
+```bash
+docker run -d --name langfuse \
+  -p 3000:3000 \
+  -e DATABASE_URL=postgresql://... \
+  langfuse/langfuse:latest
+```
+
+Then set `LANGFUSE_BASE_URL=http://localhost:3000` in your `.env`.
+
+## Why Not AI SDK DevTools?
+
+[AI SDK DevTools](https://ai-sdk-tools.dev/devtools) (`@ai-sdk-tools/devtools`) is a React component designed for **frontend applications** that use the `useChat` hook. It provides a visual debugging panel similar to React Query DevTools.
+
+Since the intelligence service is a **pure backend API** without a React frontend:
+- AI SDK DevTools cannot be integrated directly
+- The devtools require browser-side React rendering
+- Tool call monitoring happens server-side, not in a browser context
+
+For backend AI observability, **Langfuse is the recommended solution** as it's designed for server-side tracing and provides equivalent (or better) debugging capabilities:
+
+| Feature | AI SDK DevTools | Langfuse |
+|---------|----------------|----------|
+| Tool call monitoring | ✅ | ✅ |
+| Performance metrics | ✅ | ✅ |
+| Streaming visualization | ✅ | ✅ |
+| Token usage tracking | ❌ | ✅ |
+| Cost analysis | ❌ | ✅ |
+| Production traces | ❌ | ✅ |
+| Historical analysis | ❌ | ✅ |
+| Multi-provider support | Limited | ✅ |
+
+### For Frontend Developers
+
+If you're working on the **webapp** and using AI SDK's React hooks (`useChat`, `useCompletion`), you can add AI SDK DevTools to the frontend:
+
+```bash
+npm install @ai-sdk-tools/devtools
+```
+
+```tsx
+import { AIDevTools } from '@ai-sdk-tools/devtools'
+
+function App() {
+  return (
+    <div>
+      {/* Your app content */}
+      {process.env.NODE_ENV === 'development' && <AIDevTools />}
+    </div>
+  )
+}
+```
+
+This would show client-side streaming and tool call activity. However, the Hephaestus webapp currently communicates with the intelligence service via REST API, not AI SDK's streaming protocols, so this integration is not applicable at this time.
+
+## Database Access
+
+The service connects to the same PostgreSQL database as the application server. Database schema is managed by the application server (Spring Boot/Flyway migrations).
+
+### Regenerating Drizzle Schema
+
+After schema changes in the application server:
+
+```bash
+npm run db:introspect
+```
+
+This introspects the database and generates TypeScript models in `src/db/schema.ts`.
+
+## Testing
+
+Run the test suite:
+
+```bash
+npm run test
+```
+
+Tests use Vitest and mock external AI providers to ensure deterministic results.
+
+## Type Checking and Linting
+
+```bash
+npm run typecheck  # TypeScript compilation check
+npm run check      # Biome linting and formatting
+```
+
+## OpenAPI Export
+
+Generate the OpenAPI specification file:
+
+```bash
+npm run openapi:export
+```
+
+This writes `openapi.yaml` to the service root, which is used by the webapp's API client generator.

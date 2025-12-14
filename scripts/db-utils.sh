@@ -8,7 +8,7 @@
 #   draft-changelog                      - Generate changelog diff only
 #   generate-models-intelligence-service - Introspect existing DB and generate Drizzle schema for intelligence service
 
-set -e  # Exit on any error
+set -eo pipefail  # Exit on any error, including pipeline failures
 
 SCRIPT_DIR="$(dirname "$0")"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
@@ -133,7 +133,11 @@ is_postgres_running() {
         return $?
     fi
 
-    (cd "$APP_SERVER_DIR" && docker compose ps postgres 2>/dev/null | grep -q "Up")
+    # Use subshell to avoid pipefail affecting this check
+    # The function is meant to return false (non-zero) when postgres is not running
+    local output
+    output="$(cd "$APP_SERVER_DIR" && docker compose ps postgres 2>/dev/null)" || return 1
+    echo "$output" | grep -q "Up"
 }
 
 # Check if we're in the right directory
@@ -226,6 +230,11 @@ apply_migrations() {
     SPRING_PROFILES_ACTIVE=local,dev ./mvnw liquibase:update
 }
 
+# Database credentials (configurable via environment variables)
+DB_NAME="${POSTGRES_DB:-hephaestus}"
+DB_USER="${POSTGRES_USER:-root}"
+DB_PASSWORD="${POSTGRES_PASSWORD:-root}"
+
 # Generate ERD documentation
 generate_erd() {
     log_info "Generating ERD documentation..."
@@ -238,9 +247,9 @@ generate_erd() {
     fi
     
     python3 generate_mermaid_erd.py \
-        jdbc:postgresql://localhost:5432/hephaestus \
-        root \
-        root \
+        "jdbc:postgresql://${POSTGRES_HOST}:${POSTGRES_PORT}/${DB_NAME}" \
+        "$DB_USER" \
+        "$DB_PASSWORD" \
         ../docs/contributor/erd/schema.mmd
     
     log_success "ERD documentation updated at 'docs/contributor/erd/schema.mmd'"
@@ -285,9 +294,27 @@ generate_changelog_diff() {
         stop_postgres
         local data_dir
         data_dir="$(postgres_data_dir)"
-        local temp_dir="${data_dir}-temp"
+        # Use unique temp dir name with PID to avoid conflicts
+        local temp_dir="${data_dir}-temp-$$"
+        local backup_created=false
+        
+        # Cleanup function to restore database state on failure
+        cleanup_changelog_diff() {
+            if [[ "$backup_created" == "true" && -d "$temp_dir" ]]; then
+                log_warning "Restoring database state after failure..."
+                stop_postgres 2>/dev/null || true
+                rm -rf "$data_dir" 2>/dev/null || true
+                mv "$temp_dir" "$data_dir"
+                log_info "Database state restored."
+            fi
+        }
+        
+        # Set trap to cleanup on error
+        trap cleanup_changelog_diff ERR
+        
         if [[ -d "$data_dir" ]]; then
             mv "$data_dir" "$temp_dir"
+            backup_created=true
         fi
 
         # Start fresh database and apply migrations
@@ -307,6 +334,9 @@ generate_changelog_diff() {
         if [[ -d "$temp_dir" ]]; then
             mv "$temp_dir" "$data_dir"
         fi
+        
+        # Clear the trap after successful completion
+        trap - ERR
     fi
     
     # Check if changelog file was actually generated
@@ -409,21 +439,8 @@ main() {
             cmd_draft_changelog
             ;;
         "generate-models-intelligence-service")
-            # Ensure PostgreSQL is running
-            log_info "🚀 Starting Drizzle schema generation for intelligence service..."
-            check_environment
-            cd "$APP_SERVER_DIR"
-            if ! docker compose ps postgres | grep -q "Up"; then
-                log_warning "PostgreSQL is not running. Starting it now..."
-                start_postgres
-            fi
-            if [[ "${CI:-false}" == "true" ]]; then
-                apply_migrations
-            else
-                log_info "Skipping migrations in local mode (assuming DB is up-to-date)"
-            fi
-            generate_intelligence_service_models
-            log_success "🎉 Drizzle schema generation completed successfully!"
+            # Use the dedicated command function for consistency
+            cmd_generate_db_models_intelligence_service
             ;;
         "help"|"-h"|"--help")
             show_usage

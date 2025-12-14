@@ -16,6 +16,10 @@ export const getGroupedThreadsRoute = createRoute({
 			z.array(ChatThreadGroupSchema),
 			"Grouped chat threads",
 		),
+		[HttpStatusCodes.INTERNAL_SERVER_ERROR]: jsonContent(
+			z.object({ error: z.string() }),
+			"Internal error",
+		),
 	},
 });
 

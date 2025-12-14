@@ -161,6 +161,7 @@ export const deleteAfterRoute = createRoute({
 	method: "delete",
 	tags: ["documents", ...EXPORTED_TAG],
 	summary: "Delete versions after timestamp",
+	operationId: "deleteDocumentVersionsAfter",
 	request: { params: DocumentIdParamsSchema, query: DeleteAfterQuerySchema },
 	responses: {
 		[HttpStatusCodes.OK]: jsonContent(

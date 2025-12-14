@@ -1,9 +1,10 @@
 import { Skeleton } from "@/components/ui/skeleton";
-import type { GetWeatherOutput } from "@/lib/types";
+import { parseGetWeatherOutput } from "@/lib/types";
 import { WeatherTool } from "../WeatherTool";
 import type { PartRenderer } from "./types";
 
 export const WeatherToolRenderer: PartRenderer<"getWeather"> = ({ part }) => {
+	// Handle loading state
 	if (part.state === "input-available") {
 		return (
 			<div className="flex flex-col gap-2 p-4 rounded-xl border">
@@ -14,8 +15,11 @@ export const WeatherToolRenderer: PartRenderer<"getWeather"> = ({ part }) => {
 		);
 	}
 
+	// Handle completed state with type-safe parsing
 	if (part.state === "output-available") {
-		return <WeatherTool weatherAtLocation={part.output as GetWeatherOutput} />;
+		const output = parseGetWeatherOutput(part.output);
+		if (!output) return null;
+		return <WeatherTool weatherAtLocation={output} />;
 	}
 
 	return null;

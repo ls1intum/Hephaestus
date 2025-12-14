@@ -1,6 +1,16 @@
 import { LangfuseSpanProcessor } from "@langfuse/otel";
-import { NodeTracerProvider } from "@opentelemetry/sdk-trace-node";
+import { NodeSDK } from "@opentelemetry/sdk-node";
 import env from "@/env";
+
+/**
+ * OpenTelemetry instrumentation with Langfuse integration.
+ *
+ * This file initializes the OpenTelemetry SDK with the LangfuseSpanProcessor
+ * to send traces to Langfuse for observability. The setup follows the Langfuse
+ * TypeScript SDK v4 documentation pattern.
+ *
+ * @see https://langfuse.com/docs/sdk/typescript/guide
+ */
 
 // Idempotent init in case of hot reload
 let started = false;
@@ -12,10 +22,9 @@ function isLangfuseConfigured() {
 }
 
 if (!started && isLangfuseConfigured()) {
-	const langfuseSpanProcessor = new LangfuseSpanProcessor();
-	const tracerProvider = new NodeTracerProvider({
-		spanProcessors: [langfuseSpanProcessor],
+	const sdk = new NodeSDK({
+		spanProcessors: [new LangfuseSpanProcessor()],
 	});
-	tracerProvider.register();
+	sdk.start();
 	started = true;
 }

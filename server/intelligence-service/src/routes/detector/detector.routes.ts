@@ -10,6 +10,7 @@ import {
 export const detectBadPractices = createRoute({
 	path: "/detector",
 	method: "post",
+	operationId: "detectBadPractices",
 	tags: [...tags],
 	summary: "Detect bad practices for a pull request",
 	request: {

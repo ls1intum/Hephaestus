@@ -1,8 +1,8 @@
-import type {
-	CreateDocumentInput,
-	CreateDocumentOutput,
-	UpdateDocumentInput,
-	UpdateDocumentOutput,
+import {
+	parseCreateDocumentInput,
+	parseCreateDocumentOutput,
+	parseUpdateDocumentInput,
+	parseUpdateDocumentOutput,
 } from "@/lib/types";
 import { DocumentTool } from "../DocumentTool";
 import type { PartRendererProps } from "./types";
@@ -17,25 +17,27 @@ export const DocumentToolRenderer = ({
 	part,
 	onDocumentClick,
 }: DocumentToolRendererProps) => {
+	// Handle loading state (input-available)
 	if (part.state === "input-available") {
 		if (part.type === "tool-createDocument") {
-			const input = (part.input ?? {}) as Partial<CreateDocumentInput>;
+			// Use parser, but allow partial input during streaming
+			const input = parseCreateDocumentInput(part.input);
 			return (
 				<DocumentTool
 					type="create"
 					isLoading
-					args={{ title: input.title ?? "", kind: "TEXT" }}
+					args={{ title: input?.title ?? "", kind: "TEXT" }}
 					onDocumentClick={onDocumentClick}
 				/>
 			);
 		}
 		if (part.type === "tool-updateDocument") {
-			const input = (part.input ?? {}) as Partial<UpdateDocumentInput>;
+			const input = parseUpdateDocumentInput(part.input);
 			return (
 				<DocumentTool
 					type="update"
 					isLoading
-					args={{ id: input.id ?? "", description: input.description ?? "" }}
+					args={{ id: input?.id ?? "", description: input?.description ?? "" }}
 					onDocumentClick={onDocumentClick}
 				/>
 			);
@@ -43,22 +45,30 @@ export const DocumentToolRenderer = ({
 		return null;
 	}
 
+	// Handle completed state (output-available)
 	if (part.state === "output-available") {
-		const output = part.output as
-			| CreateDocumentOutput
-			| UpdateDocumentOutput
-			| undefined;
-		if (!output || typeof output !== "object") return null;
-		// We don't get an explicit flag; assume createDocument tool returns CreateDocumentOutput
-		const type: "create" | "update" =
-			part.type === "tool-createDocument" ? "create" : "update";
-		return (
-			<DocumentTool
-				type={type}
-				result={{ id: output.id, title: output.title, kind: "TEXT" }}
-				onDocumentClick={onDocumentClick}
-			/>
-		);
+		if (part.type === "tool-createDocument") {
+			const output = parseCreateDocumentOutput(part.output);
+			if (!output) return null;
+			return (
+				<DocumentTool
+					type="create"
+					result={{ id: output.id, title: output.title, kind: "TEXT" }}
+					onDocumentClick={onDocumentClick}
+				/>
+			);
+		}
+		if (part.type === "tool-updateDocument") {
+			const output = parseUpdateDocumentOutput(part.output);
+			if (!output) return null;
+			return (
+				<DocumentTool
+					type="update"
+					result={{ id: output.id, title: output.title, kind: "TEXT" }}
+					onDocumentClick={onDocumentClick}
+				/>
+			);
+		}
 	}
 
 	return null;

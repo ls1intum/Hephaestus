@@ -9,6 +9,27 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+/**
+ * Configuration for Intelligence Service API clients.
+ *
+ * <p>Provides Spring beans for the generated OpenAPI client classes that communicate
+ * with the intelligence service. These APIs are grouped as follows:
+ *
+ * <ul>
+ *   <li><b>Mentor APIs</b> - Chat, documents, and voting functionality for the mentor feature:
+ *     <ul>
+ *       <li>{@link MentorApi} - Chat threads and chat messaging (mentorChatApi)</li>
+ *       <li>{@link DocumentsApi} - Document management (mentorDocumentsApi)</li>
+ *       <li>{@link VoteApi} - Message voting (mentorVoteApi)</li>
+ *     </ul>
+ *   </li>
+ *   <li><b>Detector API</b> - Bad practice detection for pull requests</li>
+ * </ul>
+ *
+ * <p>Note: The mentor endpoints are also exposed via {@code MentorProxyController} which
+ * uses a raw WebClient for SSE streaming support. These beans can be used for server-side
+ * operations that don't require streaming.
+ */
 @Configuration
 public class IntelligenceServiceConfig {
 
@@ -20,21 +41,41 @@ public class IntelligenceServiceConfig {
         return new ApiClient().setBasePath(intelligenceServiceUrl);
     }
 
+    // ==================== Mentor APIs ====================
+
+    /**
+     * API for mentor chat functionality including threads and messaging.
+     * Handles /mentor/threads/* and /mentor/chat endpoints.
+     */
     @Bean
-    public MentorApi mentorApi(ApiClient intelligenceApiClient) {
+    public MentorApi mentorChatApi(ApiClient intelligenceApiClient) {
         return new MentorApi(intelligenceApiClient);
     }
 
+    /**
+     * API for mentor document management.
+     * Handles /mentor/documents/* endpoints.
+     */
     @Bean
-    public DocumentsApi documentsApi(ApiClient intelligenceApiClient) {
+    public DocumentsApi mentorDocumentsApi(ApiClient intelligenceApiClient) {
         return new DocumentsApi(intelligenceApiClient);
     }
 
+    /**
+     * API for voting on mentor chat messages.
+     * Handles /mentor/chat/messages/{messageId}/vote endpoint.
+     */
     @Bean
-    public VoteApi voteApi(ApiClient intelligenceApiClient) {
+    public VoteApi mentorVoteApi(ApiClient intelligenceApiClient) {
         return new VoteApi(intelligenceApiClient);
     }
 
+    // ==================== Other APIs ====================
+
+    /**
+     * API for bad practice detection in pull requests.
+     * Handles /detector endpoint.
+     */
     @Bean
     public DetectorApi detectorApi(ApiClient intelligenceApiClient) {
         return new DetectorApi(intelligenceApiClient);

@@ -6,11 +6,11 @@ import {
 	type UIMessageStreamWriter,
 } from "ai";
 import { z } from "zod";
-import db from "../../../db";
-import { document as docTable } from "../../../db/schema";
-import env from "../../../env";
-import { toolCallIdToUuid } from "../../../routes/mentor/chat/tool-call-id";
-import { DocumentKindEnum } from "../../../routes/mentor/documents/documents.schemas";
+import db from "@/db";
+import { document as docTable } from "@/db/schema";
+import env from "@/env";
+import { toolCallIdToUuid } from "@/routes/mentor/chat/tool-call-id";
+import { DocumentKindEnum } from "@/routes/mentor/documents/documents.schemas";
 
 const inputSchema = z.object({
 	title: z.string().min(1).max(255),

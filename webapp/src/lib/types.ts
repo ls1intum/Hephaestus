@@ -28,6 +28,16 @@ export type {
 	UpdateDocumentOutput,
 } from "@intelligence-service/chat/chat.shared";
 
+// Re-export type guards and parsers for runtime validation (AI SDK v6 best practice)
+export {
+	hasDocumentId,
+	parseCreateDocumentInput,
+	parseCreateDocumentOutput,
+	parseGetWeatherOutput,
+	parseUpdateDocumentInput,
+	parseUpdateDocumentOutput,
+} from "@intelligence-service/chat/chat.shared";
+
 /**
  * Type-safe data part derived from AI SDK's DataUIPart.
  * Automatically includes all CustomUIDataTypes with proper `data-` prefixes.

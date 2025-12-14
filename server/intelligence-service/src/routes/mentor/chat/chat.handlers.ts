@@ -24,13 +24,13 @@ import {
 	updateSelectedLeafMessageId,
 	updateThreadTitle,
 } from "@/lib/chat-repo";
+import { ERROR_MESSAGES, HTTP_STATUS } from "@/lib/constants";
 import type { AppRouteHandler } from "@/lib/types";
 import type {
 	HandleGetThreadRoute,
 	HandleMentorChatRoute,
 } from "./chat.routes";
 import type { ChatRequestBody, ThreadDetail } from "./chat.schemas";
-import { chatRequestBodySchema } from "./chat.schemas";
 
 type IncomingMessage = ChatRequestBody["message"];
 type IncomingPart = { type: string; [k: string]: unknown };
@@ -109,14 +109,10 @@ export const mentorChatHandler: AppRouteHandler<HandleMentorChatRoute> = async (
 		}
 		return { error: () => {}, warn: () => {} };
 	})();
-	const reqJson = context.req.valid("json");
 
-	let requestBody: ChatRequestBody;
-	try {
-		requestBody = chatRequestBodySchema.parse(reqJson);
-	} catch (_) {
-		return context.json({ error: "Invalid request body" }, { status: 400 });
-	}
+	// Hono's c.req.valid() handles validation via the route schema.
+	// If validation fails, Hono returns a 400 automatically via defaultHook.
+	const requestBody = context.req.valid("json") as ChatRequestBody;
 
 	const { id: threadId, message, previousMessageId } = requestBody;
 
@@ -329,7 +325,10 @@ export const getThreadHandler: AppRouteHandler<HandleGetThreadRoute> = async (
 	try {
 		const thread = await getThreadById(threadId);
 		if (!thread) {
-			return context.json({ error: "Thread not found" }, { status: 404 });
+			return context.json(
+				{ error: ERROR_MESSAGES.THREAD_NOT_FOUND },
+				{ status: HTTP_STATUS.NOT_FOUND },
+			);
 		}
 
 		const history = await getMessagesByThreadId(threadId);
@@ -378,13 +377,13 @@ export const getThreadHandler: AppRouteHandler<HandleGetThreadRoute> = async (
 				selectedLeafMessageId: thread.selectedLeafMessageId ?? null,
 				messages,
 			},
-			{ status: 200 },
+			{ status: HTTP_STATUS.OK },
 		);
 	} catch (err) {
 		logger.error({ err }, "Database error while fetching thread");
 		return context.json(
-			{ error: "Service temporarily unavailable" },
-			{ status: 503 },
+			{ error: ERROR_MESSAGES.SERVICE_UNAVAILABLE },
+			{ status: HTTP_STATUS.SERVICE_UNAVAILABLE },
 		);
 	}
 };

@@ -1,16 +1,14 @@
 import path from "node:path";
-import type { LanguageModel } from "ai";
 import { config } from "dotenv";
 import { expand } from "dotenv-expand";
 import { z } from "zod";
-import { getModel } from "./lib/ai-model";
+import { getModel, SUPPORTED_PROVIDERS } from "./lib/ai-model";
+
+const ENV_FILE_PATH = process.env.NODE_ENV === "test" ? ".env.test" : ".env";
 
 expand(
 	config({
-		path: path.resolve(
-			process.cwd(),
-			process.env.NODE_ENV === "test" ? ".env.test" : ".env",
-		),
+		path: path.resolve(process.cwd(), ENV_FILE_PATH),
 	}),
 );
 
@@ -29,8 +27,8 @@ const EnvSchema = z
 		AZURE_API_KEY: z.string().min(1).optional(),
 
 		// Models
-		MODEL_NAME: z.string().min(1).default("openai:gpt-5-mini"),
-		DETECTION_MODEL_NAME: z.string().min(1).default("openai:gpt-5-mini"),
+		MODEL_NAME: z.string().min(1).default("openai:gpt-4o-mini"),
+		DETECTION_MODEL_NAME: z.string().min(1).default("openai:gpt-4o-mini"),
 
 		// LangFuse (optional)
 		LANGFUSE_SECRET_KEY: z.string().min(1).optional(),
@@ -38,35 +36,47 @@ const EnvSchema = z
 		LANGFUSE_BASE_URL: z.string().min(1).url().optional(),
 	})
 	.superRefine((val, ctx) => {
-		// Basic model format validation: "provider:model"
 		const parseProvider = (modelName: string) => {
-			const [provider, model] = modelName.split(":");
-			return { provider, model } as const;
+			const colonIndex = modelName.indexOf(":");
+			if (colonIndex === -1) {
+				return { provider: undefined, model: undefined };
+			}
+			return {
+				provider: modelName.slice(0, colonIndex),
+				model: modelName.slice(colonIndex + 1),
+			};
 		};
 
 		const modelPairs = [
 			["MODEL_NAME", val.MODEL_NAME],
 			["DETECTION_MODEL_NAME", val.DETECTION_MODEL_NAME],
 		] as const;
-		for (const [field, m] of modelPairs) {
-			const { provider, model } = parseProvider(m);
+
+		for (const [field, modelName] of modelPairs) {
+			const { provider, model } = parseProvider(modelName);
+
 			if (!provider || !model) {
 				ctx.addIssue({
 					code: z.ZodIssueCode.custom,
-					message: `Invalid model format: ${m}. Expected <provider>:<model>`,
+					message: `Invalid model format: ${modelName}. Expected <provider>:<model>`,
 					path: [field],
 				});
+				continue;
 			}
-			if (!["openai", "azure"].includes(provider)) {
+
+			if (
+				!SUPPORTED_PROVIDERS.includes(
+					provider as (typeof SUPPORTED_PROVIDERS)[number],
+				)
+			) {
 				ctx.addIssue({
 					code: z.ZodIssueCode.custom,
-					message: `Unsupported provider: ${provider}. Use 'openai', 'azure', or 'azure_openai'.`,
+					message: `Unsupported provider: ${provider}. Supported providers: ${SUPPORTED_PROVIDERS.join(", ")}`,
 					path: [field],
 				});
 			}
 		}
 
-		// Conditional provider credentials
 		const modelValues = modelPairs.map(([, v]) => v);
 		const usesOpenAI = modelValues.some((m) => m.startsWith("openai:"));
 		const usesAzure = modelValues.some(
@@ -81,72 +91,39 @@ const EnvSchema = z
 			});
 		}
 
-		if (usesAzure) {
-			if (!val.AZURE_API_KEY) {
-				ctx.addIssue({
-					code: z.ZodIssueCode.custom,
-					message: "AZURE_API_KEY is required when using an Azure model",
-					path: ["AZURE_API_KEY"],
-				});
-			}
-			if (!val.AZURE_RESOURCE_NAME) {
-				ctx.addIssue({
-					code: z.ZodIssueCode.custom,
-					message: "AZURE_RESOURCE_NAME is required when using an Azure model",
-					path: ["AZURE_RESOURCE_NAME"],
-				});
-			}
+		if (usesAzure && !val.AZURE_API_KEY) {
+			ctx.addIssue({
+				code: z.ZodIssueCode.custom,
+				message: "AZURE_API_KEY is required when using an Azure model",
+				path: ["AZURE_API_KEY"],
+			});
+		}
+
+		if (usesAzure && !val.AZURE_RESOURCE_NAME) {
+			ctx.addIssue({
+				code: z.ZodIssueCode.custom,
+				message: "AZURE_RESOURCE_NAME is required when using an Azure model",
+				path: ["AZURE_RESOURCE_NAME"],
+			});
 		}
 	});
 
-export type env = z.infer<typeof EnvSchema>;
+export type Env = z.infer<typeof EnvSchema>;
 
-const isTestEnv =
-	process.env.VITEST === "true" || process.env.NODE_ENV === "test";
-const { data: parsedMaybe, error } = EnvSchema.safeParse(process.env);
-let envData: z.infer<typeof EnvSchema>;
-if (parsedMaybe) {
-	envData = parsedMaybe;
-} else if (isTestEnv) {
-	envData = {
-		NODE_ENV: "test",
-		PORT: 18080,
-		LOG_LEVEL: "silent",
-		DATABASE_URL: "postgresql://root:root@localhost:5432/hephaestus",
-		MODEL_NAME: "openai:gpt-5-mini",
-		DETECTION_MODEL_NAME: "openai:gpt-5-mini",
-		OPENAI_API_KEY: "test",
-	};
-} else {
-	// Will exit below due to error
-	envData = undefined as unknown as z.infer<typeof EnvSchema>;
+const parseResult = EnvSchema.safeParse(process.env);
+
+if (!parseResult.success) {
+	const errorTree = z.treeifyError(parseResult.error);
+	const errorMessage = JSON.stringify(errorTree.properties, null, 2);
+	throw new Error(`Invalid environment configuration:\n${errorMessage}`);
 }
 
-if (error && !isTestEnv) {
-	console.error("❌ Invalid env:");
-	console.error(JSON.stringify(z.treeifyError(error).properties, null, 2));
-	process.exit(1);
-}
-// In tests, fall back to stub models to avoid external calls
-const defaultModel: LanguageModel = isTestEnv
-	? ({
-			// Attempt to satisfy AI SDK v5 LanguageModel V2 shape
-			spec: { version: "v2", providerId: "test", modelId: "test" },
-			doStream: async function* () {
-				yield { type: "text-delta", textDelta: "test " } as unknown;
-				yield { type: "text-delta", textDelta: "response" } as unknown;
-				yield { type: "finish" } as unknown;
-			},
-		} as unknown as LanguageModel)
-	: (getModel(envData.MODEL_NAME) as unknown as LanguageModel);
-const detectionModel: LanguageModel = isTestEnv
-	? (defaultModel as LanguageModel)
-	: (getModel(envData.DETECTION_MODEL_NAME) as unknown as LanguageModel);
+const envData = parseResult.data;
 
-const exportedEnv = {
+const env = {
 	...envData,
-	defaultModel,
-	detectionModel,
+	defaultModel: getModel(envData.MODEL_NAME),
+	detectionModel: getModel(envData.DETECTION_MODEL_NAME),
 };
 
-export default exportedEnv;
+export default env;

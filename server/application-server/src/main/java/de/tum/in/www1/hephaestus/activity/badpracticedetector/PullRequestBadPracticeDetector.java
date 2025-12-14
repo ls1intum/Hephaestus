@@ -107,8 +107,7 @@ public class PullRequestBadPracticeDetector {
         );
         detectorRequest.setPullRequestTemplate(template);
 
-        // Adjust to new generated client method name from Hono OpenAPI
-        DetectorResponse detectorResponse = detectorApi.detectorPost(detectorRequest).block();
+        DetectorResponse detectorResponse = detectorApi.detectBadPractices(detectorRequest);
 
         pullRequest.setLastDetectionTime(Instant.now());
         pullRequest.setBadPracticeSummary(detectorResponse.getBadPracticeSummary());

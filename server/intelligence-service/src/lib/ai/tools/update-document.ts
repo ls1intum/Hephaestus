@@ -7,9 +7,9 @@ import {
 } from "ai";
 import { desc, eq } from "drizzle-orm";
 import { z } from "zod";
-import db from "../../../db";
-import { document as docTable } from "../../../db/schema";
-import env from "../../../env";
+import db from "@/db";
+import { document as docTable } from "@/db/schema";
+import env from "@/env";
 
 const inputSchema = z.object({
 	id: z.string().uuid(),

@@ -6,6 +6,8 @@ import java.net.URI;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.http.HttpHeaders;
@@ -33,6 +35,10 @@ import reactor.core.publisher.Flux;
 @Hidden
 @RequestMapping("/workspaces/{workspaceSlug}/mentor")
 public class MentorProxyController {
+
+    public static final String WORKSPACE_SLUG_HEADER = "X-Workspace-Slug";
+
+    private static final Pattern WORKSPACE_SLUG_PATTERN = Pattern.compile("^/workspaces/([^/]+)/mentor");
 
     private static final Set<String> HOP_BY_HOP_HEADERS = Set.of(
         HttpHeaders.CONNECTION,
@@ -69,14 +75,15 @@ public class MentorProxyController {
     ) {
         HttpMethod method = HttpMethod.valueOf(request.getMethod());
 
-        // Extract the mentor-relative path (remove /workspaces/{slug} prefix)
+        // Extract the workspace slug and mentor-relative path
         String fullPath = request.getRequestURI();
+        String workspaceSlug = extractWorkspaceSlug(fullPath);
         String mentorPath = fullPath.replaceFirst("/workspaces/[^/]+", "");
 
         String query = request.getQueryString();
         String target = intelligenceServiceBaseUrl + mentorPath + (query != null ? ("?" + query) : "");
 
-        HttpHeaders outHeaders = prepareOutgoingHeaders(incomingHeaders, jwt);
+        HttpHeaders outHeaders = prepareOutgoingHeaders(incomingHeaders, jwt, workspaceSlug);
         byte[] safeBody = body != null ? body : new byte[0];
 
         return mentorWebClient
@@ -124,7 +131,19 @@ public class MentorProxyController {
             .block();
     }
 
-    private HttpHeaders prepareOutgoingHeaders(HttpHeaders incomingHeaders, Jwt jwt) {
+    /**
+     * Extracts the workspace slug from the request URI.
+     * Expected format: /workspaces/{workspaceSlug}/mentor/...
+     */
+    private String extractWorkspaceSlug(String fullPath) {
+        Matcher matcher = WORKSPACE_SLUG_PATTERN.matcher(fullPath);
+        if (matcher.find()) {
+            return matcher.group(1);
+        }
+        return null;
+    }
+
+    private HttpHeaders prepareOutgoingHeaders(HttpHeaders incomingHeaders, Jwt jwt, String workspaceSlug) {
         HttpHeaders outHeaders = new HttpHeaders();
         for (Map.Entry<String, List<String>> e : incomingHeaders.entrySet()) {
             if (!HOP_BY_HOP_HEADERS.contains(e.getKey())) {
@@ -135,6 +154,9 @@ public class MentorProxyController {
         outHeaders.set(HttpHeaders.ACCEPT_ENCODING, "");
         if (jwt != null) {
             outHeaders.setBearerAuth(jwt.getTokenValue());
+        }
+        if (workspaceSlug != null) {
+            outHeaders.set(WORKSPACE_SLUG_HEADER, workspaceSlug);
         }
         return outHeaders;
     }

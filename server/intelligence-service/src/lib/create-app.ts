@@ -5,6 +5,7 @@ import { notFound, onError, serveEmojiFavicon } from "stoker/middlewares";
 import { defaultHook } from "stoker/openapi";
 
 import { pinoLogger } from "@/middlewares/pino-logger";
+import { workspaceContext } from "@/middlewares/workspace-context";
 
 import type { AppBindings, AppOpenAPI } from "./types";
 
@@ -19,10 +20,19 @@ export default function createApp() {
 	const app = createRouter();
 	const isTest =
 		process.env.VITEST === "true" || process.env.NODE_ENV === "test";
-	const chain = app.use(requestId()).use(serveEmojiFavicon("📝"));
+
+	// Middleware order matters:
+	// 1. requestId() - generates request ID for tracing
+	// 2. pinoLogger() - logs requests with requestId (must come after requestId)
+	// 3. Other middlewares
+	app.use(requestId());
+
 	if (!isTest) {
-		chain.use(pinoLogger());
+		app.use(pinoLogger());
 	}
+
+	app.use(serveEmojiFavicon("📝"));
+	app.use(workspaceContext());
 
 	app.notFound(notFound);
 	app.onError(onError);

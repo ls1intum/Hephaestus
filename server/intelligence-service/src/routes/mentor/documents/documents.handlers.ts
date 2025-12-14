@@ -1,6 +1,7 @@
 import { and, asc, desc, eq, gt } from "drizzle-orm";
 import db from "@/db";
 import { document as docTable } from "@/db/schema";
+import { ERROR_MESSAGES, HTTP_STATUS } from "@/lib/constants";
 import type { AppRouteHandler } from "@/lib/types";
 import type {
 	createDocumentRoute,
@@ -46,11 +47,14 @@ export const createDocumentHandler: AppRouteHandler<
 			})
 			.returning();
 		const row = rows[0];
-		if (!row) throw new Error("Insert failed");
-		return c.json(toDTO(row), { status: 201 });
+		if (!row) throw new Error(ERROR_MESSAGES.INSERT_FAILED);
+		return c.json(toDTO(row), { status: HTTP_STATUS.CREATED });
 	} catch (err) {
 		logger.error({ err }, "Create document failed");
-		return c.json({ error: "Internal error" }, { status: 500 });
+		return c.json(
+			{ error: ERROR_MESSAGES.INTERNAL_ERROR },
+			{ status: HTTP_STATUS.INTERNAL_SERVER_ERROR },
+		);
 	}
 };
 
@@ -65,8 +69,13 @@ export const getDocumentHandler: AppRouteHandler<
 		.orderBy(desc(docTable.versionNumber))
 		.limit(1);
 	const row = rows[0];
-	if (!row) return c.json({ error: "Not found" }, { status: 404 });
-	return c.json(toDTO(row), { status: 200 });
+	if (!row) {
+		return c.json(
+			{ error: ERROR_MESSAGES.DOCUMENT_NOT_FOUND },
+			{ status: HTTP_STATUS.NOT_FOUND },
+		);
+	}
+	return c.json(toDTO(row), { status: HTTP_STATUS.OK });
 };
 
 export const updateDocumentHandler: AppRouteHandler<
@@ -84,7 +93,12 @@ export const updateDocumentHandler: AppRouteHandler<
 				.orderBy(desc(docTable.versionNumber))
 				.limit(1)
 		)[0];
-		if (!latest) return c.json({ error: "Not found" }, { status: 404 });
+		if (!latest) {
+			return c.json(
+				{ error: ERROR_MESSAGES.DOCUMENT_NOT_FOUND },
+				{ status: HTTP_STATUS.NOT_FOUND },
+			);
+		}
 		const now = new Date().toISOString();
 		const version = latest.versionNumber + 1;
 		const rows = await db
@@ -100,11 +114,19 @@ export const updateDocumentHandler: AppRouteHandler<
 			})
 			.returning();
 		const inserted = rows[0];
-		if (!inserted) return c.json({ error: "Not found" }, { status: 404 });
-		return c.json(toDTO(inserted), { status: 200 });
+		if (!inserted) {
+			return c.json(
+				{ error: ERROR_MESSAGES.DOCUMENT_NOT_FOUND },
+				{ status: HTTP_STATUS.NOT_FOUND },
+			);
+		}
+		return c.json(toDTO(inserted), { status: HTTP_STATUS.OK });
 	} catch (err) {
 		logger.error({ err }, "Update document failed");
-		return c.json({ error: "Internal error" }, { status: 500 });
+		return c.json(
+			{ error: ERROR_MESSAGES.INTERNAL_ERROR },
+			{ status: HTTP_STATUS.INTERNAL_SERVER_ERROR },
+		);
 	}
 };
 
@@ -121,14 +143,20 @@ export const deleteDocumentHandler: AppRouteHandler<
 			.limit(1);
 
 		if (existing.length === 0) {
-			return c.json({ error: "Document not found" }, { status: 404 });
+			return c.json(
+				{ error: ERROR_MESSAGES.DOCUMENT_NOT_FOUND },
+				{ status: HTTP_STATUS.NOT_FOUND },
+			);
 		}
 
 		await db.delete(docTable).where(eq(docTable.id, id));
-		return c.body(null, { status: 204 });
+		return c.body(null, { status: HTTP_STATUS.NO_CONTENT });
 	} catch (err) {
 		logger.error({ err }, "Delete document failed");
-		return c.json({ error: "Internal error" }, { status: 500 });
+		return c.json(
+			{ error: ERROR_MESSAGES.INTERNAL_ERROR },
+			{ status: HTTP_STATUS.INTERNAL_SERVER_ERROR },
+		);
 	}
 };
 
@@ -158,7 +186,7 @@ export const listDocumentsHandler: AppRouteHandler<
 		createdAt: r.createdAt ?? new Date().toISOString(),
 		userId: r.userId ?? 0,
 	}));
-	return c.json(pageItems, { status: 200 });
+	return c.json(pageItems, { status: HTTP_STATUS.OK });
 };
 
 export const listVersionsHandler: AppRouteHandler<
@@ -171,10 +199,15 @@ export const listVersionsHandler: AppRouteHandler<
 		.from(docTable)
 		.where(eq(docTable.id, id))
 		.orderBy(desc(docTable.versionNumber));
-	if (!rows.length) return c.json({ error: "Not found" }, { status: 404 });
+	if (!rows.length) {
+		return c.json(
+			{ error: ERROR_MESSAGES.DOCUMENT_NOT_FOUND },
+			{ status: HTTP_STATUS.NOT_FOUND },
+		);
+	}
 	const start = page * size;
 	const end = start + size;
-	return c.json(rows.slice(start, end).map(toDTO), { status: 200 });
+	return c.json(rows.slice(start, end).map(toDTO), { status: HTTP_STATUS.OK });
 };
 
 export const getVersionHandler: AppRouteHandler<
@@ -190,8 +223,13 @@ export const getVersionHandler: AppRouteHandler<
 			)
 			.limit(1)
 	)[0];
-	if (!row) return c.json({ error: "Not found" }, { status: 404 });
-	return c.json(toDTO(row), { status: 200 });
+	if (!row) {
+		return c.json(
+			{ error: ERROR_MESSAGES.DOCUMENT_NOT_FOUND },
+			{ status: HTTP_STATUS.NOT_FOUND },
+		);
+	}
+	return c.json(toDTO(row), { status: HTTP_STATUS.OK });
 };
 
 export const deleteAfterHandler: AppRouteHandler<
@@ -206,13 +244,21 @@ export const deleteAfterHandler: AppRouteHandler<
 			.from(docTable)
 			.where(and(eq(docTable.id, id), gt(docTable.createdAt, after)))
 			.orderBy(desc(docTable.versionNumber));
-		if (!rows.length) return c.json({ error: "Not found" }, { status: 404 });
+		if (!rows.length) {
+			return c.json(
+				{ error: ERROR_MESSAGES.DOCUMENT_NOT_FOUND },
+				{ status: HTTP_STATUS.NOT_FOUND },
+			);
+		}
 		await db
 			.delete(docTable)
 			.where(and(eq(docTable.id, id), gt(docTable.createdAt, after)));
-		return c.json(rows.map(toDTO), { status: 200 });
+		return c.json(rows.map(toDTO), { status: HTTP_STATUS.OK });
 	} catch (err) {
 		logger.error({ err }, "Delete after failed");
-		return c.json({ error: "Internal error" }, { status: 500 });
+		return c.json(
+			{ error: ERROR_MESSAGES.INTERNAL_ERROR },
+			{ status: HTTP_STATUS.INTERNAL_SERVER_ERROR },
+		);
 	}
 };

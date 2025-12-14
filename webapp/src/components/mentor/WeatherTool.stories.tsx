@@ -37,6 +37,7 @@ export const Default: Story = {};
 export const NightTime: Story = {
 	args: {
 		weatherAtLocation: {
+			success: true,
 			latitude: 40.7128,
 			longitude: -74.006,
 			generationtime_ms: 0.032,
@@ -82,7 +83,7 @@ export const NightTime: Story = {
 				sunrise: ["2024-10-07T07:15", "2024-10-08T07:16"],
 				sunset: ["2024-10-07T19:00", "2024-10-08T18:58"],
 			},
-		} as GetWeatherOutput,
+		} satisfies GetWeatherOutput,
 	},
 };
 
@@ -92,6 +93,7 @@ export const NightTime: Story = {
 export const HotDay: Story = {
 	args: {
 		weatherAtLocation: {
+			success: true,
 			latitude: 33.4484,
 			longitude: -112.074,
 			generationtime_ms: 0.028,
@@ -137,7 +139,7 @@ export const HotDay: Story = {
 				sunrise: ["2024-07-15T05:25", "2024-07-16T05:26"],
 				sunset: ["2024-07-15T19:45", "2024-07-16T19:44"],
 			},
-		} as GetWeatherOutput,
+		} satisfies GetWeatherOutput,
 	},
 };
 
@@ -147,6 +149,7 @@ export const HotDay: Story = {
 export const ColdWinter: Story = {
 	args: {
 		weatherAtLocation: {
+			success: true,
 			latitude: 64.1466,
 			longitude: -21.9426,
 			generationtime_ms: 0.035,
@@ -192,7 +195,7 @@ export const ColdWinter: Story = {
 				sunrise: ["2024-01-15T11:20", "2024-01-16T11:18"],
 				sunset: ["2024-01-15T15:45", "2024-01-16T15:47"],
 			},
-		} as GetWeatherOutput,
+		} satisfies GetWeatherOutput,
 	},
 };
 
@@ -202,6 +205,7 @@ export const ColdWinter: Story = {
 export const SunriseTransition: Story = {
 	args: {
 		weatherAtLocation: {
+			success: true,
 			latitude: 35.6762,
 			longitude: 139.6503,
 			generationtime_ms: 0.024,
@@ -247,7 +251,7 @@ export const SunriseTransition: Story = {
 				sunrise: ["2024-10-07T07:15", "2024-10-08T07:16"],
 				sunset: ["2024-10-07T19:00", "2024-10-08T18:58"],
 			},
-		} as GetWeatherOutput,
+		} satisfies GetWeatherOutput,
 	},
 };
 
@@ -268,6 +272,7 @@ export const MobileView: Story = {
 export const FahrenheitUnits: Story = {
 	args: {
 		weatherAtLocation: {
+			success: true,
 			latitude: 25.7617,
 			longitude: -80.1918,
 			generationtime_ms: 0.031,
@@ -313,6 +318,6 @@ export const FahrenheitUnits: Story = {
 				sunrise: ["2024-08-15T06:35", "2024-08-16T06:36"],
 				sunset: ["2024-08-15T20:05", "2024-08-16T20:04"],
 			},
-		} as GetWeatherOutput,
+		} satisfies GetWeatherOutput,
 	},
 };
