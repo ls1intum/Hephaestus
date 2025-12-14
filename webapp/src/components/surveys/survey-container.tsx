@@ -1,4 +1,4 @@
-import { AlertCircle, MailCheck, X } from "lucide-react";
+import { AlertCircle, CheckCircle2, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -6,7 +6,6 @@ import {
 	Empty,
 	EmptyContent,
 	EmptyDescription,
-	EmptyHeader,
 	EmptyMedia,
 	EmptyTitle,
 } from "@/components/ui/empty";
@@ -32,6 +31,41 @@ interface SurveyContainerProps {
 
 type ErrorMap = Record<string, string>;
 
+/** Shared header with close button */
+function SurveyHeader({
+	title,
+	description,
+	onClose,
+}: {
+	title: string;
+	description?: string;
+	onClose: () => void;
+}) {
+	return (
+		<div className="flex items-start justify-between border-b p-4 pb-3">
+			<div className="flex-1 pr-6 sm:pr-8">
+				<h2 className="text-lg font-semibold sm:text-xl text-balance">
+					{title}
+				</h2>
+				{description && (
+					<p className="mt-1 text-xs text-muted-foreground sm:text-sm text-balance">
+						{description}
+					</p>
+				)}
+			</div>
+			<Button
+				variant="ghost"
+				size="icon"
+				className="h-8 w-8 shrink-0"
+				onClick={onClose}
+				aria-label="Close survey"
+			>
+				<X className="h-4 w-4" />
+			</Button>
+		</div>
+	);
+}
+
 export function SurveyContainer({
 	survey,
 	onComplete,
@@ -43,11 +77,12 @@ export function SurveyContainer({
 		{},
 	);
 	const [errors, setErrors] = useState<ErrorMap>({});
-	const [isCompleted, setIsCompleted] = useState(false);
-	const [finalResponses, setFinalResponses] = useState<Record<
+	const [completedResponses, setCompletedResponses] = useState<Record<
 		string,
 		SurveyResponse
 	> | null>(null);
+
+	const isCompleted = completedResponses !== null;
 
 	const currentStepIndex = history[history.length - 1] ?? 0;
 	const currentQuestion = survey.questions[currentStepIndex];
@@ -63,8 +98,7 @@ export function SurveyContainer({
 		setHistory([0]);
 		setResponses({});
 		setErrors({});
-		setIsCompleted(false);
-		setFinalResponses(null);
+		setCompletedResponses(null);
 	}, [surveyId]);
 
 	const handleResponse = (questionId: string, value: SurveyResponse) => {
@@ -83,9 +117,8 @@ export function SurveyContainer({
 	};
 
 	const handleClose = () => {
-		if (isCompleted && finalResponses) {
-			// If already completed, treat close as complete
-			onComplete(finalResponses);
+		if (completedResponses) {
+			onComplete(completedResponses);
 		} else {
 			onDismiss(currentStepIndex);
 		}
@@ -116,17 +149,17 @@ export function SurveyContainer({
 		});
 
 		if (nextStep === null || nextStep >= totalSteps) {
-			// Show thank you screen instead of immediately closing
-			setFinalResponses(snapshotResponses);
-			setIsCompleted(true);
+			// Report final progress before showing thank you screen
+			onProgress?.(snapshotResponses, {
+				currentStep: totalSteps,
+				totalSteps,
+			});
+			setCompletedResponses(snapshotResponses);
 			return;
 		}
 
 		setHistory((prev) => [...prev, nextStep]);
-
-		if (onProgress) {
-			onProgress(snapshotResponses, { currentStep: nextStep, totalSteps });
-		}
+		onProgress?.(snapshotResponses, { currentStep: nextStep, totalSteps });
 	};
 
 	const isLastStep =
@@ -134,46 +167,24 @@ export function SurveyContainer({
 		currentStepIndex === totalSteps - 1 ||
 		currentQuestion.branching?.type === "end";
 
-	// Render thank you screen when completed
+	// Thank you screen
 	if (isCompleted) {
 		return (
 			<div className="flex max-h-[85vh] flex-col sm:max-h-[600px]">
-				<div className="flex items-start justify-between border-b p-4 pb-3">
-					<div className="flex-1 pr-6 sm:pr-8">
-						<h2 className="text-lg font-semibold sm:text-xl text-balance">
-							{survey.name}
-						</h2>
-					</div>
-					<Button
-						variant="ghost"
-						size="icon"
-						className="h-8 w-8 shrink-0"
-						onClick={() => finalResponses && onComplete(finalResponses)}
-						aria-label="Close survey"
-					>
-						<X className="h-4 w-4" />
-					</Button>
-				</div>
+				<SurveyHeader title={survey.name} onClose={handleClose} />
 
-				<Empty>
-					<EmptyHeader>
-						<EmptyMedia variant="icon">
-							<MailCheck />
-						</EmptyMedia>
-						<EmptyTitle>Thank you for your participation.</EmptyTitle>
-						<EmptyDescription>
-							Your insights are critical for our research into making
-							collaborative software engineering more effective.
-						</EmptyDescription>
-						<EmptyContent>
-							<Button
-								onClick={() => finalResponses && onComplete(finalResponses)}
-								aria-label="Close survey"
-							>
-								Close survey
-							</Button>
-						</EmptyContent>
-					</EmptyHeader>
+				<Empty className="border-0">
+					<EmptyMedia variant="icon">
+						<CheckCircle2 />
+					</EmptyMedia>
+					<EmptyTitle>Thank you for your participation.</EmptyTitle>
+					<EmptyDescription>
+						Your insights are critical for our research into making
+						collaborative software engineering more effective.
+					</EmptyDescription>
+					<EmptyContent>
+						<Button onClick={handleClose}>Close survey</Button>
+					</EmptyContent>
 				</Empty>
 			</div>
 		);
@@ -185,27 +196,11 @@ export function SurveyContainer({
 
 	return (
 		<div className="flex max-h-[85vh] flex-col sm:max-h-[600px]">
-			<div className="flex items-start justify-between border-b p-4 pb-3">
-				<div className="flex-1 pr-6 sm:pr-8">
-					<h2 className="text-lg font-semibold sm:text-xl text-balance">
-						{survey.name}
-					</h2>
-					{survey.description && (
-						<p className="mt-1 text-xs text-muted-foreground sm:text-sm text-balance">
-							{survey.description}
-						</p>
-					)}
-				</div>
-				<Button
-					variant="ghost"
-					size="icon"
-					className="h-8 w-8 shrink-0"
-					onClick={handleClose}
-					aria-label="Close survey"
-				>
-					<X className="h-4 w-4" />
-				</Button>
-			</div>
+			<SurveyHeader
+				title={survey.name}
+				description={survey.description ?? undefined}
+				onClose={handleClose}
+			/>
 
 			<div className="p-4 pb-3 sm:px-6 sm:pb-4">
 				<div className="mb-2 flex items-center justify-between text-xs text-muted-foreground">

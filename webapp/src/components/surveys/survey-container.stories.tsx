@@ -10,7 +10,83 @@ import {
 import type { PostHogSurvey } from "@/types/survey";
 import { SurveyContainer } from "./survey-container";
 
-/** Real Hephaestus feedback survey - all open-text questions */
+/**
+ * Survey with diverse question types and response-based branching.
+ * Tests: open text, single choice with branching, rating scale, multiple choice.
+ */
+const branchingSurvey: PostHogSurvey = {
+	id: "019a1bba-e554-0000-ba61-39946d83e49c",
+	name: "Open feedback",
+	description: "",
+	type: "api",
+	questions: [
+		{
+			id: "a5fee21d-eeaf-475a-9849-1f908e28fa79",
+			type: "open",
+			question: "What can we do to improve our product?",
+			description: "",
+			descriptionContentType: "text",
+			required: false,
+		},
+		{
+			id: "4af1e564-2a8b-4d6f-8e5a-13708bdfc551",
+			type: "single_choice",
+			choices: ["Yes", "No", "Other"],
+			question: "Have you found this tutorial useful?",
+			description: "",
+			descriptionContentType: "text",
+			required: true,
+			hasOpenChoice: true,
+			buttonText: "Submit",
+			branching: {
+				type: "response_based",
+				responseValues: {
+					Yes: "045bc9da-bdd7-4d93-8700-a7604aff9e94",
+					No: "077bc1cc-85e5-4a3a-9283-b386ecf2d299",
+					__other__: "077bc1cc-85e5-4a3a-9283-b386ecf2d299",
+					default: "045bc9da-bdd7-4d93-8700-a7604aff9e94",
+				},
+			},
+		},
+		{
+			id: "045bc9da-bdd7-4d93-8700-a7604aff9e94",
+			type: "rating",
+			scale: 10,
+			display: "number",
+			question: "How likely are you to recommend us to a friend?",
+			description: "",
+			descriptionContentType: "text",
+			required: true,
+			buttonText: "Submit",
+			lowerBoundLabel: "Unlikely",
+			upperBoundLabel: "Very likely",
+		},
+		{
+			id: "077bc1cc-85e5-4a3a-9283-b386ecf2d299",
+			type: "multiple_choice",
+			choices: [
+				"Tutorials",
+				"Customer case studies",
+				"Product announcements",
+				"Other",
+			],
+			question: "Which types of content would you like to see more of?",
+			description: "",
+			descriptionContentType: "text",
+			required: false,
+			hasOpenChoice: true,
+			buttonText: "Submit",
+		},
+	],
+	conditions: null,
+	start_date: "2025-10-25T14:17:09.855000Z",
+	end_date: null,
+	enable_partial_responses: true,
+	current_iteration: 1,
+	current_iteration_start_date: new Date().toISOString(),
+};
+
+/** Production Hephaestus feedback survey - all open-text questions */
 const hephaestusFeedbackSurvey: PostHogSurvey = {
 	id: "019b03ae-f2e3-0000-dadd-f988e31a45fa",
 	name: "Help us improve Hephaestus!",
@@ -42,6 +118,7 @@ const hephaestusFeedbackSurvey: PostHogSurvey = {
 			type: "open",
 			question:
 				"Which page (Leaderboard vs. Profile) would you prefer as your default landing view upon login, and specifically how does that view better support your decision on what to do next?",
+			buttonText: "Submit",
 			description: "",
 			descriptionContentType: "text",
 			required: false,
@@ -74,7 +151,7 @@ const meta = {
 	parameters: { layout: "centered" },
 	tags: ["autodocs"],
 	args: {
-		survey: hephaestusFeedbackSurvey,
+		survey: branchingSurvey,
 		onComplete: fn(),
 		onDismiss: fn(),
 		onProgress: fn(),
@@ -92,10 +169,19 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 /**
- * Walks through the feedback survey using the default layout.
+ * Default survey with diverse question types and branching logic.
  */
 export const Default: Story = {
 	args: {},
+};
+
+/**
+ * Production Hephaestus feedback survey with all open-text questions.
+ */
+export const HephaestusFeedback: Story = {
+	args: {
+		survey: hephaestusFeedbackSurvey,
+	},
 };
 
 /**
@@ -142,9 +228,11 @@ export const InPagePopover: Story = {
 
 /**
  * Highlights response-based branching by logging the active question after each response.
+ * Uses the branching survey to demonstrate different paths based on user answers.
  */
 export const ResponseBasedBranching: Story = {
 	args: {
+		survey: branchingSurvey,
 		onProgress: fn((responses, meta) => {
 			console.info("Progress updated", { responses, meta });
 		}),
