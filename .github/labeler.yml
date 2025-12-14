@@ -14,10 +14,6 @@ intelligence-service:
   - changed-files:
     - any-glob-to-any-file: "server/intelligence-service/**"
 
-intelligence-service-hono:
-  - changed-files:
-    - any-glob-to-any-file: "server/intelligence-service-hono/**"
-
 webhook-ingest:
   - changed-files:
     - any-glob-to-any-file: "server/webhook-ingest/**"

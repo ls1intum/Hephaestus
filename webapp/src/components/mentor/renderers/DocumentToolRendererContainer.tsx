@@ -1,17 +1,10 @@
+import { toolCallIdToUuid } from "@intelligence-service/chat/tool-call-id";
 import type { Document } from "@/api/types.gen";
-import {
-	DocumentToolRenderer,
-} from "./DocumentToolRenderer";
-import type { PartRenderer } from "./types";
-import {
-	toolCallIdToUuid,
-} from "@intelligence-service/chat/tool-call-id";
-import type {
-	CreateDocumentOutput,
-	UpdateDocumentOutput,
-} from "@/lib/types";
 import { useDocumentArtifact } from "@/hooks/useDocumentArtifact";
+import type { CreateDocumentOutput, UpdateDocumentOutput } from "@/lib/types";
 import { DocumentPreview } from "../DocumentPreview";
+import { DocumentToolRenderer } from "./DocumentToolRenderer";
+import type { PartRenderer } from "./types";
 
 export const DocumentToolRendererContainer: PartRenderer<
 	"createDocument" | "updateDocument"

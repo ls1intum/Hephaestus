@@ -1,1534 +1,1295 @@
+openapi: 3.1.0
+info:
+  version: 0.9.0-rc.27
+  title: Hephaestus Intelligence Service API
 components:
   schemas:
-    BadPractice:
-      description: A detected bad practice in a pull request.
-      properties:
-        description:
-          description: The description of the bad practice.
-          title: Description
-          type: string
-        status:
-          $ref: '#/components/schemas/BadPracticeStatus'
-          description: The status of the bad practice.
-        title:
-          description: The title of the bad practice.
-          title: Title
-          type: string
-      required:
-      - title
-      - description
-      - status
-      title: BadPractice
-      type: object
-    BadPracticeStatus:
-      enum:
-      - Good Practice
-      - Fixed
-      - Critical Issue
-      - Normal Issue
-      - Minor Issue
-      - Won't Fix
-      - Wrong
-      title: BadPracticeStatus
-      type: string
-    ChatRequest:
-      description: Chat request model.
-      properties:
-        id:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Id
-        messages:
-          items:
-            $ref: '#/components/schemas/UIMessage'
-          title: Messages
-          type: array
-        metadata:
-          anyOf:
-          - type: object
-          - type: 'null'
-          title: Metadata
-        user_id:
-          title: User Id
-          type: integer
-      required:
-      - messages
-      - user_id
-      title: ChatRequest
-      type: object
-    ChatResponse:
-      anyOf:
-      - $ref: '#/components/schemas/StreamTextStartPart'
-      - $ref: '#/components/schemas/StreamTextDeltaPart'
-      - $ref: '#/components/schemas/StreamTextEndPart'
-      - $ref: '#/components/schemas/StreamReasoningStartPart'
-      - $ref: '#/components/schemas/StreamReasoningDeltaPart'
-      - $ref: '#/components/schemas/StreamReasoningEndPart'
-      - $ref: '#/components/schemas/StreamErrorPart'
-      - $ref: '#/components/schemas/StreamToolInputStartPart'
-      - $ref: '#/components/schemas/StreamToolInputDeltaPart'
-      - $ref: '#/components/schemas/StreamToolInputAvailablePart'
-      - $ref: '#/components/schemas/StreamToolInputErrorPart'
-      - $ref: '#/components/schemas/StreamToolOutputAvailablePart'
-      - $ref: '#/components/schemas/StreamToolOutputErrorPart'
-      - $ref: '#/components/schemas/StreamSourceUrlPart'
-      - $ref: '#/components/schemas/StreamSourceDocumentPart'
-      - $ref: '#/components/schemas/StreamFilePart'
-      - $ref: '#/components/schemas/StreamDataPart'
-      - $ref: '#/components/schemas/StreamStepStartPart'
-      - $ref: '#/components/schemas/StreamStepFinishPart'
-      - $ref: '#/components/schemas/StreamStartPart'
-      - $ref: '#/components/schemas/StreamFinishPart'
-      - $ref: '#/components/schemas/StreamMessageMetadataPart'
-      description: Response model for chat streaming.
-      title: StreamPart
-    CreateDocumentInput:
-      description: Input for createDocument tool.
-      properties:
-        document_id:
-          description: Do not populate this field, will automatically be set by the
-            system
-          title: Document Id
-          type: string
-        kind:
-          const: text
-          title: Kind
-          type: string
-        title:
-          title: Title
-          type: string
-      required:
-      - title
-      - kind
-      - document_id
-      title: CreateDocumentInput
-      type: object
-      x-hephaestus:
-        toolModel: true
-    CreateDocumentOutput:
-      description: Output for createDocument tool.
-      properties:
-        content:
-          title: Content
-          type: string
-        id:
-          title: Id
-          type: string
-        kind:
-          const: TEXT
-          title: Kind
-          type: string
-        title:
-          title: Title
-          type: string
-      required:
-      - id
-      - title
-      - kind
-      - content
-      title: CreateDocumentOutput
-      type: object
-      x-hephaestus:
-        toolModel: true
-    DataUIPart:
-      description: 'A data part with dynamic type.
-
-
-        Note: In UI messages, data can be of any JSON type (object, array, string,
-        number, etc.).'
-      properties:
-        data:
-          title: Data
-        id:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Id
-        type:
-          pattern: ^data-.*
-          title: Type
-          type: string
-      required:
-      - type
-      - data
-      title: DataUIPart
-      type: object
-    DetectorRequest:
-      properties:
-        bad_practice_summary:
-          title: Bad Practice Summary
-          type: string
-        bad_practices:
-          items:
-            $ref: '#/components/schemas/BadPractice'
-          title: Bad Practices
-          type: array
-        description:
-          title: Description
-          type: string
-        lifecycle_state:
-          title: Lifecycle State
-          type: string
-        pull_request_number:
-          title: Pull Request Number
-          type: integer
-        pull_request_template:
-          title: Pull Request Template
-          type: string
-        repository_name:
-          title: Repository Name
-          type: string
-        title:
-          title: Title
-          type: string
-      required:
-      - title
-      - description
-      - lifecycle_state
-      - repository_name
-      - pull_request_number
-      - bad_practice_summary
-      - bad_practices
-      - pull_request_template
-      title: DetectorRequest
-      type: object
-    DetectorResponse:
-      properties:
-        bad_practice_summary:
-          title: Bad Practice Summary
-          type: string
-        bad_practices:
-          items:
-            $ref: '#/components/schemas/BadPractice'
-          title: Bad Practices
-          type: array
-        trace_id:
-          title: Trace Id
-          type: string
-      required:
-      - bad_practice_summary
-      - bad_practices
-      - trace_id
-      title: DetectorResponse
-      type: object
-    DocumentCreateData:
-      properties:
-        id:
-          title: Id
-          type: string
-        kind:
-          const: text
-          title: Kind
-          type: string
-        title:
-          title: Title
-          type: string
-      required:
-      - id
-      - title
-      - kind
-      title: DocumentCreateData
-      type: object
-      x-hephaestus:
-        dataModel: true
-    DocumentDeltaData:
-      properties:
-        delta:
-          title: Delta
-          type: string
-        id:
-          title: Id
-          type: string
-        kind:
-          const: text
-          title: Kind
-          type: string
-      required:
-      - id
-      - kind
-      - delta
-      title: DocumentDeltaData
-      type: object
-      x-hephaestus:
-        dataModel: true
-    DocumentFinishData:
-      properties:
-        id:
-          title: Id
-          type: string
-        kind:
-          const: text
-          title: Kind
-          type: string
-      required:
-      - id
-      - kind
-      title: DocumentFinishData
-      type: object
-      x-hephaestus:
-        dataModel: true
-    DocumentUpdateData:
-      properties:
-        id:
-          title: Id
-          type: string
-        kind:
-          const: text
-          title: Kind
-          type: string
-      required:
-      - id
-      - kind
-      title: DocumentUpdateData
-      type: object
-      x-hephaestus:
-        dataModel: true
-    FileUIPart:
-      description: A file part of a message.
-      properties:
-        filename:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Filename
-        mediaType:
-          title: Mediatype
-          type: string
-        providerMetadata:
-          anyOf:
-          - type: object
-          - type: 'null'
-          title: Providermetadata
-        type:
-          const: file
-          default: file
-          title: Type
-          type: string
-        url:
-          title: Url
-          type: string
-      required:
-      - mediaType
-      - url
-      title: FileUIPart
-      type: object
-    GetWeatherInput:
-      description: Input for getWeather tool.
-      properties:
-        latitude:
-          title: Latitude
-          type: number
-        longitude:
-          title: Longitude
-          type: number
-      required:
-      - latitude
-      - longitude
-      title: GetWeatherInput
-      type: object
-      x-hephaestus:
-        toolModel: true
-    GetWeatherOutput:
-      description: Output for getWeather tool, aligned with WeatherTool.tsx expectations.
-      properties:
-        current:
-          anyOf:
-          - $ref: '#/components/schemas/WeatherCurrent'
-          - type: 'null'
-          default: null
-        current_units:
-          anyOf:
-          - $ref: '#/components/schemas/WeatherCurrentUnits'
-          - type: 'null'
-          default: null
-        daily:
-          anyOf:
-          - $ref: '#/components/schemas/WeatherDaily'
-          - type: 'null'
-          default: null
-        daily_units:
-          anyOf:
-          - $ref: '#/components/schemas/WeatherDailyUnits'
-          - type: 'null'
-          default: null
-        elevation:
-          anyOf:
-          - type: number
-          - type: 'null'
-          default: null
-          title: Elevation
-        generationtime_ms:
-          anyOf:
-          - type: number
-          - type: 'null'
-          default: null
-          title: Generationtime Ms
-        hourly:
-          anyOf:
-          - $ref: '#/components/schemas/WeatherHourly'
-          - type: 'null'
-          default: null
-        hourly_units:
-          anyOf:
-          - $ref: '#/components/schemas/WeatherHourlyUnits'
-          - type: 'null'
-          default: null
-        latitude:
-          anyOf:
-          - type: number
-          - type: 'null'
-          default: null
-          title: Latitude
-        longitude:
-          anyOf:
-          - type: number
-          - type: 'null'
-          default: null
-          title: Longitude
-        timezone:
-          anyOf:
-          - type: string
-          - type: 'null'
-          default: null
-          title: Timezone
-        timezone_abbreviation:
-          anyOf:
-          - type: string
-          - type: 'null'
-          default: null
-          title: Timezone Abbreviation
-        utc_offset_seconds:
-          anyOf:
-          - type: integer
-          - type: 'null'
-          default: null
-          title: Utc Offset Seconds
-      title: GetWeatherOutput
-      type: object
-      x-hephaestus:
-        toolModel: true
-    HTTPValidationError:
-      properties:
-        detail:
-          items:
-            $ref: '#/components/schemas/ValidationError'
-          title: Detail
-          type: array
-      title: HTTPValidationError
-      type: object
     HealthCheck:
-      description: Response model to validate and return when performing a health
-        check.
+      type: object
       properties:
         status:
-          default: OK
-          title: Status
           type: string
-      title: HealthCheck
-      type: object
-    ReasoningUIPart:
-      description: A reasoning part of a message.
-      properties:
-        providerMetadata:
-          anyOf:
-          - type: object
-          - type: 'null'
-          title: Providermetadata
-        state:
-          anyOf:
-          - enum:
-            - streaming
-            - done
-            type: string
-          - type: 'null'
-          title: State
-        text:
-          title: Text
-          type: string
-        type:
-          const: reasoning
-          default: reasoning
-          title: Type
-          type: string
+          enum:
+            - OK
+          description: Health status
+          example: OK
       required:
-      - text
-      title: ReasoningUIPart
+        - status
+    ChatThreadSummary:
       type: object
-    SourceDocumentUIPart:
-      description: A document source part of a message.
       properties:
-        filename:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Filename
-        mediaType:
-          title: Mediatype
-          type: string
-        providerMetadata:
-          anyOf:
-          - type: object
-          - type: 'null'
-          title: Providermetadata
-        sourceId:
-          title: Sourceid
-          type: string
-        title:
-          title: Title
-          type: string
-        type:
-          const: source-document
-          default: source-document
-          title: Type
-          type: string
-      required:
-      - sourceId
-      - mediaType
-      - title
-      title: SourceDocumentUIPart
-      type: object
-    SourceUrlUIPart:
-      description: A URL source part of a message.
-      properties:
-        providerMetadata:
-          anyOf:
-          - type: object
-          - type: 'null'
-          title: Providermetadata
-        sourceId:
-          title: Sourceid
-          type: string
-        title:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Title
-        type:
-          const: source-url
-          default: source-url
-          title: Type
-          type: string
-        url:
-          title: Url
-          type: string
-      required:
-      - sourceId
-      - url
-      title: SourceUrlUIPart
-      type: object
-    StepStartUIPart:
-      description: A step boundary part of a message.
-      properties:
-        type:
-          const: step-start
-          default: step-start
-          title: Type
-          type: string
-      title: StepStartUIPart
-      type: object
-    StreamDataPart:
-      description: 'Data part with dynamic type.
-
-
-        AI SDK v5 stream chunks support a `transient` flag that indicates the data
-
-        should not be added to the persisted message state.'
-      properties:
-        data:
-          title: Data
         id:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Id
-        transient:
-          anyOf:
-          - type: boolean
-          - type: 'null'
-          title: Transient
-        type:
-          pattern: ^data-.*
-          title: Type
           type: string
+          format: uuid
+        title:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
       required:
-      - type
-      - data
-      title: StreamDataPart
+        - id
+        - title
+    ChatThreadGroup:
       type: object
-    StreamErrorPart:
-      description: Error stream part.
       properties:
-        errorText:
-          title: Errortext
+        groupName:
           type: string
-        type:
-          const: error
-          default: error
-          title: Type
-          type: string
+        threads:
+          type: array
+          items:
+            $ref: "#/components/schemas/ChatThreadSummary"
       required:
-      - errorText
-      title: StreamErrorPart
+        - groupName
+        - threads
+    StreamTextStartPart:
       type: object
-    StreamFilePart:
-      description: File part of a message.
       properties:
-        mediaType:
-          title: Mediatype
-          type: string
-        providerMetadata:
-          anyOf:
-          - type: object
-          - type: 'null'
-          title: Providermetadata
         type:
-          const: file
-          default: file
-          title: Type
           type: string
-        url:
-          title: Url
+          enum:
+            - text-start
+        id:
           type: string
+        providerMetadata: {}
       required:
-      - url
-      - mediaType
-      title: StreamFilePart
+        - type
+        - id
+    StreamTextDeltaPart:
       type: object
-    StreamFinishPart:
-      description: End of stream event.
       properties:
-        messageMetadata:
-          anyOf:
-          - type: object
-          - type: 'null'
-          title: Messagemetadata
         type:
-          const: finish
-          default: finish
-          title: Type
           type: string
-      title: StreamFinishPart
-      type: object
-    StreamMessageMetadataPart:
-      description: Message metadata part.
-      properties:
-        messageMetadata:
-          title: Messagemetadata
-          type: object
-        type:
-          const: message-metadata
-          default: message-metadata
-          title: Type
+          enum:
+            - text-delta
+        id:
           type: string
-      required:
-      - messageMetadata
-      title: StreamMessageMetadataPart
-      type: object
-    StreamReasoningDeltaPart:
-      description: Reasoning stream delta part.
-      properties:
         delta:
-          title: Delta
           type: string
-        id:
-          title: Id
-          type: string
-        providerMetadata:
-          anyOf:
-          - type: object
-          - type: 'null'
-          title: Providermetadata
-        type:
-          const: reasoning-delta
-          default: reasoning-delta
-          title: Type
-          type: string
+        providerMetadata: {}
       required:
-      - id
-      - delta
-      title: StreamReasoningDeltaPart
+        - type
+        - id
+        - delta
+    StreamTextEndPart:
       type: object
-    StreamReasoningEndPart:
-      description: Reasoning stream end part.
       properties:
-        id:
-          title: Id
-          type: string
-        providerMetadata:
-          anyOf:
-          - type: object
-          - type: 'null'
-          title: Providermetadata
         type:
-          const: reasoning-end
-          default: reasoning-end
-          title: Type
+          type: string
+          enum:
+            - text-end
+        id:
+          type: string
+        providerMetadata: {}
+      required:
+        - type
+        - id
+    StreamErrorPart:
+      type: object
+      properties:
+        type:
+          type: string
+          enum:
+            - error
+        errorText:
           type: string
       required:
-      - id
-      title: StreamReasoningEndPart
+        - type
+        - errorText
+    StreamToolInputStartPart:
       type: object
+      properties:
+        type:
+          type: string
+          enum:
+            - tool-input-start
+        toolCallId:
+          type: string
+        toolName:
+          type: string
+        providerExecuted:
+          type: boolean
+        dynamic:
+          type: boolean
+      required:
+        - type
+        - toolCallId
+        - toolName
+    StreamToolInputDeltaPart:
+      type: object
+      properties:
+        type:
+          type: string
+          enum:
+            - tool-input-delta
+        toolCallId:
+          type: string
+        inputTextDelta:
+          type: string
+      required:
+        - type
+        - toolCallId
+        - inputTextDelta
+    StreamToolInputAvailablePart:
+      type: object
+      properties:
+        type:
+          type: string
+          enum:
+            - tool-input-available
+        toolCallId:
+          type: string
+        toolName:
+          type: string
+        input: {}
+        providerExecuted:
+          type: boolean
+        providerMetadata: {}
+        dynamic:
+          type: boolean
+      required:
+        - type
+        - toolCallId
+        - toolName
+    StreamToolInputErrorPart:
+      type: object
+      properties:
+        type:
+          type: string
+          enum:
+            - tool-input-error
+        toolCallId:
+          type: string
+        toolName:
+          type: string
+        input: {}
+        errorText:
+          type: string
+        providerExecuted:
+          type: boolean
+        providerMetadata: {}
+        dynamic:
+          type: boolean
+      required:
+        - type
+        - toolCallId
+        - toolName
+        - errorText
+    StreamToolOutputAvailablePart:
+      type: object
+      properties:
+        type:
+          type: string
+          enum:
+            - tool-output-available
+        toolCallId:
+          type: string
+        output: {}
+        providerExecuted:
+          type: boolean
+        dynamic:
+          type: boolean
+      required:
+        - type
+        - toolCallId
+    StreamToolOutputErrorPart:
+      type: object
+      properties:
+        type:
+          type: string
+          enum:
+            - tool-output-error
+        toolCallId:
+          type: string
+        errorText:
+          type: string
+        providerExecuted:
+          type: boolean
+        dynamic:
+          type: boolean
+      required:
+        - type
+        - toolCallId
+        - errorText
     StreamReasoningStartPart:
-      description: Reasoning stream start part.
+      type: object
       properties:
+        type:
+          type: string
+          enum:
+            - reasoning-start
         id:
-          title: Id
           type: string
-        providerMetadata:
-          anyOf:
-          - type: object
-          - type: 'null'
-          title: Providermetadata
-        type:
-          const: reasoning-start
-          default: reasoning-start
-          title: Type
-          type: string
+        providerMetadata: {}
       required:
-      - id
-      title: StreamReasoningStartPart
+        - type
+        - id
+    StreamReasoningDeltaPart:
       type: object
-    StreamSourceDocumentPart:
-      description: Source document part of a message.
       properties:
-        filename:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Filename
-        mediaType:
-          title: Mediatype
-          type: string
-        providerMetadata:
-          anyOf:
-          - type: object
-          - type: 'null'
-          title: Providermetadata
-        sourceId:
-          title: Sourceid
-          type: string
-        title:
-          title: Title
-          type: string
         type:
-          const: source-document
-          default: source-document
-          title: Type
           type: string
+          enum:
+            - reasoning-delta
+        id:
+          type: string
+        delta:
+          type: string
+        providerMetadata: {}
       required:
-      - sourceId
-      - mediaType
-      - title
-      title: StreamSourceDocumentPart
+        - type
+        - id
+        - delta
+    StreamReasoningEndPart:
       type: object
+      properties:
+        type:
+          type: string
+          enum:
+            - reasoning-end
+        id:
+          type: string
+        providerMetadata: {}
+      required:
+        - type
+        - id
     StreamSourceUrlPart:
-      description: Source URL part of a message.
+      type: object
       properties:
-        providerMetadata:
-          anyOf:
-          - type: object
-          - type: 'null'
-          title: Providermetadata
-        sourceId:
-          title: Sourceid
-          type: string
-        title:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Title
         type:
-          const: source-url
-          default: source-url
-          title: Type
+          type: string
+          enum:
+            - source-url
+        sourceId:
           type: string
         url:
-          title: Url
           type: string
+        title:
+          type: string
+        providerMetadata: {}
       required:
-      - sourceId
-      - url
-      title: StreamSourceUrlPart
+        - type
+        - sourceId
+        - url
+    StreamSourceDocumentPart:
       type: object
+      properties:
+        type:
+          type: string
+          enum:
+            - source-document
+        sourceId:
+          type: string
+        mediaType:
+          type: string
+        title:
+          type: string
+        filename:
+          type: string
+        providerMetadata: {}
+      required:
+        - type
+        - sourceId
+        - mediaType
+        - title
+    StreamFilePart:
+      type: object
+      properties:
+        type:
+          type: string
+          enum:
+            - file
+        url:
+          type: string
+        mediaType:
+          type: string
+        providerMetadata: {}
+      required:
+        - type
+        - url
+        - mediaType
+    StreamDataPart:
+      type: object
+      properties:
+        type:
+          type: string
+          pattern: ^data-.+
+        id:
+          type: string
+        data: {}
+        transient:
+          type: boolean
+      required:
+        - type
+    StreamStepStartPart:
+      type: object
+      properties:
+        type:
+          type: string
+          enum:
+            - start-step
+      required:
+        - type
+    StreamStepFinishPart:
+      type: object
+      properties:
+        type:
+          type: string
+          enum:
+            - finish-step
+      required:
+        - type
     StreamStartPart:
-      description: Start of stream event.
+      type: object
+      properties:
+        type:
+          type: string
+          enum:
+            - start
+        messageId:
+          type: string
+        messageMetadata: {}
+      required:
+        - type
+    StreamFinishPart:
+      type: object
+      properties:
+        type:
+          type: string
+          enum:
+            - finish
+        messageMetadata: {}
+      required:
+        - type
+    StreamMessageMetadataPart:
+      type: object
+      properties:
+        type:
+          type: string
+          enum:
+            - message-metadata
+        messageMetadata: {}
+      required:
+        - type
+    StreamAbortPart:
+      type: object
+      properties:
+        type:
+          type: string
+          enum:
+            - abort
+      required:
+        - type
+    DocumentKind:
+      type: string
+      enum:
+        - text
+    Document:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        versionNumber:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        title:
+          type: string
+        content:
+          type: string
+        kind:
+          $ref: "#/components/schemas/DocumentKind"
+        userId:
+          type: integer
+      required:
+        - id
+        - versionNumber
+        - createdAt
+        - title
+        - content
+        - kind
+        - userId
+    CreateDocumentRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 255
+        content:
+          type: string
+          minLength: 1
+        kind:
+          $ref: "#/components/schemas/DocumentKind"
+      required:
+        - title
+        - content
+        - kind
+    DocumentSummary:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        kind:
+          $ref: "#/components/schemas/DocumentKind"
+        createdAt:
+          type: string
+          format: date-time
+        userId:
+          type: integer
+      required:
+        - id
+        - title
+        - kind
+        - createdAt
+        - userId
+    ChatMessageVote:
+      type: object
       properties:
         messageId:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Messageid
-        messageMetadata:
-          anyOf:
-          - type: object
-          - type: 'null'
-          title: Messagemetadata
-        type:
-          const: start
-          default: start
-          title: Type
           type: string
-      title: StreamStartPart
-      type: object
-    StreamStepFinishPart:
-      description: Step finish event.
-      properties:
-        type:
-          const: finish-step
-          default: finish-step
-          title: Type
+          format: uuid
+        isUpvoted:
+          type: boolean
+        createdAt:
           type: string
-      title: StreamStepFinishPart
-      type: object
-    StreamStepStartPart:
-      description: Step start event.
-      properties:
-        type:
-          const: start-step
-          default: start-step
-          title: Type
+          format: date-time
+        updatedAt:
           type: string
-      title: StreamStepStartPart
-      type: object
-    StreamTextDeltaPart:
-      description: Text stream delta part.
-      properties:
-        delta:
-          title: Delta
-          type: string
-        id:
-          title: Id
-          type: string
-        providerMetadata:
-          anyOf:
-          - type: object
-          - type: 'null'
-          title: Providermetadata
-        type:
-          const: text-delta
-          default: text-delta
-          title: Type
-          type: string
+          format: date-time
       required:
-      - id
-      - delta
-      title: StreamTextDeltaPart
+        - messageId
+        - isUpvoted
+        - createdAt
+        - updatedAt
+    VoteMessageRequest:
       type: object
-    StreamTextEndPart:
-      description: Text stream end part.
       properties:
-        id:
-          title: Id
-          type: string
-        providerMetadata:
-          anyOf:
-          - type: object
-          - type: 'null'
-          title: Providermetadata
-        type:
-          const: text-end
-          default: text-end
-          title: Type
-          type: string
+        isUpvoted:
+          type: boolean
       required:
-      - id
-      title: StreamTextEndPart
+        - isUpvoted
+    BadPractice:
       type: object
-    StreamTextStartPart:
-      description: Text stream start part.
       properties:
-        id:
-          title: Id
-          type: string
-        providerMetadata:
-          anyOf:
-          - type: object
-          - type: 'null'
-          title: Providermetadata
-        type:
-          const: text-start
-          default: text-start
-          title: Type
-          type: string
-      required:
-      - id
-      title: StreamTextStartPart
-      type: object
-    StreamToolInputAvailablePart:
-      description: 'Tool input available event.
-
-
-        AI SDK v5 uses `providerMetadata` on the stream chunk; the UI part maps this
-
-        to `callProviderMetadata` when persisting tool invocation parts.'
-      properties:
-        dynamic:
-          anyOf:
-          - type: boolean
-          - type: 'null'
-          title: Dynamic
-        input:
-          title: Input
-          type: object
-        providerExecuted:
-          anyOf:
-          - type: boolean
-          - type: 'null'
-          title: Providerexecuted
-        providerMetadata:
-          anyOf:
-          - type: object
-          - type: 'null'
-          title: Providermetadata
-        toolCallId:
-          title: Toolcallid
-          type: string
-        toolName:
-          title: Toolname
-          type: string
-        type:
-          const: tool-input-available
-          default: tool-input-available
-          title: Type
-          type: string
-      required:
-      - toolCallId
-      - toolName
-      - input
-      title: StreamToolInputAvailablePart
-      type: object
-    StreamToolInputDeltaPart:
-      description: Tool input delta event.
-      properties:
-        inputTextDelta:
-          title: Inputtextdelta
-          type: string
-        toolCallId:
-          title: Toolcallid
-          type: string
-        type:
-          const: tool-input-delta
-          default: tool-input-delta
-          title: Type
-          type: string
-      required:
-      - toolCallId
-      - inputTextDelta
-      title: StreamToolInputDeltaPart
-      type: object
-    StreamToolInputErrorPart:
-      description: 'Tool input error event (signals an error occurred while preparing
-        input).
-
-
-        Mirrors AI SDK ''tool-input-error'' chunk. For non-dynamic tools, the server
-        should
-
-        record an ''output-error'' tool UI part where rawInput may be used for diagnostics.'
-      properties:
-        dynamic:
-          anyOf:
-          - type: boolean
-          - type: 'null'
-          title: Dynamic
-        errorText:
-          title: Errortext
-          type: string
-        input:
-          title: Input
-        providerExecuted:
-          anyOf:
-          - type: boolean
-          - type: 'null'
-          title: Providerexecuted
-        providerMetadata:
-          anyOf:
-          - type: object
-          - type: 'null'
-          title: Providermetadata
-        toolCallId:
-          title: Toolcallid
-          type: string
-        toolName:
-          title: Toolname
-          type: string
-        type:
-          const: tool-input-error
-          default: tool-input-error
-          title: Type
-          type: string
-      required:
-      - toolCallId
-      - toolName
-      - input
-      - errorText
-      title: StreamToolInputErrorPart
-      type: object
-    StreamToolInputStartPart:
-      description: Tool input start event.
-      properties:
-        dynamic:
-          anyOf:
-          - type: boolean
-          - type: 'null'
-          title: Dynamic
-        providerExecuted:
-          anyOf:
-          - type: boolean
-          - type: 'null'
-          title: Providerexecuted
-        toolCallId:
-          title: Toolcallid
-          type: string
-        toolName:
-          title: Toolname
-          type: string
-        type:
-          const: tool-input-start
-          default: tool-input-start
-          title: Type
-          type: string
-      required:
-      - toolCallId
-      - toolName
-      title: StreamToolInputStartPart
-      type: object
-    StreamToolOutputAvailablePart:
-      description: Tool output available event.
-      properties:
-        dynamic:
-          anyOf:
-          - type: boolean
-          - type: 'null'
-          title: Dynamic
-        output:
-          title: Output
-          type: object
-        providerExecuted:
-          anyOf:
-          - type: boolean
-          - type: 'null'
-          title: Providerexecuted
-        toolCallId:
-          title: Toolcallid
-          type: string
-        type:
-          const: tool-output-available
-          default: tool-output-available
-          title: Type
-          type: string
-      required:
-      - toolCallId
-      - output
-      title: StreamToolOutputAvailablePart
-      type: object
-    StreamToolOutputErrorPart:
-      description: Tool output error event.
-      properties:
-        dynamic:
-          anyOf:
-          - type: boolean
-          - type: 'null'
-          title: Dynamic
-        errorText:
-          title: Errortext
-          type: string
-        providerExecuted:
-          anyOf:
-          - type: boolean
-          - type: 'null'
-          title: Providerexecuted
-        toolCallId:
-          title: Toolcallid
-          type: string
-        type:
-          const: tool-output-error
-          default: tool-output-error
-          title: Type
-          type: string
-      required:
-      - toolCallId
-      - errorText
-      title: StreamToolOutputErrorPart
-      type: object
-    TextUIPart:
-      description: A text part of a message.
-      properties:
-        providerMetadata:
-          anyOf:
-          - type: object
-          - type: 'null'
-          title: Providermetadata
-        state:
-          anyOf:
-          - enum:
-            - streaming
-            - done
-            type: string
-          - type: 'null'
-          title: State
-        text:
-          title: Text
-          type: string
-        type:
-          const: text
-          default: text
-          title: Type
-          type: string
-      required:
-      - text
-      title: TextUIPart
-      type: object
-    ToolInputAvailablePart:
-      description: Tool part with input available.
-      properties:
-        callProviderMetadata:
-          anyOf:
-          - type: object
-          - type: 'null'
-          title: Callprovidermetadata
-        input:
-          title: Input
-          type: object
-        providerExecuted:
-          anyOf:
-          - type: boolean
-          - type: 'null'
-          title: Providerexecuted
-        state:
-          const: input-available
-          title: State
-          type: string
-        toolCallId:
-          title: Toolcallid
-          type: string
-        type:
-          pattern: ^tool-.*
-          title: Type
-          type: string
-      required:
-      - type
-      - toolCallId
-      - state
-      - input
-      title: ToolInputAvailablePart
-      type: object
-    ToolInputStreamingPart:
-      description: Tool part with input being streamed.
-      properties:
-        input:
-          anyOf:
-          - type: object
-          - type: 'null'
-          title: Input
-        providerExecuted:
-          anyOf:
-          - type: boolean
-          - type: 'null'
-          title: Providerexecuted
-        state:
-          const: input-streaming
-          title: State
-          type: string
-        toolCallId:
-          title: Toolcallid
-          type: string
-        type:
-          pattern: ^tool-.*
-          title: Type
-          type: string
-      required:
-      - type
-      - toolCallId
-      - state
-      title: ToolInputStreamingPart
-      type: object
-    ToolOutputAvailablePart:
-      description: Tool part with output available.
-      properties:
-        callProviderMetadata:
-          anyOf:
-          - type: object
-          - type: 'null'
-          title: Callprovidermetadata
-        input:
-          title: Input
-          type: object
-        output:
-          title: Output
-          type: object
-        providerExecuted:
-          anyOf:
-          - type: boolean
-          - type: 'null'
-          title: Providerexecuted
-        state:
-          const: output-available
-          title: State
-          type: string
-        toolCallId:
-          title: Toolcallid
-          type: string
-        type:
-          pattern: ^tool-.*
-          title: Type
-          type: string
-      required:
-      - type
-      - toolCallId
-      - state
-      - input
-      - output
-      title: ToolOutputAvailablePart
-      type: object
-    ToolOutputErrorPart:
-      description: Tool part with output error.
-      properties:
-        callProviderMetadata:
-          anyOf:
-          - type: object
-          - type: 'null'
-          title: Callprovidermetadata
-        errorText:
-          title: Errortext
-          type: string
-        input:
-          title: Input
-          type: object
-        providerExecuted:
-          anyOf:
-          - type: boolean
-          - type: 'null'
-          title: Providerexecuted
-        state:
-          const: output-error
-          title: State
-          type: string
-        toolCallId:
-          title: Toolcallid
-          type: string
-        type:
-          pattern: ^tool-.*
-          title: Type
-          type: string
-      required:
-      - type
-      - toolCallId
-      - state
-      - input
-      - errorText
-      title: ToolOutputErrorPart
-      type: object
-    UIMessage:
-      description: Message model that matches the TypeScript interface.
-      properties:
-        id:
-          description: A unique identifier for the message
-          title: Id
-          type: string
-        metadata:
-          anyOf:
-          - type: object
-          - type: 'null'
-          title: Metadata
-        parts:
-          items:
-            anyOf:
-            - $ref: '#/components/schemas/TextUIPart'
-            - $ref: '#/components/schemas/ReasoningUIPart'
-            - $ref: '#/components/schemas/ToolInputStreamingPart'
-            - $ref: '#/components/schemas/ToolInputAvailablePart'
-            - $ref: '#/components/schemas/ToolOutputAvailablePart'
-            - $ref: '#/components/schemas/ToolOutputErrorPart'
-            - $ref: '#/components/schemas/SourceUrlUIPart'
-            - $ref: '#/components/schemas/SourceDocumentUIPart'
-            - $ref: '#/components/schemas/FileUIPart'
-            - $ref: '#/components/schemas/DataUIPart'
-            - $ref: '#/components/schemas/StepStartUIPart'
-          title: Parts
-          type: array
-        role:
-          enum:
-          - system
-          - user
-          - assistant
-          title: Role
-          type: string
-      required:
-      - id
-      - role
-      - parts
-      title: UIMessage
-      type: object
-    UpdateDocumentInput:
-      description: Input for updateDocument tool.
-      properties:
-        description:
-          description: The description of changes that need to be made
-          title: Description
-          type: string
-        id:
-          description: The ID of the document to update
-          title: Id
-          type: string
-      required:
-      - id
-      - description
-      title: UpdateDocumentInput
-      type: object
-      x-hephaestus:
-        toolModel: true
-    UpdateDocumentOutput:
-      description: Output for updateDocument tool.
-      properties:
-        content:
-          title: Content
-          type: string
-        id:
-          title: Id
-          type: string
-        kind:
-          const: TEXT
-          title: Kind
-          type: string
         title:
-          title: Title
+          type: string
+        description:
+          type: string
+        status:
+          type: string
+          enum:
+            - Good Practice
+            - Fixed
+            - Critical Issue
+            - Normal Issue
+            - Minor Issue
+            - Won't Fix
+            - Wrong
+      required:
+        - title
+        - description
+        - status
+    BadPracticeResult:
+      type: object
+      properties:
+        bad_practice_summary:
+          type: string
+        bad_practices:
+          type: array
+          items:
+            $ref: "#/components/schemas/BadPractice"
+      required:
+        - bad_practice_summary
+        - bad_practices
+    DetectorResponse:
+      allOf:
+        - $ref: "#/components/schemas/BadPracticeResult"
+        - type: object
+          properties:
+            trace_id:
+              type: string
+          required:
+            - trace_id
+    DetectorRequest:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        lifecycle_state:
+          type: string
+        repository_name:
+          type: string
+        pull_request_number:
+          type: number
+        bad_practice_summary:
+          type: string
+        bad_practices:
+          type: array
+          items:
+            $ref: "#/components/schemas/BadPractice"
+        pull_request_template:
           type: string
       required:
-      - id
-      - title
-      - kind
-      - content
-      title: UpdateDocumentOutput
-      type: object
-      x-hephaestus:
-        toolModel: true
-    ValidationError:
-      properties:
-        loc:
-          items:
-            anyOf:
-            - type: string
-            - type: integer
-          title: Location
-          type: array
-        msg:
-          title: Message
-          type: string
-        type:
-          title: Error Type
-          type: string
-      required:
-      - loc
-      - msg
-      - type
-      title: ValidationError
-      type: object
-    WeatherCurrent:
-      properties:
-        interval:
-          anyOf:
-          - type: integer
-          - type: 'null'
-          default: null
-          title: Interval
-        temperature_2m:
-          anyOf:
-          - type: number
-          - type: 'null'
-          default: null
-          title: Temperature 2M
-        time:
-          anyOf:
-          - type: string
-          - type: 'null'
-          default: null
-          title: Time
-      title: WeatherCurrent
-      type: object
-    WeatherCurrentUnits:
-      properties:
-        interval:
-          anyOf:
-          - type: string
-          - type: 'null'
-          default: null
-          title: Interval
-        temperature_2m:
-          anyOf:
-          - type: string
-          - type: 'null'
-          default: null
-          title: Temperature 2M
-        time:
-          anyOf:
-          - type: string
-          - type: 'null'
-          default: null
-          title: Time
-      title: WeatherCurrentUnits
-      type: object
-    WeatherDaily:
-      properties:
-        sunrise:
-          default: []
-          items:
-            type: string
-          title: Sunrise
-          type: array
-        sunset:
-          default: []
-          items:
-            type: string
-          title: Sunset
-          type: array
-        time:
-          default: []
-          items:
-            type: string
-          title: Time
-          type: array
-      title: WeatherDaily
-      type: object
-    WeatherDailyUnits:
-      properties:
-        sunrise:
-          anyOf:
-          - type: string
-          - type: 'null'
-          default: null
-          title: Sunrise
-        sunset:
-          anyOf:
-          - type: string
-          - type: 'null'
-          default: null
-          title: Sunset
-        time:
-          anyOf:
-          - type: string
-          - type: 'null'
-          default: null
-          title: Time
-      title: WeatherDailyUnits
-      type: object
-    WeatherHourly:
-      properties:
-        temperature_2m:
-          default: []
-          items:
-            type: number
-          title: Temperature 2M
-          type: array
-        time:
-          default: []
-          items:
-            type: string
-          title: Time
-          type: array
-      title: WeatherHourly
-      type: object
-    WeatherHourlyUnits:
-      properties:
-        temperature_2m:
-          anyOf:
-          - type: string
-          - type: 'null'
-          default: null
-          title: Temperature 2M
-        time:
-          anyOf:
-          - type: string
-          - type: 'null'
-          default: null
-          title: Time
-      title: WeatherHourlyUnits
-      type: object
-info:
-  contact:
-    email: felixtj.dietrich@tum.de
-    name: Felix T.J. Dietrich
-  description: API documentation for the Hephaestus Intelligence Service.
-  title: Hephaestus Intelligence Service API
-  version: 0.9.0-rc.27
-openapi: 3.1.0
+        - title
+        - description
+        - lifecycle_state
+        - repository_name
+        - pull_request_number
+        - bad_practice_summary
+        - bad_practices
+        - pull_request_template
+  parameters: {}
 paths:
-  /detector/:
-    post:
-      operationId: detect_detector__post
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/DetectorRequest'
-        required: true
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/DetectorResponse'
-          description: Successful Response
-        '422':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/HTTPValidationError'
-          description: Validation Error
-      summary: Detect bad practices for given pull request.
-      tags:
-      - detector
   /health:
     get:
-      description: "## Perform a Health Check\nEndpoint to perform a healthcheck on.\
-        \ This endpoint can primarily be used Docker\nto ensure a robust container\
-        \ orchestration and management is in place. Other\nservices which rely on\
-        \ proper functioning of the API service will not deploy if this\nendpoint\
-        \ returns any other HTTP status code except 200 (OK).\nReturns:\n    HealthCheck:\
-        \ Returns a JSON response with the health status"
-      operationId: get_health_health_get
+      tags:
+        - healthcheck
+      summary: Perform a Health Check
+      description: Endpoint to perform a healthcheck on. This endpoint can primarily
+        be used by Docker to ensure robust container orchestration and
+        management. Other services which rely on proper functioning of the API
+        service will not deploy if this endpoint returns any other HTTP status
+        code except 200 (OK).
       responses:
-        '200':
+        "200":
+          description: Return HTTP Status Code 200 (OK)
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/HealthCheck'
-          description: Return HTTP Status Code 200 (OK)
-      summary: Perform a Health Check
+                $ref: "#/components/schemas/HealthCheck"
+  /mentor/threads/grouped:
+    get:
       tags:
-      - healthcheck
+        - mentor
+      summary: List chat threads grouped by time buckets
+      operationId: getGroupedThreads
+      responses:
+        "200":
+          description: Grouped chat threads
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ChatThreadGroup"
   /mentor/chat:
     post:
-      operationId: handle_chat_mentor_chat_post
+      tags:
+        - mentor
+      summary: Handle mentor chat
       requestBody:
+        description: Chat request body
+        required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/ChatRequest'
-        required: true
+              type: object
+              properties:
+                id:
+                  type: string
+                  format: uuid
+                message:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                      format: uuid
+                    role:
+                      type: string
+                      enum:
+                        - user
+                    parts:
+                      type: array
+                      items:
+                        anyOf:
+                          - type: object
+                            properties:
+                              type:
+                                type: string
+                                enum:
+                                  - text
+                              text:
+                                type: string
+                                minLength: 1
+                                maxLength: 2000
+                            required:
+                              - type
+                              - text
+                          - type: object
+                            properties:
+                              type:
+                                type: string
+                                enum:
+                                  - file
+                              mediaType:
+                                type: string
+                                enum:
+                                  - image/jpeg
+                                  - image/png
+                              name:
+                                type: string
+                                minLength: 1
+                                maxLength: 100
+                              url:
+                                type: string
+                                format: uri
+                            required:
+                              - type
+                              - mediaType
+                              - name
+                              - url
+                  required:
+                    - id
+                    - role
+                    - parts
+                previousMessageId:
+                  type: string
+              required:
+                - id
+                - message
       responses:
-        '200':
+        "200":
+          description: Event stream of chat updates.
           content:
             text/event-stream:
-              examples:
-                error:
-                  value:
-                    errorText: oops
-                    type: error
-                text:
-                  value:
-                    text: Hello
-                    type: text
               schema:
-                $ref: '#/components/schemas/ChatResponse'
-          description: Event stream of chat updates.
-        '422':
+                anyOf:
+                  - $ref: "#/components/schemas/StreamTextStartPart"
+                  - $ref: "#/components/schemas/StreamTextDeltaPart"
+                  - $ref: "#/components/schemas/StreamTextEndPart"
+                  - $ref: "#/components/schemas/StreamErrorPart"
+                  - $ref: "#/components/schemas/StreamToolInputStartPart"
+                  - $ref: "#/components/schemas/StreamToolInputDeltaPart"
+                  - $ref: "#/components/schemas/StreamToolInputAvailablePart"
+                  - $ref: "#/components/schemas/StreamToolInputErrorPart"
+                  - $ref: "#/components/schemas/StreamToolOutputAvailablePart"
+                  - $ref: "#/components/schemas/StreamToolOutputErrorPart"
+                  - $ref: "#/components/schemas/StreamReasoningStartPart"
+                  - $ref: "#/components/schemas/StreamReasoningDeltaPart"
+                  - $ref: "#/components/schemas/StreamReasoningEndPart"
+                  - $ref: "#/components/schemas/StreamSourceUrlPart"
+                  - $ref: "#/components/schemas/StreamSourceDocumentPart"
+                  - $ref: "#/components/schemas/StreamFilePart"
+                  - $ref: "#/components/schemas/StreamDataPart"
+                  - $ref: "#/components/schemas/StreamStepStartPart"
+                  - $ref: "#/components/schemas/StreamStepFinishPart"
+                  - $ref: "#/components/schemas/StreamStartPart"
+                  - $ref: "#/components/schemas/StreamFinishPart"
+                  - $ref: "#/components/schemas/StreamMessageMetadataPart"
+                  - $ref: "#/components/schemas/StreamAbortPart"
+  /mentor/threads/{threadId}:
+    get:
+      tags:
+        - mentor
+      summary: Get mentor chat thread detail
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: threadId
+          in: path
+      responses:
+        "200":
+          description: Thread detail with messages
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/HTTPValidationError'
-          description: Validation Error
-      summary: Handle Chat
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                  title:
+                    type:
+                      - string
+                      - "null"
+                  selectedLeafMessageId:
+                    type:
+                      - string
+                      - "null"
+                    format: uuid
+                  messages:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                          format: uuid
+                        role:
+                          type: string
+                          enum:
+                            - system
+                            - user
+                            - assistant
+                        parts:
+                          type: array
+                          items:
+                            anyOf:
+                              - type: object
+                                properties:
+                                  type:
+                                    type: string
+                                    enum:
+                                      - text
+                                  text:
+                                    type: string
+                                required:
+                                  - type
+                                  - text
+                              - type: object
+                                properties:
+                                  type:
+                                    type: string
+                                    enum:
+                                      - reasoning
+                                  text:
+                                    type: string
+                                  providerMetadata: {}
+                                required:
+                                  - type
+                                  - text
+                              - type: object
+                                properties:
+                                  type:
+                                    type: string
+                                    enum:
+                                      - file
+                                  url:
+                                    type: string
+                                    format: uri
+                                  mediaType:
+                                    type: string
+                                    enum:
+                                      - image/jpeg
+                                      - image/png
+                                  name:
+                                    type: string
+                                required:
+                                  - type
+                                  - url
+                                  - mediaType
+                              - type: object
+                                properties:
+                                  type:
+                                    type: string
+                                    pattern: ^tool-
+                                required:
+                                  - type
+                                additionalProperties: {}
+                              - type: object
+                                properties:
+                                  type:
+                                    type: string
+                                    enum:
+                                      - source-url
+                                  url:
+                                    type: string
+                                  title:
+                                    type: string
+                                  sourceId:
+                                    type: string
+                                  providerMetadata: {}
+                                required:
+                                  - type
+                                  - url
+                              - type: object
+                                properties:
+                                  type:
+                                    type: string
+                                    enum:
+                                      - source-document
+                                  mediaType:
+                                    type: string
+                                  title:
+                                    type: string
+                                  filename:
+                                    type: string
+                                  providerMetadata: {}
+                                required:
+                                  - type
+                                  - mediaType
+                                  - title
+                              - type: object
+                                properties:
+                                  type:
+                                    type: string
+                                required:
+                                  - type
+                                additionalProperties: {}
+                        createdAt:
+                          type: string
+                          format: date-time
+                        parentMessageId:
+                          type:
+                            - string
+                            - "null"
+                          format: uuid
+                      required:
+                        - id
+                        - role
+                        - parts
+                required:
+                  - id
+                  - messages
+        "404":
+          description: Thread not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                  - error
+        "500":
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                  - error
+        "503":
+          description: Service temporarily unavailable
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                  - error
+  /mentor/documents:
+    post:
       tags:
-      - mentor
+        - documents
+      summary: Create a new document
+      requestBody:
+        description: Create document
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateDocumentRequest"
+      responses:
+        "201":
+          description: Created document
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Document"
+        "500":
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                  - error
+    get:
+      tags:
+        - documents
+      summary: List latest version of documents (no auth; all users)
+      parameters:
+        - schema:
+            type:
+              - integer
+              - "null"
+            minimum: 0
+            default: 0
+          required: false
+          name: page
+          in: query
+        - schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+          required: false
+          name: size
+          in: query
+      responses:
+        "200":
+          description: Document summaries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DocumentSummary"
+        "500":
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                  - error
+  /mentor/documents/{id}:
+    get:
+      tags:
+        - documents
+      summary: Get latest version of a document
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: id
+          in: path
+      responses:
+        "200":
+          description: Document
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Document"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                  - error
+        "500":
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                  - error
+    put:
+      tags:
+        - documents
+      summary: Update a document (creates new version)
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: id
+          in: path
+      requestBody:
+        description: Update document
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateDocumentRequest"
+      responses:
+        "200":
+          description: Updated document
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Document"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                  - error
+        "500":
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                  - error
+    delete:
+      tags:
+        - documents
+      summary: Delete a document and all versions
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: id
+          in: path
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                  - error
+        "500":
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                  - error
+  /mentor/documents/{id}/versions:
+    get:
+      tags:
+        - documents
+      summary: List versions of a document
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: id
+          in: path
+        - schema:
+            type:
+              - integer
+              - "null"
+            minimum: 0
+            default: 0
+          required: false
+          name: page
+          in: query
+        - schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+          required: false
+          name: size
+          in: query
+      responses:
+        "200":
+          description: Document versions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Document"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                  - error
+        "500":
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                  - error
+    delete:
+      tags:
+        - documents
+      summary: Delete versions after timestamp
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: id
+          in: path
+        - schema:
+            type: string
+            format: date-time
+          required: true
+          name: after
+          in: query
+      responses:
+        "200":
+          description: Deleted versions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Document"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                  - error
+        "500":
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                  - error
+  /mentor/documents/{id}/versions/{versionNumber}:
+    get:
+      tags:
+        - documents
+      summary: Get specific version
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: id
+          in: path
+        - schema:
+            type:
+              - integer
+              - "null"
+          required: false
+          name: versionNumber
+          in: path
+      responses:
+        "200":
+          description: Document
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Document"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                  - error
+        "500":
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                  - error
+  /mentor/chat/messages/{messageId}/vote:
+    post:
+      tags:
+        - vote
+      summary: Vote on a chat message (upvote/downvote)
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: messageId
+          in: path
+      requestBody:
+        description: Vote request body
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VoteMessageRequest"
+      responses:
+        "200":
+          description: Vote recorded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatMessageVote"
+        "404":
+          description: Message not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                  - error
+        "500":
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                  - error
+  /detector:
+    post:
+      tags:
+        - Detector
+      summary: Detect bad practices for a pull request
+      requestBody:
+        description: Detector request
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DetectorRequest"
+      responses:
+        "200":
+          description: Detection response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DetectorResponse"
+webhooks: {}

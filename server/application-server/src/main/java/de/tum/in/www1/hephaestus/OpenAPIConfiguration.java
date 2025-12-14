@@ -43,15 +43,15 @@ public class OpenAPIConfiguration {
     // Intentionally left without domain object allowlist; we retain all non-DTO schemas.
 
     // Optional absolute or relative path to the stored mentor OpenAPI YAML
-    // Example (absolute): /Users/you/Hephaestus/server/intelligence-service-hono/openapi.yaml
-    // Example (relative to application-server module): ../intelligence-service-hono/openapi.yaml
+    // Example (absolute): /Users/you/Hephaestus/server/intelligence-service/openapi.yaml
+    // Example (relative to application-server module): ../intelligence-service/openapi.yaml
     @Value("${hephaestus.intelligence-service.openapi.path:}")
     private String mentorOpenapiPath;
 
     @Bean
     public OpenApiCustomizer schemaCustomizer() {
         return openApi -> {
-            // 1) Merge mentor paths and components from the stored intelligence-service-hono OpenAPI file
+            // 1) Merge mentor paths and components from the stored intelligence-service OpenAPI file
             mergeMentorOpenAPIFromFile(openApi);
 
             var components = openApi.getComponents();
@@ -231,10 +231,10 @@ public class OpenAPIConfiguration {
             }
         }
 
-        // 2) Try sibling module default: ../intelligence-service-hono/openapi.yaml (relative to application-server module)
+        // 2) Try sibling module default: ../intelligence-service/openapi.yaml (relative to application-server module)
         try {
             Path cwd = java.nio.file.Paths.get(System.getProperty("user.dir")).toAbsolutePath();
-            Path sibling = cwd.resolveSibling("intelligence-service-hono").resolve("openapi.yaml");
+            Path sibling = cwd.resolveSibling("intelligence-service").resolve("openapi.yaml");
             if (Files.exists(sibling)) {
                 return Files.readString(sibling, StandardCharsets.UTF_8);
             }
@@ -242,13 +242,13 @@ public class OpenAPIConfiguration {
             logger.debug("Failed reading mentor OpenAPI from sibling path: {}", e.getMessage());
         }
 
-        // 3) Try repo layout: <repo-root>/server/intelligence-service-hono/openapi.yaml
+        // 3) Try repo layout: <repo-root>/server/intelligence-service/openapi.yaml
         try {
             Path cwd = java.nio.file.Paths.get(System.getProperty("user.dir")).toAbsolutePath();
             // If cwd is .../server/application-server, repoRoot is cwd.getParent().getParent()
             Path repoRoot = cwd.getParent() != null ? cwd.getParent().getParent() : null;
             if (repoRoot != null) {
-                Path inRepo = repoRoot.resolve("server").resolve("intelligence-service-hono").resolve("openapi.yaml");
+                Path inRepo = repoRoot.resolve("server").resolve("intelligence-service").resolve("openapi.yaml");
                 if (Files.exists(inRepo)) {
                     return Files.readString(inRepo, StandardCharsets.UTF_8);
                 }

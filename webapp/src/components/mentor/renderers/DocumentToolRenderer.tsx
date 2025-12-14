@@ -17,7 +17,6 @@ export const DocumentToolRenderer = ({
 	part,
 	onDocumentClick,
 }: DocumentToolRendererProps) => {
-
 	if (part.state === "input-available") {
 		if (part.type === "tool-createDocument") {
 			const input = (part.input ?? {}) as Partial<CreateDocumentInput>;

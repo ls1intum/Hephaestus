@@ -1,45 +1,38 @@
-# Intelligence Service
+# Intelligence Service — AI-Powered Mentor and Detection API
 
-## Overview
+This service provides the AI-powered mentor chat functionality and bad practice detection for Hephaestus. It uses Hono with Zod OpenAPI for type-safe routing and AI SDK v6 for LLM interactions.
 
-A FastAPI service for interfacing with machine learning models.
+## Features
 
-## Setup
+- **Mentor Chat**: AI-powered conversational assistant with tool calling capabilities
+- **Bad Practice Detection**: Automated detection of development anti-patterns
+- **Document Artifacts**: Create and update rich documents within chat
+- **Database Integration**: Direct access to Hephaestus data via Drizzle ORM
 
-### Prerequisites
+## Run locally
 
-- **Python 3.13**
-- **Poetry** for dependency management
-- **Docker** for containerization
-
-### Installation
-
-Install dependencies using Poetry:
-
-```bash
-pip install poetry
-poetry install
-```
-If you have poetry < 2.0.0 installed, please run
-```bash
-poetry self update
+```sh
+npm install
+npm run dev
 ```
 
-## Running the Service
+Then open:
 
-### Development
+- `http://localhost:8000/docs` — Docs endpoint configuration
+- `http://localhost:8000/openapi.json` — OpenAPI v3.0 JSON
+- `http://localhost:8000/openapi.yaml` — OpenAPI v3.1 YAML
 
-```bash
-fastapi dev
+## Export OpenAPI to file
+
+Write `openapi.yaml` to the service root:
+
+```sh
+npm run openapi:export
 ```
 
-### Production
+This mirrors the Python service’s `export_openapi_specs.py` flow by generating schemas from the same app definition.
 
-```bash
-fastapi run
-```
+## Notes
 
-## Usage
-
-After running the application, you can access the FastAPI API documentation at `http://127.0.0.1:8000/docs` or `http://127.0.0.1:8000/redoc`.
-
+- The app registers a `Bearer` auth security scheme and a reusable `Error` schema.
+- Add new routes via `@hono/zod-openapi` `createRoute()` to keep the spec up-to-date.

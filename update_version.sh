@@ -189,23 +189,17 @@ fi
 # Update server/intelligence-service/openapi.yaml (non-quoted version) (if it exists)
 if [[ -f server/intelligence-service/openapi.yaml ]]; then
     sed_inplace "s#(version:[[:space:]]*)[0-9]+(\.[0-9]+){2}(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?#\1${NEW_VERSION}#" server/intelligence-service/openapi.yaml
-fi
-
-# Update intelligence-service-hono OpenAPI and sources (if they exist)
-# Update generated YAML (quoted or unquoted)
-if [[ -f server/intelligence-service-hono/openapi.yaml ]]; then
-    sed_inplace "s#(version:[[:space:]]*)\"[^\"]*\"#\\1\"${NEW_VERSION}\"#" server/intelligence-service-hono/openapi.yaml || true
-    sed_inplace "s#(version:[[:space:]]*)[^\"'[:space:]]+#\\1${NEW_VERSION}#" server/intelligence-service-hono/openapi.yaml || true
+    sed_inplace "s#(version:[[:space:]]*)\"[^\"]*\"#\\1\"${NEW_VERSION}\"#" server/intelligence-service/openapi.yaml || true
 fi
 
 # Update TypeScript sources that define the OpenAPI doc version
-if [[ -f server/intelligence-service-hono/src/openapi.ts ]]; then
-    sed_inplace "s#(version:[[:space:]]*)\"[^\"]*\"#\\1\"${NEW_VERSION}\"#" server/intelligence-service-hono/src/openapi.ts || true
-    sed_inplace "s#(version:[[:space:]]*)'[^']*'#\\1'${NEW_VERSION}'#" server/intelligence-service-hono/src/openapi.ts || true
+if [[ -f server/intelligence-service/src/openapi.ts ]]; then
+    sed_inplace "s#(version:[[:space:]]*)\"[^\"]*\"#\\1\"${NEW_VERSION}\"#" server/intelligence-service/src/openapi.ts || true
+    sed_inplace "s#(version:[[:space:]]*)'[^']*'#\\1'${NEW_VERSION}'#" server/intelligence-service/src/openapi.ts || true
 fi
-if [[ -f server/intelligence-service-hono/scripts/export-openapi.ts ]]; then
-    sed_inplace "s#(version:[[:space:]]*)\"[^\"]*\"#\\1\"${NEW_VERSION}\"#" server/intelligence-service-hono/scripts/export-openapi.ts || true
-    sed_inplace "s#(version:[[:space:]]*)'[^']*'#\\1'${NEW_VERSION}'#" server/intelligence-service-hono/scripts/export-openapi.ts || true
+if [[ -f server/intelligence-service/scripts/export-openapi.ts ]]; then
+    sed_inplace "s#(version:[[:space:]]*)\"[^\"]*\"#\\1\"${NEW_VERSION}\"#" server/intelligence-service/scripts/export-openapi.ts || true
+    sed_inplace "s#(version:[[:space:]]*)'[^']*'#\\1'${NEW_VERSION}'#" server/intelligence-service/scripts/export-openapi.ts || true
 fi
 
 # Update all files containing "The version of the OpenAPI document:" to use the new version,

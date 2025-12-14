@@ -33,7 +33,10 @@ interface UseMentorChatOptions {
 // Use server-defined vote type for consistency
 
 interface UseMentorChatReturn
-	extends Omit<UseChatHelpers<ChatMessage>, "sendMessage"> {
+	extends Omit<
+		UseChatHelpers<ChatMessage>,
+		"sendMessage" | "addToolApprovalResponse"
+	> {
 	sendMessage: (text: string) => void;
 	threadDetail: GetMentorThreadsByThreadIdResponse | undefined;
 	isThreadLoading: boolean;
@@ -85,15 +88,17 @@ export function useMentorChat({
 	} = threadQuery;
 
 	// Fetch grouped threads for sidebar/navigation; avoid immediate refetch on mount
-	const { data: groupedThreads, isLoading: isGroupedThreadsLoading } = useQuery({
-		...getGroupedThreadsOptions(),
-		initialData: () => queryClient.getQueryData(getGroupedThreadsQueryKey()),
-		initialDataUpdatedAt: Date.now(),
-		staleTime: 60_000,
-		refetchOnMount: false,
-		refetchOnWindowFocus: false,
-		refetchOnReconnect: false,
-	});
+	const { data: groupedThreads, isLoading: isGroupedThreadsLoading } = useQuery(
+		{
+			...getGroupedThreadsOptions(),
+			initialData: () => queryClient.getQueryData(getGroupedThreadsQueryKey()),
+			initialDataUpdatedAt: Date.now(),
+			staleTime: 60_000,
+			refetchOnMount: false,
+			refetchOnWindowFocus: false,
+			refetchOnReconnect: false,
+		},
+	);
 
 	// Vote message mutation
 	const voteMessageMut = useMutation(
@@ -202,6 +207,7 @@ export function useMentorChat({
 		setMessages,
 		resumeStream,
 		addToolResult,
+		addToolOutput,
 		id,
 	} = useChat<ChatMessage>({
 		id: stableThreadId, // Use stable ID that never changes
@@ -211,17 +217,17 @@ export function useMentorChat({
 		transport: stableTransport,
 		onFinish: stableOnFinish,
 		onError: stableOnError,
-	onData: (dataPart) => {
-		const part = dataPart as DataPart;
-		if (
-			part.type === "data-document-create" ||
-			part.type === "data-document-update" ||
-			part.type === "data-document-delta" ||
-			part.type === "data-document-finish"
-		) {
-			artifactDoc.onStreamPart(part);
-		}
-	},
+		onData: (dataPart) => {
+			const part = dataPart as DataPart;
+			if (
+				part.type === "data-document-create" ||
+				part.type === "data-document-update" ||
+				part.type === "data-document-delta" ||
+				part.type === "data-document-finish"
+			) {
+				artifactDoc.onStreamPart(part);
+			}
+		},
 	});
 
 	// Hydrate thread messages once when loaded and not streaming
@@ -281,15 +287,15 @@ export function useMentorChat({
 						return next;
 					});
 				},
-					onSettled: () => {
-						if (threadId || stableThreadId) {
-							queryClient.invalidateQueries({
-								queryKey: getMentorThreadsByThreadIdQueryKey({
-									path: { threadId: threadId || stableThreadId || "" },
-								}),
-							});
-						}
-					},
+				onSettled: () => {
+					if (threadId || stableThreadId) {
+						queryClient.invalidateQueries({
+							queryKey: getMentorThreadsByThreadIdQueryKey({
+								path: { threadId: threadId || stableThreadId || "" },
+							}),
+						});
+					}
+				},
 			},
 		);
 	};
@@ -311,6 +317,7 @@ export function useMentorChat({
 		setMessages,
 		resumeStream,
 		addToolResult,
+		addToolOutput,
 		id,
 		clearError,
 

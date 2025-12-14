@@ -227,10 +227,22 @@ export const WithConversation: Story = {
 				<Chat
 					id="copilot-conversation"
 					messages={CONVERSATION_MESSAGES}
-				       votes={[
-					       { messageId: "msg-2", isUpvoted: true, createdAt: new Date(), updatedAt: new Date() },
-					       { messageId: "msg-4", isUpvoted: true, createdAt: new Date(), updatedAt: new Date() },
-				       ] satisfies ChatMessageVote[]}
+					votes={
+						[
+							{
+								messageId: "msg-2",
+								isUpvoted: true,
+								createdAt: new Date(),
+								updatedAt: new Date(),
+							},
+							{
+								messageId: "msg-4",
+								isUpvoted: true,
+								createdAt: new Date(),
+								updatedAt: new Date(),
+							},
+						] satisfies ChatMessageVote[]
+					}
 					status="ready"
 					attachments={[]}
 					onMessageSubmit={fn()}

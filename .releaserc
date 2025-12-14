@@ -179,8 +179,7 @@
           "server/application-server/src/main/java/de/tum/in/www1/hephaestus/intelligenceservice/**/*", 
           "server/application-server/src/main/resources/application.yml",
           "server/application-server/openapi.yaml",
-          "server/intelligence-service/pyproject.toml",
-          "server/intelligence-service/app/main.py",
+          "server/intelligence-service/package.json",
           "server/intelligence-service/openapi.yaml",
           "server/webhook-ingest/pyproject.toml"
   ],

@@ -1,12 +1,16 @@
+import type {
+	DocumentCreateData,
+	DocumentDeltaData,
+	DocumentFinishData,
+	DocumentUpdateData,
+} from "@intelligence-service/chat/chat.shared";
 import { z } from "zod";
-import type { CustomUIDataTypes } from "@intelligence-service/chat/chat.shared";
 
 export type {
 	ChatMessage,
 	ChatTools,
 	CreateDocumentInput,
 	CreateDocumentOutput,
-	CustomUIDataTypes,
 	DocumentCreateData,
 	DocumentDeltaData,
 	DocumentFinishData,
@@ -45,11 +49,16 @@ export const messageMetadataSchema = z.object({
 	createdAt: z.string(),
 });
 
-type ToDataMessageUnion<T extends Record<PropertyKey, unknown>> = {
-	[K in keyof T]: { type: `data-${Extract<K, string>}`; data: T[K] };
-}[keyof T];
-
-export type DataPart = ToDataMessageUnion<CustomUIDataTypes>;
+/**
+ * Union type for custom streaming data parts.
+ * Maps CustomUIDataTypes keys to `{ type: "data-{key}", data: T[key] }` format.
+ */
+export type DataPart =
+	| { type: "data-document-create"; data: DocumentCreateData }
+	| { type: "data-document-update"; data: DocumentUpdateData }
+	| { type: "data-document-delta"; data: DocumentDeltaData }
+	| { type: "data-document-finish"; data: DocumentFinishData }
+	| { type: "data-usage"; data: unknown };
 
 // Typed tools mapping for automatic tool part typing in UIMessage
 

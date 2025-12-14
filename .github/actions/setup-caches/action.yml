@@ -58,13 +58,13 @@ runs:
 
     # Python/Poetry caching
     - name: Set up Python 3.13
-      if: contains(fromJSON('["intelligence-service-quality", "webhook-ingest-quality", "openapi-validation", "database-schema-validation", "database-documentation-validation", "database-models-validation"]'), inputs.cache-type)
+      if: contains(fromJSON('["webhook-ingest-quality", "openapi-validation", "database-schema-validation", "database-documentation-validation", "database-models-validation"]'), inputs.cache-type)
       uses: actions/setup-python@v4
       with:
         python-version: 3.13
         
     - name: Install Poetry
-      if: contains(fromJSON('["intelligence-service-quality", "webhook-ingest-quality", "openapi-validation", "database-schema-validation", "database-documentation-validation", "database-models-validation"]'), inputs.cache-type)
+      if: contains(fromJSON('["webhook-ingest-quality", "openapi-validation", "database-schema-validation", "database-documentation-validation", "database-models-validation"]'), inputs.cache-type)
       uses: snok/install-poetry@v1
       with:
         version: 2.1.1
@@ -72,7 +72,7 @@ runs:
         virtualenvs-in-project: true
 
     - name: Cache Poetry dependencies
-      if: contains(fromJSON('["intelligence-service-quality", "webhook-ingest-quality", "openapi-validation", "database-schema-validation", "database-documentation-validation", "database-models-validation"]'), inputs.cache-type)
+      if: contains(fromJSON('["webhook-ingest-quality", "openapi-validation", "database-schema-validation", "database-documentation-validation", "database-models-validation"]'), inputs.cache-type)
       uses: actions/cache@v4
       with:
         path: |

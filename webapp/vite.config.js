@@ -30,10 +30,10 @@ export default defineConfig(({ command }) => {
 		resolve: {
 			alias: {
 				"@": resolve(__dirname, "./src"),
-				// Alias to share TS sources from the intelligence-service-hono project
+				// Alias to share TS sources from the intelligence-service project
 				"@intelligence-service": resolve(
 					__dirname,
-					"../server/intelligence-service-hono/src/routes/mentor",
+					"../server/intelligence-service/src/routes/mentor",
 				),
 			},
 		},
@@ -42,7 +42,7 @@ export default defineConfig(({ command }) => {
 				// Allow serving files from the monorepo root and sibling server directory
 				allow: [
 					resolve(__dirname, ".."),
-					resolve(__dirname, "../server/intelligence-service-hono"),
+					resolve(__dirname, "../server/intelligence-service"),
 				],
 			},
 		},
