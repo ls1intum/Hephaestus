@@ -23,6 +23,15 @@ services:
       KEYCLOAK_GITHUB_CLIENT_ID: '${KEYCLOAK_GITHUB_CLIENT_ID:?Set GitHub OAuth client ID}'
       KEYCLOAK_GITHUB_CLIENT_SECRET: '${KEYCLOAK_GITHUB_CLIENT_SECRET:?Set GitHub OAuth client secret}'
       KEYCLOAK_GITHUB_ADMIN_USERNAME: '${KEYCLOAK_GITHUB_ADMIN_USERNAME:?Set GitHub admin username}'
+      # Slack integration (optional) - see docs/dev/slack-account-linking.md
+      KEYCLOAK_SLACK_ENABLED: '${KEYCLOAK_SLACK_ENABLED:-false}'
+      KEYCLOAK_SLACK_CLIENT_ID: '${KEYCLOAK_SLACK_CLIENT_ID:-}'
+      KEYCLOAK_SLACK_CLIENT_SECRET: '${KEYCLOAK_SLACK_CLIENT_SECRET:-}'
+      # For ngrok/proxy: set KC_HOSTNAME to your ngrok URL (without https://)
+      # Leave empty to use proxy headers (allows both localhost and ngrok to work)
+      KC_HOSTNAME: '${KC_HOSTNAME:-}'
+      KC_PROXY_HEADERS: xforwarded
+      KC_HTTP_ENABLED: 'true'
     command: 
       - start-dev
       - --import-realm

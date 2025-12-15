@@ -157,6 +157,37 @@ echo "WEBHOOK_SECRET=$WEBHOOK_SECRET" >> docker/.env
 
 The value must match the secret configured on your GitHub and GitLab webhooks (validated via `X-Hub-Signature-256` when available).
 
+### Slack integration (optional)
+
+Only needed if you're working on Slack features. Slack OAuth requires HTTPS, so you need ngrok.
+
+1. Get a permanent ngrok domain from [dashboard.ngrok.com/cloud-edge/domains](https://dashboard.ngrok.com/cloud-edge/domains).
+
+2. [Create a Slack App](https://api.slack.com/apps) → **From scratch** → Name: `Hephaestus-Dev`
+
+3. In **OAuth & Permissions → Redirect URLs**, add:
+   ```
+   https://YOUR_NGROK_DOMAIN/realms/hephaestus/broker/slack/endpoint
+   ```
+
+4. In **OAuth & Permissions → User Token Scopes**, add: `openid`, `profile`, `email`
+
+5. Copy credentials from **Basic Information** to `server/application-server/.env`:
+   ```bash
+   KEYCLOAK_SLACK_ENABLED=true
+   SLACK_LINKING_ENABLED=true
+   KEYCLOAK_SLACK_CLIENT_ID=<Client ID>
+   KEYCLOAK_SLACK_CLIENT_SECRET=<Client Secret>
+   KC_HOSTNAME=your-ngrok-domain.ngrok-free.app
+   ```
+
+6. Start ngrok:
+   ```bash
+   ngrok http --url=your-ngrok-domain.ngrok-free.app 8081
+   ```
+
+7. Access Keycloak via the ngrok URL (not localhost) when testing Slack linking.
+
 ## Web client (`webapp`)
 
 1. Install dependencies:

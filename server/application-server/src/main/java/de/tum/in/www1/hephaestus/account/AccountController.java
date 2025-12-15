@@ -24,24 +24,35 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * Controller for user account management operations.
- * Handles account deletion (GDPR) and user preferences/settings.
+ * Handles account deletion (GDPR), user preferences/settings, and Slack account
+ * linking.
  */
 @RestController
 @RequestMapping("/user")
-@Tag(name = "Account", description = "User account management (settings, deletion)")
+@Tag(name = "Account", description = "User account management (settings, deletion, integrations)")
 public class AccountController {
 
     private static final Logger logger = LoggerFactory.getLogger(AccountController.class);
 
     private final AccountService accountService;
+    private final SlackConnectionService slackConnectionService;
     private final Keycloak keycloak;
     private final UserRepository userRepository;
 
     @Value("${keycloak.realm}")
     private String realm;
 
-    public AccountController(AccountService accountService, Keycloak keycloak, UserRepository userRepository) {
+    @Value("${spring.security.oauth2.resourceserver.jwt.issuer-uri:}")
+    private String keycloakIssuerUri;
+
+    public AccountController(
+        AccountService accountService,
+        SlackConnectionService slackConnectionService,
+        Keycloak keycloak,
+        UserRepository userRepository
+    ) {
         this.accountService = accountService;
+        this.slackConnectionService = slackConnectionService;
         this.keycloak = keycloak;
         this.userRepository = userRepository;
     }
@@ -129,6 +140,80 @@ public class AccountController {
         return ResponseEntity.ok(updatedUserSettings);
     }
 
+    // ==================== Slack Connection Endpoints ====================
+
+    @GetMapping("/slack-connection")
+    @Operation(
+        summary = "Get Slack connection status",
+        description = "Check if the current user has linked their Slack account. " +
+        "If Slack is enabled, also returns the URL where users can link their Slack account in Keycloak."
+    )
+    public ResponseEntity<SlackConnectionDTO> getSlackConnection(@AuthenticationPrincipal JwtAuthenticationToken auth) {
+        var user = userRepository.getCurrentUser();
+        if (user.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+
+        JwtAuthenticationToken token = resolveAuthentication(auth);
+        String keycloakUserId = null;
+        if (token != null) {
+            keycloakUserId = token.getToken().getClaimAsString(StandardClaimNames.SUB);
+        }
+
+        SlackConnectionDTO status;
+        if (keycloakUserId != null && slackConnectionService.isSlackEnabled()) {
+            status = slackConnectionService.syncSlackIdentity(user.get(), keycloakUserId, getKeycloakBaseUrl());
+        } else {
+            status = slackConnectionService.getConnectionStatus(user.get(), getKeycloakBaseUrl());
+        }
+
+        return ResponseEntity.ok(status);
+    }
+
+    @PostMapping("/slack-connection/sync")
+    @Operation(
+        summary = "Sync Slack connection from Keycloak",
+        description = "Re-syncs the Slack User ID from Keycloak federated identities. " +
+        "Call this after linking or unlinking Slack in Keycloak Account Management."
+    )
+    public ResponseEntity<SlackConnectionDTO> syncSlackConnection(
+        @AuthenticationPrincipal JwtAuthenticationToken auth
+    ) {
+        var user = userRepository.getCurrentUser();
+        if (user.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+
+        JwtAuthenticationToken token = resolveAuthentication(auth);
+        if (token == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+
+        String keycloakUserId = token.getToken().getClaimAsString(StandardClaimNames.SUB);
+        SlackConnectionDTO status = slackConnectionService.syncSlackIdentity(
+            user.get(),
+            keycloakUserId,
+            getKeycloakBaseUrl()
+        );
+        return ResponseEntity.ok(status);
+    }
+
+    @DeleteMapping("/slack-connection")
+    @Operation(
+        summary = "Disconnect Slack account",
+        description = "Clears the stored Slack User ID. " +
+        "Note: To fully disconnect, the user should also unlink Slack in Keycloak Account Management."
+    )
+    public ResponseEntity<SlackConnectionDTO> disconnectSlack() {
+        var user = userRepository.getCurrentUser();
+        if (user.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+
+        SlackConnectionDTO result = slackConnectionService.disconnect(user.get(), getKeycloakBaseUrl());
+        return ResponseEntity.ok(result);
+    }
+
     private JwtAuthenticationToken resolveAuthentication(JwtAuthenticationToken injectedToken) {
         if (injectedToken != null) {
             return injectedToken;
@@ -138,5 +223,13 @@ public class AccountController {
             return jwtAuthenticationToken;
         }
         return null;
+    }
+
+    private String getKeycloakBaseUrl() {
+        // Strip /realms/REALM from issuer URI to get base URL
+        if (keycloakIssuerUri != null && keycloakIssuerUri.contains("/realms/")) {
+            return keycloakIssuerUri.substring(0, keycloakIssuerUri.indexOf("/realms/"));
+        }
+        return keycloakIssuerUri;
     }
 }

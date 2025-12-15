@@ -11,7 +11,8 @@ public record UserInfoDTO(
     @NonNull String avatarUrl,
     @NonNull String name,
     @NonNull String htmlUrl,
-    int leaguePoints
+    int leaguePoints,
+    String slackUserId
 ) {
     public static UserInfoDTO fromUser(User user) {
         return fromUser(user, 0);
@@ -25,7 +26,8 @@ public record UserInfoDTO(
             user.getAvatarUrl(),
             user.getName(),
             user.getHtmlUrl(),
-            leaguePoints
+            leaguePoints,
+            user.getSlackUserId()
         );
     }
 }
