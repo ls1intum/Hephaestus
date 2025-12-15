@@ -30,20 +30,24 @@ PAGER=cat gh run list --branch $(git branch --show-current) --limit 5 --json dat
 
 ```bash
 RUN_ID=<RUN_ID_FROM_STEP_3>
-PAGER=cat gh api repos/{owner}/{repo}/actions/runs/$RUN_ID/jobs --jq '[.jobs[] | select(.conclusion == "failure" and .name != "all-ci-passed") | {id, name}]'
+OWNER=$(PAGER=cat gh repo view --json owner -q .owner.login)
+REPO=$(PAGER=cat gh repo view --json name -q .name)
+PAGER=cat gh api repos/$OWNER/$REPO/actions/runs/$RUN_ID/jobs --jq '[.jobs[] | select(.conclusion == "failure" and .name != "all-ci-passed") | {id, name}]'
 ```
 
 ## 5. Get Job Logs (THE ACTUAL ERRORS)
 
 ```bash
 JOB_ID=<JOB_ID_FROM_STEP_4>
-PAGER=cat gh api repos/{owner}/{repo}/actions/jobs/$JOB_ID/logs 2>&1 | grep -E "(error|Error|ERROR|fail|FAIL|❌)" | head -30
+OWNER=$(PAGER=cat gh repo view --json owner -q .owner.login)
+REPO=$(PAGER=cat gh repo view --json name -q .name)
+PAGER=cat gh api repos/$OWNER/$REPO/actions/jobs/$JOB_ID/logs 2>&1 | grep -E "(error|Error|ERROR|fail|FAIL|❌)" | head -30
 ```
 
 Or get full logs:
 
 ```bash
-PAGER=cat gh api repos/{owner}/{repo}/actions/jobs/$JOB_ID/logs 2>&1 | tail -100
+PAGER=cat gh api repos/$OWNER/$REPO/actions/jobs/$JOB_ID/logs 2>&1 | tail -100
 ```
 
 ## 6. Common Failures Reference
