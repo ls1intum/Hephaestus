@@ -26,18 +26,21 @@ Both must pass. Fix issues before continuing.
 ## 3. Regenerate if Needed
 
 **API endpoints changed:**
+
 ```bash
 npm run generate:api:application-server:specs
 npm run generate:api:application-server:client
 ```
 
 **Database entities changed:**
+
 ```bash
 npm run db:draft-changelog
 npm run db:generate-erd-docs
 ```
 
 **Intelligence-service API changed:**
+
 ```bash
 MODEL_NAME=fake:model DETECTION_MODEL_NAME=fake:model npm run generate:api:intelligence-service:specs
 npm run generate:api:intelligence-service:client
@@ -56,6 +59,7 @@ git branch --show-current
 ```
 
 If `main`, create branch:
+
 ```bash
 git checkout -b <type>/<description>
 ```
@@ -80,9 +84,15 @@ git commit -m "<type>(<scope>): <description>"
 git push -u origin HEAD
 ```
 
-## 8. Create PR
+## 8. Check if PR Exists
 
-Generate title and body based on changes. Always provide explicit values:
+```bash
+PAGER=cat gh pr view --json number,url 2>/dev/null && echo "PR exists - skip creation" || echo "No PR - create one"
+```
+
+## 9. Create PR (if needed)
+
+Skip if step 8 showed "PR exists".
 
 ```bash
 PAGER=cat gh pr create --base main \
@@ -96,22 +106,23 @@ PAGER=cat gh pr create --base main \
 <steps to verify, or 'CI covers this'>"
 ```
 
-## 9. Open in Browser
+## 10. Open in Browser
 
 ```bash
 PAGER=cat gh pr view --web
 ```
 
-## 10. Verify
+## 11. Verify
 
 ```bash
 PAGER=cat gh pr view --json url,title -q '"PR: \(.title)\nURL: \(.url)"'
 ```
 
-## 11. Close Beads Issue
+## 12. Close Beads Issue
 
 ```bash
 PR_NUM=$(PAGER=cat gh pr view --json number -q .number)
 bd list --status open
 bd close <id> --reason "PR #$PR_NUM"
 ```
+

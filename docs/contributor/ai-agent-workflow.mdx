@@ -1,159 +1,133 @@
 ---
 title: AI Agent Workflow Guide
-description: How to work effectively with AI coding agents in Hephaestus development.
+description: The complete development workflow for AI-assisted coding in Hephaestus.
 ---
 
 # AI Agent Workflow Guide
 
-This guide covers practical workflows for AI-assisted development in Hephaestus.
+This guide defines the **end-to-end workflow** for AI-assisted development. Follow it sequentially.
 
-## Tools We Use
+## The Complete Workflow
 
-| Tool | Capabilities | Access |
-|------|--------------|--------|
-| **GitHub Copilot** | Agent mode (autonomous multi-file editing), inline completions, chat, PR reviewer, SWE agent (cloud tasks via issue assignment) | Free for students (300 premium requests/month via GitHub Student Pack), Pro $10/month |
-| **CodeRabbit** | Automated PR review | GitHub App |
-| **[Antigravity IDE](https://antigravity.dev)** | Claude Opus 4.5, complex reasoning tasks | Free for students |
-
-**GitHub Copilot access:**
-- **VSCode**: Agent mode, chat, inline completions, edits
-- **GitHub Platform**: PR reviewer, SWE agent (assign issues to @copilot)
-
-## Essential Git Commands
-
-Before working with agents, know these diff commands:
-
-```bash
-# What changed vs main branch (full PR diff)
-git --no-pager diff origin/main...HEAD
-
-# What's staged for commit
-git --no-pager diff --cached
-
-# Unstaged changes only
-git --no-pager diff
-
-# Summary of changes
-git status --short
+```mermaid
+flowchart TD
+    A[👤 User sends task] --> B[🤖 Agent creates beads issue]
+    B --> C[🤖 Agent implements]
+    C --> D{🤖 Agent validates}
+    D -->|Fail| C
+    D -->|Pass| E[👤 Review in Source Control]
+    
+    E --> F[Inspect file in tree view]
+    F --> G{File OK?}
+    G -->|Yes| H[Stage]
+    G -->|Fixable| I[Re-prompt agent]
+    G -->|Bad| J[Discard]
+    I --> C
+    H --> K{More files?}
+    J --> K
+    K -->|Yes| F
+    K -->|No| L{Staged changes?}
+    
+    L -->|None| C
+    L -->|Some| M([👤 /land-pr])
+    M --> N[🤖 Close beads issue with PR #]
+    N --> O[PR Created]
+    O --> P{CI passes?}
+    P -->|No| Q([👤 /fix-ci])
+    Q --> C
+    P -->|Yes| R[Request Review]
+    R --> S{Approved?}
+    S -->|Changes requested| T([👤 /resolve-review])
+    T --> C
+    S -->|Approved| U[Merge]
 ```
-
-## Validation Commands
-
-Run after any changes:
-
-```bash
-npm run format      # Apply formatting
-npm run check       # Full validation (format + lint + typecheck)
-npm run test:webapp # Client tests
-./mvnw verify       # Server tests
-```
-
-## Working with Agents
-
-### Human Controls Git
-
-**Agents should NOT stage, commit, or push without explicit permission.**
-
-The human developer:
-1. Reviews all changes in VSCode Source Control (tree view recommended)
-2. Validates changes with `npm run check`
-3. Stages verified changes incrementally
-4. Reverts bad generations
-5. Commits only validated code
-
-### Review Loop
-
-1. Request implementation from agent
-2. Review diff in VSCode
-3. Validate with `npm run check`
-4. Stage good changes, revert bad ones
-5. Re-prompt for fixes if needed
-
-## Handling PR Reviews
-
-Use `PAGER=cat gh` CLI to fetch and resolve review comments (works for any reviewer: human, CodeRabbit, Copilot, etc.).
-
-### Fetch Unresolved Comments
-
-```bash
-PR_NUMBER=$(PAGER=cat gh pr view --json number -q .number)
-OWNER=$(PAGER=cat gh repo view --json owner -q .owner.login)
-REPO=$(PAGER=cat gh repo view --json name -q .name)
-
-PAGER=cat gh api graphql -f query='
-query($owner: String!, $repo: String!, $number: Int!) {
-  repository(owner: $owner, name: $repo) {
-    pullRequest(number: $number) {
-      reviewThreads(first: 100) {
-        nodes {
-          id
-          isResolved
-          path
-          line
-          comments(first: 10) {
-            nodes { body author { login } diffHunk }
-          }
-        }
-      }
-    }
-  }
-}' -F owner="$OWNER" -F repo="$REPO" -F number="$PR_NUMBER" \
-  | jq '[.data.repository.pullRequest.reviewThreads.nodes[] | select(.isResolved == false)]'
-```
-
-### Resolve a Thread
-
-```bash
-PAGER=cat gh api graphql -f query='
-mutation($threadId: ID!) {
-  resolveReviewThread(input: {threadId: $threadId}) {
-    thread { isResolved }
-  }
-}' -f threadId="PRRT_kwDO..."
-```
-
-### Decision Matrix
-
-| Situation | Action |
-|-----------|--------|
-| Already fixed | Resolve thread |
-| Valid issue | Fix code, then resolve |
-| Disagree | Reply with reasoning, leave open |
-
-## Beads Issue Tracking
-
-We use [Beads](https://github.com/steveyegge/beads) for persistent issue tracking. Issues live in `.beads/issues.jsonl` and sync with git.
-
-```bash
-bd ready              # What's unblocked?
-bd create "title" -t bug -p 1  # Create issue
-bd close <id> --reason "done"  # Complete work
-bd list --status open # All open issues
-```
-
-See `AGENTS.md` section 0 for the full workflow.
 
 ## Reusable Workflows
 
-Slash commands available in `.github/prompts/`:
+These slash commands work in **VSCode Copilot** (`.github/prompts/`) and **Antigravity** (`.agent/workflows/`):
 
 | Command | Description |
 |---------|-------------|
+| `/land-pr` | Format, validate, commit, push, create PR |
 | `/resolve-review` | Fetch and address PR review comments |
-| `/land-pr` | Validate, commit, and create PR |
+| `/fix-ci` | Diagnose and fix failing CI checks |
 
-## Promptbook
+## Tools We Use
 
-*Placeholder: Add battle-tested prompts as they emerge from real usage.*
+| Tool | Use Case | Access |
+|------|----------|--------|
+| **GitHub Copilot** | Agent mode, inline completions, PR review | Free for students |
+| **Antigravity IDE** | Claude Opus 4.5, complex reasoning | Free for students |
+| **CodeRabbit** | Automated PR review | GitHub App |
+
+:::tip[Extra Context]
+Use **File → Add Folder to Workspace...** to temporarily attach another repository (e.g., a library you're integrating). Copilot's `#runSubagent` tool can then research that codebase alongside Hephaestus. Remove the folder when done to keep your workspace clean.
+:::
+
+## Agent Self-Validation
+
+Agents work best when they **validate their own work**. Always include validation in prompts:
+
+**Standard validation:**
+
+```bash
+npm run format && npm run check
+```
+
+**Ad-hoc validation (when applicable):**
+
+- Make an API request to verify the endpoint works
+- Query the database to confirm data was written
+- Scan logs for errors after the change
+- Run the specific test file that covers your change
+
+:::tip
+The more specific your validation request, the better the agent performs. "Run tests" is okay; "Run `npm test -- --grep 'auth'` and check for failures" is better.
+:::
+
+## Git Context Commands
+
+These commands help agents understand the current state. Use them in prompts to give context:
+
+```bash
+git status --short          # What files changed?
+git --no-pager diff         # What are the unstaged changes?
+git --no-pager diff --cached # What's staged for commit?
+git --no-pager diff origin/main...HEAD  # Full PR diff vs main
+```
+
+## Human Controls Git
+
+**Agents should NOT stage, commit, or push** unless you explicitly run `/land-pr`.
+
+Your responsibilities:
+
+1. Review changes in VSCode Source Control (tree view)
+2. Run `npm run check` to validate
+3. Stage good changes, revert bad ones
+4. Use `/land-pr` when ready to commit
+
+## Beads Issue Tracking
+
+Track work across sessions with [Beads](https://github.com/steveyegge/beads):
+
+```bash
+bd create "Add auth endpoint" -t task  # Start work
+bd list --status open                  # See all open issues
+bd close <id> --reason "PR #123"       # Complete work
+```
+
+Issues persist in `.beads/issues.jsonl` and sync with git. See `AGENTS.md` section 0 for details.
 
 ## Troubleshooting
 
 ### Agent Uses Outdated APIs
 
-The agent's training data may be stale. Solutions:
+The agent's training data is stale. Solutions:
+
 - Paste current file contents into the prompt
-- **Use web search** to find current documentation
-- Reference working examples from the codebase
+- Ask agent to use web search for current docs
+- Point to working examples in the codebase
 
 ### Agent Ignores Instructions
 
@@ -161,16 +135,9 @@ The agent's training data may be stale. Solutions:
 2. Break into smaller steps
 3. Use explicit constraints: "Do NOT modify..."
 
-### Build Failures
-
-```bash
-git checkout -- .     # Revert all changes
-npm run format        # Re-run on clean state
-```
-
 ## Configuration
 
 Agent instructions are loaded from:
-- `AGENTS.md` - Main reference for all agents
-- `.github/copilot-instructions.md` - Copilot-specific hints
-- `.github/instructions/` - Scoped instructions per file type
+
+- `AGENTS.md` — Main reference for all agents
+- `.github/instructions/` — Scoped instructions per file type

@@ -41,7 +41,7 @@
 		"github.copilot.chat.languageContext.fix.typescript.enabled": true,
 		"github.copilot.chat.languageContext.inline.typescript.enabled": true,
 		"github.copilot.chat.languageContext.typescript.enabled": true,
-		"chat.agent.maxRequests": 1000,
+		"chat.agent.maxRequests": 1000
 	},
 	"extensions": {
 		"recommendations": [
