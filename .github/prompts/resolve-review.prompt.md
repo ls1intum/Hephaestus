@@ -39,7 +39,8 @@ query($owner: String!, $repo: String!, $number: Int!) {
       }
     }
   }
-}' -f owner="ls1intum" -f repo="Hephaestus" \
+}' -F owner=$(gh repo view --json owner -q .owner.login) \
+   -F repo=$(gh repo view --json name -q .name) \
    -F number=$(PAGER=cat gh pr view --json number -q .number) \
   | jq '[.data.repository.pullRequest.reviewThreads.nodes[] | select(.isResolved == false)]'
 ```
@@ -100,7 +101,8 @@ query($owner: String!, $repo: String!, $number: Int!) {
       }
     }
   }
-}' -f owner="ls1intum" -f repo="Hephaestus" \
+}' -F owner=$(gh repo view --json owner -q .owner.login) \
+   -F repo=$(gh repo view --json name -q .name) \
    -F number=$(PAGER=cat gh pr view --json number -q .number) \
   | jq '[.data.repository.pullRequest.reviewThreads.nodes[] | select(.isResolved == false)] | length'
 ```
