@@ -44,7 +44,6 @@ preinstall: |
   echo "📝 Installing Poetry 2.x..."
   # Install pipx first for isolated CLI tool installation
   python3 -m pip install --user pipx
-  python3 -m pipx ensurepath
   export PATH="/root/.local/bin:$PATH"
   
   # Install Poetry via pipx for proper isolation
