@@ -48,6 +48,7 @@ We use **Semantic Release** to automatically version and release our application
 | Pattern | Example | Why |
 |---------|---------|-----|
 | `*(ci):` | `fix(ci): update workflow` | `ci` scope blocks release |
+| `*(config):` | `chore(config): update renovate.json` | `config` scope blocks release |
 | `*(deps):` | `fix(deps): update library` | `deps` scope blocks release |
 | `*(docker):` | `fix(docker): update base image` | `docker` scope blocks release |
 | `*(scripts):` | `fix(scripts): fix db backup` | `scripts` scope blocks release |
@@ -94,6 +95,7 @@ We use **Semantic Release** to automatically version and release our application
 **Infrastructure scopes** (⚠️ These prevent releases):
 
 - `ci`: CI/CD workflows
+- `config`: Tooling configuration (renovate, eslint, tsconfig, etc.)
 - `deps`: Dependencies
 - `deps-dev`: Dev dependencies
 - `docker`: Container configuration

@@ -33,6 +33,7 @@ const SCOPES = [
   'docs',
   // Infrastructure scopes (will NOT trigger release)
   'ci',
+  'config',
   'deps',
   'deps-dev',
   'docker',
@@ -79,7 +80,7 @@ const helpfulErrorsPlugin = {
           : `scope "${scope}" is not allowed.\n\n` +
             `Allowed scopes:\n` +
             `  Services:       webapp, server, ai, webhooks, docs\n` +
-            `  Infrastructure: ci, deps, deps-dev, docker, scripts, security, db, no-release\n` +
+            `  Infrastructure: ci, config, deps, deps-dev, docker, scripts, security, db, no-release\n` +
             `  Features:       gitprovider, leaderboard, mentor, notifications, profile, teams, workspace\n\n` +
             `Format: <type>(<scope>): <description>\n` +
             `Example: fix(server): resolve null pointer exception`,
