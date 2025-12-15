@@ -183,3 +183,10 @@ server/application-server/logs/
 
 # Java-Client creation temporary
 tmp
+
+# Beads (AI agent issue tracker) - local-only files
+.beads/beads.db
+.beads/beads.db-*
+.beads/bd.sock
+.beads/bd.pipe
+.beads/.exclusive-lock
