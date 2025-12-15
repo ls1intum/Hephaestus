@@ -89,14 +89,3 @@ bd close <id> --reason "done"  # Complete work
 bd list --status open # Verify state
 ```
 
-Commit `.beads/issues.jsonl` with your code changes.
-
-## Reusable Prompt Files
-
-This repository includes custom prompts in `.github/prompts/`:
-
-- **`/resolve-review`** - Fetch, analyze, and resolve PR review comments
-- **`/land-pr`** - Validate, branch, commit, and create PR
-
-Type `/resolve-review` or `/land-pr` in Copilot Chat to use them.
-
