@@ -1,5 +1,7 @@
 # Hephaestus Agent Handbook
 
+**⚠️ Do NOT stage, commit, or push unless you have permission to do so.**
+
 This file governs the entire repository. Combine these guardrails with the scoped instructions under `.github/instructions/**` (general coding, TSX, Storybook, Java tests).
 
 ## 0. Beads Issue Tracker

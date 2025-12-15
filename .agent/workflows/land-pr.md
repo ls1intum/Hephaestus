@@ -6,11 +6,7 @@ description: Validate, branch, commit, and create PR following Hephaestus conven
 
 // turbo-all
 
-## Pre-flight
-
-```bash
-PAGER=cat gh auth status
-```
+## 1. Check for Changes
 
 ```bash
 git status --short
@@ -18,114 +14,104 @@ git status --short
 
 If empty, nothing to commit - stop.
 
-## 1. Format and Validate
+## 2. Format and Validate
 
 ```bash
 npm run format
-```
-
-```bash
 npm run check
 ```
 
-Must pass. Fix issues before continuing.
+Both must pass. Fix issues before continuing.
 
-## 2. Regenerate if needed
+## 3. Regenerate if Needed
 
-If API endpoints changed:
-
+**API endpoints changed:**
 ```bash
 npm run generate:api:application-server:specs
 npm run generate:api:application-server:client
 ```
 
-If database entities changed:
-
+**Database entities changed:**
 ```bash
 npm run db:draft-changelog
 npm run db:generate-erd-docs
 ```
 
-If intelligence-service API changed:
-
+**Intelligence-service API changed:**
 ```bash
 MODEL_NAME=fake:model DETECTION_MODEL_NAME=fake:model npm run generate:api:intelligence-service:specs
 npm run generate:api:intelligence-service:client
 ```
 
-## 3. Stage beads
+## 4. Stage Beads
 
 ```bash
 git add .beads/issues.jsonl 2>/dev/null || true
 ```
 
-## 4. Branch check
+## 5. Create Branch (if on main)
 
 ```bash
 git branch --show-current
 ```
 
 If `main`, create branch:
-
 ```bash
 git checkout -b <type>/<description>
 ```
 
 Types: `feat`, `fix`, `docs`, `refactor`, `test`, `ci`, `chore`
 
-## 5. Commit
+## 6. Commit
 
 ```bash
 git add -A
-git status --short
-```
-
-```bash
 git commit -m "<type>(<scope>): <description>"
 ```
 
-Scopes:
+**Scopes:**
 - Service: `webapp`, `server`, `ai`, `webhooks`, `docs`
 - Infra (no release): `ci`, `deps`, `deps-dev`, `docker`, `scripts`, `security`, `db`, `no-release`
 - Feature: `gitprovider`, `leaderboard`, `mentor`, `notifications`, `profile`, `teams`, `workspace`
 
-## 6. Push
+## 7. Push
 
 ```bash
 git push -u origin HEAD
 ```
 
-## 7. Create PR
+## 8. Create PR
 
-Generate a PR title and body based on your changes.
-**Do not use --web**. We want to create it automatically.
+Generate title and body based on changes. Always provide explicit values:
 
 ```bash
-PAGER=cat gh pr create --base main --fill
+PAGER=cat gh pr create --base main \
+  --title "<type>(<scope>): <description>" \
+  --body "## Description
+
+<1-2 sentences describing what and why>
+
+## How to Test
+
+<steps to verify, or 'CI covers this'>"
 ```
 
-*Note: If --fill is insufficient, generate a specific body:*
-`gh pr create --base main --title "..." --body "..."`
-
-## 8. Open in Browser
+## 9. Open in Browser
 
 ```bash
 PAGER=cat gh pr view --web
 ```
 
-## 9. Verify URL
+## 10. Verify
 
 ```bash
 PAGER=cat gh pr view --json url,title -q '"PR: \(.title)\nURL: \(.url)"'
 ```
 
-## 10. Close beads
+## 11. Close Beads Issue
 
 ```bash
 PR_NUM=$(PAGER=cat gh pr view --json number -q .number)
 bd list --status open
-```
-
-```bash
 bd close <id> --reason "PR #$PR_NUM"
 ```

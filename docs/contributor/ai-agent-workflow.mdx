@@ -1,123 +1,85 @@
 ---
 title: AI Agent Workflow Guide
-description: Practical workflows, tool configurations, and battle-tested patterns for working effectively with AI coding agents in Hephaestus.
+description: How to work effectively with AI coding agents in Hephaestus development.
 ---
 
 # AI Agent Workflow Guide
 
-Hephaestus embraces AI-assisted development. This guide covers **practical workflows, tool configurations, and battle-tested patterns** for working effectively with AI coding agents.
+This guide covers practical workflows for AI-assisted development in Hephaestus.
 
-## Quick Start
+## Tools We Use
+
+| Tool | Capabilities | Access |
+|------|--------------|--------|
+| **GitHub Copilot** | Agent mode (autonomous multi-file editing), inline completions, chat, PR reviewer, SWE agent (cloud tasks via issue assignment) | Free for students (300 premium requests/month via GitHub Student Pack), Pro $10/month |
+| **CodeRabbit** | Automated PR review | GitHub App |
+| **[Antigravity IDE](https://antigravity.dev)** | Claude Opus 4.5, complex reasoning tasks | Free for students |
+
+**GitHub Copilot access:**
+- **VSCode**: Agent mode, chat, inline completions, edits
+- **GitHub Platform**: PR reviewer, SWE agent (assign issues to @copilot)
+
+## Essential Git Commands
+
+Before working with agents, know these diff commands:
 
 ```bash
-# Install beads (issue tracking for agents)
-brew tap steveyegge/beads && brew install bd  # macOS
-# or: npm install -g @beads/bd
-# or: curl -fsSL https://raw.githubusercontent.com/steveyegge/beads/main/scripts/install.sh | bash
+# What changed vs main branch (full PR diff)
+git --no-pager diff origin/main...HEAD
 
-# Initialize in repo (already done)
-bd init --quiet
+# What's staged for commit
+git --no-pager diff --cached
 
-# Verify installation
-bd doctor
+# Unstaged changes only
+git --no-pager diff
+
+# Summary of changes
+git status --short
 ```
 
-## Recommended Tools
+## Validation Commands
 
-| Tool | Use Case | Access |
-|------|----------|--------|
-| **[Antigravity IDE](https://antigravity.dev)** | Claude Opus 4.5 (free for students) | Primary for complex reasoning |
-| **GitHub Copilot** | Inline completions, quick fixes | Enterprise subscription |
-| **Codex CLI** | GPT-5.1-Codex via terminal | `npm install -g @openai/codex` |
-| **CodeRabbit** | Automated PR review | GitHub App integration |
-
-## Core Workflow: Validation-First Development
-
-Always validate everything. Agents make mistakes. Catch them early.
+Run after any changes:
 
 ```bash
-# After any agent-generated changes:
 npm run format      # Apply formatting
 npm run check       # Full validation (format + lint + typecheck)
-npm run test:webapp # Run tests if applicable
-./mvnw verify       # Java tests
-
-# Stage incrementally in VSCode:
-# View → Source Control → "View as tree"
-# ✅ Stage good changes
-# ↩️  Revert failures
-# 🔄 Re-prompt for fixes
+npm run test:webapp # Client tests
+./mvnw verify       # Server tests
 ```
 
-### The Review Loop
+## Working with Agents
 
-1. **Request implementation** from agent
-2. **Review diff** in VSCode tree view  
-3. **Stage** changes you're happy with
-4. **Revert** or **re-prompt** failed changes
-5. **Validate** with `npm run check`
-6. **Commit** only verified code
+### Human Controls Git
 
-## Beads: Issue Tracking for Agents
+**Agents should NOT stage, commit, or push without explicit permission.**
 
-Beads replaces markdown TODO lists with a proper issue tracker that agents can query, update, and reason about.
+The human developer:
+1. Reviews all changes in VSCode Source Control (tree view recommended)
+2. Validates changes with `npm run check`
+3. Stages verified changes incrementally
+4. Reverts bad generations
+5. Commits only validated code
 
-### Why Beads?
+### Review Loop
 
-- **Persistent memory**: Issues survive context window resets
-- **Dependency tracking**: Agents understand what blocks what
-- **Ready work detection**: `bd ready` shows unblocked tasks
-- **Git-synced**: Issues travel with your code
+1. Request implementation from agent
+2. Review diff in VSCode
+3. Validate with `npm run check`
+4. Stage good changes, revert bad ones
+5. Re-prompt for fixes if needed
 
-### Agent Commands
+## Handling PR Reviews
+
+Use `PAGER=cat gh` CLI to fetch and resolve review comments (works for any reviewer: human, CodeRabbit, Copilot, etc.).
+
+### Fetch Unresolved Comments
 
 ```bash
-# Show what's ready to work on
-bd ready --json
+PR_NUMBER=$(PAGER=cat gh pr view --json number -q .number)
+OWNER=$(PAGER=cat gh repo view --json owner -q .owner.login)
+REPO=$(PAGER=cat gh repo view --json name -q .name)
 
-# Create an issue (project prefix is auto-detected)
-bd create "Fix authentication bug" -t bug -p 1
-
-# Close completed work (use the ID returned by bd create)
-bd close heph-abc --reason "Implemented in commit abc123"
-
-# Show dependency tree
-bd dep tree heph-abc
-```
-
-### Session Start Protocol
-
-At the start of every session, get immediate context:
-
-```bash
-bd ready --json          # What's unblocked and ready?
-bd list --status open    # Full open work context
-bd blocked               # What's waiting on dependencies?
-```
-
-### Session End Protocol
-
-Before ending any session:
-
-```
-1. File issues for discovered work: bd create "description" -t task
-2. Link discovered work: bd dep add <new-id> <current-id> --type discovered-from
-3. Close completed issues: bd close <id> --reason "done"
-4. Verify state: bd list --status open
-5. Commit .beads/issues.jsonl with your code changes
-```
-
-:::note
-Beads auto-syncs to `.beads/issues.jsonl` after mutations (5s debounce). Just commit the JSONL file with your code changes—no manual `bd sync` needed.
-:::
-
-## Handling AI Code Reviews
-
-For CodeRabbit, Copilot, or other AI reviewers, use the `gh` CLI to analyze and resolve comments without manual intervention.
-
-### GraphQL Query: Fetch Review Comments
-
-```bash
 PAGER=cat gh api graphql -f query='
 query($owner: String!, $repo: String!, $number: Int!) {
   repository(owner: $owner, name: $repo) {
@@ -128,378 +90,87 @@ query($owner: String!, $repo: String!, $number: Int!) {
           isResolved
           path
           line
-          diffHunk
           comments(first: 10) {
-            nodes {
-              body
-              author { login }
-              diffHunk
-            }
+            nodes { body author { login } diffHunk }
           }
         }
       }
     }
   }
-}' -f owner="ls1intum" -f repo="Hephaestus" -F number=123
+}' -F owner="$OWNER" -F repo="$REPO" -F number="$PR_NUMBER" \
+  | jq '[.data.repository.pullRequest.reviewThreads.nodes[] | select(.isResolved == false)]'
 ```
 
-The `diffHunk` field contains the actual code diff context, which is essential for understanding what the reviewer is commenting on.
-
-### Resolve Comments Programmatically
+### Resolve a Thread
 
 ```bash
-# Resolve a thread after addressing the feedback
 PAGER=cat gh api graphql -f query='
 mutation($threadId: ID!) {
   resolveReviewThread(input: {threadId: $threadId}) {
     thread { isResolved }
   }
-}' -f threadId="PRRT_kwDOMzHFa..."
+}' -f threadId="PRRT_kwDO..."
 ```
 
-### CodeRabbit-Specific Commands
+### Decision Matrix
+
+| Situation | Action |
+|-----------|--------|
+| Already fixed | Resolve thread |
+| Valid issue | Fix code, then resolve |
+| Disagree | Reply with reasoning, leave open |
+
+## Beads Issue Tracking
+
+We use [Beads](https://github.com/steveyegge/beads) for persistent issue tracking. Issues live in `.beads/issues.jsonl` and sync with git.
 
 ```bash
-# In PR comments:
-@coderabbitai resolve  # Resolve all CodeRabbit comments
-@coderabbitai review   # Re-trigger review
+bd ready              # What's unblocked?
+bd create "title" -t bug -p 1  # Create issue
+bd close <id> --reason "done"  # Complete work
+bd list --status open # All open issues
 ```
 
-### GitHub Copilot Review
+See `AGENTS.md` section 0 for the full workflow.
 
-Copilot's code review comments can be handled the same way via the GraphQL API. Look for comments from `github-actions[bot]` or `copilot` in the author field.
+## Reusable Workflows
 
-```bash
-# Filter Copilot review comments
-PAGER=cat gh api graphql ... | jq '.data.repository.pullRequest.reviewThreads.nodes[] | select(.comments.nodes[].author.login | test("copilot|github-actions"))'
-```
+Slash commands available in `.github/prompts/`:
 
-### Workflow: Self-Resolving Reviews
+| Command | Description |
+|---------|-------------|
+| `/resolve-review` | Fetch and address PR review comments |
+| `/land-pr` | Validate, commit, and create PR |
 
-1. Fetch unresolved review threads via GraphQL
-2. Analyze each comment critically  
-3. If addressed → resolve via mutation
-4. If valid concern → implement fix, then resolve
-5. If disagree → reply with reasoning, leave open
+## Promptbook
 
-:::tip
-Use the `/resolve-review` workflow command for a step-by-step guide.
-:::
-
-## Promptbook: Hephaestus-Specific Prompts
-
-These prompts are tailored to the Hephaestus codebase patterns.
-
-### 🔍 Webapp Exploration
-
-```
-Analyze the webapp architecture. Focus on:
-- Routes in webapp/src/routes/ (TanStack Router file-based routing)
-- Data fetching patterns with TanStack Query (@/api/@tanstack/react-query.gen.ts)
-- State management in webapp/src/stores/ (Zustand)
-- UI components in webapp/src/components/ui/ (shadcn/Tailwind)
-
-Show me how data flows from API call to component render.
-```
-
-### 🔍 Server Exploration
-
-```
-Analyze the application-server architecture. Focus on:
-- Controllers in server/application-server/src/main/java/.../gitprovider/
-- Entity relationships and Liquibase migrations in db/changelog/
-- Security patterns with @RequireAtLeastWorkspaceAdmin
-- OpenAPI spec generation workflow
-
-Map the request lifecycle from controller to database.
-```
-
-### 🐛 Bug Investigation
-
-```
-Investigate: [paste error message or symptom]
-
-Check these Hephaestus-specific areas:
-1. Generated API client types in webapp/src/api/types.gen.ts
-2. Liquibase schema vs JPA entities (drift?)
-3. TanStack Query cache invalidation (stale data?)
-4. Spring security context propagation
-
-Show debugging steps with file:line references.
-```
-
-### ✨ Feature: New API Endpoint
-
-```
-Add endpoint: [describe endpoint]
-
-Required steps:
-1. Add JPA entity/modify existing in server/.../entity/
-2. Create/update repository and service
-3. Add controller method with proper @RequireAtLeast* annotation
-4. Run: npm run generate:api:application-server:specs
-5. Run: npm run generate:api:application-server:client  
-6. Use generated hooks in webapp with useQuery(getXxxOptions(...))
-
-Follow existing patterns in WorkspaceController.
-```
-
-### ✨ Feature: New UI Component
-
-```
-Create component: [describe component]
-
-Requirements:
-- Put in webapp/src/components/[domain]/ (NOT in ui/)
-- Use shadcn primitives from @/components/ui
-- Accept typed props interface (no React.FC)
-- Add Storybook story in same directory (.stories.tsx)
-- Use TanStack Query for data, Zustand for local state
-- NO useMemo/useCallback (React Compiler handles memoization)
-
-Reference: existing component in webapp/src/components/dashboard/
-```
-
-### 🔧 Database Migration
-
-```
-Add database change: [describe schema change]
-
-Steps:
-1. Modify JPA entity with new field/relationship
-2. Run: npm run db:draft-changelog
-3. Prune generated changelog to minimal delta
-4. Rename to descriptive name in db/changelog/
-5. Run: npm run db:generate-erd-docs
-6. For intelligence-service: npm run db:generate-models:intelligence-service
-7. Test: ./mvnw verify
-
-Reference: existing changelogs in db/changelog/
-```
-
-### 📝 Code Review (Hephaestus)
-
-```
-Review this PR for Hephaestus patterns:
-- Uses generated API client (not raw fetch)?
-- Follows container/presentation split?
-- Proper security annotations on new endpoints?
-- Liquibase changelog follows conventions?
-- TanStack Query cache properly invalidated?
-- Storybook story added for new components?
-
-Reference AGENTS.md for full checklist.
-```
-
-### 🔄 Fix Failed CI
-
-```
-CI failed with: [paste error]
-
-Check these common issues:
-1. Format: npm run format (applies all formatting)
-2. Types: npm run typecheck:webapp
-3. Lint: npm run lint:webapp
-4. Generated files out of sync: npm run generate:api:application-server:client
-5. Java tests: ./mvnw verify
-
-Show me which command reproduces the failure locally.
-```
-
-### 📚 Component Documentation
-
-```
-Generate Storybook-ready documentation for [component path]:
-- Props interface with descriptions
-- Default story showing typical usage
-- Variant stories (loading, error, empty states)
-- Mock data matching generated API types
-
-Follow patterns in existing .stories.tsx files.
-```
-
-## Configuration Files
-
-### AGENTS.md (Root)
-
-The main `AGENTS.md` in the repo root provides comprehensive agent instructions. Key sections:
-- Architecture map
-- Quality gates and commands
-- Code generation rules
-- Per-service expectations
-
-### .github/copilot-instructions.md
-
-Copilot-specific hints for PR titles, UI components, and build validation. Automatically loaded by GitHub Copilot in VSCode.
-
-### Reusable Prompt Files (Workflows)
-
-Workflows are step-by-step instructions that work across different AI tools. They're stored as markdown files and invoked as slash commands.
-
-#### Available Commands
-
-| Command | Description | VSCode Copilot | Antigravity | Codex CLI |
-|---------|-------------|----------------|-------------|-----------|
-| `/resolve-review` | Fetch and address PR review comments | ✅ | ✅ | ✅ |
-| `/land-pr` | Validate, branch, commit, create PR | ✅ | ✅ | ✅ |
-
-#### File Locations
-
-| Tool | Directory | File Pattern | Notes |
-|------|-----------|--------------|-------|
-| **VSCode Copilot** | `.github/prompts/` | `*.prompt.md` | Auto-detected by Copilot |
-| **Antigravity** | `.agent/workflows/` | `*.md` | `// turbo-all` enables auto-run |
-| **Codex CLI** | `.agent/workflows/` | `*.md` | Reference via file path |
-| **Any tool** | `AGENTS.md` | N/A | Core reference for all agents |
-
-#### How to Use
-
-**VSCode Copilot Chat:**
-1. Open Copilot Chat (`Cmd+Shift+I`)
-2. Type `/resolve-review` or `/land-pr`
-3. Follow the guided steps
-
-**Antigravity:**
-1. Type `/resolve-review` or `/land-pr` anywhere
-2. Agent executes the workflow automatically
-
-**Codex CLI (or any tool):**
-1. Reference the workflow: "Follow the steps in `.agent/workflows/resolve-review.md`"
-2. Or copy workflow steps directly into your prompt
-
-#### Creating New Workflows
-
-To add a new reusable workflow:
-
-**1. Create the Copilot prompt file** (`.github/prompts/<name>.prompt.md`):
-
-```markdown
----
-mode: agent
-description: Short description shown in autocomplete
----
-
-# Workflow Title
-
-Step-by-step instructions with code blocks...
-
-## Step 1: Do something
-
-\`\`\`bash
-some-command
-\`\`\`
-```
-
-**2. Create the Antigravity workflow** (`.agent/workflows/<name>.md`):
-
-```markdown
----
-description: Short description for the workflow
----
-
-# Workflow Title
-
-## 1. First step
-
-// turbo
-\`\`\`bash
-safe-command-to-auto-run
-\`\`\`
-
-## 2. Second step
-
-\`\`\`bash
-command-requiring-approval
-\`\`\`
-```
-
-#### YAML Frontmatter Options
-
-**Copilot (`.prompt.md`):**
-- `mode`: `agent` (agentic), `edit` (code edit), `ask` (Q&A)
-- `description`: Shown in autocomplete
-- `model`: Override AI model (optional)
-
-**Antigravity (`.md`):**
-- `description`: Workflow description
-- `// turbo`: Comment above a code block to auto-run without approval
-- `// turbo-all`: At top of file to auto-run ALL commands
-
-#### Best Practices
-
-1. **Mirror workflows**: Create both `.github/prompts/` and `.agent/workflows/` versions
-2. **Clear steps**: Number each step, explain the "why"
-3. **Executable commands**: Use actual commands, not pseudocode
-4. **Error handling**: Include what to do if a step fails
-5. **Validation**: End with verification steps
-
-### Beads Integration
-
-After initialization, beads adds:
-- `.beads/` directory (issue tracker database)
-- Git hooks for auto-sync
-- Merge driver for conflict resolution
-
-## IDE Setup
-
-### VSCode Recommended Settings
-
-```json
-{
-  "git.viewMode": "tree",
-  "diffEditor.renderSideBySide": true,
-  "editor.formatOnSave": true,
-  "files.autoSave": "afterDelay"
-}
-```
-
-### Change Management Strategy
-
-1. **Tree view**: See all modified files hierarchically
-2. **Stage incrementally**: Only commit verified changes
-3. **Revert freely**: Don't be afraid to discard bad generations
-4. **Commit often**: Small, focused commits are easier to review
+*Placeholder: Add battle-tested prompts as they emerge from real usage.*
 
 ## Troubleshooting
 
-### Agent Generates Outdated Code
+### Agent Uses Outdated APIs
 
-The agent's training data is stale. Provide:
-- Current file contents
-- Recent API documentation
-- Working examples from the codebase
+The agent's training data may be stale. Solutions:
+- Paste current file contents into the prompt
+- **Use web search** to find current documentation
+- Reference working examples from the codebase
 
 ### Agent Ignores Instructions
 
 1. Simplify the prompt
 2. Break into smaller steps
-3. Show examples of desired output
-4. Use explicit constraints: "Do NOT modify..."
+3. Use explicit constraints: "Do NOT modify..."
 
-### Beads Sync Issues
-
-```bash
-bd sync          # Force sync
-bd doctor        # Diagnose issues
-bd import -i .beads/issues.jsonl --orphan-handling resurrect
-```
-
-### Build Failures After Agent Changes
+### Build Failures
 
 ```bash
-# Reset and try again
 git checkout -- .     # Revert all changes
 npm run format        # Re-run on clean state
-# Re-prompt with more context about the failure
 ```
 
-## Best Practices Summary
+## Configuration
 
-1. **Validate everything**: `npm run check` after every change
-2. **Stage incrementally**: Don't commit blind
-3. **Use beads**: Track work across sessions
-4. **Be specific**: Vague prompts → vague results
-5. **Show context**: Include relevant file contents
-6. **Plan first**: "Show me the plan before implementing"
-7. **Iterate**: Multiple small prompts beat one mega-prompt
-8. **Learn patterns**: Reuse prompts that work well
+Agent instructions are loaded from:
+- `AGENTS.md` - Main reference for all agents
+- `.github/copilot-instructions.md` - Copilot-specific hints
+- `.github/instructions/` - Scoped instructions per file type

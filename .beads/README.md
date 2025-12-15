@@ -55,6 +55,10 @@ Issues in Beads are:
 - Branch-aware issue tracking
 - Intelligent JSONL merge resolution
 
+:::note
+The `.gitattributes` file references `merge=beads` for conflict resolution. The `beads` merge driver is automatically configured when you run the Beads install script. If merges fail, re-run the installer to register the merge driver.
+:::
+
 ## Get Started with Beads
 
 Try Beads in your own projects:

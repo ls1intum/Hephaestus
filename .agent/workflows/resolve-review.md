@@ -6,15 +6,23 @@ description: Fetch, analyze, and resolve PR review comments with full code conte
 
 // turbo-all
 
+Address review comments on the current PR (works for any reviewer: human, Copilot, CodeRabbit, etc.).
+
 ## 1. Get PR
 
 ```bash
 PAGER=cat gh pr view --json number,url,title --jq '"#\(.number): \(.title)\n\(.url)"'
 ```
 
-## 2. Fetch Unresolved
+If no PR exists, run `/land-pr` first.
+
+## 2. Fetch Unresolved Comments
 
 ```bash
+PR_NUMBER=$(PAGER=cat gh pr view --json number -q .number)
+OWNER=$(PAGER=cat gh repo view --json owner -q .owner.login)
+REPO=$(PAGER=cat gh repo view --json name -q .name)
+
 PAGER=cat gh api graphql -f query='
 query($owner: String!, $repo: String!, $number: Int!) {
   repository(owner: $owner, name: $repo) {
@@ -26,30 +34,25 @@ query($owner: String!, $repo: String!, $number: Int!) {
           path
           line
           comments(first: 3) {
-            nodes {
-              body
-              diffHunk
-              author { login }
-            }
+            nodes { body diffHunk author { login } }
           }
         }
       }
     }
   }
-}' -F owner=$(gh repo view --json owner -q .owner.login) \
-   -F repo=$(gh repo view --json name -q .name) \
-   -F number=$(PAGER=cat gh pr view --json number -q .number) \
+}' -F owner="$OWNER" -F repo="$REPO" -F number="$PR_NUMBER" \
   | jq '[.data.repository.pullRequest.reviewThreads.nodes[] | select(.isResolved == false)]'
 ```
 
-## 3. For Each Comment
+## 3. Address Each Comment
 
 Read `diffHunk` (code context) and `body` (feedback):
 
-- **Already fixed?** → Resolve
-- **Nitpick?** → Resolve or quick fix
-- **Valid issue?** → Fix code, then resolve
-- **Disagree?** → Reply with reasoning
+| Situation | Action |
+|-----------|--------|
+| Already fixed | Resolve thread |
+| Valid issue | Fix code, then resolve |
+| Disagree | Reply with reasoning, leave open |
 
 ## 4. Resolve Thread
 
@@ -65,6 +68,10 @@ mutation($threadId: ID!) {
 ## 5. Verify
 
 ```bash
+PR_NUMBER=$(PAGER=cat gh pr view --json number -q .number)
+OWNER=$(PAGER=cat gh repo view --json owner -q .owner.login)
+REPO=$(PAGER=cat gh repo view --json name -q .name)
+
 PAGER=cat gh api graphql -f query='
 query($owner: String!, $repo: String!, $number: Int!) {
   repository(owner: $owner, name: $repo) {
@@ -74,10 +81,8 @@ query($owner: String!, $repo: String!, $number: Int!) {
       }
     }
   }
-}' -F owner=$(gh repo view --json owner -q .owner.login) \
-   -F repo=$(gh repo view --json name -q .name) \
-   -F number=$(PAGER=cat gh pr view --json number -q .number) \
+}' -F owner="$OWNER" -F repo="$REPO" -F number="$PR_NUMBER" \
   | jq '[.data.repository.pullRequest.reviewThreads.nodes[] | select(.isResolved == false)] | length'
 ```
 
-Should output `0`.
+Output should be `0`.
