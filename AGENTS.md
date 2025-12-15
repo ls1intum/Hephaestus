@@ -1,6 +1,131 @@
 # Hephaestus Agent Handbook
 
+**⚠️ Do NOT stage, commit, or push unless you have permission to do so.**
+
 This file governs the entire repository. Combine these guardrails with the scoped instructions under `.github/instructions/**` (general coding, TSX, Storybook, Java tests).
+
+## 0. Beads Issue Tracker
+
+Use **beads** (`bd` CLI) for persistent task tracking across sessions. This replaces markdown TODO lists.
+
+> **First-time setup**: Run `bd onboard` to see comprehensive integration instructions. It outputs AGENTS.md and Copilot configuration templates.
+
+### Why Beads?
+
+- **Persistent memory**: Issues survive context window resets
+- **Dependency graphs**: Track what blocks what with `bd dep`
+- **Ready work detection**: `bd ready` shows unblocked tasks by priority
+- **Git-synced**: Issues auto-export to `.beads/issues.jsonl` (commit with code)
+
+### Issue Types & Priorities
+
+| Type | Use For |
+|------|---------|
+| `bug` | Something broken |
+| `feature` | New functionality |
+| `task` | Work item (tests, docs, refactoring) |
+| `epic` | Large feature with subtasks |
+| `chore` | Maintenance |
+
+| Priority | Meaning |
+|----------|---------|
+| `0` | Critical (security, data loss, broken builds) |
+| `1` | High (major features, important bugs) |
+| `2` | Medium (default) |
+| `3` | Low (polish, optimization) |
+| `4` | Backlog |
+
+### Session Start Protocol
+
+At the **start of every session**, run:
+
+```bash
+bd ready --json          # What's unblocked and ready to work on?
+bd list --status open    # Full context of all open work
+bd blocked               # What's waiting on dependencies?
+```
+
+This gives you immediate context without re-reading documentation.
+
+### Core Workflow
+
+```bash
+# 1. Check ready work
+bd ready --json
+
+# 2. Claim a task
+bd update <id> --status in_progress
+
+# 3. Do the work...
+
+# 4. Discover new work? Track its origin!
+bd create "Found bug during refactor" -t bug -p 1
+bd dep add <new-id> <current-id> --type discovered-from
+
+# 5. Complete work
+bd close <id> --reason "Fixed in commit abc123"
+
+# 6. Session end check
+bd list --status open
+```
+
+### The `discovered-from` Pattern
+
+When you find new work while working on something else, **always link it**:
+
+```bash
+# Working on heph-abc, discover a race condition
+bd create "Race condition in SlackService" -t bug -p 1
+# Returns: heph-xyz
+
+# Link it to what you were working on
+bd dep add heph-xyz heph-abc --type discovered-from
+```
+
+**Why?** This creates an audit trail of how work was discovered, enabling:
+
+- Forensics: "Why did we create this issue?"
+- Context: "What was the agent doing when it found this?"
+- Priority: Discovered bugs often relate to active work
+
+### Session End Protocol
+
+Before ending any session:
+
+1. **File issues** for any discovered/remaining work
+2. **Close** completed issues with `--reason`
+3. **Verify** with `bd list --status open`
+4. **Commit** `.beads/issues.jsonl` with your code changes
+
+> **Note**: Beads auto-exports to JSONL after mutations (5s debounce). Just commit the file with your changes—no manual export needed.
+
+### Essential Commands
+
+```bash
+# Session management
+bd ready              # Unblocked issues, sorted by priority
+bd blocked            # Issues waiting on dependencies
+bd list --status open # All open issues
+bd stale --days 7     # Forgotten issues needing attention
+
+# Issue details
+bd show <id>          # Full issue details
+bd dep tree <id>      # Visualize dependency graph
+bd search "auth"      # Full-text search
+
+# Housekeeping
+bd doctor             # Check beads health
+bd sync               # Force sync with JSONL
+```
+
+### Rules
+
+- ✅ Use `bd` for ALL task tracking
+- ✅ Always use `--json` for programmatic parsing
+- ✅ Link discovered work with `discovered-from` dependencies
+- ✅ Commit `.beads/issues.jsonl` with code changes
+- ❌ Do NOT use markdown TODO lists
+- ❌ Do NOT create planning docs in repo root (use `history/` if needed)
 
 ## 1. Architecture map
 
