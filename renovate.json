@@ -58,7 +58,7 @@
     "schedule": [
       "at any time"
     ],
-    "stabilityDays": 0,
+    "minimumReleaseAge": null,
     "prPriority": 10,
     "automerge": false
   },
@@ -175,10 +175,10 @@
     },
     {
       "description": "Spring Boot framework - keep aligned",
-      "matchPackagePatterns": [
-        "^org\\.springframework"
-      ],
-      "groupName": "Spring Boot"
+      "groupName": "Spring Boot",
+      "matchPackageNames": [
+        "/^org\\.springframework/"
+      ]
     },
     {
       "description": "React ecosystem",
