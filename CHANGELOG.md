@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.11.0](https://github.com/ls1intum/Hephaestus/compare/v0.10.10...v0.11.0) (2025-12-15)
+
+### 🚀 Features
+
+* **docs:** add ai agent workflows and beads integration ([#589](https://github.com/ls1intum/Hephaestus/issues/589)) ([61d09ef](https://github.com/ls1intum/Hephaestus/commit/61d09efcbd5dc245d7b5458cd5e8d0d09527520b))
+
 ## [0.10.10](https://github.com/ls1intum/Hephaestus/compare/v0.10.9...v0.10.10) (2025-12-14)
 
 ### 🐛 Bug Fixes
