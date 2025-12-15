@@ -125,21 +125,36 @@ Fixes #<issue-number>
 
 <steps to verify, or 'CI covers this'>
 
-## Screenshots
-
-<for UI changes, delete if not applicable>"
+## 7. Create PR
+ 
+Generate a PR title and body based on your changes.
+**Do not use --web**. We want to create it automatically.
+ 
+```bash
+PAGER=cat gh pr create --base main --fill
 ```
-
-## 8. Verify
-
+ 
+*Note: If --fill is insufficient, generate a specific body matching the template.*
+ 
+## 8. Open in Browser
+ 
 ```bash
 PAGER=cat gh pr view --web
 ```
-
-## 9. Close beads issues
-
+ 
+## 9. Verify URL
+ 
+```bash
+PAGER=cat gh pr view --json url,title -q '"PR: \(.title)\nURL: \(.url)"'
+```
+ 
+## 10. Close beads
+ 
 ```bash
 PR_NUM=$(PAGER=cat gh pr view --json number -q .number)
 bd list --status open
-bd close <issue-id> --reason "Implemented in PR #$PR_NUM"
+```
+ 
+```bash
+bd close <id> --reason "PR #$PR_NUM"
 ```

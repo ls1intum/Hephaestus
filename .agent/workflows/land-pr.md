@@ -97,17 +97,29 @@ git push -u origin HEAD
 
 ## 7. Create PR
 
+Generate a PR title and body based on your changes.
+**Do not use --web**. We want to create it automatically.
+
 ```bash
-PAGER=cat gh pr create --base main --fill --web
+PAGER=cat gh pr create --base main --fill
 ```
 
-## 8. Verify
+*Note: If --fill is insufficient, generate a specific body:*
+`gh pr create --base main --title "..." --body "..."`
+
+## 8. Open in Browser
+
+```bash
+PAGER=cat gh pr view --web
+```
+
+## 9. Verify URL
 
 ```bash
 PAGER=cat gh pr view --json url,title -q '"PR: \(.title)\nURL: \(.url)"'
 ```
 
-## 9. Close beads
+## 10. Close beads
 
 ```bash
 PR_NUM=$(PAGER=cat gh pr view --json number -q .number)
