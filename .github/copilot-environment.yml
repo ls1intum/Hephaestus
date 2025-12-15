@@ -40,28 +40,12 @@ preinstall: |
   update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.13 1
   python3 --version
   
-  # Install Poetry 2.x for Python dependency management
+  # Install Poetry 2.x via pipx for proper isolation
   echo "📝 Installing Poetry 2.x..."
-  # Install pipx first for isolated CLI tool installation
   python3 -m pip install --user pipx
+  python3 -m pipx ensurepath
   export PATH="/root/.local/bin:$PATH"
-  
-  # Install Poetry via pipx for proper isolation
   pipx install poetry==2.0.0
-  
-  # Create symlink to ensure poetry is in standard PATH
-  if [ -f /root/.local/bin/poetry ]; then
-    ln -sf /root/.local/bin/poetry /usr/local/bin/poetry || { echo "❌ Failed to create symlink for poetry"; exit 1; }
-  else
-    echo "❌ /root/.local/bin/poetry not found, cannot create symlink"
-    exit 1
-  fi
-  if [ -f /root/.local/bin/pipx ]; then
-    ln -sf /root/.local/bin/pipx /usr/local/bin/pipx || { echo "❌ Failed to create symlink for pipx"; exit 1; }
-  else
-    echo "❌ /root/.local/bin/pipx not found, cannot create symlink"
-    exit 1
-  fi
   poetry --version
   
   # Verify Docker is available (usually pre-installed in GitHub environments)
@@ -112,5 +96,5 @@ environment:
   MODEL_NAME: fake:model
   DETECTION_MODEL_NAME: fake:model
   
-  # Add Java 21, Poetry, and global npm tools to PATH
-  PATH: /usr/lib/jvm/temurin-21-jdk-amd64/bin:/usr/local/bin:/root/.local/bin:$PATH
+  # Add Java 21 and Poetry to PATH
+  PATH: /usr/lib/jvm/temurin-21-jdk-amd64/bin:/root/.local/bin:$PATH
