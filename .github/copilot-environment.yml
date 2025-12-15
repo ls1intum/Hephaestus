@@ -51,8 +51,18 @@ preinstall: |
   pipx install poetry==2.0.0
   
   # Create symlink to ensure poetry is in standard PATH
-  ln -sf /root/.local/bin/poetry /usr/local/bin/poetry
-  ln -sf /root/.local/bin/pipx /usr/local/bin/pipx
+  if [ -f /root/.local/bin/poetry ]; then
+    ln -sf /root/.local/bin/poetry /usr/local/bin/poetry || { echo "❌ Failed to create symlink for poetry"; exit 1; }
+  else
+    echo "❌ /root/.local/bin/poetry not found, cannot create symlink"
+    exit 1
+  fi
+  if [ -f /root/.local/bin/pipx ]; then
+    ln -sf /root/.local/bin/pipx /usr/local/bin/pipx || { echo "❌ Failed to create symlink for pipx"; exit 1; }
+  else
+    echo "❌ /root/.local/bin/pipx not found, cannot create symlink"
+    exit 1
+  fi
   poetry --version
   
   # Verify Docker is available (usually pre-installed in GitHub environments)
