@@ -148,7 +148,7 @@ jobs:
           fail-on-error: false
 
       - name: Upload Chromatic test results
-        if: always() && matrix.test-type == 'webapp-visual' && steps.chromatic.outputs.storybookUrl != ''
+        if: always() && matrix.test-type == 'webapp-visual' && steps.chromatic.outcome == 'success' && steps.chromatic.outputs.storybookUrl != ''
         uses: dorny/test-reporter@v2
         with:
           name: "Test Results - ${{ matrix.test-type }}"
