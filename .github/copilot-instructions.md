@@ -77,3 +77,26 @@ Think of our platform’s voice as that of a friendly, knowledgeable senior engi
 ## Quality Attributes
 
 Strive for simplicity and clarity in your code. Avoid unnecessary complexity and aim for a clean, maintainable codebase. Use descriptive variable and function names, and keep your code organized and well-structured.
+
+## Beads Issue Tracking
+
+Use `bd` CLI for all task tracking. See AGENTS.md for the full workflow.
+
+```bash
+bd ready              # Find unblocked work
+bd create "title" -t bug -p 1  # Create issue
+bd close <id> --reason "done"  # Complete work
+bd list --status open # Verify state
+```
+
+Commit `.beads/issues.jsonl` with your code changes.
+
+## Reusable Prompt Files
+
+This repository includes custom prompts in `.github/prompts/`:
+
+- **`/resolve-review`** - Fetch, analyze, and resolve PR review comments
+- **`/land-pr`** - Validate, branch, commit, and create PR
+
+Type `/resolve-review` or `/land-pr` in Copilot Chat to use them.
+
