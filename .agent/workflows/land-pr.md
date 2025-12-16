@@ -74,8 +74,9 @@ git commit -m "<type>(<scope>): <description>"
 ```
 
 **Scopes:**
+
 - Service: `webapp`, `server`, `ai`, `webhooks`, `docs`
-- Infra (no release): `ci`, `deps`, `deps-dev`, `docker`, `scripts`, `security`, `db`, `no-release`
+- Infra (no release): `ci`, `config`, `deps`, `deps-dev`, `docker`, `scripts`, `security`, `db`, `no-release`
 - Feature: `gitprovider`, `leaderboard`, `mentor`, `notifications`, `profile`, `teams`, `workspace`
 
 ## 7. Push
@@ -125,4 +126,3 @@ PR_NUM=$(PAGER=cat gh pr view --json number -q .number)
 bd list --status open
 bd close <id> --reason "PR #$PR_NUM"
 ```
-
