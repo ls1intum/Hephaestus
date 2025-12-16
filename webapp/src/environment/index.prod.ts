@@ -1,7 +1,10 @@
 // WEB_ENV_<VARIABLE_NAME> will be substituted with `substitute_env_variables.sh` on docker container start
+// __APP_VERSION__ is injected at build time by Vite for proper cache invalidation
 
 const environment = {
-	version: "WEB_ENV_APPLICATION_VERSION".replace(/^v/, ""),
+	// Version is injected at build time from package.json
+	// This ensures JS bundle content-hashes change between versions for proper cache busting
+	version: __APP_VERSION__,
 	buildInfo: {
 		branch: "WEB_ENV_GIT_BRANCH",
 		commit: "WEB_ENV_GIT_COMMIT",

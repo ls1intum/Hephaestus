@@ -302,7 +302,6 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     environment:
-      APPLICATION_VERSION: preview
       GIT_BRANCH: ${COOLIFY_BRANCH:-}
       GIT_COMMIT: ${SOURCE_COMMIT:-}
       # Coolify provides SERVICE_FQDN_WEBAPP automatically
