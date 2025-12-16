@@ -90,9 +90,9 @@ replace_vars() {
 
 # Main execution flow
 main() {
-  # Auto-generate DEPLOYED_AT timestamp at container start
-  # Container start time = deployment time
-  if [[ -z "${DEPLOYED_AT:-}" ]]; then
+  # Auto-generate DEPLOYED_AT timestamp at container start (preview environments only)
+  # Only generate when GIT_BRANCH is set, indicating a preview deployment
+  if [[ -n "${GIT_BRANCH:-}" && -z "${DEPLOYED_AT:-}" ]]; then
     export DEPLOYED_AT=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
     log "📅 Generated DEPLOYED_AT timestamp: ${DEPLOYED_AT}"
   fi
