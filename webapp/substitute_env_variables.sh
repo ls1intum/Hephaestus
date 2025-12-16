@@ -60,18 +60,17 @@ escape_js_string() {
 replace_vars() {
   local placeholder="$1"
   local env_var="${placeholder#${ENV_PREFIX}}"
-  # If the environment variable is not set, skip the replacement to avoid
-  # exiting because of `set -u`. This keeps the behaviour consistent with the
-  # earlier validation step that only warns about missing variables.
+  local value=""
+  
+  # If the environment variable is not set, use an empty string instead of skipping.
+  # This ensures placeholders are always replaced, preventing literal placeholder
+  # strings from appearing in production when optional environment variables are not set.
   if [[ ! -v "$env_var" ]]; then
-    log "⚠️ Skipping placeholder '${placeholder}' because environment variable '${env_var}' is not set."
-    return
+    log "⚠️ Replacing placeholder '${placeholder}' with empty string because environment variable '${env_var}' is not set."
+  else
+    value="${!env_var}"
+    log "🔄 Replacing placeholder '${placeholder}' with environment variable '${env_var}' value..."
   fi
-
-  local value="${!env_var}"
-
-  # Log the substitution process
-  log "🔄 Replacing placeholder '${placeholder}' with environment variable '${env_var}' value..."
 
   # Escape characters for safe JavaScript insertion
   local escaped_value
