@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.12.0](https://github.com/ls1intum/Hephaestus/compare/v0.11.1...v0.12.0) (2025-12-16)
+
+### 🐛 Bug Fixes
+
+* **webapp:** only show deployment time in preview environments ([#604](https://github.com/ls1intum/Hephaestus/issues/604)) ([67182c1](https://github.com/ls1intum/Hephaestus/commit/67182c18b012ea4eafdd0a420b41ff425b6c5b79))
+
+### 🚀 Features
+
+* **webapp:** add survey notification button with morph animation ([#603](https://github.com/ls1intum/Hephaestus/issues/603)) ([d6d993f](https://github.com/ls1intum/Hephaestus/commit/d6d993f64d74559f7b4dc0605fc176bd13f79ff9))
+
 ## [0.11.1](https://github.com/ls1intum/Hephaestus/compare/v0.11.0...v0.11.1) (2025-12-16)
 
 ### 🐛 Bug Fixes
