@@ -130,7 +130,7 @@ export function QuestionRating({
 							onValueChange={handleNumericChange}
 							variant="outline"
 							size="sm"
-							className="flex flex-wrap"
+							className="flex flex-nowrap"
 						>
 							{ratings.map((rating) => (
 								<ToggleGroupItem
