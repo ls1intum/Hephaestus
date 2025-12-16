@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.11.1](https://github.com/ls1intum/Hephaestus/compare/v0.11.0...v0.11.1) (2025-12-16)
+
+### 🐛 Bug Fixes
+
+* **ci:** fix copilot-environment.yml bd installation for CI environments ([#598](https://github.com/ls1intum/Hephaestus/issues/598)) ([8dd7cf8](https://github.com/ls1intum/Hephaestus/commit/8dd7cf8dfeb8699a82f144f7d015e4f07ce018d8))
+* **docs:** invert docs navbar logo for dark mode visibility ([#597](https://github.com/ls1intum/Hephaestus/issues/597)) ([f205124](https://github.com/ls1intum/Hephaestus/commit/f20512421ba5dc88924ca98a49b5550f4298da87))
+* replace unset WEB_ENV placeholders with empty strings to prevent production footer leak ([#600](https://github.com/ls1intum/Hephaestus/issues/600)) ([81fc4be](https://github.com/ls1intum/Hephaestus/commit/81fc4be46a329fb544da40ede930492144b19070))
+
 ## [0.11.0](https://github.com/ls1intum/Hephaestus/compare/v0.10.10...v0.11.0) (2025-12-15)
 
 ### 🚀 Features
