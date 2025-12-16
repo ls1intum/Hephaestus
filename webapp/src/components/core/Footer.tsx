@@ -21,13 +21,27 @@ export interface FooterProps {
 	};
 }
 
+const sanitizeBuildInfoValue = (value?: string) =>
+	value && !value.startsWith("WEB_ENV_") ? value : undefined;
+
 /**
  * Minimal footer with navigation links, attribution, and build info for previews.
  * Version is NOT shown here - it's displayed in the Header beside the logo.
  */
 export default function Footer({ className, buildInfo }: FooterProps) {
+	const sanitizedBuildInfo = {
+		branch: sanitizeBuildInfoValue(buildInfo?.branch),
+		commit: sanitizeBuildInfoValue(buildInfo?.commit),
+		deployedAt: sanitizeBuildInfoValue(buildInfo?.deployedAt),
+	};
+	const formattedDeployedAt = sanitizedBuildInfo.deployedAt
+		? sanitizedBuildInfo.deployedAt.replace("T", " ").substring(0, 16)
+		: undefined;
+
 	const showBuildInfo =
-		buildInfo?.branch || buildInfo?.commit || buildInfo?.deployedAt;
+		sanitizedBuildInfo.branch ||
+		sanitizedBuildInfo.commit ||
+		formattedDeployedAt;
 
 	return (
 		<footer
@@ -103,50 +117,49 @@ export default function Footer({ className, buildInfo }: FooterProps) {
 					{/* Build info only for preview/dev - minimal style */}
 					{showBuildInfo && (
 						<div className="hidden sm:flex items-center gap-2 border-l border-sidebar-border pl-4 text-xs text-muted-foreground/60 font-mono">
-							{buildInfo?.branch && (
+							{sanitizedBuildInfo.branch && (
 								<Tooltip>
 									<TooltipTrigger asChild>
 										<a
-											href={`https://github.com/ls1intum/Hephaestus/tree/${buildInfo.branch}`}
+											href={`https://github.com/ls1intum/Hephaestus/tree/${sanitizedBuildInfo.branch}`}
 											target="_blank"
 											rel="noopener noreferrer"
 											className="flex items-center gap-1 hover:text-foreground transition-colors"
 										>
 											<GitBranchIcon size={12} />
 											<span className="max-w-20 truncate">
-												{buildInfo.branch}
+												{sanitizedBuildInfo.branch}
 											</span>
 										</a>
 									</TooltipTrigger>
-									<TooltipContent>{buildInfo.branch}</TooltipContent>
+									<TooltipContent>{sanitizedBuildInfo.branch}</TooltipContent>
 								</Tooltip>
 							)}
 
-							{buildInfo?.commit && (
+							{sanitizedBuildInfo.commit && (
 								<Tooltip>
 									<TooltipTrigger asChild>
 										<a
-											href={`https://github.com/ls1intum/Hephaestus/commit/${buildInfo.commit}`}
+											href={`https://github.com/ls1intum/Hephaestus/commit/${sanitizedBuildInfo.commit}`}
 											target="_blank"
 											rel="noopener noreferrer"
 											className="flex items-center gap-1 hover:text-foreground transition-colors"
 										>
 											<GitCommitIcon size={12} />
-											<span>{buildInfo.commit.substring(0, 7)}</span>
+											<span>{sanitizedBuildInfo.commit.substring(0, 7)}</span>
 										</a>
 									</TooltipTrigger>
-									<TooltipContent>{buildInfo.commit}</TooltipContent>
+									<TooltipContent>{sanitizedBuildInfo.commit}</TooltipContent>
 								</Tooltip>
 							)}
 
-							{buildInfo?.deployedAt && (
+							{formattedDeployedAt && (
 								<Tooltip>
 									<TooltipTrigger className="flex items-center gap-1 cursor-help">
 										<ClockIcon size={12} />
 									</TooltipTrigger>
 									<TooltipContent>
-										Deployed:{" "}
-										{buildInfo.deployedAt.replace("T", " ").substring(0, 16)}
+										Deployed: {formattedDeployedAt}
 									</TooltipContent>
 								</Tooltip>
 							)}
