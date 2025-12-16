@@ -1,34 +1,76 @@
-// WEB_ENV_<VARIABLE_NAME> will be substituted with `substitute_env_variables.sh` on docker container start
+// Runtime environment configuration for production builds.
+// Environment variables are loaded from /env-config.js which is:
+// 1. NOT bundled by Vite (lives in public/ folder)
+// 2. NOT cached by the browser (nginx serves with no-cache headers)
+// 3. Has placeholders substituted by substitute_env_variables.sh at container start
+//
+// This approach ensures that when a new container version is deployed,
+// browsers will always get fresh environment values without cache issues.
+
+// Type declaration for the global __ENV__ object loaded from env-config.js
+declare global {
+	interface Window {
+		__ENV__?: {
+			APPLICATION_VERSION?: string;
+			APPLICATION_CLIENT_URL?: string;
+			APPLICATION_SERVER_URL?: string;
+			SENTRY_ENVIRONMENT?: string;
+			SENTRY_DSN?: string;
+			KEYCLOAK_URL?: string;
+			KEYCLOAK_REALM?: string;
+			KEYCLOAK_CLIENT_ID?: string;
+			POSTHOG_ENABLED?: string;
+			POSTHOG_PROJECT_API_KEY?: string;
+			POSTHOG_API_HOST?: string;
+			LEGAL_IMPRINT_HTML?: string;
+			LEGAL_PRIVACY_HTML?: string;
+			TANSTACK_DEVTOOLS_ENABLED?: string;
+			GIT_BRANCH?: string;
+			GIT_COMMIT?: string;
+			DEPLOYED_AT?: string;
+		};
+	}
+}
+
+// Helper to get env value, returns empty string if not set or still a placeholder
+function getEnv(key: keyof NonNullable<Window["__ENV__"]>): string {
+	const value = window.__ENV__?.[key] ?? "";
+	// If the value still looks like a placeholder (starts with WEB_ENV_), return empty string
+	if (value.startsWith("WEB_ENV_")) {
+		return "";
+	}
+	return value;
+}
 
 const environment = {
-	version: "WEB_ENV_APPLICATION_VERSION".replace(/^v/, ""),
+	version: getEnv("APPLICATION_VERSION").replace(/^v/, "") || "DEV",
 	buildInfo: {
-		branch: "WEB_ENV_GIT_BRANCH",
-		commit: "WEB_ENV_GIT_COMMIT",
-		deployedAt: "WEB_ENV_DEPLOYED_AT",
+		branch: getEnv("GIT_BRANCH"),
+		commit: getEnv("GIT_COMMIT"),
+		deployedAt: getEnv("DEPLOYED_AT"),
 	},
-	clientUrl: "WEB_ENV_APPLICATION_CLIENT_URL",
-	serverUrl: "WEB_ENV_APPLICATION_SERVER_URL",
+	clientUrl: getEnv("APPLICATION_CLIENT_URL"),
+	serverUrl: getEnv("APPLICATION_SERVER_URL"),
 	sentry: {
-		environment: "WEB_ENV_SENTRY_ENVIRONMENT",
-		dsn: "WEB_ENV_SENTRY_DSN",
+		environment: getEnv("SENTRY_ENVIRONMENT"),
+		dsn: getEnv("SENTRY_DSN"),
 	},
 	keycloak: {
-		url: "WEB_ENV_KEYCLOAK_URL",
-		realm: "WEB_ENV_KEYCLOAK_REALM",
-		clientId: "WEB_ENV_KEYCLOAK_CLIENT_ID",
+		url: getEnv("KEYCLOAK_URL"),
+		realm: getEnv("KEYCLOAK_REALM"),
+		clientId: getEnv("KEYCLOAK_CLIENT_ID"),
 	},
 	posthog: {
-		enabled: "WEB_ENV_POSTHOG_ENABLED",
-		projectApiKey: "WEB_ENV_POSTHOG_PROJECT_API_KEY",
-		apiHost: "WEB_ENV_POSTHOG_API_HOST",
+		enabled: getEnv("POSTHOG_ENABLED"),
+		projectApiKey: getEnv("POSTHOG_PROJECT_API_KEY"),
+		apiHost: getEnv("POSTHOG_API_HOST"),
 	},
 	legal: {
-		imprintHtml: "WEB_ENV_LEGAL_IMPRINT_HTML",
-		privacyHtml: "WEB_ENV_LEGAL_PRIVACY_HTML",
+		imprintHtml: getEnv("LEGAL_IMPRINT_HTML"),
+		privacyHtml: getEnv("LEGAL_PRIVACY_HTML"),
 	},
 	devtools: {
-		tanstack: "WEB_ENV_TANSTACK_DEVTOOLS_ENABLED",
+		tanstack: getEnv("TANSTACK_DEVTOOLS_ENABLED"),
 	},
 };
 
