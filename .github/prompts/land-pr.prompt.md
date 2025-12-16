@@ -73,8 +73,9 @@ git commit -m "<type>(<scope>): <description>"
 ```
 
 **Scopes:**
+
 - Service: `webapp`, `server`, `ai`, `webhooks`, `docs`
-- Infra (no release): `ci`, `deps`, `deps-dev`, `docker`, `scripts`, `security`, `db`, `no-release`
+- Infra (no release): `ci`, `config`, `deps`, `deps-dev`, `docker`, `scripts`, `security`, `db`, `no-release`
 - Feature: `gitprovider`, `leaderboard`, `mentor`, `notifications`, `profile`, `teams`, `workspace`
 
 ## 7. Push
