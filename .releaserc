@@ -20,6 +20,10 @@
             "release": false
           },
           {
+            "scope": "config",
+            "release": false
+          },
+          {
             "scope": "deps",
             "release": false
           },
@@ -42,22 +46,6 @@
           {
             "scope": "docs",
             "release": false
-          },
-          {
-            "type": "feat",
-            "release": "minor"
-          },
-          {
-            "type": "fix",
-            "release": "patch"
-          },
-          {
-            "type": "perf",
-            "release": "patch"
-          },
-          {
-            "type": "revert",
-            "release": "patch"
           },
           {
             "type": "docs",

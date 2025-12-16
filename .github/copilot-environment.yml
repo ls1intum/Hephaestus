@@ -40,15 +40,12 @@ preinstall: |
   update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.13 1
   python3 --version
   
-  # Install Poetry 2.x for Python dependency management
+  # Install Poetry 2.x via pipx for proper isolation
   echo "📝 Installing Poetry 2.x..."
-  if ! command -v poetry &> /dev/null; then
-    curl -sSL https://install.python-poetry.org | POETRY_VERSION=2.0.0 python3 -
-    echo 'export PATH="/root/.local/bin:$PATH"' >> ~/.bashrc
-  else
-    echo "Poetry already installed: $(poetry --version)"
-  fi
+  python3 -m pip install --user pipx
+  python3 -m pipx ensurepath
   export PATH="/root/.local/bin:$PATH"
+  pipx install poetry==2.0.0
   poetry --version
   
   # Verify Docker is available (usually pre-installed in GitHub environments)
@@ -63,6 +60,11 @@ preinstall: |
     rm -rf node_modules
   fi
   npm ci --prefer-offline --no-audit
+  
+  # Install Beads CLI for AI agent issue tracking
+  echo "📋 Installing Beads CLI (bd)..."
+  npm install -g @beads/bd
+  bd --version
   
   # Bootstrap Python environments for intelligence-service and webhook-ingest
   echo "🔧 Bootstrapping Python environments..."
