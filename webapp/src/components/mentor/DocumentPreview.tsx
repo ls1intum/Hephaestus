@@ -120,7 +120,6 @@ const DocumentContent = ({ document, isStreaming }: DocumentContentProps) => {
 					onSaveContent={() => {}}
 					status={isStreaming ? "streaming" : "idle"}
 					isCurrentVersion={true}
-					currentVersionIndex={0}
 				/>
 			)}
 		</div>

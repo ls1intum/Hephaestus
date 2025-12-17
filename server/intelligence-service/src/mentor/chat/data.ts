@@ -27,6 +27,7 @@ export async function createThread(params: {
 	id: string;
 	title?: string | null;
 	userId?: number | null;
+	workspaceId: number;
 }) {
 	const now = new Date();
 	const rows = await db
@@ -36,6 +37,7 @@ export async function createThread(params: {
 			createdAt: now.toISOString(),
 			title: params.title ?? null,
 			userId: params.userId ?? null,
+			workspaceId: params.workspaceId,
 		})
 		.returning();
 	return Array.isArray(rows) ? rows[0] : undefined;

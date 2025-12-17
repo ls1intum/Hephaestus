@@ -1,14 +1,11 @@
 import { motion } from "framer-motion";
 import { useWindowSize } from "usehooks-ts";
-import type { Document } from "@/api/types.gen";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 
 interface VersionFooterProps {
 	/** Handler for version navigation */
 	handleVersionChange: (type: "next" | "prev" | "toggle" | "latest") => void;
-	/** Array of document versions */
-	documents: Array<Document> | undefined;
 	/** Current version index being viewed */
 	currentVersionIndex: number;
 	/** Whether restore operation is in progress */
@@ -21,7 +18,6 @@ interface VersionFooterProps {
 
 export const VersionFooter = ({
 	handleVersionChange,
-	documents,
 	currentVersionIndex: _currentVersionIndex,
 	isRestoring = false,
 	onRestore,
@@ -29,8 +25,6 @@ export const VersionFooter = ({
 }: VersionFooterProps) => {
 	const { width } = useWindowSize();
 	const isMobile = width < 768;
-
-	if (!documents) return null;
 
 	return (
 		<motion.div

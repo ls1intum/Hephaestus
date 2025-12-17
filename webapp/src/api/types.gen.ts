@@ -195,157 +195,9 @@ export type RepositoryInfo = {
     nameWithOwner: string;
 };
 
-export type StreamAbortPart = {
-    type: 'abort';
-};
-
-export type StreamDataPart = {
-    data?: unknown;
-    id?: string;
-    transient?: boolean;
+export type StreamPart = {
     type: string;
-};
-
-export type StreamErrorPart = {
-    errorText: string;
-    type: 'error';
-};
-
-export type StreamFilePart = {
-    mediaType: string;
-    providerMetadata?: unknown;
-    type: 'file';
-    url: string;
-};
-
-export type StreamFinishPart = {
-    messageMetadata?: unknown;
-    type: 'finish';
-};
-
-export type StreamMessageMetadataPart = {
-    messageMetadata?: unknown;
-    type: 'message-metadata';
-};
-
-export type StreamReasoningDeltaPart = {
-    delta: string;
-    id: string;
-    providerMetadata?: unknown;
-    type: 'reasoning-delta';
-};
-
-export type StreamReasoningEndPart = {
-    id: string;
-    providerMetadata?: unknown;
-    type: 'reasoning-end';
-};
-
-export type StreamReasoningStartPart = {
-    id: string;
-    providerMetadata?: unknown;
-    type: 'reasoning-start';
-};
-
-export type StreamSourceDocumentPart = {
-    filename?: string;
-    mediaType: string;
-    providerMetadata?: unknown;
-    sourceId: string;
-    title: string;
-    type: 'source-document';
-};
-
-export type StreamSourceUrlPart = {
-    providerMetadata?: unknown;
-    sourceId: string;
-    title?: string;
-    type: 'source-url';
-    url: string;
-};
-
-export type StreamStartPart = {
-    messageId?: string;
-    messageMetadata?: unknown;
-    type: 'start';
-};
-
-export type StreamStepFinishPart = {
-    type: 'finish-step';
-};
-
-export type StreamStepStartPart = {
-    type: 'start-step';
-};
-
-export type StreamTextDeltaPart = {
-    delta: string;
-    id: string;
-    providerMetadata?: unknown;
-    type: 'text-delta';
-};
-
-export type StreamTextEndPart = {
-    id: string;
-    providerMetadata?: unknown;
-    type: 'text-end';
-};
-
-export type StreamTextStartPart = {
-    id: string;
-    providerMetadata?: unknown;
-    type: 'text-start';
-};
-
-export type StreamToolInputAvailablePart = {
-    dynamic?: boolean;
-    input?: unknown;
-    providerExecuted?: boolean;
-    providerMetadata?: unknown;
-    toolCallId: string;
-    toolName: string;
-    type: 'tool-input-available';
-};
-
-export type StreamToolInputDeltaPart = {
-    inputTextDelta: string;
-    toolCallId: string;
-    type: 'tool-input-delta';
-};
-
-export type StreamToolInputErrorPart = {
-    dynamic?: boolean;
-    errorText: string;
-    input?: unknown;
-    providerExecuted?: boolean;
-    providerMetadata?: unknown;
-    toolCallId: string;
-    toolName: string;
-    type: 'tool-input-error';
-};
-
-export type StreamToolInputStartPart = {
-    dynamic?: boolean;
-    providerExecuted?: boolean;
-    toolCallId: string;
-    toolName: string;
-    type: 'tool-input-start';
-};
-
-export type StreamToolOutputAvailablePart = {
-    dynamic?: boolean;
-    output?: unknown;
-    providerExecuted?: boolean;
-    toolCallId: string;
-    type: 'tool-output-available';
-};
-
-export type StreamToolOutputErrorPart = {
-    dynamic?: boolean;
-    errorText: string;
-    providerExecuted?: boolean;
-    toolCallId: string;
-    type: 'tool-output-error';
+    [key: string]: unknown | string;
 };
 
 export type TeamInfo = {
@@ -387,33 +239,6 @@ export type ThreadDetail = {
         id: string;
         parentMessageId?: string | null;
         parts: Array<{
-            text: string;
-            type: 'text';
-        } | {
-            providerMetadata?: unknown;
-            text: string;
-            type: 'reasoning';
-        } | {
-            mediaType: 'image/jpeg' | 'image/png';
-            name?: string;
-            type: 'file';
-            url: string;
-        } | {
-            type: string;
-            [key: string]: unknown | string;
-        } | {
-            providerMetadata?: unknown;
-            sourceId?: string;
-            title?: string;
-            type: 'source-url';
-            url: string;
-        } | {
-            filename?: string;
-            mediaType: string;
-            providerMetadata?: unknown;
-            title: string;
-            type: 'source-document';
-        } | {
             type: string;
             [key: string]: unknown | string;
         }>;
@@ -1038,7 +863,7 @@ export type MentorChatResponses = {
     /**
      * Event stream of chat updates.
      */
-    200: StreamTextStartPart | StreamTextDeltaPart | StreamTextEndPart | StreamErrorPart | StreamToolInputStartPart | StreamToolInputDeltaPart | StreamToolInputAvailablePart | StreamToolInputErrorPart | StreamToolOutputAvailablePart | StreamToolOutputErrorPart | StreamReasoningStartPart | StreamReasoningDeltaPart | StreamReasoningEndPart | StreamSourceUrlPart | StreamSourceDocumentPart | StreamFilePart | StreamDataPart | StreamStepStartPart | StreamStepFinishPart | StreamStartPart | StreamFinishPart | StreamMessageMetadataPart | StreamAbortPart;
+    200: StreamPart;
 };
 
 export type MentorChatResponse = MentorChatResponses[keyof MentorChatResponses];
@@ -1055,7 +880,7 @@ export type ListDocumentsData = {
         page?: number | null;
         size?: number;
     };
-    url: '/workspaces/{workspaceSlug}/mentor/documents/documents';
+    url: '/workspaces/{workspaceSlug}/mentor/documents';
 };
 
 export type ListDocumentsErrors = {
@@ -1090,10 +915,16 @@ export type CreateDocumentData = {
         workspaceSlug: string;
     };
     query?: never;
-    url: '/workspaces/{workspaceSlug}/mentor/documents/documents';
+    url: '/workspaces/{workspaceSlug}/mentor/documents';
 };
 
 export type CreateDocumentErrors = {
+    /**
+     * Missing workspace context
+     */
+    400: {
+        error: string;
+    };
     /**
      * Internal error
      */
@@ -1123,7 +954,7 @@ export type DeleteDocumentData = {
         id: string;
     };
     query?: never;
-    url: '/workspaces/{workspaceSlug}/mentor/documents/documents/{id}';
+    url: '/workspaces/{workspaceSlug}/mentor/documents/{id}';
 };
 
 export type DeleteDocumentErrors = {
@@ -1162,7 +993,7 @@ export type GetDocumentData = {
         id: string;
     };
     query?: never;
-    url: '/workspaces/{workspaceSlug}/mentor/documents/documents/{id}';
+    url: '/workspaces/{workspaceSlug}/mentor/documents/{id}';
 };
 
 export type GetDocumentErrors = {
@@ -1204,7 +1035,7 @@ export type UpdateDocumentData = {
         id: string;
     };
     query?: never;
-    url: '/workspaces/{workspaceSlug}/mentor/documents/documents/{id}';
+    url: '/workspaces/{workspaceSlug}/mentor/documents/{id}';
 };
 
 export type UpdateDocumentErrors = {
@@ -1245,7 +1076,7 @@ export type DeleteDocumentVersionsAfterData = {
     query: {
         after: Date;
     };
-    url: '/workspaces/{workspaceSlug}/mentor/documents/documents/{id}/versions';
+    url: '/workspaces/{workspaceSlug}/mentor/documents/{id}/versions';
 };
 
 export type DeleteDocumentVersionsAfterErrors = {
@@ -1287,7 +1118,7 @@ export type ListVersionsData = {
         page?: number | null;
         size?: number;
     };
-    url: '/workspaces/{workspaceSlug}/mentor/documents/documents/{id}/versions';
+    url: '/workspaces/{workspaceSlug}/mentor/documents/{id}/versions';
 };
 
 export type ListVersionsErrors = {
@@ -1327,7 +1158,7 @@ export type GetVersionData = {
         versionNumber: number | null;
     };
     query?: never;
-    url: '/workspaces/{workspaceSlug}/mentor/documents/documents/{id}/versions/{versionNumber}';
+    url: '/workspaces/{workspaceSlug}/mentor/documents/{id}/versions/{versionNumber}';
 };
 
 export type GetVersionErrors = {
@@ -1407,7 +1238,7 @@ export type GetGroupedThreadsData = {
         workspaceSlug: string;
     };
     query?: never;
-    url: '/workspaces/{workspaceSlug}/mentor/threads/threads/grouped';
+    url: '/workspaces/{workspaceSlug}/mentor/threads/grouped';
 };
 
 export type GetGroupedThreadsErrors = {

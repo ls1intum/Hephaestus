@@ -8,7 +8,10 @@ import { documentSchema } from "./config";
 
 export const buildDocumentFromContent = (content: string) => {
 	const parser = DOMParser.fromSchema(documentSchema);
-	const stringFromMarkdown = renderToString(<Streamdown>{content}</Streamdown>);
+	// Use mode="static" for synchronous rendering compatible with renderToString
+	const stringFromMarkdown = renderToString(
+		<Streamdown mode="static">{content}</Streamdown>,
+	);
 	const tempContainer = document.createElement("div");
 	tempContainer.innerHTML = stringFromMarkdown;
 	return parser.parse(tempContainer);

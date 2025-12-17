@@ -87,12 +87,12 @@ export const DocumentToolRendererContainer: PartRenderer<
 			versionNumber: 0,
 		};
 
-		const streaming = isStreaming || part.state !== "output-available";
+		// Use the store's isStreaming as the authoritative source
 		return (
 			<DocumentPreview
 				document={doc}
 				isLoading={isLoading}
-				isStreaming={streaming}
+				isStreaming={isStreaming}
 				onDocumentClick={(rect) => openOverlay(rect)}
 			/>
 		);

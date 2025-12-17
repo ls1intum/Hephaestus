@@ -76,6 +76,11 @@ content = content
 	.replace(/minValue:\s*[^,}\n]+,\s*/g, "")
 	.replace(/maxValue:\s*[^,}\n]+,\s*/g, "");
 
+// Fix malformed empty string defaults: drizzle-kit incorrectly generates `.default(')` for `''::character varying`
+// This should be `.default('')`
+content = content.replace(/\.default\('\)\.notNull\(\)/g, ".default('').notNull()");
+content = content.replace(/\.default\('\)/g, ".default('')");
+
 // Always remove `import { sql } from "drizzle-orm"` in generated schema; drizzle rarely uses it and it trips linters
 content = content.replace(/\n?import\s*\{\s*sql\s*\}\s*from\s*"drizzle-orm"\s*;?\s*\n?/g, "\n");
 content = content.replace(/\n?import\s*\{\s*sql\s*\}\s*from\s*'drizzle-orm'\s*;?\s*\n?/g, "\n");

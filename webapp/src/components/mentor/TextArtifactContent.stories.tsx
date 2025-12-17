@@ -25,10 +25,6 @@ const meta = {
 			control: "boolean",
 			description: "Whether the latest version is active",
 		},
-		currentVersionIndex: {
-			control: "number",
-			description: "Index of the current version",
-		},
 		isLoading: {
 			control: "boolean",
 			description: "Show loading skeleton",
@@ -39,7 +35,6 @@ const meta = {
 		mode: "edit",
 		status: "idle",
 		isCurrentVersion: true,
-		currentVersionIndex: 2,
 		onSaveContent: fn(),
 		isLoading: false,
 	},

@@ -1,5 +1,6 @@
 import { ERROR_MESSAGES, HTTP_STATUS } from "@/shared/constants";
 import type { AppRouteHandler } from "@/shared/http/types";
+import { extractErrorMessage, getLogger } from "@/shared/utils";
 import { getAllThreads } from "./data";
 import type { HandleGetGroupedThreadsRoute } from "./threads.routes";
 
@@ -73,7 +74,7 @@ function groupThreadsByRecency(rows: ThreadRow[], now: Date) {
 export const getGroupedThreadsHandler: AppRouteHandler<HandleGetGroupedThreadsRoute> = async (
 	c,
 ) => {
-	const logger = c.get("logger");
+	const logger = getLogger(c);
 
 	try {
 		const rows = await getAllThreads();
@@ -84,7 +85,7 @@ export const getGroupedThreadsHandler: AppRouteHandler<HandleGetGroupedThreadsRo
 
 		return c.json(groupThreadsByRecency(rows, new Date()), { status: HTTP_STATUS.OK });
 	} catch (err) {
-		logger.error({ err }, "Failed to fetch grouped threads");
+		logger.error({ err: extractErrorMessage(err) }, "Failed to fetch grouped threads");
 		return c.json(
 			{ error: ERROR_MESSAGES.INTERNAL_ERROR },
 			{ status: HTTP_STATUS.INTERNAL_SERVER_ERROR },

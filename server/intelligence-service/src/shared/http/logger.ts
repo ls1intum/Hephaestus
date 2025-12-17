@@ -47,13 +47,6 @@ export function pinoLogger() {
 		http: {
 			// Use Hono's requestId middleware for request tracing
 			referRequestIdKey: "requestId",
-			// Customize response message for clearer logs
-			onResMessage: (c) => {
-				const status = c.res.status;
-				const method = c.req.method;
-				const path = c.req.path;
-				return `${method} ${path} - ${status}`;
-			},
 			// Set appropriate log level based on response status
 			onResLevel: (c) => {
 				const status = c.res.status;

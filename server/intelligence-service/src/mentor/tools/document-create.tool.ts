@@ -12,7 +12,56 @@ const inputSchema = z.object({
 
 type Input = z.infer<typeof inputSchema>;
 
-export const createDocument = ({ dataStream }: { dataStream: UIMessageStreamWriter<UIMessage> }) =>
+/**
+ * Streams document content generation to the client.
+ * Returns the full generated content.
+ */
+async function streamDocumentContent(params: {
+	id: string;
+	title: string;
+	dataStream: UIMessageStreamWriter<UIMessage>;
+}): Promise<string> {
+	const { id, title, dataStream } = params;
+	let draftContent = "";
+
+	const { fullStream } = streamText({
+		model: env.defaultModel,
+		system:
+			"Write about the given topic. Markdown is supported. Use headings wherever appropriate.",
+		experimental_transform: smoothStream({ chunking: "word" }),
+		prompt: title,
+	});
+
+	for await (const delta of fullStream) {
+		if (delta.type !== "text-delta") {
+			continue;
+		}
+
+		const text = (delta as { type: string; text?: string }).text ?? "";
+		if (!text) {
+			continue;
+		}
+
+		draftContent += text;
+		dataStream.write({
+			type: "data-document-delta",
+			data: { id, kind: "text", delta: text },
+			transient: true,
+		});
+	}
+
+	return draftContent;
+}
+
+export const createDocument = ({
+	dataStream,
+	workspaceId,
+	userId,
+}: {
+	dataStream: UIMessageStreamWriter<UIMessage>;
+	workspaceId: number | null;
+	userId: number | null;
+}) =>
 	tool({
 		description:
 			"Create a document for writing or content creation. Emits streaming UI data for the client.",
@@ -28,27 +77,7 @@ export const createDocument = ({ dataStream }: { dataStream: UIMessageStreamWrit
 
 			let draftContent = "";
 			try {
-				const { fullStream } = streamText({
-					model: env.defaultModel,
-					system:
-						"Write about the given topic. Markdown is supported. Use headings wherever appropriate.",
-					experimental_transform: smoothStream({ chunking: "word" }),
-					prompt: title,
-				});
-
-				for await (const delta of fullStream) {
-					if (delta.type === "text-delta") {
-						const text = (delta as { type: string; text?: string }).text ?? "";
-						if (text) {
-							draftContent += text;
-							dataStream.write({
-								type: "data-document-delta",
-								data: { id, kind: "text", delta: text },
-								transient: true,
-							});
-						}
-					}
-				}
+				draftContent = await streamDocumentContent({ id, title, dataStream });
 			} finally {
 				dataStream.write({
 					type: "data-document-finish",
@@ -57,12 +86,18 @@ export const createDocument = ({ dataStream }: { dataStream: UIMessageStreamWrit
 				});
 			}
 
-			const doc = await createDocumentInDb({
-				id,
-				title,
-				content: draftContent,
-				kind: kind as DocumentKind,
-			});
+			// Only persist if we have a workspace ID and user ID
+			const doc =
+				workspaceId && userId
+					? await createDocumentInDb({
+							id,
+							title,
+							content: draftContent,
+							kind: kind as DocumentKind,
+							workspaceId,
+							userId,
+						})
+					: null;
 
 			return {
 				id: doc?.id ?? id,

@@ -24,7 +24,6 @@ type TextEditorProps = {
 	onSaveContent: (updatedContent: string, debounce: boolean) => void;
 	status: "streaming" | "idle";
 	isCurrentVersion: boolean;
-	currentVersionIndex: number;
 };
 
 export function TextEditor({
@@ -35,7 +34,10 @@ export function TextEditor({
 }: TextEditorProps) {
 	const containerRef = useRef<HTMLDivElement>(null);
 	const editorRef = useRef<EditorView | null>(null);
-	const prevStatusRef = useRef<TextEditorProps["status"]>(status);
+	// Initialize to opposite of streaming so we detect "entering stream" on first render
+	const prevStatusRef = useRef<TextEditorProps["status"]>(
+		status === "streaming" ? "idle" : status,
+	);
 	const streamBufRef = useRef<string>(""); // what we have already pushed as ghost
 	const ghostActiveRef = useRef<boolean>(false);
 
@@ -129,26 +131,28 @@ export function TextEditor({
 			return;
 		}
 
-		if (leavingStream && ghostActiveRef.current) {
-			// Commit buffered text as one undo step
-			streamingGhost.finish(view, { adoptMarks: true });
-			ghostActiveRef.current = false;
-			streamBufRef.current = "";
-		} else {
-			// Not streaming: ensure the document matches content
-			const currentContent = buildContentFromDocument(view.state.doc);
-			if (currentContent !== content) {
-				const newDoc = buildDocumentFromContent(content ?? "");
-				const tr = view.state.tr.replaceWith(
-					0,
-					view.state.doc.content.size,
-					newDoc.content,
-				);
-				tr.setMeta("no-save", true);
-				view.dispatch(tr);
+		if (leavingStream) {
+			// Finish or cancel the ghost
+			if (ghostActiveRef.current) {
+				streamingGhost.finish(view, { adoptMarks: true });
+				ghostActiveRef.current = false;
+				streamBufRef.current = "";
+			} else {
+				streamingGhost.cancel(view);
 			}
-			// Best-effort cleanup
-			streamingGhost.cancel(view);
+		}
+
+		// When idle, ensure document matches content prop
+		const currentContent = buildContentFromDocument(view.state.doc);
+		if (currentContent !== content) {
+			const newDoc = buildDocumentFromContent(content ?? "");
+			const tr = view.state.tr.replaceWith(
+				0,
+				view.state.doc.content.size,
+				newDoc.content,
+			);
+			tr.setMeta("no-save", true);
+			view.dispatch(tr);
 		}
 
 		prevStatusRef.current = status;

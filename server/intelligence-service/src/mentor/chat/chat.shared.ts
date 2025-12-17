@@ -1,10 +1,21 @@
+/**
+ * Shared types and schemas for cross-package compatibility.
+ *
+ * This file is consumed by both:
+ * - intelligence-service (server)
+ * - webapp (via @intelligence-service/chat/chat.shared alias)
+ *
+ * The webapp imports types from here for AI SDK UI components (useChat, etc.)
+ * because it needs access to tool schemas and custom data types for proper
+ * type inference in React components.
+ *
+ * DO NOT use @/ path aliases in this file - they won't resolve in the webapp.
+ * Keep schemas in sync with the actual tool implementations.
+ */
+
 import type { InferUITool, LanguageModelUsage, UIMessage } from "ai";
 import { tool } from "ai";
 import { z } from "zod";
-
-// Note: We define getWeather schemas here instead of importing from @/mentor/tools/weather.tool
-// because this file is consumed by the webapp which cannot resolve the @/ path alias.
-// Keep these schemas in sync with the actual tool definition.
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Weather Tool Schemas (duplicated from get-weather.ts for cross-package compatibility)

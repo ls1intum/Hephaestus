@@ -5,7 +5,7 @@ import { EXPORTED_TAG } from "@/shared/http/exported-tag";
 import { ChatThreadGroupSchema } from "./threads.schema";
 
 export const getGroupedThreadsRoute = createRoute({
-	path: "/threads/grouped",
+	path: "/grouped",
 	method: "get",
 	tags: ["mentor", ...EXPORTED_TAG],
 	summary: "List chat threads grouped by time buckets",

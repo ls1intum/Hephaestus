@@ -656,36 +656,13 @@ paths:
           content:
             text/event-stream:
               schema:
-                anyOf:
-                - $ref: "#/components/schemas/StreamTextStartPart"
-                - $ref: "#/components/schemas/StreamTextDeltaPart"
-                - $ref: "#/components/schemas/StreamTextEndPart"
-                - $ref: "#/components/schemas/StreamErrorPart"
-                - $ref: "#/components/schemas/StreamToolInputStartPart"
-                - $ref: "#/components/schemas/StreamToolInputDeltaPart"
-                - $ref: "#/components/schemas/StreamToolInputAvailablePart"
-                - $ref: "#/components/schemas/StreamToolInputErrorPart"
-                - $ref: "#/components/schemas/StreamToolOutputAvailablePart"
-                - $ref: "#/components/schemas/StreamToolOutputErrorPart"
-                - $ref: "#/components/schemas/StreamReasoningStartPart"
-                - $ref: "#/components/schemas/StreamReasoningDeltaPart"
-                - $ref: "#/components/schemas/StreamReasoningEndPart"
-                - $ref: "#/components/schemas/StreamSourceUrlPart"
-                - $ref: "#/components/schemas/StreamSourceDocumentPart"
-                - $ref: "#/components/schemas/StreamFilePart"
-                - $ref: "#/components/schemas/StreamDataPart"
-                - $ref: "#/components/schemas/StreamStepStartPart"
-                - $ref: "#/components/schemas/StreamStepFinishPart"
-                - $ref: "#/components/schemas/StreamStartPart"
-                - $ref: "#/components/schemas/StreamFinishPart"
-                - $ref: "#/components/schemas/StreamMessageMetadataPart"
-                - $ref: "#/components/schemas/StreamAbortPart"
+                $ref: "#/components/schemas/StreamPart"
           description: Event stream of chat updates.
       summary: Handle mentor chat
       tags:
       - mentor
       - exported
-  /workspaces/{workspaceSlug}/mentor/documents/documents:
+  /workspaces/{workspaceSlug}/mentor/documents:
     get:
       x-hephaestus:
         export: true
@@ -769,6 +746,17 @@ paths:
               schema:
                 $ref: "#/components/schemas/Document"
           description: Created document
+        "400":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                - error
+          description: Missing workspace context
         "500":
           content:
             application/json:
@@ -784,7 +772,7 @@ paths:
       tags:
       - documents
       - exported
-  /workspaces/{workspaceSlug}/mentor/documents/documents/{id}:
+  /workspaces/{workspaceSlug}/mentor/documents/{id}:
     delete:
       x-hephaestus:
         export: true
@@ -947,7 +935,7 @@ paths:
       tags:
       - documents
       - exported
-  /workspaces/{workspaceSlug}/mentor/documents/documents/{id}/versions:
+  /workspaces/{workspaceSlug}/mentor/documents/{id}/versions:
     delete:
       x-hephaestus:
         export: true
@@ -1087,7 +1075,7 @@ paths:
       tags:
       - documents
       - exported
-  /workspaces/{workspaceSlug}/mentor/documents/documents/{id}/versions/{versionNumber}:
+  /workspaces/{workspaceSlug}/mentor/documents/{id}/versions/{versionNumber}:
     get:
       x-hephaestus:
         export: true
@@ -1211,7 +1199,7 @@ paths:
       tags:
       - vote
       - exported
-  /workspaces/{workspaceSlug}/mentor/threads/threads/grouped:
+  /workspaces/{workspaceSlug}/mentor/threads/grouped:
     get:
       x-hephaestus:
         export: true
@@ -1885,7 +1873,8 @@ components:
       - threads
     ChatThreadSummary:
       type: object
-      x-hephaestus: a1
+      x-hephaestus:
+        export: true
       properties:
         createdAt:
           type: string
@@ -2354,367 +2343,14 @@ components:
       - id
       - name
       - nameWithOwner
-    StreamAbortPart:
+    StreamPart:
       type: object
+      additionalProperties: {}
       x-hephaestus: a1
       properties:
         type:
           type: string
-          enum:
-          - abort
       required:
-      - type
-    StreamDataPart:
-      type: object
-      x-hephaestus: a1
-      properties:
-        data: {}
-        id:
-          type: string
-        transient:
-          type: boolean
-        type:
-          type: string
-          pattern: ^data-.+
-      required:
-      - type
-    StreamErrorPart:
-      type: object
-      x-hephaestus: a1
-      properties:
-        errorText:
-          type: string
-        type:
-          type: string
-          enum:
-          - error
-      required:
-      - errorText
-      - type
-    StreamFilePart:
-      type: object
-      x-hephaestus: a1
-      properties:
-        mediaType:
-          type: string
-        providerMetadata: {}
-        type:
-          type: string
-          enum:
-          - file
-        url:
-          type: string
-      required:
-      - mediaType
-      - type
-      - url
-    StreamFinishPart:
-      type: object
-      x-hephaestus: a1
-      properties:
-        messageMetadata: {}
-        type:
-          type: string
-          enum:
-          - finish
-      required:
-      - type
-    StreamMessageMetadataPart:
-      type: object
-      x-hephaestus: a1
-      properties:
-        messageMetadata: {}
-        type:
-          type: string
-          enum:
-          - message-metadata
-      required:
-      - type
-    StreamReasoningDeltaPart:
-      type: object
-      x-hephaestus: a1
-      properties:
-        delta:
-          type: string
-        id:
-          type: string
-        providerMetadata: {}
-        type:
-          type: string
-          enum:
-          - reasoning-delta
-      required:
-      - delta
-      - id
-      - type
-    StreamReasoningEndPart:
-      type: object
-      x-hephaestus: a1
-      properties:
-        id:
-          type: string
-        providerMetadata: {}
-        type:
-          type: string
-          enum:
-          - reasoning-end
-      required:
-      - id
-      - type
-    StreamReasoningStartPart:
-      type: object
-      x-hephaestus: a1
-      properties:
-        id:
-          type: string
-        providerMetadata: {}
-        type:
-          type: string
-          enum:
-          - reasoning-start
-      required:
-      - id
-      - type
-    StreamSourceDocumentPart:
-      type: object
-      x-hephaestus: a1
-      properties:
-        filename:
-          type: string
-        mediaType:
-          type: string
-        providerMetadata: {}
-        sourceId:
-          type: string
-        title:
-          type: string
-        type:
-          type: string
-          enum:
-          - source-document
-      required:
-      - mediaType
-      - sourceId
-      - title
-      - type
-    StreamSourceUrlPart:
-      type: object
-      x-hephaestus: a1
-      properties:
-        providerMetadata: {}
-        sourceId:
-          type: string
-        title:
-          type: string
-        type:
-          type: string
-          enum:
-          - source-url
-        url:
-          type: string
-      required:
-      - sourceId
-      - type
-      - url
-    StreamStartPart:
-      type: object
-      x-hephaestus: a1
-      properties:
-        messageId:
-          type: string
-        messageMetadata: {}
-        type:
-          type: string
-          enum:
-          - start
-      required:
-      - type
-    StreamStepFinishPart:
-      type: object
-      x-hephaestus: a1
-      properties:
-        type:
-          type: string
-          enum:
-          - finish-step
-      required:
-      - type
-    StreamStepStartPart:
-      type: object
-      x-hephaestus: a1
-      properties:
-        type:
-          type: string
-          enum:
-          - start-step
-      required:
-      - type
-    StreamTextDeltaPart:
-      type: object
-      x-hephaestus: a1
-      properties:
-        delta:
-          type: string
-        id:
-          type: string
-        providerMetadata: {}
-        type:
-          type: string
-          enum:
-          - text-delta
-      required:
-      - delta
-      - id
-      - type
-    StreamTextEndPart:
-      type: object
-      x-hephaestus: a1
-      properties:
-        id:
-          type: string
-        providerMetadata: {}
-        type:
-          type: string
-          enum:
-          - text-end
-      required:
-      - id
-      - type
-    StreamTextStartPart:
-      type: object
-      x-hephaestus:
-        export: true
-      properties:
-        id:
-          type: string
-        providerMetadata: {}
-        type:
-          type: string
-          enum:
-          - text-start
-      required:
-      - id
-      - type
-    StreamToolInputAvailablePart:
-      type: object
-      x-hephaestus: a1
-      properties:
-        dynamic:
-          type: boolean
-        input: {}
-        providerExecuted:
-          type: boolean
-        providerMetadata: {}
-        toolCallId:
-          type: string
-        toolName:
-          type: string
-        type:
-          type: string
-          enum:
-          - tool-input-available
-      required:
-      - toolCallId
-      - toolName
-      - type
-    StreamToolInputDeltaPart:
-      type: object
-      x-hephaestus: a1
-      properties:
-        inputTextDelta:
-          type: string
-        toolCallId:
-          type: string
-        type:
-          type: string
-          enum:
-          - tool-input-delta
-      required:
-      - inputTextDelta
-      - toolCallId
-      - type
-    StreamToolInputErrorPart:
-      type: object
-      x-hephaestus: a1
-      properties:
-        dynamic:
-          type: boolean
-        errorText:
-          type: string
-        input: {}
-        providerExecuted:
-          type: boolean
-        providerMetadata: {}
-        toolCallId:
-          type: string
-        toolName:
-          type: string
-        type:
-          type: string
-          enum:
-          - tool-input-error
-      required:
-      - errorText
-      - toolCallId
-      - toolName
-      - type
-    StreamToolInputStartPart:
-      type: object
-      x-hephaestus: a1
-      properties:
-        dynamic:
-          type: boolean
-        providerExecuted:
-          type: boolean
-        toolCallId:
-          type: string
-        toolName:
-          type: string
-        type:
-          type: string
-          enum:
-          - tool-input-start
-      required:
-      - toolCallId
-      - toolName
-      - type
-    StreamToolOutputAvailablePart:
-      type: object
-      x-hephaestus: a1
-      properties:
-        dynamic:
-          type: boolean
-        output: {}
-        providerExecuted:
-          type: boolean
-        toolCallId:
-          type: string
-        type:
-          type: string
-          enum:
-          - tool-output-available
-      required:
-      - toolCallId
-      - type
-    StreamToolOutputErrorPart:
-      type: object
-      x-hephaestus: a1
-      properties:
-        dynamic:
-          type: boolean
-        errorText:
-          type: string
-        providerExecuted:
-          type: boolean
-        toolCallId:
-          type: string
-        type:
-          type: string
-          enum:
-          - tool-output-error
-      required:
-      - errorText
-      - toolCallId
       - type
     TeamInfo:
       type: object
@@ -2825,98 +2461,13 @@ components:
               parts:
                 type: array
                 items:
-                  anyOf:
-                  - type: object
-                    properties:
-                      text:
-                        type: string
-                      type:
-                        type: string
-                        enum:
-                        - text
-                    required:
-                    - text
-                    - type
-                  - type: object
-                    properties:
-                      providerMetadata: {}
-                      text:
-                        type: string
-                      type:
-                        type: string
-                        enum:
-                        - reasoning
-                    required:
-                    - text
-                    - type
-                  - type: object
-                    properties:
-                      mediaType:
-                        type: string
-                        enum:
-                        - image/jpeg
-                        - image/png
-                      name:
-                        type: string
-                      type:
-                        type: string
-                        enum:
-                        - file
-                      url:
-                        type: string
-                        format: uri
-                    required:
-                    - mediaType
-                    - type
-                    - url
-                  - type: object
-                    additionalProperties: {}
-                    properties:
-                      type:
-                        type: string
-                        pattern: ^tool-
-                    required:
-                    - type
-                  - type: object
-                    properties:
-                      providerMetadata: {}
-                      sourceId:
-                        type: string
-                      title:
-                        type: string
-                      type:
-                        type: string
-                        enum:
-                        - source-url
-                      url:
-                        type: string
-                    required:
-                    - type
-                    - url
-                  - type: object
-                    properties:
-                      filename:
-                        type: string
-                      mediaType:
-                        type: string
-                      providerMetadata: {}
-                      title:
-                        type: string
-                      type:
-                        type: string
-                        enum:
-                        - source-document
-                    required:
-                    - mediaType
-                    - title
-                    - type
-                  - type: object
-                    additionalProperties: {}
-                    properties:
-                      type:
-                        type: string
-                    required:
-                    - type
+                  type: object
+                  additionalProperties: {}
+                  properties:
+                    type:
+                      type: string
+                  required:
+                  - type
               role:
                 type: string
                 enum:

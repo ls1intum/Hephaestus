@@ -26,7 +26,10 @@ import org.springframework.lang.NonNull;
  * Maps directly to the UIMessage type from the AI SDK
  */
 @Entity
-@Table(name = "chat_message")
+@Table(
+    name = "chat_message",
+    indexes = { @Index(name = "idx_chat_message_thread_created", columnList = "thread_id, createdAt") }
+)
 @Getter
 @Setter
 @NoArgsConstructor

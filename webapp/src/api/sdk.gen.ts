@@ -268,7 +268,7 @@ export const mentorChat = <ThrowOnError extends boolean = false>(options: Option
  */
 export const listDocuments = <ThrowOnError extends boolean = false>(options: Options<ListDocumentsData, ThrowOnError>) => {
     return (options.client ?? _heyApiClient).get<ListDocumentsResponses, ListDocumentsErrors, ThrowOnError>({
-        url: '/workspaces/{workspaceSlug}/mentor/documents/documents',
+        url: '/workspaces/{workspaceSlug}/mentor/documents',
         ...options
     });
 };
@@ -278,7 +278,7 @@ export const listDocuments = <ThrowOnError extends boolean = false>(options: Opt
  */
 export const createDocument = <ThrowOnError extends boolean = false>(options: Options<CreateDocumentData, ThrowOnError>) => {
     return (options.client ?? _heyApiClient).post<CreateDocumentResponses, CreateDocumentErrors, ThrowOnError>({
-        url: '/workspaces/{workspaceSlug}/mentor/documents/documents',
+        url: '/workspaces/{workspaceSlug}/mentor/documents',
         ...options,
         headers: {
             'Content-Type': 'application/json',
@@ -292,7 +292,7 @@ export const createDocument = <ThrowOnError extends boolean = false>(options: Op
  */
 export const deleteDocument = <ThrowOnError extends boolean = false>(options: Options<DeleteDocumentData, ThrowOnError>) => {
     return (options.client ?? _heyApiClient).delete<DeleteDocumentResponses, DeleteDocumentErrors, ThrowOnError>({
-        url: '/workspaces/{workspaceSlug}/mentor/documents/documents/{id}',
+        url: '/workspaces/{workspaceSlug}/mentor/documents/{id}',
         ...options
     });
 };
@@ -302,7 +302,7 @@ export const deleteDocument = <ThrowOnError extends boolean = false>(options: Op
  */
 export const getDocument = <ThrowOnError extends boolean = false>(options: Options<GetDocumentData, ThrowOnError>) => {
     return (options.client ?? _heyApiClient).get<GetDocumentResponses, GetDocumentErrors, ThrowOnError>({
-        url: '/workspaces/{workspaceSlug}/mentor/documents/documents/{id}',
+        url: '/workspaces/{workspaceSlug}/mentor/documents/{id}',
         ...options
     });
 };
@@ -312,7 +312,7 @@ export const getDocument = <ThrowOnError extends boolean = false>(options: Optio
  */
 export const updateDocument = <ThrowOnError extends boolean = false>(options: Options<UpdateDocumentData, ThrowOnError>) => {
     return (options.client ?? _heyApiClient).put<UpdateDocumentResponses, UpdateDocumentErrors, ThrowOnError>({
-        url: '/workspaces/{workspaceSlug}/mentor/documents/documents/{id}',
+        url: '/workspaces/{workspaceSlug}/mentor/documents/{id}',
         ...options,
         headers: {
             'Content-Type': 'application/json',
@@ -326,7 +326,7 @@ export const updateDocument = <ThrowOnError extends boolean = false>(options: Op
  */
 export const deleteDocumentVersionsAfter = <ThrowOnError extends boolean = false>(options: Options<DeleteDocumentVersionsAfterData, ThrowOnError>) => {
     return (options.client ?? _heyApiClient).delete<DeleteDocumentVersionsAfterResponses, DeleteDocumentVersionsAfterErrors, ThrowOnError>({
-        url: '/workspaces/{workspaceSlug}/mentor/documents/documents/{id}/versions',
+        url: '/workspaces/{workspaceSlug}/mentor/documents/{id}/versions',
         ...options
     });
 };
@@ -336,7 +336,7 @@ export const deleteDocumentVersionsAfter = <ThrowOnError extends boolean = false
  */
 export const listVersions = <ThrowOnError extends boolean = false>(options: Options<ListVersionsData, ThrowOnError>) => {
     return (options.client ?? _heyApiClient).get<ListVersionsResponses, ListVersionsErrors, ThrowOnError>({
-        url: '/workspaces/{workspaceSlug}/mentor/documents/documents/{id}/versions',
+        url: '/workspaces/{workspaceSlug}/mentor/documents/{id}/versions',
         ...options
     });
 };
@@ -346,7 +346,7 @@ export const listVersions = <ThrowOnError extends boolean = false>(options: Opti
  */
 export const getVersion = <ThrowOnError extends boolean = false>(options: Options<GetVersionData, ThrowOnError>) => {
     return (options.client ?? _heyApiClient).get<GetVersionResponses, GetVersionErrors, ThrowOnError>({
-        url: '/workspaces/{workspaceSlug}/mentor/documents/documents/{id}/versions/{versionNumber}',
+        url: '/workspaces/{workspaceSlug}/mentor/documents/{id}/versions/{versionNumber}',
         ...options
     });
 };
@@ -370,7 +370,7 @@ export const voteMessage = <ThrowOnError extends boolean = false>(options: Optio
  */
 export const getGroupedThreads = <ThrowOnError extends boolean = false>(options: Options<GetGroupedThreadsData, ThrowOnError>) => {
     return (options.client ?? _heyApiClient).get<GetGroupedThreadsResponses, GetGroupedThreadsErrors, ThrowOnError>({
-        url: '/workspaces/{workspaceSlug}/mentor/threads/threads/grouped',
+        url: '/workspaces/{workspaceSlug}/mentor/threads/grouped',
         ...options
     });
 };

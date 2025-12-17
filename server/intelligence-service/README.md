@@ -22,6 +22,46 @@ Then open:
 - `http://localhost:8000/openapi.json` — OpenAPI v3.0 JSON
 - `http://localhost:8000/openapi.yaml` — OpenAPI v3.1 YAML
 
+## Debugging with Verbose Logging
+
+For debugging API issues, enable verbose logging to capture full request/response bodies:
+
+```sh
+# Add to .env
+VERBOSE_LOGGING=true
+VERBOSE_LOG_FILE=logs/verbose.log
+```
+
+This will log:
+- Full request headers (with sensitive headers redacted)
+- Request body (JSON parsed)
+- Response body (for non-streaming responses)
+- Timing information
+
+**Example output in `logs/verbose.log`:**
+```json
+{
+  "timestamp": "2025-12-16T19:30:00.000Z",
+  "type": "REQUEST",
+  "requestId": "abc-123",
+  "method": "POST",
+  "path": "/mentor/chat",
+  "headers": { "content-type": "application/json", "authorization": "[REDACTED]" },
+  "body": { "id": "thread-1", "message": { "id": "msg-1", "parts": [...] } }
+}
+────────────────────────────────────────────────────────────────────────────────
+{
+  "timestamp": "2025-12-16T19:30:00.050Z",
+  "type": "RESPONSE",
+  "requestId": "abc-123",
+  "status": 200,
+  "duration": "50ms",
+  "body": "[SSE Stream - not captured]"
+}
+```
+
+> **Warning:** This logs potentially sensitive data. Use only for debugging.
+
 ## Export OpenAPI to file
 
 Write `openapi.yaml` to the service root:

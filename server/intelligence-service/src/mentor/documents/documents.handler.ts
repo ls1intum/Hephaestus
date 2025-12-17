@@ -1,6 +1,7 @@
 import { ERROR_MESSAGES, HTTP_STATUS } from "@/shared/constants";
 import type { DocumentKind } from "@/shared/document";
 import type { AppRouteHandler } from "@/shared/http/types";
+import { extractErrorMessage, getLogger } from "@/shared/utils";
 import {
 	createDocument,
 	deleteDocument,
@@ -23,13 +24,20 @@ import type {
 } from "./documents.routes";
 
 export const createDocumentHandler: AppRouteHandler<typeof createDocumentRoute> = async (c) => {
-	const logger = c.get("logger");
+	const logger = getLogger(c);
+	const workspaceId = c.get("workspaceId");
 	const body = c.req.valid("json");
+
+	if (!workspaceId) {
+		return c.json({ error: "Missing workspace context" }, { status: HTTP_STATUS.BAD_REQUEST });
+	}
+
 	try {
 		const doc = await createDocument({
 			title: body.title,
 			content: body.content,
 			kind: body.kind as DocumentKind,
+			workspaceId,
 		});
 
 		if (!doc) {
@@ -37,7 +45,7 @@ export const createDocumentHandler: AppRouteHandler<typeof createDocumentRoute> 
 		}
 		return c.json(doc, { status: HTTP_STATUS.CREATED });
 	} catch (err) {
-		logger.error({ err }, "Create document failed");
+		logger.error({ err: extractErrorMessage(err) }, "Create document failed");
 		return c.json(
 			{ error: ERROR_MESSAGES.INTERNAL_ERROR },
 			{ status: HTTP_STATUS.INTERNAL_SERVER_ERROR },
@@ -55,7 +63,7 @@ export const getDocumentHandler: AppRouteHandler<typeof getDocumentRoute> = asyn
 };
 
 export const updateDocumentHandler: AppRouteHandler<typeof updateDocumentRoute> = async (c) => {
-	const logger = c.get("logger");
+	const logger = getLogger(c);
 	const { id } = c.req.valid("param");
 	const body = c.req.valid("json");
 	try {
@@ -73,7 +81,7 @@ export const updateDocumentHandler: AppRouteHandler<typeof updateDocumentRoute> 
 		}
 		return c.json(doc, { status: HTTP_STATUS.OK });
 	} catch (err) {
-		logger.error({ err }, "Update document failed");
+		logger.error({ err: extractErrorMessage(err) }, "Update document failed");
 		return c.json(
 			{ error: ERROR_MESSAGES.INTERNAL_ERROR },
 			{ status: HTTP_STATUS.INTERNAL_SERVER_ERROR },
@@ -82,7 +90,7 @@ export const updateDocumentHandler: AppRouteHandler<typeof updateDocumentRoute> 
 };
 
 export const deleteDocumentHandler: AppRouteHandler<typeof deleteDocumentRoute> = async (c) => {
-	const logger = c.get("logger");
+	const logger = getLogger(c);
 	const { id } = c.req.valid("param");
 	try {
 		const existing = await getDocumentById(id);
@@ -96,7 +104,7 @@ export const deleteDocumentHandler: AppRouteHandler<typeof deleteDocumentRoute> 
 		await deleteDocument(id);
 		return c.body(null, { status: HTTP_STATUS.NO_CONTENT });
 	} catch (err) {
-		logger.error({ err }, "Delete document failed");
+		logger.error({ err: extractErrorMessage(err) }, "Delete document failed");
 		return c.json(
 			{ error: ERROR_MESSAGES.INTERNAL_ERROR },
 			{ status: HTTP_STATUS.INTERNAL_SERVER_ERROR },
@@ -146,7 +154,7 @@ export const getVersionHandler: AppRouteHandler<typeof getVersionRoute> = async 
 };
 
 export const deleteAfterHandler: AppRouteHandler<typeof deleteAfterRoute> = async (c) => {
-	const logger = c.get("logger");
+	const logger = getLogger(c);
 	const { id } = c.req.valid("param");
 	const { after } = c.req.valid("query");
 	try {
@@ -168,7 +176,7 @@ export const deleteAfterHandler: AppRouteHandler<typeof deleteAfterRoute> = asyn
 
 		return c.json(toDelete, { status: HTTP_STATUS.OK });
 	} catch (err) {
-		logger.error({ err }, "Delete after failed");
+		logger.error({ err: extractErrorMessage(err) }, "Delete after failed");
 		return c.json(
 			{ error: ERROR_MESSAGES.INTERNAL_ERROR },
 			{ status: HTTP_STATUS.INTERNAL_SERVER_ERROR },

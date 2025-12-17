@@ -20,17 +20,8 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import com.fasterxml.jackson.annotation.JsonValue;
-import de.tum.in.www1.hephaestus.intelligenceservice.model.ThreadDetailMessagesInnerPartsInnerAnyOf;
-import de.tum.in.www1.hephaestus.intelligenceservice.model.ThreadDetailMessagesInnerPartsInnerAnyOf1;
-import de.tum.in.www1.hephaestus.intelligenceservice.model.ThreadDetailMessagesInnerPartsInnerAnyOf2;
-import de.tum.in.www1.hephaestus.intelligenceservice.model.ThreadDetailMessagesInnerPartsInnerAnyOf3;
-import de.tum.in.www1.hephaestus.intelligenceservice.model.ThreadDetailMessagesInnerPartsInnerAnyOf4;
-import de.tum.in.www1.hephaestus.intelligenceservice.model.ThreadDetailMessagesInnerPartsInnerAnyOf5;
-import de.tum.in.www1.hephaestus.intelligenceservice.model.ThreadDetailMessagesInnerPartsInnerAnyOf6;
-import org.openapitools.jackson.nullable.JsonNullable;
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import org.openapitools.jackson.nullable.JsonNullable;
-import java.util.NoSuchElementException;
+import java.util.HashMap;
+import java.util.Map;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import org.hibernate.validator.constraints.*;
@@ -39,47 +30,16 @@ import org.hibernate.validator.constraints.*;
  * ThreadDetailMessagesInnerPartsInner
  */
 @JsonPropertyOrder({
-  ThreadDetailMessagesInnerPartsInner.JSON_PROPERTY_TYPE,
-  ThreadDetailMessagesInnerPartsInner.JSON_PROPERTY_TEXT,
-  ThreadDetailMessagesInnerPartsInner.JSON_PROPERTY_PROVIDER_METADATA,
-  ThreadDetailMessagesInnerPartsInner.JSON_PROPERTY_URL,
-  ThreadDetailMessagesInnerPartsInner.JSON_PROPERTY_MEDIA_TYPE,
-  ThreadDetailMessagesInnerPartsInner.JSON_PROPERTY_NAME,
-  ThreadDetailMessagesInnerPartsInner.JSON_PROPERTY_TITLE,
-  ThreadDetailMessagesInnerPartsInner.JSON_PROPERTY_SOURCE_ID,
-  ThreadDetailMessagesInnerPartsInner.JSON_PROPERTY_FILENAME
+  ThreadDetailMessagesInnerPartsInner.JSON_PROPERTY_TYPE
 })
 @JsonTypeName("ThreadDetail_messages_inner_parts_inner")
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
-public class ThreadDetailMessagesInnerPartsInner {
+public class ThreadDetailMessagesInnerPartsInner extends HashMap<String, Object> {
   public static final String JSON_PROPERTY_TYPE = "type";
   private String type;
 
-  public static final String JSON_PROPERTY_TEXT = "text";
-  private String text;
-
-  public static final String JSON_PROPERTY_PROVIDER_METADATA = "providerMetadata";
-  private JsonNullable<Object> providerMetadata = JsonNullable.<Object>of(null);
-
-  public static final String JSON_PROPERTY_URL = "url";
-  private String url;
-
-  public static final String JSON_PROPERTY_MEDIA_TYPE = "mediaType";
-  private String mediaType;
-
-  public static final String JSON_PROPERTY_NAME = "name";
-  private String name;
-
-  public static final String JSON_PROPERTY_TITLE = "title";
-  private String title;
-
-  public static final String JSON_PROPERTY_SOURCE_ID = "sourceId";
-  private String sourceId;
-
-  public static final String JSON_PROPERTY_FILENAME = "filename";
-  private String filename;
-
   public ThreadDetailMessagesInnerPartsInner() {
+
   }
 
   public ThreadDetailMessagesInnerPartsInner type(String type) {
@@ -107,214 +67,6 @@ public class ThreadDetailMessagesInnerPartsInner {
     this.type = type;
   }
 
-  public ThreadDetailMessagesInnerPartsInner text(String text) {
-    
-    this.text = text;
-    return this;
-  }
-
-  /**
-   * Get text
-   * @return text
-   */
-  @jakarta.annotation.Nonnull
-  @JsonProperty(JSON_PROPERTY_TEXT)
-  @JsonInclude(value = JsonInclude.Include.ALWAYS)
-
-  public String getText() {
-    return text;
-  }
-
-
-  @JsonProperty(JSON_PROPERTY_TEXT)
-  @JsonInclude(value = JsonInclude.Include.ALWAYS)
-  public void setText(String text) {
-    this.text = text;
-  }
-
-  public ThreadDetailMessagesInnerPartsInner providerMetadata(Object providerMetadata) {
-    this.providerMetadata = JsonNullable.<Object>of(providerMetadata);
-    
-    return this;
-  }
-
-  /**
-   * Get providerMetadata
-   * @return providerMetadata
-   */
-  @jakarta.annotation.Nullable
-  @JsonIgnore
-
-  public Object getProviderMetadata() {
-        return providerMetadata.orElse(null);
-  }
-
-  @JsonProperty(JSON_PROPERTY_PROVIDER_METADATA)
-  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
-
-  public JsonNullable<Object> getProviderMetadata_JsonNullable() {
-    return providerMetadata;
-  }
-  
-  @JsonProperty(JSON_PROPERTY_PROVIDER_METADATA)
-  public void setProviderMetadata_JsonNullable(JsonNullable<Object> providerMetadata) {
-    this.providerMetadata = providerMetadata;
-  }
-
-  public void setProviderMetadata(Object providerMetadata) {
-    this.providerMetadata = JsonNullable.<Object>of(providerMetadata);
-  }
-
-  public ThreadDetailMessagesInnerPartsInner url(String url) {
-    
-    this.url = url;
-    return this;
-  }
-
-  /**
-   * Get url
-   * @return url
-   */
-  @jakarta.annotation.Nonnull
-  @JsonProperty(JSON_PROPERTY_URL)
-  @JsonInclude(value = JsonInclude.Include.ALWAYS)
-
-  public String getUrl() {
-    return url;
-  }
-
-
-  @JsonProperty(JSON_PROPERTY_URL)
-  @JsonInclude(value = JsonInclude.Include.ALWAYS)
-  public void setUrl(String url) {
-    this.url = url;
-  }
-
-  public ThreadDetailMessagesInnerPartsInner mediaType(String mediaType) {
-    
-    this.mediaType = mediaType;
-    return this;
-  }
-
-  /**
-   * Get mediaType
-   * @return mediaType
-   */
-  @jakarta.annotation.Nonnull
-  @JsonProperty(JSON_PROPERTY_MEDIA_TYPE)
-  @JsonInclude(value = JsonInclude.Include.ALWAYS)
-
-  public String getMediaType() {
-    return mediaType;
-  }
-
-
-  @JsonProperty(JSON_PROPERTY_MEDIA_TYPE)
-  @JsonInclude(value = JsonInclude.Include.ALWAYS)
-  public void setMediaType(String mediaType) {
-    this.mediaType = mediaType;
-  }
-
-  public ThreadDetailMessagesInnerPartsInner name(String name) {
-    
-    this.name = name;
-    return this;
-  }
-
-  /**
-   * Get name
-   * @return name
-   */
-  @jakarta.annotation.Nullable
-  @JsonProperty(JSON_PROPERTY_NAME)
-  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
-
-  public String getName() {
-    return name;
-  }
-
-
-  @JsonProperty(JSON_PROPERTY_NAME)
-  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
-  public void setName(String name) {
-    this.name = name;
-  }
-
-  public ThreadDetailMessagesInnerPartsInner title(String title) {
-    
-    this.title = title;
-    return this;
-  }
-
-  /**
-   * Get title
-   * @return title
-   */
-  @jakarta.annotation.Nonnull
-  @JsonProperty(JSON_PROPERTY_TITLE)
-  @JsonInclude(value = JsonInclude.Include.ALWAYS)
-
-  public String getTitle() {
-    return title;
-  }
-
-
-  @JsonProperty(JSON_PROPERTY_TITLE)
-  @JsonInclude(value = JsonInclude.Include.ALWAYS)
-  public void setTitle(String title) {
-    this.title = title;
-  }
-
-  public ThreadDetailMessagesInnerPartsInner sourceId(String sourceId) {
-    
-    this.sourceId = sourceId;
-    return this;
-  }
-
-  /**
-   * Get sourceId
-   * @return sourceId
-   */
-  @jakarta.annotation.Nullable
-  @JsonProperty(JSON_PROPERTY_SOURCE_ID)
-  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
-
-  public String getSourceId() {
-    return sourceId;
-  }
-
-
-  @JsonProperty(JSON_PROPERTY_SOURCE_ID)
-  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
-  public void setSourceId(String sourceId) {
-    this.sourceId = sourceId;
-  }
-
-  public ThreadDetailMessagesInnerPartsInner filename(String filename) {
-    
-    this.filename = filename;
-    return this;
-  }
-
-  /**
-   * Get filename
-   * @return filename
-   */
-  @jakarta.annotation.Nullable
-  @JsonProperty(JSON_PROPERTY_FILENAME)
-  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
-
-  public String getFilename() {
-    return filename;
-  }
-
-
-  @JsonProperty(JSON_PROPERTY_FILENAME)
-  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
-  public void setFilename(String filename) {
-    this.filename = filename;
-  }
-
   @Override
   public boolean equals(Object o) {
     if (this == o) {
@@ -325,45 +77,20 @@ public class ThreadDetailMessagesInnerPartsInner {
     }
     ThreadDetailMessagesInnerPartsInner threadDetailMessagesInnerPartsInner = (ThreadDetailMessagesInnerPartsInner) o;
     return Objects.equals(this.type, threadDetailMessagesInnerPartsInner.type) &&
-        Objects.equals(this.text, threadDetailMessagesInnerPartsInner.text) &&
-        equalsNullable(this.providerMetadata, threadDetailMessagesInnerPartsInner.providerMetadata) &&
-        Objects.equals(this.url, threadDetailMessagesInnerPartsInner.url) &&
-        Objects.equals(this.mediaType, threadDetailMessagesInnerPartsInner.mediaType) &&
-        Objects.equals(this.name, threadDetailMessagesInnerPartsInner.name) &&
-        Objects.equals(this.title, threadDetailMessagesInnerPartsInner.title) &&
-        Objects.equals(this.sourceId, threadDetailMessagesInnerPartsInner.sourceId) &&
-        Objects.equals(this.filename, threadDetailMessagesInnerPartsInner.filename);
-  }
-
-  private static <T> boolean equalsNullable(JsonNullable<T> a, JsonNullable<T> b) {
-    return a == b || (a != null && b != null && a.isPresent() && b.isPresent() && Objects.deepEquals(a.get(), b.get()));
+        super.equals(o);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(type, text, hashCodeNullable(providerMetadata), url, mediaType, name, title, sourceId, filename);
-  }
-
-  private static <T> int hashCodeNullable(JsonNullable<T> a) {
-    if (a == null) {
-      return 1;
-    }
-    return a.isPresent() ? Arrays.deepHashCode(new Object[]{a.get()}) : 31;
+    return Objects.hash(type, super.hashCode());
   }
 
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder();
     sb.append("class ThreadDetailMessagesInnerPartsInner {\n");
+    sb.append("    ").append(toIndentedString(super.toString())).append("\n");
     sb.append("    type: ").append(toIndentedString(type)).append("\n");
-    sb.append("    text: ").append(toIndentedString(text)).append("\n");
-    sb.append("    providerMetadata: ").append(toIndentedString(providerMetadata)).append("\n");
-    sb.append("    url: ").append(toIndentedString(url)).append("\n");
-    sb.append("    mediaType: ").append(toIndentedString(mediaType)).append("\n");
-    sb.append("    name: ").append(toIndentedString(name)).append("\n");
-    sb.append("    title: ").append(toIndentedString(title)).append("\n");
-    sb.append("    sourceId: ").append(toIndentedString(sourceId)).append("\n");
-    sb.append("    filename: ").append(toIndentedString(filename)).append("\n");
     sb.append("}");
     return sb.toString();
   }

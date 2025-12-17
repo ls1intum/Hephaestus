@@ -1,8 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { DataUIPart } from "ai";
 import { useEffect, useRef, useState } from "react";
-// TODO: These query hooks need to be created manually or endpoints proxied through app-server
-// Currently the document endpoints are only in the intelligence-service
 import {
 	getDocumentOptions,
 	getDocumentQueryKey,
@@ -12,31 +9,8 @@ import {
 } from "@/api/@tanstack/react-query.gen";
 import type { Document } from "@/api/types.gen";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
-import type { DocumentDataTypes } from "@/lib/types";
 import { useArtifactStore } from "@/stores/artifact-store";
 import { useDocumentsStore } from "@/stores/document-store";
-
-/**
- * Document-specific streaming data part.
- * Derived from AI SDK's DataUIPart using only document-related types.
- */
-type DocumentDataPart = DataUIPart<DocumentDataTypes>;
-
-/** Threshold (in characters) for auto-opening the artifact overlay */
-const AUTO_OPEN_THRESHOLD = 200;
-
-/** Get a DOMRect centered in the current viewport */
-function getCenteredRect(size = 100): DOMRect {
-	const vv = window.visualViewport ?? {
-		offsetLeft: 0,
-		offsetTop: 0,
-		width: window.innerWidth,
-		height: window.innerHeight,
-	};
-	const cx = vv.offsetLeft + vv.width / 2;
-	const cy = vv.offsetTop + vv.height / 2;
-	return new DOMRect(cx - size / 2, cy - size / 2, size, size);
-}
 
 export interface UseDocumentArtifactParams {
 	documentId: string;
@@ -67,8 +41,6 @@ export interface UseDocumentArtifactReturn {
 	onBackToLatestVersion: (() => void) | undefined;
 	/** Save current content to server (mutates latest) */
 	saveContent: (content: string, debounce?: boolean) => void;
-	/** Handle incoming document stream parts (used by useMentorChat) */
-	onStreamPart: (part: DocumentDataPart) => void;
 	/** Open artifact overlay */
 	openOverlay: (rect: DOMRect) => void;
 }
@@ -85,12 +57,7 @@ export function useDocumentArtifact({
 	const draft = useDocumentsStore(
 		(state) => state.documents[documentId]?.draft,
 	);
-	const {
-		setStreaming: setDocStreaming,
-		setEmptyDraft,
-		appendDraftDelta,
-		finishDraft,
-	} = useDocumentsStore.getState();
+	const { setStreaming: setDocStreaming } = useDocumentsStore.getState();
 	const { workspaceSlug, isLoading: isWorkspaceLoading } =
 		useActiveWorkspaceSlug();
 
@@ -318,53 +285,6 @@ export function useDocumentArtifact({
 		openArtifact(`text:${documentId}`, rect, title);
 	};
 
-	/**
-	 * Handle incoming document streaming events.
-	 * Uses exhaustive switch for type safety - TypeScript will error if a new
-	 * document data type is added but not handled.
-	 */
-	const onStreamPart = (part: DocumentDataPart) => {
-		switch (part.type) {
-			case "data-document-create":
-				setEmptyDraft(part.data.id, { title: part.data.title });
-				break;
-
-			case "data-document-update":
-				setEmptyDraft(part.data.id);
-				break;
-
-			case "data-document-delta": {
-				const draft =
-					useDocumentsStore.getState().documents[part.data.id]?.draft;
-				const draftLength = draft?.content.length ?? 0;
-				const newLength = draftLength + part.data.delta.length;
-
-				// Auto-open overlay when content exceeds threshold
-				if (
-					newLength > AUTO_OPEN_THRESHOLD &&
-					draftLength <= AUTO_OPEN_THRESHOLD
-				) {
-					openArtifact(`text:${part.data.id}`, getCenteredRect(), draft?.title);
-				}
-				appendDraftDelta(part.data.id, part.data.delta);
-				break;
-			}
-
-			case "data-document-finish": {
-				finishDraft(part.data.id);
-				const draft =
-					useDocumentsStore.getState().documents[part.data.id]?.draft;
-				const draftLength = draft?.content.length ?? 0;
-
-				// Auto-open for short documents that finish
-				if (draftLength <= AUTO_OPEN_THRESHOLD) {
-					openArtifact(`text:${part.data.id}`, getCenteredRect(), draft?.title);
-				}
-				break;
-			}
-		}
-	};
-
 	return {
 		latest,
 		draft,
@@ -384,7 +304,6 @@ export function useDocumentArtifact({
 		onRestoreSelectedVersion,
 		onBackToLatestVersion,
 		saveContent,
-		onStreamPart,
 		openOverlay,
 	};
 }

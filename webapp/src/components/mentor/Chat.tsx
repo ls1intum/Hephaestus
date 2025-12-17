@@ -109,7 +109,7 @@ export function Chat({
 							<div className="w-full max-w-3xl">
 								<MultimodalInput
 									status={
-										status === "submitted"
+										status === "submitted" || status === "streaming"
 											? "submitted"
 											: status === "error"
 												? "error"

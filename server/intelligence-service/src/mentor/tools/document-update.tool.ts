@@ -71,8 +71,12 @@ async function persistNextVersion(params: {
 	content: string;
 }): Promise<DocumentRow | undefined> {
 	const { id, base, content } = params;
+	if (!base) {
+		// Cannot create a new version without an existing document
+		return undefined;
+	}
 	const now = new Date().toISOString();
-	const nextVersion = (base?.versionNumber ?? 0) + 1;
+	const nextVersion = (base.versionNumber ?? 0) + 1;
 
 	const rows = await db
 		.insert(docTable)
@@ -80,10 +84,11 @@ async function persistNextVersion(params: {
 			id,
 			versionNumber: nextVersion,
 			createdAt: now,
-			title: base?.title ?? "",
+			title: base.title ?? "",
 			content,
-			kind: (base?.kind as "text" | undefined) ?? "text",
-			userId: base?.userId ?? 0,
+			kind: (base.kind as "text" | undefined) ?? "text",
+			userId: base.userId ?? 0,
+			workspaceId: base.workspaceId,
 		})
 		.returning();
 

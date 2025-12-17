@@ -14,7 +14,7 @@ import {
 } from "./documents.schema";
 
 export const createDocumentRoute = createRoute({
-	path: "/documents",
+	path: "/",
 	method: "post",
 	tags: ["documents", ...EXPORTED_TAG],
 	summary: "Create a new document",
@@ -24,6 +24,10 @@ export const createDocumentRoute = createRoute({
 	},
 	responses: {
 		[HttpStatusCodes.CREATED]: jsonContent(DocumentSchema, "Created document"),
+		[HttpStatusCodes.BAD_REQUEST]: jsonContent(
+			z.object({ error: z.string() }),
+			"Missing workspace context",
+		),
 		[HttpStatusCodes.INTERNAL_SERVER_ERROR]: jsonContent(
 			z.object({ error: z.string() }),
 			"Internal error",
@@ -32,7 +36,7 @@ export const createDocumentRoute = createRoute({
 });
 
 export const getDocumentRoute = createRoute({
-	path: "/documents/{id}",
+	path: "/{id}",
 	method: "get",
 	tags: ["documents", ...EXPORTED_TAG],
 	summary: "Get latest version of a document",
@@ -49,7 +53,7 @@ export const getDocumentRoute = createRoute({
 });
 
 export const updateDocumentRoute = createRoute({
-	path: "/documents/{id}",
+	path: "/{id}",
 	method: "put",
 	tags: ["documents", ...EXPORTED_TAG],
 	summary: "Update a document (creates new version)",
@@ -69,7 +73,7 @@ export const updateDocumentRoute = createRoute({
 });
 
 export const deleteDocumentRoute = createRoute({
-	path: "/documents/{id}",
+	path: "/{id}",
 	method: "delete",
 	tags: ["documents", ...EXPORTED_TAG],
 	summary: "Delete a document and all versions",
@@ -86,7 +90,7 @@ export const deleteDocumentRoute = createRoute({
 });
 
 export const listDocumentsRoute = createRoute({
-	path: "/documents",
+	path: "/",
 	method: "get",
 	tags: ["documents", ...EXPORTED_TAG],
 	summary: "List latest version of documents (no auth; all users)",
@@ -102,7 +106,7 @@ export const listDocumentsRoute = createRoute({
 });
 
 export const listVersionsRoute = createRoute({
-	path: "/documents/{id}/versions",
+	path: "/{id}/versions",
 	method: "get",
 	tags: ["documents", ...EXPORTED_TAG],
 	summary: "List versions of a document",
@@ -119,7 +123,7 @@ export const listVersionsRoute = createRoute({
 });
 
 export const getVersionRoute = createRoute({
-	path: "/documents/{id}/versions/{versionNumber}",
+	path: "/{id}/versions/{versionNumber}",
 	method: "get",
 	tags: ["documents", ...EXPORTED_TAG],
 	summary: "Get specific version",
@@ -136,7 +140,7 @@ export const getVersionRoute = createRoute({
 });
 
 export const deleteAfterRoute = createRoute({
-	path: "/documents/{id}/versions",
+	path: "/{id}/versions",
 	method: "delete",
 	tags: ["documents", ...EXPORTED_TAG],
 	summary: "Delete versions after timestamp",

@@ -1,7 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { fn } from "@storybook/test";
 import { useState } from "react";
-import type { Document } from "@/api/types.gen";
 import { VersionFooter } from "./VersionFooter";
 
 /**
@@ -15,10 +14,6 @@ const meta = {
 	},
 	tags: ["autodocs"],
 	argTypes: {
-		documents: {
-			description: "Array of document versions",
-			control: "object",
-		},
 		currentVersionIndex: {
 			description: "Current version index being viewed",
 			control: "number",
@@ -42,44 +37,11 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-// Sample documents for stories
-const sampleDocuments: Document[] = [
-	{
-		id: "doc-1",
-		title: "My Document",
-		content: "Latest version content",
-		createdAt: new Date("2024-01-15T10:30:00Z"),
-		kind: "text",
-		userId: 1,
-		versionNumber: 3,
-	},
-	{
-		id: "doc-2",
-		title: "My Document",
-		content: "Previous version content",
-		createdAt: new Date("2024-01-15T09:15:00Z"),
-		kind: "text",
-		userId: 1,
-		versionNumber: 2,
-	},
-	{
-		id: "doc-3",
-		title: "My Document",
-		content: "Even older version content",
-		createdAt: new Date("2024-01-15T08:00:00Z"),
-		kind: "text",
-		userId: 1,
-		versionNumber: 1,
-	},
-];
-
 /**
  * Default version footer with restore capability.
  */
 export const Default: Story = {
-	args: {
-		documents: sampleDocuments,
-	},
+	args: {},
 	decorators: [
 		(Story) => (
 			<div className="relative h-[400px] bg-background border border-border rounded-lg overflow-hidden">
@@ -101,7 +63,6 @@ export const Default: Story = {
  */
 export const Restoring: Story = {
 	args: {
-		documents: sampleDocuments,
 		isRestoring: true,
 	},
 	decorators: [
@@ -121,56 +82,10 @@ export const Restoring: Story = {
 };
 
 /**
- * Version footer with no documents (should not render).
- */
-export const NoDocuments: Story = {
-	args: {
-		documents: undefined,
-	},
-	decorators: [
-		(Story) => (
-			<div className="relative h-[400px] bg-background border border-border rounded-lg overflow-hidden">
-				<div className="p-6">
-					<h3 className="text-lg font-semibold mb-4">Document Content</h3>
-					<p className="text-muted-foreground">
-						No version footer should appear when documents are undefined.
-					</p>
-				</div>
-				<Story />
-			</div>
-		),
-	],
-};
-
-/**
- * Version footer with empty documents array.
- */
-export const EmptyDocuments: Story = {
-	args: {
-		documents: [],
-	},
-	decorators: [
-		(Story) => (
-			<div className="relative h-[400px] bg-background border border-border rounded-lg overflow-hidden">
-				<div className="p-6">
-					<h3 className="text-lg font-semibold mb-4">Document Content</h3>
-					<p className="text-muted-foreground">
-						Version footer should still appear with empty documents array.
-					</p>
-				</div>
-				<Story />
-			</div>
-		),
-	],
-};
-
-/**
  * Interactive version footer with state management.
  */
 export const Interactive: Story = {
-	args: {
-		documents: sampleDocuments,
-	},
+	args: {},
 	render: (args) => {
 		const [isRestoring, setIsRestoring] = useState(false);
 		const [currentIndex, setCurrentIndex] = useState(1);
@@ -208,7 +123,6 @@ export const Interactive: Story = {
 				</div>
 				<VersionFooter
 					{...args}
-					documents={sampleDocuments}
 					currentVersionIndex={currentIndex}
 					isRestoring={isRestoring}
 					handleVersionChange={handleVersionChange}
@@ -224,7 +138,6 @@ export const Interactive: Story = {
  */
 export const CustomStyled: Story = {
 	args: {
-		documents: sampleDocuments,
 		className: "border-t-2 border-blue-500 bg-blue-50",
 	},
 	decorators: [
@@ -246,9 +159,7 @@ export const CustomStyled: Story = {
  * Version footer in mobile viewport simulation.
  */
 export const Mobile: Story = {
-	args: {
-		documents: sampleDocuments,
-	},
+	args: {},
 	parameters: {
 		viewport: {
 			defaultViewport: "mobile1",
@@ -274,9 +185,7 @@ export const Mobile: Story = {
  * Version footer showing different version indexes.
  */
 export const DifferentVersions: Story = {
-	args: {
-		documents: sampleDocuments,
-	},
+	args: {},
 	render: () => {
 		const versions = [0, 1, 2];
 
@@ -298,7 +207,6 @@ export const DifferentVersions: Story = {
 							</p>
 						</div>
 						<VersionFooter
-							documents={sampleDocuments}
 							currentVersionIndex={versionIndex}
 							isRestoring={false}
 							handleVersionChange={fn()}

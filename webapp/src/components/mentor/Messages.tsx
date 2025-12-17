@@ -69,8 +69,17 @@ export function Messages({
 			if (p.type === "file") return true;
 			if (typeof p.type === "string" && p.type.startsWith("tool-")) {
 				const state = (p as { state?: string }).state;
-				if (state === "input-available" || state === "output-available")
-					return true;
+				// All states that render visible content in tool renderers
+				const visibleStates = [
+					"input-streaming",
+					"input-available",
+					"approval-requested",
+					"approval-responded",
+					"output-available",
+					"output-error",
+					"output-denied",
+				];
+				if (state && visibleStates.includes(state)) return true;
 			}
 		}
 		return false;

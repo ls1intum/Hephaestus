@@ -6,6 +6,7 @@ import { defaultHook } from "stoker/openapi";
 
 import { pinoLogger } from "./logger";
 import type { AppBindings, AppOpenAPI } from "./types";
+import { verboseLogger } from "./verbose-logger";
 import { workspaceContext } from "./workspace-context";
 
 export function createRouter() {
@@ -21,11 +22,13 @@ export default function createApp() {
 
 	// Middleware order matters:
 	// 1. requestId() - generates request ID for tracing
-	// 2. pinoLogger() - logs requests with requestId (must come after requestId)
-	// 3. Other middlewares
+	// 2. verboseLogger() - captures full request/response bodies (opt-in via VERBOSE_LOGGING=true)
+	// 3. pinoLogger() - logs requests with requestId (must come after requestId)
+	// 4. Other middlewares
 	app.use(requestId());
 
 	if (!isTest) {
+		app.use(verboseLogger());
 		app.use(pinoLogger());
 	}
 

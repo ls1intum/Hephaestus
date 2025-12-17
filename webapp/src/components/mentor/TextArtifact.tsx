@@ -36,7 +36,6 @@ export function TextArtifact({ model }: TextArtifactProps) {
 	const onBackToLatestVersion = version?.onBackToLatestVersion;
 	const onRestoreSelectedVersion = version?.onRestoreSelectedVersion;
 	const isRestoring = version?.isRestoring;
-	const documents = version?.documents;
 	const { content, mode, onSaveContent, isLoading } = text;
 	// Local helper: normalize unknown date values (Date | number seconds/ms | string)
 	const toDate = (v: unknown): Date | undefined => {
@@ -118,7 +117,6 @@ export function TextArtifact({ model }: TextArtifactProps) {
 		version && !isCurrentVersion ? (
 			<VersionFooter
 				currentVersionIndex={currentVersionIndex}
-				documents={documents ?? []}
 				handleVersionChange={(type) => {
 					if (type === "latest") onBackToLatestVersion?.();
 					if (type === "prev") onPrevVersion?.();
@@ -158,7 +156,6 @@ export function TextArtifact({ model }: TextArtifactProps) {
 				mode={mode}
 				status={overlay.status}
 				isCurrentVersion={isCurrentVersion}
-				currentVersionIndex={currentVersionIndex}
 				onSaveContent={onSaveContent}
 				isLoading={isLoading}
 			/>

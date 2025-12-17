@@ -4,9 +4,9 @@ import de.tum.in.www1.hephaestus.intelligenceservice.ApiClient;
 import de.tum.in.www1.hephaestus.intelligenceservice.BaseApi;
 
 import de.tum.in.www1.hephaestus.intelligenceservice.model.ChatThreadGroup;
-import de.tum.in.www1.hephaestus.intelligenceservice.model.GetThread404Response;
-import de.tum.in.www1.hephaestus.intelligenceservice.model.MentorChat200Response;
+import de.tum.in.www1.hephaestus.intelligenceservice.model.GetGroupedThreads500Response;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.MentorChatRequest;
+import de.tum.in.www1.hephaestus.intelligenceservice.model.StreamPart;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.ThreadDetail;
 import java.util.UUID;
 
@@ -81,7 +81,7 @@ public class MentorApi extends BaseApi {
         String[] localVarAuthNames = new String[] {  };
 
         ParameterizedTypeReference<List<ChatThreadGroup>> localReturnType = new ParameterizedTypeReference<List<ChatThreadGroup>>() {};
-        return apiClient.invokeAPI("/mentor/threads/threads/grouped", HttpMethod.GET, Collections.<String, Object>emptyMap(), localVarQueryParams, localVarPostBody, localVarHeaderParams, localVarCookieParams, localVarFormParams, localVarAccept, localVarContentType, localVarAuthNames, localReturnType);
+        return apiClient.invokeAPI("/mentor/threads/grouped", HttpMethod.GET, Collections.<String, Object>emptyMap(), localVarQueryParams, localVarPostBody, localVarHeaderParams, localVarCookieParams, localVarFormParams, localVarAccept, localVarContentType, localVarAuthNames, localReturnType);
     }
     /**
      * Get mentor chat thread detail
@@ -143,10 +143,10 @@ public class MentorApi extends BaseApi {
      * 
      * <p><b>200</b> - Event stream of chat updates.
      * @param mentorChatRequest Chat request body (required)
-     * @return MentorChat200Response
+     * @return StreamPart
      * @throws RestClientException if an error occurs while attempting to invoke the API
      */
-    public MentorChat200Response mentorChat(MentorChatRequest mentorChatRequest) throws RestClientException {
+    public StreamPart mentorChat(MentorChatRequest mentorChatRequest) throws RestClientException {
         return mentorChatWithHttpInfo(mentorChatRequest).getBody();
     }
 
@@ -155,10 +155,10 @@ public class MentorApi extends BaseApi {
      * 
      * <p><b>200</b> - Event stream of chat updates.
      * @param mentorChatRequest Chat request body (required)
-     * @return ResponseEntity&lt;MentorChat200Response&gt;
+     * @return ResponseEntity&lt;StreamPart&gt;
      * @throws RestClientException if an error occurs while attempting to invoke the API
      */
-    public ResponseEntity<MentorChat200Response> mentorChatWithHttpInfo(MentorChatRequest mentorChatRequest) throws RestClientException {
+    public ResponseEntity<StreamPart> mentorChatWithHttpInfo(MentorChatRequest mentorChatRequest) throws RestClientException {
         Object localVarPostBody = mentorChatRequest;
         
         // verify the required parameter 'mentorChatRequest' is set
@@ -183,7 +183,7 @@ public class MentorApi extends BaseApi {
 
         String[] localVarAuthNames = new String[] {  };
 
-        ParameterizedTypeReference<MentorChat200Response> localReturnType = new ParameterizedTypeReference<MentorChat200Response>() {};
+        ParameterizedTypeReference<StreamPart> localReturnType = new ParameterizedTypeReference<StreamPart>() {};
         return apiClient.invokeAPI("/mentor/chat", HttpMethod.POST, Collections.<String, Object>emptyMap(), localVarQueryParams, localVarPostBody, localVarHeaderParams, localVarCookieParams, localVarFormParams, localVarAccept, localVarContentType, localVarAuthNames, localReturnType);
     }
 

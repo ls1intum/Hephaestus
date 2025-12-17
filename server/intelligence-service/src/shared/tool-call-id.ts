@@ -2,8 +2,9 @@ import { v4 as uuidv4, v5 as uuidv5 } from "uuid";
 
 /**
  * Namespace for generating deterministic UUIDs from tool call IDs.
+ * This must be a valid UUID v4 for uuidv5 to work correctly.
  */
-export const TOOL_CALL_NAMESPACE = "11111111-2222-3333-4444-555555555555";
+export const TOOL_CALL_NAMESPACE = "893f5233-af7e-467b-aee1-264558855979";
 
 /**
  * Convert an AI SDK tool call ID to a deterministic UUID.

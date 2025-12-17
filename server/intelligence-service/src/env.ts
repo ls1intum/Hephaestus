@@ -21,6 +21,13 @@ const EnvSchema = z
 			.default("info"),
 		DATABASE_URL: z.string().url(),
 
+		// Verbose logging - logs request/response bodies to file
+		VERBOSE_LOGGING: z
+			.enum(["true", "false", "1", "0"])
+			.default("false")
+			.transform((v) => v === "true" || v === "1"),
+		VERBOSE_LOG_FILE: z.string().default("logs/verbose.log"),
+
 		// LLM Providers
 		OPENAI_API_KEY: z.string().min(1).optional(),
 		AZURE_RESOURCE_NAME: z.string().min(1).optional(),

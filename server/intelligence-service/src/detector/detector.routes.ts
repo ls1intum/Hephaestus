@@ -4,7 +4,7 @@ import { jsonContent, jsonContentRequired } from "stoker/openapi/helpers";
 import { detectorRequestSchema, detectorResponseSchema, tags } from "./detector.schema";
 
 export const detectBadPractices = createRoute({
-	path: "/detector",
+	path: "/",
 	method: "post",
 	operationId: "detectBadPractices",
 	tags: [...tags],

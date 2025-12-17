@@ -18,7 +18,7 @@ configureOpenAPI(app);
 app.get("/health", (c) => c.json({ status: "OK" as const }));
 
 // Root redirect
-app.get("/", (c) => c.redirect("/docs"));
+app.get("/", (c) => c.redirect("/reference"));
 
 // Feature routes
 app.route("/detector", detector);

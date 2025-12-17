@@ -21,13 +21,14 @@ import type {
 import environment from "@/environment";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 import { keycloakService } from "@/integrations/auth";
+import { AUTO_OPEN_THRESHOLD, getCenteredRect } from "@/lib/dom-utils";
 import type { ChatMessage, DocumentDataTypes } from "@/lib/types";
 import { useArtifactStore } from "@/stores/artifact-store";
-import { useDocumentArtifact } from "./useDocumentArtifact";
+import { useDocumentsStore } from "@/stores/document-store";
 
 /**
  * Type guard that filters data parts to only document-related ones.
- * Returns a properly typed DocumentDataPart for use with useDocumentArtifact.
+ * Returns a properly typed DocumentDataPart for handling document streaming.
  */
 function isDocumentDataPart(part: {
 	type: string;
@@ -143,14 +144,8 @@ export function useMentorChat({
 	// Artifact/document state
 	// ---------------------------
 
-	// When a document overlay is open, maintain a streaming-aware doc controller
-	const visibleOverlay = useArtifactStore((s) => s.getVisibleArtifact());
-	const artifactDoc = useDocumentArtifact({
-		documentId: visibleOverlay?.artifactId?.split(":")[1] ?? "",
-	});
-
-	// Versions query for the active document
-	// No local version/save handling here; containers manage per-artifact logic
+	// Document streaming is handled directly in onData callback using store actions
+	// to avoid stale closure issues with hook-based handlers
 
 	const openArtifactForDocument = (
 		document: Document,
@@ -248,11 +243,60 @@ export function useMentorChat({
 		onFinish: stableOnFinish,
 		onError: stableOnError,
 		onData: (dataPart) => {
-			// Filter and forward document-related data parts to the artifact handler
-			// The AI SDK provides fully typed dataPart based on ChatMessage's CustomUIDataTypes
+			// Handle document-related data parts directly using store actions
+			// This avoids stale closure issues with hook-based handlers
 			if (isDocumentDataPart(dataPart)) {
-				// TypeScript narrows dataPart to document types; onStreamPart accepts DocumentDataPart
-				artifactDoc.onStreamPart(dataPart);
+				const { setEmptyDraft, appendDraftDelta, finishDraft } =
+					useDocumentsStore.getState();
+				const { openArtifact } = useArtifactStore.getState();
+
+				switch (dataPart.type) {
+					case "data-document-create":
+						setEmptyDraft(dataPart.data.id, { title: dataPart.data.title });
+						break;
+
+					case "data-document-update":
+						setEmptyDraft(dataPart.data.id);
+						break;
+
+					case "data-document-delta": {
+						const docState =
+							useDocumentsStore.getState().documents[dataPart.data.id];
+						const draftLength = docState?.draft?.content?.length ?? 0;
+						const newLength = draftLength + dataPart.data.delta.length;
+
+						// Auto-open overlay when content exceeds threshold
+						if (
+							newLength > AUTO_OPEN_THRESHOLD &&
+							draftLength <= AUTO_OPEN_THRESHOLD
+						) {
+							openArtifact(
+								`text:${dataPart.data.id}`,
+								getCenteredRect(),
+								docState?.draft?.title,
+							);
+						}
+						appendDraftDelta(dataPart.data.id, dataPart.data.delta);
+						break;
+					}
+
+					case "data-document-finish": {
+						finishDraft(dataPart.data.id);
+						const docState =
+							useDocumentsStore.getState().documents[dataPart.data.id];
+						const draftLength = docState?.draft?.content?.length ?? 0;
+
+						// Auto-open for short documents that finish
+						if (draftLength <= AUTO_OPEN_THRESHOLD) {
+							openArtifact(
+								`text:${dataPart.data.id}`,
+								getCenteredRect(),
+								docState?.draft?.title,
+							);
+						}
+						break;
+					}
+				}
 			}
 			// data-usage and other parts are ignored (not needed on client)
 		},

@@ -11,6 +11,7 @@ export type DocumentRecord = {
 	content: string;
 	kind: DocumentKind;
 	userId: number;
+	workspaceId: number;
 };
 
 function toDTO(row: typeof docTable.$inferSelect): DocumentRecord {
@@ -22,6 +23,7 @@ function toDTO(row: typeof docTable.$inferSelect): DocumentRecord {
 		content: row.content ?? "",
 		kind: row.kind as DocumentKind,
 		userId: row.userId ?? 0,
+		workspaceId: row.workspaceId,
 	};
 }
 
@@ -34,6 +36,7 @@ export async function createDocument(params: {
 	content: string;
 	kind: DocumentKind;
 	userId?: number;
+	workspaceId: number;
 }): Promise<DocumentRecord | null> {
 	const id = params.id ?? crypto.randomUUID();
 	const now = new Date().toISOString();
@@ -47,6 +50,7 @@ export async function createDocument(params: {
 			content: params.content,
 			kind: params.kind,
 			userId: params.userId ?? 0,
+			workspaceId: params.workspaceId,
 		})
 		.returning();
 
@@ -108,6 +112,7 @@ export async function updateDocument(
 			content: params.content,
 			kind: params.kind,
 			userId: latest.userId,
+			workspaceId: latest.workspaceId,
 		})
 		.returning();
 

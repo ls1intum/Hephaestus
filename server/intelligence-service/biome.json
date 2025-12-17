@@ -32,7 +32,9 @@
 			"complexity": {
 				"noExcessiveCognitiveComplexity": {
 					"level": "error",
-					"options": { "maxAllowedComplexity": 15 }
+					"options": {
+						"maxAllowedComplexity": 15
+					}
 				},
 				"noVoid": "error",
 				"useSimplifiedLogicExpression": "error"
@@ -68,7 +70,9 @@
 				"useConst": "error",
 				"useConsistentArrayType": {
 					"level": "error",
-					"options": { "syntax": "shorthand" }
+					"options": {
+						"syntax": "shorthand"
+					}
 				},
 				"useDefaultParameterLast": "error",
 				"useExplicitLengthCheck": "error",
@@ -139,10 +143,15 @@
 						"noExcessiveCognitiveComplexity": "off"
 					},
 					"correctness": {
-						"noUnusedFunctionParameters": "off"
+						"noUnusedFunctionParameters": "off",
+						"noUndeclaredDependencies": "off"
 					},
 					"nursery": {
 						"noShadow": "off"
+					},
+					"performance": {
+						"noBarrelFile": "off",
+						"noReExportAll": "off"
 					}
 				}
 			}
@@ -168,24 +177,8 @@
 		},
 		{
 			"includes": [
-				"src/mentor/chat/chat.handler.ts",
-				"src/mentor/threads/threads.handler.ts",
-				"src/mentor/tools/document-update.tool.ts"
-			],
-			"linter": {
-				"rules": {
-					"complexity": {
-						"noExcessiveCognitiveComplexity": {
-							"level": "warn",
-							"options": { "maxAllowedComplexity": 25 }
-						}
-					}
-				}
-			}
-		},
-		{
-			"includes": [
 				"src/shared/http/types.ts",
+				"src/shared/utils/index.ts",
 				"src/repositories/index.ts",
 				"src/services/index.ts",
 				"src/utils/index.ts"

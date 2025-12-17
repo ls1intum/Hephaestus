@@ -1,10 +1,11 @@
 import { ERROR_MESSAGES, HTTP_STATUS } from "@/shared/constants";
 import type { AppRouteHandler } from "@/shared/http/types";
+import { extractErrorMessage, getLogger } from "@/shared/utils";
 import { messageExists, upsertVote } from "./data";
 import type { HandleVoteMessageRoute } from "./vote.routes";
 
 export const voteMessageHandler: AppRouteHandler<HandleVoteMessageRoute> = async (c) => {
-	const logger = c.get("logger");
+	const logger = getLogger(c);
 	const { messageId } = c.req.valid("param");
 	const { isUpvoted } = c.req.valid("json");
 
@@ -26,7 +27,7 @@ export const voteMessageHandler: AppRouteHandler<HandleVoteMessageRoute> = async
 
 		return c.json(vote, { status: HTTP_STATUS.OK });
 	} catch (err) {
-		logger.error({ err }, "Vote message failed");
+		logger.error({ err: extractErrorMessage(err) }, "Vote message failed");
 		return c.json(
 			{ error: ERROR_MESSAGES.INTERNAL_ERROR },
 			{ status: HTTP_STATUS.INTERNAL_SERVER_ERROR },
