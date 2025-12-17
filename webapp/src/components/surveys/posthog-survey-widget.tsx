@@ -82,9 +82,23 @@ export function PostHogSurveyWidget({
 	const [submissionId, setSubmissionId] = useState<string | null>(null);
 	const hasTrackedShown = useRef(false);
 	const currentUrl = useRef(window.location.href);
+	const surveyRef = useRef<PostHogSurvey | null>(null);
+
+	// Keep ref in sync for cleanup effect
+	useEffect(() => {
+		surveyRef.current = survey;
+	}, [survey]);
+
+	// Save visible survey as pending on unmount (navigation, refresh)
+	useEffect(() => {
+		return () => {
+			if (surveyRef.current && isVisible) {
+				setPendingSurvey(surveyRef.current);
+			}
+		};
+	}, [isVisible, setPendingSurvey]);
 
 	// Handle reopening the survey from the notification button
-	// Uses the full survey object from Zustand - synchronous, no fetch needed
 	useEffect(() => {
 		if (shouldShowSurvey && pendingSurvey) {
 			clearShowSignal();
