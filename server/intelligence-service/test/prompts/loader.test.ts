@@ -11,7 +11,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { ChatMessage, PromptDefinition } from "@/prompts/types";
+import type { PromptChatMessage, PromptDefinition } from "@/prompts/types";
 
 // Mock the telemetry module before importing loader
 vi.mock("@/shared/ai/telemetry", () => ({
@@ -267,7 +267,7 @@ describe("Prompt Loader", () => {
 
 		it("should use Langfuse chat messages when available", async () => {
 			vi.mocked(isTelemetryEnabled).mockReturnValue(true);
-			const langfuseMessages: ChatMessage[] = [
+			const langfuseMessages: PromptChatMessage[] = [
 				{ role: "system", content: "Langfuse system for {{project}}" },
 				{ role: "user", content: "Langfuse user {{name}}" },
 			];

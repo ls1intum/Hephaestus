@@ -8,7 +8,7 @@ import {
 	readUIMessageStream,
 	uiMessageChunkSchema,
 } from "ai";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { v4 as uuidv4 } from "uuid";
 import {
 	getGroupedThreadsOptions,
@@ -363,8 +363,9 @@ export function useMentorChat({
 
 	// Trigger greeting from the mentor (no user message required)
 	// Uses the same /chat endpoint with greeting=true flag
+	// React Compiler handles memoization automatically - no useCallback needed
 	const greetingTriggeredRef = useRef(false);
-	const triggerGreeting = useCallback(async () => {
+	const triggerGreeting = async () => {
 		if (!hasWorkspace || greetingTriggeredRef.current) {
 			return;
 		}
@@ -425,14 +426,15 @@ export function useMentorChat({
 			console.error("Greeting error:", err);
 			onError?.(err instanceof Error ? err : new Error(String(err)));
 		}
-	}, [hasWorkspace, slug, stableThreadId, setMessages, queryClient, onError]);
+	};
 
 	// Auto-trigger greeting on mount if enabled
+	// biome-ignore lint/correctness/useExhaustiveDependencies: React Compiler ensures triggerGreeting is stable - no useCallback needed
 	useEffect(() => {
 		if (autoGreeting && hasWorkspace && messages.length === 0) {
 			triggerGreeting();
 		}
-	}, [autoGreeting, hasWorkspace, messages.length, triggerGreeting]);
+	}, [autoGreeting, hasWorkspace, messages.length]);
 
 	// Vote message function
 	const voteMessage = (messageId: string, isUpvoted: boolean) => {

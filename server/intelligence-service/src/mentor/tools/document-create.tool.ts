@@ -21,10 +21,11 @@ import { formatConversationForDocument } from "@/shared/ai/messages";
 import { getTelemetryOptions } from "@/shared/ai/telemetry";
 import { type DocumentKind, DocumentKindEnum } from "@/shared/document";
 import { toolCallIdToUuid } from "@/shared/tool-call-id";
+import { defineToolMeta } from "./define-tool";
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Schema
-// ─────────────────────────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════
+// TOOL DEFINITION (Single Source of Truth)
+// ═══════════════════════════════════════════════════════════════════════════
 
 const inputSchema = z.object({
 	title: z
@@ -35,11 +36,36 @@ const inputSchema = z.object({
 	kind: DocumentKindEnum.describe('Document type. Use "text" (only supported type).'),
 });
 
+const { definition: createDocumentDefinition, TOOL_DESCRIPTION } = defineToolMeta({
+	name: "createDocument",
+	description: `Create a new document (reflection note, session summary) for the user.
+
+**When to use:**
+- When the user wants to save a reflection
+- When creating a session summary at the end of a conversation
+- When documenting learnings or action items
+
+**When NOT to use:**
+- For temporary notes (just include in chat response)
+- When updating an existing document (use updateDocument)
+
+**Document kinds:**
+- "reflection": Personal reflection on work or learning
+- "summary": Session summary with accomplishments, challenges, learnings`,
+	inputSchema,
+});
+
+export { createDocumentDefinition };
+
+// ═══════════════════════════════════════════════════════════════════════════
+// INPUT TYPE
+// ═══════════════════════════════════════════════════════════════════════════
+
 type Input = z.infer<typeof inputSchema>;
 
-// ─────────────────────────────────────────────────────────────────────────────
-// System Prompt
-// ─────────────────────────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════
+// SYSTEM PROMPT
+// ═══════════════════════════════════════════════════════════════════════════
 
 /**
  * System prompt for the document generator.
@@ -79,9 +105,9 @@ Your task: Synthesize the conversation into a clean, well-organized document.
 - Skip sections if no relevant content (don't invent)
 - Use markdown formatting`;
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Document Generation
-// ─────────────────────────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════
+// DOCUMENT GENERATION
+// ═══════════════════════════════════════════════════════════════════════════
 
 interface StreamParams {
 	id: string;
@@ -136,9 +162,9 @@ async function streamDocumentContent(params: StreamParams): Promise<string> {
 	return content;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Tool Export
-// ─────────────────────────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════
+// TOOL FACTORY
+// ═══════════════════════════════════════════════════════════════════════════
 
 interface ToolFactoryParams {
 	dataStream: UIMessageStreamWriter<UIMessage>;
@@ -146,24 +172,13 @@ interface ToolFactoryParams {
 	userId: number | null;
 }
 
-export const createDocument = ({ dataStream, workspaceId, userId }: ToolFactoryParams) =>
+/**
+ * Factory to create the document creation tool.
+ * Requires dataStream for streaming document content to the client.
+ */
+export const createDocumentTool = ({ dataStream, workspaceId, userId }: ToolFactoryParams) =>
 	tool({
-		description: `Create a document artifact that appears in the UI for review and editing.
-
-**When to use:**
-- User asks to prepare their weekly status update
-- User wants to summarize the reflection session
-- Conversation has covered accomplishments, challenges, and next steps
-
-**What it does:**
-- Synthesizes the conversation (including tool data like PRs, activity) into a document
-- Uses actual PR numbers and issue titles from the conversation
-- Generates structured sections: Accomplishments, Challenges, Learnings, Next Steps, Discussion Topics
-
-**Document title examples:**
-- "Weekly Status - Dec 16, 2024"
-- "Sprint Review Notes"
-- "Onboarding Progress Summary"`,
+		description: TOOL_DESCRIPTION,
 
 		inputSchema,
 		strict: true, // Ensure model follows schema strictly

@@ -10,38 +10,49 @@ import { z } from "zod";
 import db from "@/shared/db";
 import { chatMessage, chatThread } from "@/shared/db/schema";
 import type { ToolContext } from "./context";
+import { defineToolMeta } from "./define-tool";
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Tool Factory
-// ─────────────────────────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════
+// TOOL DEFINITION (Single Source of Truth)
+// ═══════════════════════════════════════════════════════════════════════════
+
+const inputSchema = z.object({
+	limit: z
+		.number()
+		.min(1)
+		.max(20)
+		.describe("Number of past sessions to retrieve (1-20). Use 5 for recent context."),
+});
+
+const { definition: getSessionHistoryDefinition, TOOL_DESCRIPTION } = defineToolMeta({
+	name: "getSessionHistory",
+	description: `Get summaries from past mentor sessions.
+
+**When to use:**
+- When referencing previous conversations
+- When the user asks "what did we discuss last time?"
+- When building on previous reflections
+
+**When NOT to use:**
+- For the current session (context already available)
+- For document content (use getDocuments)
+
+**Output includes:**
+- Session dates and topics
+- Key takeaways from past conversations`,
+	inputSchema,
+});
+
+export { getSessionHistoryDefinition };
+
+// ═══════════════════════════════════════════════════════════════════════════
+// TOOL FACTORY
+// ═══════════════════════════════════════════════════════════════════════════
 
 export function createGetSessionHistoryTool(ctx: ToolContext) {
 	return tool({
-		description: `Get summaries of past mentor conversations for continuity and goal follow-up.
-
-**When to use:**
-- When following up on previous discussions ("last time we talked about...")
-- When checking on goals or commitments they made
-- To maintain continuity across sessions
-
-**When NOT to use:**
-- For first-time users (no history exists)
-- When discussing current activity (use activity tools)
-
-**Output includes:**
-- Session titles and dates
-- First user message (topic indicator)
-- Whether the session may contain goals/commitments
-
-CRITICAL: Use this to reference past conversations naturally, not robotically.`,
-
-		inputSchema: z.object({
-			limit: z
-				.number()
-				.min(1)
-				.max(20)
-				.describe("Number of past sessions to retrieve (1-20). Use 5 for recent context."),
-		}),
+		description: TOOL_DESCRIPTION,
+		inputSchema,
 		strict: true,
 
 		execute: async ({ limit }) => {

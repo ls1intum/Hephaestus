@@ -17,10 +17,48 @@ import {
 	user,
 } from "@/shared/db/schema";
 import { buildPrUrl, getWorkspaceRepoIds, type ToolContext } from "./context";
+import { defineToolMeta } from "./define-tool";
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Schema
-// ─────────────────────────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════
+// TOOL DEFINITION (Single Source of Truth)
+// ═══════════════════════════════════════════════════════════════════════════
+
+const inputSchema = z.object({
+	sinceDays: z
+		.number()
+		.min(1)
+		.max(90)
+		.describe("Look back N days. Use 14 for bi-weekly, 30 for monthly review."),
+	includeThreads: z
+		.boolean()
+		.describe("Include unresolved review threads. Set true to see actionable items."),
+});
+
+const { definition: getFeedbackReceivedDefinition, TOOL_DESCRIPTION } = defineToolMeta({
+	name: "getFeedbackReceived",
+	description: `Get feedback the user has received on their pull requests.
+
+**When to use (Zimmerman Self-Reflection Phase):**
+- When exploring how their work was received
+- When discussing improvement areas
+- When the user asks "what feedback have I gotten?"
+
+**When NOT to use:**
+- For feedback they gave to others (use getReviewsGiven)
+- For general activity (use getActivitySummary)
+
+**Output includes:**
+- Review comments with sentiment
+- Reviewer information
+- Links to discussion threads`,
+	inputSchema,
+});
+
+export { getFeedbackReceivedDefinition };
+
+// ═══════════════════════════════════════════════════════════════════════════
+// OUTPUT SCHEMA
+// ═══════════════════════════════════════════════════════════════════════════
 
 const outputSchema = z.object({
 	user: z.string(),
@@ -56,40 +94,14 @@ const outputSchema = z.object({
 	),
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Tool Factory
-// ─────────────────────────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════
+// TOOL FACTORY
+// ═══════════════════════════════════════════════════════════════════════════
 
 export function createGetFeedbackReceivedTool(ctx: ToolContext) {
 	return tool({
-		description: `Get code review feedback the user has received, including review comments and unresolved threads.
-
-**When to use (Zimmerman Self-Reflection Phase):**
-- When reflecting on feedback patterns ("what feedback do I get?")
-- When discussing challenges with code reviews
-- When exploring learning opportunities from reviews
-
-**When NOT to use:**
-- For reviews they've given to others (use getReviewsGiven)
-- For PR status overview (use getPullRequests)
-
-**Output includes:**
-- Reviews received (approved, changes requested, commented)
-- Unresolved review threads that need attention
-- Top reviewers who give them feedback
-
-CRITICAL: This is for REFLECTION on feedback patterns, not just status checking.`,
-
-		inputSchema: z.object({
-			sinceDays: z
-				.number()
-				.min(1)
-				.max(90)
-				.describe("Look back N days. Use 14 for bi-weekly, 30 for monthly review."),
-			includeThreads: z
-				.boolean()
-				.describe("Include unresolved review threads. Set true to see actionable items."),
-		}),
+		description: TOOL_DESCRIPTION,
+		inputSchema,
 		outputSchema,
 		strict: true,
 

@@ -41,6 +41,29 @@ function createMockLogger(): HandlerLogger {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Test Helpers for AI SDK v6
+// ─────────────────────────────────────────────────────────────────────────────
+
+const TEST_URL = "https://api.openai.com/v1/chat/completions";
+
+/**
+ * Create an APICallError with required AI SDK v6 fields.
+ * requestBodyValues is now required in AI SDK v6.
+ */
+function createAPICallError(opts: {
+	message: string;
+	statusCode?: number;
+	isRetryable?: boolean;
+	responseBody?: string;
+}): APICallError {
+	return new APICallError({
+		...opts,
+		url: TEST_URL,
+		requestBodyValues: {}, // Required in AI SDK v6
+	});
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // createAIErrorHandler
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -67,10 +90,9 @@ describe("handleError with APICallError", () => {
 	});
 
 	it("should extract message and mark as retryable for 429 errors", () => {
-		const error = new APICallError({
+		const error = createAPICallError({
 			message: "Rate limit exceeded",
 			statusCode: 429,
-			url: "https://api.openai.com/v1/chat/completions",
 			isRetryable: true,
 		});
 
@@ -84,10 +106,9 @@ describe("handleError with APICallError", () => {
 	});
 
 	it("should handle 401 auth errors with 503 status", () => {
-		const error = new APICallError({
+		const error = createAPICallError({
 			message: "Unauthorized",
 			statusCode: 401,
-			url: "https://api.openai.com/v1/chat/completions",
 			isRetryable: false,
 		});
 
@@ -99,10 +120,9 @@ describe("handleError with APICallError", () => {
 	});
 
 	it("should handle 403 forbidden errors with 503 status", () => {
-		const error = new APICallError({
+		const error = createAPICallError({
 			message: "Forbidden",
 			statusCode: 403,
-			url: "https://api.openai.com/v1/chat/completions",
 			isRetryable: false,
 		});
 
@@ -113,10 +133,9 @@ describe("handleError with APICallError", () => {
 	});
 
 	it("should handle 408 timeout errors with 504 status", () => {
-		const error = new APICallError({
+		const error = createAPICallError({
 			message: "Request Timeout",
 			statusCode: 408,
-			url: "https://api.openai.com/v1/chat/completions",
 			isRetryable: true,
 		});
 
@@ -127,10 +146,9 @@ describe("handleError with APICallError", () => {
 	});
 
 	it("should handle 504 gateway timeout errors", () => {
-		const error = new APICallError({
+		const error = createAPICallError({
 			message: "Gateway Timeout",
 			statusCode: 504,
-			url: "https://api.openai.com/v1/chat/completions",
 			isRetryable: true,
 		});
 
@@ -141,10 +159,9 @@ describe("handleError with APICallError", () => {
 	});
 
 	it("should handle 5xx server errors with 503 status", () => {
-		const error = new APICallError({
+		const error = createAPICallError({
 			message: "Internal Server Error",
 			statusCode: 500,
-			url: "https://api.openai.com/v1/chat/completions",
 			isRetryable: true,
 		});
 
@@ -155,10 +172,9 @@ describe("handleError with APICallError", () => {
 	});
 
 	it("should handle unknown status codes with 500 status", () => {
-		const error = new APICallError({
+		const error = createAPICallError({
 			message: "Bad Request",
 			statusCode: 400,
-			url: "https://api.openai.com/v1/chat/completions",
 			isRetryable: false,
 		});
 
@@ -169,9 +185,8 @@ describe("handleError with APICallError", () => {
 	});
 
 	it("should handle undefined status code", () => {
-		const error = new APICallError({
+		const error = createAPICallError({
 			message: "Network error",
-			url: "https://api.openai.com/v1/chat/completions",
 			isRetryable: true,
 		});
 
@@ -183,10 +198,9 @@ describe("handleError with APICallError", () => {
 
 	it("should truncate long response body in details", () => {
 		const longBody = "x".repeat(1000);
-		const error = new APICallError({
+		const error = createAPICallError({
 			message: "Error with long body",
 			statusCode: 500,
-			url: "https://api.openai.com/v1/chat/completions",
 			responseBody: longBody,
 			isRetryable: true,
 		});
@@ -197,10 +211,9 @@ describe("handleError with APICallError", () => {
 	});
 
 	it("should log error details", () => {
-		const error = new APICallError({
+		const error = createAPICallError({
 			message: "API failure",
 			statusCode: 500,
-			url: "https://api.openai.com/v1/chat/completions",
 			isRetryable: true,
 		});
 
@@ -387,12 +400,10 @@ describe("handleError with RetryError", () => {
 	});
 
 	it("should extract retry info for maxRetriesExceeded", () => {
-		const lastError = new Error("Connection refused");
 		const error = new RetryError({
 			message: "Max retries exceeded",
 			reason: "maxRetriesExceeded",
-			errors: [new Error("Attempt 1"), new Error("Attempt 2"), lastError],
-			lastError,
+			errors: [new Error("Attempt 1"), new Error("Attempt 2"), new Error("Attempt 3")],
 		});
 
 		const result = handleError(error);
@@ -408,7 +419,6 @@ describe("handleError with RetryError", () => {
 			message: "Request aborted",
 			reason: "abort",
 			errors: [],
-			lastError: undefined,
 		});
 
 		const result = handleError(error);
@@ -418,12 +428,10 @@ describe("handleError with RetryError", () => {
 	});
 
 	it("should handle errorNotRetryable reason", () => {
-		const lastError = new Error("Invalid API key");
 		const error = new RetryError({
 			message: "Non-retryable error",
 			reason: "errorNotRetryable",
-			errors: [lastError],
-			lastError,
+			errors: [],
 		});
 
 		const result = handleError(error);
@@ -437,7 +445,6 @@ describe("handleError with RetryError", () => {
 			message: "Retries exhausted",
 			reason: "maxRetriesExceeded",
 			errors: [],
-			lastError: undefined,
 		});
 
 		const result = handleError(error);
@@ -451,7 +458,6 @@ describe("handleError with RetryError", () => {
 			message: "All attempts failed",
 			reason: "maxRetriesExceeded",
 			errors,
-			lastError: errors[2],
 		});
 
 		handleError(error);
@@ -471,7 +477,6 @@ describe("handleError with RetryError", () => {
 			message: "Unknown reason",
 			reason: "unknownReason" as "maxRetriesExceeded",
 			errors: [],
-			lastError: undefined,
 		});
 
 		const result = handleError(error);
@@ -683,10 +688,9 @@ describe("handleError with unknown error type", () => {
 
 describe("isAIError type guard", () => {
 	it("should return true for APICallError", () => {
-		const error = new APICallError({
+		const error = createAPICallError({
 			message: "API error",
 			statusCode: 500,
-			url: "https://api.example.com",
 			isRetryable: true,
 		});
 
@@ -716,7 +720,6 @@ describe("isAIError type guard", () => {
 			message: "Retry failed",
 			reason: "maxRetriesExceeded",
 			errors: [],
-			lastError: undefined,
 		});
 
 		expect(isAIError(error)).toBe(true);
@@ -760,10 +763,9 @@ describe("isAIError type guard", () => {
 
 describe("getStreamErrorMessage in production", () => {
 	it("should return user-safe message for APICallError 429", () => {
-		const error = new APICallError({
+		const error = createAPICallError({
 			message: "Rate limit exceeded",
 			statusCode: 429,
-			url: "https://api.example.com",
 			isRetryable: true,
 		});
 
@@ -773,10 +775,9 @@ describe("getStreamErrorMessage in production", () => {
 	});
 
 	it("should return user-safe message for APICallError 5xx", () => {
-		const error = new APICallError({
+		const error = createAPICallError({
 			message: "Internal server error",
 			statusCode: 500,
-			url: "https://api.example.com",
 			isRetryable: true,
 		});
 
@@ -786,10 +787,9 @@ describe("getStreamErrorMessage in production", () => {
 	});
 
 	it("should return generic message for other APICallErrors", () => {
-		const error = new APICallError({
+		const error = createAPICallError({
 			message: "Bad request details",
 			statusCode: 400,
-			url: "https://api.example.com",
 			isRetryable: false,
 		});
 
@@ -825,7 +825,6 @@ describe("getStreamErrorMessage in production", () => {
 			message: "All retries failed",
 			reason: "maxRetriesExceeded",
 			errors: [],
-			lastError: undefined,
 		});
 
 		const message = getStreamErrorMessage(error, true);
@@ -871,10 +870,9 @@ describe("getStreamErrorMessage in development", () => {
 	});
 
 	it("should still return AI-specific messages for AI errors", () => {
-		const error = new APICallError({
+		const error = createAPICallError({
 			message: "Rate limit exceeded",
 			statusCode: 429,
-			url: "https://api.example.com",
 			isRetryable: true,
 		});
 
@@ -905,10 +903,9 @@ describe("HTTP status code mapping", () => {
 	});
 
 	it("should map APICallError 401 to 503", () => {
-		const error = new APICallError({
+		const error = createAPICallError({
 			message: "Unauthorized",
 			statusCode: 401,
-			url: "https://api.example.com",
 			isRetryable: false,
 		});
 
@@ -916,10 +913,9 @@ describe("HTTP status code mapping", () => {
 	});
 
 	it("should map APICallError 403 to 503", () => {
-		const error = new APICallError({
+		const error = createAPICallError({
 			message: "Forbidden",
 			statusCode: 403,
-			url: "https://api.example.com",
 			isRetryable: false,
 		});
 
@@ -927,10 +923,9 @@ describe("HTTP status code mapping", () => {
 	});
 
 	it("should map APICallError 429 to 429", () => {
-		const error = new APICallError({
+		const error = createAPICallError({
 			message: "Too Many Requests",
 			statusCode: 429,
-			url: "https://api.example.com",
 			isRetryable: true,
 		});
 
@@ -938,10 +933,9 @@ describe("HTTP status code mapping", () => {
 	});
 
 	it("should map APICallError 408 to 504", () => {
-		const error = new APICallError({
+		const error = createAPICallError({
 			message: "Timeout",
 			statusCode: 408,
-			url: "https://api.example.com",
 			isRetryable: true,
 		});
 
@@ -949,10 +943,9 @@ describe("HTTP status code mapping", () => {
 	});
 
 	it("should map APICallError 504 to 504", () => {
-		const error = new APICallError({
+		const error = createAPICallError({
 			message: "Gateway Timeout",
 			statusCode: 504,
-			url: "https://api.example.com",
 			isRetryable: true,
 		});
 
@@ -960,10 +953,9 @@ describe("HTTP status code mapping", () => {
 	});
 
 	it("should map APICallError 500 to 503", () => {
-		const error = new APICallError({
+		const error = createAPICallError({
 			message: "Internal Server Error",
 			statusCode: 500,
-			url: "https://api.example.com",
 			isRetryable: true,
 		});
 
@@ -993,7 +985,6 @@ describe("HTTP status code mapping", () => {
 			message: "Retries exhausted",
 			reason: "maxRetriesExceeded",
 			errors: [],
-			lastError: undefined,
 		});
 
 		expect(handleError(error).suggestedStatus).toBe(503);
@@ -1029,10 +1020,9 @@ describe("category assignment", () => {
 	});
 
 	it("should assign api_call category to APICallError", () => {
-		const error = new APICallError({
+		const error = createAPICallError({
 			message: "API error",
 			statusCode: 500,
-			url: "https://api.example.com",
 			isRetryable: true,
 		});
 
@@ -1062,7 +1052,6 @@ describe("category assignment", () => {
 			message: "Retries exhausted",
 			reason: "maxRetriesExceeded",
 			errors: [],
-			lastError: undefined,
 		});
 
 		expect(handleError(error).category).toBe("retry_exhausted");

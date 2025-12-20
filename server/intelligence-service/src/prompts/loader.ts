@@ -13,7 +13,7 @@ import pino from "pino";
 import { isTelemetryEnabled, langfuse } from "@/shared/ai/telemetry";
 import { extractErrorMessage } from "@/shared/utils";
 import type {
-	ChatMessage,
+	PromptChatMessage,
 	PromptConfig,
 	PromptDefinition,
 	PromptType,
@@ -69,9 +69,9 @@ function compileTemplate(template: string, variables: PromptVariables = {}): str
  * Compile chat messages by replacing variables in each message.
  */
 function compileChatMessages(
-	messages: ChatMessage[],
+	messages: PromptChatMessage[],
 	variables: PromptVariables = {},
-): ChatMessage[] {
+): PromptChatMessage[] {
 	return messages.map((m) => ({
 		...m,
 		content: compileTemplate(m.content, variables),
@@ -106,9 +106,9 @@ export interface LoadPromptOptions {
  *
  * @example
  * ```typescript
- * import { badPracticeDetector } from "@/prompts/detector";
+ * import { badPracticeDetectorPrompt } from "@/prompts";
  *
- * const prompt = await loadPrompt(badPracticeDetector);
+ * const prompt = await loadPrompt(badPracticeDetectorPrompt);
  * const compiled = prompt.compile({ title: "Fix bug", description: "..." });
  *
  * // Use langfusePrompt for telemetry linking
@@ -137,13 +137,23 @@ export async function loadPrompt<T extends PromptType>(
 	if (isTelemetryEnabled()) {
 		try {
 			// Fetch prompt from Langfuse with proper type inference
-			// The SDK supports both "text" and "chat" types
+			// Use separate calls for text vs chat to satisfy TypeScript's overload resolution
 			// @see https://langfuse.com/docs/prompt-management/get-started
-			const langfusePrompt = await langfuse.prompt.get(name, {
-				...(version !== undefined ? { version } : { label }),
-				type: type as "text" | "chat",
-				fallback: definition.prompt as string | ChatMessage[],
-			});
+			const baseOptions = version !== undefined ? { version } : { label };
+
+			const langfusePrompt =
+				type === "text"
+					? await langfuse.prompt.get(name, {
+							...baseOptions,
+							type: "text",
+							fallback: definition.prompt as string,
+						})
+					: await langfuse.prompt.get(name, {
+							...baseOptions,
+							type: "chat",
+							// Langfuse's ChatMessage is { role: string, content: string }
+							fallback: definition.prompt as Array<{ role: string; content: string }>,
+						});
 
 			// Extract config from Langfuse or fall back to local definition
 			const langfuseConfig = (langfusePrompt.config ?? {}) as PromptConfig;
@@ -193,7 +203,7 @@ export async function loadPrompt<T extends PromptType>(
 			if (type === "text") {
 				return compileTemplate(definition.prompt as string, variables);
 			}
-			return compileChatMessages(definition.prompt as ChatMessage[], variables);
+			return compileChatMessages(definition.prompt as PromptChatMessage[], variables);
 		}) as ResolvedPrompt<T>["compile"],
 	};
 

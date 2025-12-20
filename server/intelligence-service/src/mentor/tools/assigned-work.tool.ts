@@ -18,10 +18,36 @@ import {
 	user,
 } from "@/shared/db/schema";
 import { buildIssueUrl, buildPrUrl, getWorkspaceRepoIds, type ToolContext } from "./context";
+import { defineToolMetaNoInput } from "./define-tool";
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Schema
-// ─────────────────────────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════
+// TOOL DEFINITION (Single Source of Truth)
+// ═══════════════════════════════════════════════════════════════════════════
+
+const { definition: getAssignedWorkDefinition, TOOL_DESCRIPTION } = defineToolMetaNoInput({
+	name: "getAssignedWork",
+	description: `Get work assigned to the user: issues they're responsible for AND PRs they're requested to review.
+
+**When to use (Zimmerman Forethought Phase):**
+- When planning what to work on ("what should I focus on?")
+- When prioritizing tasks
+- When checking responsibilities and blockers
+
+**When NOT to use:**
+- When discussing work they authored (use getPullRequests or getIssues)
+- For general activity overview (use getActivitySummary)
+
+**Output includes:**
+- Assigned issues with priority signals (age, milestone)
+- Pending review requests with wait time
+- Suggested focus areas based on urgency`,
+});
+
+export { getAssignedWorkDefinition };
+
+// ═══════════════════════════════════════════════════════════════════════════
+// OUTPUT SCHEMA
+// ═══════════════════════════════════════════════════════════════════════════
 
 const outputSchema = z.object({
 	user: z.string(),
@@ -47,29 +73,13 @@ const outputSchema = z.object({
 	focusSuggestions: z.array(z.string()),
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Tool Factory
-// ─────────────────────────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════
+// TOOL FACTORY
+// ═══════════════════════════════════════════════════════════════════════════
 
 export function createGetAssignedWorkTool(ctx: ToolContext) {
 	return tool({
-		description: `Get work assigned to the user: issues they're responsible for AND PRs they're requested to review.
-
-**When to use (Zimmerman Forethought Phase):**
-- When planning what to work on ("what should I focus on?")
-- When prioritizing tasks
-- When checking responsibilities and blockers
-
-**When NOT to use:**
-- When discussing work they authored (use getPullRequests or getIssues)
-- For general activity overview (use getActivitySummary)
-
-**Output includes:**
-- Assigned issues with priority signals (age, milestone)
-- Pending review requests with wait time
-- Suggested focus areas based on urgency
-
-CRITICAL: This surfaces their RESPONSIBILITIES, not their CONTRIBUTIONS.`,
+		description: TOOL_DESCRIPTION,
 
 		inputSchema: z.object({
 			includeReviewRequests: z

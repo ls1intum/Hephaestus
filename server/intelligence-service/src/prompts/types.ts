@@ -5,6 +5,10 @@
  * 1. Are version-controlled in git as the source of truth
  * 2. Can sync to Langfuse for editing and A/B testing
  * 3. Work without Langfuse (graceful fallback)
+ *
+ * NOTE: PromptChatMessage is distinct from AI SDK's UIMessage/ChatMessage.
+ * This type is for Langfuse prompt templates (system/user/assistant with string content).
+ * AI SDK's UIMessage is for runtime chat with typed parts (text, tool calls, etc.).
  */
 
 import type { ChatPromptClient, TextPromptClient } from "@langfuse/client";
@@ -16,13 +20,63 @@ import type { ChatPromptClient, TextPromptClient } from "@langfuse/client";
 /** Prompt types supported by Langfuse */
 export type PromptType = "text" | "chat";
 
-/** Chat message for chat-type prompts */
-export interface ChatMessage {
+/**
+ * Chat message for Langfuse chat-type prompts.
+ *
+ * This is a simple role+content structure used in Langfuse prompt templates.
+ * NOT to be confused with AI SDK's UIMessage which has typed parts.
+ */
+export interface PromptChatMessage {
 	role: "system" | "user" | "assistant";
 	content: string;
 }
 
-/** Model configuration attached to prompts */
+// ─────────────────────────────────────────────────────────────────────────────
+// Prompt Config (Langfuse v4 Best Practices)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Tool definition for storing function/tool parameters in Langfuse config.
+ * Matches OpenAI function calling format.
+ *
+ * @see https://langfuse.com/docs/prompt-management/features/config#function-calling
+ */
+export interface PromptToolDefinition {
+	type: "function";
+	function: {
+		name: string;
+		description?: string;
+		parameters: Record<string, unknown>;
+	};
+}
+
+/**
+ * Structured output response format for Langfuse config.
+ *
+ * @see https://langfuse.com/docs/prompt-management/features/config#structured-outputs
+ */
+export interface PromptResponseFormat {
+	type: "json_schema";
+	json_schema: {
+		name: string;
+		schema: Record<string, unknown>;
+		strict?: boolean;
+	};
+}
+
+/**
+ * Model configuration attached to prompts.
+ *
+ * Following Langfuse v4 best practices, this config can store:
+ * - Model parameters (model, temperature, maxTokens)
+ * - Tool/function definitions for agents
+ * - Response format for structured outputs
+ *
+ * Because config is versioned with the prompt, you can manage all parameters
+ * in one place and update them without touching application code.
+ *
+ * @see https://langfuse.com/docs/prompt-management/features/config
+ */
 export interface PromptConfig {
 	/** Model name (e.g., "gpt-4o-mini", "openai:gpt-4o") */
 	model?: string;
@@ -32,6 +86,20 @@ export interface PromptConfig {
 	maxTokens?: number;
 	/** Maximum tool call steps for multi-step agents */
 	maxToolSteps?: number;
+	/**
+	 * Tool definitions in OpenAI function format.
+	 * Store tool schemas here for versioning alongside prompts.
+	 */
+	tools?: readonly PromptToolDefinition[] | PromptToolDefinition[];
+	/**
+	 * Tool choice strategy: auto, required, none, or specific tool.
+	 */
+	toolChoice?: "auto" | "required" | "none" | { type: "tool"; toolName: string };
+	/**
+	 * Response format for structured outputs.
+	 * Use with json_schema type for guaranteed JSON structure.
+	 */
+	responseFormat?: PromptResponseFormat;
 	/** Additional configuration values */
 	[key: string]: unknown;
 }
@@ -66,7 +134,7 @@ export interface PromptDefinition<T extends PromptType = PromptType> {
 	type: T;
 
 	/** The prompt content - template string with {{variables}} */
-	prompt: T extends "text" ? string : ChatMessage[];
+	prompt: T extends "text" ? string : PromptChatMessage[];
 
 	/** Description for documentation and Langfuse UI */
 	description?: string;
@@ -82,6 +150,19 @@ export interface PromptDefinition<T extends PromptType = PromptType> {
 
 	/** List of expected variables for documentation */
 	variables?: string[];
+
+	/**
+	 * Metadata for prompt management CLI.
+	 * Used for automatic discovery and sync with Langfuse.
+	 */
+	_meta?: {
+		/**
+		 * Directory containing tool files (relative to src/).
+		 * Each *.tool.ts in this directory exports a *Definition.
+		 * @example "mentor/tools"
+		 */
+		toolsDir?: string;
+	};
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -121,5 +202,5 @@ export interface ResolvedPrompt<T extends PromptType = PromptType> {
 	 * @param variables - Variables to interpolate into the template
 	 * @returns Compiled prompt string (for text) or messages array (for chat)
 	 */
-	compile(variables?: PromptVariables): T extends "text" ? string : ChatMessage[];
+	compile(variables?: PromptVariables): T extends "text" ? string : PromptChatMessage[];
 }

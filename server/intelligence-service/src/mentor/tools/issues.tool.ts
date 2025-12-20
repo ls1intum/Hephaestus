@@ -10,10 +10,43 @@ import { z } from "zod";
 import db from "@/shared/db";
 import { issue, repository } from "@/shared/db/schema";
 import { buildIssueUrl, getWorkspaceRepoIds, type ToolContext } from "./context";
+import { defineToolMeta } from "./define-tool";
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Schema
-// ─────────────────────────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════
+// TOOL DEFINITION (Single Source of Truth)
+// ═══════════════════════════════════════════════════════════════════════════
+
+const inputSchema = z.object({
+	state: z
+		.enum(["open", "closed", "all"])
+		.describe("Filter: 'open', 'closed', or 'all'. Use 'open' for active issues."),
+	limit: z.number().min(1).max(50).describe("Maximum results (1-50). Use 10 for overview."),
+});
+
+const { definition: getIssuesDefinition, TOOL_DESCRIPTION } = defineToolMeta({
+	name: "getIssues",
+	description: `Retrieve issues the user has created (bugs, tasks, feature requests).
+
+**When to use:**
+- When discussing bugs or tasks they've reported
+- When exploring their issue tracking patterns
+- When looking for non-PR work items
+
+**When NOT to use:**
+- For pull requests (use getPullRequests)
+- For issues assigned TO them (use getAssignedWork)
+
+**Output includes:**
+- Issue number, title, state
+- Repository and URL for markdown links`,
+	inputSchema,
+});
+
+export { getIssuesDefinition };
+
+// ═══════════════════════════════════════════════════════════════════════════
+// OUTPUT SCHEMA
+// ═══════════════════════════════════════════════════════════════════════════
 
 const outputSchema = z.object({
 	user: z.string(),
@@ -31,33 +64,14 @@ const outputSchema = z.object({
 	),
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Tool Factory
-// ─────────────────────────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════
+// TOOL FACTORY
+// ═══════════════════════════════════════════════════════════════════════════
 
 export function createGetIssuesTool(ctx: ToolContext) {
 	return tool({
-		description: `Retrieve issues the user has created (bugs, tasks, feature requests).
-
-**When to use:**
-- When discussing bugs or tasks they've reported
-- When exploring their issue tracking patterns
-- When looking for non-PR work items
-
-**When NOT to use:**
-- For pull requests (use getPullRequests)
-- For issues assigned TO them (use getAssignedWork)
-
-**Output includes:**
-- Issue number, title, state
-- Repository and URL for markdown links`,
-
-		inputSchema: z.object({
-			state: z
-				.enum(["open", "closed", "all"])
-				.describe("Filter: 'open', 'closed', or 'all'. Use 'open' for active issues."),
-			limit: z.number().min(1).max(50).describe("Maximum results (1-50). Use 10 for overview."),
-		}),
+		description: TOOL_DESCRIPTION,
+		inputSchema,
 		outputSchema,
 		strict: true,
 

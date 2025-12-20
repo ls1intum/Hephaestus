@@ -23,13 +23,13 @@ describe("Document Tools", () => {
 		await cleanupTestFixtures(fixtures);
 	});
 
-	describe("createDocument", () => {
+	describe("createDocumentTool", () => {
 		it("should create a tool with required properties", async () => {
-			const { createDocument } = await import("@/mentor/tools/document-create.tool");
+			const { createDocumentTool } = await import("@/mentor/tools/document-create.tool");
 			const mockWriter = { write: vi.fn() };
 
-			const tool = createDocument({
-				dataStream: mockWriter as unknown as Parameters<typeof createDocument>[0]["dataStream"],
+			const tool = createDocumentTool({
+				dataStream: mockWriter as unknown as Parameters<typeof createDocumentTool>[0]["dataStream"],
 				workspaceId: fixtures.workspace.id,
 				userId: fixtures.user.id,
 			});
@@ -40,13 +40,13 @@ describe("Document Tools", () => {
 		});
 	});
 
-	describe("updateDocument", () => {
+	describe("updateDocumentTool", () => {
 		it("should create a tool with required properties", async () => {
-			const { updateDocument } = await import("@/mentor/tools/document-update.tool");
+			const { updateDocumentTool } = await import("@/mentor/tools/document-update.tool");
 			const mockWriter = { write: vi.fn() };
 
-			const tool = updateDocument({
-				dataStream: mockWriter as unknown as Parameters<typeof updateDocument>[0]["dataStream"],
+			const tool = updateDocumentTool({
+				dataStream: mockWriter as unknown as Parameters<typeof updateDocumentTool>[0]["dataStream"],
 			});
 
 			expect(tool.description).toBeDefined();

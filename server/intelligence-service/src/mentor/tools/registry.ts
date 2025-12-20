@@ -1,7 +1,7 @@
 /**
  * Tool Registry
  *
- * Centralized tool creation for the mentor agent.
+ * Centralized creation of read-only tools for the mentor agent.
  * This eliminates duplication between the chat handler and any future agents.
  *
  * Benefits:
@@ -9,6 +9,17 @@
  * 2. Consistent tool naming across the codebase
  * 3. Easy to add/remove tools
  * 4. Type-safe tool context injection
+ *
+ * Architecture:
+ * - Tool DESCRIPTIONS: Colocated in each *.tool.ts file
+ * - Tool EXECUTION: Also in each *.tool.ts file with Zod schemas
+ * - MERGING: Done at runtime via merger.ts with Langfuse overrides
+ *
+ * Note: Document write tools (createDocumentTool, updateDocumentTool) are NOT
+ * included here because they require dataStream injection, not just ToolContext.
+ * They are created directly in the chat handler.
+ *
+ * @see ./merger.ts - Merges descriptions with executors
  */
 
 import { createGetActivitySummaryTool } from "./activity-summary.tool";
@@ -23,6 +34,9 @@ import { createGetSessionHistoryTool } from "./session.tool";
 
 /**
  * Activity tools for the mentor - all parallel-safe, user context auto-injected.
+ *
+ * NOTE: These tools include hardcoded descriptions as fallback.
+ * When using Langfuse, descriptions come from prompt config via merger.ts.
  *
  * Tool categories:
  * - Overview: getActivitySummary (call first for context)

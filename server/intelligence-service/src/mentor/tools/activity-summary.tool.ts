@@ -18,10 +18,38 @@ import {
 	pullRequestReviewThread,
 } from "@/shared/db/schema";
 import { getWorkspaceRepoIds, type ToolContext } from "./context";
+import { defineToolMetaNoInput } from "./define-tool";
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Types
-// ─────────────────────────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════
+// TOOL DEFINITION (Single Source of Truth)
+// ═══════════════════════════════════════════════════════════════════════════
+
+const { definition: getActivitySummaryDefinition, TOOL_DESCRIPTION } = defineToolMetaNoInput({
+	name: "getActivitySummary",
+	description: `Get an interpreted overview of the user's activity with week-over-week comparisons and actionable insights.
+
+**When to use:**
+- At the start of any conversation about work or productivity
+- When the user asks "how am I doing?" or "what's been happening?"
+- Before deeper exploration to identify talking points
+
+**When NOT to use:**
+- When you already have activity data from a previous call in this conversation
+- When the user is discussing a specific PR or issue (use getPullRequests or getIssues instead)
+
+**Output includes:**
+- This week vs last week metrics (for trend analysis)
+- Interpreted insights (not just raw numbers)
+- Suggested reflection topics based on patterns
+
+CRITICAL: Call this FIRST before other activity tools. It provides context for interpretation.`,
+});
+
+export { getActivitySummaryDefinition };
+
+// ═══════════════════════════════════════════════════════════════════════════
+// TYPES
+// ═══════════════════════════════════════════════════════════════════════════
 
 interface ActivityMetrics {
 	openPRs: number;
@@ -40,13 +68,9 @@ interface ActivityInsights {
 	reflectionTopics: string[];
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Insight Generation
-// ─────────────────────────────────────────────────────────────────────────────
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Schema
-// ─────────────────────────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════
+// OUTPUT SCHEMA
+// ═══════════════════════════════════════════════════════════════════════════
 
 const outputSchema = z.object({
 	user: z.object({
@@ -70,9 +94,9 @@ const outputSchema = z.object({
 	suggestedReflectionTopics: z.array(z.string()),
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Insight Generation
-// ─────────────────────────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════
+// INSIGHT GENERATION
+// ═══════════════════════════════════════════════════════════════════════════
 
 /**
  * Generate insights from activity metrics.
@@ -123,30 +147,13 @@ function generateActivityInsights(m: ActivityMetrics): ActivityInsights {
 	};
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Tool Factory
-// ─────────────────────────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════
+// TOOL FACTORY
+// ═══════════════════════════════════════════════════════════════════════════
 
 export function createGetActivitySummaryTool(ctx: ToolContext) {
 	return tool({
-		description: `Get an interpreted overview of the user's activity with week-over-week comparisons and actionable insights.
-
-**When to use:**
-- At the start of any conversation about work or productivity
-- When the user asks "how am I doing?" or "what's been happening?"
-- Before deeper exploration to identify talking points
-
-**When NOT to use:**
-- When you already have activity data from a previous call in this conversation
-- When the user is discussing a specific PR or issue (use getPullRequests or getIssues instead)
-
-**Output includes:**
-- This week vs last week metrics (for trend analysis)
-- Interpreted insights (not just raw numbers)
-- Suggested reflection topics based on patterns
-
-CRITICAL: Call this FIRST before other activity tools. It provides context for interpretation.`,
-
+		description: TOOL_DESCRIPTION,
 		inputSchema: z.object({}),
 		outputSchema,
 		strict: true, // Ensure model follows schema strictly

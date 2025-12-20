@@ -11,7 +11,7 @@ import {
 	type VisibilityState,
 } from "@tanstack/react-table";
 import { ArrowUpDown, ChevronDown, Filter, Search, Users } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import type { TeamInfo } from "@/api/types.gen";
 import { Button } from "@/components/ui/button";
 import {
@@ -65,60 +65,53 @@ export function UsersTable({
 	const [globalFilter, setGlobalFilter] = useState("");
 	const [teamFilter, setTeamFilter] = useState<string>("all");
 
-	const columns: ColumnDef<ExtendedUserTeams>[] = useMemo(
-		() => [
-			{
-				accessorKey: "user.name",
-				header: ({ column }) => {
-					return (
-						<Button
-							variant="ghost"
-							onClick={() =>
-								column.toggleSorting(column.getIsSorted() === "asc")
-							}
-							className="h-auto p-0 font-semibold"
-						>
-							Name
-							<ArrowUpDown className="ml-2 h-4 w-4" />
-						</Button>
-					);
-				},
-				cell: ({ row }) => (
-					<div className="font-medium">{row.original.user.name}</div>
-				),
+	// React Compiler handles memoization automatically - no useMemo needed
+	const columns: ColumnDef<ExtendedUserTeams>[] = [
+		{
+			accessorKey: "user.name",
+			header: ({ column }) => {
+				return (
+					<Button
+						variant="ghost"
+						onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+						className="h-auto p-0 font-semibold"
+					>
+						Name
+						<ArrowUpDown className="ml-2 h-4 w-4" />
+					</Button>
+				);
 			},
-			{
-				accessorKey: "user.login",
-				header: ({ column }) => {
-					return (
-						<Button
-							variant="ghost"
-							onClick={() =>
-								column.toggleSorting(column.getIsSorted() === "asc")
-							}
-							className="h-auto p-0 font-semibold"
-						>
-							Username
-							<ArrowUpDown className="ml-2 h-4 w-4" />
-						</Button>
-					);
-				},
-				cell: ({ row }) => (
-					<div className="text-muted-foreground">{row.original.user.login}</div>
-				),
+			cell: ({ row }) => (
+				<div className="font-medium">{row.original.user.name}</div>
+			),
+		},
+		{
+			accessorKey: "user.login",
+			header: ({ column }) => {
+				return (
+					<Button
+						variant="ghost"
+						onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+						className="h-auto p-0 font-semibold"
+					>
+						Username
+						<ArrowUpDown className="ml-2 h-4 w-4" />
+					</Button>
+				);
 			},
-		],
-		[],
-	);
+			cell: ({ row }) => (
+				<div className="text-muted-foreground">{row.original.user.login}</div>
+			),
+		},
+	];
 
-	const filteredData = useMemo(() => {
-		return users.filter((user) => {
-			if (teamFilter === "all") return true;
-			return (
-				user.teams?.some((team) => team.id.toString() === teamFilter) || false
-			);
-		});
-	}, [users, teamFilter]);
+	// React Compiler handles memoization automatically
+	const filteredData = users.filter((user) => {
+		if (teamFilter === "all") return true;
+		return (
+			user.teams?.some((team) => team.id.toString() === teamFilter) || false
+		);
+	});
 
 	const table = useReactTable({
 		data: filteredData,

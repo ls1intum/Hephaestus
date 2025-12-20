@@ -10,10 +10,11 @@ import { z } from "zod";
 import db from "@/shared/db";
 import { issue, repository } from "@/shared/db/schema";
 import { buildPrUrl, getWorkspaceRepoIds, type ToolContext } from "./context";
+import { defineToolMeta } from "./define-tool";
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Schemas
-// ─────────────────────────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════
+// TOOL DEFINITION (Single Source of Truth)
+// ═══════════════════════════════════════════════════════════════════════════
 
 const inputSchema = z.object({
 	state: z
@@ -34,6 +35,38 @@ const inputSchema = z.object({
 			"Only include PRs updated in the last N days. Use 7 for weekly, 14 for bi-weekly review.",
 		),
 });
+
+const { definition: getPullRequestsDefinition, TOOL_DESCRIPTION } = defineToolMeta({
+	name: "getPullRequests",
+	description: `Retrieve the user's pull requests with titles, code stats, and feedback indicators.
+
+**When to use:**
+- When discussing specific work they've done ("what did I ship?")
+- After getActivitySummary to get PR titles for personalized responses
+- When exploring challenges related to specific PRs
+
+**When NOT to use:**
+- For general activity overview (use getActivitySummary first)
+- When looking for issues/bugs (use getIssues instead)
+
+**Output includes:**
+- PR number, title, and state
+- Code stats (additions, deletions, files changed)
+- Repository and full URL for markdown links
+
+**Example inputs:**
+- { state: "merged", sinceDays: 7 } - "What did I ship this week?"
+- { state: "open", limit: 20 } - "Show me my open PRs"
+
+CRITICAL: Always use the 'url' field to create markdown links like [#123](url) in your responses.`,
+	inputSchema,
+});
+
+export { getPullRequestsDefinition };
+
+// ═══════════════════════════════════════════════════════════════════════════
+// OUTPUT SCHEMA
+// ═══════════════════════════════════════════════════════════════════════════
 
 const outputSchema = z.object({
 	user: z.string(),
@@ -57,11 +90,11 @@ const outputSchema = z.object({
 	),
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Output Formatting
-// ─────────────────────────────────────────────────────────────────────────────
-
 type PullRequestOutput = z.infer<typeof outputSchema>;
+
+// ═══════════════════════════════════════════════════════════════════════════
+// OUTPUT FORMATTING
+// ═══════════════════════════════════════════════════════════════════════════
 
 function formatPRLine(pr: PullRequestOutput["pullRequests"][0]): string {
 	const stats = `+${pr.stats.additions}/-${pr.stats.deletions}`;
@@ -84,7 +117,7 @@ function addPRSection(
 	lines.push("");
 }
 
-function formatPullRequestsForModel(output: PullRequestOutput): { type: "text"; value: string } {
+function formatForModel(output: PullRequestOutput): { type: "text"; value: string } {
 	const { user: prUser, count, pullRequests } = output;
 
 	if (count === 0) {
@@ -108,34 +141,13 @@ function formatPullRequestsForModel(output: PullRequestOutput): { type: "text"; 
 	return { type: "text", value: lines.join("\n").trim() };
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Tool Factory
-// ─────────────────────────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════
+// TOOL FACTORY
+// ═══════════════════════════════════════════════════════════════════════════
 
 export function createGetPullRequestsTool(ctx: ToolContext) {
 	return tool({
-		description: `Retrieve the user's pull requests with titles, code stats, and feedback indicators.
-
-**When to use:**
-- When discussing specific work they've done ("what did I ship?")
-- After getActivitySummary to get PR titles for personalized responses
-- When exploring challenges related to specific PRs
-
-**When NOT to use:**
-- For general activity overview (use getActivitySummary first)
-- When looking for issues/bugs (use getIssues instead)
-
-**Output includes:**
-- PR number, title, and state
-- Code stats (additions, deletions, files changed)
-- Repository and full URL for markdown links
-
-**Example inputs:**
-- { state: "merged", sinceDays: 7 } - "What did I ship this week?"
-- { state: "open", limit: 20 } - "Show me my open PRs"
-
-CRITICAL: Always use the 'url' field to create markdown links like [#123](url) in your responses.`,
-
+		description: TOOL_DESCRIPTION,
 		inputSchema,
 		outputSchema,
 		strict: true,
@@ -204,8 +216,6 @@ CRITICAL: Always use the 'url' field to create markdown links like [#123](url) i
 			};
 		},
 
-		toModelOutput({ output }: { output: PullRequestOutput }) {
-			return formatPullRequestsForModel(output);
-		},
+		toModelOutput: ({ output }) => formatForModel(output),
 	});
 }

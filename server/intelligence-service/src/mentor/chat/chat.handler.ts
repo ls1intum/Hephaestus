@@ -25,11 +25,13 @@ import {
 } from "ai";
 import { v4 as uuidv4 } from "uuid";
 import env from "@/env";
-import { createActivityTools } from "@/mentor/tools";
-import { createDocument as createDocumentFactory } from "@/mentor/tools/document-create.tool";
-import { updateDocument as updateDocumentFactory } from "@/mentor/tools/document-update.tool";
+import { createActivityTools, extractToolConfig, overrideToolDescriptions } from "@/mentor/tools";
+import { createDocumentTool } from "@/mentor/tools/document-create.tool";
+import { updateDocumentTool } from "@/mentor/tools/document-update.tool";
 import { loadPrompt, mentorChatPrompt } from "@/prompts";
+import type { PromptToolDefinition } from "@/prompts/types";
 import { createAIErrorHandler, getStreamErrorMessage } from "@/shared/ai/error-handler";
+import { getModel } from "@/shared/ai/model";
 import { createMentorSystemPrompt } from "@/shared/ai/prompts";
 import { buildTelemetryOptions } from "@/shared/ai/telemetry";
 import { ERROR_MESSAGES, HTTP_STATUS } from "@/shared/constants";
@@ -200,28 +202,53 @@ export const mentorChatHandler: AppRouteHandler<HandleMentorChatRoute> = async (
 					isReturningUser: String(isReturningUser),
 				});
 
+				// Resolve model from Langfuse config or fall back to env default
+				// This follows Langfuse v4 best practice: store model in prompt config
+				// @see https://langfuse.com/docs/prompt-management/features/config#using-the-config
+				const model =
+					typeof resolvedPrompt.config.model === "string"
+						? getModel(resolvedPrompt.config.model)
+						: env.defaultModel;
+
+				// Resolve temperature from Langfuse config (optional)
+				const temperature =
+					typeof resolvedPrompt.config.temperature === "number"
+						? resolvedPrompt.config.temperature
+						: undefined;
+
+				// Extract tool config from Langfuse (toolChoice, maxToolSteps)
+				const toolConfig = extractToolConfig(resolvedPrompt.config);
+
+				// Create local tools with fallback descriptions
+				const localTools = {
+					// Document tools (require stream writer)
+					createDocument: createDocumentTool({ dataStream: writer, workspaceId, userId }),
+					updateDocument: updateDocumentTool({ dataStream: writer }),
+					// Activity tools via registry - all parallel-safe, user context auto-injected
+					...createActivityTools(toolContext),
+				};
+
+				// Override tool descriptions with Langfuse-managed versions
+				// This allows A/B testing tool descriptions and updating without code deployment
+				// @see https://langfuse.com/docs/prompt-management/features/config#function-calling
+				const langfuseTools = resolvedPrompt.config.tools as PromptToolDefinition[] | undefined;
+				const tools = overrideToolDescriptions(localTools, langfuseTools);
+
 				const result = streamText({
-					model: env.defaultModel,
+					model,
 					system: finalSystemPrompt,
 					// Use prompt for greeting, messages for normal chat
 					...(isGreetingMode ? { prompt: greetingPrompt } : { messages: modelMessages }),
-					// Create all tools via registry for consistent configuration
-					tools: {
-						// Document tools (require stream writer)
-						createDocument: createDocumentFactory({ dataStream: writer, workspaceId, userId }),
-						updateDocument: updateDocumentFactory({ dataStream: writer }),
-						// Activity tools via registry - all parallel-safe, user context auto-injected
-						...createActivityTools(toolContext),
-					},
-					toolChoice: "auto",
+					// Apply temperature from Langfuse config if available
+					...(temperature !== undefined && { temperature }),
+					// Tools with Langfuse-managed descriptions
+					tools,
+					// Tool choice from Langfuse config (default: auto)
+					toolChoice: toolConfig.toolChoice ?? "auto",
 					// Allow multi-step tool calling: the model can call tools and then
 					// continue generating a response based on tool results.
 					// Max steps is configurable via Langfuse prompt config
-					stopWhen: stepCountIs(
-						typeof resolvedPrompt.config.maxToolSteps === "number"
-							? resolvedPrompt.config.maxToolSteps
-							: 5,
-					),
+					stopWhen: stepCountIs(toolConfig.maxToolSteps ?? 5),
 					// Enable Langfuse telemetry for observability
 					...telemetryOptions,
 					// Callback for each step - useful for tracking tool usage

@@ -20,22 +20,43 @@ import { formatConversationForDocument } from "@/shared/ai/messages";
 import { getTelemetryOptions } from "@/shared/ai/telemetry";
 import db from "@/shared/db";
 import { document as docTable } from "@/shared/db/schema";
+import { defineToolMeta } from "./define-tool";
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Schema
-// ─────────────────────────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════
+// TOOL DEFINITION (Single Source of Truth)
+// ═══════════════════════════════════════════════════════════════════════════
 
 const inputSchema = z.object({
 	id: z.string().uuid().describe("The document ID to update."),
 	description: z.string().describe("What changes to make to the document."),
 });
 
+const { definition: updateDocumentDefinition, TOOL_DESCRIPTION } = defineToolMeta({
+	name: "updateDocument",
+	description: `Update an existing document with new content.
+
+**When to use:**
+- When adding to an existing reflection or summary
+- When the user wants to modify a previous document
+
+**When NOT to use:**
+- When creating a new document (use createDocument)
+- When deleting content (describe what to remove, don't delete)`,
+	inputSchema,
+});
+
+export { updateDocumentDefinition };
+
+// ═══════════════════════════════════════════════════════════════════════════
+// INPUT TYPE
+// ═══════════════════════════════════════════════════════════════════════════
+
 type Input = z.infer<typeof inputSchema>;
 type DocumentRow = typeof docTable.$inferSelect;
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Database Operations
-// ─────────────────────────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════
+// DATABASE OPERATIONS
+// ═══════════════════════════════════════════════════════════════════════════
 
 async function getLatestDocumentRow(id: string): Promise<DocumentRow | undefined> {
 	const rows = await db
@@ -76,9 +97,9 @@ async function persistNextVersion(params: {
 	return rows[0];
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Document Update
-// ─────────────────────────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════
+// DOCUMENT UPDATE
+// ═══════════════════════════════════════════════════════════════════════════
 
 interface StreamParams {
 	id: string;
@@ -151,28 +172,21 @@ ${currentContent}
 	return content;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Tool Export
-// ─────────────────────────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════
+// TOOL FACTORY
+// ═══════════════════════════════════════════════════════════════════════════
 
 interface ToolFactoryParams {
 	dataStream: UIMessageStreamWriter<UIMessage>;
 }
 
-export const updateDocument = ({ dataStream }: ToolFactoryParams) =>
+/**
+ * Factory to create the document update tool.
+ * Requires dataStream for streaming document content to the client.
+ */
+export const updateDocumentTool = ({ dataStream }: ToolFactoryParams) =>
 	tool({
-		description: `Update an existing document with new content or changes.
-
-**When to use:**
-- User asks to modify, update, or add to an existing document
-- User wants to incorporate new information into a document
-- User asks to fix or improve document content
-
-**What it does:**
-- Retrieves the current document version
-- Applies the requested changes while preserving structure
-- Creates a new version (keeps history)
-- Streams updates to the UI in real-time`,
+		description: TOOL_DESCRIPTION,
 
 		inputSchema,
 		strict: true, // Ensure model follows schema strictly

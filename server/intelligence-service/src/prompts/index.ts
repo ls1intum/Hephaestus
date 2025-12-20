@@ -4,7 +4,13 @@
  * This module provides:
  * - Type definitions for prompts
  * - Loader with Langfuse integration and fallback
- * - All prompt definitions organized by feature
+ * - Re-exports of all prompt definitions from their feature modules
+ *
+ * Prompts are COLOCATED with their features:
+ * - src/mentor/chat.prompt.ts - Mentor chat system prompt
+ * - src/detector/bad-practice.prompt.ts - Bad practice detector
+ *
+ * This barrel file re-exports them for convenience.
  *
  * @example
  * ```typescript
@@ -15,18 +21,31 @@
  * ```
  */
 
-// Detector prompts - explicit export to avoid re-export all
-export { badPracticeDetectorPrompt } from "./detector/bad-practice.prompt";
-// Loader
+// ─────────────────────────────────────────────────────────────────────────────
+// Prompt Definitions (re-exported from feature modules)
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Detector feature
+export { badPracticeDetectorPrompt } from "@/detector/bad-practice.prompt";
+// Mentor feature
+export { type MentorChatVariables, mentorChatPrompt } from "@/mentor/chat.prompt";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Loader API
+// ─────────────────────────────────────────────────────────────────────────────
+
 export type { LoadPromptOptions } from "./loader";
 export { clearPromptCache, getPromptCacheStats, loadPrompt, preloadPrompts } from "./loader";
-// Mentor prompts
-export { mentorChatPrompt } from "./mentor/chat.prompt";
-// Types - explicit exports to avoid barrel file issues
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Types
+// ─────────────────────────────────────────────────────────────────────────────
+
 export type {
-	ChatMessage,
+	PromptChatMessage,
 	PromptConfig,
 	PromptDefinition,
+	PromptToolDefinition,
 	PromptType,
 	PromptVariables,
 	ResolvedPrompt,

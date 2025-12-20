@@ -10,14 +10,23 @@ import { z } from "zod";
 import db from "@/shared/db";
 import { document } from "@/shared/db/schema";
 import type { ToolContext } from "./context";
+import { defineToolMeta } from "./define-tool";
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Tool Factory
-// ─────────────────────────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════
+// TOOL DEFINITION (Single Source of Truth)
+// ═══════════════════════════════════════════════════════════════════════════
 
-export function createGetDocumentsTool(ctx: ToolContext) {
-	return tool({
-		description: `Get documents (reflection notes, summaries) created in past mentor sessions.
+const inputSchema = z.object({
+	limit: z
+		.number()
+		.min(1)
+		.max(20)
+		.describe("Maximum documents to retrieve (1-20). Use 5 for recent, 10 for comprehensive."),
+});
+
+const { definition: getDocumentsDefinition, TOOL_DESCRIPTION } = defineToolMeta({
+	name: "getDocuments",
+	description: `Get documents (reflection notes, summaries) created in past mentor sessions.
 
 **When to use:**
 - When referencing past reflections or learnings
@@ -30,14 +39,19 @@ export function createGetDocumentsTool(ctx: ToolContext) {
 - Document titles and types
 - Creation dates
 - Content previews`,
+	inputSchema,
+});
 
-		inputSchema: z.object({
-			limit: z
-				.number()
-				.min(1)
-				.max(20)
-				.describe("Maximum documents to retrieve (1-20). Use 5 for recent, 10 for comprehensive."),
-		}),
+export { getDocumentsDefinition };
+
+// ═══════════════════════════════════════════════════════════════════════════
+// TOOL FACTORY
+// ═══════════════════════════════════════════════════════════════════════════
+
+export function createGetDocumentsTool(ctx: ToolContext) {
+	return tool({
+		description: TOOL_DESCRIPTION,
+		inputSchema,
 		strict: true,
 
 		execute: async ({ limit }) => {

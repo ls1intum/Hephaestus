@@ -18,9 +18,9 @@
 
 import { LangfuseClient } from "@langfuse/client";
 
-// Import all prompt definitions
-import { badPracticeDetectorPrompt } from "../src/prompts/detector/bad-practice.prompt";
-import { mentorChatPrompt } from "../src/prompts/mentor/chat.prompt";
+// Import all prompt definitions (colocated with their features)
+import { badPracticeDetectorPrompt } from "../src/detector/bad-practice.prompt";
+import { mentorChatPrompt } from "../src/mentor/chat.prompt";
 import type { PromptDefinition } from "../src/prompts/types";
 
 // ─────────────────────────────────────────────────────────────────────────────

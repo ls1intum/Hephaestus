@@ -4,10 +4,18 @@
  * This prompt is synced to Langfuse for management and versioning.
  * The prompt uses template variables that are compiled at runtime.
  *
+ * Tool definitions are colocated with each tool file and aggregated here.
+ * This allows:
+ * - Version-controlled tool descriptions alongside prompts
+ * - A/B testing different tool guidance
+ * - Updating tool usage patterns without code deployment
+ *
  * @see https://langfuse.com/docs/prompts/get-started
+ * @see https://langfuse.com/docs/prompt-management/features/config#function-calling
  */
 
-import type { PromptDefinition } from "../types";
+import type { PromptDefinition } from "@/prompts/types";
+import { mentorToolDefinitions } from "./tools";
 
 /**
  * Template variables for the mentor chat prompt.
@@ -33,10 +41,22 @@ export const mentorChatPrompt: PromptDefinition = {
 	name: "mentor-chat-system",
 	type: "text",
 	labels: ["production"],
-	tags: ["mentor", "chat", "system-prompt"],
+	tags: ["mentor", "chat", "system-prompt", "tools"],
+
+	// Metadata for prompt management CLI - tools are in individual *.tool.ts files
+	_meta: {
+		toolsDir: "mentor/tools",
+	},
+
 	config: {
+		// Model configuration
 		temperature: 0.7,
 		maxToolSteps: 5, // Max multi-step tool calling iterations
+
+		// Tool configuration - definitions colocated with each tool file
+		// @see https://langfuse.com/docs/prompt-management/features/config#function-calling
+		tools: mentorToolDefinitions,
+		toolChoice: "auto",
 	},
 	prompt: `You are Heph, a mentor for {{firstName}}. You have access to their GitHub activity.
 

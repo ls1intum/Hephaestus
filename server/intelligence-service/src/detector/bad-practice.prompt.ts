@@ -5,7 +5,7 @@
  * Used by the detector service to analyze pull request quality.
  */
 
-import type { PromptDefinition } from "../types";
+import type { PromptDefinition } from "@/prompts/types";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Prompt Definition

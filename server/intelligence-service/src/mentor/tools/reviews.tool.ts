@@ -10,10 +10,46 @@ import { z } from "zod";
 import db from "@/shared/db";
 import { issue, pullRequestReview, repository, user } from "@/shared/db/schema";
 import { buildPrUrl, getWorkspaceRepoIds, type ToolContext } from "./context";
+import { defineToolMeta } from "./define-tool";
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Schema
-// ─────────────────────────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════
+// TOOL DEFINITION (Single Source of Truth)
+// ═══════════════════════════════════════════════════════════════════════════
+
+const inputSchema = z.object({
+	sinceDays: z
+		.number()
+		.min(1)
+		.max(90)
+		.describe("Look back N days. Use 14 for bi-weekly, 30 for monthly review."),
+	limit: z.number().min(1).max(50).describe("Maximum results (1-50). Use 15 for overview."),
+});
+
+const { definition: getReviewsGivenDefinition, TOOL_DESCRIPTION } = defineToolMeta({
+	name: "getReviewsGiven",
+	description: `Get code reviews the user has given to teammates.
+
+**When to use:**
+- When discussing their collaboration and mentorship
+- When exploring their reviewing patterns
+- When the user asks "what reviews have I done?"
+
+**When NOT to use:**
+- For feedback they received (use getFeedbackReceived)
+- For their own PRs (use getPullRequests)
+
+**Output includes:**
+- Review verdicts (approved, changes requested, commented)
+- PR titles and authors reviewed
+- Time investment in reviews`,
+	inputSchema,
+});
+
+export { getReviewsGivenDefinition };
+
+// ═══════════════════════════════════════════════════════════════════════════
+// OUTPUT SCHEMA
+// ═══════════════════════════════════════════════════════════════════════════
 
 const outputSchema = z.object({
 	user: z.string(),
@@ -37,35 +73,14 @@ const outputSchema = z.object({
 	),
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Tool Factory
-// ─────────────────────────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════
+// TOOL FACTORY
+// ═══════════════════════════════════════════════════════════════════════════
 
 export function createGetReviewsGivenTool(ctx: ToolContext) {
 	return tool({
-		description: `Get code reviews the user has given to teammates.
-
-**When to use:**
-- When discussing their collaboration and mentoring
-- When exploring their review patterns and impact
-- When reflecting on time spent helping others
-
-**When NOT to use:**
-- For feedback THEY received (use getFeedbackReceived)
-
-**Output includes:**
-- Reviews given with state (approved, changes requested)
-- PR authors they've helped
-- Review depth indicators (has comment or not)`,
-
-		inputSchema: z.object({
-			sinceDays: z
-				.number()
-				.min(1)
-				.max(90)
-				.describe("Look back N days. Use 14 for bi-weekly, 30 for monthly review."),
-			limit: z.number().min(1).max(50).describe("Maximum results (1-50). Use 15 for overview."),
-		}),
+		description: TOOL_DESCRIPTION,
+		inputSchema,
 		outputSchema,
 		strict: true,
 
