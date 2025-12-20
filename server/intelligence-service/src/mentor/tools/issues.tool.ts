@@ -6,11 +6,15 @@
 
 import { tool } from "ai";
 import { and, desc, eq, inArray } from "drizzle-orm";
+import pino from "pino";
 import { z } from "zod";
 import db from "@/shared/db";
 import { issue, repository } from "@/shared/db/schema";
+import { MAX_ISSUES } from "./constants";
 import { buildIssueUrl, getWorkspaceRepoIds, type ToolContext } from "./context";
 import { defineToolMeta } from "./define-tool";
+
+const logger = pino({ name: "issues-tool" });
 
 // ═══════════════════════════════════════════════════════════════════════════
 // TOOL DEFINITION (Single Source of Truth)
@@ -20,7 +24,11 @@ const inputSchema = z.object({
 	state: z
 		.enum(["open", "closed", "all"])
 		.describe("Filter: 'open', 'closed', or 'all'. Use 'open' for active issues."),
-	limit: z.number().min(1).max(50).describe("Maximum results (1-50). Use 10 for overview."),
+	limit: z
+		.number()
+		.min(1)
+		.max(MAX_ISSUES)
+		.describe(`Maximum results (1-${MAX_ISSUES}). Use 10 for overview.`),
 });
 
 const { definition: getIssuesDefinition, TOOL_DESCRIPTION } = defineToolMeta({
@@ -76,48 +84,58 @@ export function createGetIssuesTool(ctx: ToolContext) {
 		strict: true,
 
 		execute: async ({ state, limit }) => {
-			const repoIds = await getWorkspaceRepoIds(ctx.workspaceId);
+			try {
+				const repoIds = await getWorkspaceRepoIds(ctx);
 
-			const conditions = [eq(issue.authorId, ctx.userId), eq(issue.issueType, "ISSUE")];
+				const conditions = [eq(issue.authorId, ctx.userId), eq(issue.issueType, "ISSUE")];
 
-			if (repoIds.length > 0) {
-				conditions.push(inArray(issue.repositoryId, repoIds));
+				if (repoIds.length > 0) {
+					conditions.push(inArray(issue.repositoryId, repoIds));
+				}
+
+				if (state === "open") {
+					conditions.push(eq(issue.state, "OPEN"));
+				} else if (state === "closed") {
+					conditions.push(eq(issue.state, "CLOSED"));
+				}
+
+				const issues = await db
+					.select({
+						number: issue.number,
+						title: issue.title,
+						state: issue.state,
+						createdAt: issue.createdAt,
+						closedAt: issue.closedAt,
+						repository: repository.nameWithOwner,
+					})
+					.from(issue)
+					.leftJoin(repository, eq(issue.repositoryId, repository.id))
+					.where(and(...conditions))
+					.orderBy(desc(issue.updatedAt))
+					.limit(limit);
+
+				return {
+					user: ctx.userLogin,
+					count: issues.length,
+					issues: issues.map((i) => ({
+						number: i.number,
+						title: i.title,
+						state: i.state?.toLowerCase(),
+						url: buildIssueUrl(i.repository, i.number),
+						repository: i.repository,
+						createdAt: i.createdAt,
+						closedAt: i.closedAt,
+					})),
+				};
+			} catch (error) {
+				logger.error({ error, userId: ctx.userId }, "Failed to fetch issues");
+				return {
+					user: ctx.userLogin,
+					count: 0,
+					issues: [],
+					_error: "Data temporarily unavailable. Issue list may be incomplete.",
+				};
 			}
-
-			if (state === "open") {
-				conditions.push(eq(issue.state, "OPEN"));
-			} else if (state === "closed") {
-				conditions.push(eq(issue.state, "CLOSED"));
-			}
-
-			const issues = await db
-				.select({
-					number: issue.number,
-					title: issue.title,
-					state: issue.state,
-					createdAt: issue.createdAt,
-					closedAt: issue.closedAt,
-					repository: repository.nameWithOwner,
-				})
-				.from(issue)
-				.leftJoin(repository, eq(issue.repositoryId, repository.id))
-				.where(and(...conditions))
-				.orderBy(desc(issue.updatedAt))
-				.limit(limit);
-
-			return {
-				user: ctx.userLogin,
-				count: issues.length,
-				issues: issues.map((i) => ({
-					number: i.number,
-					title: i.title,
-					state: i.state?.toLowerCase(),
-					url: buildIssueUrl(i.repository, i.number),
-					repository: i.repository,
-					createdAt: i.createdAt,
-					closedAt: i.closedAt,
-				})),
-			};
 		},
 
 		toModelOutput({ output }) {

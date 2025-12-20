@@ -9,6 +9,7 @@
 
 import { tool } from "ai";
 import { and, eq, inArray, sql } from "drizzle-orm";
+import pino from "pino";
 import { z } from "zod";
 import db from "@/shared/db";
 import {
@@ -17,8 +18,11 @@ import {
 	pullRequestReview,
 	pullRequestReviewThread,
 } from "@/shared/db/schema";
+import { MS_PER_DAY, OPEN_PR_WARNING_THRESHOLD } from "./constants";
 import { getWorkspaceRepoIds, type ToolContext } from "./context";
 import { defineToolMetaNoInput } from "./define-tool";
+
+const logger = pino({ name: "activity-summary-tool" });
 
 // ═══════════════════════════════════════════════════════════════════════════
 // TOOL DEFINITION (Single Source of Truth)
@@ -117,8 +121,8 @@ function generateActivityInsights(m: ActivityMetrics): ActivityInsights {
 		reflectionTopics.push("What affected your shipping pace this week?");
 	}
 
-	// Open work insight
-	if (m.openPRs > 3) {
+	// Open work insight - use constant
+	if (m.openPRs > OPEN_PR_WARNING_THRESHOLD) {
 		insights.push(
 			`You have ${m.openPRs} open PRs. Consider focusing on getting these merged before starting new work.`,
 		);
@@ -159,187 +163,208 @@ export function createGetActivitySummaryTool(ctx: ToolContext) {
 		strict: true, // Ensure model follows schema strictly
 
 		execute: async () => {
-			const repoIds = await getWorkspaceRepoIds(ctx.workspaceId);
-			const repoCondition = repoIds.length > 0 ? inArray(issue.repositoryId, repoIds) : undefined;
+			try {
+				const repoIds = await getWorkspaceRepoIds(ctx);
+				const repoCondition = repoIds.length > 0 ? inArray(issue.repositoryId, repoIds) : undefined;
 
-			const now = new Date();
-			const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-			const twoWeeksAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
+				const now = new Date();
+				const weekAgo = new Date(now.getTime() - 7 * MS_PER_DAY);
+				const twoWeeksAgo = new Date(now.getTime() - 14 * MS_PER_DAY);
 
-			const [
-				openPRs,
-				mergedThisWeek,
-				mergedLastWeek,
-				openIssues,
-				reviewsGivenThisWeek,
-				reviewsGivenLastWeek,
-				reviewsReceivedThisWeek,
-				pendingReviewRequests,
-				unresolvedThreads,
-			] = await Promise.all([
-				// Open PRs
-				db
-					.select({ count: sql<number>`count(*)` })
-					.from(issue)
-					.where(
-						and(
-							eq(issue.authorId, ctx.userId),
-							eq(issue.issueType, "PULL_REQUEST"),
-							eq(issue.state, "OPEN"),
-							repoCondition,
-						),
-					)
-					.then((r) => Number(r[0]?.count ?? 0)),
-
-				// Merged this week
-				db
-					.select({ count: sql<number>`count(*)` })
-					.from(issue)
-					.where(
-						and(
-							eq(issue.authorId, ctx.userId),
-							eq(issue.issueType, "PULL_REQUEST"),
-							eq(issue.isMerged, true),
-							sql`${issue.mergedAt} > ${weekAgo.toISOString()}`,
-							repoCondition,
-						),
-					)
-					.then((r) => Number(r[0]?.count ?? 0)),
-
-				// Merged last week (7-14 days ago)
-				db
-					.select({ count: sql<number>`count(*)` })
-					.from(issue)
-					.where(
-						and(
-							eq(issue.authorId, ctx.userId),
-							eq(issue.issueType, "PULL_REQUEST"),
-							eq(issue.isMerged, true),
-							sql`${issue.mergedAt} > ${twoWeeksAgo.toISOString()}`,
-							sql`${issue.mergedAt} <= ${weekAgo.toISOString()}`,
-							repoCondition,
-						),
-					)
-					.then((r) => Number(r[0]?.count ?? 0)),
-
-				// Open issues authored
-				db
-					.select({ count: sql<number>`count(*)` })
-					.from(issue)
-					.where(
-						and(
-							eq(issue.authorId, ctx.userId),
-							eq(issue.issueType, "ISSUE"),
-							eq(issue.state, "OPEN"),
-							repoCondition,
-						),
-					)
-					.then((r) => Number(r[0]?.count ?? 0)),
-
-				// Reviews given this week
-				db
-					.select({ count: sql<number>`count(*)` })
-					.from(pullRequestReview)
-					.innerJoin(issue, eq(pullRequestReview.pullRequestId, issue.id))
-					.where(
-						and(
-							eq(pullRequestReview.authorId, ctx.userId),
-							sql`${pullRequestReview.submittedAt} > ${weekAgo.toISOString()}`,
-							repoCondition,
-						),
-					)
-					.then((r) => Number(r[0]?.count ?? 0)),
-
-				// Reviews given last week
-				db
-					.select({ count: sql<number>`count(*)` })
-					.from(pullRequestReview)
-					.innerJoin(issue, eq(pullRequestReview.pullRequestId, issue.id))
-					.where(
-						and(
-							eq(pullRequestReview.authorId, ctx.userId),
-							sql`${pullRequestReview.submittedAt} > ${twoWeeksAgo.toISOString()}`,
-							sql`${pullRequestReview.submittedAt} <= ${weekAgo.toISOString()}`,
-							repoCondition,
-						),
-					)
-					.then((r) => Number(r[0]?.count ?? 0)),
-
-				// Reviews received this week
-				db
-					.select({ count: sql<number>`count(*)` })
-					.from(pullRequestReview)
-					.innerJoin(issue, eq(pullRequestReview.pullRequestId, issue.id))
-					.where(
-						and(
-							eq(issue.authorId, ctx.userId),
-							eq(issue.issueType, "PULL_REQUEST"),
-							sql`${pullRequestReview.submittedAt} > ${weekAgo.toISOString()}`,
-							repoCondition,
-						),
-					)
-					.then((r) => Number(r[0]?.count ?? 0)),
-
-				// Pending review requests
-				db
-					.select({ count: sql<number>`count(*)` })
-					.from(pullRequestRequestedReviewers)
-					.innerJoin(issue, eq(pullRequestRequestedReviewers.pullRequestId, issue.id))
-					.where(
-						and(
-							eq(pullRequestRequestedReviewers.userId, ctx.userId),
-							eq(issue.state, "OPEN"),
-							repoCondition,
-						),
-					)
-					.then((r) => Number(r[0]?.count ?? 0)),
-
-				// Unresolved review threads
-				db
-					.select({ count: sql<number>`count(*)` })
-					.from(pullRequestReviewThread)
-					.innerJoin(issue, eq(pullRequestReviewThread.pullRequestId, issue.id))
-					.where(
-						and(
-							eq(issue.authorId, ctx.userId),
-							eq(issue.state, "OPEN"),
-							eq(pullRequestReviewThread.state, "UNRESOLVED"),
-							repoCondition,
-						),
-					)
-					.then((r) => Number(r[0]?.count ?? 0)),
-			]);
-
-			const { insights, reflectionTopics } = generateActivityInsights({
-				openPRs,
-				mergedThisWeek,
-				mergedLastWeek,
-				openIssues,
-				reviewsGivenThisWeek,
-				reviewsGivenLastWeek,
-				reviewsReceivedThisWeek,
-				pendingReviewRequests,
-				unresolvedThreads,
-			});
-
-			return {
-				user: { login: ctx.userLogin, name: ctx.userName },
-				thisWeek: {
-					prsMerged: mergedThisWeek,
-					prsOpen: openPRs,
-					issuesOpen: openIssues,
-					reviewsGiven: reviewsGivenThisWeek,
-					reviewsReceived: reviewsReceivedThisWeek,
+				const [
+					openPRs,
+					mergedThisWeek,
+					mergedLastWeek,
+					openIssues,
+					reviewsGivenThisWeek,
+					reviewsGivenLastWeek,
+					reviewsReceivedThisWeek,
 					pendingReviewRequests,
 					unresolvedThreads,
-				},
-				lastWeek: {
-					prsMerged: mergedLastWeek,
-					reviewsGiven: reviewsGivenLastWeek,
-				},
-				insights,
-				suggestedReflectionTopics: reflectionTopics,
-			};
+				] = await Promise.all([
+					// Open PRs
+					db
+						.select({ count: sql<number>`count(*)` })
+						.from(issue)
+						.where(
+							and(
+								eq(issue.authorId, ctx.userId),
+								eq(issue.issueType, "PULL_REQUEST"),
+								eq(issue.state, "OPEN"),
+								repoCondition,
+							),
+						)
+						.then((r) => Number(r[0]?.count ?? 0)),
+
+					// Merged this week
+					db
+						.select({ count: sql<number>`count(*)` })
+						.from(issue)
+						.where(
+							and(
+								eq(issue.authorId, ctx.userId),
+								eq(issue.issueType, "PULL_REQUEST"),
+								eq(issue.isMerged, true),
+								sql`${issue.mergedAt} > ${weekAgo.toISOString()}`,
+								repoCondition,
+							),
+						)
+						.then((r) => Number(r[0]?.count ?? 0)),
+
+					// Merged last week (7-14 days ago)
+					db
+						.select({ count: sql<number>`count(*)` })
+						.from(issue)
+						.where(
+							and(
+								eq(issue.authorId, ctx.userId),
+								eq(issue.issueType, "PULL_REQUEST"),
+								eq(issue.isMerged, true),
+								sql`${issue.mergedAt} > ${twoWeeksAgo.toISOString()}`,
+								sql`${issue.mergedAt} <= ${weekAgo.toISOString()}`,
+								repoCondition,
+							),
+						)
+						.then((r) => Number(r[0]?.count ?? 0)),
+
+					// Open issues authored
+					db
+						.select({ count: sql<number>`count(*)` })
+						.from(issue)
+						.where(
+							and(
+								eq(issue.authorId, ctx.userId),
+								eq(issue.issueType, "ISSUE"),
+								eq(issue.state, "OPEN"),
+								repoCondition,
+							),
+						)
+						.then((r) => Number(r[0]?.count ?? 0)),
+
+					// Reviews given this week
+					db
+						.select({ count: sql<number>`count(*)` })
+						.from(pullRequestReview)
+						.innerJoin(issue, eq(pullRequestReview.pullRequestId, issue.id))
+						.where(
+							and(
+								eq(pullRequestReview.authorId, ctx.userId),
+								sql`${pullRequestReview.submittedAt} > ${weekAgo.toISOString()}`,
+								repoCondition,
+							),
+						)
+						.then((r) => Number(r[0]?.count ?? 0)),
+
+					// Reviews given last week
+					db
+						.select({ count: sql<number>`count(*)` })
+						.from(pullRequestReview)
+						.innerJoin(issue, eq(pullRequestReview.pullRequestId, issue.id))
+						.where(
+							and(
+								eq(pullRequestReview.authorId, ctx.userId),
+								sql`${pullRequestReview.submittedAt} > ${twoWeeksAgo.toISOString()}`,
+								sql`${pullRequestReview.submittedAt} <= ${weekAgo.toISOString()}`,
+								repoCondition,
+							),
+						)
+						.then((r) => Number(r[0]?.count ?? 0)),
+
+					// Reviews received this week
+					db
+						.select({ count: sql<number>`count(*)` })
+						.from(pullRequestReview)
+						.innerJoin(issue, eq(pullRequestReview.pullRequestId, issue.id))
+						.where(
+							and(
+								eq(issue.authorId, ctx.userId),
+								eq(issue.issueType, "PULL_REQUEST"),
+								sql`${pullRequestReview.submittedAt} > ${weekAgo.toISOString()}`,
+								repoCondition,
+							),
+						)
+						.then((r) => Number(r[0]?.count ?? 0)),
+
+					// Pending review requests
+					db
+						.select({ count: sql<number>`count(*)` })
+						.from(pullRequestRequestedReviewers)
+						.innerJoin(issue, eq(pullRequestRequestedReviewers.pullRequestId, issue.id))
+						.where(
+							and(
+								eq(pullRequestRequestedReviewers.userId, ctx.userId),
+								eq(issue.state, "OPEN"),
+								repoCondition,
+							),
+						)
+						.then((r) => Number(r[0]?.count ?? 0)),
+
+					// Unresolved review threads
+					db
+						.select({ count: sql<number>`count(*)` })
+						.from(pullRequestReviewThread)
+						.innerJoin(issue, eq(pullRequestReviewThread.pullRequestId, issue.id))
+						.where(
+							and(
+								eq(issue.authorId, ctx.userId),
+								eq(issue.state, "OPEN"),
+								eq(pullRequestReviewThread.state, "UNRESOLVED"),
+								repoCondition,
+							),
+						)
+						.then((r) => Number(r[0]?.count ?? 0)),
+				]);
+
+				const { insights, reflectionTopics } = generateActivityInsights({
+					openPRs,
+					mergedThisWeek,
+					mergedLastWeek,
+					openIssues,
+					reviewsGivenThisWeek,
+					reviewsGivenLastWeek,
+					reviewsReceivedThisWeek,
+					pendingReviewRequests,
+					unresolvedThreads,
+				});
+
+				return {
+					user: { login: ctx.userLogin, name: ctx.userName },
+					thisWeek: {
+						prsMerged: mergedThisWeek,
+						prsOpen: openPRs,
+						issuesOpen: openIssues,
+						reviewsGiven: reviewsGivenThisWeek,
+						reviewsReceived: reviewsReceivedThisWeek,
+						pendingReviewRequests,
+						unresolvedThreads,
+					},
+					lastWeek: {
+						prsMerged: mergedLastWeek,
+						reviewsGiven: reviewsGivenLastWeek,
+					},
+					insights,
+					suggestedReflectionTopics: reflectionTopics,
+				};
+			} catch (error) {
+				logger.error({ error, userId: ctx.userId }, "Failed to fetch activity summary");
+				// Return structured error so LLM knows something failed
+				return {
+					user: { login: ctx.userLogin, name: ctx.userName },
+					thisWeek: {
+						prsMerged: 0,
+						prsOpen: 0,
+						issuesOpen: 0,
+						reviewsGiven: 0,
+						reviewsReceived: 0,
+						pendingReviewRequests: 0,
+						unresolvedThreads: 0,
+					},
+					lastWeek: { prsMerged: 0, reviewsGiven: 0 },
+					insights: [],
+					suggestedReflectionTopics: [],
+					_error: "Data temporarily unavailable. Activity summary may be incomplete.",
+				};
+			}
 		},
 
 		toModelOutput({ output }) {

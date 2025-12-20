@@ -618,7 +618,7 @@ describe("Documents Module", () => {
 			// Should only have one entry for this document (latest version)
 			const matchingDocs = docs.filter((d) => d.id === created.id);
 			expect(matchingDocs.length).toBe(1);
-			expect(matchingDocs[0].title).toBe("Version Test Updated");
+			expect(matchingDocs[0]?.title).toBe("Version Test Updated");
 		});
 	});
 
@@ -649,9 +649,9 @@ describe("Documents Module", () => {
 			expect(versions.length).toBe(3);
 
 			// Versions should be ordered newest first
-			expect(versions[0].versionNumber).toBe(3);
-			expect(versions[1].versionNumber).toBe(2);
-			expect(versions[2].versionNumber).toBe(1);
+			expect(versions[0]?.versionNumber).toBe(3);
+			expect(versions[1]?.versionNumber).toBe(2);
+			expect(versions[2]?.versionNumber).toBe(1);
 		});
 
 		it("should return 404 for non-existent document", async () => {
@@ -756,7 +756,7 @@ describe("Documents Module", () => {
 			expect(versionsResponse.status).toBe(200);
 			const remainingVersions = (await versionsResponse.json()) as DocumentResponse[];
 			expect(remainingVersions.length).toBe(1);
-			expect(remainingVersions[0].versionNumber).toBe(1);
+			expect(remainingVersions[0]?.versionNumber).toBe(1);
 		});
 
 		it("should return 404 when no versions exist after timestamp", async () => {
@@ -846,7 +846,11 @@ describe("Documents Module", () => {
 
 			// Verify descending order (newest first)
 			for (let i = 0; i < versions.length - 1; i++) {
-				expect(versions[i].versionNumber).toBeGreaterThan(versions[i + 1].versionNumber);
+				const current = versions[i];
+				const next = versions[i + 1];
+				if (current && next) {
+					expect(current.versionNumber).toBeGreaterThan(next.versionNumber);
+				}
 			}
 		});
 

@@ -14,6 +14,7 @@ import {
 	type UIMessage,
 	type UIMessageStreamWriter,
 } from "ai";
+import pino from "pino";
 import { z } from "zod";
 import env from "@/env";
 import { createDocument as createDocumentInDb } from "@/mentor/documents/data";
@@ -172,9 +173,14 @@ interface ToolFactoryParams {
 	userId: number | null;
 }
 
+const logger = pino({ name: "document-create-tool" });
+
 /**
  * Factory to create the document creation tool.
  * Requires dataStream for streaming document content to the client.
+ *
+ * NOTE: If workspaceId or userId is null, documents will be streamed but NOT persisted.
+ * This is logged as a warning for debugging.
  */
 export const createDocumentTool = ({ dataStream, workspaceId, userId }: ToolFactoryParams) =>
 	tool({
@@ -214,17 +220,23 @@ export const createDocumentTool = ({ dataStream, workspaceId, userId }: ToolFact
 			}
 
 			// Persist if we have workspace context
-			const doc =
-				workspaceId && userId
-					? await createDocumentInDb({
-							id,
-							title,
-							content,
-							kind: kind as DocumentKind,
-							workspaceId,
-							userId,
-						})
-					: null;
+			let doc = null;
+			if (workspaceId && userId) {
+				doc = await createDocumentInDb({
+					id,
+					title,
+					content,
+					kind: kind as DocumentKind,
+					workspaceId,
+					userId,
+				});
+			} else {
+				// Document won't be persisted - warn for debugging
+				logger.warn(
+					{ id, title, workspaceId, userId },
+					"Document created but NOT persisted - missing workspace or user context",
+				);
+			}
 
 			return {
 				id: doc?.id ?? id,

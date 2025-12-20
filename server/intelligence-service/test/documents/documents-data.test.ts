@@ -21,6 +21,17 @@ import db from "@/shared/db";
 import { document as docTable } from "@/shared/db/schema";
 import { cleanupTestFixtures, createTestFixtures, type TestFixtures } from "../mocks";
 
+/** Assert value is defined and return it (throws if null/undefined) */
+function assertDefined<T>(
+	value: T | null | undefined,
+	message = "Expected value to be defined",
+): T {
+	if (value === null || value === undefined) {
+		throw new Error(message);
+	}
+	return value;
+}
+
 describe("Documents Data Layer", () => {
 	let fixtures: TestFixtures;
 	const createdDocIds: string[] = [];
@@ -30,7 +41,6 @@ describe("Documents Data Layer", () => {
 	});
 
 	afterEach(async () => {
-		// Clean up created documents
 		for (const id of createdDocIds) {
 			await db.delete(docTable).where(eq(docTable.id, id));
 		}
@@ -49,54 +59,37 @@ describe("Documents Data Layer", () => {
 		it("should create a new document with auto-generated ID", async () => {
 			const doc = await createDocument({
 				title: "Test Document",
-				content: "Hello world",
+				content: "Test content",
 				kind: "text",
 				workspaceId: fixtures.workspace.id,
 				userId: fixtures.user.id,
 			});
 
 			expect(doc).not.toBeNull();
-			expect(doc?.id).toBeDefined();
-			expect(doc?.title).toBe("Test Document");
-			expect(doc?.content).toBe("Hello world");
-			expect(doc?.kind).toBe("text");
-			expect(doc?.versionNumber).toBe(1);
+			const created = assertDefined(doc);
+			createdDocIds.push(created.id);
 
-			if (doc) {
-				createdDocIds.push(doc.id);
-			}
+			expect(created.id).toBeDefined();
+			expect(created.title).toBe("Test Document");
+			expect(created.content).toBe("Test content");
+			expect(created.kind).toBe("text");
+			expect(created.versionNumber).toBe(1);
 		});
 
-		it("should create a document with specified ID", async () => {
-			const specifiedId = crypto.randomUUID();
+		it("should create document with provided ID", async () => {
+			const customId = crypto.randomUUID();
 			const doc = await createDocument({
-				id: specifiedId,
-				title: "Custom ID Document",
-				content: "Content",
-				kind: "text",
-				workspaceId: fixtures.workspace.id,
-				userId: fixtures.user.id,
-			});
-
-			expect(doc?.id).toBe(specifiedId);
-			if (doc) {
-				createdDocIds.push(doc.id);
-			}
-		});
-
-		it("should set versionNumber to 1 for new documents", async () => {
-			const doc = await createDocument({
-				title: "Version Test",
+				id: customId,
+				title: "Custom ID Doc",
 				content: "",
 				kind: "text",
 				workspaceId: fixtures.workspace.id,
 				userId: fixtures.user.id,
 			});
 
-			expect(doc?.versionNumber).toBe(1);
-			if (doc) {
-				createdDocIds.push(doc.id);
-			}
+			const created = assertDefined(doc);
+			createdDocIds.push(created.id);
+			expect(created.id).toBe(customId);
 		});
 
 		it("should set createdAt timestamp", async () => {
@@ -110,14 +103,13 @@ describe("Documents Data Layer", () => {
 			});
 			const after = Date.now();
 
-			expect(doc?.createdAt).toBeDefined();
-			const createdAtTime = new Date(doc?.createdAt).getTime();
+			const created = assertDefined(doc);
+			createdDocIds.push(created.id);
+
+			expect(created.createdAt).toBeDefined();
+			const createdAtTime = new Date(created.createdAt).getTime();
 			expect(createdAtTime).toBeGreaterThanOrEqual(before - 1000);
 			expect(createdAtTime).toBeLessThanOrEqual(after + 1000);
-
-			if (doc) {
-				createdDocIds.push(doc.id);
-			}
 		});
 	});
 
@@ -127,20 +119,19 @@ describe("Documents Data Layer", () => {
 
 	describe("getDocumentById", () => {
 		it("should return document by ID", async () => {
-			const created = await createDocument({
+			const doc = await createDocument({
 				title: "Get Test",
 				content: "Content",
 				kind: "text",
 				workspaceId: fixtures.workspace.id,
 				userId: fixtures.user.id,
 			});
-			if (created) {
-				createdDocIds.push(created.id);
-			}
+			const created = assertDefined(doc);
+			createdDocIds.push(created.id);
 
-			const retrieved = await getDocumentById(created?.id);
+			const retrieved = await getDocumentById(created.id);
 			expect(retrieved).not.toBeNull();
-			expect(retrieved?.id).toBe(created?.id);
+			expect(retrieved?.id).toBe(created.id);
 			expect(retrieved?.title).toBe("Get Test");
 		});
 
@@ -157,17 +148,16 @@ describe("Documents Data Layer", () => {
 				workspaceId: fixtures.workspace.id,
 				userId: fixtures.user.id,
 			});
-			if (doc) {
-				createdDocIds.push(doc.id);
-			}
+			const created = assertDefined(doc);
+			createdDocIds.push(created.id);
 
-			await updateDocument(doc?.id, {
+			await updateDocument(created.id, {
 				title: "Version 2",
 				content: "v2",
 				kind: "text",
 			});
 
-			const retrieved = await getDocumentById(doc?.id);
+			const retrieved = await getDocumentById(created.id);
 			expect(retrieved?.versionNumber).toBe(2);
 			expect(retrieved?.title).toBe("Version 2");
 		});
@@ -186,18 +176,17 @@ describe("Documents Data Layer", () => {
 				workspaceId: fixtures.workspace.id,
 				userId: fixtures.user.id,
 			});
-			if (doc) {
-				createdDocIds.push(doc.id);
-			}
+			const created = assertDefined(doc);
+			createdDocIds.push(created.id);
 
-			await updateDocument(doc?.id, {
+			await updateDocument(created.id, {
 				title: "Version 2",
 				content: "v2",
 				kind: "text",
 			});
 
-			const v1 = await getDocumentVersion(doc?.id, 1);
-			const v2 = await getDocumentVersion(doc?.id, 2);
+			const v1 = await getDocumentVersion(created.id, 1);
+			const v2 = await getDocumentVersion(created.id, 2);
 
 			expect(v1?.title).toBe("Version 1");
 			expect(v1?.versionNumber).toBe(1);
@@ -213,11 +202,10 @@ describe("Documents Data Layer", () => {
 				workspaceId: fixtures.workspace.id,
 				userId: fixtures.user.id,
 			});
-			if (doc) {
-				createdDocIds.push(doc.id);
-			}
+			const created = assertDefined(doc);
+			createdDocIds.push(created.id);
 
-			const result = await getDocumentVersion(doc?.id, 999);
+			const result = await getDocumentVersion(created.id, 999);
 			expect(result).toBeNull();
 		});
 	});
@@ -235,11 +223,10 @@ describe("Documents Data Layer", () => {
 				workspaceId: fixtures.workspace.id,
 				userId: fixtures.user.id,
 			});
-			if (doc) {
-				createdDocIds.push(doc.id);
-			}
+			const created = assertDefined(doc);
+			createdDocIds.push(created.id);
 
-			const updated = await updateDocument(doc?.id, {
+			const updated = await updateDocument(created.id, {
 				title: "Updated",
 				content: "updated content",
 				kind: "text",
@@ -267,11 +254,10 @@ describe("Documents Data Layer", () => {
 				workspaceId: fixtures.workspace.id,
 				userId: fixtures.user.id,
 			});
-			if (doc) {
-				createdDocIds.push(doc.id);
-			}
+			const created = assertDefined(doc);
+			createdDocIds.push(created.id);
 
-			const updated = await updateDocument(doc?.id, {
+			const updated = await updateDocument(created.id, {
 				title: "Updated",
 				content: "",
 				kind: "text",
@@ -302,12 +288,9 @@ describe("Documents Data Layer", () => {
 				workspaceId: fixtures.workspace.id,
 				userId: fixtures.user.id,
 			});
-			if (doc1) {
-				createdDocIds.push(doc1.id);
-			}
-			if (doc2) {
-				createdDocIds.push(doc2.id);
-			}
+			const created1 = assertDefined(doc1);
+			const created2 = assertDefined(doc2);
+			createdDocIds.push(created1.id, created2.id);
 
 			const docs = await listDocuments();
 			const ourDocs = docs.filter((d) => createdDocIds.includes(d.id));
@@ -323,15 +306,14 @@ describe("Documents Data Layer", () => {
 				workspaceId: fixtures.workspace.id,
 				userId: fixtures.user.id,
 			});
-			if (doc) {
-				createdDocIds.push(doc.id);
-			}
+			const created = assertDefined(doc);
+			createdDocIds.push(created.id);
 
-			await updateDocument(doc?.id, { title: "v2", content: "", kind: "text" });
-			await updateDocument(doc?.id, { title: "v3", content: "", kind: "text" });
+			await updateDocument(created.id, { title: "v2", content: "", kind: "text" });
+			await updateDocument(created.id, { title: "v3", content: "", kind: "text" });
 
 			const docs = await listDocuments();
-			const ourDoc = docs.find((d) => d.id === doc?.id);
+			const ourDoc = docs.find((d) => d.id === created.id);
 
 			expect(ourDoc?.versionNumber).toBe(3);
 			expect(ourDoc?.title).toBe("v3");
@@ -351,18 +333,17 @@ describe("Documents Data Layer", () => {
 				workspaceId: fixtures.workspace.id,
 				userId: fixtures.user.id,
 			});
-			if (doc) {
-				createdDocIds.push(doc.id);
-			}
+			const created = assertDefined(doc);
+			createdDocIds.push(created.id);
 
-			await updateDocument(doc?.id, { title: "v2", content: "", kind: "text" });
-			await updateDocument(doc?.id, { title: "v3", content: "", kind: "text" });
+			await updateDocument(created.id, { title: "v2", content: "", kind: "text" });
+			await updateDocument(created.id, { title: "v3", content: "", kind: "text" });
 
-			const versions = await listVersions(doc?.id);
+			const versions = await listVersions(created.id);
 			expect(versions.length).toBe(3);
-			expect(versions[0].versionNumber).toBe(1);
-			expect(versions[1].versionNumber).toBe(2);
-			expect(versions[2].versionNumber).toBe(3);
+			expect(versions[0]?.versionNumber).toBe(1);
+			expect(versions[1]?.versionNumber).toBe(2);
+			expect(versions[2]?.versionNumber).toBe(3);
 		});
 
 		it("should return empty array for non-existent document", async () => {
@@ -384,14 +365,15 @@ describe("Documents Data Layer", () => {
 				workspaceId: fixtures.workspace.id,
 				userId: fixtures.user.id,
 			});
+			const created = assertDefined(doc);
 			// Don't add to createdDocIds since we're deleting it
 
-			await updateDocument(doc?.id, { title: "v2", content: "", kind: "text" });
+			await updateDocument(created.id, { title: "v2", content: "", kind: "text" });
 
-			const deleted = await deleteDocument(doc?.id);
+			const deleted = await deleteDocument(created.id);
 			expect(deleted).toBe(true);
 
-			const retrieved = await getDocumentById(doc?.id);
+			const retrieved = await getDocumentById(created.id);
 			expect(retrieved).toBeNull();
 		});
 
@@ -414,19 +396,18 @@ describe("Documents Data Layer", () => {
 				workspaceId: fixtures.workspace.id,
 				userId: fixtures.user.id,
 			});
-			if (doc) {
-				createdDocIds.push(doc.id);
-			}
+			const created = assertDefined(doc);
+			createdDocIds.push(created.id);
 
-			await updateDocument(doc?.id, { title: "v2", content: "", kind: "text" });
-			await updateDocument(doc?.id, { title: "v3", content: "", kind: "text" });
+			await updateDocument(created.id, { title: "v2", content: "", kind: "text" });
+			await updateDocument(created.id, { title: "v3", content: "", kind: "text" });
 
-			const count = await deleteVersionsAfter(doc?.id, 1);
+			const count = await deleteVersionsAfter(created.id, 1);
 			expect(count).toBe(2);
 
-			const versions = await listVersions(doc?.id);
+			const versions = await listVersions(created.id);
 			expect(versions.length).toBe(1);
-			expect(versions[0].versionNumber).toBe(1);
+			expect(versions[0]?.versionNumber).toBe(1);
 		});
 
 		it("should return 0 if no versions to delete", async () => {
@@ -437,11 +418,10 @@ describe("Documents Data Layer", () => {
 				workspaceId: fixtures.workspace.id,
 				userId: fixtures.user.id,
 			});
-			if (doc) {
-				createdDocIds.push(doc.id);
-			}
+			const created = assertDefined(doc);
+			createdDocIds.push(created.id);
 
-			const count = await deleteVersionsAfter(doc?.id, 1);
+			const count = await deleteVersionsAfter(created.id, 1);
 			expect(count).toBe(0);
 		});
 	});

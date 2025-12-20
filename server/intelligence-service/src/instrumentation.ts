@@ -1,6 +1,9 @@
 import { LangfuseSpanProcessor } from "@langfuse/otel";
 import { NodeSDK } from "@opentelemetry/sdk-node";
+import pino from "pino";
 import { isTelemetryEnabled } from "@/shared/ai/telemetry";
+
+const logger = pino({ name: "instrumentation" });
 
 /**
  * OpenTelemetry instrumentation with Langfuse integration.
@@ -15,6 +18,7 @@ import { isTelemetryEnabled } from "@/shared/ai/telemetry";
  * - Force flush for serverless environments
  * - Automatic AI SDK trace capture via OpenTelemetry
  * - Service resource attributes via environment variables
+ * - Error handling for telemetry failures (app continues if telemetry fails)
  *
  * @see https://langfuse.com/docs/sdk/typescript/guide
  * @see https://langfuse.com/integrations/frameworks/vercel-ai-sdk
@@ -32,20 +36,30 @@ let started = false;
 /**
  * Initialize OpenTelemetry with Langfuse span processor.
  * Idempotent - safe to call multiple times.
+ *
+ * Telemetry failures do NOT crash the application - they are logged and ignored.
  */
 export function initTelemetry(): void {
 	if (started || !isTelemetryEnabled()) {
 		return;
 	}
 
-	spanProcessor = new LangfuseSpanProcessor();
-	sdk = new NodeSDK({
-		// Resource attributes are configured via OTEL_SERVICE_NAME and OTEL_SERVICE_VERSION
-		// environment variables, which the SDK auto-detects
-		spanProcessors: [spanProcessor],
-	});
-	sdk.start();
-	started = true;
+	try {
+		spanProcessor = new LangfuseSpanProcessor();
+		sdk = new NodeSDK({
+			// Resource attributes are configured via OTEL_SERVICE_NAME and OTEL_SERVICE_VERSION
+			// environment variables, which the SDK auto-detects
+			spanProcessors: [spanProcessor],
+		});
+		sdk.start();
+		started = true;
+		logger.info("OpenTelemetry initialized with Langfuse");
+	} catch (error) {
+		// Telemetry failure should NOT crash the app
+		logger.error({ error }, "Failed to initialize telemetry - continuing without tracing");
+		sdk = undefined;
+		spanProcessor = undefined;
+	}
 }
 
 /**

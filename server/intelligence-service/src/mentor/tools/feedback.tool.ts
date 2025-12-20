@@ -7,6 +7,7 @@
 
 import { tool } from "ai";
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import pino from "pino";
 import { z } from "zod";
 import db from "@/shared/db";
 import {
@@ -16,8 +17,11 @@ import {
 	repository,
 	user,
 } from "@/shared/db/schema";
+import { MAX_LOOKBACK_DAYS, MAX_REVIEWS, MS_PER_DAY } from "./constants";
 import { buildPrUrl, getWorkspaceRepoIds, type ToolContext } from "./context";
 import { defineToolMeta } from "./define-tool";
+
+const logger = pino({ name: "feedback-tool" });
 
 // ═══════════════════════════════════════════════════════════════════════════
 // TOOL DEFINITION (Single Source of Truth)
@@ -27,8 +31,10 @@ const inputSchema = z.object({
 	sinceDays: z
 		.number()
 		.min(1)
-		.max(90)
-		.describe("Look back N days. Use 14 for bi-weekly, 30 for monthly review."),
+		.max(MAX_LOOKBACK_DAYS)
+		.describe(
+			`Look back N days (max ${MAX_LOOKBACK_DAYS}). Use 14 for bi-weekly, 30 for monthly review.`,
+		),
 	includeThreads: z
 		.boolean()
 		.describe("Include unresolved review threads. Set true to see actionable items."),
@@ -106,110 +112,122 @@ export function createGetFeedbackReceivedTool(ctx: ToolContext) {
 		strict: true,
 
 		execute: async ({ sinceDays, includeThreads }) => {
-			const repoIds = await getWorkspaceRepoIds(ctx.workspaceId);
-			const repoCondition = repoIds.length > 0 ? inArray(issue.repositoryId, repoIds) : undefined;
-			const sinceDate = new Date(Date.now() - sinceDays * 24 * 60 * 60 * 1000);
+			try {
+				const repoIds = await getWorkspaceRepoIds(ctx);
+				const repoCondition = repoIds.length > 0 ? inArray(issue.repositoryId, repoIds) : undefined;
+				const sinceDate = new Date(Date.now() - sinceDays * MS_PER_DAY);
 
-			const reviews = await db
-				.select({
-					reviewerLogin: user.login,
-					state: pullRequestReview.state,
-					prNumber: issue.number,
-					prTitle: issue.title,
-					repository: repository.nameWithOwner,
-					submittedAt: pullRequestReview.submittedAt,
-					hasBody: sql<boolean>`${pullRequestReview.body} IS NOT NULL AND ${pullRequestReview.body} != ''`,
-				})
-				.from(pullRequestReview)
-				.innerJoin(issue, eq(pullRequestReview.pullRequestId, issue.id))
-				.leftJoin(repository, eq(issue.repositoryId, repository.id))
-				.leftJoin(user, eq(pullRequestReview.authorId, user.id))
-				.where(
-					and(
-						eq(issue.authorId, ctx.userId),
-						eq(issue.issueType, "PULL_REQUEST"),
-						sql`${pullRequestReview.submittedAt} > ${sinceDate.toISOString()}`,
-						repoCondition,
-					),
-				)
-				.orderBy(desc(pullRequestReview.submittedAt))
-				.limit(30);
-
-			let unresolvedThreads: Array<{
-				prNumber: number;
-				prTitle: string | null;
-				threadCount: number;
-				repository: string | null;
-			}> = [];
-
-			if (includeThreads) {
-				const threads = await db
+				const reviews = await db
 					.select({
+						reviewerLogin: user.login,
+						state: pullRequestReview.state,
 						prNumber: issue.number,
 						prTitle: issue.title,
 						repository: repository.nameWithOwner,
-						threadCount: sql<number>`count(*)`,
+						submittedAt: pullRequestReview.submittedAt,
+						hasBody: sql<boolean>`${pullRequestReview.body} IS NOT NULL AND ${pullRequestReview.body} != ''`,
 					})
-					.from(pullRequestReviewThread)
-					.innerJoin(issue, eq(pullRequestReviewThread.pullRequestId, issue.id))
+					.from(pullRequestReview)
+					.innerJoin(issue, eq(pullRequestReview.pullRequestId, issue.id))
 					.leftJoin(repository, eq(issue.repositoryId, repository.id))
+					.leftJoin(user, eq(pullRequestReview.authorId, user.id))
 					.where(
 						and(
 							eq(issue.authorId, ctx.userId),
-							eq(issue.state, "OPEN"),
-							eq(pullRequestReviewThread.state, "UNRESOLVED"),
+							eq(issue.issueType, "PULL_REQUEST"),
+							sql`${pullRequestReview.submittedAt} > ${sinceDate.toISOString()}`,
 							repoCondition,
 						),
 					)
-					.groupBy(issue.number, issue.title, repository.nameWithOwner)
-					.limit(10);
+					.orderBy(desc(pullRequestReview.submittedAt))
+					.limit(MAX_REVIEWS);
 
-				unresolvedThreads = threads.map((t) => ({
-					prNumber: t.prNumber,
-					prTitle: t.prTitle,
-					threadCount: Number(t.threadCount),
-					repository: t.repository,
-				}));
-			}
+				let unresolvedThreads: Array<{
+					prNumber: number;
+					prTitle: string | null;
+					threadCount: number;
+					repository: string | null;
+				}> = [];
 
-			// Aggregate by reviewer
-			const reviewerCounts = new Map<string, number>();
-			for (const review of reviews) {
-				if (review.reviewerLogin) {
-					reviewerCounts.set(
-						review.reviewerLogin,
-						(reviewerCounts.get(review.reviewerLogin) ?? 0) + 1,
-					);
+				if (includeThreads) {
+					const threads = await db
+						.select({
+							prNumber: issue.number,
+							prTitle: issue.title,
+							repository: repository.nameWithOwner,
+							threadCount: sql<number>`count(*)`,
+						})
+						.from(pullRequestReviewThread)
+						.innerJoin(issue, eq(pullRequestReviewThread.pullRequestId, issue.id))
+						.leftJoin(repository, eq(issue.repositoryId, repository.id))
+						.where(
+							and(
+								eq(issue.authorId, ctx.userId),
+								eq(issue.state, "OPEN"),
+								eq(pullRequestReviewThread.state, "UNRESOLVED"),
+								repoCondition,
+							),
+						)
+						.groupBy(issue.number, issue.title, repository.nameWithOwner)
+						.limit(10);
+
+					unresolvedThreads = threads.map((t) => ({
+						prNumber: t.prNumber,
+						prTitle: t.prTitle,
+						threadCount: Number(t.threadCount),
+						repository: t.repository,
+					}));
 				}
+
+				// Aggregate by reviewer
+				const reviewerCounts = new Map<string, number>();
+				for (const review of reviews) {
+					if (review.reviewerLogin) {
+						reviewerCounts.set(
+							review.reviewerLogin,
+							(reviewerCounts.get(review.reviewerLogin) ?? 0) + 1,
+						);
+					}
+				}
+				const topReviewers = Array.from(reviewerCounts.entries())
+					.sort((a, b) => b[1] - a[1])
+					.slice(0, 5)
+					.map(([login, count]) => ({ login, reviewCount: count }));
+
+				const changesRequested = reviews.filter((r) => r.state === "CHANGES_REQUESTED").length;
+				const approved = reviews.filter((r) => r.state === "APPROVED").length;
+				const commented = reviews.filter((r) => r.state === "COMMENTED").length;
+
+				return {
+					user: ctx.userLogin,
+					summary: { totalReviews: reviews.length, approved, changesRequested, commented },
+					topReviewers,
+					unresolvedThreads: unresolvedThreads.map((t) => ({
+						prNumber: t.prNumber,
+						prTitle: t.prTitle,
+						url: buildPrUrl(t.repository, t.prNumber),
+						unresolvedCount: t.threadCount,
+					})),
+					recentReviews: reviews.slice(0, 10).map((r) => ({
+						prNumber: r.prNumber,
+						prTitle: r.prTitle,
+						url: buildPrUrl(r.repository, r.prNumber),
+						reviewer: r.reviewerLogin,
+						state: r.state?.toLowerCase(),
+						hasComment: r.hasBody,
+					})),
+				};
+			} catch (error) {
+				logger.error({ error, userId: ctx.userId }, "Failed to fetch feedback");
+				return {
+					user: ctx.userLogin,
+					summary: { totalReviews: 0, approved: 0, changesRequested: 0, commented: 0 },
+					topReviewers: [],
+					unresolvedThreads: [],
+					recentReviews: [],
+					_error: "Data temporarily unavailable. Feedback data may be incomplete.",
+				};
 			}
-			const topReviewers = Array.from(reviewerCounts.entries())
-				.sort((a, b) => b[1] - a[1])
-				.slice(0, 5)
-				.map(([login, count]) => ({ login, reviewCount: count }));
-
-			const changesRequested = reviews.filter((r) => r.state === "CHANGES_REQUESTED").length;
-			const approved = reviews.filter((r) => r.state === "APPROVED").length;
-			const commented = reviews.filter((r) => r.state === "COMMENTED").length;
-
-			return {
-				user: ctx.userLogin,
-				summary: { totalReviews: reviews.length, approved, changesRequested, commented },
-				topReviewers,
-				unresolvedThreads: unresolvedThreads.map((t) => ({
-					prNumber: t.prNumber,
-					prTitle: t.prTitle,
-					url: buildPrUrl(t.repository, t.prNumber),
-					unresolvedCount: t.threadCount,
-				})),
-				recentReviews: reviews.slice(0, 10).map((r) => ({
-					prNumber: r.prNumber,
-					prTitle: r.prTitle,
-					url: buildPrUrl(r.repository, r.prNumber),
-					reviewer: r.reviewerLogin,
-					state: r.state?.toLowerCase(),
-					hasComment: r.hasBody,
-				})),
-			};
 		},
 
 		toModelOutput({ output }) {

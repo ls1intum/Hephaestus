@@ -730,8 +730,8 @@ async function pushCommand(options: { dryRun: boolean }): Promise<void> {
 						type: "text",
 						prompt: p.definition.prompt as string,
 						config: p.definition.config,
-						labels: p.definition.labels,
-						tags: p.definition.tags,
+						labels: p.definition.labels ? [...p.definition.labels] : undefined,
+						tags: p.definition.tags ? [...p.definition.tags] : undefined,
 					});
 					spinner.succeed(`${name} ${pc.blue("updated")}`);
 				}
@@ -745,8 +745,8 @@ async function pushCommand(options: { dryRun: boolean }): Promise<void> {
 						type: "text",
 						prompt: p.definition.prompt as string,
 						config: p.definition.config,
-						labels: p.definition.labels,
-						tags: p.definition.tags,
+						labels: p.definition.labels ? [...p.definition.labels] : undefined,
+						tags: p.definition.tags ? [...p.definition.tags] : undefined,
 					});
 					spinner.succeed(`${name} ${pc.green("created")}`);
 				}

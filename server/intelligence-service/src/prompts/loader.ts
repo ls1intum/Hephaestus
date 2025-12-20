@@ -1,81 +1,119 @@
 /**
  * Prompt loader with Langfuse integration and local fallback.
- *
- * Provides a unified interface to:
- * 1. Fetch prompts from Langfuse (if available)
- * 2. Fall back to local definitions (always available)
- * 3. Cache prompts to reduce API calls
- * 4. Link prompts to Langfuse for telemetry
  */
 
-import type { ChatPromptClient, TextPromptClient } from "@langfuse/client";
+import { LRUCache } from "lru-cache";
 import pino from "pino";
 import { isTelemetryEnabled, langfuse } from "@/shared/ai/telemetry";
 import { extractErrorMessage } from "@/shared/utils";
-import type {
-	PromptChatMessage,
-	PromptConfig,
-	PromptDefinition,
-	PromptType,
-	PromptVariables,
-	ResolvedPrompt,
+import {
+	type ChatPromptDefinition,
+	isChatMessage,
+	isTextPromptDefinition,
+	type LangfuseResolvedPrompt,
+	type LocalResolvedPrompt,
+	PROMPT_TYPES,
+	type PromptChatMessage,
+	type PromptConfig,
+	type PromptDefinition,
+	type PromptType,
+	type PromptVariables,
+	type ResolvedPrompt,
+	type TextPromptDefinition,
 } from "./types";
 
 const logger = pino({ name: "prompt-loader" });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Cache
+// LRU Cache with proper eviction
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Cache for loaded prompts to avoid repeated API calls */
-const promptCache = new Map<string, ResolvedPrompt>();
+interface CacheEntry {
+	readonly prompt: ResolvedPrompt;
+	readonly promptType: PromptType;
+}
 
-/** Cache timestamps for TTL management */
-const cacheTimestamps = new Map<string, number>();
-
-/** Cache TTL in milliseconds (5 minutes) */
+/** TTL for cached prompts (5 minutes) */
 const CACHE_TTL_MS = 5 * 60 * 1000;
+/** Maximum number of prompts to cache */
+const MAX_CACHE_SIZE = 100;
 
-function isCacheValid(name: string): boolean {
-	const timestamp = cacheTimestamps.get(name);
-	if (!timestamp) {
-		return false;
+/**
+ * LRU cache for prompts with TTL-based expiration.
+ * Uses proper O(1) LRU eviction via lru-cache library.
+ */
+const promptCache = new LRUCache<string, CacheEntry>({
+	max: MAX_CACHE_SIZE,
+	ttl: CACHE_TTL_MS,
+});
+
+function getCachedPrompt<T extends PromptType>(
+	name: string,
+	expectedType: T,
+): ResolvedPrompt<T> | undefined {
+	const entry = promptCache.get(name);
+	if (!entry) {
+		return undefined;
 	}
-	return Date.now() - timestamp < CACHE_TTL_MS;
+	// Type mismatch = cache miss
+	if (entry.promptType !== expectedType) {
+		promptCache.delete(name);
+		return undefined;
+	}
+	return entry.prompt as ResolvedPrompt<T>;
+}
+
+function setCachedPrompt<T extends PromptType>(
+	name: string,
+	prompt: ResolvedPrompt<T>,
+	promptType: T,
+): void {
+	promptCache.set(name, { prompt, promptType });
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Template Compilation
 // ─────────────────────────────────────────────────────────────────────────────
 
-/**
- * Compile a prompt template by replacing {{variable}} placeholders.
- *
- * Supports Mustache-style syntax: {{variableName}}
- * Missing variables are kept as-is with a warning.
- */
-function compileTemplate(template: string, variables: PromptVariables = {}): string {
-	return template.replace(/\{\{(\w+)\}\}/g, (match, key: string) => {
+function compileTextTemplate(template: string, variables: PromptVariables = {}): string {
+	return template.replace(/\{\{(\w+)\}\}/g, (_match, key: string) => {
 		const value = variables[key];
 		if (value === undefined) {
-			logger.warn({ key, template: template.slice(0, 50) }, "Missing prompt variable");
-			return match; // Keep original placeholder
+			// Log at error level to make missing variables very visible
+			logger.error(
+				{ key, template: template.slice(0, 100) },
+				"MISSING PROMPT VARIABLE - check caller",
+			);
+			// Return a marker that will be visible in LLM output (not silent!)
+			return `[MISSING:${key}]`;
 		}
-		return String(value);
+		return value;
 	});
 }
 
-/**
- * Compile chat messages by replacing variables in each message.
- */
 function compileChatMessages(
-	messages: PromptChatMessage[],
+	messages: readonly PromptChatMessage[],
 	variables: PromptVariables = {},
-): PromptChatMessage[] {
-	return messages.map((m) => ({
-		...m,
-		content: compileTemplate(m.content, variables),
+): readonly PromptChatMessage[] {
+	return messages.map((msg) => ({
+		role: msg.role,
+		content: compileTextTemplate(msg.content, variables),
 	}));
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Config Helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
+function mergeConfigs(
+	localConfig: PromptConfig | undefined,
+	langfuseConfig: unknown,
+): PromptConfig {
+	const remote =
+		typeof langfuseConfig === "object" && langfuseConfig !== null
+			? (langfuseConfig as Record<string, unknown>)
+			: {};
+	return { ...localConfig, ...remote };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -83,177 +121,149 @@ function compileChatMessages(
 // ─────────────────────────────────────────────────────────────────────────────
 
 export interface LoadPromptOptions {
-	/** Skip cache and force fresh fetch */
-	skipCache?: boolean;
-
-	/** Langfuse label to fetch (default: "production") */
-	label?: string;
-
-	/** Specific version to fetch (overrides label) */
-	version?: number;
+	readonly skipCache?: boolean;
+	readonly label?: string;
+	readonly version?: number;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Loader
 // ─────────────────────────────────────────────────────────────────────────────
 
-/**
- * Load a prompt from Langfuse with local fallback.
- *
- * Priority:
- * 1. Langfuse (if enabled and available)
- * 2. Local definition (always available)
- *
- * @example
- * ```typescript
- * import { badPracticeDetectorPrompt } from "@/prompts";
- *
- * const prompt = await loadPrompt(badPracticeDetectorPrompt);
- * const compiled = prompt.compile({ title: "Fix bug", description: "..." });
- *
- * // Use langfusePrompt for telemetry linking
- * if (prompt.langfusePrompt) {
- *   const opts = getTelemetryOptionsWithPrompt(prompt.langfusePrompt, {...});
- * }
- * ```
- */
+export async function loadPrompt(
+	definition: TextPromptDefinition,
+	options?: LoadPromptOptions,
+): Promise<ResolvedPrompt<typeof PROMPT_TYPES.TEXT>>;
+
+export async function loadPrompt(
+	definition: ChatPromptDefinition,
+	options?: LoadPromptOptions,
+): Promise<ResolvedPrompt<typeof PROMPT_TYPES.CHAT>>;
+
 export async function loadPrompt<T extends PromptType>(
 	definition: PromptDefinition<T>,
 	options: LoadPromptOptions = {},
 ): Promise<ResolvedPrompt<T>> {
-	const { name, type } = definition;
+	const { name } = definition;
 	const { skipCache = false, label = "production", version } = options;
+	const promptType = definition.type as T;
 
-	// Check cache first (unless skipped)
-	if (!skipCache && isCacheValid(name)) {
-		const cached = promptCache.get(name);
+	if (!skipCache) {
+		const cached = getCachedPrompt<T>(name, promptType);
 		if (cached) {
 			logger.debug({ name, source: "cache" }, "Using cached prompt");
-			return cached as ResolvedPrompt<T>;
+			return cached;
 		}
 	}
 
-	// Try Langfuse if enabled
 	if (isTelemetryEnabled()) {
 		try {
-			// Fetch prompt from Langfuse with proper type inference
-			// Use separate calls for text vs chat to satisfy TypeScript's overload resolution
-			// @see https://langfuse.com/docs/prompt-management/get-started
 			const baseOptions = version !== undefined ? { version } : { label };
 
-			const langfusePrompt =
-				type === "text"
-					? await langfuse.prompt.get(name, {
-							...baseOptions,
-							type: "text",
-							fallback: definition.prompt as string,
-						})
-					: await langfuse.prompt.get(name, {
-							...baseOptions,
-							type: "chat",
-							// Langfuse's ChatMessage is { role: string, content: string }
-							fallback: definition.prompt as Array<{ role: string; content: string }>,
-						});
+			if (isTextPromptDefinition(definition)) {
+				const langfusePrompt = await langfuse.prompt.get(name, {
+					...baseOptions,
+					type: "text",
+					fallback: definition.prompt,
+				});
+				const config = mergeConfigs(definition.config, langfusePrompt.config);
+				const resolved: LangfuseResolvedPrompt<typeof PROMPT_TYPES.TEXT> = {
+					definition,
+					langfusePrompt,
+					source: "langfuse",
+					langfuseVersion: langfusePrompt.version,
+					config,
+					compile: (vars) => langfusePrompt.compile(vars),
+				};
+				setCachedPrompt(name, resolved, PROMPT_TYPES.TEXT);
+				logger.debug(
+					{ name, source: "langfuse", version: langfusePrompt.version },
+					"Loaded prompt",
+				);
+				return resolved as ResolvedPrompt<T>;
+			}
 
-			// Extract config from Langfuse or fall back to local definition
-			const langfuseConfig = (langfusePrompt.config ?? {}) as PromptConfig;
-			const resolvedConfig: PromptConfig = {
-				...definition.config, // Local definition as base
-				...langfuseConfig, // Langfuse overrides
-			};
-
-			const resolved: ResolvedPrompt<T> = {
-				definition,
-				langfusePrompt: langfusePrompt as TextPromptClient | ChatPromptClient,
+			const chatDef = definition as ChatPromptDefinition;
+			const chatMessages = chatDef.prompt.filter(isChatMessage);
+			const langfusePrompt = await langfuse.prompt.get(name, {
+				...baseOptions,
+				type: "chat",
+				fallback: chatMessages.map((m) => ({ role: m.role, content: m.content })),
+			});
+			const config = mergeConfigs(chatDef.config, langfusePrompt.config);
+			const resolved: LangfuseResolvedPrompt<typeof PROMPT_TYPES.CHAT> = {
+				definition: chatDef,
+				langfusePrompt,
 				source: "langfuse",
 				langfuseVersion: langfusePrompt.version,
-				config: resolvedConfig,
-				// Use Langfuse SDK's compile() for both text and chat prompts
-				// The SDK handles variable substitution for all prompt types
-				// @see https://langfuse.com/docs/prompt-management/features/variables
-				compile: ((variables?: PromptVariables) => {
-					return langfusePrompt.compile(variables);
-				}) as ResolvedPrompt<T>["compile"],
+				config,
+				compile: (vars) =>
+					langfusePrompt
+						.compile(vars)
+						.filter(
+							(msg): msg is PromptChatMessage =>
+								typeof msg === "object" &&
+								msg !== null &&
+								"role" in msg &&
+								"content" in msg &&
+								typeof msg.role === "string" &&
+								typeof msg.content === "string",
+						),
 			};
-
-			// Update cache
-			promptCache.set(name, resolved as ResolvedPrompt);
-			cacheTimestamps.set(name, Date.now());
-
-			logger.debug(
-				{ name, source: "langfuse", version: langfusePrompt.version },
-				"Loaded prompt from Langfuse",
-			);
-			return resolved;
+			setCachedPrompt(name, resolved, PROMPT_TYPES.CHAT);
+			logger.debug({ name, source: "langfuse", version: langfusePrompt.version }, "Loaded prompt");
+			return resolved as ResolvedPrompt<T>;
 		} catch (error) {
-			logger.warn(
-				{ name, error: extractErrorMessage(error) },
-				"Failed to load from Langfuse, using local fallback",
-			);
+			logger.warn({ name, error: extractErrorMessage(error) }, "Langfuse failed, using local");
 		}
 	}
 
-	// Use local fallback
-	const resolved: ResolvedPrompt<T> = {
-		definition,
-		langfusePrompt: undefined,
+	// Local fallback
+	if (isTextPromptDefinition(definition)) {
+		const resolved: LocalResolvedPrompt<typeof PROMPT_TYPES.TEXT> = {
+			definition,
+			source: "local",
+			config: definition.config ?? {},
+			compile: (vars) => compileTextTemplate(definition.prompt, vars),
+		};
+		setCachedPrompt(name, resolved, PROMPT_TYPES.TEXT);
+		return resolved as ResolvedPrompt<T>;
+	}
+
+	const chatDef = definition as ChatPromptDefinition;
+	const chatMessages = chatDef.prompt.filter(isChatMessage);
+	const resolved: LocalResolvedPrompt<typeof PROMPT_TYPES.CHAT> = {
+		definition: chatDef,
 		source: "local",
-		config: definition.config ?? {},
-		compile: ((variables?: PromptVariables) => {
-			if (type === "text") {
-				return compileTemplate(definition.prompt as string, variables);
-			}
-			return compileChatMessages(definition.prompt as PromptChatMessage[], variables);
-		}) as ResolvedPrompt<T>["compile"],
+		config: chatDef.config ?? {},
+		compile: (vars) => compileChatMessages(chatMessages, vars),
 	};
-
-	// Cache local prompts too
-	promptCache.set(name, resolved as ResolvedPrompt);
-	cacheTimestamps.set(name, Date.now());
-
-	logger.debug({ name, source: "local" }, "Using local prompt fallback");
-	return resolved;
+	setCachedPrompt(name, resolved, PROMPT_TYPES.CHAT);
+	return resolved as ResolvedPrompt<T>;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Cache Management
+// Cache Management (for testing)
 // ─────────────────────────────────────────────────────────────────────────────
 
-/**
- * Clear the prompt cache.
- *
- * Useful for:
- * - Testing
- * - Forcing refresh after updates
- * - Memory management
- */
 export function clearPromptCache(): void {
 	promptCache.clear();
-	cacheTimestamps.clear();
-	logger.debug("Prompt cache cleared");
 }
 
-/**
- * Preload multiple prompts at startup.
- *
- * Fetches all prompts in parallel and caches them.
- * Useful for warming the cache before serving traffic.
- */
-export async function preloadPrompts(definitions: PromptDefinition[]): Promise<void> {
-	const results = await Promise.allSettled(definitions.map((d) => loadPrompt(d)));
-
-	const succeeded = results.filter((r) => r.status === "fulfilled").length;
-	const failed = results.filter((r) => r.status === "rejected").length;
-
-	logger.info({ total: definitions.length, succeeded, failed }, "Preloaded prompts");
-}
-
-/**
- * Get cache statistics for monitoring.
- */
 export function getPromptCacheStats(): { size: number; entries: string[] } {
-	return {
-		size: promptCache.size,
-		entries: Array.from(promptCache.keys()),
-	};
+	return { size: promptCache.size, entries: Array.from(promptCache.keys()) };
+}
+
+export async function preloadPrompts(
+	definitions: readonly PromptDefinition[],
+	options: LoadPromptOptions = {},
+): Promise<void> {
+	await Promise.all(
+		definitions.map((def) => {
+			if (def.type === "text") {
+				return loadPrompt(def, options);
+			}
+			return loadPrompt(def, options);
+		}),
+	);
 }

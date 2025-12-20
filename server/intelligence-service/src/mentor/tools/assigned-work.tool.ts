@@ -7,6 +7,7 @@
 
 import { tool } from "ai";
 import { and, desc, eq, inArray } from "drizzle-orm";
+import pino from "pino";
 import { z } from "zod";
 import db from "@/shared/db";
 import {
@@ -17,8 +18,11 @@ import {
 	repository,
 	user,
 } from "@/shared/db/schema";
+import { MAX_REVIEW_REQUESTS, MS_PER_DAY, REVIEW_WAIT_URGENCY_DAYS } from "./constants";
 import { buildIssueUrl, buildPrUrl, getWorkspaceRepoIds, type ToolContext } from "./context";
 import { defineToolMetaNoInput } from "./define-tool";
+
+const logger = pino({ name: "assigned-work-tool" });
 
 // ═══════════════════════════════════════════════════════════════════════════
 // TOOL DEFINITION (Single Source of Truth)
@@ -90,103 +94,118 @@ export function createGetAssignedWorkTool(ctx: ToolContext) {
 		strict: true,
 
 		execute: async ({ includeReviewRequests }) => {
-			const repoIds = await getWorkspaceRepoIds(ctx.workspaceId);
-			const repoCondition = repoIds.length > 0 ? inArray(issue.repositoryId, repoIds) : undefined;
+			try {
+				const repoIds = await getWorkspaceRepoIds(ctx);
+				const repoCondition = repoIds.length > 0 ? inArray(issue.repositoryId, repoIds) : undefined;
 
-			// Get assigned issues
-			const assignedIssues = await db
-				.select({
-					number: issue.number,
-					title: issue.title,
-					state: issue.state,
-					createdAt: issue.createdAt,
-					repository: repository.nameWithOwner,
-					milestoneTitle: milestone.title,
-					milestoneDueOn: milestone.dueOn,
-				})
-				.from(issueAssignee)
-				.innerJoin(issue, eq(issueAssignee.issueId, issue.id))
-				.leftJoin(repository, eq(issue.repositoryId, repository.id))
-				.leftJoin(milestone, eq(issue.milestoneId, milestone.id))
-				.where(and(eq(issueAssignee.userId, ctx.userId), eq(issue.state, "OPEN"), repoCondition))
-				.orderBy(desc(issue.createdAt))
-				.limit(20);
-
-			let reviewRequests: Array<{
-				prNumber: number;
-				prTitle: string | null;
-				author: string | null;
-				repository: string | null;
-				requestedDaysAgo: number;
-			}> = [];
-
-			if (includeReviewRequests) {
-				const requests = await db
+				// Get assigned issues
+				const assignedIssues = await db
 					.select({
-						prNumber: issue.number,
-						prTitle: issue.title,
-						author: user.login,
-						repository: repository.nameWithOwner,
+						number: issue.number,
+						title: issue.title,
+						state: issue.state,
 						createdAt: issue.createdAt,
+						repository: repository.nameWithOwner,
+						milestoneTitle: milestone.title,
+						milestoneDueOn: milestone.dueOn,
 					})
-					.from(pullRequestRequestedReviewers)
-					.innerJoin(issue, eq(pullRequestRequestedReviewers.pullRequestId, issue.id))
+					.from(issueAssignee)
+					.innerJoin(issue, eq(issueAssignee.issueId, issue.id))
 					.leftJoin(repository, eq(issue.repositoryId, repository.id))
-					.leftJoin(user, eq(issue.authorId, user.id))
-					.where(
-						and(
-							eq(pullRequestRequestedReviewers.userId, ctx.userId),
-							eq(issue.state, "OPEN"),
-							repoCondition,
-						),
-					)
+					.leftJoin(milestone, eq(issue.milestoneId, milestone.id))
+					.where(and(eq(issueAssignee.userId, ctx.userId), eq(issue.state, "OPEN"), repoCondition))
 					.orderBy(desc(issue.createdAt))
-					.limit(10);
+					.limit(20);
 
-				reviewRequests = requests.map((r) => ({
-					prNumber: r.prNumber,
-					prTitle: r.prTitle,
-					author: r.author,
-					repository: r.repository,
-					requestedDaysAgo: r.createdAt
-						? Math.floor((Date.now() - new Date(r.createdAt).getTime()) / (24 * 60 * 60 * 1000))
-						: 0,
-				}));
-			}
+				let reviewRequests: Array<{
+					prNumber: number;
+					prTitle: string | null;
+					author: string | null;
+					repository: string | null;
+					requestedDaysAgo: number;
+				}> = [];
 
-			// Generate focus suggestions
-			const focusSuggestions: string[] = [];
-			const oldReviewRequests = reviewRequests.filter((r) => r.requestedDaysAgo >= 2);
-			if (oldReviewRequests.length > 0) {
-				focusSuggestions.push(`${oldReviewRequests.length} review request(s) waiting 2+ days.`);
-			}
+				if (includeReviewRequests) {
+					const requests = await db
+						.select({
+							prNumber: issue.number,
+							prTitle: issue.title,
+							author: user.login,
+							repository: repository.nameWithOwner,
+							createdAt: issue.createdAt,
+						})
+						.from(pullRequestRequestedReviewers)
+						.innerJoin(issue, eq(pullRequestRequestedReviewers.pullRequestId, issue.id))
+						.leftJoin(repository, eq(issue.repositoryId, repository.id))
+						.leftJoin(user, eq(issue.authorId, user.id))
+						.where(
+							and(
+								eq(pullRequestRequestedReviewers.userId, ctx.userId),
+								eq(issue.state, "OPEN"),
+								repoCondition,
+							),
+						)
+						.orderBy(desc(issue.createdAt))
+						.limit(MAX_REVIEW_REQUESTS);
 
-			const issuesWithDeadlines = assignedIssues.filter((i) => i.milestoneDueOn);
-			if (issuesWithDeadlines.length > 0) {
-				focusSuggestions.push(
-					`${issuesWithDeadlines.length} assigned issue(s) have milestone deadlines.`,
+					reviewRequests = requests.map((r) => ({
+						prNumber: r.prNumber,
+						prTitle: r.prTitle,
+						author: r.author,
+						repository: r.repository,
+						requestedDaysAgo: r.createdAt
+							? Math.floor((Date.now() - new Date(r.createdAt).getTime()) / MS_PER_DAY)
+							: 0,
+					}));
+				}
+
+				// Generate focus suggestions
+				const focusSuggestions: string[] = [];
+				const oldReviewRequests = reviewRequests.filter(
+					(r) => r.requestedDaysAgo >= REVIEW_WAIT_URGENCY_DAYS,
 				);
-			}
+				if (oldReviewRequests.length > 0) {
+					focusSuggestions.push(
+						`${oldReviewRequests.length} review request(s) waiting ${REVIEW_WAIT_URGENCY_DAYS}+ days.`,
+					);
+				}
 
-			return {
-				user: ctx.userLogin,
-				assignedIssues: assignedIssues.map((i) => ({
-					number: i.number,
-					title: i.title,
-					url: buildIssueUrl(i.repository, i.number),
-					repository: i.repository,
-					milestoneTitle: i.milestoneTitle,
-					milestoneDueOn: i.milestoneDueOn,
-				})),
-				pendingReviewRequests: reviewRequests.map((r) => ({
-					prNumber: r.prNumber,
-					prTitle: r.prTitle,
-					author: r.author,
-					url: buildPrUrl(r.repository, r.prNumber),
-					waitingDays: r.requestedDaysAgo,
-				})),
-				focusSuggestions,
-			};
+				const issuesWithDeadlines = assignedIssues.filter((i) => i.milestoneDueOn);
+				if (issuesWithDeadlines.length > 0) {
+					focusSuggestions.push(
+						`${issuesWithDeadlines.length} assigned issue(s) have milestone deadlines.`,
+					);
+				}
+
+				return {
+					user: ctx.userLogin,
+					assignedIssues: assignedIssues.map((i) => ({
+						number: i.number,
+						title: i.title,
+						url: buildIssueUrl(i.repository, i.number),
+						repository: i.repository,
+						milestoneTitle: i.milestoneTitle,
+						milestoneDueOn: i.milestoneDueOn,
+					})),
+					pendingReviewRequests: reviewRequests.map((r) => ({
+						prNumber: r.prNumber,
+						prTitle: r.prTitle,
+						author: r.author,
+						url: buildPrUrl(r.repository, r.prNumber),
+						waitingDays: r.requestedDaysAgo,
+					})),
+					focusSuggestions,
+				};
+			} catch (error) {
+				logger.error({ error, userId: ctx.userId }, "Failed to fetch assigned work");
+				return {
+					user: ctx.userLogin,
+					assignedIssues: [],
+					pendingReviewRequests: [],
+					focusSuggestions: [],
+					_error: "Data temporarily unavailable. Assigned work list may be incomplete.",
+				};
+			}
 		},
 
 		toModelOutput({ output }) {

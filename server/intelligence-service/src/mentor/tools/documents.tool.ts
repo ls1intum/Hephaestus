@@ -6,11 +6,15 @@
 
 import { tool } from "ai";
 import { and, desc, eq, sql } from "drizzle-orm";
+import pino from "pino";
 import { z } from "zod";
 import db from "@/shared/db";
 import { document } from "@/shared/db/schema";
+import { CONTENT_PREVIEW_LENGTH, DOCUMENT_PREVIEW_LENGTH, MAX_DOCUMENTS } from "./constants";
 import type { ToolContext } from "./context";
 import { defineToolMeta } from "./define-tool";
+
+const logger = pino({ name: "documents-tool" });
 
 // ═══════════════════════════════════════════════════════════════════════════
 // TOOL DEFINITION (Single Source of Truth)
@@ -20,8 +24,10 @@ const inputSchema = z.object({
 	limit: z
 		.number()
 		.min(1)
-		.max(20)
-		.describe("Maximum documents to retrieve (1-20). Use 5 for recent, 10 for comprehensive."),
+		.max(MAX_DOCUMENTS)
+		.describe(
+			`Maximum documents to retrieve (1-${MAX_DOCUMENTS}). Use 5 for recent, 10 for comprehensive.`,
+		),
 });
 
 const { definition: getDocumentsDefinition, TOOL_DESCRIPTION } = defineToolMeta({
@@ -55,30 +61,40 @@ export function createGetDocumentsTool(ctx: ToolContext) {
 		strict: true,
 
 		execute: async ({ limit }) => {
-			const docs = await db
-				.select({
-					id: document.id,
-					title: document.title,
-					kind: document.kind,
-					createdAt: document.createdAt,
-					preview: sql<string>`LEFT(${document.content}, 200)`,
-				})
-				.from(document)
-				.where(and(eq(document.userId, ctx.userId), eq(document.workspaceId, ctx.workspaceId)))
-				.orderBy(desc(document.createdAt))
-				.limit(limit);
+			try {
+				const docs = await db
+					.select({
+						id: document.id,
+						title: document.title,
+						kind: document.kind,
+						createdAt: document.createdAt,
+						preview: sql<string>`LEFT(${document.content}, ${DOCUMENT_PREVIEW_LENGTH})`,
+					})
+					.from(document)
+					.where(and(eq(document.userId, ctx.userId), eq(document.workspaceId, ctx.workspaceId)))
+					.orderBy(desc(document.createdAt))
+					.limit(limit);
 
-			return {
-				user: ctx.userLogin,
-				count: docs.length,
-				documents: docs.map((d) => ({
-					id: d.id,
-					title: d.title,
-					kind: d.kind,
-					createdAt: d.createdAt,
-					preview: d.preview,
-				})),
-			};
+				return {
+					user: ctx.userLogin,
+					count: docs.length,
+					documents: docs.map((d) => ({
+						id: d.id,
+						title: d.title,
+						kind: d.kind,
+						createdAt: d.createdAt,
+						preview: d.preview,
+					})),
+				};
+			} catch (error) {
+				logger.error({ error, userId: ctx.userId }, "Failed to fetch documents");
+				return {
+					user: ctx.userLogin,
+					count: 0,
+					documents: [],
+					_error: "Data temporarily unavailable. Document list may be incomplete.",
+				};
+			}
 		},
 
 		toModelOutput({ output }) {
@@ -93,7 +109,7 @@ export function createGetDocumentsTool(ctx: ToolContext) {
 				const kind = d.kind ? `[${d.kind}]` : "";
 				lines.push(`- **${d.title}** ${kind} (${dateStr})`);
 				if (d.preview) {
-					lines.push(`  _${d.preview.slice(0, 100)}..._`);
+					lines.push(`  _${d.preview.slice(0, CONTENT_PREVIEW_LENGTH)}..._`);
 				}
 			}
 

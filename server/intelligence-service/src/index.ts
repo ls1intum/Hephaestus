@@ -12,6 +12,7 @@ import pino from "pino";
 import app from "./app";
 import env from "./env";
 import { shutdownTelemetry } from "./instrumentation";
+import { pool } from "./shared/db";
 
 const logger = pino({ level: env.LOG_LEVEL });
 const port = env.PORT;
@@ -22,21 +23,59 @@ const server = serve({
 	port,
 });
 
+// Shutdown timeout to prevent hanging indefinitely
+const SHUTDOWN_TIMEOUT_MS = 10_000;
+
 // Graceful shutdown handlers
 const shutdown = async (signal: string) => {
 	logger.info({ signal }, "Received shutdown signal, gracefully shutting down...");
 
-	// Close HTTP server first (stop accepting new connections)
-	server.close(() => {
-		logger.info("HTTP server closed");
-	});
+	// Create a timeout to force exit if shutdown hangs
+	const forceExit = setTimeout(() => {
+		logger.error("Shutdown timed out, forcing exit");
+		process.exit(1);
+	}, SHUTDOWN_TIMEOUT_MS);
 
-	// Flush pending telemetry traces
-	await shutdownTelemetry();
-	logger.info("Telemetry flushed");
+	try {
+		// Close HTTP server first (stop accepting new connections)
+		await new Promise<void>((resolve) => {
+			server.close(() => {
+				logger.info("HTTP server closed");
+				resolve();
+			});
+		});
 
-	process.exit(0);
+		// Close database pool
+		await pool.end();
+		logger.info("Database pool closed");
+
+		// Flush pending telemetry traces
+		await shutdownTelemetry();
+		logger.info("Telemetry flushed");
+
+		clearTimeout(forceExit);
+		process.exit(0);
+	} catch (error) {
+		logger.error({ error }, "Error during shutdown");
+		clearTimeout(forceExit);
+		process.exit(1);
+	}
 };
 
-process.on("SIGTERM", () => shutdown("SIGTERM"));
-process.on("SIGINT", () => shutdown("SIGINT"));
+// Handle uncaught exceptions and unhandled rejections
+process.on("uncaughtException", (error) => {
+	logger.fatal({ error }, "Uncaught exception, shutting down");
+	shutdown("uncaughtException").catch(() => process.exit(1));
+});
+
+process.on("unhandledRejection", (reason) => {
+	logger.fatal({ reason }, "Unhandled rejection, shutting down");
+	shutdown("unhandledRejection").catch(() => process.exit(1));
+});
+
+process.on("SIGTERM", () => {
+	shutdown("SIGTERM").catch(() => process.exit(1));
+});
+process.on("SIGINT", () => {
+	shutdown("SIGINT").catch(() => process.exit(1));
+});

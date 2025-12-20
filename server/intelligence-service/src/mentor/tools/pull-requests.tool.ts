@@ -6,11 +6,15 @@
 
 import { tool } from "ai";
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import pino from "pino";
 import { z } from "zod";
 import db from "@/shared/db";
 import { issue, repository } from "@/shared/db/schema";
+import { MAX_LOOKBACK_DAYS, MAX_PULL_REQUESTS, MS_PER_DAY } from "./constants";
 import { buildPrUrl, getWorkspaceRepoIds, type ToolContext } from "./context";
 import { defineToolMeta } from "./define-tool";
+
+const logger = pino({ name: "pull-requests-tool" });
 
 // ═══════════════════════════════════════════════════════════════════════════
 // TOOL DEFINITION (Single Source of Truth)
@@ -25,14 +29,16 @@ const inputSchema = z.object({
 	limit: z
 		.number()
 		.min(1)
-		.max(50)
-		.describe("Maximum PRs to return (1-50). Use 10 for overview, 20+ for comprehensive lists."),
+		.max(MAX_PULL_REQUESTS)
+		.describe(
+			`Maximum PRs to return (1-${MAX_PULL_REQUESTS}). Use 10 for overview, 20+ for comprehensive lists.`,
+		),
 	sinceDays: z
 		.number()
 		.min(1)
-		.max(90)
+		.max(MAX_LOOKBACK_DAYS)
 		.describe(
-			"Only include PRs updated in the last N days. Use 7 for weekly, 14 for bi-weekly review.",
+			`Only include PRs updated in the last N days (max ${MAX_LOOKBACK_DAYS}). Use 7 for weekly, 14 for bi-weekly review.`,
 		),
 });
 
@@ -153,67 +159,77 @@ export function createGetPullRequestsTool(ctx: ToolContext) {
 		strict: true,
 
 		execute: async ({ state, limit, sinceDays }) => {
-			const repoIds = await getWorkspaceRepoIds(ctx.workspaceId);
-			const sinceDate = new Date(Date.now() - sinceDays * 24 * 60 * 60 * 1000);
+			try {
+				const repoIds = await getWorkspaceRepoIds(ctx);
+				const sinceDate = new Date(Date.now() - sinceDays * MS_PER_DAY);
 
-			const conditions = [
-				eq(issue.authorId, ctx.userId),
-				eq(issue.issueType, "PULL_REQUEST"),
-				sql`${issue.updatedAt} > ${sinceDate.toISOString()}`,
-			];
+				const conditions = [
+					eq(issue.authorId, ctx.userId),
+					eq(issue.issueType, "PULL_REQUEST"),
+					sql`${issue.updatedAt} > ${sinceDate.toISOString()}`,
+				];
 
-			if (repoIds.length > 0) {
-				conditions.push(inArray(issue.repositoryId, repoIds));
+				if (repoIds.length > 0) {
+					conditions.push(inArray(issue.repositoryId, repoIds));
+				}
+
+				if (state === "open") {
+					conditions.push(eq(issue.state, "OPEN"));
+				} else if (state === "merged") {
+					conditions.push(eq(issue.isMerged, true));
+				} else if (state === "closed") {
+					conditions.push(eq(issue.state, "CLOSED"), eq(issue.isMerged, false));
+				}
+
+				const prs = await db
+					.select({
+						number: issue.number,
+						title: issue.title,
+						state: issue.state,
+						isMerged: issue.isMerged,
+						isDraft: issue.isDraft,
+						createdAt: issue.createdAt,
+						mergedAt: issue.mergedAt,
+						additions: issue.additions,
+						deletions: issue.deletions,
+						changedFiles: issue.changedFiles,
+						commentsCount: issue.commentsCount,
+						repository: repository.nameWithOwner,
+					})
+					.from(issue)
+					.leftJoin(repository, eq(issue.repositoryId, repository.id))
+					.where(and(...conditions))
+					.orderBy(desc(issue.updatedAt))
+					.limit(limit);
+
+				return {
+					user: ctx.userLogin,
+					count: prs.length,
+					pullRequests: prs.map((pr) => ({
+						number: pr.number,
+						title: pr.title,
+						state: pr.isMerged ? "merged" : pr.isDraft ? "draft" : pr.state?.toLowerCase(),
+						url: buildPrUrl(pr.repository, pr.number),
+						repository: pr.repository,
+						createdAt: pr.createdAt,
+						mergedAt: pr.mergedAt,
+						stats: {
+							additions: pr.additions ?? 0,
+							deletions: pr.deletions ?? 0,
+							filesChanged: pr.changedFiles ?? 0,
+							comments: pr.commentsCount ?? 0,
+						},
+					})),
+				};
+			} catch (error) {
+				logger.error({ error, userId: ctx.userId }, "Failed to fetch pull requests");
+				return {
+					user: ctx.userLogin,
+					count: 0,
+					pullRequests: [],
+					_error: "Data temporarily unavailable. Pull request list may be incomplete.",
+				};
 			}
-
-			if (state === "open") {
-				conditions.push(eq(issue.state, "OPEN"));
-			} else if (state === "merged") {
-				conditions.push(eq(issue.isMerged, true));
-			} else if (state === "closed") {
-				conditions.push(eq(issue.state, "CLOSED"), eq(issue.isMerged, false));
-			}
-
-			const prs = await db
-				.select({
-					number: issue.number,
-					title: issue.title,
-					state: issue.state,
-					isMerged: issue.isMerged,
-					isDraft: issue.isDraft,
-					createdAt: issue.createdAt,
-					mergedAt: issue.mergedAt,
-					additions: issue.additions,
-					deletions: issue.deletions,
-					changedFiles: issue.changedFiles,
-					commentsCount: issue.commentsCount,
-					repository: repository.nameWithOwner,
-				})
-				.from(issue)
-				.leftJoin(repository, eq(issue.repositoryId, repository.id))
-				.where(and(...conditions))
-				.orderBy(desc(issue.updatedAt))
-				.limit(limit);
-
-			return {
-				user: ctx.userLogin,
-				count: prs.length,
-				pullRequests: prs.map((pr) => ({
-					number: pr.number,
-					title: pr.title,
-					state: pr.isMerged ? "merged" : pr.isDraft ? "draft" : pr.state?.toLowerCase(),
-					url: buildPrUrl(pr.repository, pr.number),
-					repository: pr.repository,
-					createdAt: pr.createdAt,
-					mergedAt: pr.mergedAt,
-					stats: {
-						additions: pr.additions ?? 0,
-						deletions: pr.deletions ?? 0,
-						filesChanged: pr.changedFiles ?? 0,
-						comments: pr.commentsCount ?? 0,
-					},
-				})),
-			};
 		},
 
 		toModelOutput: ({ output }) => formatForModel(output),

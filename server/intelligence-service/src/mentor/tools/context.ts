@@ -22,6 +22,12 @@ export interface ToolContext {
 	userLogin: string;
 	userName: string;
 	workspaceId: number;
+	/**
+	 * Request-scoped cache for workspace repo IDs.
+	 * Populated lazily on first access, reused for all tool calls in same request.
+	 * This prevents N identical database queries when multiple tools run.
+	 */
+	_repoIdsCache?: number[];
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -29,10 +35,9 @@ export interface ToolContext {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Get repository IDs that are monitored in the given workspace.
- * Used by tools to scope queries to relevant repositories.
+ * Fetch repository IDs from database (uncached - internal use only).
  */
-export async function getWorkspaceRepoIds(workspaceId: number): Promise<number[]> {
+async function fetchWorkspaceRepoIds(workspaceId: number): Promise<number[]> {
 	const workspaceRepos = await db
 		.select({ nameWithOwner: repositoryToMonitor.nameWithOwner })
 		.from(repositoryToMonitor)
@@ -49,6 +54,25 @@ export async function getWorkspaceRepoIds(workspaceId: number): Promise<number[]
 		.where(inArray(repository.nameWithOwner, names));
 
 	return repos.map((r) => r.id);
+}
+
+/**
+ * Get repository IDs that are monitored in the given workspace.
+ * Uses request-scoped caching to avoid repeated database queries.
+ *
+ * @param ctx - Tool context with optional cache
+ * @returns Array of repository IDs
+ */
+export async function getWorkspaceRepoIds(ctx: ToolContext): Promise<number[]> {
+	// Return cached value if available
+	if (ctx._repoIdsCache !== undefined) {
+		return ctx._repoIdsCache;
+	}
+
+	// Fetch and cache for this request
+	const repoIds = await fetchWorkspaceRepoIds(ctx.workspaceId);
+	ctx._repoIdsCache = repoIds;
+	return repoIds;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -68,7 +68,7 @@ export interface MergedToolConfig {
  */
 export function overrideToolDescriptions(
 	localTools: ToolSet,
-	langfuseTools: PromptToolDefinition[] | undefined,
+	langfuseTools: readonly PromptToolDefinition[] | undefined,
 ): ToolSet {
 	// If no Langfuse tools, return local tools as-is (graceful fallback)
 	if (!langfuseTools || langfuseTools.length === 0) {

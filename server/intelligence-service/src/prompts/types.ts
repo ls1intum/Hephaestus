@@ -1,284 +1,163 @@
 /**
  * Prompt type definitions for centralized prompt management.
- *
- * This module defines the structure for prompts that:
- * 1. Are version-controlled in git as the source of truth
- * 2. Can sync to Langfuse for editing and A/B testing
- * 3. Work without Langfuse (graceful fallback)
- *
- * NOTE: PromptChatMessage is distinct from AI SDK's UIMessage/ChatMessage.
- * This type is for Langfuse prompt templates (system/user/assistant with string content).
- * AI SDK's UIMessage is for runtime chat with typed parts (text, tool calls, etc.).
- *
  * @see https://langfuse.com/docs/prompt-management/features/variables
- * @see https://langfuse.com/docs/prompt-management/features/message-placeholders
  */
 
 import type { ChatPromptClient, TextPromptClient } from "@langfuse/client";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Prompt Types
+// Constants
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Prompt types supported by Langfuse */
-export type PromptType = "text" | "chat";
+export const PROMPT_TYPES = { TEXT: "text", CHAT: "chat" } as const;
+export type PromptType = (typeof PROMPT_TYPES)[keyof typeof PROMPT_TYPES];
 
-/**
- * Chat message for Langfuse chat-type prompts.
- *
- * This is a simple role+content structure used in Langfuse prompt templates.
- * NOT to be confused with AI SDK's UIMessage which has typed parts.
- *
- * Variables use {{variableName}} syntax (mustache-style).
- * Variable names must start with a letter and contain only alphanumeric + underscore.
- * @see https://langfuse.com/docs/prompt-management/features/variables
- */
+export const MESSAGE_ROLES = { SYSTEM: "system", USER: "user", ASSISTANT: "assistant" } as const;
+export type MessageRole = (typeof MESSAGE_ROLES)[keyof typeof MESSAGE_ROLES];
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Message Types
+// ─────────────────────────────────────────────────────────────────────────────
+
 export interface PromptChatMessage {
-	role: "system" | "user" | "assistant";
-	content: string;
+	readonly role: MessageRole;
+	readonly content: string;
 }
 
-/**
- * Placeholder message for inserting chat history at runtime.
- *
- * Use this to inject conversation history into a chat prompt.
- * @see https://langfuse.com/docs/prompt-management/features/message-placeholders
- *
- * @example
- * ```typescript
- * const prompt = [
- *   { role: "system", content: "You are a helpful assistant." },
- *   { type: "placeholder", name: "chatHistory" },
- *   { role: "user", content: "What should I do next?" },
- * ];
- * ```
- */
 export interface PromptPlaceholderMessage {
-	type: "placeholder";
-	name: string;
+	readonly type: "placeholder";
+	readonly name: string;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Prompt Config (Langfuse v4 Best Practices)
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * Tool definition for storing function/tool parameters in Langfuse config.
- * Matches OpenAI function calling format.
- *
- * @see https://langfuse.com/docs/prompt-management/features/config#function-calling
- */
-export interface PromptToolDefinition {
-	type: "function";
-	function: {
-		name: string;
-		description?: string;
-		parameters: Record<string, unknown>;
-	};
-}
-
-/**
- * Structured output response format for Langfuse config.
- *
- * @see https://langfuse.com/docs/prompt-management/features/config#structured-outputs
- */
-export interface PromptResponseFormat {
-	type: "json_schema";
-	json_schema: {
-		name: string;
-		schema: Record<string, unknown>;
-		strict?: boolean;
-	};
-}
-
-/**
- * Model configuration attached to prompts.
- *
- * Following Langfuse v4 best practices, this config can store:
- * - Model parameters (model, temperature, maxTokens)
- * - Tool/function definitions for agents
- * - Response format for structured outputs
- *
- * Because config is versioned with the prompt, you can manage all parameters
- * in one place and update them without touching application code.
- *
- * @see https://langfuse.com/docs/prompt-management/features/config
- */
-export interface PromptConfig {
-	/** Model name (e.g., "gpt-4o-mini", "openai:gpt-4o") */
-	model?: string;
-	/** Temperature for generation (0-2) */
-	temperature?: number;
-	/** Maximum tokens to generate */
-	maxTokens?: number;
-	/** Maximum tool call steps for multi-step agents */
-	maxToolSteps?: number;
-	/**
-	 * Tool definitions in OpenAI function format.
-	 * Store tool schemas here for versioning alongside prompts.
-	 */
-	tools?: readonly PromptToolDefinition[] | PromptToolDefinition[];
-	/**
-	 * Tool choice strategy: auto, required, none, or specific tool.
-	 */
-	toolChoice?: "auto" | "required" | "none" | { type: "tool"; toolName: string };
-	/**
-	 * Response format for structured outputs.
-	 * Use with json_schema type for guaranteed JSON structure.
-	 */
-	responseFormat?: PromptResponseFormat;
-	/** Additional configuration values */
-	[key: string]: unknown;
-}
-
-/** Variables that can be interpolated into the prompt: {{variable}} */
-export type PromptVariables = Record<string, string>;
-
-/**
- * Placeholder values for chat prompts - arrays of messages to inject.
- * @see https://langfuse.com/docs/prompt-management/features/message-placeholders
- */
-export type PromptPlaceholders = Record<string, PromptChatMessage[]>;
-
-/** Combined chat message type (regular message or placeholder) */
 export type ChatPromptMessage = PromptChatMessage | PromptPlaceholderMessage;
 
+export function isChatMessage(msg: ChatPromptMessage): msg is PromptChatMessage {
+	return "role" in msg && !("type" in msg);
+}
+
+export function isPlaceholderMessage(msg: ChatPromptMessage): msg is PromptPlaceholderMessage {
+	return "type" in msg && msg.type === "placeholder";
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
-// Prompt Definition (stored in git)
+// Tool Definitions
 // ─────────────────────────────────────────────────────────────────────────────
 
-/**
- * Base definition for all prompts stored in git.
- *
- * Text prompts use a simple string with {{variables}}.
- * Chat prompts use an array of messages, optionally with placeholders
- * for injecting chat history at runtime.
- *
- * IMPORTANT: Langfuse only supports simple {{variable}} replacement.
- * Mustache conditionals ({{#var}}, {{^var}}) are NOT supported.
- * Handle conditional logic in application code instead.
- *
- * @example Text prompt
- * ```typescript
- * export const detector: PromptDefinition<"text"> = {
- *   name: "bad-practice-detector",
- *   type: "text",
- *   prompt: "Analyze {{title}} for bad practices...",
- * };
- * ```
- *
- * @example Chat prompt with placeholder
- * ```typescript
- * export const chat: PromptDefinition<"chat"> = {
- *   name: "mentor-chat",
- *   type: "chat",
- *   prompt: [
- *     { role: "system", content: "You are a mentor for {{firstName}}." },
- *   ],
- * };
- * ```
- */
-export interface PromptDefinition<T extends PromptType = PromptType> {
-	/** Unique identifier used in Langfuse */
-	name: string;
-
-	/** Prompt type: "text" for simple strings, "chat" for message arrays */
-	type: T;
-
-	/**
-	 * The prompt content.
-	 * - Text: template string with {{variables}}
-	 * - Chat: array of messages, optionally with placeholders
-	 */
-	prompt: T extends "text" ? string : ChatPromptMessage[];
-
-	/** Description for documentation and Langfuse UI */
-	description?: string;
-
-	/** Optional model configuration */
-	config?: PromptConfig;
-
-	/** Labels for Langfuse deployment (e.g., ["production", "staging"]) */
-	labels?: string[];
-
-	/** Tags for organization in Langfuse */
-	tags?: string[];
-
-	/** List of expected variables for documentation */
-	variables?: string[];
-
-	/**
-	 * Metadata for prompt management CLI.
-	 * Used for automatic discovery and sync with Langfuse.
-	 */
-	_meta?: {
-		/**
-		 * Directory containing tool files (relative to src/).
-		 * Each *.tool.ts in this directory exports a *Definition.
-		 * @example "mentor/tools"
-		 */
-		toolsDir?: string;
+export interface PromptToolDefinition {
+	readonly type: "function";
+	readonly function: {
+		readonly name: string;
+		readonly description?: string;
+		readonly parameters: Readonly<Record<string, unknown>>;
 	};
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Resolved Prompt (ready for use)
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * A resolved prompt ready for use.
- *
- * Either fetched from Langfuse or using local fallback.
- * Provides a unified interface regardless of source.
- */
-export interface ResolvedPrompt<T extends PromptType = PromptType> {
-	/** Original definition from git */
-	definition: PromptDefinition<T>;
-
-	/** Langfuse prompt client for telemetry linking (undefined if using fallback) */
-	langfusePrompt?: TextPromptClient | ChatPromptClient;
-
-	/** Source of the resolved prompt */
-	source: "langfuse" | "local";
-
-	/** Langfuse version number (undefined if using fallback) */
-	langfuseVersion?: number;
-
-	/**
-	 * Configuration from Langfuse or local definition.
-	 *
-	 * Use this to get model parameters, max steps, etc.
-	 * Falls back to local definition.config if Langfuse unavailable.
-	 */
-	config: PromptConfig;
-
-	/**
-	 * Compile the prompt with variables (and placeholders for chat prompts).
-	 *
-	 * For text prompts, pass variables to interpolate {{variable}} placeholders.
-	 * For chat prompts, also pass placeholders to inject message arrays.
-	 *
-	 * @param variables - Variables to interpolate into the template
-	 * @param placeholders - (Chat only) Message arrays to inject at placeholder positions
-	 * @returns Compiled prompt string (for text) or messages array (for chat)
-	 *
-	 * @example Text prompt
-	 * ```typescript
-	 * const result = prompt.compile({ firstName: "Alice" });
-	 * // "You are a mentor for Alice."
-	 * ```
-	 *
-	 * @example Chat prompt with placeholder
-	 * ```typescript
-	 * const result = prompt.compile(
-	 *   { firstName: "Alice" },
-	 *   { chatHistory: [{ role: "user", content: "Hi!" }] }
-	 * );
-	 * // [{ role: "system", content: "..." }, { role: "user", content: "Hi!" }]
-	 * ```
-	 */
-	compile(
-		variables?: PromptVariables,
-		placeholders?: PromptPlaceholders,
-	): T extends "text" ? string : PromptChatMessage[];
+function isPromptToolDefinition(value: unknown): value is PromptToolDefinition {
+	if (typeof value !== "object" || value === null) {
+		return false;
+	}
+	const obj = value as Record<string, unknown>;
+	if (obj.type !== "function" || typeof obj.function !== "object" || obj.function === null) {
+		return false;
+	}
+	return typeof (obj.function as Record<string, unknown>).name === "string";
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Prompt Config
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface PromptConfig {
+	readonly model?: string;
+	readonly temperature?: number;
+	readonly maxTokens?: number;
+	readonly maxToolSteps?: number;
+	readonly tools?: readonly PromptToolDefinition[];
+	readonly [key: string]: unknown;
+}
+
+export function getToolsFromConfig(config: PromptConfig): readonly PromptToolDefinition[] {
+	const { tools } = config;
+	if (!Array.isArray(tools)) {
+		return [];
+	}
+	return tools.filter(isPromptToolDefinition);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Prompt Definition
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface PromptDefinitionBase {
+	readonly name: string;
+	readonly description?: string;
+	readonly config?: PromptConfig;
+	readonly labels?: readonly string[];
+	readonly tags?: readonly string[];
+	readonly variables?: readonly string[];
+	readonly _meta?: { readonly toolsDir?: string };
+}
+
+export interface TextPromptDefinition extends PromptDefinitionBase {
+	readonly type: typeof PROMPT_TYPES.TEXT;
+	readonly prompt: string;
+}
+
+export interface ChatPromptDefinition extends PromptDefinitionBase {
+	readonly type: typeof PROMPT_TYPES.CHAT;
+	readonly prompt: readonly ChatPromptMessage[];
+}
+
+export type PromptDefinition<T extends PromptType = PromptType> = T extends typeof PROMPT_TYPES.TEXT
+	? TextPromptDefinition
+	: T extends typeof PROMPT_TYPES.CHAT
+		? ChatPromptDefinition
+		: TextPromptDefinition | ChatPromptDefinition;
+
+export function isTextPromptDefinition(def: PromptDefinition): def is TextPromptDefinition {
+	return def.type === PROMPT_TYPES.TEXT;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Compile Result Types
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type TextCompileResult = string;
+export type ChatCompileResult = readonly PromptChatMessage[];
+export type CompileResult<T extends PromptType> = T extends typeof PROMPT_TYPES.TEXT
+	? TextCompileResult
+	: ChatCompileResult;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Resolved Prompt
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type PromptVariables = Readonly<Record<string, string>>;
+export type PromptPlaceholders = Readonly<Record<string, readonly PromptChatMessage[]>>;
+
+type CompileFunction<T extends PromptType> = (
+	variables?: PromptVariables,
+	placeholders?: PromptPlaceholders,
+) => CompileResult<T>;
+
+interface ResolvedPromptBase<T extends PromptType> {
+	readonly definition: PromptDefinition<T>;
+	readonly config: PromptConfig;
+	readonly compile: CompileFunction<T>;
+}
+
+export interface LangfuseResolvedPrompt<T extends PromptType> extends ResolvedPromptBase<T> {
+	readonly source: "langfuse";
+	readonly langfusePrompt: T extends typeof PROMPT_TYPES.TEXT ? TextPromptClient : ChatPromptClient;
+	readonly langfuseVersion: number;
+}
+
+export interface LocalResolvedPrompt<T extends PromptType> extends ResolvedPromptBase<T> {
+	readonly source: "local";
+	readonly langfusePrompt?: undefined;
+	readonly langfuseVersion?: undefined;
+}
+
+export type ResolvedPrompt<T extends PromptType = PromptType> =
+	| LangfuseResolvedPrompt<T>
+	| LocalResolvedPrompt<T>;

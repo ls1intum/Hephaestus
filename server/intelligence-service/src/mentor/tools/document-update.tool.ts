@@ -14,6 +14,7 @@ import {
 	type UIMessageStreamWriter,
 } from "ai";
 import { desc, eq } from "drizzle-orm";
+import pino from "pino";
 import { z } from "zod";
 import env from "@/env";
 import { formatConversationForDocument } from "@/shared/ai/messages";
@@ -75,7 +76,8 @@ async function persistNextVersion(params: {
 }): Promise<DocumentRow | undefined> {
 	const { id, base, content } = params;
 	if (!base) {
-		return undefined;
+		// Document doesn't exist - this is an error condition, not silent failure
+		throw new Error(`Document with id "${id}" not found`);
 	}
 
 	const nextVersion = (base.versionNumber ?? 0) + 1;
@@ -180,6 +182,8 @@ interface ToolFactoryParams {
 	dataStream: UIMessageStreamWriter<UIMessage>;
 }
 
+const logger = pino({ name: "document-update-tool" });
+
 /**
  * Factory to create the document update tool.
  * Requires dataStream for streaming document content to the client.
@@ -201,39 +205,71 @@ export const updateDocumentTool = ({ dataStream }: ToolFactoryParams) =>
 				transient: true,
 			});
 
-			const latestRow = await getLatestDocumentRow(id);
-			const currentContent = latestRow?.content ?? "";
-
-			// Get conversation context for additional info
-			const conversationContext = formatConversationForDocument(messages);
-
-			let content = "";
 			try {
-				content = await streamUpdatedContent({
+				const latestRow = await getLatestDocumentRow(id);
+
+				// Check if document exists BEFORE streaming
+				if (!latestRow) {
+					logger.error({ id }, "Document not found for update");
+					return {
+						id,
+						title: "",
+						content: "",
+						kind: "text" as const,
+						description,
+						error: `Document with id "${id}" not found`,
+					};
+				}
+
+				const currentContent = latestRow.content ?? "";
+
+				// Get conversation context for additional info
+				const conversationContext = formatConversationForDocument(messages);
+
+				let content = "";
+				try {
+					content = await streamUpdatedContent({
+						id,
+						currentContent,
+						description,
+						conversationContext,
+						dataStream,
+					});
+				} finally {
+					dataStream.write({
+						type: "data-document-finish",
+						data: { id, kind: "text" },
+						transient: true,
+					});
+				}
+
+				// Persist new version
+				const contentToPersist = content || currentContent;
+				const row = await persistNextVersion({ id, base: latestRow, content: contentToPersist });
+
+				return {
 					id,
-					currentContent,
+					title: row?.title ?? latestRow.title ?? "",
+					content: row?.content ?? contentToPersist,
+					kind: (row?.kind as "text" | undefined) ?? (latestRow.kind as "text") ?? "text",
 					description,
-					conversationContext,
-					dataStream,
-				});
-			} finally {
+				};
+			} catch (error) {
+				logger.error({ error, id, description }, "Document update failed");
+				// Always emit finish event even on error
 				dataStream.write({
 					type: "data-document-finish",
 					data: { id, kind: "text" },
 					transient: true,
 				});
+				return {
+					id,
+					title: "",
+					content: "",
+					kind: "text" as const,
+					description,
+					error: error instanceof Error ? error.message : "Unknown error updating document",
+				};
 			}
-
-			// Persist new version
-			const contentToPersist = content || currentContent;
-			const row = await persistNextVersion({ id, base: latestRow, content: contentToPersist });
-
-			return {
-				id,
-				title: row?.title ?? latestRow?.title ?? "",
-				content: row?.content ?? contentToPersist,
-				kind: (row?.kind as "text" | undefined) ?? (latestRow?.kind as "text") ?? "text",
-				description,
-			};
 		},
 	});

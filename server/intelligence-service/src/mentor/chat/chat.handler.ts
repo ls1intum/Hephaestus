@@ -35,7 +35,7 @@ import { createActivityTools, extractToolConfig, overrideToolDescriptions } from
 import { createDocumentTool } from "@/mentor/tools/document-create.tool";
 import { updateDocumentTool } from "@/mentor/tools/document-update.tool";
 import { loadPrompt } from "@/prompts";
-import type { PromptToolDefinition } from "@/prompts/types";
+import { getToolsFromConfig } from "@/prompts/types";
 import { createAIErrorHandler, getStreamErrorMessage } from "@/shared/ai/error-handler";
 import { getModel } from "@/shared/ai/model";
 import { createMentorSystemPrompt } from "@/shared/ai/prompts";
@@ -58,6 +58,24 @@ import {
 	uiMessageFromPersisted,
 } from "./chat.transformer";
 import { getMessagesByThreadId } from "./data";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Types
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Message part from AI SDK response (minimal shape for persistence) */
+interface MessagePart {
+	readonly type: string;
+	readonly [key: string]: unknown;
+}
+
+/** Type guard for message parts array */
+function isMessagePartsArray(value: unknown): value is MessagePart[] {
+	return (
+		Array.isArray(value) &&
+		value.every((item) => typeof item === "object" && item !== null && "type" in item)
+	);
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Constants
@@ -145,6 +163,7 @@ export const mentorChatHandler: AppRouteHandler<HandleMentorChatRoute> = async (
 	// Sub-prompts are loaded so they can be versioned/tested independently
 	// LIMITATION: Only the main prompt can be linked to the trace (Langfuse constraint)
 	// But the actual prompt text IS captured in the trace input
+	// All mentor prompts are text prompts (type: "text"), so compile() returns string
 	const [resolvedMainPrompt, resolvedGreetingFirst, resolvedGreetingContinue, resolvedReturning] =
 		await Promise.all([
 			loadPrompt(mentorChatPrompt, { label: "production" }),
@@ -155,21 +174,26 @@ export const mentorChatHandler: AppRouteHandler<HandleMentorChatRoute> = async (
 
 	// Select greeting section based on conversation state
 	// The sub-prompt's .prompt is injected as a variable value
-	const greetingSection = isFirstMessage
-		? resolvedGreetingFirst.compile({ firstName })
-		: resolvedGreetingContinue.compile({});
+	// Type assertion is safe: all prompts are text type (verified at definition)
+	const greetingSection = String(
+		isFirstMessage
+			? resolvedGreetingFirst.compile({ firstName })
+			: resolvedGreetingContinue.compile({}),
+	);
 
-	// Select returning user section
-	const returningUserSection = isReturningUser ? resolvedReturning.compile({}) : "";
+	// Select returning user section (also a text prompt)
+	const returningUserSection = isReturningUser ? String(resolvedReturning.compile({})) : "";
 
 	// Compose the final system prompt
 	// The main prompt uses {{greetingSection}} and {{returningUserSection}} as variables
-	const compiledPrompt = resolvedMainPrompt.compile({
-		firstName,
-		userLogin,
-		greetingSection: greetingSection,
-		returningUserSection: returningUserSection,
-	}) as string;
+	const compiledPrompt = String(
+		resolvedMainPrompt.compile({
+			firstName,
+			userLogin,
+			greetingSection,
+			returningUserSection,
+		}),
+	);
 
 	// Fallback: use local prompt generator if Langfuse prompt compilation fails
 	const finalSystemPrompt =
@@ -210,6 +234,7 @@ export const mentorChatHandler: AppRouteHandler<HandleMentorChatRoute> = async (
 
 	// Stream AI response
 	const stream = createUIMessageStream({
+		// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Streaming handler coordinates multiple async operations (persistence, telemetry, error handling) in a single callback. Splitting would fragment the streaming lifecycle logic.
 		execute: async ({ writer }) => {
 			try {
 				// Write the start chunk with our server-generated UUID
@@ -270,8 +295,11 @@ export const mentorChatHandler: AppRouteHandler<HandleMentorChatRoute> = async (
 				// Override tool descriptions with Langfuse-managed versions
 				// This allows A/B testing tool descriptions and updating without code deployment
 				// @see https://langfuse.com/docs/prompt-management/features/config#function-calling
-				const langfuseTools = resolvedMainPrompt.config.tools as PromptToolDefinition[] | undefined;
-				const tools = overrideToolDescriptions(localTools, langfuseTools);
+				const langfuseTools = getToolsFromConfig(resolvedMainPrompt.config);
+				const tools = overrideToolDescriptions(
+					localTools,
+					langfuseTools.length > 0 ? langfuseTools : undefined,
+				);
 
 				const result = streamText({
 					model,
@@ -325,8 +353,8 @@ export const mentorChatHandler: AppRouteHandler<HandleMentorChatRoute> = async (
 								return;
 							}
 
-							const parts = Array.isArray(responseMessage?.parts)
-								? (responseMessage.parts as Array<{ type: string; [k: string]: unknown }>)
+							const parts = isMessagePartsArray(responseMessage?.parts)
+								? responseMessage.parts
 								: [];
 
 							// Use our pre-generated UUID, NOT the responseMessage.id
