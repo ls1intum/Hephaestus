@@ -10,7 +10,7 @@
 
 import { eq, inArray, sql } from "drizzle-orm";
 import db from "@/shared/db";
-import { chatMessage, chatMessagePart, chatThread } from "@/shared/db/schema";
+import { chatMessage, chatMessagePart, chatMessageVote, chatThread } from "@/shared/db/schema";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Test Data Factories
@@ -45,6 +45,7 @@ interface TestWorkspace {
 interface TestUser {
 	id: number;
 	login: string;
+	name: string | null;
 }
 
 export interface TestFixtures {
@@ -77,7 +78,7 @@ export async function createTestFixtures(): Promise<TestFixtures> {
 
 	return {
 		workspace: { id: workspaceId, name: "Test Workspace" },
-		user: { id: userId, login: `test-user-${id}` },
+		user: { id: userId, login: `test-user-${id}`, name: "Test User" },
 	};
 }
 
@@ -96,7 +97,7 @@ export async function cleanupTestThread(threadId: string): Promise<void> {
 		WHERE id = ${threadId}
 	`);
 
-	// Delete parts first (FK constraint)
+	// Delete parts and votes first (FK constraints)
 	const messages = await db
 		.select({ id: chatMessage.id })
 		.from(chatMessage)
@@ -104,6 +105,7 @@ export async function cleanupTestThread(threadId: string): Promise<void> {
 
 	for (const msg of messages) {
 		await db.delete(chatMessagePart).where(eq(chatMessagePart.messageId, msg.id));
+		await db.delete(chatMessageVote).where(eq(chatMessageVote.messageId, msg.id));
 	}
 
 	// Delete messages

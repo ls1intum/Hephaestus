@@ -1,175 +1,127 @@
+/**
+ * Issues Tool
+ *
+ * User's issues (bugs, tasks, feature requests).
+ */
+
 import { tool } from "ai";
-import { eq } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import db from "@/shared/db";
-import {
-	issueAssignee,
-	issueComment,
-	issueLabel,
-	label,
-	milestone,
-	repository,
-	user,
-} from "@/shared/db/schema";
-import { findIssueOrPR } from "@/shared/repositories/issue.repository";
+import { issue, repository } from "@/shared/db/schema";
+import { buildIssueUrl, getWorkspaceRepoIds, type ToolContext } from "./context";
 
-const inputSchema = z.object({
-	issueId: z.number().optional().describe("The database ID of the issue (preferred if known)"),
-	repositoryNameWithOwner: z
-		.string()
-		.optional()
-		.describe("The repository name with owner (e.g., 'owner/repo')"),
-	issueNumber: z.number().optional().describe("The issue number within the repository"),
+// ─────────────────────────────────────────────────────────────────────────────
+// Schema
+// ─────────────────────────────────────────────────────────────────────────────
+
+const outputSchema = z.object({
+	user: z.string(),
+	count: z.number(),
+	issues: z.array(
+		z.object({
+			number: z.number(),
+			title: z.string().nullable(),
+			state: z.string().optional(),
+			url: z.string(),
+			repository: z.string().nullable(),
+			createdAt: z.string().nullable(),
+			closedAt: z.string().nullable(),
+		}),
+	),
 });
 
-type Input = z.infer<typeof inputSchema>;
+// ─────────────────────────────────────────────────────────────────────────────
+// Tool Factory
+// ─────────────────────────────────────────────────────────────────────────────
 
-export const getIssueDetails = tool({
-	description:
-		"Get detailed information for a specific GitHub issue by its ID or by repository and issue number. Includes comments, labels, assignees, and milestone information.",
-	inputSchema,
-	execute: async ({ issueId, repositoryNameWithOwner, issueNumber }: Input) => {
-		try {
-			if (!(issueId || (repositoryNameWithOwner && issueNumber))) {
-				return {
-					success: false,
-					error: "Either issueId or both repositoryNameWithOwner and issueNumber must be provided",
-					issue: null,
-				};
+export function createGetIssuesTool(ctx: ToolContext) {
+	return tool({
+		description: `Retrieve issues the user has created (bugs, tasks, feature requests).
+
+**When to use:**
+- When discussing bugs or tasks they've reported
+- When exploring their issue tracking patterns
+- When looking for non-PR work items
+
+**When NOT to use:**
+- For pull requests (use getPullRequests)
+- For issues assigned TO them (use getAssignedWork)
+
+**Output includes:**
+- Issue number, title, state
+- Repository and URL for markdown links`,
+
+		inputSchema: z.object({
+			state: z
+				.enum(["open", "closed", "all"])
+				.describe("Filter: 'open', 'closed', or 'all'. Use 'open' for active issues."),
+			limit: z.number().min(1).max(50).describe("Maximum results (1-50). Use 10 for overview."),
+		}),
+		outputSchema,
+		strict: true,
+
+		execute: async ({ state, limit }) => {
+			const repoIds = await getWorkspaceRepoIds(ctx.workspaceId);
+
+			const conditions = [eq(issue.authorId, ctx.userId), eq(issue.issueType, "ISSUE")];
+
+			if (repoIds.length > 0) {
+				conditions.push(inArray(issue.repositoryId, repoIds));
 			}
 
-			const issueRecord = await findIssueOrPR({
-				id: issueId,
-				repoNameWithOwner: repositoryNameWithOwner,
-				number: issueNumber,
-				type: "ISSUE",
-			});
-
-			if (!issueRecord) {
-				return {
-					success: false,
-					error: "Issue not found",
-					issue: null,
-				};
+			if (state === "open") {
+				conditions.push(eq(issue.state, "OPEN"));
+			} else if (state === "closed") {
+				conditions.push(eq(issue.state, "CLOSED"));
 			}
 
-			// Fetch related data in parallel
-			const [
-				authorResult,
-				repoResult,
-				commentsResult,
-				labelsResult,
-				assigneesResult,
-				milestoneResult,
-			] = await Promise.all([
-				// Author
-				issueRecord.authorId
-					? db.select().from(user).where(eq(user.id, issueRecord.authorId)).limit(1)
-					: Promise.resolve([]),
-				// Repository
-				issueRecord.repositoryId
-					? db.select().from(repository).where(eq(repository.id, issueRecord.repositoryId)).limit(1)
-					: Promise.resolve([]),
-				// Comments
-				db
-					.select({
-						id: issueComment.id,
-						body: issueComment.body,
-						createdAt: issueComment.createdAt,
-						authorLogin: user.login,
-						authorName: user.name,
-					})
-					.from(issueComment)
-					.leftJoin(user, eq(issueComment.authorId, user.id))
-					.where(eq(issueComment.issueId, issueRecord.id))
-					.limit(20),
-				// Labels
-				db
-					.select({
-						id: label.id,
-						name: label.name,
-						color: label.color,
-						description: label.description,
-					})
-					.from(issueLabel)
-					.innerJoin(label, eq(issueLabel.labelId, label.id))
-					.where(eq(issueLabel.issueId, issueRecord.id)),
-				// Assignees
-				db
-					.select({
-						id: user.id,
-						login: user.login,
-						name: user.name,
-						avatarUrl: user.avatarUrl,
-					})
-					.from(issueAssignee)
-					.innerJoin(user, eq(issueAssignee.userId, user.id))
-					.where(eq(issueAssignee.issueId, issueRecord.id)),
-				// Milestone
-				issueRecord.milestoneId
-					? db.select().from(milestone).where(eq(milestone.id, issueRecord.milestoneId)).limit(1)
-					: Promise.resolve([]),
-			]);
+			const issues = await db
+				.select({
+					number: issue.number,
+					title: issue.title,
+					state: issue.state,
+					createdAt: issue.createdAt,
+					closedAt: issue.closedAt,
+					repository: repository.nameWithOwner,
+				})
+				.from(issue)
+				.leftJoin(repository, eq(issue.repositoryId, repository.id))
+				.where(and(...conditions))
+				.orderBy(desc(issue.updatedAt))
+				.limit(limit);
 
 			return {
-				success: true,
-				issue: {
-					id: issueRecord.id,
-					number: issueRecord.number,
-					title: issueRecord.title,
-					state: issueRecord.state,
-					body: issueRecord.body,
-					htmlUrl: issueRecord.htmlUrl,
-					commentsCount: issueRecord.commentsCount,
-					isLocked: issueRecord.isLocked,
-					createdAt: issueRecord.createdAt,
-					updatedAt: issueRecord.updatedAt,
-					closedAt: issueRecord.closedAt,
-					author: authorResult[0]
-						? {
-								id: authorResult[0].id,
-								login: authorResult[0].login,
-								name: authorResult[0].name,
-								avatarUrl: authorResult[0].avatarUrl,
-							}
-						: null,
-					repository: repoResult[0]
-						? {
-								id: repoResult[0].id,
-								name: repoResult[0].name,
-								nameWithOwner: repoResult[0].nameWithOwner,
-								htmlUrl: repoResult[0].htmlUrl,
-							}
-						: null,
-					labels: labelsResult,
-					assignees: assigneesResult,
-					milestone: milestoneResult[0]
-						? {
-								id: milestoneResult[0].id,
-								title: milestoneResult[0].title,
-								description: milestoneResult[0].description,
-								state: milestoneResult[0].state,
-								dueOn: milestoneResult[0].dueOn,
-							}
-						: null,
-					comments: commentsResult.map((c) => ({
-						id: c.id,
-						body: c.body ? c.body.slice(0, 500) + (c.body.length > 500 ? "..." : "") : null,
-						createdAt: c.createdAt,
-						author: {
-							login: c.authorLogin,
-							name: c.authorName,
-						},
-					})),
-				},
+				user: ctx.userLogin,
+				count: issues.length,
+				issues: issues.map((i) => ({
+					number: i.number,
+					title: i.title,
+					state: i.state?.toLowerCase(),
+					url: buildIssueUrl(i.repository, i.number),
+					repository: i.repository,
+					createdAt: i.createdAt,
+					closedAt: i.closedAt,
+				})),
 			};
-		} catch (error) {
+		},
+
+		toModelOutput({ output }) {
+			if (output.count === 0) {
+				return { type: "text" as const, value: `No issues found for ${output.user}.` };
+			}
+
+			const issuesList = output.issues
+				.map((i) => {
+					const status = i.state === "open" ? "🟢 Open" : "⚫ Closed";
+					return `- [#${i.number}](${i.url}): ${i.title} (${status})`;
+				})
+				.join("\n");
+
 			return {
-				success: false,
-				error:
-					error instanceof Error ? error.message : "Failed to fetch issue details from database",
-				issue: null,
+				type: "text" as const,
+				value: `**Issues for ${output.user}** (${output.count}):\n${issuesList}`,
 			};
-		}
-	},
-});
+		},
+	});
+}

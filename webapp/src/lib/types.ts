@@ -20,8 +20,6 @@ export type {
 	DocumentDeltaData,
 	DocumentFinishData,
 	DocumentUpdateData,
-	GetWeatherInput,
-	GetWeatherOutput,
 	// Message metadata
 	MessageMetadata,
 	UpdateDocumentInput,
@@ -33,7 +31,6 @@ export {
 	hasDocumentId,
 	parseCreateDocumentInput,
 	parseCreateDocumentOutput,
-	parseGetWeatherOutput,
 	parseUpdateDocumentInput,
 	parseUpdateDocumentOutput,
 } from "@intelligence-service/chat/chat.shared";

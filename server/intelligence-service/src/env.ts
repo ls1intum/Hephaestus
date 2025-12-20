@@ -1,4 +1,6 @@
 import path from "node:path";
+import { devToolsMiddleware } from "@ai-sdk/devtools";
+import { wrapLanguageModel } from "ai";
 import { config } from "dotenv";
 import { expand } from "dotenv-expand";
 import { z } from "zod";
@@ -123,10 +125,20 @@ if (!parseResult.success) {
 
 const envData = parseResult.data;
 
+// Wrap models with DevTools middleware in development
+const isDev = envData.NODE_ENV === "development";
+const wrapWithDevTools = (model: ReturnType<typeof getModel>) =>
+	isDev
+		? wrapLanguageModel({
+				model,
+				middleware: devToolsMiddleware(),
+			})
+		: model;
+
 const env = {
 	...envData,
-	defaultModel: getModel(envData.MODEL_NAME),
-	detectionModel: getModel(envData.DETECTION_MODEL_NAME),
+	defaultModel: wrapWithDevTools(getModel(envData.MODEL_NAME)),
+	detectionModel: wrapWithDevTools(getModel(envData.DETECTION_MODEL_NAME)),
 };
 
 export default env;

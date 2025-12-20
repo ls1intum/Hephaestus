@@ -181,7 +181,9 @@
 				"src/shared/utils/index.ts",
 				"src/repositories/index.ts",
 				"src/services/index.ts",
-				"src/utils/index.ts"
+				"src/utils/index.ts",
+				"src/mentor/tools/index.ts",
+				"src/prompts/index.ts"
 			],
 			"linter": {
 				"rules": {

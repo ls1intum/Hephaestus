@@ -50,8 +50,9 @@ export const messageSchema = z.object({
 
 export const chatRequestBodySchema = z.object({
 	id: z.string().uuid(),
-	message: messageSchema,
+	message: messageSchema.optional(),
 	previousMessageId: z.string().optional(),
+	greeting: z.boolean().optional().describe("If true, generate a greeting without user message"),
 });
 
 export type ChatRequestBody = z.infer<typeof chatRequestBodySchema>;
@@ -102,8 +103,6 @@ export type {
 	DocumentDeltaData,
 	DocumentFinishData,
 	DocumentUpdateData,
-	GetWeatherInput,
-	GetWeatherOutput,
 	UpdateDocumentInput,
 	UpdateDocumentOutput,
 } from "./chat.shared";

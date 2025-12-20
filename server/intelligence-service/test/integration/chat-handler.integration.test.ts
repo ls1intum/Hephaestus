@@ -63,6 +63,7 @@ describe("Chat Handler Full Integration", () => {
 					"Content-Type": "application/json",
 					"x-workspace-id": String(fixtures.workspace.id),
 					"x-user-id": String(fixtures.user.id),
+					"x-user-login": fixtures.user.login,
 				},
 				body: JSON.stringify({
 					id: threadId,
@@ -88,6 +89,7 @@ describe("Chat Handler Full Integration", () => {
 					"Content-Type": "application/json",
 					"x-workspace-id": String(fixtures.workspace.id),
 					"x-user-id": String(fixtures.user.id),
+					"x-user-login": fixtures.user.login,
 				},
 				body: JSON.stringify({
 					id: testUuid(),
@@ -106,6 +108,7 @@ describe("Chat Handler Full Integration", () => {
 					"Content-Type": "application/json",
 					"x-workspace-id": String(fixtures.workspace.id),
 					"x-user-id": String(fixtures.user.id),
+					"x-user-login": fixtures.user.login,
 				},
 				body: JSON.stringify({
 					id: testUuid(),
@@ -128,6 +131,7 @@ describe("Chat Handler Full Integration", () => {
 					"Content-Type": "application/json",
 					"x-workspace-id": String(fixtures.workspace.id),
 					"x-user-id": String(fixtures.user.id),
+					"x-user-login": fixtures.user.login,
 				},
 				body: JSON.stringify({
 					id: testUuid(),
@@ -150,6 +154,7 @@ describe("Chat Handler Full Integration", () => {
 					"Content-Type": "application/json",
 					"x-workspace-id": String(fixtures.workspace.id),
 					"x-user-id": String(fixtures.user.id),
+					"x-user-login": fixtures.user.login,
 				},
 				body: JSON.stringify({
 					id: testUuid(),
@@ -183,6 +188,7 @@ describe("Chat Handler Full Integration", () => {
 					"Content-Type": "application/json",
 					"x-workspace-id": String(fixtures.workspace.id),
 					"x-user-id": String(fixtures.user.id),
+					"x-user-login": fixtures.user.login,
 				},
 				body: JSON.stringify({
 					id: threadId,
@@ -213,6 +219,7 @@ describe("Chat Handler Full Integration", () => {
 					"Content-Type": "application/json",
 					"x-workspace-id": String(fixtures.workspace.id),
 					"x-user-id": String(fixtures.user.id),
+					"x-user-login": fixtures.user.login,
 				},
 				body: JSON.stringify({
 					id: threadId,
@@ -247,6 +254,7 @@ describe("Chat Handler Full Integration", () => {
 					"Content-Type": "application/json",
 					"x-workspace-id": String(fixtures.workspace.id),
 					"x-user-id": String(fixtures.user.id),
+					"x-user-login": fixtures.user.login,
 				},
 				body: JSON.stringify({
 					id: threadId,
@@ -280,6 +288,7 @@ describe("Chat Handler Full Integration", () => {
 					"Content-Type": "application/json",
 					"x-workspace-id": String(fixtures.workspace.id),
 					"x-user-id": String(fixtures.user.id),
+					"x-user-login": fixtures.user.login,
 				},
 				body: JSON.stringify({
 					id: threadId,
@@ -318,6 +327,7 @@ describe("Chat Handler Full Integration", () => {
 					"Content-Type": "application/json",
 					"x-workspace-id": String(fixtures.workspace.id),
 					"x-user-id": String(fixtures.user.id),
+					"x-user-login": fixtures.user.login,
 				},
 				body: JSON.stringify({
 					id: threadId,
@@ -353,6 +363,7 @@ describe("Chat Handler Full Integration", () => {
 						"Content-Type": "application/json",
 						"x-workspace-id": String(fixtures.workspace.id),
 						"x-user-id": String(fixtures.user.id),
+						"x-user-login": fixtures.user.login,
 					},
 					body: JSON.stringify({
 						id: threadId,
@@ -373,6 +384,7 @@ describe("Chat Handler Full Integration", () => {
 						"Content-Type": "application/json",
 						"x-workspace-id": String(fixtures.workspace.id),
 						"x-user-id": String(fixtures.user.id),
+						"x-user-login": fixtures.user.login,
 					},
 					body: JSON.stringify({
 						id: threadId,
@@ -416,6 +428,7 @@ describe("Chat Handler Full Integration", () => {
 					"Content-Type": "application/json",
 					"x-workspace-id": String(fixtures.workspace.id),
 					"x-user-id": String(fixtures.user.id),
+					"x-user-login": fixtures.user.login,
 				},
 				body: JSON.stringify({
 					id: threadId,

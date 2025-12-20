@@ -16,8 +16,8 @@ describe("Type Contracts", () => {
 			expectTypeOf<ChatRequestBody["id"]>().toBeString();
 		});
 
-		it("should require message with proper structure", () => {
-			expectTypeOf<ChatRequestBody["message"]>().toMatchTypeOf<{
+		it("should have optional message with proper structure when defined", () => {
+			expectTypeOf<NonNullable<ChatRequestBody["message"]>>().toMatchTypeOf<{
 				id: string;
 				role: string;
 				parts: unknown[];
@@ -26,6 +26,10 @@ describe("Type Contracts", () => {
 
 		it("should have optional previousMessageId", () => {
 			expectTypeOf<ChatRequestBody>().toHaveProperty("previousMessageId");
+		});
+
+		it("should have optional greeting boolean", () => {
+			expectTypeOf<ChatRequestBody>().toHaveProperty("greeting");
 		});
 	});
 

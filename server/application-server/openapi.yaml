@@ -587,6 +587,9 @@ paths:
             schema:
               type: object
               properties:
+                greeting:
+                  type: boolean
+                  description: "If true, generate a greeting without user message"
                 id:
                   type: string
                   format: uuid
@@ -648,7 +651,6 @@ paths:
                   type: string
               required:
               - id
-              - message
         description: Chat request body
         required: true
       responses:
@@ -658,7 +660,8 @@ paths:
               schema:
                 $ref: "#/components/schemas/StreamPart"
           description: Event stream of chat updates.
-      summary: Handle mentor chat
+      summary: Handle mentor chat (set greeting=true for initial greeting without
+        user message)
       tags:
       - mentor
       - exported

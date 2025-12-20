@@ -2,8 +2,13 @@ import type { UseChatHelpers } from "@ai-sdk/react";
 import { useChat } from "@ai-sdk/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { DataUIPart } from "ai";
-import { DefaultChatTransport } from "ai";
-import { useEffect, useRef, useState } from "react";
+import {
+	DefaultChatTransport,
+	parseJsonEventStream,
+	readUIMessageStream,
+	uiMessageChunkSchema,
+} from "ai";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { v4 as uuidv4 } from "uuid";
 import {
 	getGroupedThreadsOptions,
@@ -21,6 +26,11 @@ import type {
 import environment from "@/environment";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 import { keycloakService } from "@/integrations/auth";
+import {
+	extractVotesFromThreadDetail,
+	parseSingleMessage,
+	parseThreadMessages,
+} from "@/lib/chat-validation";
 import { AUTO_OPEN_THRESHOLD, getCenteredRect } from "@/lib/dom-utils";
 import type { ChatMessage, DocumentDataTypes } from "@/lib/types";
 import { useArtifactStore } from "@/stores/artifact-store";
@@ -45,6 +55,7 @@ function isDocumentDataPart(part: {
 interface UseMentorChatOptions {
 	threadId?: string;
 	initialMessages?: ChatMessage[];
+	autoGreeting?: boolean; // If true, trigger greeting on mount for new threads
 	onFinish?: () => void;
 	onError?: (error: Error) => void;
 }
@@ -52,6 +63,7 @@ interface UseMentorChatOptions {
 interface UseMentorChatReturn
 	extends Omit<UseChatHelpers<ChatMessage>, "sendMessage"> {
 	sendMessage: (text: string) => void;
+	triggerGreeting: () => Promise<void>; // Manually trigger a greeting
 	threadDetail: ThreadDetail | undefined;
 	isThreadLoading: boolean;
 	threadError: Error | null;
@@ -70,6 +82,7 @@ interface UseMentorChatReturn
 export function useMentorChat({
 	threadId,
 	initialMessages = [],
+	autoGreeting = false,
 	onFinish,
 	onError,
 }: UseMentorChatOptions): UseMentorChatReturn {
@@ -309,7 +322,15 @@ export function useMentorChat({
 		if (hydratedRef.current === threadId) return;
 		if (status === "streaming" || status === "submitted") return;
 		if (!threadDetail?.messages) return;
-		setMessages(threadDetail.messages as unknown as ChatMessage[]);
+
+		// Validate messages before setting state
+		const validatedMessages = parseThreadMessages(threadDetail.messages);
+		if (!validatedMessages) {
+			console.error("[useMentorChat] Failed to validate thread messages");
+			return;
+		}
+
+		setMessages(validatedMessages);
 		hydratedRef.current = threadId;
 	}, [threadId, threadDetail?.messages, status, setMessages]);
 
@@ -317,14 +338,11 @@ export function useMentorChat({
 	const hydratedVotesRef = useRef<string | null>(null);
 	useEffect(() => {
 		if (!threadId) return; // only hydrate for existing threads
-		// We rely on the backend including votes in the thread detail DTO
-		const serverVotes = (
-			threadDetail as unknown as {
-				votes?: Array<{ messageId?: string; isUpvoted?: boolean }>;
-			}
-		)?.votes;
-		if (!serverVotes) return;
 		if (hydratedVotesRef.current === threadId) return;
+
+		// Safely extract and validate votes from thread detail
+		const serverVotes = extractVotesFromThreadDetail(threadDetail);
+		if (serverVotes.length === 0) return;
 
 		const next: Record<string, boolean | undefined> = {};
 		for (const v of serverVotes) {
@@ -341,7 +359,82 @@ export function useMentorChat({
 		}
 
 		originalSendMessage({ text });
-	}; // Vote message function
+	};
+
+	// Trigger greeting from the mentor (no user message required)
+	// Uses the same /chat endpoint with greeting=true flag
+	const greetingTriggeredRef = useRef(false);
+	const triggerGreeting = useCallback(async () => {
+		if (!hasWorkspace || greetingTriggeredRef.current) {
+			return;
+		}
+		greetingTriggeredRef.current = true;
+
+		// Use the same chat endpoint with greeting flag
+		const chatApi = `${environment.serverUrl}/workspaces/${slug}/mentor/chat`;
+
+		try {
+			const response = await fetch(chatApi, {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+					Authorization: `Bearer ${keycloakService.getToken()}`,
+				},
+				body: JSON.stringify({
+					id: stableThreadId,
+					greeting: true,
+					// No message - greeting mode
+				}),
+			});
+
+			if (!response.ok || !response.body) {
+				throw new Error("Failed to fetch greeting");
+			}
+
+			// Parse the SSE stream into UIMessageChunks
+			const chunkStream = parseJsonEventStream({
+				stream: response.body,
+				schema: uiMessageChunkSchema,
+			}).pipeThrough(
+				new TransformStream({
+					transform(chunk, controller) {
+						if (!chunk.success) {
+							throw chunk.error;
+						}
+						controller.enqueue(chunk.value);
+					},
+				}),
+			);
+
+			// Read the stream and update messages in real-time
+			const messageStream = readUIMessageStream({ stream: chunkStream });
+
+			for await (const message of messageStream) {
+				// Validate and update messages with the streaming greeting
+				const validatedMessage = parseSingleMessage(message);
+				if (validatedMessage) {
+					setMessages([validatedMessage]);
+				}
+			}
+
+			// Invalidate queries to refresh sidebar
+			queryClient.invalidateQueries({
+				queryKey: getGroupedThreadsQueryKey({ path: { workspaceSlug: slug } }),
+			});
+		} catch (err) {
+			console.error("Greeting error:", err);
+			onError?.(err instanceof Error ? err : new Error(String(err)));
+		}
+	}, [hasWorkspace, slug, stableThreadId, setMessages, queryClient, onError]);
+
+	// Auto-trigger greeting on mount if enabled
+	useEffect(() => {
+		if (autoGreeting && hasWorkspace && messages.length === 0) {
+			triggerGreeting();
+		}
+	}, [autoGreeting, hasWorkspace, messages.length, triggerGreeting]);
+
+	// Vote message function
 	const voteMessage = (messageId: string, isUpvoted: boolean) => {
 		if (!hasWorkspace) {
 			return;
@@ -418,6 +511,9 @@ export function useMentorChat({
 
 		// Loading state
 		isLoading,
+
+		// Greeting
+		triggerGreeting,
 
 		// Overlay actions
 		openArtifactForDocument,

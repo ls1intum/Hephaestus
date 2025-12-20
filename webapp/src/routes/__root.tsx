@@ -188,7 +188,6 @@ function GlobalCopilot() {
 				onAttachmentsChange={() => {}}
 				onCopy={handleCopy}
 				onVote={handleVote}
-				showSuggestedActions={true}
 				inputPlaceholder="Ask me anything..."
 				disableAttachments={true}
 				className="h-full max-h-none"

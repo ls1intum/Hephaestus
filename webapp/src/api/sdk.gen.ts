@@ -250,7 +250,7 @@ export const getMember = <ThrowOnError extends boolean = false>(options: Options
 };
 
 /**
- * Handle mentor chat
+ * Handle mentor chat (set greeting=true for initial greeting without user message)
  */
 export const mentorChat = <ThrowOnError extends boolean = false>(options: Options<MentorChatData, ThrowOnError>) => {
     return (options.client ?? _heyApiClient).post<MentorChatResponses, unknown, ThrowOnError>({

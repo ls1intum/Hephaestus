@@ -95,6 +95,15 @@ export default defineConfig({
 		allowOnly: false, // Fail if .only is used (prevents accidental commits)
 		bail: 1, // Stop on first failure in CI
 		retry: 0, // No retries - tests should be deterministic
+
+		// ═══════════════════════════════════════════════════════════════════════════
+		// Type checking - catch type errors during tests (AI SDK best practice)
+		// NOTE: Disabled for test files as they use loose typing for flexibility.
+		// Type errors in src/ are caught by npm run typecheck.
+		// ═══════════════════════════════════════════════════════════════════════════
+		typecheck: {
+			enabled: false, // TODO: Enable after fixing test types
+		},
 	},
 	resolve: {
 		alias: {

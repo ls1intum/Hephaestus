@@ -1,6 +1,6 @@
 import { azure } from "@ai-sdk/azure";
 import { openai } from "@ai-sdk/openai";
-import type { LanguageModel } from "ai";
+import type { LanguageModelV3 } from "@ai-sdk/provider";
 import { createProviderRegistry } from "ai";
 
 /**
@@ -37,7 +37,7 @@ type RealProvider = Exclude<SupportedProvider, "fake">;
  * const azureModel = getModel("azure:gpt-4");
  * ```
  */
-export const getModel = (providerAndModel: string): LanguageModel => {
+export const getModel = (providerAndModel: string): LanguageModelV3 => {
 	const colonIndex = providerAndModel.indexOf(":");
 	if (colonIndex === -1) {
 		throw new Error(
@@ -73,21 +73,21 @@ export const getModel = (providerAndModel: string): LanguageModel => {
  * Creates a fake language model for CI and OpenAPI generation.
  * This model should never be called in production - it will throw if invoked.
  */
-function createFakeModel(modelId: string): LanguageModel {
+function createFakeModel(modelId: string): LanguageModelV3 {
 	const throwNotImplemented = (): never => {
 		throw new Error(
 			`Fake model "${modelId}" was invoked. This model is only for CI/OpenAPI generation and should never be called.`,
 		);
 	};
 
-	// Minimal stub that satisfies LanguageModel interface at runtime
+	// Minimal stub that satisfies LanguageModelV3 interface at runtime
 	// This is never actually invoked - only needed for module loading during OpenAPI generation
 	return {
-		specificationVersion: "v2",
+		specificationVersion: "v3",
 		provider: "fake",
 		modelId,
-		defaultObjectGenerationMode: "json",
+		supportedUrls: [],
 		doGenerate: throwNotImplemented,
 		doStream: throwNotImplemented,
-	} as unknown as LanguageModel;
+	} as unknown as LanguageModelV3;
 }

@@ -1,83 +1,195 @@
-import { smoothStream, streamText, tool, type UIMessage, type UIMessageStreamWriter } from "ai";
+/**
+ * Document creation tool for the AI mentor.
+ *
+ * Creates structured documents (weekly status updates, reflection summaries)
+ * based on the conversation context. Uses the full conversation history
+ * including tool results to generate accurate, data-backed documents.
+ */
+
+import {
+	type ModelMessage,
+	smoothStream,
+	streamText,
+	tool,
+	type UIMessage,
+	type UIMessageStreamWriter,
+} from "ai";
 import { z } from "zod";
 import env from "@/env";
 import { createDocument as createDocumentInDb } from "@/mentor/documents/data";
+import { formatConversationForDocument } from "@/shared/ai/messages";
+import { getTelemetryOptions } from "@/shared/ai/telemetry";
 import { type DocumentKind, DocumentKindEnum } from "@/shared/document";
 import { toolCallIdToUuid } from "@/shared/tool-call-id";
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Schema
+// ─────────────────────────────────────────────────────────────────────────────
+
 const inputSchema = z.object({
-	title: z.string().min(1).max(255),
-	kind: DocumentKindEnum,
+	title: z
+		.string()
+		.min(1)
+		.max(255)
+		.describe('Document title, e.g. "Weekly Status - Dec 16, 2024" or "Sprint 5 Reflection"'),
+	kind: DocumentKindEnum.describe('Document type. Use "text" (only supported type).'),
 });
 
 type Input = z.infer<typeof inputSchema>;
 
+// ─────────────────────────────────────────────────────────────────────────────
+// System Prompt
+// ─────────────────────────────────────────────────────────────────────────────
+
 /**
- * Streams document content generation to the client.
- * Returns the full generated content.
+ * System prompt for the document generator.
+ *
+ * Key design: We separate the format instructions from the conversation data.
+ * The conversation is passed via the user message, not crammed into the system prompt.
  */
-async function streamDocumentContent(params: {
+const DOCUMENT_SYSTEM_PROMPT = `You are generating a structured document for a software developer based on their conversation with an AI mentor.
+
+Your task: Synthesize the conversation into a clean, well-organized document.
+
+**Document Structure:**
+
+## 🎯 Accomplishments
+- Specific completed work with PR/issue references (e.g., "Merged #123 - Add user authentication")
+- Focus on outcomes and impact
+
+## ⚠️ Challenges & Impediments
+- Blockers encountered and their current status
+- What was tried, what worked/didn't
+
+## 💡 Learnings & Insights
+- Technical or process learnings
+- What would be done differently
+
+## 📋 Next Steps
+- Specific, achievable goals
+- Dependencies or support needed
+
+## ❓ Discussion Topics
+- Questions for supervisor
+- Items needing feedback
+
+**Rules:**
+- Use actual PR numbers and titles from the conversation
+- Be concise but specific
+- Skip sections if no relevant content (don't invent)
+- Use markdown formatting`;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Document Generation
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface StreamParams {
 	id: string;
 	title: string;
 	dataStream: UIMessageStreamWriter<UIMessage>;
-}): Promise<string> {
-	const { id, title, dataStream } = params;
-	let draftContent = "";
+	conversationContext: string;
+}
+
+/**
+ * Streams document content to the client.
+ *
+ * Design: The conversation context is passed as the user message, not stuffed
+ * into the system prompt. This gives the model a cleaner separation between
+ * instructions (system) and data (user message).
+ */
+async function streamDocumentContent(params: StreamParams): Promise<string> {
+	const { id, title, dataStream, conversationContext } = params;
+	let content = "";
+
+	// Build a proper user prompt that includes both the request and context
+	const userPrompt = conversationContext
+		? `Create a document titled "${title}" based on this conversation:\n\n${conversationContext}`
+		: `Create a document titled "${title}". No conversation context available - create a template.`;
+
+	// Enable telemetry for document generation
+	const telemetryOptions = getTelemetryOptions({
+		operation: "document:create",
+	});
 
 	const { fullStream } = streamText({
 		model: env.defaultModel,
-		system:
-			"Write about the given topic. Markdown is supported. Use headings wherever appropriate.",
+		system: DOCUMENT_SYSTEM_PROMPT,
+		prompt: userPrompt,
 		experimental_transform: smoothStream({ chunking: "word" }),
-		prompt: title,
+		...telemetryOptions,
 	});
 
 	for await (const delta of fullStream) {
-		if (delta.type !== "text-delta") {
-			continue;
+		if (delta.type === "text-delta") {
+			const text = (delta as { type: "text-delta"; text: string }).text;
+			if (text) {
+				content += text;
+				dataStream.write({
+					type: "data-document-delta",
+					data: { id, kind: "text", delta: text },
+					transient: true,
+				});
+			}
 		}
-
-		const text = (delta as { type: string; text?: string }).text ?? "";
-		if (!text) {
-			continue;
-		}
-
-		draftContent += text;
-		dataStream.write({
-			type: "data-document-delta",
-			data: { id, kind: "text", delta: text },
-			transient: true,
-		});
 	}
 
-	return draftContent;
+	return content;
 }
 
-export const createDocument = ({
-	dataStream,
-	workspaceId,
-	userId,
-}: {
+// ─────────────────────────────────────────────────────────────────────────────
+// Tool Export
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface ToolFactoryParams {
 	dataStream: UIMessageStreamWriter<UIMessage>;
 	workspaceId: number | null;
 	userId: number | null;
-}) =>
+}
+
+export const createDocument = ({ dataStream, workspaceId, userId }: ToolFactoryParams) =>
 	tool({
-		description:
-			"Create a document for writing or content creation. Emits streaming UI data for the client.",
+		description: `Create a document artifact that appears in the UI for review and editing.
+
+**When to use:**
+- User asks to prepare their weekly status update
+- User wants to summarize the reflection session
+- Conversation has covered accomplishments, challenges, and next steps
+
+**What it does:**
+- Synthesizes the conversation (including tool data like PRs, activity) into a document
+- Uses actual PR numbers and issue titles from the conversation
+- Generates structured sections: Accomplishments, Challenges, Learnings, Next Steps, Discussion Topics
+
+**Document title examples:**
+- "Weekly Status - Dec 16, 2024"
+- "Sprint Review Notes"
+- "Onboarding Progress Summary"`,
+
 		inputSchema,
+		strict: true, // Ensure model follows schema strictly
+
 		execute: async ({ title, kind }: Input, context) => {
 			const id = toolCallIdToUuid(context?.toolCallId);
+			const messages: ModelMessage[] = context?.messages ?? [];
 
+			// Signal document creation start
 			dataStream.write({
 				type: "data-document-create",
 				data: { id, title, kind: "text" },
 				transient: true,
 			});
 
-			let draftContent = "";
+			// Extract conversation context (includes tool results!)
+			const conversationContext = formatConversationForDocument(messages);
+
+			let content = "";
 			try {
-				draftContent = await streamDocumentContent({ id, title, dataStream });
+				content = await streamDocumentContent({
+					id,
+					title,
+					dataStream,
+					conversationContext,
+				});
 			} finally {
 				dataStream.write({
 					type: "data-document-finish",
@@ -86,13 +198,13 @@ export const createDocument = ({
 				});
 			}
 
-			// Only persist if we have a workspace ID and user ID
+			// Persist if we have workspace context
 			const doc =
 				workspaceId && userId
 					? await createDocumentInDb({
 							id,
 							title,
-							content: draftContent,
+							content,
 							kind: kind as DocumentKind,
 							workspaceId,
 							userId,
@@ -103,7 +215,7 @@ export const createDocument = ({
 				id: doc?.id ?? id,
 				title: doc?.title ?? title,
 				kind: doc?.kind ?? kind,
-				content: doc?.content ?? draftContent,
+				content: doc?.content ?? content,
 			};
 		},
 	});

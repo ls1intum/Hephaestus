@@ -32,7 +32,8 @@ import org.hibernate.validator.constraints.*;
 @JsonPropertyOrder({
   MentorChatRequest.JSON_PROPERTY_ID,
   MentorChatRequest.JSON_PROPERTY_MESSAGE,
-  MentorChatRequest.JSON_PROPERTY_PREVIOUS_MESSAGE_ID
+  MentorChatRequest.JSON_PROPERTY_PREVIOUS_MESSAGE_ID,
+  MentorChatRequest.JSON_PROPERTY_GREETING
 })
 @JsonTypeName("mentorChat_request")
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
@@ -45,6 +46,9 @@ public class MentorChatRequest {
 
   public static final String JSON_PROPERTY_PREVIOUS_MESSAGE_ID = "previousMessageId";
   private String previousMessageId;
+
+  public static final String JSON_PROPERTY_GREETING = "greeting";
+  private Boolean greeting;
 
   public MentorChatRequest() {
   }
@@ -84,9 +88,9 @@ public class MentorChatRequest {
    * Get message
    * @return message
    */
-  @jakarta.annotation.Nonnull
+  @jakarta.annotation.Nullable
   @JsonProperty(JSON_PROPERTY_MESSAGE)
-  @JsonInclude(value = JsonInclude.Include.ALWAYS)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
 
   public MentorChatRequestMessage getMessage() {
     return message;
@@ -94,7 +98,7 @@ public class MentorChatRequest {
 
 
   @JsonProperty(JSON_PROPERTY_MESSAGE)
-  @JsonInclude(value = JsonInclude.Include.ALWAYS)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
   public void setMessage(MentorChatRequestMessage message) {
     this.message = message;
   }
@@ -124,6 +128,31 @@ public class MentorChatRequest {
     this.previousMessageId = previousMessageId;
   }
 
+  public MentorChatRequest greeting(Boolean greeting) {
+    
+    this.greeting = greeting;
+    return this;
+  }
+
+  /**
+   * If true, generate a greeting without user message
+   * @return greeting
+   */
+  @jakarta.annotation.Nullable
+  @JsonProperty(JSON_PROPERTY_GREETING)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+
+  public Boolean getGreeting() {
+    return greeting;
+  }
+
+
+  @JsonProperty(JSON_PROPERTY_GREETING)
+  @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+  public void setGreeting(Boolean greeting) {
+    this.greeting = greeting;
+  }
+
   @Override
   public boolean equals(Object o) {
     if (this == o) {
@@ -135,12 +164,13 @@ public class MentorChatRequest {
     MentorChatRequest mentorChatRequest = (MentorChatRequest) o;
     return Objects.equals(this.id, mentorChatRequest.id) &&
         Objects.equals(this.message, mentorChatRequest.message) &&
-        Objects.equals(this.previousMessageId, mentorChatRequest.previousMessageId);
+        Objects.equals(this.previousMessageId, mentorChatRequest.previousMessageId) &&
+        Objects.equals(this.greeting, mentorChatRequest.greeting);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(id, message, previousMessageId);
+    return Objects.hash(id, message, previousMessageId, greeting);
   }
 
   @Override
@@ -150,6 +180,7 @@ public class MentorChatRequest {
     sb.append("    id: ").append(toIndentedString(id)).append("\n");
     sb.append("    message: ").append(toIndentedString(message)).append("\n");
     sb.append("    previousMessageId: ").append(toIndentedString(previousMessageId)).append("\n");
+    sb.append("    greeting: ").append(toIndentedString(greeting)).append("\n");
     sb.append("}");
     return sb.toString();
   }

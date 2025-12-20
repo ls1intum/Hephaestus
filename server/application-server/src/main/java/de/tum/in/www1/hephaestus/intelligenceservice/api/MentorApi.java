@@ -139,7 +139,7 @@ public class MentorApi extends BaseApi {
         return apiClient.invokeAPI("/mentor/threads/{threadId}", HttpMethod.GET, uriVariables, localVarQueryParams, localVarPostBody, localVarHeaderParams, localVarCookieParams, localVarFormParams, localVarAccept, localVarContentType, localVarAuthNames, localReturnType);
     }
     /**
-     * Handle mentor chat
+     * Handle mentor chat (set greeting&#x3D;true for initial greeting without user message)
      * 
      * <p><b>200</b> - Event stream of chat updates.
      * @param mentorChatRequest Chat request body (required)
@@ -151,7 +151,7 @@ public class MentorApi extends BaseApi {
     }
 
     /**
-     * Handle mentor chat
+     * Handle mentor chat (set greeting&#x3D;true for initial greeting without user message)
      * 
      * <p><b>200</b> - Event stream of chat updates.
      * @param mentorChatRequest Chat request body (required)

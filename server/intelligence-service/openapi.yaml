@@ -291,6 +291,17 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/DetectorResponse"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                  - error
   /mentor/threads/grouped:
     get:
       tags:
@@ -762,7 +773,8 @@ paths:
       tags:
         - mentor
         - exported
-      summary: Handle mentor chat
+      summary: Handle mentor chat (set greeting=true for initial greeting without user
+        message)
       operationId: mentorChat
       requestBody:
         description: Chat request body
@@ -831,9 +843,11 @@ paths:
                     - parts
                 previousMessageId:
                   type: string
+                greeting:
+                  type: boolean
+                  description: If true, generate a greeting without user message
               required:
                 - id
-                - message
       responses:
         "200":
           description: Event stream of chat updates.

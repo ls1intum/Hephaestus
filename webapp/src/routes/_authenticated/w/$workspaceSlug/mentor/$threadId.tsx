@@ -22,45 +22,30 @@ function ThreadContainer() {
 	const { state } = useLocation();
 	const navigate = useNavigate({ from: Route.fullPath });
 
-	// Initialize mentor chat hook for existing thread
+	// Check if we should auto-trigger a greeting (for new threads)
+	const autoGreeting = state?.autoGreeting === true;
+
+	// Initialize mentor chat hook
 	const mentorChat = useMentorChat({
 		threadId,
+		autoGreeting,
 		onError: (error: Error) => {
 			console.error("Chat error:", error);
 		},
 	});
 
-	// Detect initial message passed via navigation state and send it once
-	const initialMessage: string | undefined = (() => {
-		try {
-			return (
-				state as { initialMessage?: string } | undefined
-			)?.initialMessage?.trim();
-		} catch {
-			return undefined;
-		}
-	})();
-	const initialDispatchedRef = useRef(false);
+	// Clear navigation state after mounting to prevent re-triggering on back/forward
+	const stateCleared = useRef(false);
 	useEffect(() => {
-		if (initialDispatchedRef.current) return;
-		if (initialMessage && initialMessage.length > 0) {
-			initialDispatchedRef.current = true;
-			mentorChat.sendMessage(initialMessage);
-			// Clear navigation state to avoid re-sending on back/forward
-			navigate({
-				to: Route.fullPath,
-				params: { workspaceSlug, threadId },
-				replace: true,
-				state: undefined,
-			});
-		}
-	}, [
-		initialMessage,
-		mentorChat.sendMessage,
-		threadId,
-		navigate,
-		workspaceSlug,
-	]);
+		if (stateCleared.current || !autoGreeting) return;
+		stateCleared.current = true;
+		navigate({
+			to: Route.fullPath,
+			params: { workspaceSlug, threadId },
+			replace: true,
+			state: undefined,
+		});
+	}, [autoGreeting, navigate, workspaceSlug, threadId]);
 	const handleMessageSubmit = ({ text }: { text: string }) => {
 		if (!text.trim()) return;
 		mentorChat.sendMessage(text);
@@ -186,7 +171,6 @@ function ThreadContainer() {
 				onAttachmentsChange={() => {}} // No-op since attachments are disabled
 				onCopy={handleCopy}
 				onVote={handleVote}
-				showSuggestedActions={false}
 				inputPlaceholder="Continue the conversation..."
 				disableAttachments={true}
 				className="h-[calc(100dvh-4rem)]"

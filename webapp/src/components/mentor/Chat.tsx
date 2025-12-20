@@ -1,5 +1,8 @@
 import type { UseChatHelpers } from "@ai-sdk/react";
+import { AlertCircle, RotateCcw } from "lucide-react";
 import type { ChatMessageVote } from "@/api/types.gen";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
 import { useScrollToBottom } from "@/hooks/use-scroll-to-bottom";
 import type { Attachment, ChatMessage } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -38,8 +41,8 @@ export interface ChatProps {
 	onCopy?: (content: string) => void;
 	/** Handler for voting on messages */
 	onVote?: (messageId: string, isUpvote: boolean) => void;
-	/** Whether to show suggested actions in input */
-	showSuggestedActions?: boolean;
+	/** Handler for retrying after an error */
+	onReload?: () => void;
 	/** Placeholder text for input */
 	inputPlaceholder?: string;
 	/** Whether to disable attachment functionality */
@@ -65,7 +68,7 @@ export function Chat({
 	onMessageEdit,
 	onCopy,
 	onVote,
-	showSuggestedActions = false,
+	onReload,
 	inputPlaceholder = "Send a message...",
 	disableAttachments = false,
 	className,
@@ -78,10 +81,6 @@ export function Chat({
 	// Use internal scroll management if parent doesn't provide it
 	const actualIsAtBottom = parentScrollToBottom ? parentIsAtBottom : isAtBottom;
 	const actualScrollToBottom = parentScrollToBottom || scrollToBottom;
-
-	// Suggested actions should only show when there are no messages and explicitly enabled
-	const shouldShowSuggestedActions =
-		showSuggestedActions && messages.length === 0;
 
 	return (
 		<>
@@ -105,6 +104,32 @@ export function Chat({
 
 					{/* Absolutely anchored input at the bottom of SidebarInset content area */}
 					<div className="flex flex-col gap-2 items-center w-full px-4 pb-2 -mt-20 relative z-10 bg-gradient-to-t from-muted dark:from-background/30 from-60% to-transparent pt-8">
+						{/* Error state display */}
+						{status === "error" && (
+							<div className="w-full max-w-3xl mb-2">
+								<Alert variant="destructive">
+									<AlertCircle className="size-4" />
+									<AlertTitle>Something went wrong</AlertTitle>
+									<AlertDescription className="flex items-center justify-between gap-4">
+										<span>
+											An error occurred while generating the response. Please
+											try again.
+										</span>
+										{onReload && (
+											<Button
+												variant="outline"
+												size="sm"
+												onClick={onReload}
+												className="shrink-0"
+											>
+												<RotateCcw className="size-4" />
+												Try again
+											</Button>
+										)}
+									</AlertDescription>
+								</Alert>
+							</div>
+						)}
 						{!readonly && (
 							<div className="w-full max-w-3xl">
 								<MultimodalInput
@@ -121,7 +146,6 @@ export function Chat({
 									onFileUpload={onFileUpload}
 									onSubmit={onMessageSubmit}
 									placeholder={inputPlaceholder}
-									showSuggestedActions={shouldShowSuggestedActions}
 									readonly={readonly}
 									disableAttachments={disableAttachments}
 									isAtBottom={actualIsAtBottom}

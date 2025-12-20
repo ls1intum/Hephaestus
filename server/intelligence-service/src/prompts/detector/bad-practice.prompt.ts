@@ -1,10 +1,44 @@
-import pino from "pino";
-import { langfuse } from "@/shared/ai/telemetry";
+/**
+ * Bad Practice Detector Prompt
+ *
+ * Detects issues in PR titles and descriptions based on guidelines.
+ * Used by the detector service to analyze pull request quality.
+ */
 
-const logger = pino({ name: "detector-prompts" });
-const PROMPT_NAME = "bad-practice-detector" as const;
+import type { PromptDefinition } from "../types";
 
-const initialPrompt = `You are a bad practice detector reviewing pull requests for bad practices.
+// ─────────────────────────────────────────────────────────────────────────────
+// Prompt Definition
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const badPracticeDetectorPrompt: PromptDefinition<"text"> = {
+	name: "bad-practice-detector",
+	type: "text",
+
+	description:
+		"Detects bad practices in PR titles and descriptions based on repository guidelines. " +
+		"Provides actionable feedback and tracks issue resolution across analyses.",
+
+	config: {
+		model: "gpt-4o-mini",
+		temperature: 0.2,
+	},
+
+	labels: ["production"],
+
+	tags: ["detector", "pull-request", "quality"],
+
+	variables: [
+		"title",
+		"description",
+		"lifecycle_state",
+		"repository_name",
+		"bad_practice_summary",
+		"bad_practices",
+		"pull_request_template",
+	],
+
+	prompt: `You are a bad practice detector reviewing pull requests for bad practices.
 You analyze and review the title and description of the pull request to identify any bad practices.
 You detect bad practices based on guidelines for good pull request titles and descriptions.
 
@@ -98,26 +132,7 @@ Existing Bad Practices:
 {{bad_practices}}
 
 Pull Request Template:
-{{pull_request_template}}`;
+{{pull_request_template}}`,
+};
 
-export async function getBadPracticePrompt() {
-	return await langfuse.prompt
-		.get(PROMPT_NAME)
-		.catch(async (e: Error) => {
-			if (e.message.includes("LangfuseNotFoundError")) {
-				logger.info(`Prompt "${PROMPT_NAME}" not found on LangFuse. Creating...`);
-				return await langfuse.prompt.create({
-					name: PROMPT_NAME,
-					type: "text",
-					prompt: initialPrompt,
-					labels: ["production"],
-				});
-			}
-			throw e;
-		})
-		.catch(async () => {
-			return await langfuse.prompt.get(PROMPT_NAME, {
-				fallback: initialPrompt,
-			});
-		});
-}
+export default badPracticeDetectorPrompt;

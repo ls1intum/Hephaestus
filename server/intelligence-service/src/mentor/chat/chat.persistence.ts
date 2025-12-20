@@ -33,11 +33,12 @@ type Thread = Awaited<ReturnType<typeof getThreadById>>;
 /**
  * Load or create a thread for a chat session.
  * Returns null if persistence fails (allows graceful degradation).
+ * Pass null for message when creating a greeting-only thread.
  */
 export async function loadOrCreateThread(
 	threadId: string,
 	workspaceId: number | null,
-	message: ChatRequestBody["message"],
+	message: ChatRequestBody["message"] | null,
 	logger: HandlerLogger,
 ): Promise<PersistenceResult<Thread>> {
 	if (!workspaceId) {
@@ -52,7 +53,7 @@ export async function loadOrCreateThread(
 			logger.debug({ threadId, workspaceId }, "Creating new thread");
 			thread = await createThread({
 				id: threadId,
-				title: inferTitleFromMessage(message),
+				title: message ? inferTitleFromMessage(message) : "New chat",
 				workspaceId,
 			});
 			logger.debug({ threadId, created: !!thread }, "Thread creation result");
@@ -81,7 +82,7 @@ export async function loadOrCreateThread(
  */
 export async function persistUserMessage(
 	threadId: string,
-	message: ChatRequestBody["message"],
+	message: NonNullable<ChatRequestBody["message"]>,
 	previousMessageId: string | undefined,
 	logger: HandlerLogger,
 ): Promise<PersistenceResult<string>> {
@@ -151,7 +152,7 @@ export async function persistAssistantMessage(
 export async function updateTitleIfNeeded(
 	threadId: string,
 	currentTitle: string | null | undefined,
-	message: ChatRequestBody["message"],
+	message: NonNullable<ChatRequestBody["message"]>,
 	logger: HandlerLogger,
 ): Promise<void> {
 	if (currentTitle) {

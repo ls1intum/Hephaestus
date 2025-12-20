@@ -1,18 +1,32 @@
-// Mock Language Model (AI SDK standard quality)
+// ─────────────────────────────────────────────────────────────────────────────
+// AI SDK Official Test Utilities
+// ─────────────────────────────────────────────────────────────────────────────
+
 export {
-	createAbortableStream,
-	createChunkedStream,
-	createErrorStream,
-	createTextStream,
-	DEFAULT_USAGE,
-	MockLanguageModel,
-	type MockLanguageModelConfig,
+	// Official AI SDK exports
+	convertArrayToReadableStream,
+	// Stream part builders
+	createChunkedStreamParts,
+	createFinishReasonStreamParts,
+	createMetadataStreamParts,
+	createMixedStreamParts,
+	createTextStreamParts,
+	createToolCallStreamParts,
+	MockLanguageModelV3,
 	mockId,
-	mocks,
+	// Mock model factories
+	mockModels,
+	simulateReadableStream,
+	// Constants
+	TEST_USAGE,
+	// Helpers
 	toArray,
-	toReadableStream,
-} from "./mock-language-model";
-// Test Builders (Eliminates Duplication)
+} from "./ai-sdk-mocks";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Test Builders
+// ─────────────────────────────────────────────────────────────────────────────
+
 export {
 	clearTrackedThreads,
 	createConversation,
@@ -24,9 +38,12 @@ export {
 	textPart,
 	toolCallPart,
 } from "./test-builders";
-// Re-export types
-export type { TestFixtures } from "./test-database";
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Database Test Utilities
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type { TestFixtures } from "./test-database";
 export {
 	cleanupTestFixtures,
 	cleanupTestThread,

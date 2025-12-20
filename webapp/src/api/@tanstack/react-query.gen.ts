@@ -672,7 +672,7 @@ export const getMemberOptions = (options: Options<GetMemberData>) => {
 export const mentorChatQueryKey = (options: Options<MentorChatData>) => createQueryKey('mentorChat', options);
 
 /**
- * Handle mentor chat
+ * Handle mentor chat (set greeting=true for initial greeting without user message)
  */
 export const mentorChatOptions = (options: Options<MentorChatData>) => {
     return queryOptions({
@@ -690,7 +690,7 @@ export const mentorChatOptions = (options: Options<MentorChatData>) => {
 };
 
 /**
- * Handle mentor chat
+ * Handle mentor chat (set greeting=true for initial greeting without user message)
  */
 export const mentorChatMutation = (options?: Partial<Options<MentorChatData>>): UseMutationOptions<MentorChatResponse, DefaultError, Options<MentorChatData>> => {
     const mutationOptions: UseMutationOptions<MentorChatResponse, DefaultError, Options<MentorChatData>> = {

@@ -176,7 +176,6 @@ export const Default: Story = {
 					onCopy={fn()}
 					onVote={fn()}
 					scrollToBottom={fn()}
-					showSuggestedActions={true}
 					inputPlaceholder="Ask me anything..."
 					className="h-full max-h-none"
 				/>
@@ -253,7 +252,6 @@ export const WithConversation: Story = {
 					onCopy={fn()}
 					onVote={fn()}
 					scrollToBottom={fn()}
-					showSuggestedActions={true}
 					inputPlaceholder="Continue the conversation..."
 					className="h-full max-h-none"
 				/>

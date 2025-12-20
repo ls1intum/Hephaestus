@@ -48,11 +48,6 @@ const meta = {
 				"Currently attached files awaiting submission with the next message",
 			control: "object",
 		},
-		showSuggestedActions: {
-			description:
-				"Displays contextual suggested actions to guide user interaction",
-			control: "boolean",
-		},
 		inputPlaceholder: {
 			description: "Instructional text displayed in the message input field",
 			control: "text",
@@ -99,7 +94,6 @@ const meta = {
 			console.log("Vote cast:", messageId, isUpvoted ? "upvote" : "downvote"),
 		),
 		scrollToBottom: fn(() => console.log("Scroll to bottom triggered")),
-		showSuggestedActions: true,
 		inputPlaceholder: "Ask me anything...",
 		disableAttachments: false,
 	},
@@ -503,5 +497,20 @@ export const SecureMode: Story = {
 		messages: CONVERSATION_MESSAGES.slice(0, 4),
 		disableAttachments: true,
 		inputPlaceholder: "Send a message (file attachments disabled)...",
+	},
+};
+
+/**
+ * Error state when AI response fails.
+ *
+ * Demonstrates the error UI with a retry button. When an error occurs during
+ * message generation, users see a friendly error message and can click "Try again"
+ * to retry the last message.
+ */
+export const ErrorState: Story = {
+	args: {
+		messages: CONVERSATION_MESSAGES.slice(0, 3),
+		status: "error",
+		onReload: fn(() => console.log("Retry triggered")),
 	},
 };

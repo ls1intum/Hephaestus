@@ -1,0 +1,109 @@
+# Sync Prompts from Langfuse
+#
+# This workflow syncs prompts from Langfuse to the repository.
+# It can be triggered manually or via Langfuse webhook (repository_dispatch).
+#
+# To set up Langfuse webhook:
+# 1. Go to Langfuse > Settings > Webhooks
+# 2. Create webhook with URL: https://api.github.com/repos/ls1intum/Hephaestus/dispatches
+# 3. Set event type: "sync-prompts"
+# 4. Add Authorization header: token YOUR_GITHUB_PAT (with repo scope)
+# 5. Select "Prompt" events
+
+name: Sync Prompts
+
+on:
+  # Manual trigger
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run (no changes)"
+        required: false
+        default: "false"
+        type: boolean
+
+  # Langfuse webhook trigger
+  repository_dispatch:
+    types: [sync-prompts]
+
+jobs:
+  sync-prompts:
+    name: Sync Prompts from Langfuse
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: server/intelligence-service
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          # Need full history for proper commits
+          fetch-depth: 0
+          # Use a PAT to allow pushing commits
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: ".node-version"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Export prompts from Langfuse
+        id: export
+        env:
+          LANGFUSE_PUBLIC_KEY: ${{ secrets.LANGFUSE_PUBLIC_KEY }}
+          LANGFUSE_SECRET_KEY: ${{ secrets.LANGFUSE_SECRET_KEY }}
+          LANGFUSE_BASE_URL: ${{ secrets.LANGFUSE_BASE_URL }}
+        run: |
+          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
+            npm run prompts:sync:dry-run
+            echo "dry_run=true" >> $GITHUB_OUTPUT
+          else
+            npm run prompts:export
+            echo "dry_run=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Check for changes
+        if: steps.export.outputs.dry_run == 'false'
+        id: changes
+        run: |
+          if [ -f prompts-export.json ]; then
+            echo "Prompt export created"
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+          else
+            echo "No changes"
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create Pull Request
+        if: steps.changes.outputs.has_changes == 'true'
+        uses: peter-evans/create-pull-request@v7
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "chore(ai): sync prompts from Langfuse"
+          title: "chore(ai): sync prompts from Langfuse"
+          body: |
+            ## Prompt Sync from Langfuse
+
+            This PR was automatically created by the prompt sync workflow.
+
+            ### Changes
+            - Exported prompts from Langfuse to `prompts-export.json`
+
+            ### Review
+            - [ ] Review the exported prompts
+            - [ ] Update local prompt definitions if needed
+            - [ ] Run `npm run prompts:sync` to push back to Langfuse
+
+            ---
+            *Triggered by: ${{ github.event_name }}*
+          branch: chore/sync-prompts-from-langfuse
+          delete-branch: true
+          labels: |
+            ai
+            automated

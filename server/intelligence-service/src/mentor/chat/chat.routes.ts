@@ -13,7 +13,7 @@ export const mentorChatRoute = createRoute({
 	path: "/chat",
 	method: "post",
 	tags: ["mentor", ...EXPORTED_TAG],
-	summary: "Handle mentor chat",
+	summary: "Handle mentor chat (set greeting=true for initial greeting without user message)",
 	operationId: "mentorChat",
 	request: {
 		body: jsonContentRequired(chatRequestBodySchema, "Chat request body"),

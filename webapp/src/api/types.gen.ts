@@ -833,8 +833,12 @@ export type MentorChatData = {
      * Chat request body
      */
     body: {
+        /**
+         * If true, generate a greeting without user message
+         */
+        greeting?: boolean;
         id: string;
-        message: {
+        message?: {
             id: string;
             parts: Array<{
                 text: string;

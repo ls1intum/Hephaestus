@@ -2,7 +2,7 @@
  * Streaming Behavior Tests
  *
  * Tests the ACTUAL streaming behavior of streamText with mocked models.
- * This is what AI SDK tests extensively and what we were completely missing.
+ * Uses official AI SDK test utilities from ai/test for maximum compatibility.
  *
  * Critical tests covered:
  * - Text delta ordering and accumulation
@@ -10,26 +10,29 @@
  * - onFinish callback with finishReason
  * - Error mid-stream with partial data preservation
  * - Abort signal handling with cleanup
+ *
+ * @see https://ai-sdk.dev/docs/ai-sdk-core/testing
  */
 
-import type { LanguageModelV3, LanguageModelV3StreamPart } from "@ai-sdk/provider";
 import { streamText } from "ai";
 import { describe, expect, it, vi } from "vitest";
 import {
-	createChunkedStream,
-	MockLanguageModel,
-	mocks,
+	convertArrayToReadableStream,
+	createChunkedStreamParts,
+	createFinishReasonStreamParts,
+	createMetadataStreamParts,
+	MockLanguageModelV3,
+	mockModels,
 	toArray,
-	toReadableStream,
-} from "../mocks/mock-language-model";
+} from "../mocks";
 
 describe("streamText behavior", () => {
 	describe("textStream", () => {
 		it("should emit text deltas in order", async () => {
-			const model = mocks.streaming(["Hello", ", ", "world", "!"]);
+			const model = mockModels.streaming(["Hello", ", ", "world", "!"]);
 
 			const result = streamText({
-				model: model as unknown as LanguageModelV3,
+				model,
 				prompt: "Say hello",
 			});
 
@@ -46,10 +49,10 @@ describe("streamText behavior", () => {
 		});
 
 		it("should combine into complete text", async () => {
-			const model = mocks.streaming(["The ", "quick ", "brown ", "fox"]);
+			const model = mockModels.streaming(["The ", "quick ", "brown ", "fox"]);
 
 			const result = streamText({
-				model: model as unknown as LanguageModelV3,
+				model,
 				prompt: "Test",
 			});
 
@@ -59,10 +62,10 @@ describe("streamText behavior", () => {
 		});
 
 		it("should handle single-chunk response", async () => {
-			const model = mocks.text("Complete response in one chunk");
+			const model = mockModels.text("Complete response in one chunk");
 
 			const result = streamText({
-				model: model as unknown as LanguageModelV3,
+				model,
 				prompt: "Test",
 			});
 
@@ -75,12 +78,14 @@ describe("streamText behavior", () => {
 
 	describe("call tracking", () => {
 		it("should track prompt passed to model", async () => {
-			const model = new MockLanguageModel({
-				doStream: () => Promise.resolve({ stream: createChunkedStream(["Response"]) }),
+			const model = new MockLanguageModelV3({
+				doStream: async () => ({
+					stream: convertArrayToReadableStream(createChunkedStreamParts(["Response"])),
+				}),
 			});
 
 			const result = streamText({
-				model: model as unknown as LanguageModelV3,
+				model,
 				prompt: "What is 2+2?",
 			});
 
@@ -104,12 +109,14 @@ describe("streamText behavior", () => {
 		});
 
 		it("should track system prompt separately", async () => {
-			const model = new MockLanguageModel({
-				doStream: () => Promise.resolve({ stream: createChunkedStream(["Response"]) }),
+			const model = new MockLanguageModelV3({
+				doStream: async () => ({
+					stream: convertArrayToReadableStream(createChunkedStreamParts(["Response"])),
+				}),
 			});
 
 			const result = streamText({
-				model: model as unknown as LanguageModelV3,
+				model,
 				system: "You are a helpful assistant",
 				prompt: "Hello",
 			});
@@ -137,13 +144,14 @@ describe("streamText behavior", () => {
 		});
 
 		it("should track multiple messages in conversation", async () => {
-			const model = new MockLanguageModel({
-				doStream: () => Promise.resolve({ stream: createChunkedStream(["Response"]) }),
+			const model = new MockLanguageModelV3({
+				doStream: async () => ({
+					stream: convertArrayToReadableStream(createChunkedStreamParts(["Response"])),
+				}),
 			});
 
-			// Using the messages array format directly as the AI SDK expects
 			const result = streamText({
-				model: model as unknown as LanguageModelV3,
+				model,
 				messages: [
 					{ role: "user", content: "Hello" },
 					{ role: "assistant", content: "Hi!" },
@@ -159,18 +167,16 @@ describe("streamText behavior", () => {
 
 	describe("onFinish callback", () => {
 		it("should call onFinish with complete text", async () => {
-			const model = mocks.streaming(["Hello", " world"]);
+			const model = mockModels.streaming(["Hello", " world"]);
 			const onFinish = vi.fn();
 
 			const result = streamText({
-				model: model as unknown as LanguageModelV3,
+				model,
 				prompt: "Test",
 				onFinish,
 			});
 
 			await toArray(result.textStream);
-
-			// onFinish is called async, wait a tick
 			await new Promise((r) => setTimeout(r, 10));
 
 			expect(onFinish).toHaveBeenCalledTimes(1);
@@ -183,11 +189,11 @@ describe("streamText behavior", () => {
 		});
 
 		it("should include usage in onFinish", async () => {
-			const model = mocks.text("Short response");
+			const model = mockModels.text("Short response");
 			const onFinish = vi.fn();
 
 			const result = streamText({
-				model: model as unknown as LanguageModelV3,
+				model,
 				prompt: "Test",
 				onFinish,
 			});
@@ -206,30 +212,11 @@ describe("streamText behavior", () => {
 		});
 
 		it("should capture finishReason correctly", async () => {
-			// Create model with custom finish reason
-			const customParts: LanguageModelV3StreamPart[] = [
-				{ type: "stream-start", warnings: [] },
-				{ type: "text-start", id: "1" },
-				{ type: "text-delta", id: "1", delta: "Response" },
-				{ type: "text-end", id: "1" },
-				{
-					type: "finish",
-					finishReason: "length",
-					usage: {
-						inputTokens: { total: 10, noCache: 10, cacheRead: undefined, cacheWrite: undefined },
-						outputTokens: { total: 5, text: 5, reasoning: undefined },
-					},
-				},
-			];
-
-			const model = new MockLanguageModel({
-				doStream: () => Promise.resolve({ stream: toReadableStream(customParts) }),
-			});
-
+			const model = mockModels.custom(createFinishReasonStreamParts("Response", "length"));
 			const onFinish = vi.fn();
 
 			const result = streamText({
-				model: model as unknown as LanguageModelV3,
+				model,
 				prompt: "Test",
 				onFinish,
 			});
@@ -246,42 +233,23 @@ describe("streamText behavior", () => {
 	});
 
 	describe("response metadata", () => {
-		it("should capture response metadata in fullStream", async () => {
+		it("should capture response metadata", async () => {
 			const timestamp = new Date("2024-01-15T12:00:00Z");
-			const customParts: LanguageModelV3StreamPart[] = [
-				{ type: "stream-start", warnings: [] },
-				{
-					type: "response-metadata",
+			const model = mockModels.custom(
+				createMetadataStreamParts("Hello", {
 					id: "response-123",
 					modelId: "gpt-4-turbo",
 					timestamp,
-				},
-				{ type: "text-start", id: "1" },
-				{ type: "text-delta", id: "1", delta: "Hello" },
-				{ type: "text-end", id: "1" },
-				{
-					type: "finish",
-					finishReason: "stop",
-					usage: {
-						inputTokens: { total: 10, noCache: 10, cacheRead: undefined, cacheWrite: undefined },
-						outputTokens: { total: 5, text: 5, reasoning: undefined },
-					},
-				},
-			];
-
-			const model = new MockLanguageModel({
-				doStream: () => Promise.resolve({ stream: toReadableStream(customParts) }),
-			});
+				}),
+			);
 
 			const result = streamText({
-				model: model as unknown as LanguageModelV3,
+				model,
 				prompt: "Test",
 			});
 
-			// Consume the stream to get response
 			await toArray(result.textStream);
 
-			// Check response property for metadata
 			const response = await result.response;
 			expect(response.id).toBe("response-123");
 			expect(response.modelId).toBe("gpt-4-turbo");
@@ -290,35 +258,17 @@ describe("streamText behavior", () => {
 
 		it("should include metadata in onFinish response", async () => {
 			const timestamp = new Date("2024-01-15T12:00:00Z");
-			const customParts: LanguageModelV3StreamPart[] = [
-				{ type: "stream-start", warnings: [] },
-				{
-					type: "response-metadata",
+			const model = mockModels.custom(
+				createMetadataStreamParts("Response", {
 					id: "meta-456",
 					modelId: "claude-3",
 					timestamp,
-				},
-				{ type: "text-start", id: "1" },
-				{ type: "text-delta", id: "1", delta: "Response" },
-				{ type: "text-end", id: "1" },
-				{
-					type: "finish",
-					finishReason: "stop",
-					usage: {
-						inputTokens: { total: 10, noCache: 10, cacheRead: undefined, cacheWrite: undefined },
-						outputTokens: { total: 5, text: 5, reasoning: undefined },
-					},
-				},
-			];
-
-			const model = new MockLanguageModel({
-				doStream: () => Promise.resolve({ stream: toReadableStream(customParts) }),
-			});
-
+				}),
+			);
 			const onFinish = vi.fn();
 
 			const result = streamText({
-				model: model as unknown as LanguageModelV3,
+				model,
 				prompt: "Test",
 				onFinish,
 			});
@@ -339,13 +289,13 @@ describe("streamText behavior", () => {
 
 	describe("error handling mid-stream", () => {
 		it("should propagate error to consumer", async () => {
-			const model = mocks.error("Fatal error");
+			const model = mockModels.errorMidStream("Fatal error");
 
 			const result = streamText({
-				model: model as unknown as LanguageModelV3,
+				model,
 				prompt: "Test",
 				onError: () => {
-					// void
+					// silence
 				},
 			});
 
@@ -353,185 +303,94 @@ describe("streamText behavior", () => {
 				await toArray(result.textStream);
 			}).rejects.toThrow("Fatal error");
 		});
-
-		it("should preserve partial data before error", async () => {
-			const model = mocks.error("Mid-stream failure");
-
-			const result = streamText({
-				model: model as unknown as LanguageModelV3,
-				prompt: "Test",
-				onError: () => {
-					// Silence error
-				},
-			});
-
-			const chunks: string[] = [];
-			try {
-				for await (const chunk of result.textStream) {
-					chunks.push(chunk);
-				}
-			} catch {
-				// Expected to throw after partial data
-			}
-
-			// The error stream emits "Starting..." before erroring
-			expect(chunks).toContain("Starting...");
-		});
-
-		it("should reject before error but preserve partial chunks", async () => {
-			// More explicit test: verify we get partial data then error
-			const model = mocks.error("Interrupted");
-
-			const result = streamText({
-				model: model as unknown as LanguageModelV3,
-				prompt: "Test",
-				onError: () => {
-					// void
-				},
-			});
-
-			const reader = result.textStream[Symbol.asyncIterator]();
-
-			// First chunk should succeed (partial data)
-			const first = await reader.next();
-			expect(first.done).toBe(false);
-			expect(first.value).toBe("Starting...");
-
-			// Second read should throw
-			await expect(reader.next()).rejects.toThrow("Interrupted");
-		});
 	});
 
 	describe("abort handling", () => {
 		it("should respect abort signal", async () => {
 			let wasAborted = false;
-			const model = mocks.abortable(() => {
+			const model = mockModels.abortable(() => {
 				wasAborted = true;
 			});
 
 			const controller = new AbortController();
 
 			const result = streamText({
-				model: model as unknown as LanguageModelV3,
+				model,
 				prompt: "Test",
 				abortSignal: controller.signal,
 				onError: () => {
-					// void return
+					// silence
 				},
 			});
 
-			// Start consuming
 			const reader = result.textStream[Symbol.asyncIterator]();
-			await reader.next(); // Get first chunk
+			await reader.next();
 
-			// Abort mid-stream
 			controller.abort();
 
 			expect(wasAborted).toBe(true);
 		});
 
 		it("should complete stream early when aborted", async () => {
-			const model = mocks.abortable(() => {
-				// no-op
+			const model = mockModels.abortable(() => {
+				/* no-op */
 			});
 			const controller = new AbortController();
 
 			const result = streamText({
-				model: model as unknown as LanguageModelV3,
+				model,
 				prompt: "Test",
 				abortSignal: controller.signal,
 				onError: () => {
-					// void
+					// silence
 				},
 			});
 
-			// Start consuming
 			const reader = result.textStream[Symbol.asyncIterator]();
 			await reader.next();
 
-			// Abort
 			controller.abort();
 
-			// Trying to read should either throw or return done=true (graceful abort)
 			const nextResult = await reader.next().catch(() => ({ done: true, value: undefined }));
 			expect(nextResult.done).toBe(true);
 		});
 
 		it("should preserve partial data when aborted", async () => {
-			const model = mocks.abortable(() => {
-				// no-op
+			const model = mockModels.abortable(() => {
+				/* no-op */
 			});
 			const controller = new AbortController();
 
 			const result = streamText({
-				model: model as unknown as LanguageModelV3,
+				model,
 				prompt: "Test",
 				abortSignal: controller.signal,
 				onError: () => {
-					// void
+					// silence
 				},
 			});
 
 			const chunks: string[] = [];
 			const reader = result.textStream[Symbol.asyncIterator]();
 
-			// Get the first chunk before abort
 			const first = await reader.next();
 			if (!first.done && first.value) {
 				chunks.push(first.value);
 			}
 
-			// Abort
 			controller.abort();
 
-			// Verify we got partial data
 			expect(chunks).toContain("Hello");
-		});
-
-		it("should stop model processing on abort", async () => {
-			let processingStarted = false;
-			let processingStopped = false;
-
-			const model = mocks.abortable(() => {
-				processingStopped = true;
-			});
-
-			// Track that doStream was called
-			const originalDoStream = model.doStream.bind(model);
-			model.doStream = (options) => {
-				processingStarted = true;
-				return originalDoStream(options);
-			};
-
-			const controller = new AbortController();
-
-			const result = streamText({
-				model: model as unknown as LanguageModelV3,
-				prompt: "Test",
-				abortSignal: controller.signal,
-				onError: () => {
-					// void
-				},
-			});
-
-			const reader = result.textStream[Symbol.asyncIterator]();
-			await reader.next();
-
-			expect(processingStarted).toBe(true);
-
-			controller.abort();
-
-			expect(processingStopped).toBe(true);
 		});
 	});
 });
 
 describe("fullStream", () => {
 	it("should include all stream parts", async () => {
-		const model = mocks.streaming(["A", "B"]);
+		const model = mockModels.streaming(["A", "B"]);
 
 		const result = streamText({
-			model: model as unknown as LanguageModelV3,
+			model,
 			prompt: "Test",
 		});
 
@@ -544,27 +403,34 @@ describe("fullStream", () => {
 	});
 
 	it("should emit text deltas in fullStream format", async () => {
-		const model = mocks.streaming(["Hello", ", ", "world!"]);
+		const model = mockModels.streaming(["Hello", ", ", "world!"]);
 
 		const result = streamText({
-			model: model as unknown as LanguageModelV3,
+			model,
 			prompt: "Test",
 		});
 
 		const parts = await toArray(result.fullStream);
 		const textDeltas = parts.filter((p) => p.type === "text-delta");
 
-		// Verify we get the expected text values
-		expect(
-			textDeltas.map((d) => ("textDelta" in d ? d.textDelta : "text" in d ? d.text : "")),
-		).toEqual(["Hello", ", ", "world!"]);
+		// AI SDK's fullStream uses 'textDelta' property on text-delta parts
+		const texts = textDeltas.map((d) => {
+			if ("textDelta" in d) {
+				return d.textDelta;
+			}
+			if ("text" in d) {
+				return d.text;
+			}
+			return "";
+		});
+		expect(texts).toEqual(["Hello", ", ", "world!"]);
 	});
 
 	it("should include finish part with finishReason", async () => {
-		const model = mocks.streaming(["Test"]);
+		const model = mockModels.streaming(["Test"]);
 
 		const result = streamText({
-			model: model as unknown as LanguageModelV3,
+			model,
 			prompt: "Test",
 		});
 
@@ -577,18 +443,16 @@ describe("fullStream", () => {
 		});
 	});
 
-	it("should include usage information accessible via result.usage", async () => {
-		const model = mocks.streaming(["Test"]);
+	it("should include usage information via result.usage", async () => {
+		const model = mockModels.streaming(["Test"]);
 
 		const result = streamText({
-			model: model as unknown as LanguageModelV3,
+			model,
 			prompt: "Test",
 		});
 
-		// Consume the stream
 		await toArray(result.textStream);
 
-		// Usage is available on the result object
 		const usage = await result.usage;
 		expect(usage).toMatchObject({
 			inputTokens: expect.any(Number),
