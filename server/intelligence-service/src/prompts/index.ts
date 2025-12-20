@@ -27,8 +27,15 @@
 
 // Detector feature
 export { badPracticeDetectorPrompt } from "@/detector/bad-practice.prompt";
-// Mentor feature
-export { type MentorChatVariables, mentorChatPrompt } from "@/mentor/chat.prompt";
+// Mentor feature - main prompt and sub-prompts
+export {
+	greetingContinuePrompt,
+	greetingFirstMessagePrompt,
+	type MentorChatVariables,
+	mentorChatPrompt,
+	mentorPrompts,
+	returningUserPrompt,
+} from "@/mentor/chat.prompt";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Loader API
@@ -42,9 +49,12 @@ export { clearPromptCache, getPromptCacheStats, loadPrompt, preloadPrompts } fro
 // ─────────────────────────────────────────────────────────────────────────────
 
 export type {
+	ChatPromptMessage,
 	PromptChatMessage,
 	PromptConfig,
 	PromptDefinition,
+	PromptPlaceholderMessage,
+	PromptPlaceholders,
 	PromptToolDefinition,
 	PromptType,
 	PromptVariables,

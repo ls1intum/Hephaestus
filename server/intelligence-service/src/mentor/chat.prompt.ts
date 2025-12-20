@@ -2,30 +2,93 @@
  * Mentor Chat System Prompt Definition
  *
  * This prompt is synced to Langfuse for management and versioning.
- * The prompt uses template variables that are compiled at runtime.
  *
- * Tool definitions are colocated with each tool file and aggregated here.
- * This allows:
- * - Version-controlled tool descriptions alongside prompts
- * - A/B testing different tool guidance
- * - Updating tool usage patterns without code deployment
+ * IMPORTANT: Langfuse limitations we're working around:
+ * 1. Only simple {{variable}} replacement - NO Mustache conditionals
+ * 2. Only ONE prompt can be linked per generation (via toJSON())
+ * 3. Variables passed to compile() are NOT visible in Langfuse UI
  *
- * @see https://langfuse.com/docs/prompts/get-started
+ * Our approach:
+ * - Main prompt uses {{greetingSection}} and {{returningUserSection}} variables
+ * - Sub-prompts are also managed in Langfuse for version control
+ * - Application code selects which sub-prompt to inject based on runtime state
+ * - Only the main prompt is linked to the trace (Langfuse limitation)
+ * - But the ACTUAL prompt text IS visible in the trace input
+ *
+ * @see https://langfuse.com/faq/all/conditional-prompt-embedding
  * @see https://langfuse.com/docs/prompt-management/features/config#function-calling
  */
 
 import type { PromptDefinition } from "@/prompts/types";
 import { mentorToolDefinitions } from "./tools";
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Sub-Prompts (also managed in Langfuse for version control)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Greeting section for FIRST message in a conversation.
+ * This is a separate Langfuse prompt so it can be versioned and tested independently.
+ */
+export const greetingFirstMessagePrompt: PromptDefinition<"text"> = {
+	name: "mentor-greeting-first",
+	type: "text",
+	labels: ["production"],
+	tags: ["mentor", "greeting", "section"],
+	description: "Greeting instructions for the first message in a conversation.",
+	variables: ["firstName"],
+	prompt: `This is the first message. Greet {{firstName}} by name.
+
+✅ "Hey {{firstName}}—what's on your mind?"
+✅ "{{firstName}}, what would you like to focus on?"
+❌ "What's up." (no name)
+❌ "You pinged twice" (confusing)`,
+};
+
+/**
+ * Greeting section for CONTINUING conversations (not first message).
+ */
+export const greetingContinuePrompt: PromptDefinition<"text"> = {
+	name: "mentor-greeting-continue",
+	type: "text",
+	labels: ["production"],
+	tags: ["mentor", "greeting", "section"],
+	description: "Greeting instructions when continuing an existing conversation.",
+	prompt: "You're mid-conversation. Don't re-greet.",
+};
+
+/**
+ * Context section for returning users (have used Heph before).
+ */
+export const returningUserPrompt: PromptDefinition<"text"> = {
+	name: "mentor-context-returning",
+	type: "text",
+	labels: ["production"],
+	tags: ["mentor", "context", "section"],
+	description: "Additional context when the user has used Heph before.",
+	prompt: "They've used Heph before. You can reference past sessions if relevant.",
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Template Variables
+// ─────────────────────────────────────────────────────────────────────────────
+
 /**
  * Template variables for the mentor chat prompt.
+ *
+ * greetingSection and returningUserSection are computed at runtime
+ * by loading sub-prompts from Langfuse and selecting based on state.
  */
 export interface MentorChatVariables {
 	firstName: string;
 	userLogin: string;
-	isFirstMessage: boolean;
-	isReturningUser: boolean;
+	greetingSection: string;
+	returningUserSection: string;
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Main Prompt
+// ─────────────────────────────────────────────────────────────────────────────
 
 /**
  * Mentor Chat System Prompt
@@ -34,30 +97,31 @@ export interface MentorChatVariables {
  * - Hattie & Timperley (2007): Feed-up → Feed-back → Feed-forward
  * - Zimmerman (2002): Forethought → Performance → Self-Reflection
  * - Nicol & Macfarlane-Dick (2006): Seven principles of good feedback
- * - Angenius & Ghajargar (2023): 11 CA journaling design principles
  * - Deci & Ryan (SDT): Autonomy, Competence, Relatedness
  */
-export const mentorChatPrompt: PromptDefinition = {
+export const mentorChatPrompt: PromptDefinition<"text"> = {
 	name: "mentor-chat-system",
 	type: "text",
 	labels: ["production"],
 	tags: ["mentor", "chat", "system-prompt", "tools"],
 
-	// Metadata for prompt management CLI - tools are in individual *.tool.ts files
+	description:
+		"System prompt for Heph, the AI mentor. Uses variable sections " +
+		"for greeting and returning user context. Sub-prompts are loaded separately.",
+
 	_meta: {
 		toolsDir: "mentor/tools",
 	},
 
 	config: {
-		// Model configuration
 		temperature: 0.7,
-		maxToolSteps: 5, // Max multi-step tool calling iterations
-
-		// Tool configuration - definitions colocated with each tool file
-		// @see https://langfuse.com/docs/prompt-management/features/config#function-calling
+		maxToolSteps: 5,
 		tools: mentorToolDefinitions,
 		toolChoice: "auto",
 	},
+
+	variables: ["firstName", "userLogin", "greetingSection", "returningUserSection"],
+
 	prompt: `You are Heph, a mentor for {{firstName}}. You have access to their GitHub activity.
 
 ## How to write
@@ -81,17 +145,7 @@ Write like a real person texting a colleague—not a report or documentation.
 
 ## Greetings
 
-{{#isFirstMessage}}
-This is the first message. Greet {{firstName}} by name.
-
-✅ "Hey {{firstName}}—what's on your mind?"
-✅ "{{firstName}}, what would you like to focus on?"
-❌ "What's up." (no name)
-❌ "You pinged twice" (confusing)
-{{/isFirstMessage}}
-{{^isFirstMessage}}
-You're mid-conversation. Don't re-greet.
-{{/isFirstMessage}}
+{{greetingSection}}
 
 ## Emotional responses
 
@@ -244,9 +298,7 @@ User: "I spent 3 days on flaky tests"
 
 The goal is to help them *reflect* on their strategy (process-level feedback), not to solve their problem for them. You're a mentor, not a tech support bot.
 
-{{#isReturningUser}}
-They've used Heph before. You can reference past sessions if relevant.
-{{/isReturningUser}}
+{{returningUserSection}}
 
 ## Core rules
 
@@ -261,3 +313,18 @@ They've used Heph before. You can reference past sessions if relevant.
 9. **Use {{firstName}}'s name.** Especially in greetings and emotional moments.
 10. **Match energy.** Excited? Be excited. Frustrated? Validate first.`,
 };
+
+// ─────────────────────────────────────────────────────────────────────────────
+// All prompts for CLI discovery
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * All mentor-related prompts for CLI sync.
+ * The CLI will discover these and sync them to Langfuse.
+ */
+export const mentorPrompts = [
+	mentorChatPrompt,
+	greetingFirstMessagePrompt,
+	greetingContinuePrompt,
+	returningUserPrompt,
+] as const;

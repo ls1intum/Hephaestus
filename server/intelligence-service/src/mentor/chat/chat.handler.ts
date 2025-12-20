@@ -25,10 +25,16 @@ import {
 } from "ai";
 import { v4 as uuidv4 } from "uuid";
 import env from "@/env";
+import {
+	greetingContinuePrompt,
+	greetingFirstMessagePrompt,
+	mentorChatPrompt,
+	returningUserPrompt,
+} from "@/mentor/chat.prompt";
 import { createActivityTools, extractToolConfig, overrideToolDescriptions } from "@/mentor/tools";
 import { createDocumentTool } from "@/mentor/tools/document-create.tool";
 import { updateDocumentTool } from "@/mentor/tools/document-update.tool";
-import { loadPrompt, mentorChatPrompt } from "@/prompts";
+import { loadPrompt } from "@/prompts";
 import type { PromptToolDefinition } from "@/prompts/types";
 import { createAIErrorHandler, getStreamErrorMessage } from "@/shared/ai/error-handler";
 import { getModel } from "@/shared/ai/model";
@@ -135,18 +141,37 @@ export const mentorChatHandler: AppRouteHandler<HandleMentorChatRoute> = async (
 	const isReturningUser = history.length > 0 || thread?.workspaceId !== undefined;
 	const isFirstMessage = history.length === 0;
 
-	// Load mentor system prompt from Langfuse (with local fallback)
-	// mentorChatPrompt is type "text", so compile returns string
-	const resolvedPrompt = await loadPrompt(mentorChatPrompt, { label: "production" });
-	const compiledPrompt = resolvedPrompt.compile({
+	// Load all prompts from Langfuse (with local fallback)
+	// Sub-prompts are loaded so they can be versioned/tested independently
+	// LIMITATION: Only the main prompt can be linked to the trace (Langfuse constraint)
+	// But the actual prompt text IS captured in the trace input
+	const [resolvedMainPrompt, resolvedGreetingFirst, resolvedGreetingContinue, resolvedReturning] =
+		await Promise.all([
+			loadPrompt(mentorChatPrompt, { label: "production" }),
+			loadPrompt(greetingFirstMessagePrompt, { label: "production" }),
+			loadPrompt(greetingContinuePrompt, { label: "production" }),
+			loadPrompt(returningUserPrompt, { label: "production" }),
+		]);
+
+	// Select greeting section based on conversation state
+	// The sub-prompt's .prompt is injected as a variable value
+	const greetingSection = isFirstMessage
+		? resolvedGreetingFirst.compile({ firstName })
+		: resolvedGreetingContinue.compile({});
+
+	// Select returning user section
+	const returningUserSection = isReturningUser ? resolvedReturning.compile({}) : "";
+
+	// Compose the final system prompt
+	// The main prompt uses {{greetingSection}} and {{returningUserSection}} as variables
+	const compiledPrompt = resolvedMainPrompt.compile({
 		firstName,
 		userLogin,
-		isFirstMessage: String(isFirstMessage),
-		isReturningUser: String(isReturningUser),
+		greetingSection: greetingSection,
+		returningUserSection: returningUserSection,
 	}) as string;
 
 	// Fallback: use local prompt generator if Langfuse prompt compilation fails
-	// (e.g., if template variables don't match)
 	const finalSystemPrompt =
 		compiledPrompt && compiledPrompt.trim().length > 0
 			? compiledPrompt
@@ -168,8 +193,14 @@ export const mentorChatHandler: AppRouteHandler<HandleMentorChatRoute> = async (
 		{
 			threadId,
 			assistantMessageId,
-			promptSource: resolvedPrompt.source,
-			promptVersion: resolvedPrompt.langfuseVersion,
+			promptSource: resolvedMainPrompt.source,
+			promptVersion: resolvedMainPrompt.langfuseVersion,
+			subPromptVersions: {
+				greeting: isFirstMessage
+					? resolvedGreetingFirst.langfuseVersion
+					: resolvedGreetingContinue.langfuseVersion,
+				returning: isReturningUser ? resolvedReturning.langfuseVersion : null,
+			},
 		},
 		"Generated UUID for assistant message - will be sent to client via stream",
 	);
@@ -193,31 +224,39 @@ export const mentorChatHandler: AppRouteHandler<HandleMentorChatRoute> = async (
 				const greetingPrompt = `Greet ${firstName} warmly by name and ask what's on their mind. Keep it short (1-2 sentences).`;
 
 				// Build telemetry options with unified helper
-				// Handles both Langfuse-sourced and local prompts uniformly
-				const telemetryOptions = buildTelemetryOptions(resolvedPrompt, traceName, {
+				// IMPORTANT: Only the main prompt is linked - Langfuse limitation
+				// Sub-prompt versions are logged in metadata for debugging
+				const telemetryOptions = buildTelemetryOptions(resolvedMainPrompt, traceName, {
 					sessionId: threadId, // Group conversation messages
 					userId: userLogin,
 					workspaceId: String(workspaceId),
 					messageCount: String(modelMessages.length),
 					isReturningUser: String(isReturningUser),
+					isFirstMessage: String(isFirstMessage),
+					// Log sub-prompt versions for debugging (not linked, just metadata)
+					greetingPromptVersion: String(
+						isFirstMessage
+							? (resolvedGreetingFirst.langfuseVersion ?? "local")
+							: (resolvedGreetingContinue.langfuseVersion ?? "local"),
+					),
 				});
 
 				// Resolve model from Langfuse config or fall back to env default
 				// This follows Langfuse v4 best practice: store model in prompt config
 				// @see https://langfuse.com/docs/prompt-management/features/config#using-the-config
 				const model =
-					typeof resolvedPrompt.config.model === "string"
-						? getModel(resolvedPrompt.config.model)
+					typeof resolvedMainPrompt.config.model === "string"
+						? getModel(resolvedMainPrompt.config.model)
 						: env.defaultModel;
 
 				// Resolve temperature from Langfuse config (optional)
 				const temperature =
-					typeof resolvedPrompt.config.temperature === "number"
-						? resolvedPrompt.config.temperature
+					typeof resolvedMainPrompt.config.temperature === "number"
+						? resolvedMainPrompt.config.temperature
 						: undefined;
 
 				// Extract tool config from Langfuse (toolChoice, maxToolSteps)
-				const toolConfig = extractToolConfig(resolvedPrompt.config);
+				const toolConfig = extractToolConfig(resolvedMainPrompt.config);
 
 				// Create local tools with fallback descriptions
 				const localTools = {
@@ -231,7 +270,7 @@ export const mentorChatHandler: AppRouteHandler<HandleMentorChatRoute> = async (
 				// Override tool descriptions with Langfuse-managed versions
 				// This allows A/B testing tool descriptions and updating without code deployment
 				// @see https://langfuse.com/docs/prompt-management/features/config#function-calling
-				const langfuseTools = resolvedPrompt.config.tools as PromptToolDefinition[] | undefined;
+				const langfuseTools = resolvedMainPrompt.config.tools as PromptToolDefinition[] | undefined;
 				const tools = overrideToolDescriptions(localTools, langfuseTools);
 
 				const result = streamText({
@@ -345,8 +384,8 @@ export const mentorChatHandler: AppRouteHandler<HandleMentorChatRoute> = async (
 						isGreetingMode,
 						finishReason,
 						stepCount: steps.length,
-						promptSource: resolvedPrompt.source,
-						promptVersion: resolvedPrompt.langfuseVersion,
+						promptSource: resolvedMainPrompt.source,
+						promptVersion: resolvedMainPrompt.langfuseVersion,
 						usage: {
 							inputTokens: totalUsage.inputTokens,
 							outputTokens: totalUsage.outputTokens,

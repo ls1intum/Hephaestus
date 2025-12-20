@@ -9,6 +9,9 @@
  * NOTE: PromptChatMessage is distinct from AI SDK's UIMessage/ChatMessage.
  * This type is for Langfuse prompt templates (system/user/assistant with string content).
  * AI SDK's UIMessage is for runtime chat with typed parts (text, tool calls, etc.).
+ *
+ * @see https://langfuse.com/docs/prompt-management/features/variables
+ * @see https://langfuse.com/docs/prompt-management/features/message-placeholders
  */
 
 import type { ChatPromptClient, TextPromptClient } from "@langfuse/client";
@@ -25,10 +28,34 @@ export type PromptType = "text" | "chat";
  *
  * This is a simple role+content structure used in Langfuse prompt templates.
  * NOT to be confused with AI SDK's UIMessage which has typed parts.
+ *
+ * Variables use {{variableName}} syntax (mustache-style).
+ * Variable names must start with a letter and contain only alphanumeric + underscore.
+ * @see https://langfuse.com/docs/prompt-management/features/variables
  */
 export interface PromptChatMessage {
 	role: "system" | "user" | "assistant";
 	content: string;
+}
+
+/**
+ * Placeholder message for inserting chat history at runtime.
+ *
+ * Use this to inject conversation history into a chat prompt.
+ * @see https://langfuse.com/docs/prompt-management/features/message-placeholders
+ *
+ * @example
+ * ```typescript
+ * const prompt = [
+ *   { role: "system", content: "You are a helpful assistant." },
+ *   { type: "placeholder", name: "chatHistory" },
+ *   { role: "user", content: "What should I do next?" },
+ * ];
+ * ```
+ */
+export interface PromptPlaceholderMessage {
+	type: "placeholder";
+	name: string;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -107,6 +134,15 @@ export interface PromptConfig {
 /** Variables that can be interpolated into the prompt: {{variable}} */
 export type PromptVariables = Record<string, string>;
 
+/**
+ * Placeholder values for chat prompts - arrays of messages to inject.
+ * @see https://langfuse.com/docs/prompt-management/features/message-placeholders
+ */
+export type PromptPlaceholders = Record<string, PromptChatMessage[]>;
+
+/** Combined chat message type (regular message or placeholder) */
+export type ChatPromptMessage = PromptChatMessage | PromptPlaceholderMessage;
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Prompt Definition (stored in git)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -114,15 +150,31 @@ export type PromptVariables = Record<string, string>;
 /**
  * Base definition for all prompts stored in git.
  *
- * @example
+ * Text prompts use a simple string with {{variables}}.
+ * Chat prompts use an array of messages, optionally with placeholders
+ * for injecting chat history at runtime.
+ *
+ * IMPORTANT: Langfuse only supports simple {{variable}} replacement.
+ * Mustache conditionals ({{#var}}, {{^var}}) are NOT supported.
+ * Handle conditional logic in application code instead.
+ *
+ * @example Text prompt
  * ```typescript
- * export const badPracticeDetector: PromptDefinition<"text"> = {
+ * export const detector: PromptDefinition<"text"> = {
  *   name: "bad-practice-detector",
  *   type: "text",
  *   prompt: "Analyze {{title}} for bad practices...",
- *   config: { model: "gpt-4o-mini", temperature: 0.2 },
- *   labels: ["production"],
- *   variables: ["title", "description"],
+ * };
+ * ```
+ *
+ * @example Chat prompt with placeholder
+ * ```typescript
+ * export const chat: PromptDefinition<"chat"> = {
+ *   name: "mentor-chat",
+ *   type: "chat",
+ *   prompt: [
+ *     { role: "system", content: "You are a mentor for {{firstName}}." },
+ *   ],
  * };
  * ```
  */
@@ -133,8 +185,12 @@ export interface PromptDefinition<T extends PromptType = PromptType> {
 	/** Prompt type: "text" for simple strings, "chat" for message arrays */
 	type: T;
 
-	/** The prompt content - template string with {{variables}} */
-	prompt: T extends "text" ? string : PromptChatMessage[];
+	/**
+	 * The prompt content.
+	 * - Text: template string with {{variables}}
+	 * - Chat: array of messages, optionally with placeholders
+	 */
+	prompt: T extends "text" ? string : ChatPromptMessage[];
 
 	/** Description for documentation and Langfuse UI */
 	description?: string;
@@ -197,10 +253,32 @@ export interface ResolvedPrompt<T extends PromptType = PromptType> {
 	config: PromptConfig;
 
 	/**
-	 * Compile the prompt with variables.
+	 * Compile the prompt with variables (and placeholders for chat prompts).
+	 *
+	 * For text prompts, pass variables to interpolate {{variable}} placeholders.
+	 * For chat prompts, also pass placeholders to inject message arrays.
 	 *
 	 * @param variables - Variables to interpolate into the template
+	 * @param placeholders - (Chat only) Message arrays to inject at placeholder positions
 	 * @returns Compiled prompt string (for text) or messages array (for chat)
+	 *
+	 * @example Text prompt
+	 * ```typescript
+	 * const result = prompt.compile({ firstName: "Alice" });
+	 * // "You are a mentor for Alice."
+	 * ```
+	 *
+	 * @example Chat prompt with placeholder
+	 * ```typescript
+	 * const result = prompt.compile(
+	 *   { firstName: "Alice" },
+	 *   { chatHistory: [{ role: "user", content: "Hi!" }] }
+	 * );
+	 * // [{ role: "system", content: "..." }, { role: "user", content: "Hi!" }]
+	 * ```
 	 */
-	compile(variables?: PromptVariables): T extends "text" ? string : PromptChatMessage[];
+	compile(
+		variables?: PromptVariables,
+		placeholders?: PromptPlaceholders,
+	): T extends "text" ? string : PromptChatMessage[];
 }

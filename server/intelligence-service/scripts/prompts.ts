@@ -96,24 +96,32 @@ async function discoverToolFiles(toolsDir: string): Promise<DiscoveredTool[]> {
 /**
  * Auto-discover all prompt files matching *.prompt.ts in src/
  * Prompts are colocated with their features (e.g., mentor/chat.prompt.ts)
+ * Multiple prompts can be exported from a single file.
  */
 async function discoverPrompts(): Promise<DiscoveredPrompt[]> {
 	const pattern = path.join(SRC_DIR, "**/*.prompt.ts");
 	const files = await glob(pattern, { absolute: true });
 
 	const prompts: DiscoveredPrompt[] = [];
+	const seenNames = new Set<string>(); // Track unique prompt names
 
 	for (const filePath of files) {
 		try {
 			const module = await import(filePath);
 
-			// Find the exported PromptDefinition
+			// Find ALL exported PromptDefinitions in the file
 			for (const exportName of Object.keys(module)) {
 				const exported = module[exportName];
 				if (isPromptDefinition(exported)) {
+					// Skip if we've already seen this prompt name (handles default + named export)
+					if (seenNames.has(exported.name)) {
+						continue;
+					}
+					seenNames.add(exported.name);
+
 					const relativePath = path.relative(SRC_DIR, filePath);
 
-					// Discover tools in the toolsDir
+					// Discover tools in the toolsDir (only for prompts that have it)
 					let tools: DiscoveredTool[] = [];
 					if (exported._meta?.toolsDir) {
 						const toolsDirPath = path.join(SRC_DIR, exported._meta.toolsDir);
@@ -126,7 +134,7 @@ async function discoverPrompts(): Promise<DiscoveredPrompt[]> {
 						definition: exported,
 						tools,
 					});
-					break; // One prompt per file
+					// Don't break - allow multiple prompts per file
 				}
 			}
 		} catch (err) {
