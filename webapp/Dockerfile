@@ -18,6 +18,11 @@ COPY webapp/ /app/
 COPY server/intelligence-service/src/mentor/ /server/intelligence-service/src/mentor/
 COPY server/intelligence-service/src/shared/ /server/intelligence-service/src/shared/
 
+# Create a symlink so the shared code can resolve node_modules from webapp's dependencies
+# This is needed because imports like 'uuid' and 'ai' in the shared code need to resolve
+# to the webapp's node_modules since we don't install intelligence-service deps in Docker
+RUN ln -s /app/node_modules /server/intelligence-service/node_modules
+
 # Build the React application using the production build script
 # This runs copy-env-prod.js first to use the production environment config
 RUN npm run build:prod
