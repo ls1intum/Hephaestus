@@ -143,6 +143,22 @@ try {
 	if (!relationsContent.startsWith("// @ts-nocheck")) {
 		relationsContent = relationsHeader + relationsContent;
 	}
+
+	// Normalize destructuring patterns in relations functions for consistent formatting
+	// Drizzle-kit generates different spacing on different platforms:
+	// macOS: ({ one, many }) vs Linux: ({one, many})
+	// Normalize to: ({ one, many }) for consistency
+	relationsContent = relationsContent.replace(
+		/\(\{([a-z, ]+)\}\)\s*=>/g,
+		(_match, params: string) => {
+			const normalized = params
+				.split(",")
+				.map((p) => p.trim())
+				.join(", ");
+			return `({ ${normalized} }) =>`;
+		},
+	);
+
 	fs.writeFileSync(relationsDst, relationsContent, "utf8");
 	fs.unlinkSync(relationsSrc);
 } catch (error) {
