@@ -40,15 +40,12 @@ preinstall: |
   update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.13 1
   python3 --version
   
-  # Install Poetry 2.x for Python dependency management
+  # Install Poetry 2.x via pipx for proper isolation
   echo "📝 Installing Poetry 2.x..."
-  if ! command -v poetry &> /dev/null; then
-    curl -sSL https://install.python-poetry.org | POETRY_VERSION=2.0.0 python3 -
-    echo 'export PATH="/root/.local/bin:$PATH"' >> ~/.bashrc
-  else
-    echo "Poetry already installed: $(poetry --version)"
-  fi
+  python3 -m pip install --user pipx
+  python3 -m pipx ensurepath
   export PATH="/root/.local/bin:$PATH"
+  pipx install poetry==2.0.0
   poetry --version
   
   # Verify Docker is available (usually pre-installed in GitHub environments)
@@ -63,6 +60,28 @@ preinstall: |
     rm -rf node_modules
   fi
   npm ci --prefer-offline --no-audit
+  
+  # Install Beads CLI for AI agent issue tracking
+  echo "📋 Installing Beads CLI (bd)..."
+  npm install -g @beads/bd
+  # The @beads/bd postinstall script skips binary download when CI=true
+  # Run postinstall manually without CI flag to download the native binary
+  BD_POSTINSTALL_SCRIPT="$(npm root -g)/@beads/bd/scripts/postinstall.js"
+  if [ -f "$BD_POSTINSTALL_SCRIPT" ]; then
+    CI="" node "$BD_POSTINSTALL_SCRIPT"
+    bd --version
+  else
+    echo "⚠️ Beads postinstall script not found at $BD_POSTINSTALL_SCRIPT"
+    echo "⚠️ bd commands may not work properly"
+  fi
+  
+  # Initialize beads database from JSONL if present (required for fresh clones)
+  echo "📋 Initializing Beads database..."
+  if [ -f ".beads/issues.jsonl" ]; then
+    bd init || echo "⚠️ Beads init failed, bd commands may require manual 'bd init'"
+  else
+    echo "ℹ️ No .beads/issues.jsonl found, skipping bd init (not a beads-enabled project)"
+  fi
   
   # Bootstrap Python environments for intelligence-service and webhook-ingest
   echo "🔧 Bootstrapping Python environments..."

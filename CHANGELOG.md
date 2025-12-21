@@ -1,5 +1,35 @@
 # Changelog
 
+## [0.12.0](https://github.com/ls1intum/Hephaestus/compare/v0.11.1...v0.12.0) (2025-12-16)
+
+### 🐛 Bug Fixes
+
+* **webapp:** only show deployment time in preview environments ([#604](https://github.com/ls1intum/Hephaestus/issues/604)) ([67182c1](https://github.com/ls1intum/Hephaestus/commit/67182c18b012ea4eafdd0a420b41ff425b6c5b79))
+
+### 🚀 Features
+
+* **webapp:** add survey notification button with morph animation ([#603](https://github.com/ls1intum/Hephaestus/issues/603)) ([d6d993f](https://github.com/ls1intum/Hephaestus/commit/d6d993f64d74559f7b4dc0605fc176bd13f79ff9))
+
+## [0.11.1](https://github.com/ls1intum/Hephaestus/compare/v0.11.0...v0.11.1) (2025-12-16)
+
+### 🐛 Bug Fixes
+
+* **ci:** fix copilot-environment.yml bd installation for CI environments ([#598](https://github.com/ls1intum/Hephaestus/issues/598)) ([8dd7cf8](https://github.com/ls1intum/Hephaestus/commit/8dd7cf8dfeb8699a82f144f7d015e4f07ce018d8))
+* **docs:** invert docs navbar logo for dark mode visibility ([#597](https://github.com/ls1intum/Hephaestus/issues/597)) ([f205124](https://github.com/ls1intum/Hephaestus/commit/f20512421ba5dc88924ca98a49b5550f4298da87))
+* replace unset WEB_ENV placeholders with empty strings to prevent production footer leak ([#600](https://github.com/ls1intum/Hephaestus/issues/600)) ([81fc4be](https://github.com/ls1intum/Hephaestus/commit/81fc4be46a329fb544da40ede930492144b19070))
+
+## [0.11.0](https://github.com/ls1intum/Hephaestus/compare/v0.10.10...v0.11.0) (2025-12-15)
+
+### 🚀 Features
+
+* **docs:** add ai agent workflows and beads integration ([#589](https://github.com/ls1intum/Hephaestus/issues/589)) ([61d09ef](https://github.com/ls1intum/Hephaestus/commit/61d09efcbd5dc245d7b5458cd5e8d0d09527520b))
+
+## [0.10.10](https://github.com/ls1intum/Hephaestus/compare/v0.10.9...v0.10.10) (2025-12-14)
+
+### 🐛 Bug Fixes
+
+* **webapp:** display a thank you screen upon survey completion ([#587](https://github.com/ls1intum/Hephaestus/issues/587)) ([e417711](https://github.com/ls1intum/Hephaestus/commit/e41771112560a61b7609ec6d2a3c4267b8591bf3))
+
 ## [0.10.9](https://github.com/ls1intum/Hephaestus/compare/v0.10.8...v0.10.9) (2025-12-14)
 
 ### 🐛 Bug Fixes

@@ -22,6 +22,11 @@ const sidebars: SidebarsConfig = {
       label: 'Operations',
       items: ['release-management', 'mail-notifications'],
     },
+    {
+      type: 'category',
+      label: 'AI Development',
+      items: ['ai-agent-workflow'],
+    },
   ],
 };
 

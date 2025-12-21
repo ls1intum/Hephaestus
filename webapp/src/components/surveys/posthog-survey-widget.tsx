@@ -3,6 +3,7 @@ import type { Survey as PostHogSurveyRaw } from "posthog-js";
 import { usePostHog } from "posthog-js/react";
 import { useEffect, useRef, useState } from "react";
 
+import { useSurveyNotificationStore } from "@/stores/survey-notification-store";
 import {
 	normalisePostHogSurvey,
 	type PostHogSurvey,
@@ -10,6 +11,7 @@ import {
 	type SurveyResponse,
 } from "@/types/survey";
 import { SurveyContainer } from "./survey-container";
+import { SURVEY_LAYOUT_ID } from "./survey-notification-button";
 
 /**
  * Check if a URL matches the survey's URL condition
@@ -60,12 +62,38 @@ export function PostHogSurveyWidget({
 	reloadOnComplete = false,
 }: PostHogSurveyWidgetProps) {
 	const posthog = usePostHog();
+
+	// Zustand store for persistent survey notifications
+	const shouldShowSurvey = useSurveyNotificationStore(
+		(s) => s.shouldShowSurvey,
+	);
+	const pendingSurvey = useSurveyNotificationStore((s) => s.pendingSurvey);
+	const clearShowSignal = useSurveyNotificationStore((s) => s.clearShowSignal);
+	const setPendingSurvey = useSurveyNotificationStore(
+		(s) => s.setPendingSurvey,
+	);
+	const clearPendingSurvey = useSurveyNotificationStore(
+		(s) => s.clearPendingSurvey,
+	);
+
 	const [survey, setSurvey] = useState<PostHogSurvey | null>(null);
 	const [isVisible, setIsVisible] = useState(false);
 	const [showWithDelay, setShowWithDelay] = useState(false);
 	const [submissionId, setSubmissionId] = useState<string | null>(null);
 	const hasTrackedShown = useRef(false);
 	const currentUrl = useRef(window.location.href);
+
+	// Handle reopening the survey from the notification button
+	// Uses the full survey object from Zustand - synchronous, no fetch needed
+	useEffect(() => {
+		if (shouldShowSurvey && pendingSurvey) {
+			clearShowSignal();
+			setSurvey(pendingSurvey);
+			setIsVisible(true);
+			setShowWithDelay(true);
+			hasTrackedShown.current = false;
+		}
+	}, [shouldShowSurvey, pendingSurvey, clearShowSignal]);
 
 	// Monitor URL changes and re-check survey conditions
 	useEffect(() => {
@@ -287,11 +315,16 @@ export function PostHogSurveyWidget({
 		if (!survey || !posthog) {
 			return;
 		}
+
 		posthog.capture("survey dismissed", {
 			$survey_id: survey.id,
 			$survey_name: survey.name,
 			$current_step: step,
 		});
+
+		// Store full survey in persistent Zustand store - survives page refresh
+		setPendingSurvey(survey);
+
 		setIsVisible(false);
 		setSurvey(null);
 		setSubmissionId(null);
@@ -333,6 +366,10 @@ export function PostHogSurveyWidget({
 				completed: true,
 			}),
 		);
+
+		// Clear the pending notification since survey is now completed
+		clearPendingSurvey();
+
 		setIsVisible(false);
 		setSurvey(null);
 		setSubmissionId(null);
@@ -347,33 +384,36 @@ export function PostHogSurveyWidget({
 	}
 
 	return (
-		<AnimatePresence>
+		<AnimatePresence mode="wait">
 			{showWithDelay && (
-				<motion.div
-					initial={{ opacity: 0, y: 100, scale: 0.95 }}
-					animate={{ opacity: 1, y: 0, scale: 1 }}
-					exit={{ opacity: 0, y: 100, scale: 0.95 }}
-					transition={{
-						type: "spring",
-						stiffness: 300,
-						damping: 30,
-						opacity: { duration: 0.3 },
-					}}
-					className="fixed inset-x-0 bottom-0 z-[100] w-full px-4 pb-4 sm:inset-auto sm:bottom-6 sm:right-6 sm:w-auto sm:px-0 sm:pb-0"
-				>
+				<motion.div className="fixed inset-x-0 bottom-0 z-[100] w-full px-4 pb-4 sm:inset-auto sm:bottom-6 sm:right-6 sm:w-auto sm:px-0 sm:pb-0">
 					<div className="mx-auto w-full sm:max-w-md">
+						{/* Outer container: morphs via layoutId to notification button */}
 						<motion.div
-							initial={{ scale: 0.95 }}
-							animate={{ scale: 1 }}
-							transition={{ delay: 0.1, type: "spring", stiffness: 400 }}
-							className="overflow-hidden rounded-lg border bg-background shadow-2xl"
+							layoutId={SURVEY_LAYOUT_ID}
+							layout
+							className="overflow-hidden border bg-background shadow-2xl"
+							style={{ borderRadius: 12 }}
+							transition={{
+								type: "spring",
+								stiffness: 400,
+								damping: 30,
+							}}
 						>
-							<SurveyContainer
-								survey={survey}
-								onComplete={handleComplete}
-								onDismiss={handleDismiss}
-								onProgress={handleProgress}
-							/>
+							{/* Inner content: fades out during morph */}
+							<motion.div
+								initial={{ opacity: 0 }}
+								animate={{ opacity: 1 }}
+								exit={{ opacity: 0 }}
+								transition={{ duration: 0.15 }}
+							>
+								<SurveyContainer
+									survey={survey}
+									onComplete={handleComplete}
+									onDismiss={handleDismiss}
+									onProgress={handleProgress}
+								/>
+							</motion.div>
 						</motion.div>
 					</div>
 				</motion.div>
