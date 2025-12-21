@@ -199,15 +199,15 @@ jobs:
       # intelligence-service quality checks with comprehensive validation
       - name: intelligence-service quality & type checking
         if: matrix.check == 'intelligence-service-quality'
-        working-directory: ./server/intelligence-service
         run: |
           echo "🔍 Running intelligence-service quality checks..."
+          # Install at root level to properly resolve workspace dependencies including platform-specific binaries
           npm ci --no-audit --progress=false
 
           ISSUES_FOUND=()
 
           echo "🎨 Linting (Biome)..."
-          if ! npm run check; then
+          if ! npm -w server/intelligence-service run check; then
             echo "❌ Biome check failed"
             ISSUES_FOUND+=("Biome check failed. Run: cd server/intelligence-service && npm run check -- --fix")
           else
@@ -215,7 +215,7 @@ jobs:
           fi
 
           echo "📊 TypeScript typecheck..."
-          if ! npm run typecheck; then
+          if ! npm -w server/intelligence-service run typecheck; then
             echo "❌ TypeScript typecheck failed"
             ISSUES_FOUND+=("TypeScript typecheck failed. Run: cd server/intelligence-service && npm run typecheck")
           else
@@ -223,7 +223,7 @@ jobs:
           fi
 
           echo "🧪 Build check..."
-          if ! npm run build; then
+          if ! npm -w server/intelligence-service run build; then
             echo "❌ Build failed"
             ISSUES_FOUND+=("Build failed. Run: cd server/intelligence-service && npm run build")
           else

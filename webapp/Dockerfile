@@ -4,15 +4,19 @@ FROM node:22-alpine AS build
 WORKDIR /app
 
 # Copy package.json for dependency installation
-COPY package.json /app/
+COPY webapp/package.json /app/
 
 # Install dependencies
 # Note: Using npm install instead of npm ci because this is a workspace package
 # and the package-lock.json is at the monorepo root, not in this folder
 RUN npm install --ignore-scripts
 
-# Copy the rest of the application code
-COPY ./ /app/
+# Copy the webapp application code
+COPY webapp/ /app/
+
+# Copy intelligence-service shared types (required for @intelligence-service/* imports)
+COPY server/intelligence-service/src/mentor/ /server/intelligence-service/src/mentor/
+COPY server/intelligence-service/src/shared/ /server/intelligence-service/src/shared/
 
 # Build the React application using the production build script
 # This runs copy-env-prod.js first to use the production environment config
@@ -31,13 +35,13 @@ RUN apk update && \
 COPY --from=build /app/dist /usr/share/nginx/html
 
 # Copy the substitution script into the image
-COPY substitute_env_variables.sh /usr/local/bin/
+COPY webapp/substitute_env_variables.sh /usr/local/bin/
 
 # Make the substitution script executable
 RUN chmod +x /usr/local/bin/substitute_env_variables.sh
 
 # Copy custom Nginx configuration
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY webapp/nginx.conf /etc/nginx/conf.d/default.conf
 
 # Expose port 80
 EXPOSE 80

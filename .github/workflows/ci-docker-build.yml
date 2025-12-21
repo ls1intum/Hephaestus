@@ -20,7 +20,7 @@ jobs:
           - name: "webapp"
             image-name: "ls1intum/hephaestus/webapp"
             docker-file: "./webapp/Dockerfile"
-            docker-context: "./webapp"
+            docker-context: "."
             title: "Hephaestus Webapp"
             description: "Web client for Hephaestus"
           - name: "application-server"
