@@ -201,10 +201,10 @@ jobs:
         if: matrix.check == 'intelligence-service-quality'
         run: |
           echo "🔍 Running intelligence-service quality checks..."
-          # Clean install to ensure platform-specific binaries (like biome) are properly installed
-          # Clear npm cache and node_modules to avoid cross-platform binary issues
+          # Use npm install (not npm ci) to resolve platform-specific optional dependencies
+          # npm ci uses exact lockfile which may not include linux binaries when generated on macOS
           rm -rf node_modules server/intelligence-service/node_modules ~/.npm
-          npm ci --no-audit --progress=false
+          npm install --no-audit --progress=false
 
           ISSUES_FOUND=()
 
