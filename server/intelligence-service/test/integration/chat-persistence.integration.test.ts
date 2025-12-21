@@ -59,7 +59,7 @@ describe("Chat Persistence Module", () => {
 				parts: [{ type: "text" as const, text: "Hello" }],
 			};
 
-			const result = await loadOrCreateThread(threadId, null, message, testLogger);
+			const result = await loadOrCreateThread(threadId, null, null, message, testLogger);
 
 			expect(result.success).toBe(false);
 			if (!result.success) {
@@ -77,7 +77,13 @@ describe("Chat Persistence Module", () => {
 				parts: [{ type: "text" as const, text: "Hello, this is my first message" }],
 			};
 
-			const result = await loadOrCreateThread(threadId, fixtures.workspace.id, message, testLogger);
+			const result = await loadOrCreateThread(
+				threadId,
+				fixtures.workspace.id,
+				fixtures.user.id,
+				message,
+				testLogger,
+			);
 
 			expect(result.success).toBe(true);
 			if (result.success) {
@@ -96,6 +102,7 @@ describe("Chat Persistence Module", () => {
 				id: threadId,
 				title: "Existing Thread",
 				workspaceId: fixtures.workspace.id,
+				userId: fixtures.user.id,
 			});
 
 			const message = {
@@ -104,7 +111,13 @@ describe("Chat Persistence Module", () => {
 				parts: [{ type: "text" as const, text: "Follow-up message" }],
 			};
 
-			const result = await loadOrCreateThread(threadId, fixtures.workspace.id, message, testLogger);
+			const result = await loadOrCreateThread(
+				threadId,
+				fixtures.workspace.id,
+				fixtures.user.id,
+				message,
+				testLogger,
+			);
 
 			expect(result.success).toBe(true);
 			if (result.success) {

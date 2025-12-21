@@ -25,21 +25,21 @@ import com.fasterxml.jackson.annotation.JsonTypeName;
 import org.hibernate.validator.constraints.*;
 
 /**
- * GetGroupedThreads500Response
+ * DetectBadPractices500Response
  */
 @JsonPropertyOrder({
-  GetGroupedThreads500Response.JSON_PROPERTY_ERROR
+  DetectBadPractices500Response.JSON_PROPERTY_ERROR
 })
-@JsonTypeName("getGroupedThreads_500_response")
+@JsonTypeName("detectBadPractices_500_response")
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
-public class GetGroupedThreads500Response {
+public class DetectBadPractices500Response {
   public static final String JSON_PROPERTY_ERROR = "error";
   private String error;
 
-  public GetGroupedThreads500Response() {
+  public DetectBadPractices500Response() {
   }
 
-  public GetGroupedThreads500Response error(String error) {
+  public DetectBadPractices500Response error(String error) {
     
     this.error = error;
     return this;
@@ -72,8 +72,8 @@ public class GetGroupedThreads500Response {
     if (o == null || getClass() != o.getClass()) {
       return false;
     }
-    GetGroupedThreads500Response getGroupedThreads500Response = (GetGroupedThreads500Response) o;
-    return Objects.equals(this.error, getGroupedThreads500Response.error);
+    DetectBadPractices500Response detectBadPractices500Response = (DetectBadPractices500Response) o;
+    return Objects.equals(this.error, detectBadPractices500Response.error);
   }
 
   @Override
@@ -84,7 +84,7 @@ public class GetGroupedThreads500Response {
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder();
-    sb.append("class GetGroupedThreads500Response {\n");
+    sb.append("class DetectBadPractices500Response {\n");
     sb.append("    error: ").append(toIndentedString(error)).append("\n");
     sb.append("}");
     return sb.toString();

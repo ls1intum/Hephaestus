@@ -264,7 +264,7 @@ export const mentorChat = <ThrowOnError extends boolean = false>(options: Option
 };
 
 /**
- * List latest version of documents (no auth; all users)
+ * List documents owned by the authenticated user
  */
 export const listDocuments = <ThrowOnError extends boolean = false>(options: Options<ListDocumentsData, ThrowOnError>) => {
     return (options.client ?? _heyApiClient).get<ListDocumentsResponses, ListDocumentsErrors, ThrowOnError>({

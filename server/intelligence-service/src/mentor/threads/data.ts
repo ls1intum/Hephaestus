@@ -1,4 +1,4 @@
-import { desc } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import db from "@/shared/db";
 import { chatThread } from "@/shared/db/schema";
 
@@ -9,9 +9,13 @@ export type ThreadSummary = {
 };
 
 /**
- * Get all threads ordered by creation date (newest first).
+ * Get all threads for a specific user and workspace, ordered by creation date (newest first).
+ * This ensures users only see their own threads within their authorized workspace.
  */
-export async function getAllThreads(): Promise<ThreadSummary[]> {
+export async function getThreadsByUserAndWorkspace(
+	userId: number,
+	workspaceId: number,
+): Promise<ThreadSummary[]> {
 	const rows = await db
 		.select({
 			id: chatThread.id,
@@ -19,6 +23,7 @@ export async function getAllThreads(): Promise<ThreadSummary[]> {
 			createdAt: chatThread.createdAt,
 		})
 		.from(chatThread)
+		.where(and(eq(chatThread.userId, userId), eq(chatThread.workspaceId, workspaceId)))
 		.orderBy(desc(chatThread.createdAt));
 
 	return rows.map((r) => ({

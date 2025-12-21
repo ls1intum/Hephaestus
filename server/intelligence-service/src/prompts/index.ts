@@ -45,6 +45,5 @@ export {
 	isChatMessage,
 	isPlaceholderMessage,
 	isTextPromptDefinition,
-	MESSAGE_ROLES,
 	PROMPT_TYPES,
 } from "./types";

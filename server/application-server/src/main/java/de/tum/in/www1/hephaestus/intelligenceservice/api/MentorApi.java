@@ -4,7 +4,7 @@ import de.tum.in.www1.hephaestus.intelligenceservice.ApiClient;
 import de.tum.in.www1.hephaestus.intelligenceservice.BaseApi;
 
 import de.tum.in.www1.hephaestus.intelligenceservice.model.ChatThreadGroup;
-import de.tum.in.www1.hephaestus.intelligenceservice.model.GetGroupedThreads500Response;
+import de.tum.in.www1.hephaestus.intelligenceservice.model.DetectBadPractices500Response;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.MentorChatRequest;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.StreamPart;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.ThreadDetail;
@@ -46,6 +46,7 @@ public class MentorApi extends BaseApi {
      * List chat threads grouped by time buckets
      * 
      * <p><b>200</b> - Grouped chat threads
+     * <p><b>400</b> - Missing context
      * <p><b>500</b> - Internal error
      * @return List&lt;ChatThreadGroup&gt;
      * @throws RestClientException if an error occurs while attempting to invoke the API
@@ -58,6 +59,7 @@ public class MentorApi extends BaseApi {
      * List chat threads grouped by time buckets
      * 
      * <p><b>200</b> - Grouped chat threads
+     * <p><b>400</b> - Missing context
      * <p><b>500</b> - Internal error
      * @return ResponseEntity&lt;List&lt;ChatThreadGroup&gt;&gt;
      * @throws RestClientException if an error occurs while attempting to invoke the API
@@ -87,6 +89,7 @@ public class MentorApi extends BaseApi {
      * Get mentor chat thread detail
      * 
      * <p><b>200</b> - Thread detail with messages
+     * <p><b>400</b> - Missing required context
      * <p><b>404</b> - Thread not found
      * <p><b>500</b> - Internal error
      * <p><b>503</b> - Service temporarily unavailable
@@ -102,6 +105,7 @@ public class MentorApi extends BaseApi {
      * Get mentor chat thread detail
      * 
      * <p><b>200</b> - Thread detail with messages
+     * <p><b>400</b> - Missing required context
      * <p><b>404</b> - Thread not found
      * <p><b>500</b> - Internal error
      * <p><b>503</b> - Service temporarily unavailable

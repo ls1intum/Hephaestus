@@ -12,7 +12,8 @@ import type { ChatPromptClient, TextPromptClient } from "@langfuse/client";
 export const PROMPT_TYPES = { TEXT: "text", CHAT: "chat" } as const;
 export type PromptType = (typeof PROMPT_TYPES)[keyof typeof PROMPT_TYPES];
 
-export const MESSAGE_ROLES = { SYSTEM: "system", USER: "user", ASSISTANT: "assistant" } as const;
+/** Message roles for chat prompts (not exported - use MessageRole type instead) */
+const MESSAGE_ROLES = { SYSTEM: "system", USER: "user", ASSISTANT: "assistant" } as const;
 export type MessageRole = (typeof MESSAGE_ROLES)[keyof typeof MESSAGE_ROLES];
 
 // ─────────────────────────────────────────────────────────────────────────────

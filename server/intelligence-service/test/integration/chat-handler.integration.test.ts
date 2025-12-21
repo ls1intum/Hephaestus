@@ -412,6 +412,7 @@ describe("Chat Handler Full Integration", () => {
 			await createThread({
 				id: threadId,
 				workspaceId: fixtures.workspace.id,
+				userId: fixtures.user.id,
 			});
 
 			await saveMessage({

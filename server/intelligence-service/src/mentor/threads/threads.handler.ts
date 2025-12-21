@@ -1,11 +1,10 @@
 import { ERROR_MESSAGES, HTTP_STATUS } from "@/shared/constants";
 import type { AppRouteHandler } from "@/shared/http/types";
 import { extractErrorMessage, getLogger } from "@/shared/utils";
-import { getAllThreads } from "./data";
+import { getThreadsByUserAndWorkspace, type ThreadSummary } from "./data";
 import type { HandleGetGroupedThreadsRoute } from "./threads.routes";
 
-type ThreadRow = Awaited<ReturnType<typeof getAllThreads>>[number];
-type ThreadSummary = { id: string; title: string; createdAt?: string };
+type ThreadRow = ThreadSummary;
 
 const GROUP_ORDER = [
 	"Today",
@@ -75,9 +74,20 @@ export const getGroupedThreadsHandler: AppRouteHandler<HandleGetGroupedThreadsRo
 	c,
 ) => {
 	const logger = getLogger(c);
+	const userId = c.get("userId");
+	const workspaceId = c.get("workspaceId");
+
+	// Require user context for authorization
+	if (!(userId && workspaceId)) {
+		return c.json(
+			{ error: "Missing required context (userId or workspaceId)" },
+			{ status: HTTP_STATUS.BAD_REQUEST },
+		);
+	}
 
 	try {
-		const rows = await getAllThreads();
+		// Only fetch threads belonging to this user in this workspace
+		const rows = await getThreadsByUserAndWorkspace(userId, workspaceId);
 
 		if (rows.length === 0) {
 			return c.json([], { status: HTTP_STATUS.OK });

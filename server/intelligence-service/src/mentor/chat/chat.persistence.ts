@@ -34,10 +34,12 @@ type Thread = Awaited<ReturnType<typeof getThreadById>>;
  * Load or create a thread for a chat session.
  * Returns null if persistence fails (allows graceful degradation).
  * Pass null for message when creating a greeting-only thread.
+ * Verifies thread ownership if thread already exists.
  */
 export async function loadOrCreateThread(
 	threadId: string,
 	workspaceId: number | null,
+	userId: number | null,
 	message: ChatRequestBody["message"] | null,
 	logger: HandlerLogger,
 ): Promise<PersistenceResult<Thread>> {
@@ -49,11 +51,21 @@ export async function loadOrCreateThread(
 	try {
 		let thread = await getThreadById(threadId);
 
-		if (!thread) {
-			logger.debug({ threadId, workspaceId }, "Creating new thread");
+		if (thread) {
+			// Verify ownership - thread must belong to the same user and workspace
+			if (thread.userId !== userId || thread.workspaceId !== workspaceId) {
+				logger.warn(
+					{ threadId, threadUserId: thread.userId, requestUserId: userId },
+					"Thread ownership mismatch - access denied",
+				);
+				return { success: false, error: "Thread not found or access denied" };
+			}
+		} else {
+			logger.debug({ threadId, workspaceId, userId }, "Creating new thread");
 			thread = await createThread({
 				id: threadId,
 				title: message ? inferTitleFromMessage(message) : "New chat",
+				userId,
 				workspaceId,
 			});
 			logger.debug({ threadId, created: !!thread }, "Thread creation result");

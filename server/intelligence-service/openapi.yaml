@@ -318,6 +318,17 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/ChatThreadGroup"
+        "400":
+          description: Missing context
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                  - error
         "500":
           description: Internal error
           content:
@@ -352,7 +363,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Document"
         "400":
-          description: Missing workspace context
+          description: Missing required context
           content:
             application/json:
               schema:
@@ -378,7 +389,7 @@ paths:
       tags:
         - documents
         - exported
-      summary: List latest version of documents (no auth; all users)
+      summary: List documents owned by the authenticated user
       operationId: listDocuments
       parameters:
         - schema:
@@ -407,6 +418,17 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/DocumentSummary"
+        "400":
+          description: Missing context
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                  - error
         "500":
           description: Internal error
           content:
@@ -440,6 +462,17 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Document"
+        "400":
+          description: Missing context
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                  - error
         "404":
           description: Not found
           content:
@@ -490,6 +523,17 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Document"
+        "400":
+          description: Missing context
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                  - error
         "404":
           description: Not found
           content:
@@ -529,6 +573,17 @@ paths:
       responses:
         "204":
           description: Deleted
+        "400":
+          description: Missing context
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                  - error
         "404":
           description: Not found
           content:
@@ -592,6 +647,17 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/Document"
+        "400":
+          description: Missing context
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                  - error
         "404":
           description: Not found
           content:
@@ -643,6 +709,17 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/Document"
+        "400":
+          description: Missing context
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                  - error
         "404":
           description: Not found
           content:
@@ -694,6 +771,17 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Document"
+        "400":
+          description: Missing context
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                  - error
         "404":
           description: Not found
           content:
@@ -745,6 +833,17 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ChatMessageVote"
+        "400":
+          description: Missing context
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                  - error
         "404":
           description: Message not found
           content:
@@ -877,6 +976,17 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ThreadDetail"
+        "400":
+          description: Missing required context
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                  - error
         "404":
           description: Thread not found
           content:

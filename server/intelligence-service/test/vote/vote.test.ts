@@ -62,7 +62,11 @@ describe("Vote Feature", () => {
 			`http://localhost/mentor/messages/chat/messages/${messageId}/vote`,
 			{
 				method: "POST",
-				headers: { "Content-Type": "application/json" },
+				headers: {
+					"Content-Type": "application/json",
+					"x-user-id": String(fixtures.user.id),
+					"x-workspace-id": String(fixtures.workspace.id),
+				},
 				body: JSON.stringify({ isUpvoted }),
 			},
 		);
@@ -71,9 +75,10 @@ describe("Vote Feature", () => {
 
 	/**
 	 * Helper to create a test thread with a message.
+	 * The thread is owned by the test user for proper authorization.
 	 */
 	async function createThreadWithMessage(): Promise<{ threadId: string; messageId: string }> {
-		const threadId = await createTestThread(fixtures.workspace.id);
+		const threadId = await createTestThread(fixtures.workspace.id, { userId: fixtures.user.id });
 		createdThreadIds.push(threadId);
 		const messageId = await createTestMessage(threadId, { text: "Test message for voting" });
 		return { threadId, messageId };

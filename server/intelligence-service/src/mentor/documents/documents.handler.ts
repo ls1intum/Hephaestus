@@ -8,7 +8,7 @@ import {
 	deleteVersionsAfter,
 	getDocumentById,
 	getDocumentVersion,
-	listDocuments,
+	listDocumentsByUserAndWorkspace,
 	listVersions,
 	updateDocument,
 } from "./data";
@@ -25,11 +25,15 @@ import type {
 
 export const createDocumentHandler: AppRouteHandler<typeof createDocumentRoute> = async (c) => {
 	const logger = getLogger(c);
+	const userId = c.get("userId");
 	const workspaceId = c.get("workspaceId");
 	const body = c.req.valid("json");
 
-	if (!workspaceId) {
-		return c.json({ error: "Missing workspace context" }, { status: HTTP_STATUS.BAD_REQUEST });
+	if (!(userId && workspaceId)) {
+		return c.json(
+			{ error: "Missing required context (userId or workspaceId)" },
+			{ status: HTTP_STATUS.BAD_REQUEST },
+		);
 	}
 
 	try {
@@ -37,6 +41,7 @@ export const createDocumentHandler: AppRouteHandler<typeof createDocumentRoute> 
 			title: body.title,
 			content: body.content,
 			kind: body.kind as DocumentKind,
+			userId,
 			workspaceId,
 		});
 
@@ -55,7 +60,17 @@ export const createDocumentHandler: AppRouteHandler<typeof createDocumentRoute> 
 
 export const getDocumentHandler: AppRouteHandler<typeof getDocumentRoute> = async (c) => {
 	const { id } = c.req.valid("param");
-	const doc = await getDocumentById(id);
+	const userId = c.get("userId");
+	const workspaceId = c.get("workspaceId");
+
+	if (!(userId && workspaceId)) {
+		return c.json(
+			{ error: "Missing required context (userId or workspaceId)" },
+			{ status: HTTP_STATUS.BAD_REQUEST },
+		);
+	}
+
+	const doc = await getDocumentById(id, userId, workspaceId);
 	if (!doc) {
 		return c.json({ error: ERROR_MESSAGES.DOCUMENT_NOT_FOUND }, { status: HTTP_STATUS.NOT_FOUND });
 	}
@@ -66,7 +81,26 @@ export const updateDocumentHandler: AppRouteHandler<typeof updateDocumentRoute> 
 	const logger = getLogger(c);
 	const { id } = c.req.valid("param");
 	const body = c.req.valid("json");
+	const userId = c.get("userId");
+	const workspaceId = c.get("workspaceId");
+
+	if (!(userId && workspaceId)) {
+		return c.json(
+			{ error: "Missing required context (userId or workspaceId)" },
+			{ status: HTTP_STATUS.BAD_REQUEST },
+		);
+	}
+
 	try {
+		// First verify the document belongs to the user
+		const existing = await getDocumentById(id, userId, workspaceId);
+		if (!existing) {
+			return c.json(
+				{ error: ERROR_MESSAGES.DOCUMENT_NOT_FOUND },
+				{ status: HTTP_STATUS.NOT_FOUND },
+			);
+		}
+
 		const doc = await updateDocument(id, {
 			title: body.title,
 			content: body.content,
@@ -92,8 +126,19 @@ export const updateDocumentHandler: AppRouteHandler<typeof updateDocumentRoute> 
 export const deleteDocumentHandler: AppRouteHandler<typeof deleteDocumentRoute> = async (c) => {
 	const logger = getLogger(c);
 	const { id } = c.req.valid("param");
+	const userId = c.get("userId");
+	const workspaceId = c.get("workspaceId");
+
+	if (!(userId && workspaceId)) {
+		return c.json(
+			{ error: "Missing required context (userId or workspaceId)" },
+			{ status: HTTP_STATUS.BAD_REQUEST },
+		);
+	}
+
 	try {
-		const existing = await getDocumentById(id);
+		// Verify the document belongs to the user before deleting
+		const existing = await getDocumentById(id, userId, workspaceId);
 		if (!existing) {
 			return c.json(
 				{ error: ERROR_MESSAGES.DOCUMENT_NOT_FOUND },
@@ -114,7 +159,17 @@ export const deleteDocumentHandler: AppRouteHandler<typeof deleteDocumentRoute> 
 
 export const listDocumentsHandler: AppRouteHandler<typeof listDocumentsRoute> = async (c) => {
 	const { page, size } = c.req.valid("query");
-	const docs = await listDocuments();
+	const userId = c.get("userId");
+	const workspaceId = c.get("workspaceId");
+
+	if (!(userId && workspaceId)) {
+		return c.json(
+			{ error: "Missing required context (userId or workspaceId)" },
+			{ status: HTTP_STATUS.BAD_REQUEST },
+		);
+	}
+
+	const docs = await listDocumentsByUserAndWorkspace(userId, workspaceId);
 
 	const start = page * size;
 	const end = start + size;
@@ -131,7 +186,17 @@ export const listDocumentsHandler: AppRouteHandler<typeof listDocumentsRoute> = 
 export const listVersionsHandler: AppRouteHandler<typeof listVersionsRoute> = async (c) => {
 	const { id } = c.req.valid("param");
 	const { page, size } = c.req.valid("query");
-	const versions = await listVersions(id);
+	const userId = c.get("userId");
+	const workspaceId = c.get("workspaceId");
+
+	if (!(userId && workspaceId)) {
+		return c.json(
+			{ error: "Missing required context (userId or workspaceId)" },
+			{ status: HTTP_STATUS.BAD_REQUEST },
+		);
+	}
+
+	const versions = await listVersions(id, userId, workspaceId);
 
 	if (versions.length === 0) {
 		return c.json({ error: ERROR_MESSAGES.DOCUMENT_NOT_FOUND }, { status: HTTP_STATUS.NOT_FOUND });
@@ -146,7 +211,17 @@ export const listVersionsHandler: AppRouteHandler<typeof listVersionsRoute> = as
 
 export const getVersionHandler: AppRouteHandler<typeof getVersionRoute> = async (c) => {
 	const { id, versionNumber } = c.req.valid("param");
-	const doc = await getDocumentVersion(id, versionNumber);
+	const userId = c.get("userId");
+	const workspaceId = c.get("workspaceId");
+
+	if (!(userId && workspaceId)) {
+		return c.json(
+			{ error: "Missing required context (userId or workspaceId)" },
+			{ status: HTTP_STATUS.BAD_REQUEST },
+		);
+	}
+
+	const doc = await getDocumentVersion(id, versionNumber, userId, workspaceId);
 	if (!doc) {
 		return c.json({ error: ERROR_MESSAGES.DOCUMENT_NOT_FOUND }, { status: HTTP_STATUS.NOT_FOUND });
 	}
@@ -157,9 +232,19 @@ export const deleteAfterHandler: AppRouteHandler<typeof deleteAfterRoute> = asyn
 	const logger = getLogger(c);
 	const { id } = c.req.valid("param");
 	const { after } = c.req.valid("query");
+	const userId = c.get("userId");
+	const workspaceId = c.get("workspaceId");
+
+	if (!(userId && workspaceId)) {
+		return c.json(
+			{ error: "Missing required context (userId or workspaceId)" },
+			{ status: HTTP_STATUS.BAD_REQUEST },
+		);
+	}
+
 	try {
-		// Get versions to return before deleting
-		const versions = await listVersions(id);
+		// Get versions to return before deleting (filtered by user/workspace)
+		const versions = await listVersions(id, userId, workspaceId);
 		const afterDate = new Date(after);
 		const toDelete = versions.filter((v) => new Date(v.createdAt) > afterDate);
 

@@ -8,7 +8,7 @@ export const WORKSPACE_ID_HEADER = "x-workspace-id";
 export const WORKSPACE_SLUG_HEADER = "x-workspace-slug";
 export const USER_ID_HEADER = "x-user-id";
 export const USER_LOGIN_HEADER = "x-user-login";
-export const USER_NAME_HEADER = "x-user-name";
+export const USER_FIRST_NAME_HEADER = "x-user-first-name";
 
 export interface AppBindings {
 	Variables: {
@@ -17,7 +17,7 @@ export interface AppBindings {
 		workspaceSlug: string | null;
 		userId: number | null;
 		userLogin: string | null;
-		userName: string | null; // User's display name (may differ from login)
+		userName: string | null; // User's first name (extracted from display name by proxy)
 	};
 }
 

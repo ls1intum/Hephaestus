@@ -48,8 +48,8 @@ export const badPracticeResultSchema = z
 
 export const detectorResponseSchema = badPracticeResultSchema
 	.extend({
-		/** Correlation ID for linking requests to Langfuse traces. Format: detector:<repo>#<pr> */
-		correlation_id: z.string(),
+		/** Trace ID for linking requests to Langfuse traces. Format: detector:<repo>#<pr> */
+		trace_id: z.string(),
 	})
 	.openapi("DetectorResponse");
 

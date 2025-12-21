@@ -3,6 +3,7 @@ package de.tum.in.www1.hephaestus.intelligenceservice.api;
 import de.tum.in.www1.hephaestus.intelligenceservice.ApiClient;
 import de.tum.in.www1.hephaestus.intelligenceservice.BaseApi;
 
+import de.tum.in.www1.hephaestus.intelligenceservice.model.DetectBadPractices500Response;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.DetectorRequest;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.DetectorResponse;
 
@@ -42,6 +43,7 @@ public class DetectorApi extends BaseApi {
      * Detect bad practices for a pull request
      * 
      * <p><b>200</b> - Detection response
+     * <p><b>500</b> - Internal server error
      * @param detectorRequest Detector request (required)
      * @return DetectorResponse
      * @throws RestClientException if an error occurs while attempting to invoke the API
@@ -54,6 +56,7 @@ public class DetectorApi extends BaseApi {
      * Detect bad practices for a pull request
      * 
      * <p><b>200</b> - Detection response
+     * <p><b>500</b> - Internal server error
      * @param detectorRequest Detector request (required)
      * @return ResponseEntity&lt;DetectorResponse&gt;
      * @throws RestClientException if an error occurs while attempting to invoke the API

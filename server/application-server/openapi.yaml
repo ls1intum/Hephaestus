@@ -708,6 +708,17 @@ paths:
                 items:
                   $ref: "#/components/schemas/DocumentSummary"
           description: Document summaries
+        "400":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                - error
+          description: Missing context
         "500":
           content:
             application/json:
@@ -719,7 +730,7 @@ paths:
                 required:
                 - error
           description: Internal error
-      summary: List latest version of documents (no auth; all users)
+      summary: List documents owned by the authenticated user
       tags:
       - documents
       - exported
@@ -759,7 +770,7 @@ paths:
                     type: string
                 required:
                 - error
-          description: Missing workspace context
+          description: Missing required context
         "500":
           content:
             application/json:
@@ -799,6 +810,17 @@ paths:
       responses:
         "204":
           description: Deleted
+        "400":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                - error
+          description: Missing context
         "404":
           content:
             application/json:
@@ -852,6 +874,17 @@ paths:
               schema:
                 $ref: "#/components/schemas/Document"
           description: Document
+        "400":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                - error
+          description: Missing context
         "404":
           content:
             application/json:
@@ -912,6 +945,17 @@ paths:
               schema:
                 $ref: "#/components/schemas/Document"
           description: Updated document
+        "400":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                - error
+          description: Missing context
         "404":
           content:
             application/json:
@@ -976,6 +1020,17 @@ paths:
                 items:
                   $ref: "#/components/schemas/Document"
           description: Deleted versions
+        "400":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                - error
+          description: Missing context
         "404":
           content:
             application/json:
@@ -1052,6 +1107,17 @@ paths:
                 items:
                   $ref: "#/components/schemas/Document"
           description: Document versions
+        "400":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                - error
+          description: Missing context
         "404":
           content:
             application/json:
@@ -1115,6 +1181,17 @@ paths:
               schema:
                 $ref: "#/components/schemas/Document"
           description: Document
+        "400":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                - error
+          description: Missing context
         "404":
           content:
             application/json:
@@ -1176,6 +1253,17 @@ paths:
               schema:
                 $ref: "#/components/schemas/ChatMessageVote"
           description: Vote recorded
+        "400":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                - error
+          description: Missing context
         "404":
           content:
             application/json:
@@ -1224,6 +1312,17 @@ paths:
                 items:
                   $ref: "#/components/schemas/ChatThreadGroup"
           description: Grouped chat threads
+        "400":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                - error
+          description: Missing context
         "500":
           content:
             application/json:
@@ -1267,6 +1366,17 @@ paths:
               schema:
                 $ref: "#/components/schemas/ThreadDetail"
           description: Thread detail with messages
+        "400":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                required:
+                - error
+          description: Missing required context
         "404":
           content:
             application/json:

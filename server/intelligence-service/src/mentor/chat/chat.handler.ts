@@ -20,6 +20,7 @@ import {
 	convertToModelMessages,
 	createUIMessageStream,
 	createUIMessageStreamResponse,
+	hasToolCall,
 	stepCountIs,
 	streamText,
 } from "ai";
@@ -123,7 +124,20 @@ export const mentorChatHandler: AppRouteHandler<HandleMentorChatRoute> = async (
 	const toolContext = { workspaceId, userId, userLogin, userName: userName || userLogin };
 
 	// Persistence (best-effort - degradation allowed but logged)
-	const threadResult = await loadOrCreateThread(threadId, workspaceId, message ?? null, logger);
+	// Thread ownership is verified here - returns error if thread exists but belongs to another user
+	const threadResult = await loadOrCreateThread(
+		threadId,
+		workspaceId,
+		userId,
+		message ?? null,
+		logger,
+	);
+
+	// If thread exists but belongs to another user, deny access
+	if (!threadResult.success && threadResult.error?.includes("access denied")) {
+		return context.json({ error: ERROR_MESSAGES.THREAD_NOT_FOUND }, HTTP_STATUS.NOT_FOUND);
+	}
+
 	const thread = threadResult.success ? threadResult.data : null;
 
 	// Only persist user message if we have one and thread exists
@@ -153,9 +167,8 @@ export const mentorChatHandler: AppRouteHandler<HandleMentorChatRoute> = async (
 	}
 
 	// Create personalized system prompt with user context
-	// Use real name if available, fall back to login
-	const displayName = userName || userLogin;
-	const firstName = displayName.split(" ")[0] || userLogin;
+	// userName is already the first name (extracted by MentorProxyController)
+	const firstName = userName || userLogin;
 	const isReturningUser = history.length > 0 || thread?.workspaceId !== undefined;
 	const isFirstMessage = history.length === 0;
 
@@ -201,7 +214,7 @@ export const mentorChatHandler: AppRouteHandler<HandleMentorChatRoute> = async (
 			? compiledPrompt
 			: createMentorSystemPrompt({
 					userLogin,
-					userName: displayName,
+					userName: firstName,
 					isReturningUser,
 					messageCount: history.length,
 				});
@@ -314,8 +327,32 @@ export const mentorChatHandler: AppRouteHandler<HandleMentorChatRoute> = async (
 					toolChoice: toolConfig.toolChoice ?? "auto",
 					// Allow multi-step tool calling: the model can call tools and then
 					// continue generating a response based on tool results.
-					// Max steps is configurable via Langfuse prompt config
-					stopWhen: stepCountIs(toolConfig.maxToolSteps ?? 5),
+					// Stops on: max steps OR after document creation (terminal action)
+					stopWhen: [stepCountIs(toolConfig.maxToolSteps ?? 5), hasToolCall("createDocument")],
+					// Dynamic tool activation: disable one-shot tools after they've been called
+					// This reduces token usage by removing irrelevant tool descriptions
+					prepareStep: ({ steps: previousSteps }) => {
+						// Tools that provide static data - no need to call more than once
+						const oneShotTools = ["getActivitySummary", "getAssignedWork"];
+						const usedTools = new Set(
+							previousSteps.flatMap((step: { toolCalls: Array<{ toolName: string }> }) =>
+								step.toolCalls.map((tc: { toolName: string }) => tc.toolName),
+							),
+						);
+
+						// Check if any one-shot tool was already used
+						const hasUsedOneShotTool = oneShotTools.some((t) => usedTools.has(t));
+						if (!hasUsedOneShotTool) {
+							return undefined; // No changes needed
+						}
+
+						// Filter out already-used one-shot tools
+						const activeTools = Object.keys(tools).filter(
+							(toolName) => !(oneShotTools.includes(toolName) && usedTools.has(toolName)),
+						) as Array<keyof typeof tools>;
+
+						return { activeTools };
+					},
 					// Enable Langfuse telemetry for observability
 					...telemetryOptions,
 					// Callback for each step - useful for tracking tool usage
@@ -458,12 +495,39 @@ export const mentorChatHandler: AppRouteHandler<HandleMentorChatRoute> = async (
 export const getThreadHandler: AppRouteHandler<HandleGetThreadRoute> = async (context) => {
 	const logger = getLogger(context);
 	const { threadId } = context.req.valid("param");
+	const userId = context.get("userId");
+	const workspaceId = context.get("workspaceId");
+
+	// Require user context for authorization
+	if (!(userId && workspaceId)) {
+		return context.json(
+			{ error: "Missing required context (userId or workspaceId)" },
+			{ status: HTTP_STATUS.BAD_REQUEST },
+		);
+	}
 
 	try {
 		const { getThreadById } = await import("./data");
 		const thread = await getThreadById(threadId);
 
+		// Check if thread exists
 		if (!thread) {
+			return context.json(
+				{ error: ERROR_MESSAGES.THREAD_NOT_FOUND },
+				{ status: HTTP_STATUS.NOT_FOUND },
+			);
+		}
+
+		// Check ownership - thread must belong to the same user and workspace
+		// Note: thread.userId can be null for legacy threads created before auth was added
+		const threadUserId = thread.userId ? Number(thread.userId) : null;
+		const threadWorkspaceId = thread.workspaceId ? Number(thread.workspaceId) : null;
+
+		if (threadUserId !== userId || threadWorkspaceId !== workspaceId) {
+			logger.debug(
+				{ threadId, threadUserId, userId, threadWorkspaceId, workspaceId },
+				"Thread ownership mismatch",
+			);
 			return context.json(
 				{ error: ERROR_MESSAGES.THREAD_NOT_FOUND },
 				{ status: HTTP_STATUS.NOT_FOUND },

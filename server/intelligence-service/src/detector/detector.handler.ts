@@ -88,13 +88,13 @@ export const detectBadPracticesHandler: AppRouteHandler<DetectBadPracticesRoute>
 		});
 
 		// ───────────────────────────────────────────────────────────────────
-		// 4. Build response with correlation ID for Langfuse linking
+		// 4. Build response with trace ID for Langfuse linking
 		// ───────────────────────────────────────────────────────────────────
-		// The correlation ID allows linking API responses to Langfuse traces
-		// Format: detector:<repo>#<pr>
+		// The trace ID allows linking API responses to Langfuse traces
+		// Format: detector:<repo>#<pr> (used as session ID in Langfuse)
 		const response = detectorResponseSchema.parse({
 			...object,
-			correlation_id: sessionId,
+			trace_id: sessionId,
 		});
 
 		// Log success metrics

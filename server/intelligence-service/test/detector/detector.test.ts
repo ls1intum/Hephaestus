@@ -182,7 +182,7 @@ describe("Detector Schemas", () => {
 	});
 
 	describe("detectorResponseSchema", () => {
-		it("should extend result with correlation_id", () => {
+		it("should extend result with trace_id", () => {
 			const response = {
 				bad_practice_summary: "One issue found",
 				bad_practices: [
@@ -192,21 +192,21 @@ describe("Detector Schemas", () => {
 						status: "Minor Issue",
 					},
 				],
-				correlation_id: "detector:repo#123",
+				trace_id: "detector:repo#123",
 			};
 
 			const result = detectorResponseSchema.safeParse(response);
 			expect(result.success).toBe(true);
 			if (result.success) {
-				expect(result.data.correlation_id).toBe("detector:repo#123");
+				expect(result.data.trace_id).toBe("detector:repo#123");
 			}
 		});
 
-		it("should reject response without correlation_id", () => {
+		it("should reject response without trace_id", () => {
 			const responseWithoutTrace = {
 				bad_practice_summary: "Summary",
 				bad_practices: [],
-				// missing correlation_id
+				// missing trace_id
 			};
 
 			const result = detectorResponseSchema.safeParse(responseWithoutTrace);
@@ -292,7 +292,7 @@ describe("Detector Handler Contract", () => {
 					status: "Critical Issue" as const,
 				},
 			],
-			correlation_id: "detector:repo#123",
+			trace_id: "detector:repo#123",
 		};
 
 		const result = detectorResponseSchema.safeParse(mockHandlerOutput);

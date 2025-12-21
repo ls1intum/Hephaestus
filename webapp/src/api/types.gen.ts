@@ -889,6 +889,12 @@ export type ListDocumentsData = {
 
 export type ListDocumentsErrors = {
     /**
+     * Missing context
+     */
+    400: {
+        error: string;
+    };
+    /**
      * Internal error
      */
     500: {
@@ -924,7 +930,7 @@ export type CreateDocumentData = {
 
 export type CreateDocumentErrors = {
     /**
-     * Missing workspace context
+     * Missing required context
      */
     400: {
         error: string;
@@ -962,6 +968,12 @@ export type DeleteDocumentData = {
 };
 
 export type DeleteDocumentErrors = {
+    /**
+     * Missing context
+     */
+    400: {
+        error: string;
+    };
     /**
      * Not found
      */
@@ -1001,6 +1013,12 @@ export type GetDocumentData = {
 };
 
 export type GetDocumentErrors = {
+    /**
+     * Missing context
+     */
+    400: {
+        error: string;
+    };
     /**
      * Not found
      */
@@ -1044,6 +1062,12 @@ export type UpdateDocumentData = {
 
 export type UpdateDocumentErrors = {
     /**
+     * Missing context
+     */
+    400: {
+        error: string;
+    };
+    /**
      * Not found
      */
     404: {
@@ -1084,6 +1108,12 @@ export type DeleteDocumentVersionsAfterData = {
 };
 
 export type DeleteDocumentVersionsAfterErrors = {
+    /**
+     * Missing context
+     */
+    400: {
+        error: string;
+    };
     /**
      * Not found
      */
@@ -1127,6 +1157,12 @@ export type ListVersionsData = {
 
 export type ListVersionsErrors = {
     /**
+     * Missing context
+     */
+    400: {
+        error: string;
+    };
+    /**
      * Not found
      */
     404: {
@@ -1166,6 +1202,12 @@ export type GetVersionData = {
 };
 
 export type GetVersionErrors = {
+    /**
+     * Missing context
+     */
+    400: {
+        error: string;
+    };
     /**
      * Not found
      */
@@ -1209,6 +1251,12 @@ export type VoteMessageData = {
 
 export type VoteMessageErrors = {
     /**
+     * Missing context
+     */
+    400: {
+        error: string;
+    };
+    /**
      * Message not found
      */
     404: {
@@ -1247,6 +1295,12 @@ export type GetGroupedThreadsData = {
 
 export type GetGroupedThreadsErrors = {
     /**
+     * Missing context
+     */
+    400: {
+        error: string;
+    };
+    /**
      * Internal error
      */
     500: {
@@ -1279,6 +1333,12 @@ export type GetThreadData = {
 };
 
 export type GetThreadErrors = {
+    /**
+     * Missing required context
+     */
+    400: {
+        error: string;
+    };
     /**
      * Thread not found
      */

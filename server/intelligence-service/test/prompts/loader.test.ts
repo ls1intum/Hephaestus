@@ -345,66 +345,10 @@ describe("Prompt Loader", () => {
 		});
 	});
 
-	describe("Cache TTL", () => {
-		// NOTE: TTL behavior is now managed by the lru-cache library, which uses
-		// performance.now() internally and doesn't respond to vitest's fake timers.
-		// We trust the well-tested lru-cache library for TTL expiration.
-		// These tests verify our integration still works as expected.
-
-		it.skip("should fetch fresh after TTL expires", async () => {
-			// Skipped: lru-cache uses performance.now() which vitest cannot mock
-			const now = Date.now();
-			vi.useFakeTimers();
-			vi.setSystemTime(now);
-			vi.mocked(isTelemetryEnabled).mockReturnValue(true);
-			vi.mocked(langfuse.prompt.get).mockResolvedValue({
-				prompt: "Fresh prompt",
-				version: 1,
-				config: {},
-				compile: vi.fn(() => "Fresh"),
-			} as unknown as Awaited<ReturnType<typeof langfuse.prompt.get>>);
-
-			// First call
-			await loadPrompt(textPromptDefinition);
-			expect(langfuse.prompt.get).toHaveBeenCalledTimes(1);
-
-			// Advance time by 5 minutes + 1 second (past TTL)
-			vi.setSystemTime(now + 5 * 60 * 1000 + 1000);
-
-			// Second call - should fetch fresh
-			await loadPrompt(textPromptDefinition);
-			expect(langfuse.prompt.get).toHaveBeenCalledTimes(2);
-
-			vi.useRealTimers();
-		});
-
-		it.skip("should use cache within TTL", async () => {
-			// Skipped: lru-cache uses performance.now() which vitest cannot mock
-			const now = Date.now();
-			vi.useFakeTimers();
-			vi.setSystemTime(now);
-			vi.mocked(isTelemetryEnabled).mockReturnValue(true);
-			vi.mocked(langfuse.prompt.get).mockResolvedValue({
-				prompt: "Cached prompt",
-				version: 1,
-				config: {},
-				compile: vi.fn(() => "Cached"),
-			} as unknown as Awaited<ReturnType<typeof langfuse.prompt.get>>);
-
-			// First call
-			await loadPrompt(textPromptDefinition);
-			expect(langfuse.prompt.get).toHaveBeenCalledTimes(1);
-
-			// Advance time by 4 minutes (within TTL)
-			vi.setSystemTime(now + 4 * 60 * 1000);
-
-			// Second call - should use cache
-			await loadPrompt(textPromptDefinition);
-			expect(langfuse.prompt.get).toHaveBeenCalledTimes(1);
-
-			vi.useRealTimers();
-		});
-	});
+	// NOTE: TTL behavior is managed by the lru-cache library which uses
+	// performance.now() internally. This is a well-tested third-party library
+	// and testing its TTL behavior would require mocking performance.now()
+	// which vitest's fake timers don't support. We trust the library.
 
 	describe("clearPromptCache", () => {
 		it("should clear all cached prompts", async () => {

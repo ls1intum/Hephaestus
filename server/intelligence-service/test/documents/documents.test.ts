@@ -279,7 +279,7 @@ describe("Documents Module", () => {
 			const response = await app.fetch(request);
 			expect(response.status).toBe(400);
 			const error = (await response.json()) as ErrorResponse;
-			expect(error.error).toBe("Missing workspace context");
+			expect(error.error).toBe("Missing required context (userId or workspaceId)");
 		});
 
 		it("should reject creation with invalid kind", async () => {

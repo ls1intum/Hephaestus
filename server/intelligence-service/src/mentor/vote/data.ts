@@ -1,6 +1,6 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import db from "@/shared/db";
-import { chatMessage, chatMessageVote } from "@/shared/db/schema";
+import { chatMessage, chatMessageVote, chatThread } from "@/shared/db/schema";
 
 export type VoteRecord = {
 	messageId: string;
@@ -10,13 +10,26 @@ export type VoteRecord = {
 };
 
 /**
- * Check if a message exists.
+ * Check if a message exists and belongs to the user (via thread ownership).
+ * Returns true only if the message exists and the user owns the thread.
  */
-export async function messageExists(messageId: string): Promise<boolean> {
+export async function messageExistsForUser(
+	messageId: string,
+	userId: number,
+	workspaceId: number,
+): Promise<boolean> {
+	// Join message -> thread to verify ownership
 	const rows = await db
 		.select({ id: chatMessage.id })
 		.from(chatMessage)
-		.where(eq(chatMessage.id, messageId))
+		.innerJoin(chatThread, eq(chatMessage.threadId, chatThread.id))
+		.where(
+			and(
+				eq(chatMessage.id, messageId),
+				eq(chatThread.userId, userId),
+				eq(chatThread.workspaceId, workspaceId),
+			),
+		)
 		.limit(1);
 	return rows.length > 0;
 }

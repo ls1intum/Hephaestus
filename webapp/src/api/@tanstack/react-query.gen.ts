@@ -709,7 +709,7 @@ export const mentorChatMutation = (options?: Partial<Options<MentorChatData>>): 
 export const listDocumentsQueryKey = (options: Options<ListDocumentsData>) => createQueryKey('listDocuments', options);
 
 /**
- * List latest version of documents (no auth; all users)
+ * List documents owned by the authenticated user
  */
 export const listDocumentsOptions = (options: Options<ListDocumentsData>) => {
     return queryOptions({
@@ -729,7 +729,7 @@ export const listDocumentsOptions = (options: Options<ListDocumentsData>) => {
 export const listDocumentsInfiniteQueryKey = (options: Options<ListDocumentsData>): QueryKey<Options<ListDocumentsData>> => createQueryKey('listDocuments', options, true);
 
 /**
- * List latest version of documents (no auth; all users)
+ * List documents owned by the authenticated user
  */
 export const listDocumentsInfiniteOptions = (options: Options<ListDocumentsData>) => {
     return infiniteQueryOptions<ListDocumentsResponse, ListDocumentsError, InfiniteData<ListDocumentsResponse>, QueryKey<Options<ListDocumentsData>>, number | null | Pick<QueryKey<Options<ListDocumentsData>>[0], 'body' | 'headers' | 'path' | 'query'>>(

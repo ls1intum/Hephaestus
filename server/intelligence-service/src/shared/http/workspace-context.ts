@@ -1,9 +1,9 @@
 import type { Context, Next } from "hono";
 import type { AppBindings } from "./types";
 import {
+	USER_FIRST_NAME_HEADER,
 	USER_ID_HEADER,
 	USER_LOGIN_HEADER,
-	USER_NAME_HEADER,
 	WORKSPACE_ID_HEADER,
 	WORKSPACE_SLUG_HEADER,
 } from "./types";
@@ -18,7 +18,7 @@ import {
  * - X-Workspace-Slug: The workspace's URL slug (for logging/debugging)
  * - X-User-Id: The user's database ID (for document ownership)
  * - X-User-Login: The user's login/username (for logging/debugging)
- * - X-User-Name: The user's display name (for personalization)
+ * - X-User-First-Name: The user's first name (for personalization)
  */
 export function workspaceContext() {
 	return async (c: Context<AppBindings>, next: Next) => {
@@ -26,7 +26,7 @@ export function workspaceContext() {
 		const workspaceSlug = c.req.header(WORKSPACE_SLUG_HEADER) ?? null;
 		const userIdHeader = c.req.header(USER_ID_HEADER);
 		const userLogin = c.req.header(USER_LOGIN_HEADER) ?? null;
-		const userName = c.req.header(USER_NAME_HEADER) ?? null;
+		const userFirstName = c.req.header(USER_FIRST_NAME_HEADER) ?? null;
 
 		let workspaceId: number | null = null;
 		if (workspaceIdHeader) {
@@ -48,7 +48,7 @@ export function workspaceContext() {
 		c.set("workspaceSlug", workspaceSlug);
 		c.set("userId", userId);
 		c.set("userLogin", userLogin);
-		c.set("userName", userName);
+		c.set("userName", userFirstName);
 		await next();
 	};
 }

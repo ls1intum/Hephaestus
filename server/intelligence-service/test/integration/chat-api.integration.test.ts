@@ -68,6 +68,7 @@ describe("Chat API Integration", () => {
 				id: threadId,
 				title: "Test Thread",
 				workspaceId: fixtures.workspace.id,
+				userId: fixtures.user.id,
 			});
 
 			await saveMessage({
@@ -129,6 +130,7 @@ describe("Chat API Integration", () => {
 			await createThread({
 				id: threadId,
 				workspaceId: fixtures.workspace.id,
+				userId: fixtures.user.id,
 			});
 
 			// Note: content must include 'type' for transformer to recognize it
@@ -203,6 +205,7 @@ describe("Chat API Integration", () => {
 				id: threadId,
 				title: "Recent Thread",
 				workspaceId: fixtures.workspace.id,
+				userId: fixtures.user.id,
 			});
 
 			const request = new Request("http://localhost/mentor/threads/grouped", {

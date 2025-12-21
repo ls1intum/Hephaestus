@@ -58,13 +58,26 @@ export async function createDocument(params: {
 }
 
 /**
- * Get the latest version of a document by ID.
+ * Get the latest version of a document by ID, filtered by user and workspace.
+ * Returns null if document doesn't exist or doesn't belong to the user/workspace.
  */
-export async function getDocumentById(id: string): Promise<DocumentRecord | null> {
+export async function getDocumentById(
+	id: string,
+	userId?: number,
+	workspaceId?: number,
+): Promise<DocumentRecord | null> {
+	const conditions = [eq(docTable.id, id)];
+	if (userId !== undefined) {
+		conditions.push(eq(docTable.userId, userId));
+	}
+	if (workspaceId !== undefined) {
+		conditions.push(eq(docTable.workspaceId, workspaceId));
+	}
+
 	const rows = await db
 		.select()
 		.from(docTable)
-		.where(eq(docTable.id, id))
+		.where(and(...conditions))
 		.orderBy(desc(docTable.versionNumber))
 		.limit(1);
 
@@ -72,16 +85,26 @@ export async function getDocumentById(id: string): Promise<DocumentRecord | null
 }
 
 /**
- * Get a specific version of a document.
+ * Get a specific version of a document, filtered by user and workspace.
  */
 export async function getDocumentVersion(
 	id: string,
 	versionNumber: number,
+	userId?: number,
+	workspaceId?: number,
 ): Promise<DocumentRecord | null> {
+	const conditions = [eq(docTable.id, id), eq(docTable.versionNumber, versionNumber)];
+	if (userId !== undefined) {
+		conditions.push(eq(docTable.userId, userId));
+	}
+	if (workspaceId !== undefined) {
+		conditions.push(eq(docTable.workspaceId, workspaceId));
+	}
+
 	const rows = await db
 		.select()
 		.from(docTable)
-		.where(and(eq(docTable.id, id), eq(docTable.versionNumber, versionNumber)))
+		.where(and(...conditions))
 		.limit(1);
 
 	return rows[0] ? toDTO(rows[0]) : null;
@@ -89,12 +112,15 @@ export async function getDocumentVersion(
 
 /**
  * Create a new version of a document (update).
+ * Verifies ownership before allowing update.
  */
 export async function updateDocument(
 	id: string,
 	params: { title: string; content: string; kind: DocumentKind },
+	userId?: number,
+	workspaceId?: number,
 ): Promise<DocumentRecord | null> {
-	const latest = await getDocumentById(id);
+	const latest = await getDocumentById(id, userId, workspaceId);
 	if (!latest) {
 		return null;
 	}
@@ -120,13 +146,17 @@ export async function updateDocument(
 }
 
 /**
- * List all documents (latest version of each).
+ * List documents for a specific user and workspace (latest version of each).
  */
-export async function listDocuments(): Promise<DocumentRecord[]> {
-	// Get distinct document IDs with their max version
+export async function listDocumentsByUserAndWorkspace(
+	userId: number,
+	workspaceId: number,
+): Promise<DocumentRecord[]> {
+	// Get documents filtered by user and workspace
 	const rows = await db
 		.select()
 		.from(docTable)
+		.where(and(eq(docTable.userId, userId), eq(docTable.workspaceId, workspaceId)))
 		.orderBy(desc(docTable.createdAt), desc(docTable.versionNumber));
 
 	// Deduplicate by ID (keep first occurrence which is latest version)
@@ -142,13 +172,25 @@ export async function listDocuments(): Promise<DocumentRecord[]> {
 }
 
 /**
- * List all versions of a document.
+ * List all versions of a document, filtered by user and workspace.
  */
-export async function listVersions(id: string): Promise<DocumentRecord[]> {
+export async function listVersions(
+	id: string,
+	userId?: number,
+	workspaceId?: number,
+): Promise<DocumentRecord[]> {
+	const conditions = [eq(docTable.id, id)];
+	if (userId !== undefined) {
+		conditions.push(eq(docTable.userId, userId));
+	}
+	if (workspaceId !== undefined) {
+		conditions.push(eq(docTable.workspaceId, workspaceId));
+	}
+
 	const rows = await db
 		.select()
 		.from(docTable)
-		.where(eq(docTable.id, id))
+		.where(and(...conditions))
 		.orderBy(asc(docTable.versionNumber));
 
 	return rows.map(toDTO);
@@ -156,18 +198,43 @@ export async function listVersions(id: string): Promise<DocumentRecord[]> {
 
 /**
  * Delete a document and all its versions.
+ * Only deletes if the document belongs to the specified user/workspace.
  */
-export async function deleteDocument(id: string): Promise<boolean> {
-	const result = await db.delete(docTable).where(eq(docTable.id, id));
+export async function deleteDocument(
+	id: string,
+	userId?: number,
+	workspaceId?: number,
+): Promise<boolean> {
+	const conditions = [eq(docTable.id, id)];
+	if (userId !== undefined) {
+		conditions.push(eq(docTable.userId, userId));
+	}
+	if (workspaceId !== undefined) {
+		conditions.push(eq(docTable.workspaceId, workspaceId));
+	}
+
+	const result = await db.delete(docTable).where(and(...conditions));
 	return (result.rowCount ?? 0) > 0;
 }
 
 /**
  * Delete all versions after a specific version number.
+ * Only affects documents belonging to the specified user/workspace.
  */
-export async function deleteVersionsAfter(id: string, versionNumber: number): Promise<number> {
-	const result = await db
-		.delete(docTable)
-		.where(and(eq(docTable.id, id), gt(docTable.versionNumber, versionNumber)));
+export async function deleteVersionsAfter(
+	id: string,
+	versionNumber: number,
+	userId?: number,
+	workspaceId?: number,
+): Promise<number> {
+	const conditions = [eq(docTable.id, id), gt(docTable.versionNumber, versionNumber)];
+	if (userId !== undefined) {
+		conditions.push(eq(docTable.userId, userId));
+	}
+	if (workspaceId !== undefined) {
+		conditions.push(eq(docTable.workspaceId, workspaceId));
+	}
+
+	const result = await db.delete(docTable).where(and(...conditions));
 	return result.rowCount ?? 0;
 }

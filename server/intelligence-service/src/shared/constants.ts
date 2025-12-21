@@ -1,17 +1,3 @@
-import * as HttpStatusPhrases from "stoker/http-status-phrases";
-import { createMessageObjectSchema } from "stoker/openapi/schemas";
-
-export const ZOD_ERROR_MESSAGES = {
-	REQUIRED: "Required",
-	EXPECTED_NUMBER: "Invalid input: expected number, received NaN",
-	NO_UPDATES: "No updates provided",
-	EXPECTED_STRING: "Invalid input: expected string, received undefined",
-};
-
-export const ZOD_ERROR_CODES = {
-	INVALID_UPDATES: "invalid_updates",
-};
-
 /**
  * HTTP error response messages for consistent error handling.
  * Use these constants instead of magic strings in handlers.
@@ -45,5 +31,3 @@ export const HTTP_STATUS = {
 	INTERNAL_SERVER_ERROR: 500,
 	SERVICE_UNAVAILABLE: 503,
 } as const;
-
-export const notFoundSchema = createMessageObjectSchema(HttpStatusPhrases.NOT_FOUND);

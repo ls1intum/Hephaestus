@@ -20,6 +20,7 @@ export const voteMessageRoute = createRoute({
 	},
 	responses: {
 		[HttpStatusCodes.OK]: jsonContent(ChatMessageVoteSchema, "Vote recorded"),
+		[HttpStatusCodes.BAD_REQUEST]: jsonContent(z.object({ error: z.string() }), "Missing context"),
 		[HttpStatusCodes.NOT_FOUND]: jsonContent(z.object({ error: z.string() }), "Message not found"),
 		[HttpStatusCodes.INTERNAL_SERVER_ERROR]: jsonContent(
 			z.object({ error: z.string() }),

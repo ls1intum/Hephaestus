@@ -13,6 +13,7 @@ export const getGroupedThreadsRoute = createRoute({
 	request: {},
 	responses: {
 		[HttpStatusCodes.OK]: jsonContent(z.array(ChatThreadGroupSchema), "Grouped chat threads"),
+		[HttpStatusCodes.BAD_REQUEST]: jsonContent(z.object({ error: z.string() }), "Missing context"),
 		[HttpStatusCodes.INTERNAL_SERVER_ERROR]: jsonContent(
 			z.object({ error: z.string() }),
 			"Internal error",

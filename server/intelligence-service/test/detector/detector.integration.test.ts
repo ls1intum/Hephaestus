@@ -140,11 +140,11 @@ describe("Detector API Integration", () => {
 				bad_practice_summary: mockResult.bad_practice_summary,
 				bad_practices: mockResult.bad_practices,
 			});
-			expect(data.correlation_id).toBeDefined();
-			expect(typeof data.correlation_id).toBe("string");
+			expect(data.trace_id).toBeDefined();
+			expect(typeof data.trace_id).toBe("string");
 		});
 
-		it("should include correlation_id in response for Langfuse linking", async () => {
+		it("should include trace_id in response for Langfuse linking", async () => {
 			const mockResult = createGoodPRResponse();
 			mockGenerateObject.mockResolvedValueOnce({ object: mockResult });
 
@@ -157,8 +157,8 @@ describe("Detector API Integration", () => {
 			expect(response.status).toBe(200);
 
 			const data = (await response.json()) as DetectorResponse;
-			// correlation_id format: "detector:<repo>#<pr>"
-			expect(data.correlation_id).toBe("detector:MyRepo#42");
+			// trace_id format: "detector:<repo>#<pr>"
+			expect(data.trace_id).toBe("detector:MyRepo#42");
 		});
 
 		it("should return empty bad_practices array for clean PR", async () => {
@@ -512,7 +512,7 @@ describe("Detector API Integration", () => {
 			expect(response.status).toBe(200);
 
 			const data = (await response.json()) as DetectorResponse;
-			expect(data.correlation_id).toBe("detector:my-org/my-repo.js#534");
+			expect(data.trace_id).toBe("detector:my-org/my-repo.js#534");
 		});
 
 		it("should handle newlines and markdown in description", async () => {

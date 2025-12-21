@@ -6,9 +6,9 @@ import de.tum.in.www1.hephaestus.intelligenceservice.BaseApi;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.ChatMessageVote;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.ChatThreadGroup;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.CreateDocumentRequest;
+import de.tum.in.www1.hephaestus.intelligenceservice.model.DetectBadPractices500Response;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.Document;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.DocumentSummary;
-import de.tum.in.www1.hephaestus.intelligenceservice.model.GetGroupedThreads500Response;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.MentorChatRequest;
 import java.time.OffsetDateTime;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.StreamPart;
@@ -52,7 +52,7 @@ public class ExportedApi extends BaseApi {
      * Create a new document
      * 
      * <p><b>201</b> - Created document
-     * <p><b>400</b> - Missing workspace context
+     * <p><b>400</b> - Missing required context
      * <p><b>500</b> - Internal error
      * @param createDocumentRequest Create document (required)
      * @return Document
@@ -66,7 +66,7 @@ public class ExportedApi extends BaseApi {
      * Create a new document
      * 
      * <p><b>201</b> - Created document
-     * <p><b>400</b> - Missing workspace context
+     * <p><b>400</b> - Missing required context
      * <p><b>500</b> - Internal error
      * @param createDocumentRequest Create document (required)
      * @return ResponseEntity&lt;Document&gt;
@@ -104,6 +104,7 @@ public class ExportedApi extends BaseApi {
      * Delete a document and all versions
      * 
      * <p><b>204</b> - Deleted
+     * <p><b>400</b> - Missing context
      * <p><b>404</b> - Not found
      * <p><b>500</b> - Internal error
      * @param id  (required)
@@ -117,6 +118,7 @@ public class ExportedApi extends BaseApi {
      * Delete a document and all versions
      * 
      * <p><b>204</b> - Deleted
+     * <p><b>400</b> - Missing context
      * <p><b>404</b> - Not found
      * <p><b>500</b> - Internal error
      * @param id  (required)
@@ -156,6 +158,7 @@ public class ExportedApi extends BaseApi {
      * Delete versions after timestamp
      * 
      * <p><b>200</b> - Deleted versions
+     * <p><b>400</b> - Missing context
      * <p><b>404</b> - Not found
      * <p><b>500</b> - Internal error
      * @param id  (required)
@@ -171,6 +174,7 @@ public class ExportedApi extends BaseApi {
      * Delete versions after timestamp
      * 
      * <p><b>200</b> - Deleted versions
+     * <p><b>400</b> - Missing context
      * <p><b>404</b> - Not found
      * <p><b>500</b> - Internal error
      * @param id  (required)
@@ -219,6 +223,7 @@ public class ExportedApi extends BaseApi {
      * Get latest version of a document
      * 
      * <p><b>200</b> - Document
+     * <p><b>400</b> - Missing context
      * <p><b>404</b> - Not found
      * <p><b>500</b> - Internal error
      * @param id  (required)
@@ -233,6 +238,7 @@ public class ExportedApi extends BaseApi {
      * Get latest version of a document
      * 
      * <p><b>200</b> - Document
+     * <p><b>400</b> - Missing context
      * <p><b>404</b> - Not found
      * <p><b>500</b> - Internal error
      * @param id  (required)
@@ -272,6 +278,7 @@ public class ExportedApi extends BaseApi {
      * List chat threads grouped by time buckets
      * 
      * <p><b>200</b> - Grouped chat threads
+     * <p><b>400</b> - Missing context
      * <p><b>500</b> - Internal error
      * @return List&lt;ChatThreadGroup&gt;
      * @throws RestClientException if an error occurs while attempting to invoke the API
@@ -284,6 +291,7 @@ public class ExportedApi extends BaseApi {
      * List chat threads grouped by time buckets
      * 
      * <p><b>200</b> - Grouped chat threads
+     * <p><b>400</b> - Missing context
      * <p><b>500</b> - Internal error
      * @return ResponseEntity&lt;List&lt;ChatThreadGroup&gt;&gt;
      * @throws RestClientException if an error occurs while attempting to invoke the API
@@ -313,6 +321,7 @@ public class ExportedApi extends BaseApi {
      * Get mentor chat thread detail
      * 
      * <p><b>200</b> - Thread detail with messages
+     * <p><b>400</b> - Missing required context
      * <p><b>404</b> - Thread not found
      * <p><b>500</b> - Internal error
      * <p><b>503</b> - Service temporarily unavailable
@@ -328,6 +337,7 @@ public class ExportedApi extends BaseApi {
      * Get mentor chat thread detail
      * 
      * <p><b>200</b> - Thread detail with messages
+     * <p><b>400</b> - Missing required context
      * <p><b>404</b> - Thread not found
      * <p><b>500</b> - Internal error
      * <p><b>503</b> - Service temporarily unavailable
@@ -368,6 +378,7 @@ public class ExportedApi extends BaseApi {
      * Get specific version
      * 
      * <p><b>200</b> - Document
+     * <p><b>400</b> - Missing context
      * <p><b>404</b> - Not found
      * <p><b>500</b> - Internal error
      * @param id  (required)
@@ -383,6 +394,7 @@ public class ExportedApi extends BaseApi {
      * Get specific version
      * 
      * <p><b>200</b> - Document
+     * <p><b>400</b> - Missing context
      * <p><b>404</b> - Not found
      * <p><b>500</b> - Internal error
      * @param id  (required)
@@ -426,9 +438,10 @@ public class ExportedApi extends BaseApi {
         return apiClient.invokeAPI("/mentor/documents/{id}/versions/{versionNumber}", HttpMethod.GET, uriVariables, localVarQueryParams, localVarPostBody, localVarHeaderParams, localVarCookieParams, localVarFormParams, localVarAccept, localVarContentType, localVarAuthNames, localReturnType);
     }
     /**
-     * List latest version of documents (no auth; all users)
+     * List documents owned by the authenticated user
      * 
      * <p><b>200</b> - Document summaries
+     * <p><b>400</b> - Missing context
      * <p><b>500</b> - Internal error
      * @param page  (optional, default to 0)
      * @param size  (optional, default to 20)
@@ -440,9 +453,10 @@ public class ExportedApi extends BaseApi {
     }
 
     /**
-     * List latest version of documents (no auth; all users)
+     * List documents owned by the authenticated user
      * 
      * <p><b>200</b> - Document summaries
+     * <p><b>400</b> - Missing context
      * <p><b>500</b> - Internal error
      * @param page  (optional, default to 0)
      * @param size  (optional, default to 20)
@@ -478,6 +492,7 @@ public class ExportedApi extends BaseApi {
      * List versions of a document
      * 
      * <p><b>200</b> - Document versions
+     * <p><b>400</b> - Missing context
      * <p><b>404</b> - Not found
      * <p><b>500</b> - Internal error
      * @param id  (required)
@@ -494,6 +509,7 @@ public class ExportedApi extends BaseApi {
      * List versions of a document
      * 
      * <p><b>200</b> - Document versions
+     * <p><b>400</b> - Missing context
      * <p><b>404</b> - Not found
      * <p><b>500</b> - Internal error
      * @param id  (required)
@@ -587,6 +603,7 @@ public class ExportedApi extends BaseApi {
      * Update a document (creates new version)
      * 
      * <p><b>200</b> - Updated document
+     * <p><b>400</b> - Missing context
      * <p><b>404</b> - Not found
      * <p><b>500</b> - Internal error
      * @param id  (required)
@@ -602,6 +619,7 @@ public class ExportedApi extends BaseApi {
      * Update a document (creates new version)
      * 
      * <p><b>200</b> - Updated document
+     * <p><b>400</b> - Missing context
      * <p><b>404</b> - Not found
      * <p><b>500</b> - Internal error
      * @param id  (required)
@@ -649,6 +667,7 @@ public class ExportedApi extends BaseApi {
      * Vote on a chat message (upvote/downvote)
      * 
      * <p><b>200</b> - Vote recorded
+     * <p><b>400</b> - Missing context
      * <p><b>404</b> - Message not found
      * <p><b>500</b> - Internal error
      * @param messageId  (required)
@@ -664,6 +683,7 @@ public class ExportedApi extends BaseApi {
      * Vote on a chat message (upvote/downvote)
      * 
      * <p><b>200</b> - Vote recorded
+     * <p><b>400</b> - Missing context
      * <p><b>404</b> - Message not found
      * <p><b>500</b> - Internal error
      * @param messageId  (required)

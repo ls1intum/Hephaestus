@@ -4,7 +4,7 @@ import de.tum.in.www1.hephaestus.intelligenceservice.ApiClient;
 import de.tum.in.www1.hephaestus.intelligenceservice.BaseApi;
 
 import de.tum.in.www1.hephaestus.intelligenceservice.model.ChatMessageVote;
-import de.tum.in.www1.hephaestus.intelligenceservice.model.GetGroupedThreads500Response;
+import de.tum.in.www1.hephaestus.intelligenceservice.model.DetectBadPractices500Response;
 import java.util.UUID;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.VoteMessageRequest;
 
@@ -44,6 +44,7 @@ public class VoteApi extends BaseApi {
      * Vote on a chat message (upvote/downvote)
      * 
      * <p><b>200</b> - Vote recorded
+     * <p><b>400</b> - Missing context
      * <p><b>404</b> - Message not found
      * <p><b>500</b> - Internal error
      * @param messageId  (required)
@@ -59,6 +60,7 @@ public class VoteApi extends BaseApi {
      * Vote on a chat message (upvote/downvote)
      * 
      * <p><b>200</b> - Vote recorded
+     * <p><b>400</b> - Missing context
      * <p><b>404</b> - Message not found
      * <p><b>500</b> - Internal error
      * @param messageId  (required)

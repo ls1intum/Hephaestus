@@ -47,10 +47,11 @@ describe("Error Handling Integration", () => {
 	});
 
 	// ─────────────────────────────────────────────────────────────────────────────
-	// 2. Missing x-user-id header (threads are workspace-scoped, not user-scoped)
+	// ─────────────────────────────────────────────────────────────────────────────
+	// 2. Missing x-user-id header (threads are user-scoped for security)
 	// ─────────────────────────────────────────────────────────────────────────────
 
-	it("should still work without x-user-id header for thread retrieval", async () => {
+	it("should return 400 without x-user-id header for thread retrieval", async () => {
 		const threadId = testUuid();
 
 		const request = new Request(`http://localhost/mentor/threads/${threadId}`, {
@@ -63,8 +64,8 @@ describe("Error Handling Integration", () => {
 
 		const response = await app.fetch(request);
 
-		// Returns 404 because thread doesn't exist, not auth error
-		expect(response.status).toBe(404);
+		// Returns 400 because userId is required for authorization
+		expect(response.status).toBe(400);
 	});
 
 	// ─────────────────────────────────────────────────────────────────────────────

@@ -43,6 +43,10 @@ export const getThreadRoute = createRoute({
 	},
 	responses: {
 		[HttpStatusCodes.OK]: jsonContent(threadDetailSchema, "Thread detail with messages"),
+		[HttpStatusCodes.BAD_REQUEST]: jsonContent(
+			z.object({ error: z.string() }),
+			"Missing required context",
+		),
 		[HttpStatusCodes.NOT_FOUND]: jsonContent(z.object({ error: z.string() }), "Thread not found"),
 		[HttpStatusCodes.INTERNAL_SERVER_ERROR]: jsonContent(
 			z.object({ error: z.string() }),

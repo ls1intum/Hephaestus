@@ -9,11 +9,12 @@ import { eq } from "drizzle-orm";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import {
 	createDocument,
+	type DocumentRecord,
 	deleteDocument,
 	deleteVersionsAfter,
 	getDocumentById,
 	getDocumentVersion,
-	listDocuments,
+	listDocumentsByUserAndWorkspace,
 	listVersions,
 	updateDocument,
 } from "@/mentor/documents/data";
@@ -269,11 +270,11 @@ describe("Documents Data Layer", () => {
 	});
 
 	// ─────────────────────────────────────────────────────────────────────────
-	// listDocuments Tests
+	// listDocumentsByUserAndWorkspace Tests
 	// ─────────────────────────────────────────────────────────────────────────
 
-	describe("listDocuments", () => {
-		it("should return all documents", async () => {
+	describe("listDocumentsByUserAndWorkspace", () => {
+		it("should return documents for user and workspace", async () => {
 			const doc1 = await createDocument({
 				title: "Doc 1",
 				content: "",
@@ -292,8 +293,8 @@ describe("Documents Data Layer", () => {
 			const created2 = assertDefined(doc2);
 			createdDocIds.push(created1.id, created2.id);
 
-			const docs = await listDocuments();
-			const ourDocs = docs.filter((d) => createdDocIds.includes(d.id));
+			const docs = await listDocumentsByUserAndWorkspace(fixtures.user.id, fixtures.workspace.id);
+			const ourDocs = docs.filter((d: DocumentRecord) => createdDocIds.includes(d.id));
 
 			expect(ourDocs.length).toBe(2);
 		});
@@ -312,8 +313,8 @@ describe("Documents Data Layer", () => {
 			await updateDocument(created.id, { title: "v2", content: "", kind: "text" });
 			await updateDocument(created.id, { title: "v3", content: "", kind: "text" });
 
-			const docs = await listDocuments();
-			const ourDoc = docs.find((d) => d.id === created.id);
+			const docs = await listDocumentsByUserAndWorkspace(fixtures.user.id, fixtures.workspace.id);
+			const ourDoc = docs.find((d: DocumentRecord) => d.id === created.id);
 
 			expect(ourDoc?.versionNumber).toBe(3);
 			expect(ourDoc?.title).toBe("v3");

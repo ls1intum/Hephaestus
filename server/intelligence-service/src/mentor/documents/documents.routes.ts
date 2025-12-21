@@ -26,7 +26,7 @@ export const createDocumentRoute = createRoute({
 		[HttpStatusCodes.CREATED]: jsonContent(DocumentSchema, "Created document"),
 		[HttpStatusCodes.BAD_REQUEST]: jsonContent(
 			z.object({ error: z.string() }),
-			"Missing workspace context",
+			"Missing required context",
 		),
 		[HttpStatusCodes.INTERNAL_SERVER_ERROR]: jsonContent(
 			z.object({ error: z.string() }),
@@ -44,6 +44,7 @@ export const getDocumentRoute = createRoute({
 	request: { params: DocumentIdParamsSchema },
 	responses: {
 		[HttpStatusCodes.OK]: jsonContent(DocumentSchema, "Document"),
+		[HttpStatusCodes.BAD_REQUEST]: jsonContent(z.object({ error: z.string() }), "Missing context"),
 		[HttpStatusCodes.NOT_FOUND]: jsonContent(z.object({ error: z.string() }), "Not found"),
 		[HttpStatusCodes.INTERNAL_SERVER_ERROR]: jsonContent(
 			z.object({ error: z.string() }),
@@ -64,6 +65,7 @@ export const updateDocumentRoute = createRoute({
 	},
 	responses: {
 		[HttpStatusCodes.OK]: jsonContent(DocumentSchema, "Updated document"),
+		[HttpStatusCodes.BAD_REQUEST]: jsonContent(z.object({ error: z.string() }), "Missing context"),
 		[HttpStatusCodes.NOT_FOUND]: jsonContent(z.object({ error: z.string() }), "Not found"),
 		[HttpStatusCodes.INTERNAL_SERVER_ERROR]: jsonContent(
 			z.object({ error: z.string() }),
@@ -81,6 +83,7 @@ export const deleteDocumentRoute = createRoute({
 	request: { params: DocumentIdParamsSchema },
 	responses: {
 		[HttpStatusCodes.NO_CONTENT]: { description: "Deleted" },
+		[HttpStatusCodes.BAD_REQUEST]: jsonContent(z.object({ error: z.string() }), "Missing context"),
 		[HttpStatusCodes.NOT_FOUND]: jsonContent(z.object({ error: z.string() }), "Not found"),
 		[HttpStatusCodes.INTERNAL_SERVER_ERROR]: jsonContent(
 			z.object({ error: z.string() }),
@@ -93,11 +96,12 @@ export const listDocumentsRoute = createRoute({
 	path: "/",
 	method: "get",
 	tags: ["documents", ...EXPORTED_TAG],
-	summary: "List latest version of documents (no auth; all users)",
+	summary: "List documents owned by the authenticated user",
 	operationId: "listDocuments",
 	request: { query: PaginationQuerySchema },
 	responses: {
 		[HttpStatusCodes.OK]: jsonContent(z.array(DocumentSummarySchema), "Document summaries"),
+		[HttpStatusCodes.BAD_REQUEST]: jsonContent(z.object({ error: z.string() }), "Missing context"),
 		[HttpStatusCodes.INTERNAL_SERVER_ERROR]: jsonContent(
 			z.object({ error: z.string() }),
 			"Internal error",
@@ -114,6 +118,7 @@ export const listVersionsRoute = createRoute({
 	request: { params: DocumentIdParamsSchema, query: PaginationQuerySchema },
 	responses: {
 		[HttpStatusCodes.OK]: jsonContent(z.array(DocumentSchema), "Document versions"),
+		[HttpStatusCodes.BAD_REQUEST]: jsonContent(z.object({ error: z.string() }), "Missing context"),
 		[HttpStatusCodes.NOT_FOUND]: jsonContent(z.object({ error: z.string() }), "Not found"),
 		[HttpStatusCodes.INTERNAL_SERVER_ERROR]: jsonContent(
 			z.object({ error: z.string() }),
@@ -131,6 +136,7 @@ export const getVersionRoute = createRoute({
 	request: { params: VersionParamsSchema },
 	responses: {
 		[HttpStatusCodes.OK]: jsonContent(DocumentSchema, "Document"),
+		[HttpStatusCodes.BAD_REQUEST]: jsonContent(z.object({ error: z.string() }), "Missing context"),
 		[HttpStatusCodes.NOT_FOUND]: jsonContent(z.object({ error: z.string() }), "Not found"),
 		[HttpStatusCodes.INTERNAL_SERVER_ERROR]: jsonContent(
 			z.object({ error: z.string() }),
@@ -148,6 +154,7 @@ export const deleteAfterRoute = createRoute({
 	request: { params: DocumentIdParamsSchema, query: DeleteAfterQuerySchema },
 	responses: {
 		[HttpStatusCodes.OK]: jsonContent(z.array(DocumentSchema), "Deleted versions"),
+		[HttpStatusCodes.BAD_REQUEST]: jsonContent(z.object({ error: z.string() }), "Missing context"),
 		[HttpStatusCodes.NOT_FOUND]: jsonContent(z.object({ error: z.string() }), "Not found"),
 		[HttpStatusCodes.INTERNAL_SERVER_ERROR]: jsonContent(
 			z.object({ error: z.string() }),

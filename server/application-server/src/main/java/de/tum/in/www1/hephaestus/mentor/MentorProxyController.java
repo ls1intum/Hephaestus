@@ -63,8 +63,8 @@ public class MentorProxyController {
     public static final String USER_ID_HEADER = "X-User-Id";
     /** Header used to pass user login to the intelligence service. */
     public static final String USER_LOGIN_HEADER = "X-User-Login";
-    /** Header used to pass user's display name to the intelligence service. */
-    public static final String USER_NAME_HEADER = "X-User-Name";
+    /** Header used to pass user's first name to the intelligence service. */
+    public static final String USER_FIRST_NAME_HEADER = "X-User-First-Name";
 
     private static final Set<String> HOP_BY_HOP_HEADERS = Set.of(
         HttpHeaders.CONNECTION,
@@ -289,11 +289,9 @@ public class MentorProxyController {
             if (currentUser.getLogin() != null) {
                 outHeaders.set(USER_LOGIN_HEADER, currentUser.getLogin());
             }
-            if (currentUser.getName() != null && !currentUser.getName().equals(currentUser.getLogin())) {
-                // Only set name header if it's different from login (i.e., we have a real name)
-                outHeaders.set(USER_NAME_HEADER, currentUser.getName());
-            }
         }
+        // Get first name from JWT's given_name claim (Keycloak standard OIDC claim)
+        SecurityUtils.getGivenName(jwt).ifPresent(name -> outHeaders.set(USER_FIRST_NAME_HEADER, name));
         return outHeaders;
     }
 
