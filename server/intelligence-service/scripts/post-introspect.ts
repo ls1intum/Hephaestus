@@ -144,6 +144,20 @@ try {
 		relationsContent = relationsHeader + relationsContent;
 	}
 
+	// Sort imports from ./schema alphabetically for consistent output across platforms
+	// Drizzle-kit generates imports in different order on macOS vs Linux
+	const schemaImportRegex = /import\s*\{\s*([\s\S]*?)\s*\}\s*from\s*["']\.\/schema["'];?/;
+	const schemaImportMatch = relationsContent.match(schemaImportRegex);
+	if (schemaImportMatch?.[1]) {
+		const importedNames = schemaImportMatch[1]
+			.split(",")
+			.map((s) => s.trim())
+			.filter(Boolean)
+			.sort((a, b) => a.localeCompare(b));
+		const sortedImport = `import {\n\t${importedNames.join(",\n\t")},\n} from "./schema";`;
+		relationsContent = relationsContent.replace(schemaImportRegex, sortedImport);
+	}
+
 	// Normalize destructuring patterns in relations functions for consistent formatting
 	// Drizzle-kit generates different spacing on different platforms:
 	// macOS: ({ one, many }) vs Linux: ({one, many})
