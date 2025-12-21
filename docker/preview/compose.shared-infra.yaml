@@ -82,7 +82,7 @@ services:
   # Keycloak PostgreSQL - Database for Keycloak (internal only)
   # ---------------------------------------------------------------------------
   keycloak-db:
-    image: postgres:16-alpine
+    image: postgres:16-alpine@sha256:6a388fba16e2a94d6d92bc3c435cdc2e20145add88547615b3d8fa545d703afe
     restart: unless-stopped
     environment:
       POSTGRES_DB: keycloak
@@ -156,7 +156,7 @@ services:
   # Postfix - Email relay (internal only)
   # ---------------------------------------------------------------------------
   postfix:
-    image: ghcr.io/ls1admin/postfix:latest
+    image: ghcr.io/ls1admin/postfix:latest@sha256:c7d7f2dab71992b7a137e787573258a51ea7936f4b4a1786d0de0254acdde302
     restart: unless-stopped
     hostname: ${PREVIEW_DOMAIN:?Required}
     logging:

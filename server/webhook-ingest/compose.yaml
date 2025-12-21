@@ -25,7 +25,7 @@ services:
         max-file: "3"
 
   nats-server:
-    image: nats:alpine
+    image: nats:alpine@sha256:88fe8e0e09d6084a06b3d4dbbffbca70fa632b1ad981af8473da23c446630957
     ports:
       - "4222:4222"
       - "8222:8222"

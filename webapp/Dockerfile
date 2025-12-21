@@ -1,5 +1,5 @@
 # Stage 1: Build the React application
-FROM node:22-alpine AS build
+FROM node:22-alpine@sha256:0340fa682d72068edf603c305bfbc10e23219fb0e40df58d9ea4d6f33a9798bf AS build
 
 WORKDIR /app
 
@@ -16,7 +16,7 @@ COPY ./ /app/
 RUN npm run build:prod
 
 # Stage 2: Serve the app with Nginx
-FROM nginx:stable-alpine
+FROM nginx:stable-alpine@sha256:30f1c0d78e0ad60901648be663a710bdadf19e4c10ac6782c235200619158284
 
 # Install necessary packages and explicitly update libxml2 for security fixes
 RUN apk update && \
