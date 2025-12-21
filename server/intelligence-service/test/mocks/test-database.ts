@@ -60,7 +60,9 @@ export interface TestFixtures {
  * Uses raw SQL to bypass foreign key setup complexity.
  */
 export async function createTestFixtures(): Promise<TestFixtures> {
-	const id = Date.now() + Math.floor(Math.random() * 1000);
+	// Use crypto.getRandomValues for better randomness (not security-critical, but good practice)
+	const randomValue = crypto.getRandomValues(new Uint32Array(1))[0] ?? 0;
+	const id = Date.now() + (randomValue % 1000);
 	const workspaceId = id;
 	const userId = id + 1;
 

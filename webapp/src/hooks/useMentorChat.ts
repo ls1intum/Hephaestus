@@ -185,7 +185,7 @@ export function useMentorChat({
 
 	// Create stable transport configuration
 	const mentorChatApi = `${environment.serverUrl}/workspaces/${slug}/mentor/chat`;
-	const stableTransport = new DefaultChatTransport({
+	const stableTransport = new DefaultChatTransport<ChatMessage>({
 		api: mentorChatApi,
 		// Always attach a fresh token per request
 		prepareSendMessagesRequest: ({ id, messages }) => {

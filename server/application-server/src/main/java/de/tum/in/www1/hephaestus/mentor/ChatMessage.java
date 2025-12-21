@@ -2,7 +2,6 @@ package de.tum.in.www1.hephaestus.mentor;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.hypersistence.utils.hibernate.type.json.JsonType;
 import io.micrometer.common.lang.Nullable;
 import jakarta.persistence.*;
@@ -36,8 +35,6 @@ import org.springframework.lang.NonNull;
 @ToString
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
 public class ChatMessage {
-
-    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     @Id
     @EqualsAndHashCode.Include

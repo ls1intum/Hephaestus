@@ -79,7 +79,7 @@ jobs:
           # Always install to avoid half-restored caches
           npm ci --prefer-offline --no-audit
 
-          if ! npm run format:java; then
+          if ! npm run format:java:check; then
             echo "❌ application-server formatting failed. Run: npm run format:java"
             exit 1
           fi

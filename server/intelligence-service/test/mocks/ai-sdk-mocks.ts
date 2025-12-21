@@ -7,7 +7,11 @@
  * @see https://ai-sdk.dev/docs/ai-sdk-core/testing
  */
 
-import type { LanguageModelV3StreamPart, LanguageModelV3Usage } from "@ai-sdk/provider";
+import type {
+	LanguageModelV3FinishReason,
+	LanguageModelV3StreamPart,
+	LanguageModelV3Usage,
+} from "@ai-sdk/provider";
 import { convertArrayToReadableStream, MockLanguageModelV3 } from "ai/test";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -30,6 +34,15 @@ export const TEST_USAGE: LanguageModelV3Usage = {
 	outputTokens: { total: 5, text: 5, reasoning: undefined },
 };
 
+/**
+ * Create a finish reason object (new format in AI SDK v3.0.0-beta.166+).
+ */
+function finishReason(
+	unified: LanguageModelV3FinishReason["unified"],
+): LanguageModelV3FinishReason {
+	return { unified, raw: undefined };
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Stream Part Builders
 // ─────────────────────────────────────────────────────────────────────────────
@@ -45,7 +58,7 @@ export function createTextStreamParts(text: string): LanguageModelV3StreamPart[]
 		{ type: "text-start", id: "text-0" },
 		{ type: "text-delta", id: "text-0", delta: text },
 		{ type: "text-end", id: "text-0" },
-		{ type: "finish", finishReason: "stop", usage: TEST_USAGE },
+		{ type: "finish", finishReason: finishReason("stop"), usage: TEST_USAGE },
 	];
 }
 
@@ -59,7 +72,7 @@ export function createChunkedStreamParts(chunks: string[]): LanguageModelV3Strea
 		{ type: "text-start", id: "text-0" },
 		...chunks.map((delta) => ({ type: "text-delta" as const, id: "text-0", delta })),
 		{ type: "text-end", id: "text-0" },
-		{ type: "finish", finishReason: "stop", usage: TEST_USAGE },
+		{ type: "finish", finishReason: finishReason("stop"), usage: TEST_USAGE },
 	];
 }
 
@@ -83,7 +96,7 @@ export function createToolCallStreamParts(
 			toolName: call.name,
 			input: JSON.stringify(call.args),
 		})),
-		{ type: "finish", finishReason: "tool-calls" as const, usage: TEST_USAGE },
+		{ type: "finish", finishReason: finishReason("tool-calls"), usage: TEST_USAGE },
 	];
 }
 
@@ -111,7 +124,7 @@ export function createMixedStreamParts(
 			toolName: toolCall.name,
 			input: JSON.stringify(toolCall.args),
 		},
-		{ type: "finish", finishReason: "tool-calls" as const, usage: TEST_USAGE },
+		{ type: "finish", finishReason: finishReason("tool-calls"), usage: TEST_USAGE },
 	];
 }
 
@@ -120,7 +133,7 @@ export function createMixedStreamParts(
  */
 export function createFinishReasonStreamParts(
 	text: string,
-	finishReason: "stop" | "length" | "content-filter" | "tool-calls" | "error" | "other" | "unknown",
+	finishReasonType: LanguageModelV3FinishReason["unified"],
 ): LanguageModelV3StreamPart[] {
 	return [
 		{ type: "stream-start", warnings: [] },
@@ -128,7 +141,7 @@ export function createFinishReasonStreamParts(
 		{ type: "text-start", id: "text-0" },
 		{ type: "text-delta", id: "text-0", delta: text },
 		{ type: "text-end", id: "text-0" },
-		{ type: "finish", finishReason, usage: TEST_USAGE },
+		{ type: "finish", finishReason: finishReason(finishReasonType), usage: TEST_USAGE },
 	];
 }
 
@@ -145,7 +158,7 @@ export function createMetadataStreamParts(
 		{ type: "text-start", id: "text-0" },
 		{ type: "text-delta", id: "text-0", delta: text },
 		{ type: "text-end", id: "text-0" },
-		{ type: "finish", finishReason: "stop", usage: TEST_USAGE },
+		{ type: "finish", finishReason: finishReason("stop"), usage: TEST_USAGE },
 	];
 }
 
