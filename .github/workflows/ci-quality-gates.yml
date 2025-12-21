@@ -202,7 +202,8 @@ jobs:
         run: |
           echo "🔍 Running intelligence-service quality checks..."
           # Clean install to ensure platform-specific binaries (like biome) are properly installed
-          rm -rf node_modules server/intelligence-service/node_modules
+          # Clear npm cache and node_modules to avoid cross-platform binary issues
+          rm -rf node_modules server/intelligence-service/node_modules ~/.npm
           npm ci --no-audit --progress=false
 
           ISSUES_FOUND=()
