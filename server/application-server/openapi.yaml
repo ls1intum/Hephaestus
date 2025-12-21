@@ -712,23 +712,13 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                required:
-                - error
+                $ref: "#/components/schemas/ErrorResponse"
           description: Missing context
         "500":
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                required:
-                - error
+                $ref: "#/components/schemas/ErrorResponse"
           description: Internal error
       summary: List documents owned by the authenticated user
       tags:
@@ -764,23 +754,13 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                required:
-                - error
+                $ref: "#/components/schemas/ErrorResponse"
           description: Missing required context
         "500":
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                required:
-                - error
+                $ref: "#/components/schemas/ErrorResponse"
           description: Internal error
       summary: Create a new document
       tags:
@@ -814,34 +794,19 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                required:
-                - error
+                $ref: "#/components/schemas/ErrorResponse"
           description: Missing context
         "404":
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                required:
-                - error
+                $ref: "#/components/schemas/ErrorResponse"
           description: Not found
         "500":
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                required:
-                - error
+                $ref: "#/components/schemas/ErrorResponse"
           description: Internal error
       summary: Delete a document and all versions
       tags:
@@ -878,34 +843,19 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                required:
-                - error
+                $ref: "#/components/schemas/ErrorResponse"
           description: Missing context
         "404":
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                required:
-                - error
+                $ref: "#/components/schemas/ErrorResponse"
           description: Not found
         "500":
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                required:
-                - error
+                $ref: "#/components/schemas/ErrorResponse"
           description: Internal error
       summary: Get latest version of a document
       tags:
@@ -949,34 +899,19 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                required:
-                - error
+                $ref: "#/components/schemas/ErrorResponse"
           description: Missing context
         "404":
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                required:
-                - error
+                $ref: "#/components/schemas/ErrorResponse"
           description: Not found
         "500":
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                required:
-                - error
+                $ref: "#/components/schemas/ErrorResponse"
           description: Internal error
       summary: Update a document (creates new version)
       tags:
@@ -1024,34 +959,19 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                required:
-                - error
+                $ref: "#/components/schemas/ErrorResponse"
           description: Missing context
         "404":
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                required:
-                - error
+                $ref: "#/components/schemas/ErrorResponse"
           description: Not found
         "500":
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                required:
-                - error
+                $ref: "#/components/schemas/ErrorResponse"
           description: Internal error
       summary: Delete versions after timestamp
       tags:
@@ -1111,34 +1031,19 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                required:
-                - error
+                $ref: "#/components/schemas/ErrorResponse"
           description: Missing context
         "404":
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                required:
-                - error
+                $ref: "#/components/schemas/ErrorResponse"
           description: Not found
         "500":
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                required:
-                - error
+                $ref: "#/components/schemas/ErrorResponse"
           description: Internal error
       summary: List versions of a document
       tags:
@@ -1185,41 +1090,26 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                required:
-                - error
+                $ref: "#/components/schemas/ErrorResponse"
           description: Missing context
         "404":
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                required:
-                - error
+                $ref: "#/components/schemas/ErrorResponse"
           description: Not found
         "500":
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                required:
-                - error
+                $ref: "#/components/schemas/ErrorResponse"
           description: Internal error
       summary: Get specific version
       tags:
       - documents
       - exported
-  /workspaces/{workspaceSlug}/mentor/messages/chat/messages/{messageId}/vote:
-    post:
+  /workspaces/{workspaceSlug}/mentor/messages/{messageId}/vote:
+    put:
       x-hephaestus:
         export: true
       operationId: voteMessage
@@ -1257,36 +1147,21 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                required:
-                - error
+                $ref: "#/components/schemas/ErrorResponse"
           description: Missing context
         "404":
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                required:
-                - error
+                $ref: "#/components/schemas/ErrorResponse"
           description: Message not found
         "500":
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                required:
-                - error
+                $ref: "#/components/schemas/ErrorResponse"
           description: Internal error
-      summary: Vote on a chat message (upvote/downvote)
+      summary: Vote on a chat message (upvote/downvote) - idempotent upsert
       tags:
       - vote
       - exported
@@ -1316,23 +1191,13 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                required:
-                - error
+                $ref: "#/components/schemas/ErrorResponse"
           description: Missing context
         "500":
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                required:
-                - error
+                $ref: "#/components/schemas/ErrorResponse"
           description: Internal error
       summary: List chat threads grouped by time buckets
       tags:
@@ -1370,45 +1235,25 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                required:
-                - error
+                $ref: "#/components/schemas/ErrorResponse"
           description: Missing required context
         "404":
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                required:
-                - error
+                $ref: "#/components/schemas/ErrorResponse"
           description: Thread not found
         "500":
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                required:
-                - error
+                $ref: "#/components/schemas/ErrorResponse"
           description: Internal error
         "503":
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                required:
-                - error
+                $ref: "#/components/schemas/ErrorResponse"
           description: Service temporarily unavailable
       summary: Get mentor chat thread detail
       tags:
@@ -1986,8 +1831,7 @@ components:
       - threads
     ChatThreadSummary:
       type: object
-      x-hephaestus:
-        export: true
+      x-hephaestus: a1
       properties:
         createdAt:
           type: string
@@ -2123,6 +1967,16 @@ components:
       - kind
       - title
       - userId
+    ErrorResponse:
+      type: object
+      x-hephaestus:
+        export: true
+      properties:
+        error:
+          type: string
+          description: Human-readable error message
+      required:
+      - error
     LabelInfo:
       type: object
       properties:

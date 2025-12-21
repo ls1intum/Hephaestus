@@ -6,6 +6,7 @@
  * and assert on the actual streamed data (text, tool calls, etc.).
  *
  * Uses mocked LLM responses to test the full streaming pipeline.
+ *
  */
 
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";

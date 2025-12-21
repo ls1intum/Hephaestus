@@ -58,6 +58,7 @@
 	},
 	"devDependencies": {
 		"@biomejs/biome": "2.3.8",
+		"@testcontainers/postgresql": "^11.10.0",
 		"@types/node": "25.0.2",
 		"@types/pg": "8.16.0",
 		"@vitest/coverage-v8": "4.0.15",
@@ -67,6 +68,7 @@
 		"glob": "^13.0.0",
 		"ora": "^9.0.0",
 		"picocolors": "^1.1.1",
+		"testcontainers": "^11.10.0",
 		"ts-morph": "^27.0.2",
 		"tsc-alias": "1.8.16",
 		"tsx": "4.21.0",

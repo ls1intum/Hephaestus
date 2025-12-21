@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { extractErrorMessage, toLoggableError } from "@/shared/utils/error";
 
 describe("extractErrorMessage", () => {
@@ -20,22 +20,22 @@ describe("extractErrorMessage", () => {
 });
 
 describe("toLoggableError", () => {
+	afterEach(() => {
+		vi.unstubAllEnvs();
+	});
+
 	it("should return message only in production", () => {
-		const originalEnv = process.env.NODE_ENV;
-		process.env.NODE_ENV = "production";
+		vi.stubEnv("NODE_ENV", "production");
 
 		const error = new Error("Production error");
 		const result = toLoggableError(error);
 
 		expect(result.message).toBe("Production error");
 		expect(result.stack).toBeUndefined();
-
-		process.env.NODE_ENV = originalEnv;
 	});
 
 	it("should include stack trace in development", () => {
-		const originalEnv = process.env.NODE_ENV;
-		process.env.NODE_ENV = "development";
+		vi.stubEnv("NODE_ENV", "development");
 
 		const error = new Error("Dev error");
 		const result = toLoggableError(error);
@@ -43,8 +43,6 @@ describe("toLoggableError", () => {
 		expect(result.message).toBe("Dev error");
 		expect(result.stack).toBeDefined();
 		expect(result.stack).toContain("Dev error");
-
-		process.env.NODE_ENV = originalEnv;
 	});
 
 	it("should handle non-Error values gracefully", () => {

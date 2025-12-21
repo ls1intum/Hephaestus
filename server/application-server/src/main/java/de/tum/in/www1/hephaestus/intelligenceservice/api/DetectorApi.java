@@ -3,9 +3,9 @@ package de.tum.in.www1.hephaestus.intelligenceservice.api;
 import de.tum.in.www1.hephaestus.intelligenceservice.ApiClient;
 import de.tum.in.www1.hephaestus.intelligenceservice.BaseApi;
 
-import de.tum.in.www1.hephaestus.intelligenceservice.model.DetectBadPractices500Response;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.DetectorRequest;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.DetectorResponse;
+import de.tum.in.www1.hephaestus.intelligenceservice.model.ErrorResponse;
 
 import java.util.Collections;
 import java.util.HashMap;

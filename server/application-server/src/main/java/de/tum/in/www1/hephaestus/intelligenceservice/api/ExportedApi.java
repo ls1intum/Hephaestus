@@ -6,9 +6,9 @@ import de.tum.in.www1.hephaestus.intelligenceservice.BaseApi;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.ChatMessageVote;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.ChatThreadGroup;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.CreateDocumentRequest;
-import de.tum.in.www1.hephaestus.intelligenceservice.model.DetectBadPractices500Response;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.Document;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.DocumentSummary;
+import de.tum.in.www1.hephaestus.intelligenceservice.model.ErrorResponse;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.MentorChatRequest;
 import java.time.OffsetDateTime;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.StreamPart;
@@ -664,7 +664,7 @@ public class ExportedApi extends BaseApi {
         return apiClient.invokeAPI("/mentor/documents/{id}", HttpMethod.PUT, uriVariables, localVarQueryParams, localVarPostBody, localVarHeaderParams, localVarCookieParams, localVarFormParams, localVarAccept, localVarContentType, localVarAuthNames, localReturnType);
     }
     /**
-     * Vote on a chat message (upvote/downvote)
+     * Vote on a chat message (upvote/downvote) - idempotent upsert
      * 
      * <p><b>200</b> - Vote recorded
      * <p><b>400</b> - Missing context
@@ -680,7 +680,7 @@ public class ExportedApi extends BaseApi {
     }
 
     /**
-     * Vote on a chat message (upvote/downvote)
+     * Vote on a chat message (upvote/downvote) - idempotent upsert
      * 
      * <p><b>200</b> - Vote recorded
      * <p><b>400</b> - Missing context
@@ -725,7 +725,7 @@ public class ExportedApi extends BaseApi {
         String[] localVarAuthNames = new String[] {  };
 
         ParameterizedTypeReference<ChatMessageVote> localReturnType = new ParameterizedTypeReference<ChatMessageVote>() {};
-        return apiClient.invokeAPI("/mentor/messages/chat/messages/{messageId}/vote", HttpMethod.POST, uriVariables, localVarQueryParams, localVarPostBody, localVarHeaderParams, localVarCookieParams, localVarFormParams, localVarAccept, localVarContentType, localVarAuthNames, localReturnType);
+        return apiClient.invokeAPI("/mentor/messages/{messageId}/vote", HttpMethod.PUT, uriVariables, localVarQueryParams, localVarPostBody, localVarHeaderParams, localVarCookieParams, localVarFormParams, localVarAccept, localVarContentType, localVarAuthNames, localReturnType);
     }
 
     @Override

@@ -43,21 +43,15 @@ import { createMentorSystemPrompt } from "@/shared/ai/prompts";
 import { buildTelemetryOptions } from "@/shared/ai/telemetry";
 import { ERROR_MESSAGES, HTTP_STATUS } from "@/shared/constants";
 import type { AppRouteHandler } from "@/shared/http/types";
-import { extractErrorMessage, getLogger } from "@/shared/utils";
+import { getLogger } from "@/shared/utils";
 import {
 	loadOrCreateThread,
 	persistAssistantMessage,
 	persistUserMessage,
 	updateTitleIfNeeded,
 } from "./chat.persistence";
-import type { HandleGetThreadRoute, HandleMentorChatRoute } from "./chat.routes";
-import type { ThreadDetail } from "./chat.schema";
-import {
-	incomingToUiMessage,
-	toThreadDetailMessage,
-	type UMessage,
-	uiMessageFromPersisted,
-} from "./chat.transformer";
+import type { HandleMentorChatRoute } from "./chat.routes";
+import { incomingToUiMessage, type UMessage, uiMessageFromPersisted } from "./chat.transformer";
 import { getMessagesByThreadId } from "./data";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -91,16 +85,16 @@ const TRACE_NAME_GREETING = "mentor:greeting";
 // ─────────────────────────────────────────────────────────────────────────────
 
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Handler orchestrates multiple concerns (persistence, streaming, telemetry, error handling) which inherently adds complexity. Refactoring would split core chat logic across many files, reducing cohesion.
-export const mentorChatHandler: AppRouteHandler<HandleMentorChatRoute> = async (context) => {
-	const logger = getLogger(context);
+export const mentorChatHandler: AppRouteHandler<HandleMentorChatRoute> = async (c) => {
+	const logger = getLogger(c);
 	// Hono's c.req.valid() returns the validated type from the route schema
-	const requestBody = context.req.valid("json");
+	const requestBody = c.req.valid("json");
 	const { id: threadId, message, previousMessageId, greeting } = requestBody;
 
-	const workspaceId = context.get("workspaceId");
-	const userId = context.get("userId");
-	const userLogin = context.get("userLogin");
-	const userName = context.get("userName"); // Real display name if available
+	const workspaceId = c.get("workspaceId");
+	const userId = c.get("userId");
+	const userLogin = c.get("userLogin");
+	const userName = c.get("userName"); // Real display name if available
 
 	// Greeting mode: generate initial greeting without user message
 	const isGreetingMode = greeting === true && !message;
@@ -113,7 +107,7 @@ export const mentorChatHandler: AppRouteHandler<HandleMentorChatRoute> = async (
 	// Validate required context for tools - fail fast if missing
 	if (!(workspaceId && userId && userLogin)) {
 		logger.error({ workspaceId, userId, userLogin }, "Missing required context headers");
-		return context.json(
+		return c.json(
 			{ error: "Missing required context (workspaceId, userId, or userLogin)" },
 			HTTP_STATUS.BAD_REQUEST,
 		);
@@ -135,7 +129,7 @@ export const mentorChatHandler: AppRouteHandler<HandleMentorChatRoute> = async (
 
 	// If thread exists but belongs to another user, deny access
 	if (!threadResult.success && threadResult.error?.includes("access denied")) {
-		return context.json({ error: ERROR_MESSAGES.THREAD_NOT_FOUND }, HTTP_STATUS.NOT_FOUND);
+		return c.json({ error: ERROR_MESSAGES.THREAD_NOT_FOUND }, HTTP_STATUS.NOT_FOUND);
 	}
 
 	const thread = threadResult.success ? threadResult.data : null;
@@ -160,10 +154,7 @@ export const mentorChatHandler: AppRouteHandler<HandleMentorChatRoute> = async (
 		modelMessages = await convertToModelMessages(uiMessages);
 	} else {
 		// No message and not greeting - bad request
-		return context.json(
-			{ error: "Message required unless greeting=true" },
-			HTTP_STATUS.BAD_REQUEST,
-		);
+		return c.json({ error: "Message required unless greeting=true" }, HTTP_STATUS.BAD_REQUEST);
 	}
 
 	// Create personalized system prompt with user context
@@ -486,70 +477,4 @@ export const mentorChatHandler: AppRouteHandler<HandleMentorChatRoute> = async (
 	});
 
 	return createUIMessageStreamResponse({ stream });
-};
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Get Thread Handler
-// ─────────────────────────────────────────────────────────────────────────────
-
-export const getThreadHandler: AppRouteHandler<HandleGetThreadRoute> = async (context) => {
-	const logger = getLogger(context);
-	const { threadId } = context.req.valid("param");
-	const userId = context.get("userId");
-	const workspaceId = context.get("workspaceId");
-
-	// Require user context for authorization
-	if (!(userId && workspaceId)) {
-		return context.json(
-			{ error: "Missing required context (userId or workspaceId)" },
-			{ status: HTTP_STATUS.BAD_REQUEST },
-		);
-	}
-
-	try {
-		const { getThreadById } = await import("./data");
-		const thread = await getThreadById(threadId);
-
-		// Check if thread exists
-		if (!thread) {
-			return context.json(
-				{ error: ERROR_MESSAGES.THREAD_NOT_FOUND },
-				{ status: HTTP_STATUS.NOT_FOUND },
-			);
-		}
-
-		// Check ownership - thread must belong to the same user and workspace
-		// Note: thread.userId can be null for legacy threads created before auth was added
-		const threadUserId = thread.userId ? Number(thread.userId) : null;
-		const threadWorkspaceId = thread.workspaceId ? Number(thread.workspaceId) : null;
-
-		if (threadUserId !== userId || threadWorkspaceId !== workspaceId) {
-			logger.debug(
-				{ threadId, threadUserId, userId, threadWorkspaceId, workspaceId },
-				"Thread ownership mismatch",
-			);
-			return context.json(
-				{ error: ERROR_MESSAGES.THREAD_NOT_FOUND },
-				{ status: HTTP_STATUS.NOT_FOUND },
-			);
-		}
-
-		const history = await getMessagesByThreadId(threadId);
-		const messages = history.map(toThreadDetailMessage);
-
-		const response: ThreadDetail = {
-			id: thread.id,
-			title: thread.title ?? null,
-			selectedLeafMessageId: thread.selectedLeafMessageId ?? null,
-			messages,
-		};
-
-		return context.json(response, { status: HTTP_STATUS.OK });
-	} catch (err) {
-		logger.error({ err: extractErrorMessage(err) }, "Failed to fetch thread");
-		return context.json(
-			{ error: ERROR_MESSAGES.SERVICE_UNAVAILABLE },
-			{ status: HTTP_STATUS.SERVICE_UNAVAILABLE },
-		);
-	}
 };

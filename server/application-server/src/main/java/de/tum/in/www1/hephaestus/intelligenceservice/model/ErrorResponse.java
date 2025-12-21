@@ -25,28 +25,27 @@ import com.fasterxml.jackson.annotation.JsonTypeName;
 import org.hibernate.validator.constraints.*;
 
 /**
- * DetectBadPractices500Response
+ * ErrorResponse
  */
 @JsonPropertyOrder({
-  DetectBadPractices500Response.JSON_PROPERTY_ERROR
+  ErrorResponse.JSON_PROPERTY_ERROR
 })
-@JsonTypeName("detectBadPractices_500_response")
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
-public class DetectBadPractices500Response {
+public class ErrorResponse {
   public static final String JSON_PROPERTY_ERROR = "error";
   private String error;
 
-  public DetectBadPractices500Response() {
+  public ErrorResponse() {
   }
 
-  public DetectBadPractices500Response error(String error) {
+  public ErrorResponse error(String error) {
     
     this.error = error;
     return this;
   }
 
   /**
-   * Get error
+   * Human-readable error message
    * @return error
    */
   @jakarta.annotation.Nonnull
@@ -72,8 +71,8 @@ public class DetectBadPractices500Response {
     if (o == null || getClass() != o.getClass()) {
       return false;
     }
-    DetectBadPractices500Response detectBadPractices500Response = (DetectBadPractices500Response) o;
-    return Objects.equals(this.error, detectBadPractices500Response.error);
+    ErrorResponse errorResponse = (ErrorResponse) o;
+    return Objects.equals(this.error, errorResponse.error);
   }
 
   @Override
@@ -84,7 +83,7 @@ public class DetectBadPractices500Response {
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder();
-    sb.append("class DetectBadPractices500Response {\n");
+    sb.append("class ErrorResponse {\n");
     sb.append("    error: ").append(toIndentedString(error)).append("\n");
     sb.append("}");
     return sb.toString();

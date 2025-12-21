@@ -2,6 +2,7 @@ import { createRoute, z } from "@hono/zod-openapi";
 import * as HttpStatusCodes from "stoker/http-status-codes";
 import { jsonContent, jsonContentRequired } from "stoker/openapi/helpers";
 import { EXPORTED_TAG } from "@/shared/http/exported-tag";
+import { ErrorResponseSchema } from "@/shared/http/schemas";
 import {
 	CreateDocumentRequestSchema,
 	DeleteAfterQuerySchema,
@@ -24,14 +25,8 @@ export const createDocumentRoute = createRoute({
 	},
 	responses: {
 		[HttpStatusCodes.CREATED]: jsonContent(DocumentSchema, "Created document"),
-		[HttpStatusCodes.BAD_REQUEST]: jsonContent(
-			z.object({ error: z.string() }),
-			"Missing required context",
-		),
-		[HttpStatusCodes.INTERNAL_SERVER_ERROR]: jsonContent(
-			z.object({ error: z.string() }),
-			"Internal error",
-		),
+		[HttpStatusCodes.BAD_REQUEST]: jsonContent(ErrorResponseSchema, "Missing required context"),
+		[HttpStatusCodes.INTERNAL_SERVER_ERROR]: jsonContent(ErrorResponseSchema, "Internal error"),
 	},
 });
 
@@ -44,12 +39,9 @@ export const getDocumentRoute = createRoute({
 	request: { params: DocumentIdParamsSchema },
 	responses: {
 		[HttpStatusCodes.OK]: jsonContent(DocumentSchema, "Document"),
-		[HttpStatusCodes.BAD_REQUEST]: jsonContent(z.object({ error: z.string() }), "Missing context"),
-		[HttpStatusCodes.NOT_FOUND]: jsonContent(z.object({ error: z.string() }), "Not found"),
-		[HttpStatusCodes.INTERNAL_SERVER_ERROR]: jsonContent(
-			z.object({ error: z.string() }),
-			"Internal error",
-		),
+		[HttpStatusCodes.BAD_REQUEST]: jsonContent(ErrorResponseSchema, "Missing context"),
+		[HttpStatusCodes.NOT_FOUND]: jsonContent(ErrorResponseSchema, "Not found"),
+		[HttpStatusCodes.INTERNAL_SERVER_ERROR]: jsonContent(ErrorResponseSchema, "Internal error"),
 	},
 });
 
@@ -65,12 +57,9 @@ export const updateDocumentRoute = createRoute({
 	},
 	responses: {
 		[HttpStatusCodes.OK]: jsonContent(DocumentSchema, "Updated document"),
-		[HttpStatusCodes.BAD_REQUEST]: jsonContent(z.object({ error: z.string() }), "Missing context"),
-		[HttpStatusCodes.NOT_FOUND]: jsonContent(z.object({ error: z.string() }), "Not found"),
-		[HttpStatusCodes.INTERNAL_SERVER_ERROR]: jsonContent(
-			z.object({ error: z.string() }),
-			"Internal error",
-		),
+		[HttpStatusCodes.BAD_REQUEST]: jsonContent(ErrorResponseSchema, "Missing context"),
+		[HttpStatusCodes.NOT_FOUND]: jsonContent(ErrorResponseSchema, "Not found"),
+		[HttpStatusCodes.INTERNAL_SERVER_ERROR]: jsonContent(ErrorResponseSchema, "Internal error"),
 	},
 });
 
@@ -83,12 +72,9 @@ export const deleteDocumentRoute = createRoute({
 	request: { params: DocumentIdParamsSchema },
 	responses: {
 		[HttpStatusCodes.NO_CONTENT]: { description: "Deleted" },
-		[HttpStatusCodes.BAD_REQUEST]: jsonContent(z.object({ error: z.string() }), "Missing context"),
-		[HttpStatusCodes.NOT_FOUND]: jsonContent(z.object({ error: z.string() }), "Not found"),
-		[HttpStatusCodes.INTERNAL_SERVER_ERROR]: jsonContent(
-			z.object({ error: z.string() }),
-			"Internal error",
-		),
+		[HttpStatusCodes.BAD_REQUEST]: jsonContent(ErrorResponseSchema, "Missing context"),
+		[HttpStatusCodes.NOT_FOUND]: jsonContent(ErrorResponseSchema, "Not found"),
+		[HttpStatusCodes.INTERNAL_SERVER_ERROR]: jsonContent(ErrorResponseSchema, "Internal error"),
 	},
 });
 
@@ -101,11 +87,8 @@ export const listDocumentsRoute = createRoute({
 	request: { query: PaginationQuerySchema },
 	responses: {
 		[HttpStatusCodes.OK]: jsonContent(z.array(DocumentSummarySchema), "Document summaries"),
-		[HttpStatusCodes.BAD_REQUEST]: jsonContent(z.object({ error: z.string() }), "Missing context"),
-		[HttpStatusCodes.INTERNAL_SERVER_ERROR]: jsonContent(
-			z.object({ error: z.string() }),
-			"Internal error",
-		),
+		[HttpStatusCodes.BAD_REQUEST]: jsonContent(ErrorResponseSchema, "Missing context"),
+		[HttpStatusCodes.INTERNAL_SERVER_ERROR]: jsonContent(ErrorResponseSchema, "Internal error"),
 	},
 });
 
@@ -118,12 +101,9 @@ export const listVersionsRoute = createRoute({
 	request: { params: DocumentIdParamsSchema, query: PaginationQuerySchema },
 	responses: {
 		[HttpStatusCodes.OK]: jsonContent(z.array(DocumentSchema), "Document versions"),
-		[HttpStatusCodes.BAD_REQUEST]: jsonContent(z.object({ error: z.string() }), "Missing context"),
-		[HttpStatusCodes.NOT_FOUND]: jsonContent(z.object({ error: z.string() }), "Not found"),
-		[HttpStatusCodes.INTERNAL_SERVER_ERROR]: jsonContent(
-			z.object({ error: z.string() }),
-			"Internal error",
-		),
+		[HttpStatusCodes.BAD_REQUEST]: jsonContent(ErrorResponseSchema, "Missing context"),
+		[HttpStatusCodes.NOT_FOUND]: jsonContent(ErrorResponseSchema, "Not found"),
+		[HttpStatusCodes.INTERNAL_SERVER_ERROR]: jsonContent(ErrorResponseSchema, "Internal error"),
 	},
 });
 
@@ -136,12 +116,9 @@ export const getVersionRoute = createRoute({
 	request: { params: VersionParamsSchema },
 	responses: {
 		[HttpStatusCodes.OK]: jsonContent(DocumentSchema, "Document"),
-		[HttpStatusCodes.BAD_REQUEST]: jsonContent(z.object({ error: z.string() }), "Missing context"),
-		[HttpStatusCodes.NOT_FOUND]: jsonContent(z.object({ error: z.string() }), "Not found"),
-		[HttpStatusCodes.INTERNAL_SERVER_ERROR]: jsonContent(
-			z.object({ error: z.string() }),
-			"Internal error",
-		),
+		[HttpStatusCodes.BAD_REQUEST]: jsonContent(ErrorResponseSchema, "Missing context"),
+		[HttpStatusCodes.NOT_FOUND]: jsonContent(ErrorResponseSchema, "Not found"),
+		[HttpStatusCodes.INTERNAL_SERVER_ERROR]: jsonContent(ErrorResponseSchema, "Internal error"),
 	},
 });
 
@@ -154,12 +131,9 @@ export const deleteAfterRoute = createRoute({
 	request: { params: DocumentIdParamsSchema, query: DeleteAfterQuerySchema },
 	responses: {
 		[HttpStatusCodes.OK]: jsonContent(z.array(DocumentSchema), "Deleted versions"),
-		[HttpStatusCodes.BAD_REQUEST]: jsonContent(z.object({ error: z.string() }), "Missing context"),
-		[HttpStatusCodes.NOT_FOUND]: jsonContent(z.object({ error: z.string() }), "Not found"),
-		[HttpStatusCodes.INTERNAL_SERVER_ERROR]: jsonContent(
-			z.object({ error: z.string() }),
-			"Internal error",
-		),
+		[HttpStatusCodes.BAD_REQUEST]: jsonContent(ErrorResponseSchema, "Missing context"),
+		[HttpStatusCodes.NOT_FOUND]: jsonContent(ErrorResponseSchema, "Not found"),
+		[HttpStatusCodes.INTERNAL_SERVER_ERROR]: jsonContent(ErrorResponseSchema, "Internal error"),
 	},
 });
 

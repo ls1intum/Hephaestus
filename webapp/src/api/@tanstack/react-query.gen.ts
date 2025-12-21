@@ -932,28 +932,8 @@ export const getVersionOptions = (options: Options<GetVersionData>) => {
     });
 };
 
-export const voteMessageQueryKey = (options: Options<VoteMessageData>) => createQueryKey('voteMessage', options);
-
 /**
- * Vote on a chat message (upvote/downvote)
- */
-export const voteMessageOptions = (options: Options<VoteMessageData>) => {
-    return queryOptions({
-        queryFn: async ({ queryKey, signal }) => {
-            const { data } = await voteMessage({
-                ...options,
-                ...queryKey[0],
-                signal,
-                throwOnError: true
-            });
-            return data;
-        },
-        queryKey: voteMessageQueryKey(options)
-    });
-};
-
-/**
- * Vote on a chat message (upvote/downvote)
+ * Vote on a chat message (upvote/downvote) - idempotent upsert
  */
 export const voteMessageMutation = (options?: Partial<Options<VoteMessageData>>): UseMutationOptions<VoteMessageResponse, VoteMessageError, Options<VoteMessageData>> => {
     const mutationOptions: UseMutationOptions<VoteMessageResponse, VoteMessageError, Options<VoteMessageData>> = {

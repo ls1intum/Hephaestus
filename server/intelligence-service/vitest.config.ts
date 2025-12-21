@@ -71,8 +71,8 @@ export default defineConfig({
 		// ═══════════════════════════════════════════════════════════════════════════
 		// Timeouts - Fail fast, don't hang
 		// ═══════════════════════════════════════════════════════════════════════════
-		testTimeout: 10000,
-		hookTimeout: 10000,
+		testTimeout: 30000, // Increased for database operations
+		hookTimeout: 60000, // Increased for container startup
 
 		// ═══════════════════════════════════════════════════════════════════════════
 		// Watch mode disabled for CI
@@ -87,13 +87,14 @@ export default defineConfig({
 		// ═══════════════════════════════════════════════════════════════════════════
 		// Setup files
 		// ═══════════════════════════════════════════════════════════════════════════
+		globalSetup: ["./test/global-setup.ts"],
 		setupFiles: ["./test/setup.ts"],
 
 		// ═══════════════════════════════════════════════════════════════════════════
 		// Strict mode settings
 		// ═══════════════════════════════════════════════════════════════════════════
 		allowOnly: false, // Fail if .only is used (prevents accidental commits)
-		bail: 1, // Stop on first failure in CI
+		bail: 0, // Don't stop on first failure - run all tests to see full picture
 		retry: 0, // No retries - tests should be deterministic
 
 		// ═══════════════════════════════════════════════════════════════════════════

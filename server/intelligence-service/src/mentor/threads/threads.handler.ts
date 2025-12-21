@@ -1,8 +1,11 @@
+import { getMessagesByThreadId, getThreadById } from "@/mentor/chat/data";
 import { ERROR_MESSAGES, HTTP_STATUS } from "@/shared/constants";
 import type { AppRouteHandler } from "@/shared/http/types";
+import { getValidatedContext } from "@/shared/http/workspace-context";
 import { extractErrorMessage, getLogger } from "@/shared/utils";
 import { getThreadsByUserAndWorkspace, type ThreadSummary } from "./data";
-import type { HandleGetGroupedThreadsRoute } from "./threads.routes";
+import type { HandleGetGroupedThreadsRoute, HandleGetThreadRoute } from "./threads.routes";
+import type { ThreadDetail } from "./threads.schema";
 
 type ThreadRow = ThreadSummary;
 
@@ -74,20 +77,15 @@ export const getGroupedThreadsHandler: AppRouteHandler<HandleGetGroupedThreadsRo
 	c,
 ) => {
 	const logger = getLogger(c);
-	const userId = c.get("userId");
-	const workspaceId = c.get("workspaceId");
 
-	// Require user context for authorization
-	if (!(userId && workspaceId)) {
-		return c.json(
-			{ error: "Missing required context (userId or workspaceId)" },
-			{ status: HTTP_STATUS.BAD_REQUEST },
-		);
+	const ctx = getValidatedContext(c);
+	if (!ctx) {
+		return c.json({ error: ERROR_MESSAGES.MISSING_CONTEXT }, { status: HTTP_STATUS.BAD_REQUEST });
 	}
 
 	try {
 		// Only fetch threads belonging to this user in this workspace
-		const rows = await getThreadsByUserAndWorkspace(userId, workspaceId);
+		const rows = await getThreadsByUserAndWorkspace(ctx.userId, ctx.workspaceId);
 
 		if (rows.length === 0) {
 			return c.json([], { status: HTTP_STATUS.OK });
@@ -99,6 +97,88 @@ export const getGroupedThreadsHandler: AppRouteHandler<HandleGetGroupedThreadsRo
 		return c.json(
 			{ error: ERROR_MESSAGES.INTERNAL_ERROR },
 			{ status: HTTP_STATUS.INTERNAL_SERVER_ERROR },
+		);
+	}
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Get Thread Detail Handler
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Transform persisted message to API response format.
+ */
+function toThreadDetailMessage(msg: {
+	id: string;
+	role: string;
+	parts: Array<{ type: string; content: unknown; originalType?: string | null }>;
+	createdAt: Date;
+	parentMessageId?: string | null;
+}) {
+	return {
+		id: msg.id,
+		role: msg.role as "system" | "user" | "assistant",
+		parts: msg.parts.map((part) => {
+			const content = part.content as Record<string, unknown>;
+			return { type: part.originalType ?? part.type, ...content };
+		}),
+		createdAt: msg.createdAt.toISOString(),
+		parentMessageId: msg.parentMessageId ?? null,
+	};
+}
+
+export const getThreadHandler: AppRouteHandler<HandleGetThreadRoute> = async (c) => {
+	const logger = getLogger(c);
+	const { threadId } = c.req.valid("param");
+
+	const ctx = getValidatedContext(c);
+	if (!ctx) {
+		return c.json({ error: ERROR_MESSAGES.MISSING_CONTEXT }, { status: HTTP_STATUS.BAD_REQUEST });
+	}
+
+	try {
+		const thread = await getThreadById(threadId);
+
+		// Check if thread exists
+		if (!thread) {
+			return c.json({ error: ERROR_MESSAGES.THREAD_NOT_FOUND }, { status: HTTP_STATUS.NOT_FOUND });
+		}
+
+		// Check ownership - thread must belong to the same user and workspace
+		// Note: thread.userId can be null for legacy threads created before auth was added
+		const threadUserId = thread.userId ? Number(thread.userId) : null;
+		const threadWorkspaceId = thread.workspaceId ? Number(thread.workspaceId) : null;
+
+		if (threadUserId !== ctx.userId || threadWorkspaceId !== ctx.workspaceId) {
+			logger.debug(
+				{
+					threadId,
+					threadUserId,
+					userId: ctx.userId,
+					threadWorkspaceId,
+					workspaceId: ctx.workspaceId,
+				},
+				"Thread ownership mismatch",
+			);
+			return c.json({ error: ERROR_MESSAGES.THREAD_NOT_FOUND }, { status: HTTP_STATUS.NOT_FOUND });
+		}
+
+		const history = await getMessagesByThreadId(threadId);
+		const messages = history.map(toThreadDetailMessage);
+
+		const response: ThreadDetail = {
+			id: thread.id,
+			title: thread.title ?? null,
+			selectedLeafMessageId: thread.selectedLeafMessageId ?? null,
+			messages,
+		};
+
+		return c.json(response, { status: HTTP_STATUS.OK });
+	} catch (err) {
+		logger.error({ err: extractErrorMessage(err) }, "Failed to fetch thread");
+		return c.json(
+			{ error: ERROR_MESSAGES.SERVICE_UNAVAILABLE },
+			{ status: HTTP_STATUS.SERVICE_UNAVAILABLE },
 		);
 	}
 };

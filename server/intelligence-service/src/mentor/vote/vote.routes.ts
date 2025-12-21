@@ -1,7 +1,8 @@
-import { createRoute, z } from "@hono/zod-openapi";
+import { createRoute } from "@hono/zod-openapi";
 import * as HttpStatusCodes from "stoker/http-status-codes";
 import { jsonContent, jsonContentRequired } from "stoker/openapi/helpers";
 import { EXPORTED_TAG } from "@/shared/http/exported-tag";
+import { ErrorResponseSchema } from "@/shared/http/schemas";
 import {
 	ChatMessageVoteSchema,
 	VoteMessageParamsSchema,
@@ -9,10 +10,10 @@ import {
 } from "./vote.schema";
 
 export const voteMessageRoute = createRoute({
-	path: "/chat/messages/{messageId}/vote",
-	method: "post",
+	path: "/{messageId}/vote",
+	method: "put",
 	tags: ["vote", ...EXPORTED_TAG],
-	summary: "Vote on a chat message (upvote/downvote)",
+	summary: "Vote on a chat message (upvote/downvote) - idempotent upsert",
 	operationId: "voteMessage",
 	request: {
 		params: VoteMessageParamsSchema,
@@ -20,12 +21,9 @@ export const voteMessageRoute = createRoute({
 	},
 	responses: {
 		[HttpStatusCodes.OK]: jsonContent(ChatMessageVoteSchema, "Vote recorded"),
-		[HttpStatusCodes.BAD_REQUEST]: jsonContent(z.object({ error: z.string() }), "Missing context"),
-		[HttpStatusCodes.NOT_FOUND]: jsonContent(z.object({ error: z.string() }), "Message not found"),
-		[HttpStatusCodes.INTERNAL_SERVER_ERROR]: jsonContent(
-			z.object({ error: z.string() }),
-			"Internal error",
-		),
+		[HttpStatusCodes.BAD_REQUEST]: jsonContent(ErrorResponseSchema, "Missing context"),
+		[HttpStatusCodes.NOT_FOUND]: jsonContent(ErrorResponseSchema, "Message not found"),
+		[HttpStatusCodes.INTERNAL_SERVER_ERROR]: jsonContent(ErrorResponseSchema, "Internal error"),
 	},
 });
 

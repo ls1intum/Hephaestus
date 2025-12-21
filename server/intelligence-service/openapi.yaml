@@ -28,24 +28,34 @@ components:
     BadPracticeResult:
       type: object
       properties:
-        bad_practice_summary:
+        badPracticeSummary:
           type: string
-        bad_practices:
+        badPractices:
           type: array
           items:
             $ref: "#/components/schemas/BadPractice"
       required:
-        - bad_practice_summary
-        - bad_practices
+        - badPracticeSummary
+        - badPractices
     DetectorResponse:
       allOf:
         - $ref: "#/components/schemas/BadPracticeResult"
         - type: object
           properties:
-            trace_id:
+            traceId:
               type: string
           required:
-            - trace_id
+            - traceId
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Human-readable error message
+      required:
+        - error
+      x-hephaestus: &a1
+        export: true
     DetectorRequest:
       type: object
       properties:
@@ -53,29 +63,29 @@ components:
           type: string
         description:
           type: string
-        lifecycle_state:
+        lifecycleState:
           type: string
-        repository_name:
+        repositoryName:
           type: string
-        pull_request_number:
+        pullRequestNumber:
           type: number
-        bad_practice_summary:
+        badPracticeSummary:
           type: string
-        bad_practices:
+        badPractices:
           type: array
           items:
             $ref: "#/components/schemas/BadPractice"
-        pull_request_template:
+        pullRequestTemplate:
           type: string
       required:
         - title
         - description
-        - lifecycle_state
-        - repository_name
-        - pull_request_number
-        - bad_practice_summary
-        - bad_practices
-        - pull_request_template
+        - lifecycleState
+        - repositoryName
+        - pullRequestNumber
+        - badPracticeSummary
+        - badPractices
+        - pullRequestTemplate
     ChatThreadSummary:
       type: object
       properties:
@@ -90,8 +100,7 @@ components:
       required:
         - id
         - title
-      x-hephaestus: &a1
-        export: true
+      x-hephaestus: *a1
     ChatThreadGroup:
       type: object
       properties:
@@ -104,6 +113,61 @@ components:
       required:
         - groupName
         - threads
+      x-hephaestus: *a1
+    ThreadDetail:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type:
+            - string
+            - "null"
+        selectedLeafMessageId:
+          type:
+            - string
+            - "null"
+          format: uuid
+        messages:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                format: uuid
+              role:
+                type: string
+                enum:
+                  - system
+                  - user
+                  - assistant
+              parts:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    type:
+                      type: string
+                  required:
+                    - type
+                  additionalProperties: {}
+              createdAt:
+                type: string
+                format: date-time
+              parentMessageId:
+                type:
+                  - string
+                  - "null"
+                format: uuid
+            required:
+              - id
+              - role
+              - parts
+      required:
+        - id
+        - messages
       x-hephaestus: *a1
     DocumentKind:
       type: string
@@ -214,61 +278,6 @@ components:
         - type
       additionalProperties: {}
       x-hephaestus: *a1
-    ThreadDetail:
-      type: object
-      properties:
-        id:
-          type: string
-          format: uuid
-        title:
-          type:
-            - string
-            - "null"
-        selectedLeafMessageId:
-          type:
-            - string
-            - "null"
-          format: uuid
-        messages:
-          type: array
-          items:
-            type: object
-            properties:
-              id:
-                type: string
-                format: uuid
-              role:
-                type: string
-                enum:
-                  - system
-                  - user
-                  - assistant
-              parts:
-                type: array
-                items:
-                  type: object
-                  properties:
-                    type:
-                      type: string
-                  required:
-                    - type
-                  additionalProperties: {}
-              createdAt:
-                type: string
-                format: date-time
-              parentMessageId:
-                type:
-                  - string
-                  - "null"
-                format: uuid
-            required:
-              - id
-              - role
-              - parts
-      required:
-        - id
-        - messages
-      x-hephaestus: *a1
   parameters: {}
 paths:
   /detector:
@@ -296,12 +305,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                required:
-                  - error
+                $ref: "#/components/schemas/ErrorResponse"
   /mentor/threads/grouped:
     get:
       tags:
@@ -323,23 +327,59 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                required:
-                  - error
+                $ref: "#/components/schemas/ErrorResponse"
         "500":
           description: Internal error
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                required:
-                  - error
+                $ref: "#/components/schemas/ErrorResponse"
+      x-hephaestus: *a1
+  /mentor/threads/{threadId}:
+    get:
+      tags:
+        - mentor
+        - exported
+      summary: Get mentor chat thread detail
+      operationId: getThread
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: threadId
+          in: path
+      responses:
+        "200":
+          description: Thread detail with messages
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ThreadDetail"
+        "400":
+          description: Missing required context
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Thread not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: Service temporarily unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
       x-hephaestus: *a1
   /mentor/documents:
     post:
@@ -367,23 +407,13 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                required:
-                  - error
+                $ref: "#/components/schemas/ErrorResponse"
         "500":
           description: Internal error
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                required:
-                  - error
+                $ref: "#/components/schemas/ErrorResponse"
       x-hephaestus: *a1
     get:
       tags:
@@ -423,23 +453,13 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                required:
-                  - error
+                $ref: "#/components/schemas/ErrorResponse"
         "500":
           description: Internal error
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                required:
-                  - error
+                $ref: "#/components/schemas/ErrorResponse"
       x-hephaestus: *a1
   /mentor/documents/{id}:
     get:
@@ -467,34 +487,19 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                required:
-                  - error
+                $ref: "#/components/schemas/ErrorResponse"
         "404":
           description: Not found
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                required:
-                  - error
+                $ref: "#/components/schemas/ErrorResponse"
         "500":
           description: Internal error
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                required:
-                  - error
+                $ref: "#/components/schemas/ErrorResponse"
       x-hephaestus: *a1
     put:
       tags:
@@ -528,34 +533,19 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                required:
-                  - error
+                $ref: "#/components/schemas/ErrorResponse"
         "404":
           description: Not found
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                required:
-                  - error
+                $ref: "#/components/schemas/ErrorResponse"
         "500":
           description: Internal error
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                required:
-                  - error
+                $ref: "#/components/schemas/ErrorResponse"
       x-hephaestus: *a1
     delete:
       tags:
@@ -578,34 +568,19 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                required:
-                  - error
+                $ref: "#/components/schemas/ErrorResponse"
         "404":
           description: Not found
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                required:
-                  - error
+                $ref: "#/components/schemas/ErrorResponse"
         "500":
           description: Internal error
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                required:
-                  - error
+                $ref: "#/components/schemas/ErrorResponse"
       x-hephaestus: *a1
   /mentor/documents/{id}/versions:
     get:
@@ -652,34 +627,19 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                required:
-                  - error
+                $ref: "#/components/schemas/ErrorResponse"
         "404":
           description: Not found
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                required:
-                  - error
+                $ref: "#/components/schemas/ErrorResponse"
         "500":
           description: Internal error
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                required:
-                  - error
+                $ref: "#/components/schemas/ErrorResponse"
       x-hephaestus: *a1
     delete:
       tags:
@@ -714,34 +674,19 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                required:
-                  - error
+                $ref: "#/components/schemas/ErrorResponse"
         "404":
           description: Not found
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                required:
-                  - error
+                $ref: "#/components/schemas/ErrorResponse"
         "500":
           description: Internal error
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                required:
-                  - error
+                $ref: "#/components/schemas/ErrorResponse"
       x-hephaestus: *a1
   /mentor/documents/{id}/versions/{versionNumber}:
     get:
@@ -776,41 +721,26 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                required:
-                  - error
+                $ref: "#/components/schemas/ErrorResponse"
         "404":
           description: Not found
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                required:
-                  - error
+                $ref: "#/components/schemas/ErrorResponse"
         "500":
           description: Internal error
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                required:
-                  - error
+                $ref: "#/components/schemas/ErrorResponse"
       x-hephaestus: *a1
-  /mentor/messages/chat/messages/{messageId}/vote:
-    post:
+  /mentor/messages/{messageId}/vote:
+    put:
       tags:
         - vote
         - exported
-      summary: Vote on a chat message (upvote/downvote)
+      summary: Vote on a chat message (upvote/downvote) - idempotent upsert
       operationId: voteMessage
       parameters:
         - schema:
@@ -838,34 +768,19 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                required:
-                  - error
+                $ref: "#/components/schemas/ErrorResponse"
         "404":
           description: Message not found
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                required:
-                  - error
+                $ref: "#/components/schemas/ErrorResponse"
         "500":
           description: Internal error
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                required:
-                  - error
+                $ref: "#/components/schemas/ErrorResponse"
       x-hephaestus: *a1
   /mentor/chat:
     post:
@@ -954,71 +869,5 @@ paths:
             text/event-stream:
               schema:
                 $ref: "#/components/schemas/StreamPart"
-      x-hephaestus: *a1
-  /mentor/threads/{threadId}:
-    get:
-      tags:
-        - mentor
-        - exported
-      summary: Get mentor chat thread detail
-      operationId: getThread
-      parameters:
-        - schema:
-            type: string
-            format: uuid
-          required: true
-          name: threadId
-          in: path
-      responses:
-        "200":
-          description: Thread detail with messages
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ThreadDetail"
-        "400":
-          description: Missing required context
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                required:
-                  - error
-        "404":
-          description: Thread not found
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                required:
-                  - error
-        "500":
-          description: Internal error
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                required:
-                  - error
-        "503":
-          description: Service temporarily unavailable
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                required:
-                  - error
       x-hephaestus: *a1
 webhooks: {}

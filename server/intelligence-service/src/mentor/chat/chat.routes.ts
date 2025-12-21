@@ -1,13 +1,8 @@
-import { createRoute, z } from "@hono/zod-openapi";
+import { createRoute } from "@hono/zod-openapi";
 import * as HttpStatusCodes from "stoker/http-status-codes";
-import { jsonContent, jsonContentRequired } from "stoker/openapi/helpers";
+import { jsonContentRequired } from "stoker/openapi/helpers";
 import { EXPORTED_TAG } from "@/shared/http/exported-tag";
-import {
-	chatRequestBodySchema,
-	streamPartSchema,
-	ThreadIdParamsSchema,
-	threadDetailSchema,
-} from "./chat.schema";
+import { chatRequestBodySchema, streamPartSchema } from "./chat.schema";
 
 export const mentorChatRoute = createRoute({
 	path: "/chat",
@@ -31,32 +26,3 @@ export const mentorChatRoute = createRoute({
 });
 
 export type HandleMentorChatRoute = typeof mentorChatRoute;
-
-export const getThreadRoute = createRoute({
-	path: "/threads/{threadId}",
-	method: "get",
-	tags: ["mentor", ...EXPORTED_TAG],
-	summary: "Get mentor chat thread detail",
-	operationId: "getThread",
-	request: {
-		params: ThreadIdParamsSchema,
-	},
-	responses: {
-		[HttpStatusCodes.OK]: jsonContent(threadDetailSchema, "Thread detail with messages"),
-		[HttpStatusCodes.BAD_REQUEST]: jsonContent(
-			z.object({ error: z.string() }),
-			"Missing required context",
-		),
-		[HttpStatusCodes.NOT_FOUND]: jsonContent(z.object({ error: z.string() }), "Thread not found"),
-		[HttpStatusCodes.INTERNAL_SERVER_ERROR]: jsonContent(
-			z.object({ error: z.string() }),
-			"Internal error",
-		),
-		[HttpStatusCodes.SERVICE_UNAVAILABLE]: jsonContent(
-			z.object({ error: z.string() }),
-			"Service temporarily unavailable",
-		),
-	},
-});
-
-export type HandleGetThreadRoute = typeof getThreadRoute;

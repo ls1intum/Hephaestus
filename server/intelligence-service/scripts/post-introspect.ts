@@ -89,6 +89,15 @@ content = content.replace(
 	"",
 );
 
+// Fix drizzle-kit introspect bug: it incorrectly assigns operator classes from the SECOND column
+// to the FIRST column in composite indexes. For example:
+//   index(...).using("btree", table.threadId.op("timestamptz_ops"), table.createdAt.op("timestamptz_ops"))
+// should be:
+//   index(...).using("btree", table.threadId, table.createdAt)
+// The operator classes are defaults for btree and don't need to be specified.
+// Remove all .op("..._ops") from indexes as btree uses default operator classes
+content = content.replace(/\.op\("[a-z0-9_]+_ops"\)/g, "");
+
 // Also ensure AnyPgColumn is not left in imports if unused
 content = content.replace(
 	/import\s*\{([^}]+)\}\s*from\s*"drizzle-orm\/pg-core"/,

@@ -4,9 +4,6 @@
  * Tests the data persistence layer with a real database.
  * Follows AI SDK pattern: test real behavior, mock only the LLM.
  *
- * Prerequisites:
- * - PostgreSQL running with test database
- * - DATABASE_URL environment variable set
  */
 
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";

@@ -36,25 +36,25 @@ interface ErrorResponse {
 const createValidRequest = (overrides: Partial<DetectorRequest> = {}): DetectorRequest => ({
 	title: "feat: add user authentication",
 	description: "Implements JWT-based authentication with refresh tokens.",
-	lifecycle_state: "Ready for review",
-	repository_name: "Hephaestus",
-	pull_request_number: 534,
-	bad_practice_summary: "",
-	bad_practices: [],
-	pull_request_template: "## Description\n\n## Changes\n\n## Testing",
+	lifecycleState: "Ready for review",
+	repositoryName: "Hephaestus",
+	pullRequestNumber: 534,
+	badPracticeSummary: "",
+	badPractices: [],
+	pullRequestTemplate: "## Description\n\n## Changes\n\n## Testing",
 	...overrides,
 });
 
 /** Standard response for a good PR */
 const createGoodPRResponse = (): BadPracticeResult => ({
-	bad_practice_summary: "No issues found! The PR follows best practices.",
-	bad_practices: [],
+	badPracticeSummary: "No issues found! The PR follows best practices.",
+	badPractices: [],
 });
 
 /** Response indicating a critical issue (empty description) */
 const createCriticalIssueResponse = (): BadPracticeResult => ({
-	bad_practice_summary: "Critical issue found: PR description is empty.",
-	bad_practices: [
+	badPracticeSummary: "Critical issue found: PR description is empty.",
+	badPractices: [
 		{
 			title: "Empty description",
 			description:
@@ -66,8 +66,8 @@ const createCriticalIssueResponse = (): BadPracticeResult => ({
 
 /** Response indicating a normal issue (vague title) */
 const createNormalIssueResponse = (): BadPracticeResult => ({
-	bad_practice_summary: "One issue found: PR title could be more descriptive.",
-	bad_practices: [
+	badPracticeSummary: "One issue found: PR title could be more descriptive.",
+	badPractices: [
 		{
 			title: "Vague title",
 			description:
@@ -137,31 +137,31 @@ describe("Detector API Integration", () => {
 
 			const data = (await response.json()) as DetectorResponse;
 			expect(data).toMatchObject({
-				bad_practice_summary: mockResult.bad_practice_summary,
-				bad_practices: mockResult.bad_practices,
+				badPracticeSummary: mockResult.badPracticeSummary,
+				badPractices: mockResult.badPractices,
 			});
-			expect(data.trace_id).toBeDefined();
-			expect(typeof data.trace_id).toBe("string");
+			expect(data.traceId).toBeDefined();
+			expect(typeof data.traceId).toBe("string");
 		});
 
-		it("should include trace_id in response for Langfuse linking", async () => {
+		it("should include traceId in response for Langfuse linking", async () => {
 			const mockResult = createGoodPRResponse();
 			mockGenerateObject.mockResolvedValueOnce({ object: mockResult });
 
 			const request = createValidRequest({
-				repository_name: "MyRepo",
-				pull_request_number: 42,
+				repositoryName: "MyRepo",
+				pullRequestNumber: 42,
 			});
 			const response = await makeDetectorRequest(request);
 
 			expect(response.status).toBe(200);
 
 			const data = (await response.json()) as DetectorResponse;
-			// trace_id format: "detector:<repo>#<pr>"
-			expect(data.trace_id).toBe("detector:MyRepo#42");
+			// traceId format: "detector:<repo>#<pr>"
+			expect(data.traceId).toBe("detector:MyRepo#42");
 		});
 
-		it("should return empty bad_practices array for clean PR", async () => {
+		it("should return empty badPractices array for clean PR", async () => {
 			const mockResult = createGoodPRResponse();
 			mockGenerateObject.mockResolvedValueOnce({ object: mockResult });
 
@@ -170,10 +170,10 @@ describe("Detector API Integration", () => {
 			expect(response.status).toBe(200);
 
 			const data = (await response.json()) as DetectorResponse;
-			expect(data.bad_practices).toEqual([]);
+			expect(data.badPractices).toEqual([]);
 		});
 
-		it("should return non-empty bad_practices array when issues found", async () => {
+		it("should return non-empty badPractices array when issues found", async () => {
 			const mockResult = createCriticalIssueResponse();
 			mockGenerateObject.mockResolvedValueOnce({ object: mockResult });
 
@@ -186,8 +186,8 @@ describe("Detector API Integration", () => {
 			expect(response.status).toBe(200);
 
 			const data = (await response.json()) as DetectorResponse;
-			expect(data.bad_practices.length).toBeGreaterThan(0);
-			expect(data.bad_practices[0]).toMatchObject({
+			expect(data.badPractices.length).toBeGreaterThan(0);
+			expect(data.badPractices[0]).toMatchObject({
 				title: expect.any(String),
 				description: expect.any(String),
 				status: expect.stringMatching(
@@ -216,8 +216,8 @@ describe("Detector API Integration", () => {
 			expect(response.status).toBe(200);
 
 			const data = (await response.json()) as DetectorResponse;
-			expect(data.bad_practices).toHaveLength(1);
-			expect(data.bad_practices[0]?.status).toBe("Critical Issue");
+			expect(data.badPractices).toHaveLength(1);
+			expect(data.badPractices[0]?.status).toBe("Critical Issue");
 		});
 
 		it("should detect vague title as normal issue", async () => {
@@ -234,14 +234,14 @@ describe("Detector API Integration", () => {
 			expect(response.status).toBe(200);
 
 			const data = (await response.json()) as DetectorResponse;
-			expect(data.bad_practices).toHaveLength(1);
-			expect(data.bad_practices[0]?.status).toBe("Normal Issue");
+			expect(data.badPractices).toHaveLength(1);
+			expect(data.badPractices[0]?.status).toBe("Normal Issue");
 		});
 
 		it("should return good practice for well-formed PR", async () => {
 			const mockResult: BadPracticeResult = {
-				bad_practice_summary: "Excellent PR! All best practices followed.",
-				bad_practices: [
+				badPracticeSummary: "Excellent PR! All best practices followed.",
+				badPractices: [
 					{
 						title: "Clear and descriptive",
 						description: "Title and description clearly explain the changes",
@@ -262,14 +262,14 @@ describe("Detector API Integration", () => {
 			expect(response.status).toBe(200);
 
 			const data = (await response.json()) as DetectorResponse;
-			expect(data.bad_practices).toHaveLength(1);
-			expect(data.bad_practices[0]?.status).toBe("Good Practice");
+			expect(data.badPractices).toHaveLength(1);
+			expect(data.badPractices[0]?.status).toBe("Good Practice");
 		});
 
 		it("should handle mixed good and bad practices", async () => {
 			const mockResult: BadPracticeResult = {
-				bad_practice_summary: "Mixed results: good title but missing tests",
-				bad_practices: [
+				badPracticeSummary: "Mixed results: good title but missing tests",
+				badPractices: [
 					{
 						title: "Descriptive title",
 						description: "Title follows conventional commits",
@@ -289,9 +289,9 @@ describe("Detector API Integration", () => {
 			expect(response.status).toBe(200);
 
 			const data = (await response.json()) as DetectorResponse;
-			expect(data.bad_practices).toHaveLength(2);
+			expect(data.badPractices).toHaveLength(2);
 
-			const statuses = data.bad_practices.map((bp: BadPractice) => bp.status);
+			const statuses = data.badPractices.map((bp: BadPractice) => bp.status);
 			expect(statuses).toContain("Good Practice");
 			expect(statuses).toContain("Normal Issue");
 		});
@@ -312,28 +312,28 @@ describe("Detector API Integration", () => {
 			expect(response.status).toBe(422);
 		});
 
-		it("should return 422 for invalid pull_request_number type", async () => {
+		it("should return 422 for invalid pullRequestNumber type", async () => {
 			const response = await makeDetectorRequest({
 				...createValidRequest(),
-				pull_request_number: "not-a-number",
+				pullRequestNumber: "not-a-number",
 			});
 
 			expect(response.status).toBe(422);
 		});
 
-		it("should return 422 for invalid bad_practices format", async () => {
+		it("should return 422 for invalid badPractices format", async () => {
 			const response = await makeDetectorRequest({
 				...createValidRequest(),
-				bad_practices: "not-an-array",
+				badPractices: "not-an-array",
 			});
 
 			expect(response.status).toBe(422);
 		});
 
-		it("should return 422 for bad_practice with invalid status", async () => {
+		it("should return 422 for badPractice with invalid status", async () => {
 			const response = await makeDetectorRequest({
 				...createValidRequest(),
-				bad_practices: [
+				badPractices: [
 					{
 						title: "Test",
 						description: "Test description",
@@ -434,7 +434,7 @@ describe("Detector API Integration", () => {
 			expect(response.status).toBe(200);
 
 			const data = (await response.json()) as DetectorResponse;
-			expect(data).toHaveProperty("bad_practice_summary");
+			expect(data).toHaveProperty("badPracticeSummary");
 		});
 
 		it("should handle unicode characters in description", async () => {
@@ -450,24 +450,24 @@ describe("Detector API Integration", () => {
 			expect(response.status).toBe(200);
 		});
 
-		it("should handle empty bad_practices array in input", async () => {
+		it("should handle empty badPractices array in input", async () => {
 			const mockResult = createCriticalIssueResponse();
 			mockGenerateObject.mockResolvedValueOnce({ object: mockResult });
 
 			const response = await makeDetectorRequest(
 				createValidRequest({
-					bad_practices: [],
-					bad_practice_summary: "",
+					badPractices: [],
+					badPracticeSummary: "",
 				}),
 			);
 
 			expect(response.status).toBe(200);
 
 			const data = (await response.json()) as DetectorResponse;
-			expect(data.bad_practices).toBeDefined();
+			expect(data.badPractices).toBeDefined();
 		});
 
-		it("should handle existing bad_practices in input", async () => {
+		it("should handle existing badPractices in input", async () => {
 			const existingBadPractice = {
 				title: "Previously detected issue",
 				description: "This was found in a previous analysis",
@@ -475,8 +475,8 @@ describe("Detector API Integration", () => {
 			};
 
 			const mockResult: BadPracticeResult = {
-				bad_practice_summary: "Re-analyzed with context",
-				bad_practices: [
+				badPracticeSummary: "Re-analyzed with context",
+				badPractices: [
 					{
 						title: "Previously detected issue",
 						description: "Still present",
@@ -488,8 +488,8 @@ describe("Detector API Integration", () => {
 
 			const response = await makeDetectorRequest(
 				createValidRequest({
-					bad_practices: [existingBadPractice],
-					bad_practice_summary: "One minor issue",
+					badPractices: [existingBadPractice],
+					badPracticeSummary: "One minor issue",
 				}),
 			);
 
@@ -505,14 +505,14 @@ describe("Detector API Integration", () => {
 
 			const response = await makeDetectorRequest(
 				createValidRequest({
-					repository_name: "my-org/my-repo.js",
+					repositoryName: "my-org/my-repo.js",
 				}),
 			);
 
 			expect(response.status).toBe(200);
 
 			const data = (await response.json()) as DetectorResponse;
-			expect(data.trace_id).toBe("detector:my-org/my-repo.js#534");
+			expect(data.traceId).toBe("detector:my-org/my-repo.js#534");
 		});
 
 		it("should handle newlines and markdown in description", async () => {
@@ -546,13 +546,13 @@ npm test
 			expect(response.status).toBe(200);
 		});
 
-		it("should handle empty pull_request_template", async () => {
+		it("should handle empty pullRequestTemplate", async () => {
 			const mockResult = createGoodPRResponse();
 			mockGenerateObject.mockResolvedValueOnce({ object: mockResult });
 
 			const response = await makeDetectorRequest(
 				createValidRequest({
-					pull_request_template: "",
+					pullRequestTemplate: "",
 				}),
 			);
 
@@ -568,7 +568,7 @@ npm test
 
 				const response = await makeDetectorRequest(
 					createValidRequest({
-						lifecycle_state: state,
+						lifecycleState: state,
 					}),
 				);
 
@@ -603,8 +603,8 @@ npm test
 
 			await makeDetectorRequest(
 				createValidRequest({
-					repository_name: "TestRepo",
-					pull_request_number: 99,
+					repositoryName: "TestRepo",
+					pullRequestNumber: 99,
 				}),
 			);
 

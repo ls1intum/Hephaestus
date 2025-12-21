@@ -52,3 +52,47 @@ export function workspaceContext() {
 		await next();
 	};
 }
+
+/**
+ * Validated context with non-null userId and workspaceId.
+ * Returned by `getValidatedContext` when context is valid.
+ */
+export interface ValidatedContext {
+	readonly userId: number;
+	readonly workspaceId: number;
+	readonly workspaceSlug: string | null;
+	readonly userLogin: string | null;
+	readonly userName: string | null;
+}
+
+/**
+ * Extracts and validates user context from Hono context.
+ *
+ * Use this in handlers that require authenticated user context.
+ * Returns `null` if userId or workspaceId is missing.
+ *
+ * @example
+ * ```ts
+ * const ctx = getValidatedContext(c);
+ * if (!ctx) {
+ *   return c.json({ error: ERROR_MESSAGES.MISSING_CONTEXT }, { status: HTTP_STATUS.BAD_REQUEST });
+ * }
+ * // ctx.userId and ctx.workspaceId are guaranteed to be numbers
+ * ```
+ */
+export function getValidatedContext(c: Context<AppBindings>): ValidatedContext | null {
+	const userId = c.get("userId");
+	const workspaceId = c.get("workspaceId");
+
+	if (userId === null || workspaceId === null) {
+		return null;
+	}
+
+	return {
+		userId,
+		workspaceId,
+		workspaceSlug: c.get("workspaceSlug"),
+		userLogin: c.get("userLogin"),
+		userName: c.get("userName"),
+	};
+}

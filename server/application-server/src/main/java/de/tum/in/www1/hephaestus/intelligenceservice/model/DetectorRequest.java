@@ -50,22 +50,22 @@ public class DetectorRequest {
   public static final String JSON_PROPERTY_DESCRIPTION = "description";
   private String description;
 
-  public static final String JSON_PROPERTY_LIFECYCLE_STATE = "lifecycle_state";
+  public static final String JSON_PROPERTY_LIFECYCLE_STATE = "lifecycleState";
   private String lifecycleState;
 
-  public static final String JSON_PROPERTY_REPOSITORY_NAME = "repository_name";
+  public static final String JSON_PROPERTY_REPOSITORY_NAME = "repositoryName";
   private String repositoryName;
 
-  public static final String JSON_PROPERTY_PULL_REQUEST_NUMBER = "pull_request_number";
+  public static final String JSON_PROPERTY_PULL_REQUEST_NUMBER = "pullRequestNumber";
   private BigDecimal pullRequestNumber;
 
-  public static final String JSON_PROPERTY_BAD_PRACTICE_SUMMARY = "bad_practice_summary";
+  public static final String JSON_PROPERTY_BAD_PRACTICE_SUMMARY = "badPracticeSummary";
   private String badPracticeSummary;
 
-  public static final String JSON_PROPERTY_BAD_PRACTICES = "bad_practices";
+  public static final String JSON_PROPERTY_BAD_PRACTICES = "badPractices";
   private List<BadPractice> badPractices = new ArrayList<>();
 
-  public static final String JSON_PROPERTY_PULL_REQUEST_TEMPLATE = "pull_request_template";
+  public static final String JSON_PROPERTY_PULL_REQUEST_TEMPLATE = "pullRequestTemplate";
   private String pullRequestTemplate;
 
   public DetectorRequest() {

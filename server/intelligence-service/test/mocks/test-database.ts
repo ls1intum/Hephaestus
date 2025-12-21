@@ -1,11 +1,13 @@
 /**
  * Test Database Utilities
  *
- * These utilities support integration testing with real database operations.
- * Unlike the AI SDK which only tests in-memory, we test against a real
- * PostgreSQL database to catch real-world issues.
+ * Utilities for integration testing against a real PostgreSQL database.
+ * The database is provided by Testcontainers (see global-setup.ts).
  *
- * Strategy: Use a test database, seed minimal required data, clean up after.
+ * NO FALLBACKS - Tests require Docker. This is intentional:
+ * - Consistent test environment across all machines
+ * - CI/CD has Docker available
+ * - Developers must have Docker installed (standard practice)
  */
 
 import { eq, inArray, sql } from "drizzle-orm";
@@ -13,7 +15,7 @@ import db from "@/shared/db";
 import { chatMessage, chatMessagePart, chatMessageVote, chatThread } from "@/shared/db/schema";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Test Data Factories
+// Test ID Generation
 // ─────────────────────────────────────────────────────────────────────────────
 
 let testIdCounter = 0;
@@ -156,7 +158,6 @@ export async function getTestThreadWithMessages(threadId: string) {
 
 	let parts: (typeof chatMessagePart.$inferSelect)[] = [];
 	if (messageIds.length > 0) {
-		// Get parts using drizzle inArray
 		parts = await db
 			.select()
 			.from(chatMessagePart)

@@ -352,11 +352,11 @@ export const getVersion = <ThrowOnError extends boolean = false>(options: Option
 };
 
 /**
- * Vote on a chat message (upvote/downvote)
+ * Vote on a chat message (upvote/downvote) - idempotent upsert
  */
 export const voteMessage = <ThrowOnError extends boolean = false>(options: Options<VoteMessageData, ThrowOnError>) => {
-    return (options.client ?? _heyApiClient).post<VoteMessageResponses, VoteMessageErrors, ThrowOnError>({
-        url: '/workspaces/{workspaceSlug}/mentor/messages/chat/messages/{messageId}/vote',
+    return (options.client ?? _heyApiClient).put<VoteMessageResponses, VoteMessageErrors, ThrowOnError>({
+        url: '/workspaces/{workspaceSlug}/mentor/messages/{messageId}/vote',
         ...options,
         headers: {
             'Content-Type': 'application/json',

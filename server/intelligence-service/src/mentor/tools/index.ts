@@ -120,7 +120,6 @@ export {
 export {
 	buildIssueUrl,
 	buildPrUrl,
-	buildReviewUrl,
 	getWorkspaceRepoIds,
 	type ToolContext,
 } from "./context";

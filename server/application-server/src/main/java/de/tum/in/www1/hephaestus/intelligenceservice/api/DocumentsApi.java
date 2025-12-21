@@ -4,9 +4,9 @@ import de.tum.in.www1.hephaestus.intelligenceservice.ApiClient;
 import de.tum.in.www1.hephaestus.intelligenceservice.BaseApi;
 
 import de.tum.in.www1.hephaestus.intelligenceservice.model.CreateDocumentRequest;
-import de.tum.in.www1.hephaestus.intelligenceservice.model.DetectBadPractices500Response;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.Document;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.DocumentSummary;
+import de.tum.in.www1.hephaestus.intelligenceservice.model.ErrorResponse;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 

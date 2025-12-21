@@ -9,7 +9,7 @@
  */
 
 import type { UIMessage } from "ai";
-import type { ThreadDetail } from "./chat.schema";
+import type { ThreadDetail } from "@/mentor/threads/threads.schema";
 import type { PersistedMessage, PersistedPart } from "./data";
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -6,9 +6,10 @@
  */
 
 import { describe, expectTypeOf, it } from "vitest";
-import type { ChatRequestBody, ThreadDetail } from "@/mentor/chat/chat.schema";
+import type { ChatRequestBody } from "@/mentor/chat/chat.schema";
 import type { UMessage } from "@/mentor/chat/chat.transformer";
 import type { PersistedMessage, PersistedPart } from "@/mentor/chat/data";
+import type { ThreadDetail } from "@/mentor/threads/threads.schema";
 
 describe("Type Contracts", () => {
 	describe("ChatRequestBody", () => {

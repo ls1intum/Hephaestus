@@ -85,6 +85,13 @@ export type DocumentSummary = {
     userId: number;
 };
 
+export type ErrorResponse = {
+    /**
+     * Human-readable error message
+     */
+    error: string;
+};
+
 export type LabelInfo = {
     color: string;
     id: number;
@@ -891,15 +898,11 @@ export type ListDocumentsErrors = {
     /**
      * Missing context
      */
-    400: {
-        error: string;
-    };
+    400: ErrorResponse;
     /**
      * Internal error
      */
-    500: {
-        error: string;
-    };
+    500: ErrorResponse;
 };
 
 export type ListDocumentsError = ListDocumentsErrors[keyof ListDocumentsErrors];
@@ -932,15 +935,11 @@ export type CreateDocumentErrors = {
     /**
      * Missing required context
      */
-    400: {
-        error: string;
-    };
+    400: ErrorResponse;
     /**
      * Internal error
      */
-    500: {
-        error: string;
-    };
+    500: ErrorResponse;
 };
 
 export type CreateDocumentError = CreateDocumentErrors[keyof CreateDocumentErrors];
@@ -971,21 +970,15 @@ export type DeleteDocumentErrors = {
     /**
      * Missing context
      */
-    400: {
-        error: string;
-    };
+    400: ErrorResponse;
     /**
      * Not found
      */
-    404: {
-        error: string;
-    };
+    404: ErrorResponse;
     /**
      * Internal error
      */
-    500: {
-        error: string;
-    };
+    500: ErrorResponse;
 };
 
 export type DeleteDocumentError = DeleteDocumentErrors[keyof DeleteDocumentErrors];
@@ -1016,21 +1009,15 @@ export type GetDocumentErrors = {
     /**
      * Missing context
      */
-    400: {
-        error: string;
-    };
+    400: ErrorResponse;
     /**
      * Not found
      */
-    404: {
-        error: string;
-    };
+    404: ErrorResponse;
     /**
      * Internal error
      */
-    500: {
-        error: string;
-    };
+    500: ErrorResponse;
 };
 
 export type GetDocumentError = GetDocumentErrors[keyof GetDocumentErrors];
@@ -1064,21 +1051,15 @@ export type UpdateDocumentErrors = {
     /**
      * Missing context
      */
-    400: {
-        error: string;
-    };
+    400: ErrorResponse;
     /**
      * Not found
      */
-    404: {
-        error: string;
-    };
+    404: ErrorResponse;
     /**
      * Internal error
      */
-    500: {
-        error: string;
-    };
+    500: ErrorResponse;
 };
 
 export type UpdateDocumentError = UpdateDocumentErrors[keyof UpdateDocumentErrors];
@@ -1111,21 +1092,15 @@ export type DeleteDocumentVersionsAfterErrors = {
     /**
      * Missing context
      */
-    400: {
-        error: string;
-    };
+    400: ErrorResponse;
     /**
      * Not found
      */
-    404: {
-        error: string;
-    };
+    404: ErrorResponse;
     /**
      * Internal error
      */
-    500: {
-        error: string;
-    };
+    500: ErrorResponse;
 };
 
 export type DeleteDocumentVersionsAfterError = DeleteDocumentVersionsAfterErrors[keyof DeleteDocumentVersionsAfterErrors];
@@ -1159,21 +1134,15 @@ export type ListVersionsErrors = {
     /**
      * Missing context
      */
-    400: {
-        error: string;
-    };
+    400: ErrorResponse;
     /**
      * Not found
      */
-    404: {
-        error: string;
-    };
+    404: ErrorResponse;
     /**
      * Internal error
      */
-    500: {
-        error: string;
-    };
+    500: ErrorResponse;
 };
 
 export type ListVersionsError = ListVersionsErrors[keyof ListVersionsErrors];
@@ -1205,21 +1174,15 @@ export type GetVersionErrors = {
     /**
      * Missing context
      */
-    400: {
-        error: string;
-    };
+    400: ErrorResponse;
     /**
      * Not found
      */
-    404: {
-        error: string;
-    };
+    404: ErrorResponse;
     /**
      * Internal error
      */
-    500: {
-        error: string;
-    };
+    500: ErrorResponse;
 };
 
 export type GetVersionError = GetVersionErrors[keyof GetVersionErrors];
@@ -1246,28 +1209,22 @@ export type VoteMessageData = {
         messageId: string;
     };
     query?: never;
-    url: '/workspaces/{workspaceSlug}/mentor/messages/chat/messages/{messageId}/vote';
+    url: '/workspaces/{workspaceSlug}/mentor/messages/{messageId}/vote';
 };
 
 export type VoteMessageErrors = {
     /**
      * Missing context
      */
-    400: {
-        error: string;
-    };
+    400: ErrorResponse;
     /**
      * Message not found
      */
-    404: {
-        error: string;
-    };
+    404: ErrorResponse;
     /**
      * Internal error
      */
-    500: {
-        error: string;
-    };
+    500: ErrorResponse;
 };
 
 export type VoteMessageError = VoteMessageErrors[keyof VoteMessageErrors];
@@ -1297,15 +1254,11 @@ export type GetGroupedThreadsErrors = {
     /**
      * Missing context
      */
-    400: {
-        error: string;
-    };
+    400: ErrorResponse;
     /**
      * Internal error
      */
-    500: {
-        error: string;
-    };
+    500: ErrorResponse;
 };
 
 export type GetGroupedThreadsError = GetGroupedThreadsErrors[keyof GetGroupedThreadsErrors];
@@ -1336,27 +1289,19 @@ export type GetThreadErrors = {
     /**
      * Missing required context
      */
-    400: {
-        error: string;
-    };
+    400: ErrorResponse;
     /**
      * Thread not found
      */
-    404: {
-        error: string;
-    };
+    404: ErrorResponse;
     /**
      * Internal error
      */
-    500: {
-        error: string;
-    };
+    500: ErrorResponse;
     /**
      * Service temporarily unavailable
      */
-    503: {
-        error: string;
-    };
+    503: ErrorResponse;
 };
 
 export type GetThreadError = GetThreadErrors[keyof GetThreadErrors];

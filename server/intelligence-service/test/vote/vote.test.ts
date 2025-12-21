@@ -7,6 +7,7 @@
  * - Vote persistence (upsert behavior)
  * - Validation errors
  * - Edge cases
+ *
  */
 
 import { eq } from "drizzle-orm";
@@ -58,18 +59,15 @@ describe("Vote Feature", () => {
 	 * Helper to vote on a message via the API.
 	 */
 	function voteMessage(messageId: string, isUpvoted: boolean) {
-		const request = new Request(
-			`http://localhost/mentor/messages/chat/messages/${messageId}/vote`,
-			{
-				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-					"x-user-id": String(fixtures.user.id),
-					"x-workspace-id": String(fixtures.workspace.id),
-				},
-				body: JSON.stringify({ isUpvoted }),
+		const request = new Request(`http://localhost/mentor/messages/${messageId}/vote`, {
+			method: "PUT",
+			headers: {
+				"Content-Type": "application/json",
+				"x-user-id": String(fixtures.user.id),
+				"x-workspace-id": String(fixtures.workspace.id),
 			},
-		);
+			body: JSON.stringify({ isUpvoted }),
+		});
 		return app.fetch(request);
 	}
 
@@ -195,14 +193,11 @@ describe("Vote Feature", () => {
 		it("should return 422 for invalid messageId format (not UUID)", async () => {
 			const invalidMessageId = "not-a-valid-uuid";
 
-			const request = new Request(
-				`http://localhost/mentor/messages/chat/messages/${invalidMessageId}/vote`,
-				{
-					method: "POST",
-					headers: { "Content-Type": "application/json" },
-					body: JSON.stringify({ isUpvoted: true }),
-				},
-			);
+			const request = new Request(`http://localhost/mentor/messages/${invalidMessageId}/vote`, {
+				method: "PUT",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ isUpvoted: true }),
+			});
 
 			const response = await app.fetch(request);
 			// OpenAPI/Zod validation returns 422 Unprocessable Entity
@@ -210,8 +205,8 @@ describe("Vote Feature", () => {
 		});
 
 		it("should return 400 for empty messageId", async () => {
-			const request = new Request("http://localhost/mentor/messages/chat/messages//vote", {
-				method: "POST",
+			const request = new Request("http://localhost/mentor/messages//vote", {
+				method: "PUT",
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify({ isUpvoted: true }),
 			});
@@ -224,14 +219,11 @@ describe("Vote Feature", () => {
 		it("should return 422 for missing isUpvoted field", async () => {
 			const { messageId } = await createThreadWithMessage();
 
-			const request = new Request(
-				`http://localhost/mentor/messages/chat/messages/${messageId}/vote`,
-				{
-					method: "POST",
-					headers: { "Content-Type": "application/json" },
-					body: JSON.stringify({}),
-				},
-			);
+			const request = new Request(`http://localhost/mentor/messages/${messageId}/vote`, {
+				method: "PUT",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({}),
+			});
 
 			const response = await app.fetch(request);
 			// OpenAPI/Zod validation returns 422 Unprocessable Entity
@@ -241,13 +233,10 @@ describe("Vote Feature", () => {
 		it("should return 400 or 422 for missing request body", async () => {
 			const { messageId } = await createThreadWithMessage();
 
-			const request = new Request(
-				`http://localhost/mentor/messages/chat/messages/${messageId}/vote`,
-				{
-					method: "POST",
-					headers: { "Content-Type": "application/json" },
-				},
-			);
+			const request = new Request(`http://localhost/mentor/messages/${messageId}/vote`, {
+				method: "PUT",
+				headers: { "Content-Type": "application/json" },
+			});
 
 			const response = await app.fetch(request);
 			// Missing body can return 400 (Bad Request) or 422 (Unprocessable Entity)
@@ -257,14 +246,11 @@ describe("Vote Feature", () => {
 		it("should return 422 for invalid isUpvoted type (string)", async () => {
 			const { messageId } = await createThreadWithMessage();
 
-			const request = new Request(
-				`http://localhost/mentor/messages/chat/messages/${messageId}/vote`,
-				{
-					method: "POST",
-					headers: { "Content-Type": "application/json" },
-					body: JSON.stringify({ isUpvoted: "true" }),
-				},
-			);
+			const request = new Request(`http://localhost/mentor/messages/${messageId}/vote`, {
+				method: "PUT",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ isUpvoted: "true" }),
+			});
 
 			const response = await app.fetch(request);
 			// OpenAPI/Zod validation returns 422 Unprocessable Entity
@@ -274,14 +260,11 @@ describe("Vote Feature", () => {
 		it("should return 422 for invalid isUpvoted type (number)", async () => {
 			const { messageId } = await createThreadWithMessage();
 
-			const request = new Request(
-				`http://localhost/mentor/messages/chat/messages/${messageId}/vote`,
-				{
-					method: "POST",
-					headers: { "Content-Type": "application/json" },
-					body: JSON.stringify({ isUpvoted: 1 }),
-				},
-			);
+			const request = new Request(`http://localhost/mentor/messages/${messageId}/vote`, {
+				method: "PUT",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ isUpvoted: 1 }),
+			});
 
 			const response = await app.fetch(request);
 			// OpenAPI/Zod validation returns 422 Unprocessable Entity
@@ -341,14 +324,11 @@ describe("Vote Feature", () => {
 		it("should handle null isUpvoted field", async () => {
 			const { messageId } = await createThreadWithMessage();
 
-			const request = new Request(
-				`http://localhost/mentor/messages/chat/messages/${messageId}/vote`,
-				{
-					method: "POST",
-					headers: { "Content-Type": "application/json" },
-					body: JSON.stringify({ isUpvoted: null }),
-				},
-			);
+			const request = new Request(`http://localhost/mentor/messages/${messageId}/vote`, {
+				method: "PUT",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ isUpvoted: null }),
+			});
 
 			const response = await app.fetch(request);
 			// null is not a valid boolean, OpenAPI/Zod returns 422 Unprocessable Entity

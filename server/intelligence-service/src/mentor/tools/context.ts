@@ -98,13 +98,3 @@ export function buildIssueUrl(repoNameWithOwner: string | null, issueNumber: num
 	}
 	return `https://github.com/${repoNameWithOwner}/issues/${issueNumber}`;
 }
-
-/**
- * Build GitHub review URL from PR URL and review ID.
- */
-export function buildReviewUrl(prUrl: string, reviewId: number): string {
-	if (!prUrl) {
-		return "";
-	}
-	return `${prUrl}#pullrequestreview-${reviewId}`;
-}

@@ -3,6 +3,7 @@
  *
  * Tests that resources are properly isolated by user and workspace.
  * Verifies that users cannot access other users' data.
+ *
  */
 
 import { v4 as uuidv4 } from "uuid";
@@ -75,8 +76,8 @@ describe("Authorization", () => {
 
 	function makeVoteRequest(messageId: string, userId: number, workspaceId: number) {
 		return app.fetch(
-			new Request(`http://localhost/mentor/messages/chat/messages/${messageId}/vote`, {
-				method: "POST",
+			new Request(`http://localhost/mentor/messages/${messageId}/vote`, {
+				method: "PUT",
 				headers: {
 					"Content-Type": "application/json",
 					"x-user-id": String(userId),
@@ -133,8 +134,8 @@ describe("Authorization", () => {
 
 		it("should reject vote without context", async () => {
 			const response = await app.fetch(
-				new Request(`http://localhost/mentor/messages/chat/messages/${uuidv4()}/vote`, {
-					method: "POST",
+				new Request(`http://localhost/mentor/messages/${uuidv4()}/vote`, {
+					method: "PUT",
 					headers: {
 						"Content-Type": "application/json",
 						// Missing context headers

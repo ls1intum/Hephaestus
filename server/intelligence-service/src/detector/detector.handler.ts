@@ -35,17 +35,17 @@ export const detectBadPracticesHandler: AppRouteHandler<DetectBadPracticesRoute>
 	const {
 		title,
 		description,
-		lifecycle_state,
-		repository_name,
-		pull_request_number,
-		bad_practice_summary,
-		bad_practices,
-		pull_request_template,
+		lifecycleState,
+		repositoryName,
+		pullRequestNumber,
+		badPracticeSummary,
+		badPractices,
+		pullRequestTemplate,
 	} = c.req.valid("json");
 
 	// Construct session ID for grouping related traces
 	// Format: "detector:<repo>#<pr>" to avoid collision with mentor sessions
-	const sessionId = `detector:${repository_name}#${pull_request_number}`;
+	const sessionId = `detector:${repositoryName}#${pullRequestNumber}`;
 
 	try {
 		// ───────────────────────────────────────────────────────────────────
@@ -55,11 +55,11 @@ export const detectBadPracticesHandler: AppRouteHandler<DetectBadPracticesRoute>
 		const renderedPrompt = prompt.compile({
 			title,
 			description,
-			lifecycle_state,
-			repository_name,
-			bad_practice_summary,
-			bad_practices: JSON.stringify(bad_practices),
-			pull_request_template,
+			lifecycle_state: lifecycleState,
+			repository_name: repositoryName,
+			bad_practice_summary: badPracticeSummary,
+			bad_practices: JSON.stringify(badPractices),
+			pull_request_template: pullRequestTemplate,
 		});
 
 		// ───────────────────────────────────────────────────────────────────
@@ -70,10 +70,10 @@ export const detectBadPracticesHandler: AppRouteHandler<DetectBadPracticesRoute>
 		// the observe() wrapper which conflicts with Hono's strict typing.
 		const telemetryOptions = buildTelemetryOptions(prompt, TRACE_NAME, {
 			sessionId,
-			repository: repository_name,
-			pullRequestNumber: pull_request_number,
-			lifecycleState: lifecycle_state,
-			existingBadPracticeCount: bad_practices.length,
+			repository: repositoryName,
+			pullRequestNumber,
+			lifecycleState,
+			existingBadPracticeCount: badPractices.length,
 			model: env.DETECTION_MODEL_NAME,
 		});
 
@@ -94,19 +94,19 @@ export const detectBadPracticesHandler: AppRouteHandler<DetectBadPracticesRoute>
 		// Format: detector:<repo>#<pr> (used as session ID in Langfuse)
 		const response = detectorResponseSchema.parse({
 			...object,
-			trace_id: sessionId,
+			traceId: sessionId,
 		});
 
 		// Log success metrics
-		const badPracticeCount = response.bad_practices.length;
-		const criticalCount = response.bad_practices.filter(
+		const badPracticeCount = response.badPractices.length;
+		const criticalCount = response.badPractices.filter(
 			(bp) => bp.status === "Critical Issue",
 		).length;
 
 		logger.info(
 			{
-				repository_name,
-				pull_request_number,
+				repositoryName,
+				pullRequestNumber,
 				badPracticeCount,
 				criticalCount,
 				sessionId,
@@ -124,8 +124,8 @@ export const detectBadPracticesHandler: AppRouteHandler<DetectBadPracticesRoute>
 			{
 				error: errorMessage,
 				errorType: error instanceof Error ? error.name : "Unknown",
-				repository_name,
-				pull_request_number,
+				repositoryName,
+				pullRequestNumber,
 			},
 			"Detector failed",
 		);

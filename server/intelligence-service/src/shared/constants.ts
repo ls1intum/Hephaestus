@@ -8,6 +8,7 @@ export const ERROR_MESSAGES = {
 	INTERNAL_ERROR: "Internal error",
 	SERVICE_UNAVAILABLE: "Service temporarily unavailable",
 	INVALID_REQUEST: "Invalid request body",
+	MISSING_CONTEXT: "Missing required context (userId or workspaceId)",
 
 	// Resource-specific errors
 	THREAD_NOT_FOUND: "Thread not found",

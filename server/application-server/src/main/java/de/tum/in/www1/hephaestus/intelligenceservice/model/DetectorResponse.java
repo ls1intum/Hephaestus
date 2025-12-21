@@ -38,13 +38,13 @@ import org.hibernate.validator.constraints.*;
 })
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
 public class DetectorResponse {
-  public static final String JSON_PROPERTY_BAD_PRACTICE_SUMMARY = "bad_practice_summary";
+  public static final String JSON_PROPERTY_BAD_PRACTICE_SUMMARY = "badPracticeSummary";
   private String badPracticeSummary;
 
-  public static final String JSON_PROPERTY_BAD_PRACTICES = "bad_practices";
+  public static final String JSON_PROPERTY_BAD_PRACTICES = "badPractices";
   private List<BadPractice> badPractices = new ArrayList<>();
 
-  public static final String JSON_PROPERTY_TRACE_ID = "trace_id";
+  public static final String JSON_PROPERTY_TRACE_ID = "traceId";
   private String traceId;
 
   public DetectorResponse() {

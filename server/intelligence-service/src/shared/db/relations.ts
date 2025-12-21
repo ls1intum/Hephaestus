@@ -12,8 +12,10 @@ import {
 	document,
 	issue,
 	issueAssignee,
+	issueBlocking,
 	issueComment,
 	issueLabel,
+	issueType,
 	label,
 	milestone,
 	organization,
@@ -35,7 +37,73 @@ import {
 	workspaceSlugHistory,
 } from "./schema";
 
+export const milestoneRelations = relations(milestone, ({ one, many }) => ({
+	repository: one(repository, {
+		fields: [milestone.repositoryId],
+		references: [repository.id],
+	}),
+	user: one(user, {
+		fields: [milestone.creatorId],
+		references: [user.id],
+	}),
+	issues: many(issue),
+}));
+
+export const repositoryRelations = relations(repository, ({ one, many }) => ({
+	milestones: many(milestone),
+	organization: one(organization, {
+		fields: [repository.organizationId],
+		references: [organization.id],
+	}),
+	issues: many(issue),
+	labels: many(label),
+	repositoryCollaborators: many(repositoryCollaborator),
+	teamRepositoryPermissions: many(teamRepositoryPermission),
+}));
+
+export const userRelations = relations(user, ({ many }) => ({
+	milestones: many(milestone),
+	issueComments: many(issueComment),
+	pullRequestReviews: many(pullRequestReview),
+	pullRequestReviewComments: many(pullRequestReviewComment),
+	issues_mergedById: many(issue, {
+		relationName: "issue_mergedById_user_id",
+	}),
+	issues_authorId: many(issue, {
+		relationName: "issue_authorId_user_id",
+	}),
+	chatThreads: many(chatThread),
+	pullRequestReviewThreads: many(pullRequestReviewThread),
+	contributionEvents: many(contributionEvent),
+	issueAssignees: many(issueAssignee),
+	pullRequestRequestedReviewers: many(pullRequestRequestedReviewers),
+	teamMemberships: many(teamMembership),
+	repositoryCollaborators: many(repositoryCollaborator),
+	workspaceMemberships: many(workspaceMembership),
+	documents: many(document),
+}));
+
+export const organizationRelations = relations(organization, ({ many }) => ({
+	repositories: many(repository),
+	workspaces: many(workspace),
+	issueTypes: many(issueType),
+}));
+
+export const issueCommentRelations = relations(issueComment, ({ one }) => ({
+	issue: one(issue, {
+		fields: [issueComment.issueId],
+		references: [issue.id],
+	}),
+	user: one(user, {
+		fields: [issueComment.authorId],
+		references: [user.id],
+	}),
+}));
+
 export const issueRelations = relations(issue, ({ one, many }) => ({
+	issueComments: many(issueComment),
+	pullRequestReviews: many(pullRequestReview),
+	pullRequestReviewComments: many(pullRequestReviewComment),
 	repository: one(repository, {
 		fields: [issue.repositoryId],
 		references: [repository.id],
@@ -54,76 +122,29 @@ export const issueRelations = relations(issue, ({ one, many }) => ({
 		references: [user.id],
 		relationName: "issue_authorId_user_id",
 	}),
-	issueComments: many(issueComment),
-	pullRequestReviews: many(pullRequestReview),
-	pullRequestReviewComments: many(pullRequestReviewComment),
+	issue: one(issue, {
+		fields: [issue.parentIssueId],
+		references: [issue.id],
+		relationName: "issue_parentIssueId_issue_id",
+	}),
+	issues: many(issue, {
+		relationName: "issue_parentIssueId_issue_id",
+	}),
+	issueType: one(issueType, {
+		fields: [issue.issueTypeId],
+		references: [issueType.id],
+	}),
 	badPracticeDetections: many(badPracticeDetection),
 	pullrequestbadpractices: many(pullrequestbadpractice),
 	pullRequestReviewThreads: many(pullRequestReviewThread),
 	issueLabels: many(issueLabel),
 	issueAssignees: many(issueAssignee),
 	pullRequestRequestedReviewers: many(pullRequestRequestedReviewers),
-}));
-
-export const repositoryRelations = relations(repository, ({ one, many }) => ({
-	issues: many(issue),
-	milestones: many(milestone),
-	organization: one(organization, {
-		fields: [repository.organizationId],
-		references: [organization.id],
+	issueBlockings_blockedIssueId: many(issueBlocking, {
+		relationName: "issueBlocking_blockedIssueId_issue_id",
 	}),
-	labels: many(label),
-	repositoryCollaborators: many(repositoryCollaborator),
-	teamRepositoryPermissions: many(teamRepositoryPermission),
-}));
-
-export const milestoneRelations = relations(milestone, ({ one, many }) => ({
-	issues: many(issue),
-	repository: one(repository, {
-		fields: [milestone.repositoryId],
-		references: [repository.id],
-	}),
-	user: one(user, {
-		fields: [milestone.creatorId],
-		references: [user.id],
-	}),
-}));
-
-export const userRelations = relations(user, ({ many }) => ({
-	issues_mergedById: many(issue, {
-		relationName: "issue_mergedById_user_id",
-	}),
-	issues_authorId: many(issue, {
-		relationName: "issue_authorId_user_id",
-	}),
-	milestones: many(milestone),
-	issueComments: many(issueComment),
-	pullRequestReviews: many(pullRequestReview),
-	pullRequestReviewComments: many(pullRequestReviewComment),
-	chatThreads: many(chatThread),
-	pullRequestReviewThreads: many(pullRequestReviewThread),
-	contributionEvents: many(contributionEvent),
-	issueAssignees: many(issueAssignee),
-	pullRequestRequestedReviewers: many(pullRequestRequestedReviewers),
-	teamMemberships: many(teamMembership),
-	repositoryCollaborators: many(repositoryCollaborator),
-	workspaceMemberships: many(workspaceMembership),
-	documents: many(document),
-}));
-
-export const organizationRelations = relations(organization, ({ many }) => ({
-	repositories: many(repository),
-	workspaces: many(workspace),
-}));
-
-export const issueCommentRelations = relations(issueComment, ({ one }) => ({
-	issue: one(issue, {
-		fields: [issueComment.issueId],
-		references: [issue.id],
-	}),
-	user: one(user, {
-		fields: [issueComment.authorId],
-		references: [user.id],
+	issueBlockings_blockingIssueId: many(issueBlocking, {
+		relationName: "issueBlocking_blockingIssueId_issue_id",
 	}),
 }));
 
@@ -195,6 +216,14 @@ export const pullRequestReviewThreadRelations = relations(
 	}),
 );
 
+export const issueTypeRelations = relations(issueType, ({ one, many }) => ({
+	issues: many(issue),
+	organization: one(organization, {
+		fields: [issueType.organizationId],
+		references: [organization.id],
+	}),
+}));
+
 export const labelRelations = relations(label, ({ one, many }) => ({
 	repository: one(repository, {
 		fields: [label.repositoryId],
@@ -226,6 +255,14 @@ export const pullrequestbadpracticeRelations = relations(
 	}),
 );
 
+export const badPracticeDetectionRelations = relations(badPracticeDetection, ({ one, many }) => ({
+	issue: one(issue, {
+		fields: [badPracticeDetection.pullrequestId],
+		references: [issue.id],
+	}),
+	pullrequestbadpractices: many(pullrequestbadpractice),
+}));
+
 export const workspaceRelations = relations(workspace, ({ one, many }) => ({
 	organization: one(organization, {
 		fields: [workspace.organizationId],
@@ -236,14 +273,6 @@ export const workspaceRelations = relations(workspace, ({ one, many }) => ({
 	workspaceSlugHistories: many(workspaceSlugHistory),
 	workspaceMemberships: many(workspaceMembership),
 	documents: many(document),
-}));
-
-export const badPracticeDetectionRelations = relations(badPracticeDetection, ({ one, many }) => ({
-	issue: one(issue, {
-		fields: [badPracticeDetection.pullrequestId],
-		references: [issue.id],
-	}),
-	pullrequestbadpractices: many(pullrequestbadpractice),
 }));
 
 export const repositoryToMonitorRelations = relations(repositoryToMonitor, ({ one }) => ({
@@ -357,6 +386,19 @@ export const teamRelations = relations(team, ({ many }) => ({
 	teamLabels: many(teamLabels),
 	teamMemberships: many(teamMembership),
 	teamRepositoryPermissions: many(teamRepositoryPermission),
+}));
+
+export const issueBlockingRelations = relations(issueBlocking, ({ one }) => ({
+	issue_blockedIssueId: one(issue, {
+		fields: [issueBlocking.blockedIssueId],
+		references: [issue.id],
+		relationName: "issueBlocking_blockedIssueId_issue_id",
+	}),
+	issue_blockingIssueId: one(issue, {
+		fields: [issueBlocking.blockingIssueId],
+		references: [issue.id],
+		relationName: "issueBlocking_blockingIssueId_issue_id",
+	}),
 }));
 
 export const teamMembershipRelations = relations(teamMembership, ({ one }) => ({

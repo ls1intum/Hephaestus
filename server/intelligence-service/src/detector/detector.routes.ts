@@ -1,12 +1,8 @@
-import { createRoute, z } from "@hono/zod-openapi";
+import { createRoute } from "@hono/zod-openapi";
 import * as HttpStatusCodes from "stoker/http-status-codes";
 import { jsonContent, jsonContentRequired } from "stoker/openapi/helpers";
+import { ErrorResponseSchema } from "@/shared/http/schemas";
 import { detectorRequestSchema, detectorResponseSchema, tags } from "./detector.schema";
-
-/** Schema for error responses */
-const errorResponseSchema = z.object({
-	error: z.string(),
-});
 
 export const detectBadPractices = createRoute({
 	path: "/",
@@ -20,7 +16,7 @@ export const detectBadPractices = createRoute({
 	responses: {
 		[HttpStatusCodes.OK]: jsonContent(detectorResponseSchema, "Detection response"),
 		[HttpStatusCodes.INTERNAL_SERVER_ERROR]: jsonContent(
-			errorResponseSchema,
+			ErrorResponseSchema,
 			"Internal server error",
 		),
 	},

@@ -3,6 +3,7 @@
  *
  * Verifies the tool registry creates all tools correctly
  * and that tools are consistent across the codebase.
+ *
  */
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";

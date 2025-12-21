@@ -4,7 +4,7 @@ import de.tum.in.www1.hephaestus.intelligenceservice.ApiClient;
 import de.tum.in.www1.hephaestus.intelligenceservice.BaseApi;
 
 import de.tum.in.www1.hephaestus.intelligenceservice.model.ChatThreadGroup;
-import de.tum.in.www1.hephaestus.intelligenceservice.model.DetectBadPractices500Response;
+import de.tum.in.www1.hephaestus.intelligenceservice.model.ErrorResponse;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.MentorChatRequest;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.StreamPart;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.ThreadDetail;

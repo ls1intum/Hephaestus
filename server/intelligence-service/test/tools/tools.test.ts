@@ -6,6 +6,7 @@
  * 1. Parallel-safe - can be called simultaneously
  * 2. User-context injected - never ask for username
  * 3. Workspace-scoped - only relevant repositories
+ *
  */
 
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";

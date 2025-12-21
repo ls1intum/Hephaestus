@@ -6,6 +6,10 @@ export type BadPracticeDetection = typeof badPracticeDetection.$inferSelect;
 
 export const tags = ["Detector"] as const;
 
+/**
+ * Bad practice status enum.
+ * Maps to the analysis result categories.
+ */
 export const badPracticeStatusSchema = z.enum([
 	"Good Practice",
 	"Fixed",
@@ -26,30 +30,33 @@ export const badPracticeSchema = z
 
 export type BadPractice = z.infer<typeof badPracticeSchema>;
 
+/**
+ * Detector request schema for analyzing pull request quality.
+ */
 export const detectorRequestSchema = z
 	.object({
 		title: z.string(),
 		description: z.string(),
-		lifecycle_state: z.string(),
-		repository_name: z.string(),
-		pull_request_number: z.number(),
-		bad_practice_summary: z.string(),
-		bad_practices: z.array(badPracticeSchema),
-		pull_request_template: z.string(),
+		lifecycleState: z.string(),
+		repositoryName: z.string(),
+		pullRequestNumber: z.number(),
+		badPracticeSummary: z.string(),
+		badPractices: z.array(badPracticeSchema),
+		pullRequestTemplate: z.string(),
 	})
 	.openapi("DetectorRequest");
 
 export const badPracticeResultSchema = z
 	.object({
-		bad_practice_summary: z.string(),
-		bad_practices: z.array(badPracticeSchema),
+		badPracticeSummary: z.string(),
+		badPractices: z.array(badPracticeSchema),
 	})
 	.openapi("BadPracticeResult");
 
 export const detectorResponseSchema = badPracticeResultSchema
 	.extend({
 		/** Trace ID for linking requests to Langfuse traces. Format: detector:<repo>#<pr> */
-		trace_id: z.string(),
+		traceId: z.string(),
 	})
 	.openapi("DetectorResponse");
 

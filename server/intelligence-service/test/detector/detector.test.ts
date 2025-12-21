@@ -95,12 +95,12 @@ describe("Detector Schemas", () => {
 		const validRequest: DetectorRequest = {
 			title: "feat: add user authentication",
 			description: "Implements JWT-based authentication",
-			lifecycle_state: "Ready for review",
-			repository_name: "my-app",
-			pull_request_number: 123,
-			bad_practice_summary: "",
-			bad_practices: [],
-			pull_request_template: "## Description\n\n## Changes",
+			lifecycleState: "Ready for review",
+			repositoryName: "my-app",
+			pullRequestNumber: 123,
+			badPracticeSummary: "",
+			badPractices: [],
+			pullRequestTemplate: "## Description\n\n## Changes",
 		};
 
 		it("should accept valid detector requests", () => {
@@ -111,14 +111,14 @@ describe("Detector Schemas", () => {
 		it("should accept requests with existing bad practices", () => {
 			const requestWithPractices = {
 				...validRequest,
-				bad_practices: [
+				badPractices: [
 					{
 						title: "Short description",
 						description: "Description is less than 50 characters",
 						status: "Minor Issue",
 					},
 				],
-				bad_practice_summary: "One minor issue detected",
+				badPracticeSummary: "One minor issue detected",
 			};
 
 			const result = detectorRequestSchema.safeParse(requestWithPractices);
@@ -129,8 +129,8 @@ describe("Detector Schemas", () => {
 			const invalidCases = [
 				{ ...validRequest, title: undefined },
 				{ ...validRequest, description: undefined },
-				{ ...validRequest, lifecycle_state: undefined },
-				{ ...validRequest, pull_request_number: undefined },
+				{ ...validRequest, lifecycleState: undefined },
+				{ ...validRequest, pullRequestNumber: undefined },
 			];
 
 			for (const invalidCase of invalidCases) {
@@ -139,10 +139,10 @@ describe("Detector Schemas", () => {
 			}
 		});
 
-		it("should reject non-numeric pull_request_number", () => {
+		it("should reject non-numeric pullRequestNumber", () => {
 			const result = detectorRequestSchema.safeParse({
 				...validRequest,
-				pull_request_number: "123", // string instead of number
+				pullRequestNumber: "123", // string instead of number
 			});
 			expect(result.success).toBe(false);
 		});
@@ -151,8 +151,8 @@ describe("Detector Schemas", () => {
 	describe("badPracticeResultSchema", () => {
 		it("should accept valid result with bad practices", () => {
 			const validResult: BadPracticeResult = {
-				bad_practice_summary: "Found 2 issues that need attention",
-				bad_practices: [
+				badPracticeSummary: "Found 2 issues that need attention",
+				badPractices: [
 					{
 						title: "Empty description",
 						description: "The PR description is empty",
@@ -172,8 +172,8 @@ describe("Detector Schemas", () => {
 
 		it("should accept result with empty bad practices array", () => {
 			const cleanResult: BadPracticeResult = {
-				bad_practice_summary: "No issues found! Great work!",
-				bad_practices: [],
+				badPracticeSummary: "No issues found! Great work!",
+				badPractices: [],
 			};
 
 			const result = badPracticeResultSchema.safeParse(cleanResult);
@@ -182,31 +182,31 @@ describe("Detector Schemas", () => {
 	});
 
 	describe("detectorResponseSchema", () => {
-		it("should extend result with trace_id", () => {
+		it("should extend result with traceId", () => {
 			const response = {
-				bad_practice_summary: "One issue found",
-				bad_practices: [
+				badPracticeSummary: "One issue found",
+				badPractices: [
 					{
 						title: "Test issue",
 						description: "Test description",
 						status: "Minor Issue",
 					},
 				],
-				trace_id: "detector:repo#123",
+				traceId: "detector:repo#123",
 			};
 
 			const result = detectorResponseSchema.safeParse(response);
 			expect(result.success).toBe(true);
 			if (result.success) {
-				expect(result.data.trace_id).toBe("detector:repo#123");
+				expect(result.data.traceId).toBe("detector:repo#123");
 			}
 		});
 
-		it("should reject response without trace_id", () => {
+		it("should reject response without traceId", () => {
 			const responseWithoutTrace = {
-				bad_practice_summary: "Summary",
-				bad_practices: [],
-				// missing trace_id
+				badPracticeSummary: "Summary",
+				badPractices: [],
+				// missing traceId
 			};
 
 			const result = detectorResponseSchema.safeParse(responseWithoutTrace);
@@ -266,12 +266,12 @@ describe("Detector Handler Contract", () => {
 		const requiredFields: (keyof DetectorRequest)[] = [
 			"title",
 			"description",
-			"lifecycle_state",
-			"repository_name",
-			"pull_request_number",
-			"bad_practice_summary",
-			"bad_practices",
-			"pull_request_template",
+			"lifecycleState",
+			"repositoryName",
+			"pullRequestNumber",
+			"badPracticeSummary",
+			"badPractices",
+			"pullRequestTemplate",
 		];
 
 		// Verify schema shape matches expected fields
@@ -284,15 +284,15 @@ describe("Detector Handler Contract", () => {
 	it("should produce response matching schema", () => {
 		// This verifies the handler output contract
 		const mockHandlerOutput = {
-			bad_practice_summary: "Found 1 critical issue",
-			bad_practices: [
+			badPracticeSummary: "Found 1 critical issue",
+			badPractices: [
 				{
 					title: "Empty description",
 					description: "PR description is empty which makes review difficult",
 					status: "Critical Issue" as const,
 				},
 			],
-			trace_id: "detector:repo#123",
+			traceId: "detector:repo#123",
 		};
 
 		const result = detectorResponseSchema.safeParse(mockHandlerOutput);
@@ -307,12 +307,12 @@ describe("Detector Handler Contract", () => {
 			const request = {
 				title: "Test PR",
 				description: "Test",
-				lifecycle_state: state,
-				repository_name: "repo",
-				pull_request_number: 1,
-				bad_practice_summary: "",
-				bad_practices: [],
-				pull_request_template: "",
+				lifecycleState: state,
+				repositoryName: "repo",
+				pullRequestNumber: 1,
+				badPracticeSummary: "",
+				badPractices: [],
+				pullRequestTemplate: "",
 			};
 
 			const result = detectorRequestSchema.safeParse(request);

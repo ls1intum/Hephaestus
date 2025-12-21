@@ -28,7 +28,7 @@ import org.springframework.lang.NonNull;
 @Entity
 @Table(
     name = "chat_message",
-    indexes = { @Index(name = "idx_chat_message_thread_created", columnList = "thread_id, createdAt") }
+    indexes = { @Index(name = "idx_chat_message_thread_created", columnList = "thread_id, created_at") }
 )
 @Getter
 @Setter
