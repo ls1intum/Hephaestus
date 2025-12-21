@@ -175,4 +175,19 @@ try {
 	}
 }
 
+// Run biome format on the generated files to ensure consistent formatting across platforms
+import { execSync } from "node:child_process";
+
+const filesToFormat = [schemaDst, relationsDst].filter((f) => fs.existsSync(f));
+if (filesToFormat.length > 0) {
+	try {
+		execSync(`npx biome format --write ${filesToFormat.join(" ")}`, {
+			cwd: path.resolve(__dirname, ".."),
+			stdio: "inherit",
+		});
+	} catch (error) {
+		console.warn("[post-introspect] Failed to run biome format:", error);
+	}
+}
+
 console.log("[post-introspect] Patched schema.ts with ts-nocheck and cleanup");
