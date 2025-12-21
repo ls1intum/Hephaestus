@@ -201,10 +201,12 @@ jobs:
         if: matrix.check == 'intelligence-service-quality'
         run: |
           echo "🔍 Running intelligence-service quality checks..."
-          # Use npm install (not npm ci) to resolve platform-specific optional dependencies
-          # npm ci uses exact lockfile which may not include linux binaries when generated on macOS
+          # Clean install and explicitly install linux biome binary
+          # The package-lock.json from macOS may not include linux platform binaries
           rm -rf node_modules server/intelligence-service/node_modules ~/.npm
           npm install --no-audit --progress=false
+          # Explicitly install the linux platform binary for biome
+          npm install @biomejs/cli-linux-x64@2.3.8 --save-dev --no-audit --progress=false
 
           ISSUES_FOUND=()
 
