@@ -457,7 +457,8 @@ jobs:
 
           # Install Linux biome binary - npm ci may restore cached node_modules from macOS
           # which doesn't include the platform-specific binary for Linux
-          npm install @biomejs/cli-linux-x64 --save-optional --prefer-offline || true
+          # Pin version to match package.json for consistent formatting
+          npm install @biomejs/cli-linux-x64@2.3.8 --save-optional --prefer-offline || true
 
           # Start PostgreSQL service for model operations
           echo "🐘 Starting PostgreSQL service..."
