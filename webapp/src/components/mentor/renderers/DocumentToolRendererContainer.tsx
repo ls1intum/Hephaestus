@@ -49,25 +49,18 @@ function extractDocumentId(part: {
 	return "";
 }
 
-export const DocumentToolRendererContainer: PartRenderer<
-	"createDocument" | "updateDocument"
-> = ({ message, part, variant }) => {
+export const DocumentToolRendererContainer: PartRenderer<"createDocument" | "updateDocument"> = ({
+	message,
+	part,
+	variant,
+}) => {
 	const documentId = extractDocumentId(part);
 
-	const {
-		latest,
-		draft,
-		selectedVersion,
-		isLoading,
-		isStreaming,
-		openOverlay,
-	} = useDocumentArtifact({ documentId });
+	const { latest, draft, selectedVersion, isLoading, isStreaming, openOverlay } =
+		useDocumentArtifact({ documentId });
 
-	const currentDoc = isStreaming
-		? (draft ?? latest ?? selectedVersion)
-		: selectedVersion || latest;
-	const hasContent =
-		typeof currentDoc?.content === "string" && currentDoc.content.length > 0;
+	const currentDoc = isStreaming ? (draft ?? latest ?? selectedVersion) : selectedVersion || latest;
+	const hasContent = typeof currentDoc?.content === "string" && currentDoc.content.length > 0;
 
 	const isEmbeddedInArtifact = variant === "artifact";
 	if (

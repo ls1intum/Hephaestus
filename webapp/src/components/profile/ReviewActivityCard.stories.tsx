@@ -24,13 +24,7 @@ const meta = {
 		state: {
 			description: "The state of the review",
 			control: "select",
-			options: [
-				"APPROVED",
-				"CHANGES_REQUESTED",
-				"COMMENTED",
-				"DISMISSED",
-				"PENDING",
-			],
+			options: ["APPROVED", "CHANGES_REQUESTED", "COMMENTED", "DISMISSED", "PENDING"],
 		},
 		submittedAt: {
 			description: "When the review was submitted (Date object)",
@@ -195,8 +189,7 @@ export const WithCodeInTitle: Story = {
 		submittedAt: new Date(),
 		htmlUrl: "https://github.com/ls1intum/Hephaestus/pull/42",
 		pullRequest: {
-			title:
-				"Update `LeaderboardTable` component and fix `ProfileContent` layout",
+			title: "Update `LeaderboardTable` component and fix `ProfileContent` layout",
 			number: 42,
 			repository: {
 				name: "Hephaestus",

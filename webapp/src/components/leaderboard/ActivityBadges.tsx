@@ -6,11 +6,7 @@ import {
 	FileDiffIcon,
 } from "@primer/octicons-react";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-	Tooltip,
-	TooltipContent,
-	TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import type { ReviewedPullRequest } from "./ReviewsPopover";
 import { ReviewsPopover } from "./ReviewsPopover";
@@ -49,11 +45,7 @@ export function ActivityBadges({
 		return (
 			<div className={cn("flex items-center gap-2", className)}>
 				{[40, 15, 25, 35, 30].map((width, index) => (
-					<Skeleton
-						key={`activity-badge-skeleton-${index}`}
-						className="h-4"
-						style={{ width }}
-					/>
+					<Skeleton key={`activity-badge-skeleton-${index}`} className="h-4" style={{ width }} />
 				))}
 			</div>
 		);
@@ -63,10 +55,7 @@ export function ActivityBadges({
 		<div className={cn("flex items-center gap-2", className)}>
 			{reviewedPullRequests.length > 0 && (
 				<>
-					<ReviewsPopover
-						reviewedPRs={reviewedPullRequests}
-						highlight={highlightReviews}
-					/>
+					<ReviewsPopover reviewedPRs={reviewedPullRequests} highlight={highlightReviews} />
 					<div className="flex items-center text-github-muted-foreground">
 						<ChevronLeftIcon className="h-4 w-4" />
 					</div>

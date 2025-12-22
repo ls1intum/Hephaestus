@@ -1,13 +1,5 @@
 import type { LucideIcon } from "lucide-react";
-import {
-	AlertTriangle,
-	Ban,
-	Bug,
-	Check,
-	Flame,
-	Rocket,
-	XOctagon,
-} from "lucide-react";
+import { AlertTriangle, Ban, Bug, Check, Flame, Rocket, XOctagon } from "lucide-react";
 import type { PullRequestBadPractice } from "@/api/types.gen";
 
 // State configuration for bad practice types
@@ -52,9 +44,7 @@ export const stateConfig: {
 };
 
 // Filter practices by category
-export function filterGoodAndBadPractices(
-	allBadPractices: PullRequestBadPractice[],
-): {
+export function filterGoodAndBadPractices(allBadPractices: PullRequestBadPractice[]): {
 	goodPractices: PullRequestBadPractice[];
 	badPractices: PullRequestBadPractice[];
 	resolvedPractices: PullRequestBadPractice[];

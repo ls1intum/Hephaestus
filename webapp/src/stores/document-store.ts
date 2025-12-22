@@ -10,10 +10,7 @@ type DocumentState = {
 type DocumentsState = {
 	documents: Record<string, DocumentState>;
 	setStreaming: (documentId: string, isStreaming: boolean) => void;
-	setEmptyDraft: (
-		documentId: string,
-		params?: { title?: string; id?: string },
-	) => void;
+	setEmptyDraft: (documentId: string, params?: { title?: string; id?: string }) => void;
 	appendDraftDelta: (documentId: string, delta: string) => void;
 	finishDraft: (documentId: string) => void;
 };
@@ -64,8 +61,7 @@ export const useDocumentsStore = create<DocumentsState>()((set) => ({
 			const prev: DocumentState = state.documents[documentId] ?? {
 				isStreaming: false,
 			};
-			const nextContent =
-				((prev.draft?.content as string | undefined) ?? "") + (delta ?? "");
+			const nextContent = ((prev.draft?.content as string | undefined) ?? "") + (delta ?? "");
 
 			const draft = (
 				prev.draft

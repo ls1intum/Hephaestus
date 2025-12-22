@@ -98,8 +98,7 @@ const mockActivityData: Activity = {
 			htmlUrl: "http://example.com/pr/12",
 			createdAt: new Date("2024-01-01"),
 			updatedAt: new Date("2024-01-02"),
-			badPracticeSummary:
-				"We found 2 bad practices in this pull request. Please fix them.",
+			badPracticeSummary: "We found 2 bad practices in this pull request. Please fix them.",
 			badPractices: [
 				{
 					id: 1,
@@ -110,8 +109,7 @@ const mockActivityData: Activity = {
 				{
 					id: 2,
 					title: "Unchecked checkbox in description",
-					description:
-						"Unchecked checkboxes in the description are not allowed.",
+					description: "Unchecked checkboxes in the description are not allowed.",
 					state: "MINOR_ISSUE",
 				},
 			],

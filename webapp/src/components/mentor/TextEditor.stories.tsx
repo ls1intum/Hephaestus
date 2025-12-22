@@ -45,8 +45,7 @@ export const Empty: Story = {
  */
 export const BasicText: Story = {
 	args: {
-		content:
-			"Welcome to the text editor! Start typing to see the rich text features in action.",
+		content: "Welcome to the text editor! Start typing to see the rich text features in action.",
 	},
 };
 

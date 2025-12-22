@@ -33,10 +33,7 @@ const faqItems = [
 
 export function LandingFAQSection() {
 	return (
-		<section
-			id="faq"
-			className="w-full py-8 md:py-16 bg-gradient-to-b from-background to-muted/30"
-		>
+		<section id="faq" className="w-full py-8 md:py-16 bg-gradient-to-b from-background to-muted/30">
 			<div className="container px-4 md:px-6">
 				<div className="mb-10 text-center max-w-3xl mx-auto">
 					<Badge className="mb-4" variant="outline">
@@ -55,12 +52,8 @@ export function LandingFAQSection() {
 								value={`item-${index}`}
 								className="border-b border-muted"
 							>
-								<AccordionTrigger className="text-left font-medium">
-									{item.q}
-								</AccordionTrigger>
-								<AccordionContent className="text-muted-foreground">
-									{item.a}
-								</AccordionContent>
+								<AccordionTrigger className="text-left font-medium">{item.q}</AccordionTrigger>
+								<AccordionContent className="text-muted-foreground">{item.a}</AccordionContent>
 							</AccordionItem>
 						))}
 					</Accordion>

@@ -75,8 +75,7 @@ export function Chat({
 	partRenderers,
 }: ChatProps) {
 	// Internal scroll management for the chat container
-	const { containerRef, endRef, isAtBottom, scrollToBottom } =
-		useScrollToBottom();
+	const { containerRef, endRef, isAtBottom, scrollToBottom } = useScrollToBottom();
 
 	// Use internal scroll management if parent doesn't provide it
 	const actualIsAtBottom = parentScrollToBottom ? parentIsAtBottom : isAtBottom;
@@ -111,17 +110,9 @@ export function Chat({
 									<AlertCircle className="size-4" />
 									<AlertTitle>Something went wrong</AlertTitle>
 									<AlertDescription className="flex items-center justify-between gap-4">
-										<span>
-											An error occurred while generating the response. Please
-											try again.
-										</span>
+										<span>An error occurred while generating the response. Please try again.</span>
 										{onReload && (
-											<Button
-												variant="outline"
-												size="sm"
-												onClick={onReload}
-												className="shrink-0"
-											>
+											<Button variant="outline" size="sm" onClick={onReload} className="shrink-0">
 												<RotateCcw className="size-4" />
 												Try again
 											</Button>

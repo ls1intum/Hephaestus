@@ -14,8 +14,7 @@ const meta = {
 	tags: ["autodocs"],
 	argTypes: {
 		artifactKind: {
-			description:
-				"Type of artifact being loaded - determines skeleton layout and structure",
+			description: "Type of artifact being loaded - determines skeleton layout and structure",
 			control: "select",
 			options: ["text"],
 		},

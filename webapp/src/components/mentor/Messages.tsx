@@ -64,8 +64,7 @@ export function Messages({
 		if (parts.length === 0) return false;
 		for (const p of parts) {
 			if (p.type === "text" && (p.text ?? "").trim().length > 0) return true;
-			if (p.type === "reasoning" && (p.text ?? "").trim().length > 0)
-				return true;
+			if (p.type === "reasoning" && (p.text ?? "").trim().length > 0) return true;
 			if (p.type === "file") return true;
 			if (typeof p.type === "string" && p.type.startsWith("tool-")) {
 				const state = (p as { state?: string }).state;
@@ -86,17 +85,13 @@ export function Messages({
 	};
 
 	return (
-		<ScrollArea
-			className="flex flex-col w-full flex-1 min-h-0"
-			ref={containerRef}
-		>
+		<ScrollArea className="flex flex-col w-full flex-1 min-h-0" ref={containerRef}>
 			<div
 				className={cn(
 					"flex flex-col w-full pb-16",
 					{
 						// Default layout - centered like the input
-						"min-w-0 gap-2 flex-1 pt-4 relative mx-auto md:max-w-3xl":
-							!isArtifact,
+						"min-w-0 gap-2 flex-1 pt-4 relative mx-auto md:max-w-3xl": !isArtifact,
 						// Artifact layout
 						"gap-2 flex-1 px-0 pt-4": isArtifact,
 						"gap-4": readonly,
@@ -121,9 +116,7 @@ export function Messages({
 						<PreviewMessage
 							key={message.id}
 							message={message}
-							isLoading={
-								status === "streaming" && messages.length - 1 === index
-							}
+							isLoading={status === "streaming" && messages.length - 1 === index}
 							vote={votes?.find((vote) => vote.messageId === message.id)}
 							readonly={readonly}
 							variant={variant}
@@ -141,8 +134,7 @@ export function Messages({
 						if (messages.length === 0) return <ThinkingMessage />;
 						const last = messages[messages.length - 1];
 						const isUser = last.role === "user";
-						const assistantHasVisible =
-							last.role === "assistant" && hasVisibleContent(last);
+						const assistantHasVisible = last.role === "assistant" && hasVisibleContent(last);
 						return isUser || !assistantHasVisible ? <ThinkingMessage /> : null;
 					})()}
 

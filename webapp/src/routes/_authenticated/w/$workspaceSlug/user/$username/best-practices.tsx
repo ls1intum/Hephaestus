@@ -170,10 +170,7 @@ export function BestPracticesContainer() {
 		});
 	};
 
-	const onProvideBadPracticeFeedback = (
-		badPracticeId: number,
-		feedback: BadPracticeFeedback,
-	) => {
+	const onProvideBadPracticeFeedback = (badPracticeId: number, feedback: BadPracticeFeedback) => {
 		if (!hasWorkspace) {
 			return;
 		}
@@ -187,9 +184,7 @@ export function BestPracticesContainer() {
 		<PracticesPage
 			activityData={activityQuery.data}
 			isLoading={activityQuery.isLoading}
-			isDetectingBadPractices={
-				detect.isPending || detectBadPracticesForPullRequest.isPending
-			}
+			isDetectingBadPractices={detect.isPending || detectBadPracticesForPullRequest.isPending}
 			username={username}
 			displayName={displayName}
 			currUserIsDashboardUser={currUserIsDashboardUser}

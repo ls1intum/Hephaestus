@@ -4,11 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import type { DateRange } from "react-day-picker";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
-import {
-	Popover,
-	PopoverContent,
-	PopoverTrigger,
-} from "@/components/ui/popover";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
 	Select,
 	SelectContent,
@@ -37,13 +33,7 @@ export interface ProfileTimeframePickerProps {
 }
 
 /** Icon component for each preset type */
-function PresetIcon({
-	preset,
-	className,
-}: {
-	preset: TimeframePreset;
-	className?: string;
-}) {
+function PresetIcon({ preset, className }: { preset: TimeframePreset; className?: string }) {
 	const iconClass = cn("h-4 w-4 shrink-0", className);
 
 	switch (preset) {
@@ -83,29 +73,15 @@ export function ProfileTimeframePicker({
 		return undefined;
 	});
 
-	const lastEmittedRef = useRef<{ after: string; before?: string } | null>(
-		null,
-	);
+	const lastEmittedRef = useRef<{ after: string; before?: string } | null>(null);
 
 	useEffect(() => {
 		if (userInteracted) return;
-		const detected = detectPresetFromDates(
-			afterDate,
-			beforeDate,
-			schedule,
-			enableAllActivity,
-		);
+		const detected = detectPresetFromDates(afterDate, beforeDate, schedule, enableAllActivity);
 		if (detected !== selectedPreset) {
 			setSelectedPreset(detected);
 		}
-	}, [
-		afterDate,
-		beforeDate,
-		schedule,
-		enableAllActivity,
-		userInteracted,
-		selectedPreset,
-	]);
+	}, [afterDate, beforeDate, schedule, enableAllActivity, userInteracted, selectedPreset]);
 
 	useEffect(() => {
 		if (!onTimeframeChange) return;
@@ -189,19 +165,14 @@ export function ProfileTimeframePicker({
 
 	// Trigger shows detailed label (with dates), dropdown shows simple labels
 	const selectDisplayValue =
-		selectedPreset === "custom"
-			? "Custom range"
-			: formatSelectedLabel(selectedPreset, schedule);
+		selectedPreset === "custom" ? "Custom range" : formatSelectedLabel(selectedPreset, schedule);
 
 	return (
 		<div className="flex flex-wrap items-center gap-2">
 			<Select value={selectedPreset} onValueChange={handlePresetChange}>
 				<SelectTrigger className="w-auto min-w-[260px]">
 					<div className="flex items-center gap-2">
-						<PresetIcon
-							preset={selectedPreset}
-							className="text-muted-foreground"
-						/>
+						<PresetIcon preset={selectedPreset} className="text-muted-foreground" />
 						<SelectValue>{selectDisplayValue}</SelectValue>
 					</div>
 				</SelectTrigger>

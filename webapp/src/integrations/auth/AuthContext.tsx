@@ -43,9 +43,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 	const [isLoading, setIsLoading] = useState(true);
 	const [username, setUsername] = useState<string | undefined>(undefined);
 	const [userRoles, setUserRoles] = useState<string[]>([]);
-	const [userProfile, setUserProfile] = useState<UserProfile | undefined>(
-		undefined,
-	);
+	const [userProfile, setUserProfile] = useState<UserProfile | undefined>(undefined);
 
 	// Initialize Keycloak once
 	useEffect(() => {
@@ -58,10 +56,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 			) {
 				const baseUrl = window.location.pathname + window.location.search;
 				if (process.env.NODE_ENV !== "production") {
-					console.debug(
-						"AuthProvider: Cleaning URL from auth params, redirecting to:",
-						baseUrl,
-					);
+					console.debug("AuthProvider: Cleaning URL from auth params, redirecting to:", baseUrl);
 				}
 
 				// Use history API to replace the current URL without auth parameters
@@ -102,10 +97,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 			globalState.initPromise
 				.then((authenticated) => {
 					if (process.env.NODE_ENV !== "production") {
-						console.debug(
-							"AuthProvider: Existing initialization completed:",
-							authenticated,
-						);
+						console.debug("AuthProvider: Existing initialization completed:", authenticated);
 					}
 					if (authenticated) {
 						const userName = keycloakService.getUsername();
@@ -135,10 +127,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 				}
 				const authenticated = await keycloakService.init();
 				if (process.env.NODE_ENV !== "production") {
-					console.debug(
-						"AuthProvider: Keycloak initialized, authenticated:",
-						authenticated,
-					);
+					console.debug("AuthProvider: Keycloak initialized, authenticated:", authenticated);
 				}
 
 				if (authenticated) {
@@ -156,10 +145,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 				globalState.initPromise = null;
 				return authenticated;
 			} catch (error) {
-				console.error(
-					"AuthProvider: Failed to initialize authentication",
-					error,
-				);
+				console.error("AuthProvider: Failed to initialize authentication", error);
 				globalState.initPromise = null;
 				throw error;
 			} finally {

@@ -106,9 +106,7 @@ export function TextArtifactContainer({
 		content: {
 			// Prefer streaming draft content while streaming; otherwise selected version
 			content:
-				(doc.isStreaming ? doc.draft?.content : undefined) ??
-				doc.selectedVersion?.content ??
-				"",
+				(doc.isStreaming ? doc.draft?.content : undefined) ?? doc.selectedVersion?.content ?? "",
 			mode: "edit",
 			onSaveContent: (c, _debounce) => {
 				// Block saves while streaming or when viewing history

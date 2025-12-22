@@ -37,10 +37,7 @@ export function SuggestedActions({ onAction }: SuggestedActionsProps) {
 	];
 
 	return (
-		<div
-			data-testid="suggested-actions"
-			className="grid sm:grid-cols-2 gap-2 w-full"
-		>
+		<div data-testid="suggested-actions" className="grid sm:grid-cols-2 gap-2 w-full">
 			{suggestedActions.map((suggestedAction, index) => (
 				<motion.div
 					initial={{ opacity: 0, y: 20 }}
@@ -58,9 +55,7 @@ export function SuggestedActions({ onAction }: SuggestedActionsProps) {
 						className="text-left bg-background border rounded-xl px-4 py-3.5 text-sm flex-1 gap-1 sm:flex-col w-full h-auto justify-start items-start"
 					>
 						<span className="font-medium">{suggestedAction.title}</span>
-						<span className="text-muted-foreground">
-							{suggestedAction.label}
-						</span>
+						<span className="text-muted-foreground">{suggestedAction.label}</span>
 					</Button>
 				</motion.div>
 			))}

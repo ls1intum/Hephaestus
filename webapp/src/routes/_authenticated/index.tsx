@@ -11,8 +11,7 @@ export const Route = createFileRoute("/_authenticated/")({
 function RedirectToWorkspace() {
 	const navigate = useNavigate();
 	const { isAuthenticated } = useAuth();
-	const { workspaceSlug, workspaces, selectWorkspace, isLoading } =
-		useActiveWorkspaceSlug();
+	const { workspaceSlug, workspaces, selectWorkspace, isLoading } = useActiveWorkspaceSlug();
 
 	useEffect(() => {
 		if (!isAuthenticated || isLoading) return;
@@ -25,14 +24,7 @@ function RedirectToWorkspace() {
 				replace: true,
 			});
 		}
-	}, [
-		isAuthenticated,
-		isLoading,
-		workspaceSlug,
-		workspaces,
-		selectWorkspace,
-		navigate,
-	]);
+	}, [isAuthenticated, isLoading, workspaceSlug, workspaces, selectWorkspace, navigate]);
 
 	if (!isAuthenticated || isLoading) {
 		return null;

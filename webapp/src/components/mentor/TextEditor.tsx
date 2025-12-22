@@ -5,19 +5,9 @@ import { EditorView } from "prosemirror-view";
 import { useEffect, useRef } from "react";
 import "prosemirror-view/style/prosemirror.css";
 
-import {
-	documentSchema,
-	handleTransaction,
-	headingRule,
-} from "@/lib/text-editor/config";
-import {
-	buildContentFromDocument,
-	buildDocumentFromContent,
-} from "@/lib/text-editor/functions";
-import {
-	streamingGhost,
-	streamingGhostPlugin,
-} from "@/lib/text-editor/streamingGhost";
+import { documentSchema, handleTransaction, headingRule } from "@/lib/text-editor/config";
+import { buildContentFromDocument, buildDocumentFromContent } from "@/lib/text-editor/functions";
+import { streamingGhost, streamingGhostPlugin } from "@/lib/text-editor/streamingGhost";
 
 type TextEditorProps = {
 	content: string;
@@ -26,18 +16,11 @@ type TextEditorProps = {
 	isCurrentVersion: boolean;
 };
 
-export function TextEditor({
-	content,
-	onSaveContent,
-	status,
-	isCurrentVersion,
-}: TextEditorProps) {
+export function TextEditor({ content, onSaveContent, status, isCurrentVersion }: TextEditorProps) {
 	const containerRef = useRef<HTMLDivElement>(null);
 	const editorRef = useRef<EditorView | null>(null);
 	// Initialize to opposite of streaming so we detect "entering stream" on first render
-	const prevStatusRef = useRef<TextEditorProps["status"]>(
-		status === "streaming" ? "idle" : status,
-	);
+	const prevStatusRef = useRef<TextEditorProps["status"]>(status === "streaming" ? "idle" : status);
 	const streamBufRef = useRef<string>(""); // what we have already pushed as ghost
 	const ghostActiveRef = useRef<boolean>(false);
 
@@ -146,11 +129,7 @@ export function TextEditor({
 		const currentContent = buildContentFromDocument(view.state.doc);
 		if (currentContent !== content) {
 			const newDoc = buildDocumentFromContent(content ?? "");
-			const tr = view.state.tr.replaceWith(
-				0,
-				view.state.doc.content.size,
-				newDoc.content,
-			);
+			const tr = view.state.tr.replaceWith(0, view.state.doc.content.size, newDoc.content);
 			tr.setMeta("no-save", true);
 			view.dispatch(tr);
 		}

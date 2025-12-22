@@ -5,10 +5,7 @@ import Header from "@/components/core/Header";
 import { useSurveyNotificationStore } from "@/stores/survey-notification-store";
 import type { PostHogSurvey } from "@/types/survey";
 import { SurveyContainer } from "./survey-container";
-import {
-	SURVEY_LAYOUT_ID,
-	SurveyNotificationButton,
-} from "./survey-notification-button";
+import { SURVEY_LAYOUT_ID, SurveyNotificationButton } from "./survey-notification-button";
 
 const meta = {
 	title: "Surveys/SurveyNotificationButton",
@@ -86,11 +83,7 @@ export const FullPagePreview: Story = {
 					<main className="p-8 max-w-2xl mx-auto">
 						<h1 className="text-2xl font-bold mb-4">Dashboard</h1>
 						<p className="text-muted-foreground">
-							{pending
-								? "Click the badge to reopen."
-								: visible
-									? "Click X to dismiss."
-									: "Done."}
+							{pending ? "Click the badge to reopen." : visible ? "Click X to dismiss." : "Done."}
 						</p>
 					</main>
 

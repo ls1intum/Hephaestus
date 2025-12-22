@@ -31,9 +31,7 @@ export const Leagues = [
  * Returns the league tier based on league points
  */
 export function getLeagueFromPoints(points: number) {
-	return Leagues.find(
-		(league) => points >= league.minPoints && points < league.maxPoints,
-	);
+	return Leagues.find((league) => points >= league.minPoints && points < league.maxPoints);
 }
 
 /**

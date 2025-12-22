@@ -11,15 +11,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
-import {
-	afterEach,
-	beforeEach,
-	describe,
-	expect,
-	it,
-	type Mock,
-	vi,
-} from "vitest";
+import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 
 // Mock external dependencies before importing the hook
 vi.mock("@ai-sdk/react", () => ({
@@ -79,17 +71,11 @@ const mockUseChat = useChat as Mock;
 const mockUseActiveWorkspaceSlug = useActiveWorkspaceSlug as Mock;
 
 // Test utilities
-function createMockMessage(
-	role: "user" | "assistant",
-	text: string,
-	id?: string,
-): ChatMessage {
+function createMockMessage(role: "user" | "assistant", text: string, id?: string): ChatMessage {
 	return {
 		id: id ?? `msg-${Math.random().toString(36).slice(2)}`,
 		role,
-		parts: [
-			{ type: "text", text, state: role === "assistant" ? "done" : undefined },
-		],
+		parts: [{ type: "text", text, state: role === "assistant" ? "done" : undefined }],
 	} as ChatMessage;
 }
 
@@ -109,9 +95,7 @@ function createQueryClient() {
 
 function createWrapper(queryClient: QueryClient) {
 	return function Wrapper({ children }: { children: ReactNode }) {
-		return (
-			<QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
-		);
+		return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
 	};
 }
 
@@ -177,10 +161,9 @@ describe("useMentorChat", () => {
 		});
 
 		it("should use provided threadId when available", () => {
-			const { result } = renderHook(
-				() => useMentorChat({ threadId: "existing-thread-123" }),
-				{ wrapper: createWrapper(queryClient) },
-			);
+			const { result } = renderHook(() => useMentorChat({ threadId: "existing-thread-123" }), {
+				wrapper: createWrapper(queryClient),
+			});
 
 			expect(result.current.currentThreadId).toBe("existing-thread-123");
 		});
@@ -209,10 +192,9 @@ describe("useMentorChat", () => {
 				isLoading: true,
 			});
 
-			const { result } = renderHook(
-				() => useMentorChat({ threadId: "thread-123" }),
-				{ wrapper: createWrapper(queryClient) },
-			);
+			const { result } = renderHook(() => useMentorChat({ threadId: "thread-123" }), {
+				wrapper: createWrapper(queryClient),
+			});
 
 			expect(result.current.isLoading).toBe(true);
 		});
@@ -309,10 +291,7 @@ describe("useMentorChat", () => {
 		it("should reflect 'streaming' status during response streaming", () => {
 			mockUseChat.mockReturnValue({
 				id: "mock-uuid-123",
-				messages: [
-					createMockMessage("user", "Hello"),
-					createMockMessage("assistant", "Hi..."),
-				],
+				messages: [createMockMessage("user", "Hello"), createMockMessage("assistant", "Hi...")],
 				status: "streaming",
 				error: undefined,
 				sendMessage: mockSendMessage,
@@ -340,10 +319,9 @@ describe("useMentorChat", () => {
 				isLoading: true,
 			});
 
-			const { result: loadingResult, rerender } = renderHook(
-				() => useMentorChat({}),
-				{ wrapper: createWrapper(queryClient) },
-			);
+			const { result: loadingResult, rerender } = renderHook(() => useMentorChat({}), {
+				wrapper: createWrapper(queryClient),
+			});
 
 			expect(loadingResult.current.isLoading).toBe(true);
 
@@ -475,9 +453,7 @@ describe("useMentorChat", () => {
 		it("should only trigger greeting once even if called multiple times", async () => {
 			const mockFetch = vi.fn().mockResolvedValue({
 				ok: true,
-				body: createMockSSEStream([
-					'data: {"type":"finish","finishReason":"stop"}\n\n',
-				]),
+				body: createMockSSEStream(['data: {"type":"finish","finishReason":"stop"}\n\n']),
 			});
 			global.fetch = mockFetch;
 
@@ -706,10 +682,9 @@ describe("useMentorChat", () => {
 				messages: threadMessages,
 			});
 
-			const { result } = renderHook(
-				() => useMentorChat({ threadId: "thread-123" }),
-				{ wrapper: createWrapper(queryClient) },
-			);
+			const { result } = renderHook(() => useMentorChat({ threadId: "thread-123" }), {
+				wrapper: createWrapper(queryClient),
+			});
 
 			// The hook should set the threadId as currentThreadId
 			expect(result.current.currentThreadId).toBe("thread-123");
@@ -744,10 +719,7 @@ describe("useMentorChat", () => {
 			});
 
 			queryClient.setQueryData(
-				[
-					"getThread",
-					{ path: { workspaceSlug: "test-workspace", threadId: "thread-123" } },
-				],
+				["getThread", { path: { workspaceSlug: "test-workspace", threadId: "thread-123" } }],
 				{
 					id: "thread-123",
 					messages: [createMockMessage("user", "Test")],
@@ -845,11 +817,7 @@ describe("useMentorChat", () => {
 				result.current.openArtifactForDocument(mockDocument as never, mockRect);
 			});
 
-			expect(mockOpenArtifact).toHaveBeenCalledWith(
-				"text:doc-123",
-				mockRect,
-				"Test Doc",
-			);
+			expect(mockOpenArtifact).toHaveBeenCalledWith("text:doc-123", mockRect, "Test Doc");
 		});
 
 		it("should expose closeArtifact", () => {
@@ -883,9 +851,7 @@ describe("useMentorChat", () => {
 			});
 
 			// Capture the onData callback
-			let capturedOnData:
-				| ((dataPart: { type: string; data?: unknown }) => void)
-				| undefined;
+			let capturedOnData: ((dataPart: { type: string; data?: unknown }) => void) | undefined;
 			mockUseChat.mockImplementation((options) => {
 				capturedOnData = options.onData;
 				return {

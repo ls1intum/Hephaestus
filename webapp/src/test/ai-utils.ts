@@ -114,9 +114,7 @@ export interface MockChatThreadGroup {
 	}>;
 }
 
-export function createMockGroupedThreads(
-	count: number = 2,
-): MockChatThreadGroup[] {
+export function createMockGroupedThreads(count: number = 2): MockChatThreadGroup[] {
 	const threads = Array.from({ length: count }, (_, i) => ({
 		id: `thread-${i}`,
 		title: `Thread ${i}`,
@@ -137,10 +135,7 @@ export function formatSSEChunk(chunk: UIMessageChunk): string {
 /**
  * Create SSE stream chunks for a simple text response
  */
-export function createTextStreamChunks(
-	text: string,
-	partId: string = "0",
-): string[] {
+export function createTextStreamChunks(text: string, partId: string = "0"): string[] {
 	const words = text.split(" ");
 	const chunks: UIMessageChunk[] = [
 		{ type: "start" },
@@ -165,9 +160,7 @@ export function createTextStreamChunks(
 /**
  * Create a mock ReadableStream that emits SSE chunks
  */
-export function createMockSSEStream(
-	chunks: string[],
-): ReadableStream<Uint8Array> {
+export function createMockSSEStream(chunks: string[]): ReadableStream<Uint8Array> {
 	const encoder = new TextEncoder();
 	let index = 0;
 
@@ -229,9 +222,7 @@ export async function waitForStatus(
 	const start = Date.now();
 	while (getStatus() !== targetStatus) {
 		if (Date.now() - start > timeout) {
-			throw new Error(
-				`Timeout waiting for status "${targetStatus}", current: "${getStatus()}"`,
-			);
+			throw new Error(`Timeout waiting for status "${targetStatus}", current: "${getStatus()}"`);
 		}
 		await new Promise((resolve) => setTimeout(resolve, 10));
 	}

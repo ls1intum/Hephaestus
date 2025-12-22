@@ -1,8 +1,4 @@
-import {
-	createFileRoute,
-	useLocation,
-	useNavigate,
-} from "@tanstack/react-router";
+import { createFileRoute, useLocation, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef } from "react";
 import { ArtifactOverlayContainer } from "@/components/mentor/ArtifactOverlayContainer";
 import { Chat } from "@/components/mentor/Chat";
@@ -11,9 +7,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useMentorChat } from "@/hooks/useMentorChat";
 import type { ChatMessage } from "@/lib/types";
 
-export const Route = createFileRoute(
-	"/_authenticated/w/$workspaceSlug/mentor/$threadId",
-)({
+export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/mentor/$threadId")({
 	component: ThreadContainer,
 });
 
@@ -133,8 +127,7 @@ function ThreadContainer() {
 			<div className="h-full flex items-center justify-center p-6">
 				<div className="text-center">
 					<p className="text-destructive mb-4">
-						Failed to load conversation. Thread may not exist or you don't have
-						access to it.
+						Failed to load conversation. Thread may not exist or you don't have access to it.
 					</p>
 					<p className="text-sm text-muted-foreground">
 						Try refreshing the page or go back to the main chat.

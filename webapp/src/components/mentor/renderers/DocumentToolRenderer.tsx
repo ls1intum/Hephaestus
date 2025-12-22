@@ -8,9 +8,7 @@ import {
 import { DocumentTool } from "../DocumentTool";
 import type { PartRendererProps } from "./types";
 
-type DocumentToolRendererProps = PartRendererProps<
-	"createDocument" | "updateDocument"
-> & {
+type DocumentToolRendererProps = PartRendererProps<"createDocument" | "updateDocument"> & {
 	onDocumentClick?: (rect: DOMRect) => void;
 };
 
@@ -78,10 +76,7 @@ const renderOutputState = (
 	return null;
 };
 
-export const DocumentToolRenderer = ({
-	part,
-	onDocumentClick,
-}: DocumentToolRendererProps) => {
+export const DocumentToolRenderer = ({ part, onDocumentClick }: DocumentToolRendererProps) => {
 	const state = part.state;
 
 	// Exhaustive switch to handle all AI SDK v6 tool states
@@ -106,8 +101,7 @@ export const DocumentToolRenderer = ({
 				<div className="flex items-center gap-2 p-3 rounded-lg border border-destructive/50 bg-destructive/10 text-destructive text-sm">
 					<AlertCircle className="size-4 shrink-0" />
 					<span>
-						Failed to{" "}
-						{part.type === "tool-createDocument" ? "create" : "update"} document
+						Failed to {part.type === "tool-createDocument" ? "create" : "update"} document
 						{part.errorText ? `: ${part.errorText}` : ""}
 					</span>
 				</div>
@@ -119,9 +113,7 @@ export const DocumentToolRenderer = ({
 				<div className="flex items-center gap-2 p-3 rounded-lg border border-muted-foreground/30 bg-muted text-muted-foreground text-sm">
 					<XCircle className="size-4 shrink-0" />
 					<span>
-						Document{" "}
-						{part.type === "tool-createDocument" ? "creation" : "update"} was
-						denied
+						Document {part.type === "tool-createDocument" ? "creation" : "update"} was denied
 					</span>
 				</div>
 			);

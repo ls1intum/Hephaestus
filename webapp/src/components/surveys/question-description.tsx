@@ -25,7 +25,5 @@ export function QuestionDescription({
 		);
 	}
 
-	return (
-		<FieldDescription className={className}>{description}</FieldDescription>
-	);
+	return <FieldDescription className={className}>{description}</FieldDescription>;
 }

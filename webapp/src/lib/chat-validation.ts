@@ -44,9 +44,7 @@ const chatMessagesArraySchema = z.array(chatMessageSchema);
  * @param messages - Unknown messages array from server response
  * @returns Validated ChatMessage[] or undefined
  */
-export function parseThreadMessages(
-	messages: unknown,
-): ChatMessage[] | undefined {
+export function parseThreadMessages(messages: unknown): ChatMessage[] | undefined {
 	const result = chatMessagesArraySchema.safeParse(messages);
 	if (!result.success) {
 		console.warn("[parseThreadMessages] Validation failed:", result.error);
@@ -105,10 +103,7 @@ export function extractVotesFromThreadDetail(
 
 	const result = votesArraySchema.safeParse(detail.votes);
 	if (!result.success) {
-		console.warn(
-			"[extractVotesFromThreadDetail] Validation failed:",
-			result.error,
-		);
+		console.warn("[extractVotesFromThreadDetail] Validation failed:", result.error);
 		return [];
 	}
 

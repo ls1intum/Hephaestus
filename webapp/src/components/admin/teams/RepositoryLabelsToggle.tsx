@@ -7,11 +7,7 @@ export interface RepositoryLabelsToggleProps {
 	team: TeamInfo;
 	repository: RepositoryInfo;
 	catalogLabels: LabelInfo[];
-	onAddLabel?: (
-		teamId: number,
-		repositoryId: number,
-		label: string,
-	) => Promise<void>;
+	onAddLabel?: (teamId: number, repositoryId: number, label: string) => Promise<void>;
 	onRemoveLabel?: (teamId: number, labelId: number) => Promise<void>;
 }
 
@@ -50,8 +46,8 @@ export function RepositoryLabelsToggle({
 		<div className="space-y-1.5">
 			<h4 className="font-medium text-sm">Labels</h4>
 			<p className="text-xs text-muted-foreground">
-				Selecting labels limits this team's contribution metrics to items tagged
-				with any of the selected labels for this repository.
+				Selecting labels limits this team's contribution metrics to items tagged with any of the
+				selected labels for this repository.
 			</p>
 			{shown.length > 0 ? (
 				<div className="flex flex-wrap gap-1.5">
@@ -62,11 +58,7 @@ export function RepositoryLabelsToggle({
 								type="button"
 								key={`${label.id}-${label.name}`}
 								onClick={() => handleToggle(label)}
-								title={
-									isActive
-										? "Click to remove from team"
-										: "Click to add to team"
-								}
+								title={isActive ? "Click to remove from team" : "Click to add to team"}
 							>
 								<GithubBadge
 									label={label.name}
@@ -83,9 +75,7 @@ export function RepositoryLabelsToggle({
 					})}
 				</div>
 			) : (
-				<p className="text-xs text-muted-foreground">
-					No labels available for this repository.
-				</p>
+				<p className="text-xs text-muted-foreground">No labels available for this repository.</p>
 			)}
 		</div>
 	);

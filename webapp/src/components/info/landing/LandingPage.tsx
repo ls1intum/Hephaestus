@@ -12,11 +12,7 @@ interface LandingPageProps {
 	isSignedIn?: boolean;
 }
 
-export function LandingPage({
-	onSignIn,
-	onGoToDashboard,
-	isSignedIn = false,
-}: LandingPageProps) {
+export function LandingPage({ onSignIn, onGoToDashboard, isSignedIn = false }: LandingPageProps) {
 	const learnMoreRef = useRef<HTMLDivElement>(null);
 
 	const handleLearnMoreClick = () => {

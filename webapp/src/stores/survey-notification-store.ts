@@ -26,8 +26,7 @@ export const useSurveyNotificationStore = create<SurveyNotificationState>()(
 			shouldShowSurvey: false,
 			dismissedAt: null,
 
-			setPendingSurvey: (survey) =>
-				set({ pendingSurvey: survey, dismissedAt: Date.now() }),
+			setPendingSurvey: (survey) => set({ pendingSurvey: survey, dismissedAt: Date.now() }),
 
 			clearPendingSurvey: () =>
 				set({
@@ -40,8 +39,7 @@ export const useSurveyNotificationStore = create<SurveyNotificationState>()(
 				if (get().pendingSurvey) set({ shouldShowSurvey: true });
 			},
 
-			clearShowSignal: () =>
-				set({ shouldShowSurvey: false, pendingSurvey: null }),
+			clearShowSignal: () => set({ shouldShowSurvey: false, pendingSurvey: null }),
 		}),
 		{
 			name: "hephaestus-survey-notification",
@@ -56,5 +54,4 @@ export const useSurveyNotificationStore = create<SurveyNotificationState>()(
 	),
 );
 
-export const selectHasPendingSurvey = (s: SurveyNotificationState) =>
-	s.pendingSurvey !== null;
+export const selectHasPendingSurvey = (s: SurveyNotificationState) => s.pendingSurvey !== null;

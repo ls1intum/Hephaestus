@@ -141,8 +141,7 @@ export function MultimodalInput({
 		}
 	}, [status, scrollToBottom]);
 
-	const canSubmit =
-		input.trim().length > 0 && uploadQueue.length === 0 && !readonly;
+	const canSubmit = input.trim().length > 0 && uploadQueue.length === 0 && !readonly;
 
 	return (
 		<div className="relative w-full flex flex-col gap-4">
@@ -243,11 +242,7 @@ export function MultimodalInput({
 						rows={2}
 						autoFocus={!readonly}
 						onKeyDown={(event) => {
-							if (
-								event.key === "Enter" &&
-								!event.shiftKey &&
-								!event.nativeEvent.isComposing
-							) {
+							if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
 								event.preventDefault();
 
 								if (status !== "ready") {
@@ -266,11 +261,7 @@ export function MultimodalInput({
 				<div className="flex gap-2 justify-between">
 					<div className="flex gap-2">
 						{!disableAttachments && (
-							<AttachmentsButton
-								fileInputRef={fileInputRef}
-								status={status}
-								readonly={readonly}
-							/>
+							<AttachmentsButton fileInputRef={fileInputRef} status={status} readonly={readonly} />
 						)}
 					</div>
 					<div>
@@ -328,13 +319,7 @@ function StopButton({ onStop }: { onStop: () => void }) {
 	);
 }
 
-function SendButton({
-	onSubmit,
-	disabled,
-}: {
-	onSubmit: () => void;
-	disabled: boolean;
-}) {
+function SendButton({ onSubmit, disabled }: { onSubmit: () => void; disabled: boolean }) {
 	return (
 		<Button
 			data-testid="send-button"

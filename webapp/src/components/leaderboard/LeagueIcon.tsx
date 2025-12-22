@@ -6,11 +6,7 @@ import {
 	LeagueNoneIcon,
 	LeagueSilverIcon,
 } from "@/components/leaderboard/LeagueIcons";
-import {
-	Tooltip,
-	TooltipContent,
-	TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { getLeagueLabel, getLeagueTier } from "./utils";
 
@@ -44,14 +40,10 @@ export function LeagueIcon({
 	return (
 		<Tooltip>
 			<TooltipTrigger asChild>
-				<div
-					className={cn("flex flex-col items-center justify-center", className)}
-				>
+				<div className={cn("flex flex-col items-center justify-center", className)}>
 					<IconComponent size={size} aria-label={`${label} tier`} />
 					{showPoints && (
-						<span className="text-xs font-semibold text-muted-foreground">
-							{leaguePoints}
-						</span>
+						<span className="text-xs font-semibold text-muted-foreground">{leaguePoints}</span>
 					)}
 				</div>
 			</TooltipTrigger>

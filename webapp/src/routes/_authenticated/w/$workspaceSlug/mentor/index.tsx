@@ -3,18 +3,13 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef } from "react";
 import { v4 as uuidv4 } from "uuid";
 
-import {
-	getGroupedThreadsQueryKey,
-	getThreadQueryKey,
-} from "@/api/@tanstack/react-query.gen";
+import { getGroupedThreadsQueryKey, getThreadQueryKey } from "@/api/@tanstack/react-query.gen";
 import type { ChatThreadGroup, ChatThreadSummary } from "@/api/types.gen";
 import { Greeting } from "@/components/mentor/Greeting";
 import { NoWorkspace } from "@/components/workspace/NoWorkspace";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 
-export const Route = createFileRoute(
-	"/_authenticated/w/$workspaceSlug/mentor/",
-)({
+export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/mentor/")({
 	component: MentorContainer,
 });
 
@@ -33,10 +28,9 @@ function MentorContainer() {
 		const threadId = uuidv4();
 
 		// Pre-populate thread cache
-		queryClient.setQueryData(
-			getThreadQueryKey({ path: { workspaceSlug: slug, threadId } }),
-			{ messages: [] },
-		);
+		queryClient.setQueryData(getThreadQueryKey({ path: { workspaceSlug: slug, threadId } }), {
+			messages: [],
+		});
 
 		// Add to thread list
 		queryClient.setQueryData<Array<ChatThreadGroup>>(
@@ -48,9 +42,7 @@ function MentorContainer() {
 					title: "New chat",
 					createdAt: new Date(),
 				};
-				const idx = threadGroups.findIndex(
-					(g) => g.groupName.toLowerCase() === "today",
-				);
+				const idx = threadGroups.findIndex((g) => g.groupName.toLowerCase() === "today");
 				if (idx >= 0) {
 					const group = threadGroups[idx];
 					const exists = group.threads.some((t) => t.id === threadId);
@@ -59,11 +51,7 @@ function MentorContainer() {
 						groupName: group.groupName,
 						threads: [newSummary, ...group.threads],
 					};
-					return [
-						...threadGroups.slice(0, idx),
-						updatedGroup,
-						...threadGroups.slice(idx + 1),
-					];
+					return [...threadGroups.slice(0, idx), updatedGroup, ...threadGroups.slice(idx + 1)];
 				}
 				return [{ groupName: "Today", threads: [newSummary] }, ...threadGroups];
 			},

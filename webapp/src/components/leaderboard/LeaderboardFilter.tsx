@@ -1,12 +1,6 @@
 import { SlidersHorizontal } from "lucide-react";
 import type { LeaderboardVariant } from "@/components/leaderboard/LeaderboardPage";
-import {
-	Card,
-	CardContent,
-	CardDescription,
-	CardHeader,
-	CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { type LeaderboardSortType, SortFilter } from "./SortFilter";
@@ -17,11 +11,7 @@ export interface LeaderboardFilterProps {
 	teamOptions: TeamFilterOption[];
 	onTeamChange?: (team: string) => void;
 	onSortChange?: (sort: LeaderboardSortType) => void;
-	onTimeframeChange?: (
-		afterDate: string,
-		beforeDate?: string,
-		timeframe?: string,
-	) => void;
+	onTimeframeChange?: (afterDate: string, beforeDate?: string, timeframe?: string) => void;
 	selectedTeam?: string;
 	selectedSort?: LeaderboardSortType;
 	initialAfterDate?: string;
@@ -61,8 +51,7 @@ export function LeaderboardFilter({
 		<Card>
 			<CardHeader>
 				<CardTitle>
-					<SlidersHorizontal className="inline mr-2 h-4 w-4" /> Leaderboard
-					Options
+					<SlidersHorizontal className="inline mr-2 h-4 w-4" /> Leaderboard Options
 				</CardTitle>
 				<CardDescription>
 					Customize the leaderboard view by filtering and sorting the data.
@@ -73,9 +62,7 @@ export function LeaderboardFilter({
 					<Switch
 						id="mode-switch"
 						checked={selectedMode === "TEAM"}
-						onCheckedChange={(checked) =>
-							onModeChange?.(checked ? "TEAM" : "INDIVIDUAL")
-						}
+						onCheckedChange={(checked) => onModeChange?.(checked ? "TEAM" : "INDIVIDUAL")}
 					/>
 					<Label htmlFor="mode-switch">Team Leaderboard</Label>
 				</div>
@@ -88,10 +75,7 @@ export function LeaderboardFilter({
 						/>
 					)}
 					{selectedMode === "INDIVIDUAL" && (
-						<SortFilter
-							onSortChange={onSortChange}
-							selectedSort={selectedSort}
-						/>
+						<SortFilter onSortChange={onSortChange} selectedSort={selectedSort} />
 					)}
 					<TimeframeFilter
 						onTimeframeChange={onTimeframeChange}

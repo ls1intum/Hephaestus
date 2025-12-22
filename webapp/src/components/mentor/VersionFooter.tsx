@@ -36,9 +36,7 @@ export const VersionFooter = ({
 		>
 			<div>
 				<div>You are viewing a previous version</div>
-				<div className="text-muted-foreground text-sm">
-					Restore this version to make edits
-				</div>
+				<div className="text-muted-foreground text-sm">Restore this version to make edits</div>
 			</div>
 
 			<div className="flex flex-row gap-4">

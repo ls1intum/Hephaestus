@@ -14,8 +14,7 @@ interface MentorSidebarProps {
 
 export function MentorSidebar({ className }: MentorSidebarProps) {
 	const { threadId } = useParams({ strict: false });
-	const { workspaceSlug, isLoading: isWorkspaceLoading } =
-		useActiveWorkspaceSlug();
+	const { workspaceSlug, isLoading: isWorkspaceLoading } = useActiveWorkspaceSlug();
 	const slug = workspaceSlug ?? "";
 	const { data: groupedThreads, isLoading: isThreadsLoading } = useQuery({
 		...getGroupedThreadsOptions({
@@ -28,9 +27,7 @@ export function MentorSidebar({ className }: MentorSidebarProps) {
 	const formatDate = (dateString: string) => {
 		const date = new Date(dateString);
 		const now = new Date();
-		const diffInMinutes = Math.floor(
-			(now.getTime() - date.getTime()) / (1000 * 60),
-		);
+		const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60));
 
 		if (diffInMinutes < 60) {
 			return `${diffInMinutes}m ago`;
@@ -50,17 +47,13 @@ export function MentorSidebar({ className }: MentorSidebarProps) {
 	};
 
 	return (
-		<div
-			className={cn("flex flex-col h-full bg-background border-r", className)}
-		>
+		<div className={cn("flex flex-col h-full bg-background border-r", className)}>
 			{/* Header */}
 			<div className="p-4 border-b">
 				<Link
 					to="/w/$workspaceSlug/mentor"
 					params={{ workspaceSlug: slug }}
-					className={
-						!workspaceSlug ? "pointer-events-none opacity-50" : undefined
-					}
+					className={!workspaceSlug ? "pointer-events-none opacity-50" : undefined}
 				>
 					<Button variant="outline" className="w-full justify-start">
 						<Plus className="h-4 w-4 mr-2" />
@@ -92,9 +85,7 @@ export function MentorSidebar({ className }: MentorSidebarProps) {
 												className="block"
 											>
 												<Button
-													variant={
-														threadId === thread.id ? "secondary" : "ghost"
-													}
+													variant={threadId === thread.id ? "secondary" : "ghost"}
 													className={cn(
 														"w-full justify-start text-left h-auto p-2",
 														threadId === thread.id && "bg-secondary",
@@ -102,13 +93,9 @@ export function MentorSidebar({ className }: MentorSidebarProps) {
 												>
 													<MessageSquare className="h-4 w-4 mr-2 flex-shrink-0" />
 													<div className="flex-1 min-w-0">
-														<div className="truncate text-sm font-medium">
-															{thread.title}
-														</div>
+														<div className="truncate text-sm font-medium">{thread.title}</div>
 														<div className="text-xs text-muted-foreground">
-															{thread.createdAt
-																? formatDate(thread.createdAt.toString())
-																: ""}
+															{thread.createdAt ? formatDate(thread.createdAt.toString()) : ""}
 														</div>
 													</div>
 												</Button>

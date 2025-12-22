@@ -34,8 +34,7 @@ function AboutContainer() {
 	const otherContributors =
 		contributors?.filter(
 			(contributor) =>
-				contributor.id !== PROJECT_MANAGER_DATA.id &&
-				!contributor.login.includes("[bot]"),
+				contributor.id !== PROJECT_MANAGER_DATA.id && !contributor.login.includes("[bot]"),
 		) || [];
 
 	return (

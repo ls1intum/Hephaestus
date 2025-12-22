@@ -24,13 +24,11 @@ const meta = {
 	parameters: {
 		layout: "fullscreen",
 		messages: {
-			description:
-				"Chronologically ordered array of chat messages with full conversation history",
+			description: "Chronologically ordered array of chat messages with full conversation history",
 			control: "object",
 		},
 		votes: {
-			description:
-				"User feedback votes associated with specific messages for quality improvement",
+			description: "User feedback votes associated with specific messages for quality improvement",
 			control: "object",
 		},
 		status: {
@@ -39,13 +37,11 @@ const meta = {
 			options: ["submitted", "streaming", "ready", "error"],
 		},
 		readonly: {
-			description:
-				"Disables input interface for viewing historical conversations",
+			description: "Disables input interface for viewing historical conversations",
 			control: "boolean",
 		},
 		attachments: {
-			description:
-				"Currently attached files awaiting submission with the next message",
+			description: "Currently attached files awaiting submission with the next message",
 			control: "object",
 		},
 		inputPlaceholder: {
@@ -53,8 +49,7 @@ const meta = {
 			control: "text",
 		},
 		disableAttachments: {
-			description:
-				"Removes file attachment functionality for security-restricted environments",
+			description: "Removes file attachment functionality for security-restricted environments",
 			control: "boolean",
 		},
 	},
@@ -68,12 +63,7 @@ const meta = {
 		attachments: [],
 		// Event handlers with realistic implementations for demo purposes
 		onMessageSubmit: fn((data: { text: string; attachments: unknown[] }) =>
-			console.log(
-				"Message submitted:",
-				data.text,
-				"with attachments:",
-				data.attachments,
-			),
+			console.log("Message submitted:", data.text, "with attachments:", data.attachments),
 		),
 		onStop: fn(() => console.log("Streaming stopped by user")),
 		onFileUpload: fn(async (files: File[]) => {

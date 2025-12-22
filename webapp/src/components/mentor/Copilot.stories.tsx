@@ -135,27 +135,24 @@ export const Default: Story = {
 			<div className="p-8">
 				<h1 className="text-2xl font-bold mb-4">Copilot Widget - New Chat</h1>
 				<p className="text-muted-foreground mb-8 max-w-2xl">
-					This demonstrates the Copilot widget in its initial state. Look for
-					the chat icon in the bottom-right corner to start a new conversation
-					with the AI assistant.
+					This demonstrates the Copilot widget in its initial state. Look for the chat icon in the
+					bottom-right corner to start a new conversation with the AI assistant.
 				</p>
 
 				<div className="space-y-4">
 					<div className="p-6 bg-background rounded-lg border">
 						<h2 className="font-semibold mb-2">Main Application Content</h2>
 						<p className="text-muted-foreground">
-							This is your main application content. The Copilot widget floats
-							above this content and can be accessed at any time without
-							disrupting the user's workflow.
+							This is your main application content. The Copilot widget floats above this content
+							and can be accessed at any time without disrupting the user's workflow.
 						</p>
 					</div>
 
 					<div className="p-6 bg-background rounded-lg border">
 						<h2 className="font-semibold mb-2">Always Available</h2>
 						<p className="text-muted-foreground">
-							Users can continue working while having instant access to AI
-							assistance through the floating widget. Perfect for contextual
-							help and quick questions.
+							Users can continue working while having instant access to AI assistance through the
+							floating widget. Perfect for contextual help and quick questions.
 						</p>
 					</div>
 				</div>
@@ -192,31 +189,26 @@ export const WithConversation: Story = {
 	render: () => (
 		<div className="h-screen w-full bg-background relative">
 			<div className="p-8">
-				<h1 className="text-2xl font-bold mb-4">
-					Copilot Widget - Active Conversation
-				</h1>
+				<h1 className="text-2xl font-bold mb-4">Copilot Widget - Active Conversation</h1>
 				<p className="text-muted-foreground mb-8 max-w-2xl">
-					This shows the Copilot widget with an ongoing conversation about
-					birthday planning. Click the chat icon to see the conversation history
-					and document artifacts.
+					This shows the Copilot widget with an ongoing conversation about birthday planning. Click
+					the chat icon to see the conversation history and document artifacts.
 				</p>
 
 				<div className="space-y-4">
 					<div className="p-6 bg-background rounded-lg border">
 						<h2 className="font-semibold mb-2">Rich Conversations</h2>
 						<p className="text-muted-foreground">
-							The widget supports complex conversations with document creation,
-							editing, and artifact management. All within a compact,
-							non-intrusive interface.
+							The widget supports complex conversations with document creation, editing, and
+							artifact management. All within a compact, non-intrusive interface.
 						</p>
 					</div>
 
 					<div className="p-6 bg-background rounded-lg border">
 						<h2 className="font-semibold mb-2">Document Artifacts</h2>
 						<p className="text-muted-foreground">
-							AI-generated documents can be viewed, edited, and downloaded
-							directly from the chat interface. Perfect for creative writing,
-							planning, and collaborative content creation.
+							AI-generated documents can be viewed, edited, and downloaded directly from the chat
+							interface. Perfect for creative writing, planning, and collaborative content creation.
 						</p>
 					</div>
 				</div>

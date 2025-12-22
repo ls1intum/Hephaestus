@@ -70,9 +70,7 @@ export function ComingSoon({
 				</h1>
 
 				<div className="space-y-4">
-					<p className="mx-auto max-w-[600px] text-lg text-muted-foreground">
-						{description}
-					</p>
+					<p className="mx-auto max-w-[600px] text-lg text-muted-foreground">{description}</p>
 					<p className="text-sm font-medium text-primary">{attribution}</p>
 				</div>
 			</div>

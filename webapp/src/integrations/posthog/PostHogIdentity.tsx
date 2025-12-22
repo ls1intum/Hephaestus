@@ -69,8 +69,7 @@ export function PostHogIdentity() {
 
 		if (userProfile && !hasIdentified.current) {
 			const email = userProfile.email;
-			const name =
-				`${userProfile.firstName || ""} ${userProfile.lastName || ""}`.trim();
+			const name = `${userProfile.firstName || ""} ${userProfile.lastName || ""}`.trim();
 			const username = userProfile.username;
 
 			posthog.identify(userId, {

@@ -139,14 +139,10 @@ export function IssueCard({
 						) : (
 							<>
 								{additions !== undefined && (
-									<span className="text-github-success-foreground font-bold">
-										+{additions}
-									</span>
+									<span className="text-github-success-foreground font-bold">+{additions}</span>
 								)}
 								{deletions !== undefined && (
-									<span className="text-github-danger-foreground font-bold">
-										-{deletions}
-									</span>
+									<span className="text-github-danger-foreground font-bold">-{deletions}</span>
 								)}
 							</>
 						)}
@@ -166,11 +162,7 @@ export function IssueCard({
 			{!isLoading && pullRequestLabels.length > 0 && (
 				<div className="flex flex-row items-center flex-wrap gap-2 p-6 pt-2">
 					{pullRequestLabels.map((label) => (
-						<GithubBadge
-							key={label.id}
-							label={label.name}
-							color={label.color}
-						/>
+						<GithubBadge key={label.id} label={label.name} color={label.color} />
 					))}
 				</div>
 			)}

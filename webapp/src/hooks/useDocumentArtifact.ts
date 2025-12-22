@@ -51,15 +51,10 @@ export function useDocumentArtifact({
 	const { openArtifact } = useArtifactStore();
 	const queryClient = useQueryClient();
 
-	const documentState = useDocumentsStore(
-		(state) => state.documents[documentId],
-	);
-	const draft = useDocumentsStore(
-		(state) => state.documents[documentId]?.draft,
-	);
+	const documentState = useDocumentsStore((state) => state.documents[documentId]);
+	const draft = useDocumentsStore((state) => state.documents[documentId]?.draft);
 	const { setStreaming: setDocStreaming } = useDocumentsStore.getState();
-	const { workspaceSlug, isLoading: isWorkspaceLoading } =
-		useActiveWorkspaceSlug();
+	const { workspaceSlug, isLoading: isWorkspaceLoading } = useActiveWorkspaceSlug();
 
 	// Local selection state: -1 = latest
 	const [selectedIndex, setSelectedIndex] = useState<number>(-1);
@@ -67,8 +62,7 @@ export function useDocumentArtifact({
 
 	// Streaming state
 	const isStreaming = documentState?.isStreaming ?? false;
-	const setStreaming = (streaming: boolean) =>
-		setDocStreaming(documentId, streaming);
+	const setStreaming = (streaming: boolean) => setDocStreaming(documentId, streaming);
 	const [isSaving, setIsSaving] = useState(false);
 
 	// Queries
@@ -94,16 +88,13 @@ export function useDocumentArtifact({
 
 	// Build navigable list that excludes the current latest version number to avoid duplicating "latest" (-1) in the list
 	const navigableNumbersAsc = (() => {
-		if (!versionNumbersAsc.length) return versionNumbersAsc;
+		if (versionNumbersAsc.length === 0) return versionNumbersAsc;
 		const latestNum = latest?.versionNumber;
-		return latestNum == null
-			? versionNumbersAsc
-			: versionNumbersAsc.filter((n) => n !== latestNum);
+		return latestNum == null ? versionNumbersAsc : versionNumbersAsc.filter((n) => n !== latestNum);
 	})();
 
 	// Resolve selected version number by index in the navigable list
-	const selectedVersionNumber =
-		selectedIndex >= 0 ? navigableNumbersAsc[selectedIndex] : undefined;
+	const selectedVersionNumber = selectedIndex >= 0 ? navigableNumbersAsc[selectedIndex] : undefined;
 
 	const {
 		data: selectedVersionDoc,
@@ -127,9 +118,7 @@ export function useDocumentArtifact({
 	// Derived
 	const selectedVersion = isCurrentVersion ? latest : selectedVersionDoc;
 	const isLoading =
-		isWorkspaceLoading ||
-		loadingLatest ||
-		(selectedIndex >= 0 && loadingSelectedVersion);
+		isWorkspaceLoading || loadingLatest || (selectedIndex >= 0 && loadingSelectedVersion);
 	const error = errorLatest ?? errorSelectedVersion;
 	// Navigation using the sorted navigableNumbersAsc as the source of truth
 	const posInNumbers = selectedIndex >= 0 ? selectedIndex : -1;
@@ -147,7 +136,7 @@ export function useDocumentArtifact({
 		? () => {
 				setSelectedIndex((prev) => {
 					const nav = navRef.current;
-					if (!nav.length) return prev;
+					if (nav.length === 0) return prev;
 					if (prev < 0) {
 						const toIdx = nav.length - 1;
 						return toIdx;
@@ -166,7 +155,7 @@ export function useDocumentArtifact({
 			? () => {
 					setSelectedIndex((prev) => {
 						const nav = navRef.current;
-						if (!nav.length) return prev;
+						if (nav.length === 0) return prev;
 						if (prev >= 0 && prev < nav.length - 1) {
 							const toIdx = prev + 1;
 							return toIdx;
@@ -176,9 +165,7 @@ export function useDocumentArtifact({
 				}
 			: undefined;
 
-	const onBackToLatestVersion = !isCurrentVersion
-		? () => setSelectedIndex(-1)
-		: undefined;
+	const onBackToLatestVersion = !isCurrentVersion ? () => setSelectedIndex(-1) : undefined;
 
 	// Restore selected version as new latest
 	const { mutate: mutateRestore } = useMutation({
@@ -221,9 +208,7 @@ export function useDocumentArtifact({
 	};
 
 	const onRestoreSelectedVersion =
-		!isCurrentVersion && selectedVersionDoc
-			? handleRestoreSelectedVersion
-			: undefined;
+		!isCurrentVersion && selectedVersionDoc ? handleRestoreSelectedVersion : undefined;
 
 	// Save latest content
 	const { mutate: mutateSave } = useMutation({

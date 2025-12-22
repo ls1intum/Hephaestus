@@ -48,8 +48,8 @@ export const Default: Story = {
 				<div className="p-6">
 					<h3 className="text-lg font-semibold mb-4">Document Content</h3>
 					<p className="text-muted-foreground">
-						You are viewing a previous version of this document. Use the footer
-						controls to restore or navigate back to the latest version.
+						You are viewing a previous version of this document. Use the footer controls to restore
+						or navigate back to the latest version.
 					</p>
 				</div>
 				<Story />
@@ -71,8 +71,7 @@ export const Restoring: Story = {
 				<div className="p-6">
 					<h3 className="text-lg font-semibold mb-4">Document Content</h3>
 					<p className="text-muted-foreground">
-						Restore operation is in progress. The restore button shows a loading
-						state.
+						Restore operation is in progress. The restore button shows a loading state.
 					</p>
 				</div>
 				<Story />
@@ -90,9 +89,7 @@ export const Interactive: Story = {
 		const [isRestoring, setIsRestoring] = useState(false);
 		const [currentIndex, setCurrentIndex] = useState(1);
 
-		const handleVersionChange = (
-			type: "next" | "prev" | "toggle" | "latest",
-		) => {
+		const handleVersionChange = (type: "next" | "prev" | "toggle" | "latest") => {
 			console.log(`Version change: ${type}`);
 			if (type === "latest") {
 				setCurrentIndex(0);
@@ -113,8 +110,7 @@ export const Interactive: Story = {
 				<div className="p-6">
 					<h3 className="text-lg font-semibold mb-4">Interactive Document</h3>
 					<p className="text-muted-foreground mb-4">
-						Click "Restore this version" to see the loading state, or "Back to
-						latest" to navigate.
+						Click "Restore this version" to see the loading state, or "Back to latest" to navigate.
 					</p>
 					<div className="text-sm text-muted-foreground">
 						<div>Current Version Index: {currentIndex}</div>
@@ -145,9 +141,7 @@ export const CustomStyled: Story = {
 			<div className="relative h-[400px] bg-background border border-border rounded-lg overflow-hidden">
 				<div className="p-6">
 					<h3 className="text-lg font-semibold mb-4">Document Content</h3>
-					<p className="text-muted-foreground">
-						Version footer with custom blue-themed styling.
-					</p>
+					<p className="text-muted-foreground">Version footer with custom blue-themed styling.</p>
 				</div>
 				<Story />
 			</div>
@@ -171,8 +165,7 @@ export const Mobile: Story = {
 				<div className="p-4">
 					<h3 className="text-lg font-semibold mb-4">Mobile View</h3>
 					<p className="text-sm text-muted-foreground">
-						Version footer adapts to mobile layout with vertical button
-						stacking.
+						Version footer adapts to mobile layout with vertical button stacking.
 					</p>
 				</div>
 				<Story />
@@ -197,9 +190,7 @@ export const DifferentVersions: Story = {
 						className="relative h-[300px] bg-background border border-border rounded-lg overflow-hidden"
 					>
 						<div className="p-4">
-							<h4 className="font-semibold mb-2">
-								Version Index: {versionIndex}
-							</h4>
+							<h4 className="font-semibold mb-2">Version Index: {versionIndex}</h4>
 							<p className="text-sm text-muted-foreground">
 								{versionIndex === 0 && "Latest version (most recent)"}
 								{versionIndex === 1 && "Previous version"}

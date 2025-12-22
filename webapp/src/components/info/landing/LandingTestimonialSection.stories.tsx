@@ -20,8 +20,7 @@ const meta = {
 	tags: ["autodocs"],
 	argTypes: {
 		onSignIn: {
-			description:
-				"Callback function triggered when the sign-in button is clicked",
+			description: "Callback function triggered when the sign-in button is clicked",
 			action: "signed in",
 		},
 		isSignedIn: {

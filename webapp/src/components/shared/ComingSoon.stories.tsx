@@ -35,8 +35,7 @@ export const Default: Story = {
 export const CustomContent: Story = {
 	args: {
 		title: "Feature in Development",
-		description:
-			"Our team is crafting this feature with care. Check back soon for updates!",
+		description: "Our team is crafting this feature with care. Check back soon for updates!",
 		attribution: "— Engineering Team",
 	},
 };

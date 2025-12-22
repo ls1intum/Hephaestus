@@ -17,12 +17,7 @@ import {
 	getThreadQueryKey,
 	voteMessageMutation,
 } from "@/api/@tanstack/react-query.gen";
-import type {
-	ChatMessageVote,
-	ChatThreadGroup,
-	Document,
-	ThreadDetail,
-} from "@/api/types.gen";
+import type { ChatMessageVote, ChatThreadGroup, Document, ThreadDetail } from "@/api/types.gen";
 import environment from "@/environment";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 import { keycloakService } from "@/integrations/auth";
@@ -60,8 +55,7 @@ interface UseMentorChatOptions {
 	onError?: (error: Error) => void;
 }
 
-interface UseMentorChatReturn
-	extends Omit<UseChatHelpers<ChatMessage>, "sendMessage"> {
+interface UseMentorChatReturn extends Omit<UseChatHelpers<ChatMessage>, "sendMessage"> {
 	sendMessage: (text: string) => void;
 	triggerGreeting: () => Promise<void>; // Manually trigger a greeting
 	threadDetail: ThreadDetail | undefined;
@@ -87,8 +81,7 @@ export function useMentorChat({
 	onError,
 }: UseMentorChatOptions): UseMentorChatReturn {
 	const queryClient = useQueryClient();
-	const { workspaceSlug, isLoading: isWorkspaceLoading } =
-		useActiveWorkspaceSlug();
+	const { workspaceSlug, isLoading: isWorkspaceLoading } = useActiveWorkspaceSlug();
 	const slug = workspaceSlug ?? "";
 	const hasWorkspace = Boolean(workspaceSlug);
 
@@ -104,8 +97,7 @@ export function useMentorChat({
 			path: { workspaceSlug: slug, threadId: threadId || "" },
 		}),
 		enabled: Boolean(threadId) && hasWorkspace,
-		initialData: () =>
-			hasWorkspace ? queryClient.getQueryData(threadQueryKey) : undefined,
+		initialData: () => (hasWorkspace ? queryClient.getQueryData(threadQueryKey) : undefined),
 		initialDataUpdatedAt: Date.now(),
 		staleTime: 60_000,
 		refetchOnMount: false,
@@ -113,37 +105,28 @@ export function useMentorChat({
 		refetchOnReconnect: false,
 	});
 
-	const {
-		data: threadDetail,
-		isLoading: isThreadLoading,
-		error: threadError,
-	} = threadQuery;
+	const { data: threadDetail, isLoading: isThreadLoading, error: threadError } = threadQuery;
 
 	// Fetch grouped threads for sidebar/navigation; avoid immediate refetch on mount
 	const groupedThreadsKey = getGroupedThreadsQueryKey({
 		path: { workspaceSlug: slug },
 	});
-	const { data: groupedThreads, isLoading: isGroupedThreadsLoading } = useQuery(
-		{
-			...getGroupedThreadsOptions({ path: { workspaceSlug: slug } }),
-			enabled: hasWorkspace,
-			initialData: () =>
-				hasWorkspace ? queryClient.getQueryData(groupedThreadsKey) : undefined,
-			initialDataUpdatedAt: Date.now(),
-			staleTime: 60_000,
-			refetchOnMount: false,
-			refetchOnWindowFocus: false,
-			refetchOnReconnect: false,
-		},
-	);
+	const { data: groupedThreads, isLoading: isGroupedThreadsLoading } = useQuery({
+		...getGroupedThreadsOptions({ path: { workspaceSlug: slug } }),
+		enabled: hasWorkspace,
+		initialData: () => (hasWorkspace ? queryClient.getQueryData(groupedThreadsKey) : undefined),
+		initialDataUpdatedAt: Date.now(),
+		staleTime: 60_000,
+		refetchOnMount: false,
+		refetchOnWindowFocus: false,
+		refetchOnReconnect: false,
+	});
 
 	// Vote message mutation
 	const voteMessageMut = useMutation(voteMessageMutation());
 
 	// Optimistic votes state: messageId -> isUpvoted
-	const [voteState, setVoteState] = useState<
-		Record<string, boolean | undefined>
-	>({});
+	const [voteState, setVoteState] = useState<Record<string, boolean | undefined>>({});
 	const votes: ChatMessageVote[] = Object.entries(voteState)
 		.filter((entry): entry is [string, boolean] => entry[1] !== undefined)
 		.map(([messageId, isUpvoted]) => ({
@@ -160,21 +143,14 @@ export function useMentorChat({
 	// Document streaming is handled directly in onData callback using store actions
 	// to avoid stale closure issues with hook-based handlers
 
-	const openArtifactForDocument = (
-		document: Document,
-		boundingBox: DOMRect,
-	) => {
+	const openArtifactForDocument = (document: Document, boundingBox: DOMRect) => {
 		// Delegate to global overlay store
-		useArtifactStore
-			.getState()
-			.openArtifact(`text:${document.id}`, boundingBox, document.title);
+		useArtifactStore.getState().openArtifact(`text:${document.id}`, boundingBox, document.title);
 	};
 
 	const openArtifactById = async (documentId: string, boundingBox: DOMRect) => {
 		// Optimistically open overlay; data will be fetched by overlay hook
-		useArtifactStore
-			.getState()
-			.openArtifact(`text:${documentId}`, boundingBox, "Document");
+		useArtifactStore.getState().openArtifact(`text:${documentId}`, boundingBox, "Document");
 	};
 
 	const closeArtifact = () => {
@@ -193,8 +169,7 @@ export function useMentorChat({
 			// Only send the latest message; backend reconstructs context from thread ID
 			const lastMessage = messages.at(-1);
 			// Determine previous message ID from current local state (selected leaf or last message)
-			const prev =
-				messages.length > 1 ? messages[messages.length - 2]?.id : undefined;
+			const prev = messages.length > 1 ? messages[messages.length - 2]?.id : undefined;
 			return {
 				body: {
 					id: effectiveId,
@@ -259,8 +234,7 @@ export function useMentorChat({
 			// Handle document-related data parts directly using store actions
 			// This avoids stale closure issues with hook-based handlers
 			if (isDocumentDataPart(dataPart)) {
-				const { setEmptyDraft, appendDraftDelta, finishDraft } =
-					useDocumentsStore.getState();
+				const { setEmptyDraft, appendDraftDelta, finishDraft } = useDocumentsStore.getState();
 				const { openArtifact } = useArtifactStore.getState();
 
 				switch (dataPart.type) {
@@ -273,21 +247,13 @@ export function useMentorChat({
 						break;
 
 					case "data-document-delta": {
-						const docState =
-							useDocumentsStore.getState().documents[dataPart.data.id];
+						const docState = useDocumentsStore.getState().documents[dataPart.data.id];
 						const draftLength = docState?.draft?.content?.length ?? 0;
 						const newLength = draftLength + dataPart.data.delta.length;
 
 						// Auto-open overlay when content exceeds threshold
-						if (
-							newLength > AUTO_OPEN_THRESHOLD &&
-							draftLength <= AUTO_OPEN_THRESHOLD
-						) {
-							openArtifact(
-								`text:${dataPart.data.id}`,
-								getCenteredRect(),
-								docState?.draft?.title,
-							);
+						if (newLength > AUTO_OPEN_THRESHOLD && draftLength <= AUTO_OPEN_THRESHOLD) {
+							openArtifact(`text:${dataPart.data.id}`, getCenteredRect(), docState?.draft?.title);
 						}
 						appendDraftDelta(dataPart.data.id, dataPart.data.delta);
 						break;
@@ -295,17 +261,12 @@ export function useMentorChat({
 
 					case "data-document-finish": {
 						finishDraft(dataPart.data.id);
-						const docState =
-							useDocumentsStore.getState().documents[dataPart.data.id];
+						const docState = useDocumentsStore.getState().documents[dataPart.data.id];
 						const draftLength = docState?.draft?.content?.length ?? 0;
 
 						// Auto-open for short documents that finish
 						if (draftLength <= AUTO_OPEN_THRESHOLD) {
-							openArtifact(
-								`text:${dataPart.data.id}`,
-								getCenteredRect(),
-								docState?.draft?.title,
-							);
+							openArtifact(`text:${dataPart.data.id}`, getCenteredRect(), docState?.draft?.title);
 						}
 						break;
 					}

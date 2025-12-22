@@ -12,11 +12,7 @@ export interface TeamTreeProps {
 		repositoryId: number,
 		hidden: boolean,
 	) => void | Promise<void>;
-	onAddLabel?: (
-		teamId: number,
-		repositoryId: number,
-		label: string,
-	) => Promise<void>;
+	onAddLabel?: (teamId: number, repositoryId: number, label: string) => Promise<void>;
 	onRemoveLabel?: (teamId: number, labelId: number) => Promise<void>;
 	getCatalogLabels: (repoId: number) => LabelInfo[];
 }
@@ -31,9 +27,7 @@ export function TeamTree({
 	onRemoveLabel,
 	getCatalogLabels,
 }: TeamTreeProps) {
-	const children = (childrenMap.get(team.id) ?? []).filter((c) =>
-		displaySet.has(c.id),
-	);
+	const children = (childrenMap.get(team.id) ?? []).filter((c) => displaySet.has(c.id));
 	return (
 		<TeamCard
 			team={team}

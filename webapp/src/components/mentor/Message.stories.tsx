@@ -99,10 +99,7 @@ const createMessageWithReasoning = (
 	metadata: { createdAt: new Date().toISOString() },
 });
 
-const createMessageWithAttachments = (
-	text: string,
-	id = "msg-4",
-): ChatMessage => ({
+const createMessageWithAttachments = (text: string, id = "msg-4"): ChatMessage => ({
 	id,
 	role: "user",
 	parts: [
@@ -174,9 +171,7 @@ Always write tests for your components using Jest and React Testing Library.`,
  */
 export const UserMessage: Story = {
 	args: {
-		message: createUserMessage(
-			"Can you help me understand React component patterns?",
-		),
+		message: createUserMessage("Can you help me understand React component patterns?"),
 	},
 };
 
@@ -305,9 +300,7 @@ export const ReadonlyMessage: Story = {
  */
 export const EditModeMessage: Story = {
 	args: {
-		message: createUserMessage(
-			"How do I optimize React performance in large applications?",
-		),
+		message: createUserMessage("How do I optimize React performance in large applications?"),
 		initialEditMode: true,
 	},
 };
@@ -400,8 +393,7 @@ export const UpdateDocumentLoadingMessage: Story = {
  */
 export const LongMessage: Story = {
 	args: {
-		message:
-			createAssistantMessage(`# Complete Guide to React Performance Optimization
+		message: createAssistantMessage(`# Complete Guide to React Performance Optimization
 
 React performance optimization is crucial for building scalable applications. Here's a comprehensive guide covering all the essential techniques:
 
@@ -481,8 +473,7 @@ export const ThinkingLoadingState: StoryObj<typeof ThinkingMessage> = {
 	parameters: {
 		docs: {
 			description: {
-				story:
-					"Loading state shown while the assistant is thinking or processing a request.",
+				story: "Loading state shown while the assistant is thinking or processing a request.",
 			},
 		},
 	},

@@ -1,9 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import {
-	createFileRoute,
-	retainSearchParams,
-	useNavigate,
-} from "@tanstack/react-router";
+import { createFileRoute, retainSearchParams, useNavigate } from "@tanstack/react-router";
 import { zodValidator } from "@tanstack/zod-adapter";
 import { formatISO } from "date-fns";
 import { useEffect } from "react";
@@ -46,17 +42,14 @@ export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/")({
 	validateSearch: zodValidator(leaderboardSearchSchema),
 	// Configure search middleware to retain params when navigating
 	search: {
-		middlewares: [
-			retainSearchParams(["team", "sort", "after", "before", "mode"]),
-		],
+		middlewares: [retainSearchParams(["team", "sort", "after", "before", "mode"])],
 	},
 });
 
 function LeaderboardContainer() {
 	// Get the current user from auth context
 	const { username } = useAuth();
-	const { workspaceSlug, isLoading: isWorkspaceLoading } =
-		useActiveWorkspaceSlug();
+	const { workspaceSlug, isLoading: isWorkspaceLoading } = useActiveWorkspaceSlug();
 	const slug = workspaceSlug ?? "";
 	const hasWorkspace = Boolean(workspaceSlug);
 	const showNoWorkspace = !isWorkspaceLoading && !hasWorkspace;
@@ -185,14 +178,11 @@ function LeaderboardContainer() {
 	};
 
 	// Valid selectable values are the full visible paths
-	const teamLabelsById = teamsList.reduce<Record<number, string>>(
-		(acc, team) => {
-			const label = makeLabel(team);
-			acc[team.id] = label.length > 0 ? label : team.name;
-			return acc;
-		},
-		{},
-	);
+	const teamLabelsById = teamsList.reduce<Record<number, string>>((acc, team) => {
+		const label = makeLabel(team);
+		acc[team.id] = label.length > 0 ? label : team.name;
+		return acc;
+	}, {});
 
 	const visibleTeamEntries = teamsList
 		.filter((t) => !t.hidden)

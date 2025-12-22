@@ -54,10 +54,7 @@ export function setToScheduledTime(
 	const currentISODay = getISODay(date);
 	const diff = dayOfWeek - currentISODay;
 	const adjustedDate = addDays(date, diff);
-	return setMilliseconds(
-		setSeconds(setMinutes(setHours(adjustedDate, hour), minute), 0),
-		0,
-	);
+	return setMilliseconds(setSeconds(setMinutes(setHours(adjustedDate, hour), minute), 0), 0);
 }
 
 /**
@@ -68,8 +65,7 @@ export function getLeaderboardWeekStart(
 	schedule: LeaderboardSchedule = DEFAULT_SCHEDULE,
 ): Date {
 	const currentISODay = getISODay(now);
-	const currentTime =
-		now.getHours() * 60 + now.getMinutes() + now.getSeconds() / 60;
+	const currentTime = now.getHours() * 60 + now.getMinutes() + now.getSeconds() / 60;
 	const scheduledTime = schedule.hour * 60 + schedule.minute;
 
 	// If we're past the scheduled day OR on the scheduled day past the scheduled time
@@ -78,20 +74,10 @@ export function getLeaderboardWeekStart(
 		(currentISODay === schedule.day && currentTime >= scheduledTime);
 
 	if (pastSchedule) {
-		return setToScheduledTime(
-			now,
-			schedule.day,
-			schedule.hour,
-			schedule.minute,
-		);
+		return setToScheduledTime(now, schedule.day, schedule.hour, schedule.minute);
 	}
 	// Haven't reached the schedule yet, use last week's scheduled day
-	return setToScheduledTime(
-		subWeeks(now, 1),
-		schedule.day,
-		schedule.hour,
-		schedule.minute,
-	);
+	return setToScheduledTime(subWeeks(now, 1), schedule.day, schedule.hour, schedule.minute);
 }
 
 /**
@@ -188,10 +174,10 @@ export function getDateRangeForPreset(
 /**
  * Format a date range to ISO strings for API/URL consumption.
  */
-export function formatDateRangeForApi(range: {
-	after: Date;
-	before: Date | undefined;
-}): { after: string; before: string | undefined } {
+export function formatDateRangeForApi(range: { after: Date; before: Date | undefined }): {
+	after: string;
+	before: string | undefined;
+} {
 	return {
 		after: formatISO(range.after),
 		before: range.before ? formatISO(range.before) : undefined,
@@ -316,10 +302,7 @@ export function formatPresetLabel(
 		case "last-month": {
 			const lastMonth = subMonths(now, 1);
 			const monthName = format(lastMonth, "LLLL");
-			const daysInMonth = differenceInCalendarDays(
-				startOfMonth(now),
-				startOfMonth(lastMonth),
-			);
+			const daysInMonth = differenceInCalendarDays(startOfMonth(now), startOfMonth(lastMonth));
 			return `Last month · ${monthName} (${daysInMonth} days)`;
 		}
 
@@ -354,9 +337,7 @@ export function formatCustomRangeLabel(from?: Date, to?: Date): string {
 		return `Since ${fromLabel} (${daysSinceStart} days)`;
 	}
 
-	const toLabel = isSameYear(from, to)
-		? format(to, "LLL d")
-		: format(to, "LLL d, y");
+	const toLabel = isSameYear(from, to) ? format(to, "LLL d") : format(to, "LLL d, y");
 
 	const daySpan = differenceInCalendarDays(to, from) + 1;
 	return `${fromLabel} – ${toLabel} (${daySpan} days)`;
@@ -380,10 +361,7 @@ export function detectPresetFromDates(
 	const now = new Date();
 
 	// Check for all-activity (epoch start)
-	if (
-		enableAllActivity &&
-		after.getTime() <= new Date(0).getTime() + 86400000
-	) {
+	if (enableAllActivity && after.getTime() <= new Date(0).getTime() + 86400000) {
 		return "all-activity";
 	}
 
@@ -400,22 +378,14 @@ export function detectPresetFromDates(
 
 	// Check this week (bounded - for leaderboard)
 	const thisWeekEnd = getLeaderboardWeekEnd(thisWeekStart);
-	if (
-		datesAreClose(after, thisWeekStart) &&
-		before &&
-		datesAreClose(before, thisWeekEnd)
-	) {
+	if (datesAreClose(after, thisWeekStart) && before && datesAreClose(before, thisWeekEnd)) {
 		return "this-week";
 	}
 
 	// Check last week
 	const lastWeekStart = getLastLeaderboardWeekStart(now, schedule);
 	const lastWeekEnd = getLeaderboardWeekEnd(lastWeekStart);
-	if (
-		datesAreClose(after, lastWeekStart) &&
-		before &&
-		datesAreClose(before, lastWeekEnd)
-	) {
+	if (datesAreClose(after, lastWeekStart) && before && datesAreClose(before, lastWeekEnd)) {
 		return "last-week";
 	}
 
@@ -427,21 +397,13 @@ export function detectPresetFromDates(
 
 	// Check this month (bounded)
 	const nextMonthStart = startOfMonth(addDays(endOfMonth(now), 1));
-	if (
-		datesAreClose(after, thisMonthStart) &&
-		before &&
-		datesAreClose(before, nextMonthStart)
-	) {
+	if (datesAreClose(after, thisMonthStart) && before && datesAreClose(before, nextMonthStart)) {
 		return "this-month";
 	}
 
 	// Check last month
 	const lastMonthStart = startOfMonth(subMonths(now, 1));
-	if (
-		datesAreClose(after, lastMonthStart) &&
-		before &&
-		datesAreClose(before, thisMonthStart)
-	) {
+	if (datesAreClose(after, lastMonthStart) && before && datesAreClose(before, thisMonthStart)) {
 		return "last-month";
 	}
 

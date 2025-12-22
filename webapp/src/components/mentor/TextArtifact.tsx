@@ -65,9 +65,7 @@ export function TextArtifact({ model }: TextArtifactProps) {
 		const now = new Date();
 		const deltaMs = Math.abs(now.getTime() - dt.getTime());
 		const isFresh = deltaMs < 60_000; // under 1 minute
-		const rel = isFresh
-			? "just now"
-			: formatDistance(dt, now, { addSuffix: true });
+		const rel = isFresh ? "just now" : formatDistance(dt, now, { addSuffix: true });
 		return v != null ? `Version ${v} • ${rel}` : rel;
 	})();
 

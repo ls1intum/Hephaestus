@@ -14,12 +14,7 @@ const meta = {
 		description: "Pick all that resonate with you.",
 		descriptionContentType: "text",
 		required: false,
-		choices: [
-			"Tutorials",
-			"Customer case studies",
-			"Product announcements",
-			"Other",
-		],
+		choices: ["Tutorials", "Customer case studies", "Product announcements", "Other"],
 		hasOpenChoice: true,
 		value: [] as string[],
 		error: undefined,

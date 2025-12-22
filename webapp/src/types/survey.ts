@@ -4,20 +4,9 @@ import type {
 } from "posthog-js";
 import { SurveyQuestionBranchingType } from "posthog-js";
 
-export type SurveyQuestionType =
-	| "open"
-	| "link"
-	| "rating"
-	| "single_choice"
-	| "multiple_choice";
+export type SurveyQuestionType = "open" | "link" | "rating" | "single_choice" | "multiple_choice";
 
-export type SurveyResponse =
-	| string
-	| number
-	| string[]
-	| boolean
-	| null
-	| undefined;
+export type SurveyResponse = string | number | string[] | boolean | null | undefined;
 
 export interface ConditionalBranching {
 	type: "specific_question" | "response_based" | "end";
@@ -61,9 +50,7 @@ export interface PostHogSurvey {
 
 export const SURVEY_RESPONSE_END = "__end__";
 
-export const normalisePostHogSurvey = (
-	survey: PostHogSurveyRaw,
-): PostHogSurvey => {
+export const normalisePostHogSurvey = (survey: PostHogSurveyRaw): PostHogSurvey => {
 	const normalizedIds = survey.questions.map(
 		(question, index) => question.id ?? `${survey.id}-question-${index + 1}`,
 	);
@@ -193,8 +180,7 @@ const normalizeBranching = ({
 			return { type: "specific_question", specificQuestionId: target };
 		}
 		case SurveyQuestionBranchingType.ResponseBased: {
-			const values = (branching as { responseValues?: Record<string, unknown> })
-				.responseValues;
+			const values = (branching as { responseValues?: Record<string, unknown> }).responseValues;
 			if (!values) return undefined;
 			const mapped: Record<string, string> = {};
 			for (const [key, value] of Object.entries(values)) {

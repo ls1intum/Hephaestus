@@ -43,13 +43,9 @@ export type DataPart = DataUIPart<CustomUIDataTypes>;
 
 // Artifact typing
 export type ArtifactKind = "text" | (string & {});
-export type ArtifactId<K extends ArtifactKind = ArtifactKind> =
-	`${K}:${string}`;
+export type ArtifactId<K extends ArtifactKind = ArtifactKind> = `${K}:${string}`;
 
-export function makeArtifactId<K extends ArtifactKind>(
-	kind: K,
-	payload: string,
-): ArtifactId<K> {
+export function makeArtifactId<K extends ArtifactKind>(kind: K, payload: string): ArtifactId<K> {
 	return `${kind}:${payload}` as ArtifactId<K>;
 }
 

@@ -19,18 +19,13 @@ export interface MockUseChatState<TMessage extends UIMessage = ChatMessage> {
 
 export interface MockUseChatControls<TMessage extends UIMessage = ChatMessage> {
 	/** Set messages directly */
-	setMessages: (
-		messages: TMessage[] | ((prev: TMessage[]) => TMessage[]),
-	) => void;
+	setMessages: (messages: TMessage[] | ((prev: TMessage[]) => TMessage[])) => void;
 	/** Set status */
 	setStatus: (status: MockChatStatus) => void;
 	/** Set error */
 	setError: (error: Error | undefined) => void;
 	/** Simulate streaming text response */
-	simulateStreamingResponse: (
-		text: string,
-		messageId?: string,
-	) => Promise<void>;
+	simulateStreamingResponse: (text: string, messageId?: string) => Promise<void>;
 	/** Simulate receiving a data part during streaming */
 	simulateDataPart: (dataPart: { type: string; data?: unknown }) => void;
 	/** Get current state */
@@ -41,9 +36,7 @@ export interface MockUseChatControls<TMessage extends UIMessage = ChatMessage> {
 
 export interface MockUseChatReturn<TMessage extends UIMessage = ChatMessage>
 	extends Omit<UseChatHelpers<TMessage>, "setMessages"> {
-	setMessages: (
-		messages: TMessage[] | ((prev: TMessage[]) => TMessage[]),
-	) => void;
+	setMessages: (messages: TMessage[] | ((prev: TMessage[]) => TMessage[])) => void;
 }
 
 /**
@@ -53,9 +46,7 @@ export interface MockUseChatReturn<TMessage extends UIMessage = ChatMessage>
 export function createMockUseChat<TMessage extends UIMessage = ChatMessage>(
 	initialState: Partial<MockUseChatState<TMessage>> = {},
 ): {
-	mockUseChat: (
-		options?: Record<string, unknown>,
-	) => MockUseChatReturn<TMessage>;
+	mockUseChat: (options?: Record<string, unknown>) => MockUseChatReturn<TMessage>;
 	controls: MockUseChatControls<TMessage>;
 } {
 	let state: MockUseChatState<TMessage> = {
@@ -72,9 +63,7 @@ export function createMockUseChat<TMessage extends UIMessage = ChatMessage>(
 	type OnDataCallback = (dataPart: { type: string; data?: unknown }) => void;
 	let onData: OnDataCallback | undefined;
 
-	const setMessagesImpl = (
-		messagesOrUpdater: TMessage[] | ((prev: TMessage[]) => TMessage[]),
-	) => {
+	const setMessagesImpl = (messagesOrUpdater: TMessage[] | ((prev: TMessage[]) => TMessage[])) => {
 		if (typeof messagesOrUpdater === "function") {
 			state.messages = messagesOrUpdater(state.messages);
 		} else {
@@ -101,10 +90,7 @@ export function createMockUseChat<TMessage extends UIMessage = ChatMessage>(
 				onError?.(error);
 			}
 		},
-		simulateStreamingResponse: async (
-			text: string,
-			messageId = "assistant-msg-1",
-		) => {
+		simulateStreamingResponse: async (text: string, messageId = "assistant-msg-1") => {
 			state.status = "streaming";
 
 			const assistantMessage = {
@@ -131,9 +117,7 @@ export function createMockUseChat<TMessage extends UIMessage = ChatMessage>(
 		simulateDataPart,
 	} as MockUseChatControls<TMessage>;
 
-	const mockUseChat = (
-		options: Record<string, unknown> = {},
-	): MockUseChatReturn<TMessage> => {
+	const mockUseChat = (options: Record<string, unknown> = {}): MockUseChatReturn<TMessage> => {
 		// Capture callbacks from options
 		if (options.onFinish && typeof options.onFinish === "function") {
 			onFinish = options.onFinish as (options: { message: TMessage }) => void;
@@ -151,11 +135,7 @@ export function createMockUseChat<TMessage extends UIMessage = ChatMessage>(
 		}
 
 		// Update initial messages if provided
-		if (
-			options.messages &&
-			Array.isArray(options.messages) &&
-			state.messages.length === 0
-		) {
+		if (options.messages && Array.isArray(options.messages) && state.messages.length === 0) {
 			state.messages = options.messages as TMessage[];
 		}
 
@@ -165,9 +145,7 @@ export function createMockUseChat<TMessage extends UIMessage = ChatMessage>(
 				const userMessage = {
 					id: `user-msg-${Date.now()}`,
 					role: "user" as const,
-					parts: input?.parts ?? [
-						{ type: "text" as const, text: input?.text ?? "" },
-					],
+					parts: input?.parts ?? [{ type: "text" as const, text: input?.text ?? "" }],
 				} as TMessage;
 
 				state.messages = [...state.messages, userMessage];
@@ -211,10 +189,7 @@ interface StreamingChunk {
 /**
  * Create mock streaming response chunks for testing
  */
-export function createMockStreamingChunks(
-	text: string,
-	partId = "0",
-): StreamingChunk[] {
+export function createMockStreamingChunks(text: string, partId = "0"): StreamingChunk[] {
 	const words = text.split(" ");
 	const chunks: StreamingChunk[] = [
 		{ type: "start" },
