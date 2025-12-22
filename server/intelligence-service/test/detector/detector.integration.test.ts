@@ -81,13 +81,13 @@ const createNormalIssueResponse = (): BadPracticeResult => ({
 // Mock Setup
 // ─────────────────────────────────────────────────────────────────────────────
 
-// Mock the AI SDK's generateObject function
-const mockGenerateObject = vi.fn();
+// Mock the AI SDK's generateText function
+const mockGenerateText = vi.fn();
 vi.mock("ai", async (importOriginal) => {
 	const actual = await importOriginal<typeof import("ai")>();
 	return {
 		...actual,
-		generateObject: (...args: unknown[]) => mockGenerateObject(...args),
+		generateText: (...args: unknown[]) => mockGenerateText(...args),
 	};
 });
 
@@ -129,7 +129,7 @@ describe("Detector API Integration", () => {
 	describe("Happy Path", () => {
 		it("should return detection response for valid request", async () => {
 			const mockResult = createGoodPRResponse();
-			mockGenerateObject.mockResolvedValueOnce({ object: mockResult });
+			mockGenerateText.mockResolvedValueOnce({ output: mockResult });
 
 			const response = await makeDetectorRequest(createValidRequest());
 
@@ -146,7 +146,7 @@ describe("Detector API Integration", () => {
 
 		it("should include traceId in response for Langfuse linking", async () => {
 			const mockResult = createGoodPRResponse();
-			mockGenerateObject.mockResolvedValueOnce({ object: mockResult });
+			mockGenerateText.mockResolvedValueOnce({ output: mockResult });
 
 			const request = createValidRequest({
 				repositoryName: "MyRepo",
@@ -163,7 +163,7 @@ describe("Detector API Integration", () => {
 
 		it("should return empty badPractices array for clean PR", async () => {
 			const mockResult = createGoodPRResponse();
-			mockGenerateObject.mockResolvedValueOnce({ object: mockResult });
+			mockGenerateText.mockResolvedValueOnce({ output: mockResult });
 
 			const response = await makeDetectorRequest(createValidRequest());
 
@@ -175,7 +175,7 @@ describe("Detector API Integration", () => {
 
 		it("should return non-empty badPractices array when issues found", async () => {
 			const mockResult = createCriticalIssueResponse();
-			mockGenerateObject.mockResolvedValueOnce({ object: mockResult });
+			mockGenerateText.mockResolvedValueOnce({ output: mockResult });
 
 			const response = await makeDetectorRequest(
 				createValidRequest({
@@ -204,7 +204,7 @@ describe("Detector API Integration", () => {
 	describe("Detection Quality", () => {
 		it("should detect empty description as critical issue", async () => {
 			const mockResult = createCriticalIssueResponse();
-			mockGenerateObject.mockResolvedValueOnce({ object: mockResult });
+			mockGenerateText.mockResolvedValueOnce({ output: mockResult });
 
 			const response = await makeDetectorRequest(
 				createValidRequest({
@@ -222,7 +222,7 @@ describe("Detector API Integration", () => {
 
 		it("should detect vague title as normal issue", async () => {
 			const mockResult = createNormalIssueResponse();
-			mockGenerateObject.mockResolvedValueOnce({ object: mockResult });
+			mockGenerateText.mockResolvedValueOnce({ output: mockResult });
 
 			const response = await makeDetectorRequest(
 				createValidRequest({
@@ -249,7 +249,7 @@ describe("Detector API Integration", () => {
 					},
 				],
 			};
-			mockGenerateObject.mockResolvedValueOnce({ object: mockResult });
+			mockGenerateText.mockResolvedValueOnce({ output: mockResult });
 
 			const response = await makeDetectorRequest(
 				createValidRequest({
@@ -282,7 +282,7 @@ describe("Detector API Integration", () => {
 					},
 				],
 			};
-			mockGenerateObject.mockResolvedValueOnce({ object: mockResult });
+			mockGenerateText.mockResolvedValueOnce({ output: mockResult });
 
 			const response = await makeDetectorRequest(createValidRequest());
 
@@ -346,7 +346,7 @@ describe("Detector API Integration", () => {
 		});
 
 		it("should return 500 when AI generation fails", async () => {
-			mockGenerateObject.mockRejectedValueOnce(new Error("AI service unavailable"));
+			mockGenerateText.mockRejectedValueOnce(new Error("AI service unavailable"));
 
 			const response = await makeDetectorRequest(createValidRequest());
 
@@ -358,7 +358,7 @@ describe("Detector API Integration", () => {
 		});
 
 		it("should return user-friendly error message on AI failure", async () => {
-			mockGenerateObject.mockRejectedValueOnce(new Error("Rate limit exceeded"));
+			mockGenerateText.mockRejectedValueOnce(new Error("Rate limit exceeded"));
 
 			const response = await makeDetectorRequest(createValidRequest());
 
@@ -407,7 +407,7 @@ describe("Detector API Integration", () => {
 		it("should handle very long description", async () => {
 			const longDescription = "A".repeat(10000);
 			const mockResult = createGoodPRResponse();
-			mockGenerateObject.mockResolvedValueOnce({ object: mockResult });
+			mockGenerateText.mockResolvedValueOnce({ output: mockResult });
 
 			const response = await makeDetectorRequest(
 				createValidRequest({
@@ -418,12 +418,12 @@ describe("Detector API Integration", () => {
 			expect(response.status).toBe(200);
 
 			// Verify the mock was called with the long description
-			expect(mockGenerateObject).toHaveBeenCalled();
+			expect(mockGenerateText).toHaveBeenCalled();
 		});
 
 		it("should handle unicode characters in title", async () => {
 			const mockResult = createGoodPRResponse();
-			mockGenerateObject.mockResolvedValueOnce({ object: mockResult });
+			mockGenerateText.mockResolvedValueOnce({ output: mockResult });
 
 			const response = await makeDetectorRequest(
 				createValidRequest({
@@ -439,7 +439,7 @@ describe("Detector API Integration", () => {
 
 		it("should handle unicode characters in description", async () => {
 			const mockResult = createGoodPRResponse();
-			mockGenerateObject.mockResolvedValueOnce({ object: mockResult });
+			mockGenerateText.mockResolvedValueOnce({ output: mockResult });
 
 			const response = await makeDetectorRequest(
 				createValidRequest({
@@ -452,7 +452,7 @@ describe("Detector API Integration", () => {
 
 		it("should handle empty badPractices array in input", async () => {
 			const mockResult = createCriticalIssueResponse();
-			mockGenerateObject.mockResolvedValueOnce({ object: mockResult });
+			mockGenerateText.mockResolvedValueOnce({ output: mockResult });
 
 			const response = await makeDetectorRequest(
 				createValidRequest({
@@ -484,7 +484,7 @@ describe("Detector API Integration", () => {
 					},
 				],
 			};
-			mockGenerateObject.mockResolvedValueOnce({ object: mockResult });
+			mockGenerateText.mockResolvedValueOnce({ output: mockResult });
 
 			const response = await makeDetectorRequest(
 				createValidRequest({
@@ -496,12 +496,12 @@ describe("Detector API Integration", () => {
 			expect(response.status).toBe(200);
 
 			// Verify existing bad practices were passed to the AI
-			expect(mockGenerateObject).toHaveBeenCalled();
+			expect(mockGenerateText).toHaveBeenCalled();
 		});
 
 		it("should handle special characters in repository name", async () => {
 			const mockResult = createGoodPRResponse();
-			mockGenerateObject.mockResolvedValueOnce({ object: mockResult });
+			mockGenerateText.mockResolvedValueOnce({ output: mockResult });
 
 			const response = await makeDetectorRequest(
 				createValidRequest({
@@ -517,7 +517,7 @@ describe("Detector API Integration", () => {
 
 		it("should handle newlines and markdown in description", async () => {
 			const mockResult = createGoodPRResponse();
-			mockGenerateObject.mockResolvedValueOnce({ object: mockResult });
+			mockGenerateText.mockResolvedValueOnce({ output: mockResult });
 
 			const markdownDescription = `
 ## Summary
@@ -548,7 +548,7 @@ npm test
 
 		it("should handle empty pullRequestTemplate", async () => {
 			const mockResult = createGoodPRResponse();
-			mockGenerateObject.mockResolvedValueOnce({ object: mockResult });
+			mockGenerateText.mockResolvedValueOnce({ output: mockResult });
 
 			const response = await makeDetectorRequest(
 				createValidRequest({
@@ -564,7 +564,7 @@ npm test
 
 			for (const state of lifecycleStates) {
 				const mockResult = createGoodPRResponse();
-				mockGenerateObject.mockResolvedValueOnce({ object: mockResult });
+				mockGenerateText.mockResolvedValueOnce({ output: mockResult });
 
 				const response = await makeDetectorRequest(
 					createValidRequest({
@@ -584,13 +584,13 @@ npm test
 	describe("AI SDK Integration", () => {
 		it("should pass correct schema to generateObject", async () => {
 			const mockResult = createGoodPRResponse();
-			mockGenerateObject.mockResolvedValueOnce({ object: mockResult });
+			mockGenerateText.mockResolvedValueOnce({ output: mockResult });
 
 			await makeDetectorRequest(createValidRequest());
 
-			expect(mockGenerateObject).toHaveBeenCalledWith(
+			expect(mockGenerateText).toHaveBeenCalledWith(
 				expect.objectContaining({
-					schema: expect.any(Object),
+					output: expect.any(Object),
 					prompt: expect.any(String),
 					model: expect.anything(),
 				}),
@@ -599,7 +599,7 @@ npm test
 
 		it("should include telemetry options when enabled", async () => {
 			const mockResult = createGoodPRResponse();
-			mockGenerateObject.mockResolvedValueOnce({ object: mockResult });
+			mockGenerateText.mockResolvedValueOnce({ output: mockResult });
 
 			await makeDetectorRequest(
 				createValidRequest({
@@ -611,10 +611,10 @@ npm test
 			// Telemetry options are passed when Langfuse env vars are set
 			// In tests without Langfuse config, buildTelemetryOptions returns undefined
 			// so we just verify the call was made with expected model/schema
-			expect(mockGenerateObject).toHaveBeenCalledWith(
+			expect(mockGenerateText).toHaveBeenCalledWith(
 				expect.objectContaining({
 					model: expect.anything(),
-					schema: expect.any(Object),
+					output: expect.any(Object),
 					prompt: expect.any(String),
 				}),
 			);
@@ -622,12 +622,12 @@ npm test
 
 		it("should use detection model from environment", async () => {
 			const mockResult = createGoodPRResponse();
-			mockGenerateObject.mockResolvedValueOnce({ object: mockResult });
+			mockGenerateText.mockResolvedValueOnce({ output: mockResult });
 
 			await makeDetectorRequest(createValidRequest());
 
-			expect(mockGenerateObject).toHaveBeenCalled();
-			const callArgs = mockGenerateObject.mock.calls[0]?.[0] as Record<string, unknown>;
+			expect(mockGenerateText).toHaveBeenCalled();
+			const callArgs = mockGenerateText.mock.calls[0]?.[0] as Record<string, unknown>;
 			expect(callArgs).toHaveProperty("model");
 		});
 	});

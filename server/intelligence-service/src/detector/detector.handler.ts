@@ -1,15 +1,11 @@
 /**
  * Bad Practice Detector Handler
  *
- * Analyzes PR titles and descriptions for quality issues.
- * Uses Langfuse for observability via OpenTelemetry integration.
- *
- * Telemetry is captured automatically via the LangfuseSpanProcessor
- * which intercepts AI SDK calls. Additional context is added via
- * experimental_telemetry metadata.
+ * Analyzes PR titles and descriptions for quality issues using structured output.
+ * Telemetry captured via Langfuse OpenTelemetry integration.
  */
 
-import { generateObject } from "ai";
+import { generateText, Output } from "ai";
 import env from "@/env";
 import { badPracticeDetectorPrompt, loadPrompt } from "@/prompts";
 import { buildTelemetryOptions } from "@/shared/ai/telemetry";
@@ -80,10 +76,10 @@ export const detectBadPracticesHandler: AppRouteHandler<DetectBadPracticesRoute>
 		// ───────────────────────────────────────────────────────────────────
 		// 3. Generate detection result
 		// ───────────────────────────────────────────────────────────────────
-		const { object } = await generateObject({
+		const { output } = await generateText({
 			model: env.detectionModel,
 			prompt: renderedPrompt,
-			schema: badPracticeResultSchema,
+			output: Output.object({ schema: badPracticeResultSchema }),
 			...telemetryOptions,
 		});
 
@@ -93,7 +89,7 @@ export const detectBadPracticesHandler: AppRouteHandler<DetectBadPracticesRoute>
 		// The trace ID allows linking API responses to Langfuse traces
 		// Format: detector:<repo>#<pr> (used as session ID in Langfuse)
 		const response = detectorResponseSchema.parse({
-			...object,
+			...output,
 			traceId: sessionId,
 		});
 

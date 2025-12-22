@@ -3,8 +3,8 @@
  *
  * This handler orchestrates:
  * 1. Thread/message persistence
- * 2. AI model invocation with tool calling
- * 3. Response streaming to client
+ * 2. AI model invocation with multi-step tool calling (stopWhen, prepareStep)
+ * 3. Response streaming to client with messageMetadata (token usage)
  * 4. Error handling with AI SDK type discrimination
  * 5. Usage metrics logging for telemetry
  * 6. Langfuse observability with proper trace naming
@@ -374,6 +374,24 @@ export const mentorChatHandler: AppRouteHandler<HandleMentorChatRoute> = async (
 						sendReasoning: true,
 						// Omit the default start chunk since we already sent one with our UUID
 						sendStart: false,
+						// Send metadata for timestamps, model info, and token usage
+						messageMetadata: ({ part }) => {
+							if (part.type === "start") {
+								return {
+									createdAt: Date.now(),
+									model: resolvedMainPrompt.config.model ?? env.MODEL_NAME,
+								};
+							}
+							if (part.type === "finish") {
+								return {
+									inputTokens: part.totalUsage.inputTokens,
+									outputTokens: part.totalUsage.outputTokens,
+									totalTokens: part.totalUsage.totalTokens,
+									finishReason: part.finishReason,
+								};
+							}
+							return undefined;
+						},
 						onFinish: async ({ responseMessage, finishReason: streamFinishReason }) => {
 							// Only persist if thread was successfully created
 							if (!threadResult.success) {
