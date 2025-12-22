@@ -13,6 +13,7 @@ import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.testconfig.BaseIntegrationTest;
+import de.tum.in.www1.hephaestus.workspace.AccountType;
 import de.tum.in.www1.hephaestus.workspace.Workspace;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceRepository;
 import java.io.IOException;
@@ -161,6 +162,7 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
         // Create organization
         Organization org = new Organization();
         org.setId(215361191L);
+        org.setGithubId(215361191L);
         org.setLogin("HephaestusTest");
         org.setCreatedAt(Instant.now());
         org.setUpdatedAt(Instant.now());
@@ -189,6 +191,8 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
         workspace.setStatus(Workspace.WorkspaceStatus.ACTIVE);
         workspace.setIsPubliclyViewable(true);
         workspace.setOrganization(org);
+        workspace.setAccountLogin("HephaestusTest");
+        workspace.setAccountType(AccountType.ORG);
         workspaceRepository.save(workspace);
     }
 

@@ -57,7 +57,8 @@ public abstract class BaseGitHubProcessor {
                 user.setId(userId);
                 user.setLogin(dto.login());
                 user.setAvatarUrl(dto.avatarUrl());
-                user.setName(dto.name());
+                // Use login as fallback for name if null (name is @NonNull)
+                user.setName(dto.name() != null ? dto.name() : dto.login());
                 return userRepository.save(user);
             });
     }

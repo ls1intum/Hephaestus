@@ -71,6 +71,7 @@ public class GitHubLabelMessageHandler extends GitHubMessageHandler<GitHubLabelE
             .map(label -> {
                 if (dto.name() != null) label.setName(dto.name());
                 if (dto.color() != null) label.setColor(dto.color());
+                label.setDescription(dto.description());
                 return labelRepository.save(label);
             })
             .orElseGet(() -> {
@@ -78,6 +79,7 @@ public class GitHubLabelMessageHandler extends GitHubMessageHandler<GitHubLabelE
                 label.setId(dto.id());
                 label.setName(dto.name());
                 label.setColor(dto.color());
+                label.setDescription(dto.description());
                 label.setRepository(context.repository());
                 return labelRepository.save(label);
             });

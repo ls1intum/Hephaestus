@@ -66,7 +66,8 @@ public class GitHubMembershipMessageHandler extends GitHubMessageHandler<GitHubM
             newUser.setId(memberDto.id());
             newUser.setLogin(memberDto.login());
             newUser.setAvatarUrl(memberDto.avatarUrl());
-            newUser.setName(memberDto.name());
+            // Use login as fallback for name if null (name is @NonNull)
+            newUser.setName(memberDto.name() != null ? memberDto.name() : memberDto.login());
             userRepository.save(newUser);
         }
 

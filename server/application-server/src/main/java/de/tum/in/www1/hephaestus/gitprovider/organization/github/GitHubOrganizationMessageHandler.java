@@ -62,7 +62,8 @@ public class GitHubOrganizationMessageHandler extends GitHubMessageHandler<GitHu
                         user.setId(userDto.id());
                         user.setLogin(userDto.login());
                         user.setAvatarUrl(userDto.avatarUrl());
-                        user.setName(userDto.name());
+                        // Use login as fallback for name if null (name is @NonNull)
+                        user.setName(userDto.name() != null ? userDto.name() : userDto.login());
                         userRepository.save(user);
                     }
                     logger.info("Member added to org {}: {}", orgDto.login(), userDto.login());

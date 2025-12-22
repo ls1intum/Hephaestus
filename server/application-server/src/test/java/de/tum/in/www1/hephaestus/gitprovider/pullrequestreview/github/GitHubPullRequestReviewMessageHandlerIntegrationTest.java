@@ -69,6 +69,7 @@ class GitHubPullRequestReviewMessageHandlerIntegrationTest extends BaseIntegrati
         // Create organization
         Organization org = new Organization();
         org.setId(215361191L);
+        org.setGithubId(215361191L);
         org.setLogin("HephaestusTest");
         org.setCreatedAt(Instant.now());
         org.setUpdatedAt(Instant.now());
@@ -172,13 +173,18 @@ class GitHubPullRequestReviewMessageHandlerIntegrationTest extends BaseIntegrati
     @Test
     @DisplayName("Should handle dismissed event")
     void shouldHandleDismissedEvent() throws Exception {
-        // Given - first create the review
-        GitHubPullRequestReviewEventDTO submitEvent = loadPayload("pull_request_review.submitted");
-        createTestPullRequest(submitEvent.pullRequest().getDatabaseId(), submitEvent.pullRequest().number());
-        handler.handleEvent(submitEvent);
-
-        // Load dismissed event
+        // Given - load dismissed event first to get the correct review ID
         GitHubPullRequestReviewEventDTO dismissEvent = loadPayload("pull_request_review.dismissed");
+        createTestPullRequest(dismissEvent.pullRequest().getDatabaseId(), dismissEvent.pullRequest().number());
+        
+        // Create the review first (simulate submitted state) with the ID that will be dismissed
+        PullRequest pr = pullRequestRepository.findById(dismissEvent.pullRequest().getDatabaseId()).orElseThrow();
+        PullRequestReview existingReview = new PullRequestReview();
+        existingReview.setId(dismissEvent.review().id());
+        existingReview.setState(PullRequestReview.State.APPROVED);
+        existingReview.setPullRequest(pr);
+        existingReview.setDismissed(false);
+        reviewRepository.save(existingReview);
 
         // When
         handler.handleEvent(dismissEvent);

@@ -77,13 +77,15 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
      */
     @Transactional
     public Issue process(GitHubIssueDTO dto, ProcessingContext context) {
-        if (dto.databaseId() == null) {
+        // Use getDatabaseId() which falls back to id for webhook payloads
+        Long dbId = dto.getDatabaseId();
+        if (dbId == null) {
             logger.warn("Issue DTO missing databaseId, skipping");
             return null;
         }
 
         Repository repository = context.repository();
-        Optional<Issue> existingOpt = issueRepository.findById(dto.databaseId());
+        Optional<Issue> existingOpt = issueRepository.findById(dbId);
 
         Issue issue;
         boolean isNew = existingOpt.isEmpty();
@@ -212,9 +214,10 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
      */
     @Transactional
     public void processDeleted(GitHubIssueDTO issueDto) {
-        if (issueDto.databaseId() != null) {
-            issueRepository.deleteById(issueDto.databaseId());
-            logger.info("Deleted issue with id {}", issueDto.databaseId());
+        Long dbId = issueDto.getDatabaseId();
+        if (dbId != null) {
+            issueRepository.deleteById(dbId);
+            logger.info("Deleted issue with id {}", dbId);
         }
     }
 

@@ -50,6 +50,7 @@ class GitHubInstallationRepositoriesMessageHandlerIntegrationTest extends BaseIn
         // Create organization
         Organization org = new Organization();
         org.setId(215361191L);
+        org.setGithubId(215361191L);
         org.setLogin(login);
         org.setCreatedAt(Instant.now());
         org.setUpdatedAt(Instant.now());

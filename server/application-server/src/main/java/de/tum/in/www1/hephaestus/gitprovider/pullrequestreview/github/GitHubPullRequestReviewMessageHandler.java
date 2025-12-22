@@ -78,8 +78,20 @@ public class GitHubPullRequestReviewMessageHandler extends GitHubMessageHandler<
         // Ensure PR exists
         prProcessor.process(prDto, context);
 
-        // Process review
-        processReview(reviewDto, prDto.getDatabaseId(), context);
+        // Process review based on action
+        if ("dismissed".equals(event.action())) {
+            processDismissed(reviewDto.id());
+        } else {
+            processReview(reviewDto, prDto.getDatabaseId(), context);
+        }
+    }
+
+    private void processDismissed(Long reviewId) {
+        reviewRepository.findById(reviewId).ifPresent(review -> {
+            review.setDismissed(true);
+            reviewRepository.save(review);
+            logger.info("Review {} dismissed", reviewId);
+        });
     }
 
     private void processReview(

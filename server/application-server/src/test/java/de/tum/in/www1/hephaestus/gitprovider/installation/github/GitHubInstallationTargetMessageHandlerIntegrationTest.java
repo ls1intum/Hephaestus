@@ -50,6 +50,7 @@ class GitHubInstallationTargetMessageHandlerIntegrationTest extends BaseIntegrat
         // Create organization
         Organization org = new Organization();
         org.setId(215361191L);
+        org.setGithubId(215361191L);
         org.setLogin(login);
         org.setCreatedAt(Instant.now());
         org.setUpdatedAt(Instant.now());
@@ -80,8 +81,8 @@ class GitHubInstallationTargetMessageHandlerIntegrationTest extends BaseIntegrat
     @Test
     @DisplayName("Should handle renamed event")
     void shouldHandleRenamedEvent() throws Exception {
-        // Given
-        GitHubInstallationTargetEventDTO event = loadPayload("installation_target.renamed");
+        // Given - use installation_target.json which has action: "renamed"
+        GitHubInstallationTargetEventDTO event = loadPayload("installation_target");
         setupTestWorkspace(event.installation().id(), "OldName");
 
         // When

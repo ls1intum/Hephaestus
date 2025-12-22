@@ -63,6 +63,7 @@ class GitHubTeamMessageHandlerIntegrationTest extends BaseIntegrationTest {
         // Create organization
         testOrganization = new Organization();
         testOrganization.setId(215361191L);
+        testOrganization.setGithubId(215361191L);
         testOrganization.setLogin("HephaestusTest");
         testOrganization.setCreatedAt(Instant.now());
         testOrganization.setUpdatedAt(Instant.now());

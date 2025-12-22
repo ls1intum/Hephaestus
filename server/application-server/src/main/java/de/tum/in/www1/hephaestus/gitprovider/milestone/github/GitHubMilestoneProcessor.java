@@ -33,10 +33,9 @@ public class GitHubMilestoneProcessor {
     private final ApplicationEventPublisher eventPublisher;
 
     public GitHubMilestoneProcessor(
-        MilestoneRepository milestoneRepository,
-        UserRepository userRepository,
-        ApplicationEventPublisher eventPublisher
-    ) {
+            MilestoneRepository milestoneRepository,
+            UserRepository userRepository,
+            ApplicationEventPublisher eventPublisher) {
         this.milestoneRepository = milestoneRepository;
         this.userRepository = userRepository;
         this.eventPublisher = eventPublisher;
@@ -52,12 +51,8 @@ public class GitHubMilestoneProcessor {
      * @return the persisted Milestone entity
      */
     @Transactional
-    public Milestone process(
-        GitHubMilestoneDTO dto,
-        Repository repository,
-        @Nullable GitHubUserDTO creatorDto,
-        ProcessingContext context
-    ) {
+    public Milestone process(GitHubMilestoneDTO dto, Repository repository, 
+            @Nullable GitHubUserDTO creatorDto, ProcessingContext context) {
         if (dto == null || dto.id() == null) {
             logger.warn("Milestone DTO is null or missing id, skipping");
             return null;
@@ -87,9 +82,11 @@ public class GitHubMilestoneProcessor {
         Milestone saved = milestoneRepository.save(milestone);
 
         // Publish domain event
-        eventPublisher.publishEvent(
-            new EntityEvents.MilestoneProcessed(saved, isNew, context.workspaceId(), repository.getId())
-        );
+        eventPublisher.publishEvent(new EntityEvents.MilestoneProcessed(
+                saved,
+                isNew,
+                context.workspaceId(),
+                repository.getId()));
 
         logger.debug("Processed milestone {} ({}): {}", saved.getTitle(), saved.getId(), isNew ? "created" : "updated");
         return saved;
@@ -107,16 +104,16 @@ public class GitHubMilestoneProcessor {
             return;
         }
 
-        milestoneRepository
-            .findById(milestoneId)
-            .ifPresent(milestone -> {
-                Long repoId = milestone.getRepository() != null ? milestone.getRepository().getId() : null;
-                milestoneRepository.delete(milestone);
-                eventPublisher.publishEvent(
-                    new EntityEvents.MilestoneDeleted(milestoneId, milestone.getTitle(), context.workspaceId(), repoId)
-                );
-                logger.debug("Deleted milestone {} ({})", milestone.getTitle(), milestoneId);
-            });
+        milestoneRepository.findById(milestoneId).ifPresent(milestone -> {
+            Long repoId = milestone.getRepository() != null ? milestone.getRepository().getId() : null;
+            milestoneRepository.delete(milestone);
+            eventPublisher.publishEvent(new EntityEvents.MilestoneDeleted(
+                    milestoneId,
+                    milestone.getTitle(),
+                    context.workspaceId(),
+                    repoId));
+            logger.debug("Deleted milestone {} ({})", milestone.getTitle(), milestoneId);
+        });
     }
 
     private Milestone.State parseState(String state) {
@@ -139,14 +136,15 @@ public class GitHubMilestoneProcessor {
             return null;
         }
         return userRepository
-            .findById(userId)
-            .orElseGet(() -> {
-                User user = new User();
-                user.setId(userId);
-                user.setLogin(dto.login());
-                user.setAvatarUrl(dto.avatarUrl());
-                user.setName(dto.name());
-                return userRepository.save(user);
-            });
+                .findById(userId)
+                .orElseGet(() -> {
+                    User user = new User();
+                    user.setId(userId);
+                    user.setLogin(dto.login());
+                    user.setAvatarUrl(dto.avatarUrl());
+                    // Use login as fallback for name if null (name is @NonNull)
+                    user.setName(dto.name() != null ? dto.name() : dto.login());
+                    return userRepository.save(user);
+                });
     }
 }
