@@ -169,18 +169,25 @@ try {
 	}
 }
 
-// Run biome check --write to format AND organize imports for consistent output
+// Run biome format twice to ensure idempotent output
+// (biome has known issues where the first format may not match subsequent formats)
 import { execSync } from "node:child_process";
 
 const filesToFormat = [schemaDst].filter((f) => fs.existsSync(f));
 if (filesToFormat.length > 0) {
 	try {
+		// First pass: format + organize imports
 		execSync(`npx biome check --write --unsafe ${filesToFormat.join(" ")}`, {
 			cwd: path.resolve(__dirname, ".."),
 			stdio: "inherit",
 		});
+		// Second pass: ensure formatting is idempotent
+		execSync(`npx biome format --write ${filesToFormat.join(" ")}`, {
+			cwd: path.resolve(__dirname, ".."),
+			stdio: "inherit",
+		});
 	} catch (error) {
-		console.warn("[post-introspect] Failed to run biome check:", error);
+		console.warn("[post-introspect] Failed to run biome:", error);
 	}
 }
 
