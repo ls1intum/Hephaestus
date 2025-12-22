@@ -38,4 +38,4 @@ EXPOSE 8000
 # Basic health check against the health endpoint (busybox wget is available)
 HEALTHCHECK --interval=30s --timeout=3s --retries=3 CMD wget -qO- http://localhost:8000/health || exit 1
 
-CMD ["node", "/app/dist/index.js"]
+CMD ["node", "/app/dist/src/index.js"]
