@@ -22,6 +22,32 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const schemaPath = path.resolve(__dirname, "../drizzle/schema.ts");
 
+/**
+ * Sort named imports in an import statement for deterministic output.
+ * drizzle-kit produces random import order on each run.
+ * @param fileContent - The file content
+ * @param moduleName - The module name WITHOUT quotes, e.g., "./schema" or "drizzle-orm/pg-core"
+ */
+function sortNamedImports(fileContent: string, moduleName: string): string {
+	// Match import { ... } from "module" or '...'
+	// The regex needs to handle multi-line imports with newlines and tabs inside { }
+	const escapedModule = moduleName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+	const importRegex = new RegExp(
+		`import\\s*\\{([^}]+)\\}\\s*from\\s*["']${escapedModule}["']`,
+		"gs",
+	);
+
+	return fileContent.replace(importRegex, (_match, imports: string) => {
+		const sorted = imports
+			.split(",")
+			.map((s) => s.trim())
+			.filter(Boolean)
+			.sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()))
+			.join(",\n\t");
+		return `import {\n\t${sorted},\n} from "${moduleName}"`;
+	});
+}
+
 let content: string;
 try {
 	content = fs.readFileSync(schemaPath, "utf8");
@@ -131,6 +157,9 @@ const removePgTableBlock = (name: string) => {
 removePgTableBlock("databasechangelog");
 removePgTableBlock("databasechangeloglock");
 
+// Sort imports from drizzle-orm/pg-core for deterministic output
+content = sortNamedImports(content, "drizzle-orm/pg-core");
+
 fs.writeFileSync(schemaPath, content, "utf8");
 
 // Move ./drizzle/relations.ts to ./src/shared/db/relations.ts (overwrite if exists)
@@ -143,6 +172,10 @@ try {
 	if (!relationsContent.startsWith("// @ts-nocheck")) {
 		relationsContent = relationsHeader + relationsContent;
 	}
+
+	// Sort imports from ./schema for deterministic output
+	// drizzle-kit produces random import order on each run
+	relationsContent = sortNamedImports(relationsContent, "./schema");
 
 	// Normalize destructuring patterns in relations functions for consistent formatting
 	// Drizzle-kit generates different spacing on different platforms:
