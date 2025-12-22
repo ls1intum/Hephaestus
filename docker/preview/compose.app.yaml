@@ -179,7 +179,7 @@ services:
   # ---------------------------------------------------------------------------
   intelligence-service:
     build:
-      context: ./server/intelligence-service
+      context: ../../server/intelligence-service
       dockerfile: Dockerfile
     restart: unless-stopped
     environment:
@@ -224,7 +224,7 @@ services:
   # ---------------------------------------------------------------------------
   application-server:
     build:
-      context: ./server/application-server
+      context: ../../server/application-server
       dockerfile: Dockerfile
     restart: unless-stopped
     environment:
@@ -294,8 +294,8 @@ services:
   # ---------------------------------------------------------------------------
   webapp:
     build:
-      context: ./webapp
-      dockerfile: Dockerfile
+      context: ../../
+      dockerfile: webapp/Dockerfile
     restart: unless-stopped
     environment:
       APPLICATION_VERSION: preview
