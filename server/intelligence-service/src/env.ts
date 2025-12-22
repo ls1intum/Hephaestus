@@ -32,7 +32,7 @@ const EnvSchema = z
 
 		// LLM Providers
 		OPENAI_API_KEY: z.string().min(1).optional(),
-		AZURE_RESOURCE_NAME: z.string().min(1).optional(),
+		AZURE_RESOURCE_NAME: z.string().min(1).optional(), // Just the resource name (e.g., "myresource")
 		AZURE_API_KEY: z.string().min(1).optional(),
 
 		// Models

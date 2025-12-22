@@ -183,34 +183,30 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     environment:
+      NODE_ENV: production
+      PORT: 8000
+      LOG_LEVEL: info
       # Database - Coolify provides SERVICE_NAME_POSTGRES with the correct container name
-      DATABASE_URL: postgresql://${SERVICE_NAME_POSTGRES:-postgres}:5432/hephaestus
-      DATABASE_USERNAME: hephaestus
-      DATABASE_PASSWORD: ${POSTGRES_PASSWORD:-hephaestus-preview}
+      DATABASE_URL: postgresql://hephaestus:${POSTGRES_PASSWORD:-hephaestus-preview}@${SERVICE_NAME_POSTGRES:-postgres}:5432/hephaestus
       # AI Models
       MODEL_NAME: ${MODEL_NAME:?Required}
       DETECTION_MODEL_NAME: ${DETECTION_MODEL_NAME:?Required}
       # OpenAI
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-      OPENAI_API_VERSION: ${OPENAI_API_VERSION:-}
       # Azure OpenAI
-      AZURE_OPENAI_ENDPOINT: ${AZURE_OPENAI_ENDPOINT:-}
-      AZURE_OPENAI_API_KEY: ${AZURE_OPENAI_API_KEY:-}
-      # Ollama
-      OLLAMA_HOST: ${OLLAMA_HOST:-}
-      OLLAMA_BASIC_AUTH_USERNAME: ${OLLAMA_BASIC_AUTH_USERNAME:-}
-      OLLAMA_BASIC_AUTH_PASSWORD: ${OLLAMA_BASIC_AUTH_PASSWORD:-}
+      AZURE_RESOURCE_NAME: ${AZURE_RESOURCE_NAME:-}
+      AZURE_API_KEY: ${AZURE_API_KEY:-}
       # Observability (optional)
       LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-}
       LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-}
-      LANGFUSE_HOST: ${LANGFUSE_HOST:-}
+      LANGFUSE_BASE_URL: ${LANGFUSE_BASE_URL:-}
     depends_on:
       postgres:
         condition: service_healthy
       seed-loader:
         condition: service_completed_successfully
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://127.0.0.1:5000/health"]
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8000/health"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -240,7 +236,7 @@ services:
       DATABASE_USERNAME: hephaestus
       DATABASE_PASSWORD: ${POSTGRES_PASSWORD:-hephaestus-preview}
       # Internal service - Coolify provides SERVICE_NAME_INTELLIGENCE_SERVICE
-      INTELLIGENCE_SERVICE_URL: http://${SERVICE_NAME_INTELLIGENCE_SERVICE:-intelligence-service}:5000
+      INTELLIGENCE_SERVICE_URL: http://${SERVICE_NAME_INTELLIGENCE_SERVICE:-intelligence-service}:8000
       # Shared infrastructure (must match shared-infra service names with UUID suffix)
       # When "Connect to Predefined Network" is enabled, use the full container names
       NATS_SERVER: nats://nats-server:4222
@@ -272,7 +268,7 @@ services:
       SENTRY_DSN: ${SENTRY_DSN:-}
       LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-}
       LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-}
-      LANGFUSE_HOST: ${LANGFUSE_HOST:-}
+      LANGFUSE_BASE_URL: ${LANGFUSE_BASE_URL:-}
     depends_on:
       postgres:
         condition: service_healthy

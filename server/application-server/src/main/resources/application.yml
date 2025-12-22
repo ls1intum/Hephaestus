@@ -150,7 +150,7 @@ hephaestus:
         tracing:
             enabled: false
             # The host of the langfuse server
-            host: ${LANGFUSE_HOST:}
+            host: ${LANGFUSE_BASE_URL:}
             # The public key of the langfuse server
             public-key: ${LANGFUSE_PUBLIC_KEY:}
             # The secret key of the langfuse server
