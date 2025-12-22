@@ -7,7 +7,7 @@
 		"build": "tsc && tsc-alias",
 		"start": "node dist/index.js",
 		"db:setup": "tsx scripts/setup-db.ts",
-		"db:introspect": "drizzle-kit introspect --dialect=postgresql --url=postgresql://root:root@localhost:5432/hephaestus && tsx scripts/post-introspect.ts",
+		"db:introspect": "bash scripts/db-introspect.sh",
 		"openapi:export": "tsx scripts/export-openapi.ts",
 		"prompts": "tsx scripts/prompts.ts",
 		"prompts:status": "tsx scripts/prompts.ts status",
