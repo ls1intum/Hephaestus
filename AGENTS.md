@@ -131,7 +131,7 @@ bd sync               # Force sync with JSONL
 
 - `server/application-server/`: Spring Boot 3.5, Liquibase-managed PostgreSQL schema, synchronous + reactive APIs, generated OpenAPI spec in `openapi.yaml`.
 - `webapp/`: React 19 + TanStack Router/Query, Tailwind 4 UI kit (`src/components/ui`), generated API client in `src/api/**`.
-- `server/intelligence-service/`: FastAPI service orchestrating AI models. OpenAPI spec is exported via Poetry and mirrored into the Java client under the application server.
+- `server/intelligence-service/`: TypeScript/Hono service orchestrating AI models via Vercel AI SDK. OpenAPI spec is exported and mirrored into the Java client under the application server.
 - `server/webhook-ingest/`: FastAPI webhook intake that forwards events into NATS JetStream.
 - `docs/`: Contributor docs (including the ERD that `db:generate-erd-docs` regenerates).
 
@@ -139,10 +139,10 @@ bd sync               # Force sync with JSONL
 
 - **Node.js**: Use the exact version from `.node-version` (currently 22.10.0). Stick with npm—the repo maintains `package-lock.json` and uses npm workspaces.
 - **Java**: JDK 21 (see `pom.xml`). Maven wrapper is checked in; **always run builds through `./mvnw`** (Maven wrapper) to ensure consistent Maven versions.
-- **Python**: Python 3.13 with Poetry 2.x. Both Python services keep virtualenvs inside their folders (`.venv`). Run `npm run bootstrap:py` before formatting/linting to ensure dev dependencies are installed.
+- **Python**: Python 3.13 with Poetry 2.x. The webhook-ingest service uses a virtualenv inside its folder (`.venv`). Run `npm run bootstrap:py` before formatting/linting to ensure dev dependencies are installed.
 - **Docker & Docker Compose**: Required for database helper scripts (`scripts/db-utils.sh`) and for spinning up Postgres/Keycloak/NATS locally.
 - **Databases**: Default PostgreSQL DSN is `postgresql://root:root@localhost:5432/hephaestus`. The database helpers spin this up for you via Docker.
-- **Environment variables**: When generating intelligence service OpenAPI specs locally, set `MODEL_NAME=fake:model` and `DETECTION_MODEL_NAME=fake:model` (the FastAPI settings expect a provider-qualified model name).
+- **Environment variables**: When generating intelligence service OpenAPI specs locally, set `MODEL_NAME=fake:model` and `DETECTION_MODEL_NAME=fake:model` (the service settings expect a provider-qualified model name).
 
 ## 3. Quality gates & routine commands
 
@@ -198,8 +198,8 @@ We rely heavily on generated artifacts. Never hand-edit these directories—rege
 | `server/application-server/openapi.yaml` | `npm run generate:api:application-server:specs` (runs `./mvnw verify -DskipTests=true -Dapp.profiles=specs`). |
 | `webapp/src/api/**/*`, `webapp/src/api/@tanstack/react-query.gen.ts`, `webapp/src/api/client.gen.ts`, `webapp/src/api/types.gen.ts` | `npm run generate:api:application-server:client` (wraps `npm -w webapp run openapi-ts`). |
 | `server/application-server/src/main/java/de/tum/in/www1/hephaestus/intelligenceservice/**` | `npm run generate:api:intelligence-service:client` (OpenAPI Generator CLI). |
-| `server/intelligence-service/openapi.yaml` | `MODEL_NAME=fake:model DETECTION_MODEL_NAME=fake:model npm run generate:api:intelligence-service:specs` (delegates to `poetry run openapi`). |
-| `server/intelligence-service/app/db/models_gen.py` | `npm run db:generate-models:intelligence-service` (requires the application-server database to be reachable). |
+| `server/intelligence-service/openapi.yaml` | `npm run generate:api:intelligence-service:specs` (runs `npm -w server/intelligence-service run openapi:export`). |
+| `server/intelligence-service/src/shared/db/schema.ts` | `npm run db:generate-models:intelligence-service` (requires the application-server database to be reachable). |
 | `docs/contributor/erd/schema.mmd` | `npm run db:generate-erd-docs` (connects to the same Postgres instance). |
 
 Regeneration is destructive; stash local edits before running these commands. Check diffs carefully—generated clients must be committed alongside API changes.
@@ -212,7 +212,7 @@ Regeneration is destructive; stash local edits before running these commands. Ch
   2. Snapshot the schema, run Liquibase diff, and create a timestamped changelog file.
   3. Tear down the temporary container.
 - Trim the generated changelog to only the real schema deltas (e.g., new columns). Never commit the raw diff wholesale—prune back to the minimal change set before renaming it into `db/changelog/`.
-- After drafting a changelog, run `npm run db:generate-erd-docs` and `npm run db:generate-models:intelligence-service` to keep ERD docs and SQLAlchemy models in sync.
+- After drafting a changelog, run `npm run db:generate-erd-docs` and `npm run db:generate-models:intelligence-service` to keep ERD docs and Drizzle schema in sync.
 - Never manually edit generated Liquibase diff sections unless you fully understand the implications. Prefer creating a follow-up changelog to fix mistakes.
 
 ## 6. Frontend (webapp) expectations
@@ -247,25 +247,28 @@ Regeneration is destructive; stash local edits before running these commands. Ch
 - When integrating with the intelligence-service client, always regenerate (`npm run generate:api:intelligence-service:client`) after touching the spec and commit the updated Java files.
 - Controller-level integration tests should extend `AbstractWorkspaceIntegrationTest` (or an equivalent domain-specific base), exercise access control through `WebTestClient` + `TestAuthUtils`, and follow the contributor testing guide's checklist. This keeps authentication, validation, and persistence assertions consistent across new endpoints.
 
-## 8. Python services expectations
+## 8. Intelligence service expectations (TypeScript)
 
-- Both services rely on Poetry with in-project virtualenvs. Run `poetry install --with dev --no-root` before running tooling.
-- Intelligence service:
-  - Settings live in `app/settings.py`; `MODEL_NAME` and `DETECTION_MODEL_NAME` must be provider-qualified (`openai:gpt-4o`, `fake:model`, etc.). For tooling/CI we rely on the `fake` provider.
-  - FastAPI routers under `app/routers/**`; keep business logic in `app/services/**` or domain-specific modules. Unit-test model/detector logic when modifying heuristics.
-  - OpenAPI generation toggles `settings.IS_GENERATING_OPENAPI` to disable Langfuse; avoid leaking runtime-only side effects into generation mode.
-- Webhook ingest service:
-  - Uses FastAPI with NATS JetStream (`nats-py`). Keep NATS subject naming consistent with the README (`github.<owner>.<repo>.<event>`).
-  - Configuration via environment variables (see README). When adding config, extend `pyproject.toml` and `.env` templates accordingly.
-- Formatting: run `npm run format:intelligence-service` or `npm run format:webhook-ingest`. Add type hints so mypy stays green in the intelligence service.
+- Uses Hono as the HTTP framework with Vercel AI SDK for LLM orchestration.
+- Settings live in `src/env.ts`; `MODEL_NAME` and `DETECTION_MODEL_NAME` must be provider-qualified (`openai:gpt-4o`, `anthropic:claude-sonnet-4-20250514`, etc.).
+- Drizzle ORM for database access; schema is auto-generated via `npm run db:introspect` from the application-server's Liquibase-managed PostgreSQL.
+- OpenAPI spec is exported via `npm run openapi:export`.
+- Formatting: run `npm run format:intelligence-service`. Biome handles linting and formatting.
 
-## 9. Documentation & assets
+## 9. Webhook ingest service expectations (Python)
+
+- Uses FastAPI with NATS JetStream (`nats-py`). Keep NATS subject naming consistent with the README (`github.<owner>.<repo>.<event>`).
+- Uses Poetry with in-project virtualenv. Run `poetry install --with dev --no-root` before running tooling.
+- Configuration via environment variables (see README). When adding config, extend `pyproject.toml` and `.env` templates accordingly.
+- Formatting: run `npm run format:webhook-ingest`. Add type hints for mypy.
+
+## 10. Documentation & assets
 
 - ERD diagrams live under `docs/contributor/erd/`. Regenerate via `npm run db:generate-erd-docs` after schema changes.
 - Contributor documentation should stay in `docs/` (GitHub Pages). Keep README/CONTRIBUTING updates concise and actionable.
 - Screenshots or large binary assets belong under `docs/images/` or the Storybook stories, not inside source directories.
 
-## 10. Pull requests
+## 11. Pull requests
 
 Before opening a PR, run `npm run format && npm run check`. The PR template (`.github/PULL_REQUEST_TEMPLATE.md`) guides you through title format and checklists. Key points:
 
@@ -273,7 +276,7 @@ Before opening a PR, run `npm run format && npm run check`. The PR template (`.g
 - **Generated files**: Regenerate and commit OpenAPI specs, clients, and ERD docs when APIs or entities change.
 - **Database changes**: Run `npm run db:draft-changelog` and prune to minimal deltas.
 
-## 11. Known command caveats
+## 12. Known command caveats
 
 - `npm run db:draft-changelog` requires Docker to be installed and available on PATH. In CI we set `CI=true`; locally ensure Docker Desktop/daemon is running before invoking the script.
 - `npm run generate:api:intelligence-service:specs` fails unless `MODEL_NAME` and `DETECTION_MODEL_NAME` are set (use the `fake:model` provider for tooling).

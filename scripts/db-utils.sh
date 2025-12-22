@@ -382,9 +382,9 @@ cmd_draft_changelog() {
     log_success "🎉 Changelog diff process completed!"
 }
 
-# Generate SQLAlchemy models for intelligence service
+# Generate Drizzle schema for intelligence service
 cmd_generate_db_models_intelligence_service() {
-    log_info "🚀 Starting SQLAlchemy model generation for intelligence service..."
+    log_info "🚀 Starting Drizzle schema generation for intelligence service..."
     check_environment
     
     # Ensure PostgreSQL is running and ready
@@ -405,7 +405,7 @@ cmd_generate_db_models_intelligence_service() {
     fi
     
     generate_intelligence_service_models
-    log_success "🎉 SQLAlchemy model generation completed successfully!"
+    log_success "🎉 Drizzle schema generation completed successfully!"
 }
 
 # Show usage information
