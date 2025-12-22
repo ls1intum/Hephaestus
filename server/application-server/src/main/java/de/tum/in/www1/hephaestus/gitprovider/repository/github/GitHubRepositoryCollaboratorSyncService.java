@@ -22,6 +22,11 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * @deprecated Use webhook handlers and GraphQL-based collaborator sync instead.
+ */
+@Deprecated(forRemoval = true)
+@SuppressWarnings("deprecation")
 @Service
 public class GitHubRepositoryCollaboratorSyncService {
 

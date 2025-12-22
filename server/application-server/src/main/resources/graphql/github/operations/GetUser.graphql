@@ -1,0 +1,21 @@
+# GraphQL query for fetching user details
+# Used by GraphQL-based sync services
+
+query GetUser($login: String!) {
+	user(login: $login) {
+		id
+		databaseId
+		login
+		name
+		email
+		avatarUrl
+		url
+		bio
+		company
+		location
+		websiteUrl
+		twitterUsername
+		createdAt
+		updatedAt
+	}
+}

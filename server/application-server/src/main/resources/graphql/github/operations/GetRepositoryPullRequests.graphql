@@ -1,0 +1,105 @@
+# GraphQL query for fetching repository pull requests with all fields
+# Used by GraphQL-based sync services
+
+query GetRepositoryPullRequests($owner: String!, $name: String!, $first: Int!, $after: String, $states: [PullRequestState!]) {
+	repository(owner: $owner, name: $name) {
+		pullRequests(first: $first, after: $after, states: $states, orderBy: { field: UPDATED_AT, direction: DESC }) {
+			pageInfo {
+				hasNextPage
+				endCursor
+			}
+			totalCount
+			nodes {
+				id
+				databaseId
+				number
+				title
+				body
+				state
+				url
+				createdAt
+				updatedAt
+				closedAt
+				mergedAt
+				isDraft
+				additions
+				deletions
+				changedFiles
+				
+				# Head and base refs
+				headRefName
+				baseRefName
+				headRefOid
+				baseRefOid
+				
+				# Author
+				author {
+					... on User {
+						id
+						databaseId
+						login
+						avatarUrl
+						name
+						email
+					}
+				}
+				
+				# Merged by
+				mergedBy {
+					... on User {
+						id
+						databaseId
+						login
+						avatarUrl
+					}
+				}
+				
+				# Assignees
+				assignees(first: 20) {
+					nodes {
+						id
+						databaseId
+						login
+						avatarUrl
+						name
+					}
+				}
+				
+				# Requested reviewers
+				reviewRequests(first: 20) {
+					nodes {
+						requestedReviewer {
+							... on User {
+								id
+								databaseId
+								login
+								avatarUrl
+							}
+						}
+					}
+				}
+				
+				# Labels
+				labels(first: 50) {
+					nodes {
+						id
+						name
+						description
+						color
+					}
+				}
+				
+				# Milestone
+				milestone {
+					id
+					number
+					title
+					description
+					state
+					dueOn
+					url
+				}
+			}
+		}
+	}
+}

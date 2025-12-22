@@ -1,0 +1,34 @@
+# GraphQL query for fetching organization details
+# Used by GraphQL-based sync services
+
+query GetOrganization($login: String!) {
+	organization(login: $login) {
+		id
+		databaseId
+		login
+		name
+		description
+		avatarUrl
+		url
+		email
+		websiteUrl
+		createdAt
+		updatedAt
+		
+		# Organization members
+		membersWithRole(first: 100) {
+			totalCount
+			edges {
+				role
+				node {
+					id
+					databaseId
+					login
+					avatarUrl
+					name
+					email
+				}
+			}
+		}
+	}
+}

@@ -1,65 +1,85 @@
 package de.tum.in.www1.hephaestus.gitprovider.issuedependency.github;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
+import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContextFactory;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
-import org.kohsuke.github.GHEventPayloadIssueDependencies;
+import de.tum.in.www1.hephaestus.gitprovider.issue.github.GitHubIssueProcessor;
+import de.tum.in.www1.hephaestus.gitprovider.issuedependency.github.dto.GitHubIssueDependenciesEventDTO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Handles GitHub issue_dependencies webhook events for blocking relationships.
+ * Handles GitHub issue_dependencies webhook events.
  * <p>
- * This handler processes two event types:
- * <ul>
- * <li>{@code blocked_by_added} - An issue was marked as blocked by another</li>
- * <li>{@code blocked_by_removed} - A blocking relationship was removed</li>
- * </ul>
+ * Uses DTOs directly (no hub4j) for complete field coverage.
  * <p>
- * These events are distinct from sub_issues events - blocking indicates a
- * dependency/prerequisite relationship, while sub_issues indicates hierarchy.
- * <p>
- * <b>NOTE (Dec 2025):</b> The {@code issue_dependencies} webhook event is
- * <b>STILL NOT AVAILABLE</b> for subscription in GitHub App settings.
- * GitHub shipped the "Blocked by" UI feature without webhook support
- * (see <a href="https://github.com/orgs/community/discussions/165749">
- * Community Discussion #165749</a>). API/webhook support was listed under
- * "What we are thinking about next" rather than "What is included."
- * Until webhooks are available, issue dependencies can only be synced via
- * GraphQL bulk queries. This handler is prepared for when webhooks launch.
- *
- * @see GHEventPayloadIssueDependencies
- * @see GitHubIssueDependencySyncService
+ * TODO: Full dependency tracking when IssueDependency entity is created.
  */
 @Component
-public class GitHubIssueDependenciesMessageHandler extends GitHubMessageHandler<GHEventPayloadIssueDependencies> {
+public class GitHubIssueDependenciesMessageHandler extends GitHubMessageHandler<GitHubIssueDependenciesEventDTO> {
 
     private static final Logger logger = LoggerFactory.getLogger(GitHubIssueDependenciesMessageHandler.class);
 
-    private final GitHubIssueDependencySyncService issueDependencySyncService;
+    private final ProcessingContextFactory contextFactory;
+    private final GitHubIssueProcessor issueProcessor;
 
-    public GitHubIssueDependenciesMessageHandler(GitHubIssueDependencySyncService issueDependencySyncService) {
-        super(GHEventPayloadIssueDependencies.class);
-        this.issueDependencySyncService = issueDependencySyncService;
-    }
-
-    @Override
-    protected void handleEvent(GHEventPayloadIssueDependencies payload) {
-        var action = payload.getActionType();
-        long blockedIssueId = payload.getBlockedIssueId();
-        long blockingIssueId = payload.getBlockingIssueId();
-
-        logger.info(
-            "Received issue_dependencies event: action={}, blockedIssue={}, blockingIssue={}",
-            action,
-            blockedIssueId,
-            blockingIssueId
-        );
-
-        issueDependencySyncService.processIssueDependencyEvent(blockedIssueId, blockingIssueId, payload.isBlockEvent());
+    GitHubIssueDependenciesMessageHandler(
+        ProcessingContextFactory contextFactory,
+        GitHubIssueProcessor issueProcessor
+    ) {
+        super(GitHubIssueDependenciesEventDTO.class);
+        this.contextFactory = contextFactory;
+        this.issueProcessor = issueProcessor;
     }
 
     @Override
     protected String getEventKey() {
         return "issue_dependencies";
+    }
+
+    @Override
+    @Transactional
+    protected void handleEvent(GitHubIssueDependenciesEventDTO event) {
+        var blockedIssueDto = event.blockedIssue();
+        var blockingIssueDto = event.blockingIssue();
+
+        if (blockedIssueDto == null || blockingIssueDto == null) {
+            logger.warn("Received issue_dependencies event with missing data");
+            return;
+        }
+
+        logger.info(
+            "Received issue_dependencies event: action={}, blocked=#{}, blocking=#{}, repo={}",
+            event.action(),
+            blockedIssueDto.number(),
+            blockingIssueDto.number(),
+            event.repository() != null ? event.repository().fullName() : "unknown"
+        );
+
+        ProcessingContext context = contextFactory.forWebhookEvent(event).orElse(null);
+        if (context == null) {
+            return;
+        }
+
+        // Ensure both issues exist
+        issueProcessor.process(blockedIssueDto, context);
+        issueProcessor.process(blockingIssueDto, context);
+
+        // Log the action - full dependency tracking can be added when entity exists
+        switch (event.action()) {
+            case "added" -> logger.info(
+                "Dependency added: #{} blocked by #{}",
+                blockedIssueDto.number(),
+                blockingIssueDto.number()
+            );
+            case "removed" -> logger.info(
+                "Dependency removed: #{} blocked by #{}",
+                blockedIssueDto.number(),
+                blockingIssueDto.number()
+            );
+            default -> logger.debug("Unhandled issue_dependencies action: {}", event.action());
+        }
     }
 }

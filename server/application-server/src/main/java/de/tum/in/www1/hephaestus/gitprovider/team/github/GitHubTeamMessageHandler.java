@@ -1,128 +1,34 @@
 package de.tum.in.www1.hephaestus.gitprovider.team.github;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
-import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
-import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
-import de.tum.in.www1.hephaestus.gitprovider.repository.github.GitHubRepositoryConverter;
 import de.tum.in.www1.hephaestus.gitprovider.team.Team;
 import de.tum.in.www1.hephaestus.gitprovider.team.TeamRepository;
-import de.tum.in.www1.hephaestus.gitprovider.team.permission.TeamRepositoryPermission;
-import java.util.List;
-import java.util.Objects;
-import org.kohsuke.github.GHEvent;
-import org.kohsuke.github.GHEventPayload;
-import org.kohsuke.github.GHRepository;
-import org.kohsuke.github.GHTeam;
+import de.tum.in.www1.hephaestus.gitprovider.team.github.dto.GitHubTeamEventDTO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * Handles GitHub team webhook events.
+ * <p>
+ * Uses DTOs directly (no hub4j) for complete field coverage.
+ */
 @Component
-public class GitHubTeamMessageHandler extends GitHubMessageHandler<GHEventPayload.Team> {
+public class GitHubTeamMessageHandler extends GitHubMessageHandler<GitHubTeamEventDTO> {
 
     private static final Logger logger = LoggerFactory.getLogger(GitHubTeamMessageHandler.class);
 
     private final TeamRepository teamRepository;
-    private final RepositoryRepository repositoryRepository;
-    private final GitHubTeamConverter teamConverter;
-    private final GitHubRepositoryConverter repositoryConverter;
 
-    public GitHubTeamMessageHandler(
-        TeamRepository teamRepository,
-        RepositoryRepository repositoryRepository,
-        GitHubTeamConverter teamConverter,
-        GitHubRepositoryConverter repositoryConverter
-    ) {
-        super(GHEventPayload.Team.class);
+    GitHubTeamMessageHandler(TeamRepository teamRepository) {
+        super(GitHubTeamEventDTO.class);
         this.teamRepository = teamRepository;
-        this.repositoryRepository = repositoryRepository;
-        this.teamConverter = teamConverter;
-        this.repositoryConverter = repositoryConverter;
     }
 
     @Override
-    protected void handleEvent(GHEventPayload.Team eventPayload) {
-        String action = eventPayload.getAction();
-        long teamId = eventPayload.getTeam() != null ? eventPayload.getTeam().getId() : -1L;
-        String orgLogin = eventPayload.getOrganization() != null ? eventPayload.getOrganization().getLogin() : null;
-
-        logger.info("org={} action={} teamId={}", orgLogin, action, teamId);
-
-        if ("deleted".equals(action)) {
-            teamRepository.deleteById(teamId);
-            return;
-        }
-
-        // Upsert team basics from payload for any non-deleted action
-        Team team = upsertTeamFromPayload(eventPayload, orgLogin);
-
-        // If repository present, handle repo-level permission updates offline
-        if (eventPayload.getRepository() != null) {
-            Repository repo = upsertRepositoryFromPayload(eventPayload.getRepository());
-            var level = extractPermissionLevel(eventPayload.getRepository());
-
-            if ("removed_from_repository".equals(action) || level == null) {
-                // remove permission if present
-                team.getRepoPermissions().removeIf(p -> Objects.equals(p.getRepository().getId(), repo.getId()));
-            } else {
-                // upsert permission
-                var existing = team
-                    .getRepoPermissions()
-                    .stream()
-                    .filter(p -> Objects.equals(p.getRepository().getId(), repo.getId()))
-                    .findFirst()
-                    .orElse(null);
-                if (existing == null) {
-                    team.addRepoPermission(new TeamRepositoryPermission(team, repo, level));
-                } else {
-                    existing.setPermission(level);
-                }
-            }
-            teamRepository.save(team);
-        }
-    }
-
-    private Team upsertTeamFromPayload(GHEventPayload.Team payload, String orgLogin) {
-        if (payload.getTeam() == null) {
-            return null;
-        }
-        GHTeam t = payload.getTeam();
-        Team team = teamRepository.findById(t.getId()).orElseGet(Team::new);
-        team.setId(t.getId());
-        team = teamConverter.update(t, team);
-        // Ensure organization is taken from event payload (converter may attempt API call)
-        if (orgLogin != null) {
-            team.setOrganization(orgLogin);
-        }
-        return teamRepository.save(team);
-    }
-
-    private Repository upsertRepositoryFromPayload(GHRepository ghRepo) {
-        Repository repo = repositoryRepository.findById(ghRepo.getId()).orElseGet(Repository::new);
-        repo.setId(ghRepo.getId());
-        repo = repositoryConverter.update(ghRepo, repo);
-        return repositoryRepository.save(repo);
-    }
-
-    private TeamRepositoryPermission.PermissionLevel extractPermissionLevel(GHRepository ghRepo) {
-        // map using permissions booleans only (role name is not available in this GHRepository version)
-        try {
-            if (ghRepo.hasAdminAccess()) {
-                return TeamRepositoryPermission.PermissionLevel.ADMIN;
-            }
-            if (ghRepo.hasPushAccess()) {
-                return TeamRepositoryPermission.PermissionLevel.WRITE;
-            }
-            if (ghRepo.hasPullAccess()) {
-                return TeamRepositoryPermission.PermissionLevel.READ;
-            }
-        } catch (Exception ignored) {}
-        return null;
-    }
-
-    @Override
-    protected GHEvent getHandlerEvent() {
-        return GHEvent.TEAM;
+    protected String getEventKey() {
+        return "team";
     }
 
     @Override
@@ -131,7 +37,60 @@ public class GitHubTeamMessageHandler extends GitHubMessageHandler<GHEventPayloa
     }
 
     @Override
-    public List<GitHubMessageDomain> getAdditionalDomains() {
-        return List.of(GitHubMessageDomain.REPOSITORY);
+    @Transactional
+    protected void handleEvent(GitHubTeamEventDTO event) {
+        var teamDto = event.team();
+
+        if (teamDto == null) {
+            logger.warn("Received team event with missing data");
+            return;
+        }
+
+        logger.info(
+            "Received team event: action={}, team={}, org={}",
+            event.action(),
+            teamDto.name(),
+            event.organization() != null ? event.organization().login() : "unknown"
+        );
+
+        switch (event.action()) {
+            case "deleted" -> teamRepository.deleteById(teamDto.id());
+            case "created", "edited" -> processTeam(teamDto, event.organization());
+            default -> logger.debug("Unhandled team action: {}", event.action());
+        }
+    }
+
+    private void processTeam(GitHubTeamEventDTO.GitHubTeamDTO dto, GitHubTeamEventDTO.GitHubOrgRefDTO org) {
+        teamRepository
+            .findById(dto.id())
+            .ifPresentOrElse(
+                team -> {
+                    if (dto.name() != null) team.setName(dto.name());
+                    if (dto.description() != null) team.setDescription(dto.description());
+                    if (dto.htmlUrl() != null) team.setHtmlUrl(dto.htmlUrl());
+                    if (dto.privacy() != null) team.setPrivacy(mapPrivacy(dto.privacy()));
+                    teamRepository.save(team);
+                },
+                () -> {
+                    Team team = new Team();
+                    team.setId(dto.id());
+                    team.setName(dto.name());
+                    team.setDescription(dto.description());
+                    team.setHtmlUrl(dto.htmlUrl());
+                    team.setPrivacy(mapPrivacy(dto.privacy()));
+                    if (org != null) {
+                        team.setOrganization(org.login());
+                    }
+                    teamRepository.save(team);
+                }
+            );
+    }
+
+    private Team.Privacy mapPrivacy(String privacy) {
+        if (privacy == null) return Team.Privacy.CLOSED;
+        return switch (privacy.toLowerCase()) {
+            case "secret" -> Team.Privacy.SECRET;
+            default -> Team.Privacy.CLOSED;
+        };
     }
 }

@@ -1,90 +1,109 @@
 package de.tum.in.www1.hephaestus.gitprovider.issue.github;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
+import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContextFactory;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
-import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
-import de.tum.in.www1.hephaestus.gitprovider.issue.IssueRepository;
-import de.tum.in.www1.hephaestus.gitprovider.repository.github.GitHubRepositorySyncService;
-import org.kohsuke.github.GHEvent;
-import org.kohsuke.github.GHEventPayloadIssueWithType;
+import de.tum.in.www1.hephaestus.gitprovider.issue.github.dto.GitHubIssueDTO;
+import de.tum.in.www1.hephaestus.gitprovider.issue.github.dto.GitHubIssueEventDTO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 /**
- * Handles all GitHub issue webhook events including typed/untyped actions.
+ * Handles all GitHub issue webhook events.
  * <p>
- * Uses {@link GHEventPayloadIssueWithType} which extends hub4j's Issue payload
- * to include the "type" field for typed/untyped events.
+ * This handler uses DTOs directly (no hub4j) to ensure all fields are captured,
+ * including issue types which hub4j doesn't support.
  * <p>
- * Issue type processing is delegated to {@link GitHubIssueSyncService} to
- * ensure
- * consistent behavior between webhook and REST API sync.
+ * Processing is delegated to {@link GitHubIssueProcessor} which handles:
+ * <ul>
+ * <li>DTO to entity conversion</li>
+ * <li>Persistence</li>
+ * <li>Domain event publishing</li>
+ * </ul>
  */
 @Component
-public class GitHubIssueMessageHandler extends GitHubMessageHandler<GHEventPayloadIssueWithType> {
+public class GitHubIssueMessageHandler extends GitHubMessageHandler<GitHubIssueEventDTO> {
 
     private static final Logger logger = LoggerFactory.getLogger(GitHubIssueMessageHandler.class);
 
-    private final IssueRepository issueRepository;
-    private final GitHubIssueSyncService issueSyncService;
-    private final GitHubRepositorySyncService repositorySyncService;
+    private final ProcessingContextFactory contextFactory;
+    private final GitHubIssueProcessor issueProcessor;
 
-    public GitHubIssueMessageHandler(
-        IssueRepository issueRepository,
-        GitHubIssueSyncService issueSyncService,
-        GitHubRepositorySyncService repositorySyncService
-    ) {
-        super(GHEventPayloadIssueWithType.class);
-        this.issueRepository = issueRepository;
-        this.issueSyncService = issueSyncService;
-        this.repositorySyncService = repositorySyncService;
+    public GitHubIssueMessageHandler(ProcessingContextFactory contextFactory, GitHubIssueProcessor issueProcessor) {
+        super(GitHubIssueEventDTO.class);
+        this.contextFactory = contextFactory;
+        this.issueProcessor = issueProcessor;
     }
 
     @Override
-    protected void handleEvent(GHEventPayloadIssueWithType eventPayload) {
-        var action = eventPayload.getAction();
-        var repository = eventPayload.getRepository();
-        var ghIssue = eventPayload.getIssue();
+    protected String getEventKey() {
+        return "issues";
+    }
+
+    @Override
+    protected void handleEvent(GitHubIssueEventDTO event) {
+        GitHubIssueDTO issueDto = event.issue();
+
+        if (issueDto == null) {
+            logger.warn("Received issue event with missing issue data");
+            return;
+        }
 
         logger.info(
-            "Received issue event for repository: {}, issue: {}, action: {}",
-            repository.getFullName(),
-            ghIssue.getNumber(),
-            action
+            "Received issue event: action={}, issue=#{}, repo={}",
+            event.action(),
+            issueDto.number(),
+            event.repository() != null ? event.repository().fullName() : "unknown"
         );
 
-        repositorySyncService.processRepository(repository);
-
-        if ("deleted".equals(action)) {
-            issueRepository.deleteById(ghIssue.getId());
+        ProcessingContext context = contextFactory.forWebhookEvent(event).orElse(null);
+        if (context == null) {
             return;
         }
 
-        Issue issue;
-
-        // For typed events, pass the issue type to the sync service for linking
-        if (eventPayload.isTypedAction() && eventPayload.getIssueType() != null) {
-            issue = issueSyncService.processIssue(ghIssue, eventPayload.getIssueType(), repository.getOwnerName());
-            if (issue != null) {
-                logger.info("Set issue type '{}' for issue #{}", issue.getIssueType().getName(), issue.getNumber());
-            }
-        } else {
-            // Standard issue processing
-            issue = issueSyncService.processIssue(ghIssue);
-        }
-
-        if (issue == null) {
-            return;
-        }
-
-        // Handle untyped action - clear the issue type
-        if (eventPayload.isUntypedAction()) {
-            issueSyncService.clearIssueType(issue);
-        }
+        routeToProcessor(event, issueDto, context);
     }
 
-    @Override
-    protected GHEvent getHandlerEvent() {
-        return GHEvent.ISSUES;
+    private void routeToProcessor(GitHubIssueEventDTO event, GitHubIssueDTO issueDto, ProcessingContext context) {
+        switch (event.action()) {
+            case "opened",
+                "edited",
+                "assigned",
+                "unassigned",
+                "milestoned",
+                "demilestoned",
+                "pinned",
+                "unpinned",
+                "locked",
+                "unlocked",
+                "transferred" -> issueProcessor.process(issueDto, context);
+            case "closed" -> issueProcessor.processClosed(issueDto, context);
+            case "reopened" -> issueProcessor.processReopened(issueDto, context);
+            case "deleted" -> issueProcessor.processDeleted(issueDto);
+            case "labeled" -> {
+                if (event.label() != null) {
+                    issueProcessor.processLabeled(issueDto, event.label(), context);
+                } else {
+                    issueProcessor.process(issueDto, context);
+                }
+            }
+            case "unlabeled" -> {
+                if (event.label() != null) {
+                    issueProcessor.processUnlabeled(issueDto, event.label(), context);
+                } else {
+                    issueProcessor.process(issueDto, context);
+                }
+            }
+            case "typed" -> {
+                String orgLogin = event.repository().fullName().split("/")[0];
+                issueProcessor.processTyped(issueDto, event.issueType(), orgLogin, context);
+            }
+            case "untyped" -> issueProcessor.processUntyped(issueDto, context);
+            default -> {
+                logger.debug("Unhandled issue action: {}", event.action());
+                issueProcessor.process(issueDto, context);
+            }
+        }
     }
 }

@@ -1,68 +1,134 @@
 package de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.github;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
+import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContextFactory;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
-import de.tum.in.www1.hephaestus.gitprovider.pullrequest.github.GitHubPullRequestSyncService;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequest.github.GitHubPullRequestProcessor;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReviewRepository;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.PullRequestReviewComment;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.PullRequestReviewCommentRepository;
-import de.tum.in.www1.hephaestus.gitprovider.repository.github.GitHubRepositorySyncService;
-import org.kohsuke.github.GHEvent;
-import org.kohsuke.github.GHEventPayload;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.github.dto.GitHubPullRequestReviewCommentEventDTO;
+import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * Handles GitHub pull_request_review_comment webhook events.
+ * <p>
+ * Uses DTOs directly (no hub4j) for complete field coverage.
+ */
 @Component
 public class GitHubPullRequestReviewCommentMessageHandler
-    extends GitHubMessageHandler<GHEventPayload.PullRequestReviewComment> {
+    extends GitHubMessageHandler<GitHubPullRequestReviewCommentEventDTO> {
 
     private static final Logger logger = LoggerFactory.getLogger(GitHubPullRequestReviewCommentMessageHandler.class);
 
-    private final PullRequestReviewCommentRepository pullRequestReviewCommentRepository;
-    private final GitHubPullRequestReviewCommentSyncService pullRequestReviewCommentSyncService;
-    private final GitHubPullRequestSyncService pullRequestSyncService;
-    private final GitHubRepositorySyncService repositorySyncService;
+    private final ProcessingContextFactory contextFactory;
+    private final GitHubPullRequestProcessor prProcessor;
+    private final PullRequestReviewCommentRepository commentRepository;
+    private final PullRequestRepository prRepository;
+    private final PullRequestReviewRepository reviewRepository;
+    private final UserRepository userRepository;
 
-    public GitHubPullRequestReviewCommentMessageHandler(
-        PullRequestReviewCommentRepository pullRequestReviewCommentRepository,
-        GitHubPullRequestReviewCommentSyncService pullRequestReviewCommentSyncService,
-        GitHubPullRequestSyncService pullRequestSyncService,
-        GitHubRepositorySyncService repositorySyncService
+    GitHubPullRequestReviewCommentMessageHandler(
+        ProcessingContextFactory contextFactory,
+        GitHubPullRequestProcessor prProcessor,
+        PullRequestReviewCommentRepository commentRepository,
+        PullRequestRepository prRepository,
+        PullRequestReviewRepository reviewRepository,
+        UserRepository userRepository
     ) {
-        super(GHEventPayload.PullRequestReviewComment.class);
-        this.pullRequestReviewCommentRepository = pullRequestReviewCommentRepository;
-        this.pullRequestReviewCommentSyncService = pullRequestReviewCommentSyncService;
-        this.pullRequestSyncService = pullRequestSyncService;
-        this.repositorySyncService = repositorySyncService;
+        super(GitHubPullRequestReviewCommentEventDTO.class);
+        this.contextFactory = contextFactory;
+        this.prProcessor = prProcessor;
+        this.commentRepository = commentRepository;
+        this.prRepository = prRepository;
+        this.reviewRepository = reviewRepository;
+        this.userRepository = userRepository;
     }
 
     @Override
-    protected void handleEvent(GHEventPayload.PullRequestReviewComment eventPayload) {
-        var action = eventPayload.getAction();
-        var pullRequest = eventPayload.getPullRequest();
-        var repository = pullRequest.getRepository();
-        var comment = eventPayload.getComment();
-        logger.info(
-            "Received pull request review comment event for repository: {}, pull request: {}, action: {}, commentId: {}",
-            repository.getFullName(),
-            pullRequest.getNumber(),
-            action,
-            comment.getId()
-        );
-        repositorySyncService.processRepository(repository);
-        pullRequestSyncService.processPullRequest(pullRequest);
+    protected String getEventKey() {
+        return "pull_request_review_comment";
+    }
 
-        if (action.equals("deleted")) {
-            pullRequestReviewCommentSyncService.deletePullRequestReviewComment(comment.getId());
+    @Override
+    @Transactional
+    protected void handleEvent(GitHubPullRequestReviewCommentEventDTO event) {
+        var commentDto = event.comment();
+        var prDto = event.pullRequest();
+
+        if (commentDto == null || prDto == null) {
+            logger.warn("Received pull_request_review_comment event with missing data");
+            return;
+        }
+
+        logger.info(
+            "Received pull_request_review_comment event: action={}, pr=#{}, comment={}, repo={}",
+            event.action(),
+            prDto.number(),
+            commentDto.id(),
+            event.repository() != null ? event.repository().fullName() : "unknown"
+        );
+
+        ProcessingContext context = contextFactory.forWebhookEvent(event).orElse(null);
+        if (context == null) {
+            return;
+        }
+
+        // Ensure PR exists
+        prProcessor.process(prDto, context);
+
+        // Handle comment
+        if ("deleted".equals(event.action())) {
+            commentRepository.deleteById(commentDto.id());
         } else {
-            pullRequestReviewCommentSyncService.processPullRequestReviewComment(
-                comment,
-                pullRequest,
-                eventPayload.getSender()
-            );
+            processComment(commentDto, prDto.getDatabaseId());
         }
     }
 
-    @Override
-    protected GHEvent getHandlerEvent() {
-        return GHEvent.PULL_REQUEST_REVIEW_COMMENT;
+    private void processComment(GitHubPullRequestReviewCommentEventDTO.GitHubReviewCommentDTO dto, Long prId) {
+        PullRequest pr = prRepository.findById(prId).orElse(null);
+        if (pr == null) {
+            logger.warn("PR not found for comment: prId={}", prId);
+            return;
+        }
+
+        commentRepository
+            .findById(dto.id())
+            .ifPresentOrElse(
+                comment -> {
+                    comment.setBody(dto.body());
+                    comment.setUpdatedAt(dto.updatedAt());
+                    commentRepository.save(comment);
+                },
+                () -> {
+                    PullRequestReviewComment comment = new PullRequestReviewComment();
+                    comment.setId(dto.id());
+                    comment.setBody(dto.body());
+                    comment.setDiffHunk(dto.diffHunk());
+                    comment.setPath(dto.path());
+                    comment.setHtmlUrl(dto.htmlUrl());
+                    comment.setCreatedAt(dto.createdAt());
+                    comment.setUpdatedAt(dto.updatedAt());
+                    comment.setPullRequest(pr);
+
+                    // Link to review if present
+                    if (dto.reviewId() != null) {
+                        reviewRepository.findById(dto.reviewId()).ifPresent(comment::setReview);
+                    }
+
+                    // Link author if present
+                    if (dto.author() != null && dto.author().id() != null) {
+                        userRepository.findById(dto.author().id()).ifPresent(comment::setAuthor);
+                    }
+
+                    commentRepository.save(comment);
+                }
+            );
     }
 }

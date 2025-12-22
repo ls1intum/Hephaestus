@@ -1,0 +1,36 @@
+# GraphQL query for fetching issue comments
+# Used by GraphQL-based sync services
+
+query GetIssueComments($owner: String!, $name: String!, $number: Int!, $first: Int!, $after: String) {
+	repository(owner: $owner, name: $name) {
+		issue(number: $number) {
+			comments(first: $first, after: $after) {
+				pageInfo {
+					hasNextPage
+					endCursor
+				}
+				totalCount
+				nodes {
+					id
+					databaseId
+					body
+					url
+					createdAt
+					updatedAt
+					
+					# Author
+					author {
+						... on User {
+							id
+							databaseId
+							login
+							avatarUrl
+						}
+					}
+					
+					authorAssociation
+				}
+			}
+		}
+	}
+}

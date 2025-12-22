@@ -1,56 +1,76 @@
 package de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewthread.github;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
+import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContextFactory;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
-import de.tum.in.www1.hephaestus.gitprovider.pullrequest.github.GitHubPullRequestSyncService;
-import de.tum.in.www1.hephaestus.gitprovider.repository.github.GitHubRepositorySyncService;
-import org.kohsuke.github.GHEvent;
-import org.kohsuke.github.GHEventPayloadPullRequestReviewThread;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequest.github.GitHubPullRequestProcessor;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewthread.github.dto.GitHubPullRequestReviewThreadEventDTO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * Handles GitHub pull_request_review_thread webhook events.
+ * <p>
+ * Uses DTOs directly (no hub4j) for complete field coverage.
+ */
 @Component
 public class GitHubPullRequestReviewThreadMessageHandler
-    extends GitHubMessageHandler<GHEventPayloadPullRequestReviewThread> {
+    extends GitHubMessageHandler<GitHubPullRequestReviewThreadEventDTO> {
 
     private static final Logger logger = LoggerFactory.getLogger(GitHubPullRequestReviewThreadMessageHandler.class);
 
-    private final GitHubPullRequestReviewThreadSyncService threadSyncService;
-    private final GitHubPullRequestSyncService pullRequestSyncService;
-    private final GitHubRepositorySyncService repositorySyncService;
+    private final ProcessingContextFactory contextFactory;
+    private final GitHubPullRequestProcessor prProcessor;
 
-    public GitHubPullRequestReviewThreadMessageHandler(
-        GitHubPullRequestReviewThreadSyncService threadSyncService,
-        GitHubPullRequestSyncService pullRequestSyncService,
-        GitHubRepositorySyncService repositorySyncService
+    GitHubPullRequestReviewThreadMessageHandler(
+        ProcessingContextFactory contextFactory,
+        GitHubPullRequestProcessor prProcessor
     ) {
-        super(GHEventPayloadPullRequestReviewThread.class);
-        this.threadSyncService = threadSyncService;
-        this.pullRequestSyncService = pullRequestSyncService;
-        this.repositorySyncService = repositorySyncService;
+        super(GitHubPullRequestReviewThreadEventDTO.class);
+        this.contextFactory = contextFactory;
+        this.prProcessor = prProcessor;
     }
 
     @Override
-    protected void handleEvent(GHEventPayloadPullRequestReviewThread eventPayload) {
-        var action = eventPayload.getAction();
-        var pullRequest = eventPayload.getPullRequest();
-        var repository = eventPayload.getRepository();
+    protected String getEventKey() {
+        return "pull_request_review_thread";
+    }
+
+    @Override
+    @Transactional
+    protected void handleEvent(GitHubPullRequestReviewThreadEventDTO event) {
+        var threadDto = event.thread();
+        var prDto = event.pullRequest();
+
+        if (threadDto == null || prDto == null) {
+            logger.warn("Received pull_request_review_thread event with missing data");
+            return;
+        }
 
         logger.info(
-            "Received pull request review thread event for repository: {}, pull request: {}, action: {}",
-            repository.getFullName(),
-            pullRequest.getNumber(),
-            action
+            "Received pull_request_review_thread event: action={}, pr=#{}, thread={}, repo={}",
+            event.action(),
+            prDto.number(),
+            threadDto.id(),
+            event.repository() != null ? event.repository().fullName() : "unknown"
         );
 
-        repositorySyncService.processRepository(repository);
-        pullRequestSyncService.processPullRequest(pullRequest);
+        ProcessingContext context = contextFactory.forWebhookEvent(event).orElse(null);
+        if (context == null) {
+            return;
+        }
 
-        threadSyncService.processThreadEvent(eventPayload);
-    }
+        // For now, just ensure PR is up to date
+        // Thread handling can be expanded if needed
+        prProcessor.process(prDto, context);
 
-    @Override
-    protected GHEvent getHandlerEvent() {
-        return GHEvent.PULL_REQUEST_REVIEW_THREAD;
+        // Log the thread action
+        switch (event.action()) {
+            case "resolved" -> logger.info("Thread {} resolved on PR #{}", threadDto.id(), prDto.number());
+            case "unresolved" -> logger.info("Thread {} unresolved on PR #{}", threadDto.id(), prDto.number());
+            default -> logger.debug("Unhandled thread action: {}", event.action());
+        }
     }
 }

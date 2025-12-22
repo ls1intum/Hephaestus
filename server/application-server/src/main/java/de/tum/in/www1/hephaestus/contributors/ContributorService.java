@@ -1,22 +1,20 @@
 package de.tum.in.www1.hephaestus.contributors;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import org.kohsuke.github.GHRepository.Contributor;
-import org.kohsuke.github.GitHub;
-import org.kohsuke.github.GitHubBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.http.HttpHeaders;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.web.reactive.function.client.WebClient;
 
 /**
  * Service for fetching Hephaestus project contributors from GitHub.
@@ -26,9 +24,20 @@ import org.springframework.stereotype.Service;
 public class ContributorService {
 
     private static final Logger logger = LoggerFactory.getLogger(ContributorService.class);
+    private static final String GITHUB_API_BASE = "https://api.github.com";
+
+    private final WebClient webClient;
 
     @Value("${github.meta.auth-token:}")
     private String githubAuthToken;
+
+    public ContributorService(WebClient.Builder webClientBuilder) {
+        this.webClient = webClientBuilder
+            .baseUrl(GITHUB_API_BASE)
+            .defaultHeader(HttpHeaders.ACCEPT, "application/vnd.github+json")
+            .defaultHeader("X-GitHub-Api-Version", "2022-11-28")
+            .build();
+    }
 
     /**
      * Get all contributors to the Hephaestus project.
@@ -46,11 +55,10 @@ public class ContributorService {
         }
 
         try {
-            GitHub gitHub = new GitHubBuilder().withOAuthToken(githubAuthToken).build();
             Map<Long, ContributorDTO> uniqueContributors = new LinkedHashMap<>();
-            collectContributorsForRepository(gitHub, "ls1intum/Hephaestus", uniqueContributors);
+            collectContributorsForRepository("ls1intum", "Hephaestus", uniqueContributors);
             return sortContributors(uniqueContributors);
-        } catch (IOException e) {
+        } catch (Exception e) {
             logger.error("Error fetching global contributors: {}", e.getMessage());
             return new ArrayList<>();
         }
@@ -60,18 +68,24 @@ public class ContributorService {
     @Scheduled(fixedRateString = "${hephaestus.cache.contributors.evict-rate:3600000}")
     public void evictContributorsCache() {}
 
-    private void collectContributorsForRepository(
-        GitHub gitHub,
-        String repositoryName,
-        Map<Long, ContributorDTO> accumulator
-    ) {
+    private void collectContributorsForRepository(String owner, String repo, Map<Long, ContributorDTO> accumulator) {
         try {
-            gitHub
-                .getRepository(repositoryName)
-                .listContributors()
-                .forEach(contributor -> safelyAddContributor(contributor, accumulator));
-        } catch (IOException e) {
-            logger.warn("Failed to fetch contributors for repository {}: {}", repositoryName, e.getMessage());
+            List<ContributorDTO.GitHubContributorResponse> contributors = webClient
+                .get()
+                .uri("/repos/{owner}/{repo}/contributors?per_page=100", owner, repo)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + githubAuthToken)
+                .retrieve()
+                .bodyToFlux(ContributorDTO.GitHubContributorResponse.class)
+                .collectList()
+                .block();
+
+            if (contributors != null) {
+                for (var contributor : contributors) {
+                    safelyAddContributor(contributor, accumulator);
+                }
+            }
+        } catch (Exception e) {
+            logger.warn("Failed to fetch contributors for repository {}/{}: {}", owner, repo, e.getMessage());
         }
     }
 
@@ -82,17 +96,20 @@ public class ContributorService {
         "renovate[bot]"
     );
 
-    private void safelyAddContributor(Contributor contributor, Map<Long, ContributorDTO> accumulator) {
+    private void safelyAddContributor(
+        ContributorDTO.GitHubContributorResponse contributor,
+        Map<Long, ContributorDTO> accumulator
+    ) {
         try {
-            String login = contributor.getLogin();
+            String login = contributor.login();
             if (login != null && EXCLUDED_LOGINS.contains(login.toLowerCase())) {
                 logger.debug("Skipping excluded contributor: {}", login);
                 return;
             }
 
-            ContributorDTO dto = ContributorDTO.fromContributor(contributor);
+            ContributorDTO dto = contributor.toContributorDTO();
             accumulator.putIfAbsent(dto.id(), dto);
-        } catch (IOException e) {
+        } catch (Exception e) {
             logger.error("Error converting contributor to DTO: {}", e.getMessage());
         }
     }

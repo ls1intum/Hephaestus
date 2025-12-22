@@ -10,6 +10,11 @@ import org.slf4j.LoggerFactory;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
 
+/**
+ * @deprecated Use {@link GitHubPullRequestProcessor} with DTOs instead.
+ */
+@Deprecated(forRemoval = true)
+@SuppressWarnings("deprecation")
 @Component
 public class GitHubPullRequestConverter extends BaseGitServiceEntityConverter<GHPullRequest, PullRequest> {
 

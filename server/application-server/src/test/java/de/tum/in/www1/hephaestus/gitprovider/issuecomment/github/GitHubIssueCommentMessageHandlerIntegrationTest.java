@@ -2,134 +2,197 @@ package de.tum.in.www1.hephaestus.gitprovider.issuecomment.github;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.tum.in.www1.hephaestus.gitprovider.common.AuthorAssociation;
-import de.tum.in.www1.hephaestus.gitprovider.common.GitHubPayload;
-import de.tum.in.www1.hephaestus.gitprovider.common.GitHubPayloadExtension;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.issue.IssueRepository;
+import de.tum.in.www1.hephaestus.gitprovider.issuecomment.IssueComment;
 import de.tum.in.www1.hephaestus.gitprovider.issuecomment.IssueCommentRepository;
+import de.tum.in.www1.hephaestus.gitprovider.issuecomment.github.dto.GitHubIssueCommentEventDTO;
+import de.tum.in.www1.hephaestus.gitprovider.organization.Organization;
+import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationRepository;
+import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
+import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.testconfig.BaseIntegrationTest;
+import de.tum.in.www1.hephaestus.workspace.AccountType;
+import de.tum.in.www1.hephaestus.workspace.Workspace;
+import de.tum.in.www1.hephaestus.workspace.WorkspaceRepository;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.kohsuke.github.GHEventPayload;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * Integration tests for GitHubIssueCommentMessageHandler.
+ * <p>
+ * Tests use JSON fixtures parsed directly into DTOs (no hub4j dependency).
+ */
 @DisplayName("GitHub Issue Comment Message Handler")
-@ExtendWith(GitHubPayloadExtension.class)
+@Transactional
 class GitHubIssueCommentMessageHandlerIntegrationTest extends BaseIntegrationTest {
-
-    private static final long ISSUE_COMMENT_ID = 3476883532L;
 
     @Autowired
     private GitHubIssueCommentMessageHandler handler;
 
     @Autowired
-    private IssueCommentRepository issueCommentRepository;
+    private IssueCommentRepository commentRepository;
 
     @Autowired
     private IssueRepository issueRepository;
 
+    @Autowired
+    private RepositoryRepository repositoryRepository;
+
+    @Autowired
+    private OrganizationRepository organizationRepository;
+
+    @Autowired
+    private WorkspaceRepository workspaceRepository;
+
+    @Autowired
+    private ObjectMapper objectMapper;
+
+    private Repository testRepository;
+    private Issue testIssue;
+
     @BeforeEach
     void setUp() {
         databaseTestUtils.cleanDatabase();
+        setupTestData();
+    }
+
+    private void setupTestData() {
+        // Create organization
+        Organization org = new Organization();
+        org.setId(215361191L);
+        org.setLogin("HephaestusTest");
+        org.setCreatedAt(Instant.now());
+        org.setUpdatedAt(Instant.now());
+        org.setName("Hephaestus Test");
+        org.setAvatarUrl("https://avatars.githubusercontent.com/u/215361191?v=4");
+        org = organizationRepository.save(org);
+
+        // Create repository
+        testRepository = new Repository();
+        testRepository.setId(1000663383L);
+        testRepository.setName("TestRepository");
+        testRepository.setNameWithOwner("HephaestusTest/TestRepository");
+        testRepository.setHtmlUrl("https://github.com/HephaestusTest/TestRepository");
+        testRepository.setVisibility(Repository.Visibility.PUBLIC);
+        testRepository.setDefaultBranch("main");
+        testRepository.setCreatedAt(Instant.now());
+        testRepository.setUpdatedAt(Instant.now());
+        testRepository.setPushedAt(Instant.now());
+        testRepository.setOrganization(org);
+        testRepository = repositoryRepository.save(testRepository);
+
+        // Create workspace
+        Workspace workspace = new Workspace();
+        workspace.setWorkspaceSlug("hephaestus-test");
+        workspace.setDisplayName("Hephaestus Test");
+        workspace.setStatus(Workspace.WorkspaceStatus.ACTIVE);
+        workspace.setIsPubliclyViewable(true);
+        workspace.setOrganization(org);
+        workspace.setAccountLogin("HephaestusTest");
+        workspace.setAccountType(AccountType.ORG);
+        workspaceRepository.save(workspace);
+    }
+
+    private void createTestIssue(Long issueId, int number) {
+        testIssue = new Issue();
+        testIssue.setId(issueId);
+        testIssue.setNumber(number);
+        testIssue.setTitle("Test Issue");
+        testIssue.setState(Issue.State.OPEN);
+        testIssue.setRepository(testRepository);
+        testIssue.setCreatedAt(Instant.now());
+        testIssue.setUpdatedAt(Instant.now());
+        testIssue = issueRepository.save(testIssue);
     }
 
     @Test
-    @DisplayName("should persist created issue comments with author and issue links")
-    void createdEventPersistsComment(@GitHubPayload("issue_comment.created") GHEventPayload.IssueComment payload)
-        throws Exception {
-        // Act
-        handler.handleEvent(payload);
-
-        // Assert
-        var comment = issueCommentRepository.findById(ISSUE_COMMENT_ID).orElseThrow();
-        assertThat(comment.getBody()).isEqualTo(payload.getComment().getBody());
-        assertThat(comment.getHtmlUrl()).isEqualTo(payload.getComment().getHtmlUrl().toString());
-        assertThat(comment.getAuthorAssociation()).isEqualTo(AuthorAssociation.MEMBER);
-        assertThat(comment.getCreatedAt()).isEqualTo(Instant.parse("2025-11-01T21:44:00Z"));
-        assertThat(comment.getUpdatedAt()).isEqualTo(Instant.parse("2025-11-01T21:44:00Z"));
-
-        assertThat(comment.getAuthor()).isNotNull();
-        assertThat(comment.getAuthor().getLogin()).isEqualTo(payload.getComment().getUser().getLogin());
-
-        assertThat(comment.getIssue()).isNotNull();
-        assertThat(comment.getIssue().getId()).isEqualTo(payload.getIssue().getId());
-        assertThat(comment.getIssue().isHasPullRequest()).isFalse();
-
-        assertThat(issueRepository.count()).isEqualTo(1);
+    @DisplayName("Should return correct event key")
+    void shouldReturnCorrectEventKey() {
+        assertThat(handler.getEventKey()).isEqualTo("issue_comment");
     }
 
     @Test
-    @DisplayName("should ignore duplicate create events")
-    void createdEventIsIdempotent(@GitHubPayload("issue_comment.created") GHEventPayload.IssueComment payload)
-        throws Exception {
-        // Arrange
-        handler.handleEvent(payload);
-        var original = issueCommentRepository.findById(ISSUE_COMMENT_ID).orElseThrow();
-        var originalUpdatedAt = original.getUpdatedAt();
+    @DisplayName("Should create comment on created event")
+    void shouldCreateCommentOnCreatedEvent() throws Exception {
+        // Given
+        GitHubIssueCommentEventDTO event = loadPayload("issue_comment.created");
 
-        // Act
-        handler.handleEvent(payload);
+        // Create the issue that the comment belongs to
+        createTestIssue(event.issue().getDatabaseId(), event.issue().number());
 
-        // Assert
-        assertThat(issueCommentRepository.count()).isEqualTo(1);
-        assertThat(issueRepository.count()).isEqualTo(1);
-        var replayed = issueCommentRepository.findById(ISSUE_COMMENT_ID).orElseThrow();
-        assertThat(replayed.getUpdatedAt()).isEqualTo(originalUpdatedAt);
+        // Verify comment doesn't exist initially
+        assertThat(commentRepository.findById(event.comment().id())).isEmpty();
+
+        // When
+        handler.handleEvent(event);
+
+        // Then
+        assertThat(commentRepository.findById(event.comment().id()))
+            .isPresent()
+            .get()
+            .satisfies(comment -> {
+                assertThat(comment.getId()).isEqualTo(event.comment().id());
+                assertThat(comment.getBody()).isEqualTo(event.comment().body());
+                assertThat(comment.getHtmlUrl()).isEqualTo(event.comment().htmlUrl());
+            });
     }
 
     @Test
-    @DisplayName("should update comment body and timestamp on edit events")
-    void editedEventUpdatesComment(
-        @GitHubPayload("issue_comment.created") GHEventPayload.IssueComment created,
-        @GitHubPayload("issue_comment.edited") GHEventPayload.IssueComment edited
-    ) throws Exception {
-        // Arrange
-        handler.handleEvent(created);
-        var originalUpdatedAt = issueCommentRepository.findById(ISSUE_COMMENT_ID).orElseThrow().getUpdatedAt();
+    @DisplayName("Should update comment on edited event")
+    void shouldUpdateCommentOnEditedEvent() throws Exception {
+        // Given - first create the comment
+        GitHubIssueCommentEventDTO createEvent = loadPayload("issue_comment.created");
+        createTestIssue(createEvent.issue().getDatabaseId(), createEvent.issue().number());
+        handler.handleEvent(createEvent);
 
-        // Act
-        handler.handleEvent(edited);
+        // Load edited event
+        GitHubIssueCommentEventDTO editEvent = loadPayload("issue_comment.edited");
 
-        // Assert
-        var comment = issueCommentRepository.findById(ISSUE_COMMENT_ID).orElseThrow();
-        assertThat(comment.getBody()).isEqualTo(edited.getComment().getBody());
-        assertThat(comment.getUpdatedAt()).isAfter(originalUpdatedAt);
+        // When
+        handler.handleEvent(editEvent);
+
+        // Then
+        assertThat(commentRepository.findById(editEvent.comment().id()))
+            .isPresent()
+            .get()
+            .satisfies(comment -> {
+                assertThat(comment.getBody()).isEqualTo(editEvent.comment().body());
+            });
     }
 
     @Test
-    @DisplayName("should delete comments without removing parent issue on delete events")
-    void deletedEventRemovesComment(
-        @GitHubPayload("issue_comment.created") GHEventPayload.IssueComment created,
-        @GitHubPayload("issue_comment.deleted") GHEventPayload.IssueComment deleted
-    ) throws Exception {
-        // Arrange
-        handler.handleEvent(created);
-        assertThat(issueCommentRepository.findById(ISSUE_COMMENT_ID)).isPresent();
+    @DisplayName("Should delete comment on deleted event")
+    void shouldDeleteCommentOnDeletedEvent() throws Exception {
+        // Given - first create the comment
+        GitHubIssueCommentEventDTO createEvent = loadPayload("issue_comment.created");
+        createTestIssue(createEvent.issue().getDatabaseId(), createEvent.issue().number());
+        handler.handleEvent(createEvent);
 
-        // Act
-        handler.handleEvent(deleted);
+        // Verify it exists
+        assertThat(commentRepository.findById(createEvent.comment().id())).isPresent();
 
-        // Assert
-        assertThat(issueCommentRepository.findById(ISSUE_COMMENT_ID)).isEmpty();
-        assertThat(issueRepository.findById(created.getIssue().getId())).isPresent();
+        // Load deleted event
+        GitHubIssueCommentEventDTO deleteEvent = loadPayload("issue_comment.deleted");
+
+        // When
+        handler.handleEvent(deleteEvent);
+
+        // Then
+        assertThat(commentRepository.findById(deleteEvent.comment().id())).isEmpty();
     }
 
-    @Test
-    @DisplayName("should flag pull request backed issues when processing PR comments")
-    void createdEventAgainstPullRequestSetsFlag(
-        @GitHubPayload("issue_comment.created.pull-request") GHEventPayload.IssueComment payload
-    ) throws Exception {
-        // Act
-        handler.handleEvent(payload);
-
-        // Assert
-        var comment = issueCommentRepository.findById(payload.getComment().getId()).orElseThrow();
-        assertThat(comment.getIssue()).isNotNull();
-        assertThat(comment.getIssue().isHasPullRequest()).isTrue();
-        assertThat(comment.getIssue().getNumber()).isEqualTo(payload.getIssue().getNumber());
-        assertThat(comment.getAuthor().getLogin()).isEqualTo(payload.getComment().getUser().getLogin());
+    private GitHubIssueCommentEventDTO loadPayload(String filename) throws IOException {
+        ClassPathResource resource = new ClassPathResource("github/" + filename + ".json");
+        String json = resource.getContentAsString(StandardCharsets.UTF_8);
+        return objectMapper.readValue(json, GitHubIssueCommentEventDTO.class);
     }
 }

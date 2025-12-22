@@ -8,6 +8,11 @@ import org.kohsuke.github.GHIssueStateReason;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
 
+/**
+ * @deprecated Use {@link GitHubIssueProcessor} with DTOs instead.
+ */
+@Deprecated(forRemoval = true)
+@SuppressWarnings("deprecation")
 @Component
 public class GitHubIssueConverter extends BaseGitServiceEntityConverter<GHIssue, Issue> {
 

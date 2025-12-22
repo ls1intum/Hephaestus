@@ -27,7 +27,6 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
-import org.kohsuke.github.GHRepositorySelection;
 
 @Entity
 @Table(name = "workspace")
@@ -102,7 +101,7 @@ public class Workspace {
     private String personalAccessToken;
 
     @Enumerated(EnumType.STRING)
-    private GHRepositorySelection githubRepositorySelection; // ALL / SELECTED
+    private RepositorySelection githubRepositorySelection; // ALL / SELECTED
 
     private Instant installationLinkedAt;
 

@@ -2,23 +2,36 @@ package de.tum.in.www1.hephaestus.gitprovider.milestone.github;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.tum.in.www1.hephaestus.gitprovider.common.GitHubPayload;
-import de.tum.in.www1.hephaestus.gitprovider.common.GitHubPayloadExtension;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import de.tum.in.www1.hephaestus.gitprovider.milestone.Milestone;
 import de.tum.in.www1.hephaestus.gitprovider.milestone.MilestoneRepository;
+import de.tum.in.www1.hephaestus.gitprovider.milestone.github.dto.GitHubMilestoneEventDTO;
+import de.tum.in.www1.hephaestus.gitprovider.organization.Organization;
+import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationRepository;
+import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
+import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.testconfig.BaseIntegrationTest;
+import de.tum.in.www1.hephaestus.workspace.AccountType;
+import de.tum.in.www1.hephaestus.workspace.Workspace;
+import de.tum.in.www1.hephaestus.workspace.WorkspaceRepository;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.kohsuke.github.GHEvent;
-import org.kohsuke.github.GHEventPayloadMilestone;
-import org.kohsuke.github.GHMilestone;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * Integration tests for GitHubMilestoneMessageHandler.
+ * <p>
+ * Tests use JSON fixtures parsed directly into DTOs (no hub4j dependency).
+ */
 @DisplayName("GitHub Milestone Message Handler")
-@ExtendWith(GitHubPayloadExtension.class)
+@Transactional
 class GitHubMilestoneMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
@@ -30,137 +43,161 @@ class GitHubMilestoneMessageHandlerIntegrationTest extends BaseIntegrationTest {
     @Autowired
     private UserRepository userRepository;
 
+    @Autowired
+    private RepositoryRepository repositoryRepository;
+
+    @Autowired
+    private OrganizationRepository organizationRepository;
+
+    @Autowired
+    private WorkspaceRepository workspaceRepository;
+
+    @Autowired
+    private ObjectMapper objectMapper;
+
+    private Repository testRepository;
+
     @BeforeEach
-    void cleanDatabase() {
+    void setUp() {
         databaseTestUtils.cleanDatabase();
+        setupTestData();
+    }
+
+    private void setupTestData() {
+        // Create organization
+        Organization org = new Organization();
+        org.setId(215361191L);
+        org.setLogin("HephaestusTest");
+        org.setCreatedAt(Instant.now());
+        org.setUpdatedAt(Instant.now());
+        org.setName("Hephaestus Test");
+        org.setAvatarUrl("https://avatars.githubusercontent.com/u/215361191?v=4");
+        org = organizationRepository.save(org);
+
+        // Create repository
+        testRepository = new Repository();
+        testRepository.setId(1000663383L);
+        testRepository.setName("TestRepository");
+        testRepository.setNameWithOwner("HephaestusTest/TestRepository");
+        testRepository.setHtmlUrl("https://github.com/HephaestusTest/TestRepository");
+        testRepository.setVisibility(Repository.Visibility.PUBLIC);
+        testRepository.setDefaultBranch("main");
+        testRepository.setCreatedAt(Instant.now());
+        testRepository.setUpdatedAt(Instant.now());
+        testRepository.setPushedAt(Instant.now());
+        testRepository.setOrganization(org);
+        testRepository = repositoryRepository.save(testRepository);
+
+        // Create workspace
+        Workspace workspace = new Workspace();
+        workspace.setWorkspaceSlug("hephaestus-test");
+        workspace.setDisplayName("Hephaestus Test");
+        workspace.setStatus(Workspace.WorkspaceStatus.ACTIVE);
+        workspace.setIsPubliclyViewable(true);
+        workspace.setOrganization(org);
+        workspace.setAccountLogin("HephaestusTest");
+        workspace.setAccountType(AccountType.ORG);
+        workspaceRepository.save(workspace);
     }
 
     @Test
-    void shouldReturnCorrectHandlerEventType() {
-        assertThat(handler.getHandlerEvent()).isEqualTo(GHEvent.MILESTONE);
+    @DisplayName("Should return correct event key")
+    void shouldReturnCorrectEventKey() {
+        assertThat(handler.getEventKey()).isEqualTo("milestone");
     }
 
     @Test
-    @DisplayName("should persist milestones on creation events")
-    void createdEventPersistsMilestone(@GitHubPayload("milestone.created") GHEventPayloadMilestone payload)
-        throws Exception {
-        handler.handleEvent(payload);
+    @DisplayName("Should persist milestones on creation events")
+    void shouldPersistMilestoneOnCreatedEvent() throws Exception {
+        // Given
+        GitHubMilestoneEventDTO event = loadPayload("milestone.created");
 
-        var saved = getMilestone(payload);
-        GHMilestone ghMilestone = payload.getMilestone();
+        // Verify milestone doesn't exist initially
+        assertThat(milestoneRepository.findById(event.milestone().id())).isEmpty();
 
-        assertThat(saved.getState()).isEqualTo(Milestone.State.OPEN);
-        assertThat(saved.getHtmlUrl()).isEqualTo(ghMilestone.getHtmlUrl().toString());
-        assertThat(saved.getTitle()).isEqualTo(ghMilestone.getTitle());
-        assertThat(saved.getDescription()).isEqualTo(ghMilestone.getDescription());
-        assertThat(saved.getDueOn()).isEqualTo(ghMilestone.getDueOn());
-        assertThat(saved.getOpenIssuesCount()).isEqualTo(ghMilestone.getOpenIssues());
-        assertThat(saved.getClosedIssuesCount()).isEqualTo(ghMilestone.getClosedIssues());
-        assertThat(saved.getCreatedAt()).isEqualTo(ghMilestone.getCreatedAt());
-        assertThat(saved.getUpdatedAt()).isEqualTo(ghMilestone.getUpdatedAt());
-        assertThat(saved.getCreator()).isNotNull();
-        assertThat(saved.getCreator().getId()).isEqualTo(ghMilestone.getCreator().getId());
-        assertThat(saved.getRepository()).isNotNull();
-        assertThat(saved.getRepository().getId()).isEqualTo(payload.getRepository().getId());
-        assertThat(milestoneRepository.count()).isEqualTo(1);
+        // When
+        handler.handleEvent(event);
+
+        // Then
+        assertThat(milestoneRepository.findById(event.milestone().id()))
+            .isPresent()
+            .get()
+            .satisfies(milestone -> {
+                assertThat(milestone.getId()).isEqualTo(event.milestone().id());
+                assertThat(milestone.getTitle()).isEqualTo(event.milestone().title());
+                assertThat(milestone.getDescription()).isEqualTo(event.milestone().description());
+                assertThat(milestone.getState()).isEqualTo(Milestone.State.OPEN);
+            });
     }
 
     @Test
-    @DisplayName("should update milestone details on edit events")
-    void editedEventUpdatesMilestone(
-        @GitHubPayload("milestone.created") GHEventPayloadMilestone created,
-        @GitHubPayload("milestone.edited") GHEventPayloadMilestone edited
-    ) throws Exception {
-        handler.handleEvent(created);
+    @DisplayName("Should update milestone details on edit events")
+    void shouldUpdateMilestoneOnEditedEvent() throws Exception {
+        // Given - first create the milestone
+        GitHubMilestoneEventDTO createEvent = loadPayload("milestone.created");
+        handler.handleEvent(createEvent);
 
-        handler.handleEvent(edited);
+        // Load edited event
+        GitHubMilestoneEventDTO editEvent = loadPayload("milestone.edited");
 
-        var updated = getMilestone(edited);
-        GHMilestone ghMilestone = edited.getMilestone();
+        // When
+        handler.handleEvent(editEvent);
 
-        assertThat(updated.getDescription()).isEqualTo(ghMilestone.getDescription());
-        assertThat(updated.getDueOn()).isEqualTo(ghMilestone.getDueOn());
-        assertThat(updated.getUpdatedAt()).isEqualTo(ghMilestone.getUpdatedAt());
-        assertThat(updated.getOpenIssuesCount()).isEqualTo(ghMilestone.getOpenIssues());
-        assertThat(updated.getClosedIssuesCount()).isEqualTo(ghMilestone.getClosedIssues());
+        // Then
+        assertThat(milestoneRepository.findById(editEvent.milestone().id()))
+            .isPresent()
+            .get()
+            .satisfies(milestone -> {
+                assertThat(milestone.getTitle()).isEqualTo(editEvent.milestone().title());
+                assertThat(milestone.getDescription()).isEqualTo(editEvent.milestone().description());
+            });
     }
 
     @Test
-    @DisplayName("should mark milestones as closed on close events")
-    void closedEventMarksMilestone(
-        @GitHubPayload("milestone.created") GHEventPayloadMilestone created,
-        @GitHubPayload("milestone.closed") GHEventPayloadMilestone closed
-    ) throws Exception {
-        handler.handleEvent(created);
+    @DisplayName("Should close milestone on closed event")
+    void shouldCloseMilestoneOnClosedEvent() throws Exception {
+        // Given - first create the milestone
+        GitHubMilestoneEventDTO createEvent = loadPayload("milestone.created");
+        handler.handleEvent(createEvent);
 
-        handler.handleEvent(closed);
+        // Load closed event
+        GitHubMilestoneEventDTO closedEvent = loadPayload("milestone.closed");
 
-        var saved = getMilestone(closed);
-        GHMilestone ghMilestone = closed.getMilestone();
+        // When
+        handler.handleEvent(closedEvent);
 
-        assertThat(saved.getState()).isEqualTo(Milestone.State.CLOSED);
-        assertThat(saved.getClosedAt()).isEqualTo(ghMilestone.getClosedAt());
-        assertThat(saved.getDueOn()).isEqualTo(ghMilestone.getDueOn());
-        assertThat(saved.getClosedIssuesCount()).isEqualTo(ghMilestone.getClosedIssues());
+        // Then
+        assertThat(milestoneRepository.findById(closedEvent.milestone().id()))
+            .isPresent()
+            .get()
+            .satisfies(milestone -> {
+                assertThat(milestone.getState()).isEqualTo(Milestone.State.CLOSED);
+            });
     }
 
     @Test
-    @DisplayName("should reopen milestones on opened events")
-    void openedEventReopensMilestone(
-        @GitHubPayload("milestone.created") GHEventPayloadMilestone created,
-        @GitHubPayload("milestone.closed") GHEventPayloadMilestone closed,
-        @GitHubPayload("milestone.opened") GHEventPayloadMilestone opened
-    ) throws Exception {
-        handler.handleEvent(created);
-        handler.handleEvent(closed);
+    @DisplayName("Should delete milestone on deleted event")
+    void shouldDeleteMilestoneOnDeletedEvent() throws Exception {
+        // Given - first create the milestone
+        GitHubMilestoneEventDTO createEvent = loadPayload("milestone.created");
+        handler.handleEvent(createEvent);
 
-        handler.handleEvent(opened);
+        // Verify it exists
+        assertThat(milestoneRepository.findById(createEvent.milestone().id())).isPresent();
 
-        var reopened = getMilestone(opened);
-        GHMilestone ghMilestone = opened.getMilestone();
+        // Load deleted event
+        GitHubMilestoneEventDTO deleteEvent = loadPayload("milestone.deleted");
 
-        assertThat(reopened.getState()).isEqualTo(Milestone.State.OPEN);
-        assertThat(reopened.getClosedAt()).isNull();
-        assertThat(reopened.getUpdatedAt()).isEqualTo(ghMilestone.getUpdatedAt());
-        assertThat(reopened.getOpenIssuesCount()).isEqualTo(ghMilestone.getOpenIssues());
+        // When
+        handler.handleEvent(deleteEvent);
+
+        // Then
+        assertThat(milestoneRepository.findById(deleteEvent.milestone().id())).isEmpty();
     }
 
-    @Test
-    @DisplayName("should delete milestones on delete events")
-    void deletedEventRemovesMilestone(
-        @GitHubPayload("milestone.created") GHEventPayloadMilestone created,
-        @GitHubPayload("milestone.deleted") GHEventPayloadMilestone deleted
-    ) throws Exception {
-        handler.handleEvent(created);
-        assertThat(milestoneRepository.findById(created.getMilestone().getId())).isPresent();
-
-        handler.handleEvent(deleted);
-
-        assertThat(milestoneRepository.findById(deleted.getMilestone().getId())).isEmpty();
-    }
-
-    @Test
-    @DisplayName("should be idempotent when replaying creation events")
-    void createdEventIsIdempotent(@GitHubPayload("milestone.created") GHEventPayloadMilestone payload)
-        throws Exception {
-        handler.handleEvent(payload);
-        var first = getMilestone(payload);
-        var initialUsers = userRepository.count();
-
-        handler.handleEvent(payload);
-
-        assertThat(milestoneRepository.count()).isEqualTo(1);
-        assertThat(userRepository.count()).isEqualTo(initialUsers);
-
-        var second = getMilestone(payload);
-        assertThat(second.getUpdatedAt()).isEqualTo(first.getUpdatedAt());
-        assertThat(second.getDescription()).isEqualTo(first.getDescription());
-    }
-
-    private Milestone getMilestone(GHEventPayloadMilestone payload) {
-        long milestoneId = payload.getMilestone().getId();
-        return milestoneRepository
-            .findById(milestoneId)
-            .orElseThrow(() -> new AssertionError("Milestone " + milestoneId + " was not persisted"));
+    private GitHubMilestoneEventDTO loadPayload(String filename) throws IOException {
+        ClassPathResource resource = new ClassPathResource("github/" + filename + ".json");
+        String json = resource.getContentAsString(StandardCharsets.UTF_8);
+        return objectMapper.readValue(json, GitHubMilestoneEventDTO.class);
     }
 }

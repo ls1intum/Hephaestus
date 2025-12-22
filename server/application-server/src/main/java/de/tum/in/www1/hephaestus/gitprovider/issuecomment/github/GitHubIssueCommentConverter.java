@@ -7,6 +7,11 @@ import org.kohsuke.github.GHIssueComment;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
 
+/**
+ * @deprecated Use webhook DTOs and comment processing services instead.
+ */
+@Deprecated(forRemoval = true)
+@SuppressWarnings("deprecation")
 @Component
 public class GitHubIssueCommentConverter extends BaseGitServiceEntityConverter<GHIssueComment, IssueComment> {
 

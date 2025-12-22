@@ -18,7 +18,11 @@ import org.springframework.lang.NonNull;
  * <p>
  * For GHUser, this converter skips createdAt/updatedAt - those fields will be
  * populated later via {@code GitHubUserSyncService} when the user is fully fetched.
+ *
+ * @deprecated This converter hierarchy uses hub4j types and will be removed once sync services
+ *             are migrated to GraphQL. Use DTO-based processors instead.
  */
+@Deprecated(forRemoval = true)
 @ReadingConverter
 public abstract class BaseGitServiceEntityConverter<S extends GHObject, T extends BaseGitServiceEntity>
     implements Converter<S, T> {

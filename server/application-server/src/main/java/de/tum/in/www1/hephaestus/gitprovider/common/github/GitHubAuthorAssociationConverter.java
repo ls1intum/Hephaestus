@@ -8,6 +8,13 @@ import org.springframework.core.convert.converter.Converter;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
 
+/**
+ * Converts hub4j GHCommentAuthorAssociation to domain AuthorAssociation.
+ *
+ * @deprecated Use {@link AuthorAssociation#fromString(String)} instead.
+ *             This converter will be removed with the hub4j migration.
+ */
+@Deprecated(forRemoval = true)
 @Component
 public class GitHubAuthorAssociationConverter implements Converter<GHCommentAuthorAssociation, AuthorAssociation> {
 

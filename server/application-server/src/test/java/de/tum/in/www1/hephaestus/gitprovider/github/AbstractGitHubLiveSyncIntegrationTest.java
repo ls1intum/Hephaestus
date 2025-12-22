@@ -3,6 +3,7 @@ package de.tum.in.www1.hephaestus.gitprovider.github;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.app.GitHubAppTokenService;
 import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserSyncService;
 import de.tum.in.www1.hephaestus.workspace.AccountType;
+import de.tum.in.www1.hephaestus.workspace.RepositorySelection;
 import de.tum.in.www1.hephaestus.workspace.RepositoryToMonitor;
 import de.tum.in.www1.hephaestus.workspace.RepositoryToMonitorRepository;
 import de.tum.in.www1.hephaestus.workspace.Workspace;
@@ -96,7 +97,7 @@ abstract class AbstractGitHubLiveSyncIntegrationTest extends BaseGitHubLiveInteg
         ws.setDisplayName(githubOrganization());
         ws.setAccountLogin(githubOrganization());
         ws.setAccountType(AccountType.ORG);
-        ws.setGithubRepositorySelection(org.kohsuke.github.GHRepositorySelection.ALL);
+        ws.setGithubRepositorySelection(RepositorySelection.ALL);
         return workspaceRepository.save(ws);
     }
 

@@ -1,0 +1,62 @@
+# GraphQL query for fetching pull request reviews
+# Used by GraphQL-based sync services
+
+query GetPullRequestReviews($owner: String!, $name: String!, $number: Int!, $first: Int!, $after: String) {
+	repository(owner: $owner, name: $name) {
+		pullRequest(number: $number) {
+			reviews(first: $first, after: $after) {
+				pageInfo {
+					hasNextPage
+					endCursor
+				}
+				totalCount
+				nodes {
+					id
+					databaseId
+					body
+					state
+					url
+					createdAt
+					updatedAt
+					submittedAt
+					
+					# Author
+					author {
+						... on User {
+							id
+							databaseId
+							login
+							avatarUrl
+						}
+					}
+					
+					# Comments in review
+					comments(first: 100) {
+						totalCount
+						nodes {
+							id
+							databaseId
+							body
+							path
+							position
+							line
+							diffHunk
+							createdAt
+							updatedAt
+							
+							# Comment author
+							author {
+								... on User {
+									id
+									databaseId
+									login
+									avatarUrl
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+}

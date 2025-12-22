@@ -33,7 +33,7 @@ public class GitHubDataSyncScheduler {
     private static final Logger logger = LoggerFactory.getLogger(GitHubDataSyncScheduler.class);
 
     private final WorkspaceService workspaceService;
-    private final GitHubDataSyncService dataSyncService;
+    private final GitHubGraphQlDataSyncService dataSyncService;
     private final MonitoringScopeFilter monitoringScopeFilter;
     private final GitHubSubIssueSyncService subIssueSyncService;
     private final GitHubIssueTypeSyncService issueTypeSyncService;
@@ -128,9 +128,10 @@ public class GitHubDataSyncScheduler {
             // Wrap sync operations with context executor to propagate context to async
             // threads
             Runnable syncTask = WorkspaceContextExecutor.wrap(() -> {
-                repositoriesToSync.forEach(dataSyncService::syncRepositoryToMonitor);
-                dataSyncService.syncUsers(workspace);
-                dataSyncService.syncTeams(workspace);
+                repositoriesToSync.forEach(dataSyncService::syncRepository);
+                // TODO: User and Team sync via GraphQL not yet implemented
+                // dataSyncService.syncUsers(workspace);
+                // dataSyncService.syncTeams(workspace);
 
                 // Sync sub-issues, issue types, and issue dependencies via GraphQL
                 // These are workspace-level operations (fetched across all repositories)

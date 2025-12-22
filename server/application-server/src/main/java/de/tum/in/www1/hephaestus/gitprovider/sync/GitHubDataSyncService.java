@@ -311,13 +311,20 @@ public class GitHubDataSyncService {
             return;
         }
 
-        if (shouldSyncLabels) {
+        // Get workspace ID for GraphQL-based sync services
+        var workspaceId = repositoryToMonitor.getWorkspace().getId();
+        // Get local repository entity
+        var localRepository = repositoryRepository
+            .findByNameWithOwner(repositoryToMonitor.getNameWithOwner())
+            .orElse(null);
+
+        if (shouldSyncLabels && localRepository != null) {
             logger.info("{} - Syncing labels...", repositoryToMonitor.getNameWithOwner());
-            syncRepositoryLabels(ghRepository, repositoryToMonitor);
+            syncRepositoryLabels(localRepository, repositoryToMonitor, workspaceId);
         }
-        if (shouldSyncMilestones) {
+        if (shouldSyncMilestones && localRepository != null) {
             logger.info("{} - Syncing milestones...", repositoryToMonitor.getNameWithOwner());
-            syncRepositoryMilestones(ghRepository, repositoryToMonitor);
+            syncRepositoryMilestones(localRepository, repositoryToMonitor, workspaceId);
         }
         if (shouldSyncIssuesAndPullRequests) {
             logger.info("{} - Syncing recent issues and pull requests...", repositoryToMonitor.getNameWithOwner());
@@ -487,16 +494,24 @@ public class GitHubDataSyncService {
         }
     }
 
-    private void syncRepositoryLabels(GHRepository repository, RepositoryToMonitor repositoryToMonitor) {
+    private void syncRepositoryLabels(
+        de.tum.in.www1.hephaestus.gitprovider.repository.Repository repository,
+        RepositoryToMonitor repositoryToMonitor,
+        Long workspaceId
+    ) {
         var currentTime = Instant.now();
-        labelSyncService.syncLabelsOfRepository(repository);
+        labelSyncService.syncLabelsForRepository(workspaceId, repository.getId());
         repositoryToMonitor.setLabelsSyncedAt(currentTime);
         repositoryToMonitorRepository.save(repositoryToMonitor);
     }
 
-    private void syncRepositoryMilestones(GHRepository repository, RepositoryToMonitor repositoryToMonitor) {
+    private void syncRepositoryMilestones(
+        de.tum.in.www1.hephaestus.gitprovider.repository.Repository repository,
+        RepositoryToMonitor repositoryToMonitor,
+        Long workspaceId
+    ) {
         var currentTime = Instant.now();
-        milestoneSyncService.syncMilestonesOfRepository(repository);
+        milestoneSyncService.syncMilestonesForRepository(workspaceId, repository.getId());
         repositoryToMonitor.setMilestonesSyncedAt(currentTime);
         repositoryToMonitorRepository.save(repositoryToMonitor);
     }

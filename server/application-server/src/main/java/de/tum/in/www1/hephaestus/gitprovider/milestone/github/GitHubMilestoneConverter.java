@@ -9,6 +9,11 @@ import org.slf4j.LoggerFactory;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
 
+/**
+ * @deprecated Use {@link GitHubMilestoneProcessor} with DTOs instead.
+ */
+@Deprecated(forRemoval = true)
+@SuppressWarnings("deprecation")
 @Component
 public class GitHubMilestoneConverter extends BaseGitServiceEntityConverter<GHMilestone, Milestone> {
 

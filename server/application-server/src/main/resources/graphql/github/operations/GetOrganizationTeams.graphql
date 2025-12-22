@@ -1,0 +1,59 @@
+# GraphQL query for fetching organization teams
+# Used by GraphQL-based sync services
+
+query GetOrganizationTeams($login: String!, $first: Int!, $after: String) {
+	organization(login: $login) {
+		teams(first: $first, after: $after) {
+			pageInfo {
+				hasNextPage
+				endCursor
+			}
+			totalCount
+			nodes {
+				id
+				databaseId
+				slug
+				name
+				description
+				privacy
+				url
+				createdAt
+				updatedAt
+				
+				# Team members
+				members(first: 100) {
+					totalCount
+					nodes {
+						id
+						databaseId
+						login
+						avatarUrl
+						name
+					}
+				}
+				
+				# Parent team
+				parentTeam {
+					id
+					databaseId
+					slug
+					name
+				}
+				
+				# Repositories with permissions
+				repositories(first: 100) {
+					totalCount
+					edges {
+						permission
+						node {
+							id
+							databaseId
+							name
+							nameWithOwner
+						}
+					}
+				}
+			}
+		}
+	}
+}

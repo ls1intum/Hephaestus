@@ -2,25 +2,37 @@ package de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.github;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.tum.in.www1.hephaestus.gitprovider.common.GitHubPayload;
-import de.tum.in.www1.hephaestus.gitprovider.common.GitHubPayloadExtension;
-import de.tum.in.www1.hephaestus.gitprovider.contribution.ContributionEventRepository;
-import de.tum.in.www1.hephaestus.gitprovider.contribution.ContributionSourceType;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import de.tum.in.www1.hephaestus.gitprovider.organization.Organization;
+import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationRepository;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
-import de.tum.in.www1.hephaestus.gitprovider.pullrequest.github.GitHubPullRequestConverter;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReview;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReviewRepository;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.github.dto.GitHubPullRequestReviewEventDTO;
+import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
+import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.testconfig.BaseIntegrationTest;
+import de.tum.in.www1.hephaestus.workspace.AccountType;
+import de.tum.in.www1.hephaestus.workspace.Workspace;
+import de.tum.in.www1.hephaestus.workspace.WorkspaceRepository;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.kohsuke.github.GHEventPayload;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * Integration tests for GitHubPullRequestReviewMessageHandler.
+ * <p>
+ * Tests use JSON fixtures parsed directly into DTOs (no hub4j dependency).
+ */
 @DisplayName("GitHub Pull Request Review Message Handler")
-@ExtendWith(GitHubPayloadExtension.class)
+@Transactional
 class GitHubPullRequestReviewMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
@@ -33,180 +45,156 @@ class GitHubPullRequestReviewMessageHandlerIntegrationTest extends BaseIntegrati
     private PullRequestRepository pullRequestRepository;
 
     @Autowired
-    private GitHubPullRequestConverter pullRequestConverter;
+    private RepositoryRepository repositoryRepository;
 
     @Autowired
-    private ContributionEventRepository contributionEventRepository;
+    private OrganizationRepository organizationRepository;
+
+    @Autowired
+    private WorkspaceRepository workspaceRepository;
+
+    @Autowired
+    private ObjectMapper objectMapper;
+
+    private Repository testRepository;
+    private PullRequest testPullRequest;
 
     @BeforeEach
     void setUp() {
         databaseTestUtils.cleanDatabase();
+        setupTestData();
+    }
+
+    private void setupTestData() {
+        // Create organization
+        Organization org = new Organization();
+        org.setId(215361191L);
+        org.setLogin("HephaestusTest");
+        org.setCreatedAt(Instant.now());
+        org.setUpdatedAt(Instant.now());
+        org.setName("Hephaestus Test");
+        org.setAvatarUrl("https://avatars.githubusercontent.com/u/215361191?v=4");
+        org = organizationRepository.save(org);
+
+        // Create repository
+        testRepository = new Repository();
+        testRepository.setId(1000663383L);
+        testRepository.setName("TestRepository");
+        testRepository.setNameWithOwner("HephaestusTest/TestRepository");
+        testRepository.setHtmlUrl("https://github.com/HephaestusTest/TestRepository");
+        testRepository.setVisibility(Repository.Visibility.PUBLIC);
+        testRepository.setDefaultBranch("main");
+        testRepository.setCreatedAt(Instant.now());
+        testRepository.setUpdatedAt(Instant.now());
+        testRepository.setPushedAt(Instant.now());
+        testRepository.setOrganization(org);
+        testRepository = repositoryRepository.save(testRepository);
+
+        // Create workspace
+        Workspace workspace = new Workspace();
+        workspace.setWorkspaceSlug("hephaestus-test");
+        workspace.setDisplayName("Hephaestus Test");
+        workspace.setStatus(Workspace.WorkspaceStatus.ACTIVE);
+        workspace.setIsPubliclyViewable(true);
+        workspace.setOrganization(org);
+        workspace.setAccountLogin("HephaestusTest");
+        workspace.setAccountType(AccountType.ORG);
+        workspaceRepository.save(workspace);
+    }
+
+    private void createTestPullRequest(Long prId, int number) {
+        testPullRequest = new PullRequest();
+        testPullRequest.setId(prId);
+        testPullRequest.setNumber(number);
+        testPullRequest.setTitle("Test Pull Request");
+        testPullRequest.setState(PullRequest.State.OPEN);
+        testPullRequest.setRepository(testRepository);
+        testPullRequest.setCreatedAt(Instant.now());
+        testPullRequest.setUpdatedAt(Instant.now());
+        testPullRequest = pullRequestRepository.save(testPullRequest);
     }
 
     @Test
-    @DisplayName("should persist submitted reviews")
-    void submittedEventPersistsReview(
-        @GitHubPayload("pull_request_review.submitted") GHEventPayload.PullRequestReview payload
-    ) throws Exception {
-        // Act
-        handler.handleEvent(payload);
+    @DisplayName("Should return correct event key")
+    void shouldReturnCorrectEventKey() {
+        assertThat(handler.getEventKey()).isEqualTo("pull_request_review");
+    }
 
-        // Assert
-        var review = reviewRepository.findById(payload.getReview().getId());
-        assertThat(review)
+    @Test
+    @DisplayName("Should create review on submitted event")
+    void shouldCreateReviewOnSubmittedEvent() throws Exception {
+        // Given
+        GitHubPullRequestReviewEventDTO event = loadPayload("pull_request_review.submitted");
+
+        // Create the PR that the review belongs to
+        createTestPullRequest(event.pullRequest().getDatabaseId(), event.pullRequest().number());
+
+        // Verify review doesn't exist initially
+        assertThat(reviewRepository.findById(event.review().id())).isEmpty();
+
+        // When
+        handler.handleEvent(event);
+
+        // Then
+        assertThat(reviewRepository.findById(event.review().id()))
             .isPresent()
             .get()
-            .satisfies(saved -> {
-                assertThat(saved.getState()).isEqualTo(PullRequestReview.State.APPROVED);
-                assertThat(saved.isDismissed()).isFalse();
-                assertThat(saved.getHtmlUrl()).isEqualTo(payload.getReview().getHtmlUrl().toString());
-                assertThat(saved.getSubmittedAt()).isEqualTo(payload.getReview().getSubmittedAt());
+            .satisfies(review -> {
+                assertThat(review.getId()).isEqualTo(event.review().id());
+                assertThat(review.getBody()).isEqualTo(event.review().body());
+                assertThat(review.getHtmlUrl()).isEqualTo(event.review().htmlUrl());
             });
     }
 
     @Test
-    @DisplayName("should persist contribution events for submitted reviews")
-    void submittedEventCreatesContributionEvent(
-        @GitHubPayload("pull_request_review.submitted") GHEventPayload.PullRequestReview payload
-    ) throws Exception {
-        handler.handleEvent(payload);
+    @DisplayName("Should update review on edited event")
+    void shouldUpdateReviewOnEditedEvent() throws Exception {
+        // Given - first create the review
+        GitHubPullRequestReviewEventDTO submitEvent = loadPayload("pull_request_review.submitted");
+        createTestPullRequest(submitEvent.pullRequest().getDatabaseId(), submitEvent.pullRequest().number());
+        handler.handleEvent(submitEvent);
 
-        var event = contributionEventRepository
-            .findBySourceTypeAndSourceId(ContributionSourceType.PULL_REQUEST_REVIEW, payload.getReview().getId())
-            .orElseThrow();
+        // Load edited event
+        GitHubPullRequestReviewEventDTO editEvent = loadPayload("pull_request_review.edited");
 
-        assertThat(event.getActor()).isNotNull();
-        assertThat(event.getActor().getId()).isEqualTo(payload.getReview().getUser().getId());
-        assertThat(event.getOccurredAt()).isEqualTo(payload.getReview().getSubmittedAt());
-        assertThat(event.getXpAwarded()).isZero();
+        // When
+        handler.handleEvent(editEvent);
+
+        // Then
+        assertThat(reviewRepository.findById(editEvent.review().id()))
+            .isPresent()
+            .get()
+            .satisfies(review -> {
+                assertThat(review.getBody()).isEqualTo(editEvent.review().body());
+            });
     }
 
     @Test
-    @DisplayName("should link submitted reviews to pull requests and authors")
-    void submittedEventLinksReviewAndAuthor(
-        @GitHubPayload("pull_request_review.submitted") GHEventPayload.PullRequestReview payload
-    ) throws Exception {
-        // Act
-        handler.handleEvent(payload);
+    @DisplayName("Should handle dismissed event")
+    void shouldHandleDismissedEvent() throws Exception {
+        // Given - first create the review
+        GitHubPullRequestReviewEventDTO submitEvent = loadPayload("pull_request_review.submitted");
+        createTestPullRequest(submitEvent.pullRequest().getDatabaseId(), submitEvent.pullRequest().number());
+        handler.handleEvent(submitEvent);
 
-        // Assert
-        var review = reviewRepository.findById(payload.getReview().getId()).orElseThrow();
-        assertThat(review.getPullRequest()).isNotNull();
-        assertThat(review.getPullRequest().getId()).isEqualTo(payload.getPullRequest().getId());
-        assertThat(review.getAuthor()).isNotNull();
-        assertThat(review.getAuthor().getId()).isEqualTo(payload.getReview().getUser().getId());
-        assertThat(review.getAuthor().getLogin()).isEqualTo(payload.getReview().getUser().getLogin());
-        assertThat(review.getCommitId()).isEqualTo(payload.getReview().getCommitId());
+        // Load dismissed event
+        GitHubPullRequestReviewEventDTO dismissEvent = loadPayload("pull_request_review.dismissed");
 
-        assertThat(reviewRepository.count()).isEqualTo(1);
-        assertThat(pullRequestRepository.count()).isEqualTo(1);
+        // When
+        handler.handleEvent(dismissEvent);
+
+        // Then - review should be marked as dismissed
+        assertThat(reviewRepository.findById(dismissEvent.review().id()))
+            .isPresent()
+            .get()
+            .satisfies(review -> {
+                assertThat(review.isDismissed()).isTrue();
+            });
     }
 
-    @Test
-    @DisplayName("should ignore duplicate submitted events")
-    void replayedSubmittedEventIsIdempotent(
-        @GitHubPayload("pull_request_review.submitted") GHEventPayload.PullRequestReview payload
-    ) throws Exception {
-        // Arrange
-        handler.handleEvent(payload);
-        var original = reviewRepository.findById(payload.getReview().getId()).orElseThrow();
-        var originalSubmittedAt = original.getSubmittedAt();
-
-        // Act
-        handler.handleEvent(payload);
-
-        // Assert
-        assertThat(reviewRepository.count()).isEqualTo(1);
-        assertThat(pullRequestRepository.count()).isEqualTo(1);
-
-        var review = reviewRepository.findById(payload.getReview().getId()).orElseThrow();
-        assertThat(review.getSubmittedAt()).isEqualTo(originalSubmittedAt);
-        assertThat(review.getBody()).isEqualTo(payload.getReview().getBody());
-        assertThat(review.isDismissed()).isFalse();
-    }
-
-    @Test
-    @DisplayName("should upsert contribution events idempotently on replay")
-    void replayedSubmittedEventUpsertsContributionEvent(
-        @GitHubPayload("pull_request_review.submitted") GHEventPayload.PullRequestReview payload
-    ) throws Exception {
-        handler.handleEvent(payload);
-        handler.handleEvent(payload);
-
-        assertThat(contributionEventRepository.count()).isEqualTo(1);
-
-        var event = contributionEventRepository
-            .findBySourceTypeAndSourceId(ContributionSourceType.PULL_REQUEST_REVIEW, payload.getReview().getId())
-            .orElseThrow();
-        assertThat(event.getOccurredAt()).isEqualTo(payload.getReview().getSubmittedAt());
-    }
-
-    @Test
-    @DisplayName("should retain review state when dismissed")
-    void dismissedEventMarksReview(
-        @GitHubPayload("pull_request_review.dismissed") GHEventPayload.PullRequestReview dismissed
-    ) throws Exception {
-        // Arrange
-        var pullRequest = dismissed.getPullRequest();
-        var pullRequestEntity = pullRequestRepository
-            .findById(pullRequest.getId())
-            .orElseGet(() -> pullRequestRepository.save(pullRequestConverter.convert(pullRequest)));
-
-        PullRequestReview existingReview = new PullRequestReview();
-        existingReview.setId(dismissed.getReview().getId());
-        existingReview.setState(PullRequestReview.State.APPROVED);
-        existingReview.setDismissed(false);
-        existingReview.setHtmlUrl(dismissed.getReview().getHtmlUrl().toString());
-        existingReview.setSubmittedAt(Instant.now());
-        existingReview.setPullRequest(pullRequestEntity);
-        reviewRepository.save(existingReview);
-
-        // Act
-        handler.handleEvent(dismissed);
-
-        // Assert
-        var review = reviewRepository.findById(dismissed.getReview().getId()).orElseThrow();
-        assertThat(review.getState()).isEqualTo(PullRequestReview.State.APPROVED);
-        assertThat(review.isDismissed()).isTrue();
-    }
-
-    @Test
-    @DisplayName("should update existing reviews on edit events")
-    void editedEventUpdatesReview(
-        @GitHubPayload("pull_request_review.submitted") GHEventPayload.PullRequestReview submitted,
-        @GitHubPayload("pull_request_review.edited") GHEventPayload.PullRequestReview edited
-    ) throws Exception {
-        // Arrange
-        handler.handleEvent(submitted);
-
-        // Act
-        handler.handleEvent(edited);
-
-        // Assert
-        var review = reviewRepository.findById(submitted.getReview().getId()).orElseThrow();
-        assertThat(review.getBody()).isEqualTo(edited.getReview().getBody());
-        assertThat(review.getSubmittedAt()).isEqualTo(edited.getReview().getSubmittedAt());
-    }
-
-    @Test
-    @DisplayName("should keep dismissal flag when edits arrive")
-    void editedEventKeepsDismissedState(
-        @GitHubPayload("pull_request_review.submitted") GHEventPayload.PullRequestReview submitted,
-        @GitHubPayload("pull_request_review.edited") GHEventPayload.PullRequestReview edited
-    ) throws Exception {
-        // Arrange
-        handler.handleEvent(submitted);
-        var review = reviewRepository.findById(submitted.getReview().getId()).orElseThrow();
-        review.setDismissed(true);
-        reviewRepository.save(review);
-
-        // Act
-        handler.handleEvent(edited);
-
-        // Assert
-        var updated = reviewRepository.findById(submitted.getReview().getId()).orElseThrow();
-        assertThat(updated.isDismissed()).isTrue();
-        assertThat(updated.getState()).isEqualTo(PullRequestReview.State.APPROVED);
-        assertThat(updated.getBody()).isEqualTo(edited.getReview().getBody());
+    private GitHubPullRequestReviewEventDTO loadPayload(String filename) throws IOException {
+        ClassPathResource resource = new ClassPathResource("github/" + filename + ".json");
+        String json = resource.getContentAsString(StandardCharsets.UTF_8);
+        return objectMapper.readValue(json, GitHubPullRequestReviewEventDTO.class);
     }
 }

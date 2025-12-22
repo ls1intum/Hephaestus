@@ -14,6 +14,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
 
+/**
+ * @deprecated Use webhook DTOs and repository processing services instead.
+ */
+@Deprecated(forRemoval = true)
+@SuppressWarnings("deprecation")
 @Component
 public class GitHubRepositoryConverter extends BaseGitServiceEntityConverter<GHRepository, Repository> {
 

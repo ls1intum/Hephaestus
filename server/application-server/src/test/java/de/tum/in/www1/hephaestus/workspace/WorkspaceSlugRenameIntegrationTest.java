@@ -12,7 +12,6 @@ import java.time.temporal.ChronoUnit;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.kohsuke.github.GHRepositorySelection;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.reactive.AutoConfigureWebTestClient;
 import org.springframework.http.HttpStatus;
@@ -176,7 +175,7 @@ class WorkspaceSlugRenameIntegrationTest extends AbstractWorkspaceIntegrationTes
 
         workspaceService.renameSlug(workspace.getId(), "install-alpha-renamed");
 
-        Workspace created = workspaceService.ensureForInstallation(999L, "install-alpha", GHRepositorySelection.ALL);
+        Workspace created = workspaceService.ensureForInstallation(999L, "install-alpha", RepositorySelection.ALL);
 
         assertThat(created).as("workspace should be created with fallback slug").isNotNull();
         assertThat(created.getWorkspaceSlug()).isNotEqualTo("install-alpha");
@@ -194,7 +193,7 @@ class WorkspaceSlugRenameIntegrationTest extends AbstractWorkspaceIntegrationTes
         persistUser("install-owner-collision");
         persistUser("collision");
 
-        Workspace linked = workspaceService.ensureForInstallation(1111L, "collision", GHRepositorySelection.ALL);
+        Workspace linked = workspaceService.ensureForInstallation(1111L, "collision", RepositorySelection.ALL);
 
         assertThat(linked).isNotNull();
         assertThat(linked.getId()).isEqualTo(existing.getId());

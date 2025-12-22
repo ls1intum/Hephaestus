@@ -9,16 +9,13 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.github.app.GitHubAppTokenService;
-import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
-import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserSyncService;
 import de.tum.in.www1.hephaestus.monitoring.MonitoringScopeFilter;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.kohsuke.github.GitHub;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -38,13 +35,7 @@ class WorkspaceProvisioningServiceTest {
     private GitHubAppTokenService gitHubAppTokenService;
 
     @Mock
-    private GitHubUserSyncService gitHubUserSyncService;
-
-    @Mock
     private UserRepository userRepository;
-
-    @Mock
-    private OrganizationSyncService organizationSyncService;
 
     @Mock
     private WorkspaceMembershipRepository workspaceMembershipRepository;
@@ -74,9 +65,7 @@ class WorkspaceProvisioningServiceTest {
             repositoryToMonitorRepository,
             workspaceService,
             gitHubAppTokenService,
-            gitHubUserSyncService,
             userRepository,
-            organizationSyncService,
             workspaceMembershipRepository,
             workspaceMembershipService,
             monitoringScopeFilter
@@ -114,7 +103,8 @@ class WorkspaceProvisioningServiceTest {
             workspaceService.createWorkspace(anyString(), anyString(), anyString(), any(AccountType.class), anyLong())
         ).thenReturn(workspace);
         when(workspaceRepository.save(any(Workspace.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(gitHubUserSyncService.syncUser(any(GitHub.class), anyString())).thenReturn(owner);
+        // User lookup for PAT bootstrap - user already exists
+        when(userRepository.findByLogin("aet-org")).thenReturn(Optional.of(owner));
         when(userRepository.findByLogin("admin")).thenReturn(Optional.of(admin));
 
         provisioningService.bootstrapDefaultPatWorkspace();
@@ -150,7 +140,8 @@ class WorkspaceProvisioningServiceTest {
             workspaceService.createWorkspace(anyString(), anyString(), anyString(), any(AccountType.class), anyLong())
         ).thenReturn(workspace);
         when(workspaceRepository.save(any(Workspace.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(gitHubUserSyncService.syncUser(any(GitHub.class), anyString())).thenReturn(owner);
+        // User lookup for PAT bootstrap - user already exists
+        when(userRepository.findByLogin("aet-org")).thenReturn(Optional.of(owner));
         when(userRepository.findByLogin("admin")).thenReturn(Optional.empty());
 
         provisioningService.bootstrapDefaultPatWorkspace();

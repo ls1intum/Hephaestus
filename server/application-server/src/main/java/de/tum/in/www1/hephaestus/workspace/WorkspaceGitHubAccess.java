@@ -11,7 +11,11 @@ import org.springframework.stereotype.Component;
 
 /**
  * Helper for resolving a workspace-scoped Hub4J client along with the corresponding GitHub organization.
+ *
+ * @deprecated This uses hub4j clients and will be removed once sync services are migrated to GraphQL.
+ *             Use {@link de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider} instead.
  */
+@Deprecated(forRemoval = true)
 @Component
 public class WorkspaceGitHubAccess {
 

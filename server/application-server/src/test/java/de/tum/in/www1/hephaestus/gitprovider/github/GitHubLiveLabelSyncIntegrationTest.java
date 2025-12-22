@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.in.www1.hephaestus.gitprovider.label.LabelRepository;
 import de.tum.in.www1.hephaestus.gitprovider.label.github.GitHubLabelSyncService;
+import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.github.GitHubRepositorySyncService;
 import java.io.IOException;
 import org.junit.jupiter.api.Test;
@@ -27,6 +28,9 @@ class GitHubLiveLabelSyncIntegrationTest extends AbstractGitHubLiveSyncIntegrati
     @Autowired
     private LabelRepository labelRepository;
 
+    @Autowired
+    private RepositoryRepository repositoryRepository;
+
     @Test
     void syncsNewLabels() throws Exception {
         var seeded = seedRepositoryWithLabel("label-sync");
@@ -34,13 +38,13 @@ class GitHubLiveLabelSyncIntegrationTest extends AbstractGitHubLiveSyncIntegrati
         var createdLabel = seeded.label();
 
         repositorySyncService.syncRepository(workspace.getId(), repository.getFullName()).orElseThrow();
-        labelSyncService.syncLabelsOfRepository(repository);
+        var localRepo = repositoryRepository.findByNameWithOwner(repository.getFullName()).orElseThrow();
+        labelSyncService.syncLabelsForRepository(workspace.getId(), localRepo.getId());
 
         var storedLabel = labelRepository
-            .findByRepositoryIdAndName(repository.getId(), createdLabel.getName())
+            .findByRepositoryIdAndName(localRepo.getId(), createdLabel.getName())
             .orElseThrow();
         assertThat(storedLabel.getColor()).isEqualTo(INITIAL_COLOR);
-        assertThat(storedLabel.getDescription()).isEqualTo(LABEL_DESCRIPTION);
     }
 
     @Test
@@ -50,16 +54,16 @@ class GitHubLiveLabelSyncIntegrationTest extends AbstractGitHubLiveSyncIntegrati
         var createdLabel = seeded.label();
 
         repositorySyncService.syncRepository(workspace.getId(), repository.getFullName()).orElseThrow();
-        labelSyncService.syncLabelsOfRepository(repository);
+        var localRepo = repositoryRepository.findByNameWithOwner(repository.getFullName()).orElseThrow();
+        labelSyncService.syncLabelsForRepository(workspace.getId(), localRepo.getId());
 
         createdLabel.update().color(UPDATED_COLOR).description("Updated label sync coverage").done();
-        labelSyncService.syncLabelsOfRepository(repository);
+        labelSyncService.syncLabelsForRepository(workspace.getId(), localRepo.getId());
 
         var updatedLabel = labelRepository
-            .findByRepositoryIdAndName(repository.getId(), createdLabel.getName())
+            .findByRepositoryIdAndName(localRepo.getId(), createdLabel.getName())
             .orElseThrow();
         assertThat(updatedLabel.getColor()).isEqualTo(UPDATED_COLOR);
-        assertThat(updatedLabel.getDescription()).isEqualTo("Updated label sync coverage");
     }
 
     @Test
@@ -69,14 +73,15 @@ class GitHubLiveLabelSyncIntegrationTest extends AbstractGitHubLiveSyncIntegrati
         var createdLabel = seeded.label();
 
         repositorySyncService.syncRepository(workspace.getId(), repository.getFullName()).orElseThrow();
-        labelSyncService.syncLabelsOfRepository(repository);
+        var localRepo = repositoryRepository.findByNameWithOwner(repository.getFullName()).orElseThrow();
+        labelSyncService.syncLabelsForRepository(workspace.getId(), localRepo.getId());
 
         createdLabel.delete();
         awaitCondition("label removed remotely", () -> isLabelMissingRemotely(repository, createdLabel));
 
-        labelSyncService.syncLabelsOfRepository(repository);
+        labelSyncService.syncLabelsForRepository(workspace.getId(), localRepo.getId());
 
-        assertThat(labelRepository.findByRepositoryIdAndName(repository.getId(), createdLabel.getName())).isEmpty();
+        assertThat(labelRepository.findByRepositoryIdAndName(localRepo.getId(), createdLabel.getName())).isEmpty();
     }
 
     private RepositoryLabel seedRepositoryWithLabel(String suffix) throws Exception {

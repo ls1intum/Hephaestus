@@ -13,7 +13,6 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
-import org.kohsuke.github.GHEventPayloadSubIssues;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -43,7 +42,7 @@ import org.springframework.transaction.annotation.Transactional;
  * <li>Respects sync cooldown to avoid excessive API calls</li>
  * </ul>
  *
- * @see org.kohsuke.github.GHEventPayloadSubIssues
+ * @see GitHubSubIssuesMessageHandler
  */
 @Service
 public class GitHubSubIssueSyncService {
@@ -90,7 +89,7 @@ public class GitHubSubIssueSyncService {
         long subIssueId,
         long parentIssueId,
         boolean isLink,
-        @Nullable GHEventPayloadSubIssues.SubIssuesSummary parentSummary
+        @Nullable SubIssuesSummaryDTO parentSummary
     ) {
         logger.info(
             "Processing sub-issue event: subIssue={}, parentIssue={}, isLink={}",
@@ -119,11 +118,7 @@ public class GitHubSubIssueSyncService {
         processSubIssueEvent(subIssueId, parentIssueId, isLink, null);
     }
 
-    private void linkSubIssueToParent(
-        Issue subIssue,
-        long parentIssueId,
-        @Nullable GHEventPayloadSubIssues.SubIssuesSummary parentSummary
-    ) {
+    private void linkSubIssueToParent(Issue subIssue, long parentIssueId, @Nullable SubIssuesSummaryDTO parentSummary) {
         Optional<Issue> parentOpt = issueRepository.findById(parentIssueId);
         if (parentOpt.isEmpty()) {
             logger.debug("Parent issue {} not found in database, skipping link", parentIssueId);
@@ -142,7 +137,7 @@ public class GitHubSubIssueSyncService {
     private void unlinkSubIssueFromParent(
         Issue subIssue,
         long parentIssueId,
-        @Nullable GHEventPayloadSubIssues.SubIssuesSummary parentSummary
+        @Nullable SubIssuesSummaryDTO parentSummary
     ) {
         Issue currentParent = subIssue.getParentIssue();
         if (currentParent != null) {
@@ -157,14 +152,14 @@ public class GitHubSubIssueSyncService {
         }
     }
 
-    private void updateParentSummary(Issue parentIssue, @Nullable GHEventPayloadSubIssues.SubIssuesSummary summary) {
+    private void updateParentSummary(Issue parentIssue, @Nullable SubIssuesSummaryDTO summary) {
         if (summary == null) {
             return;
         }
 
-        parentIssue.setSubIssuesTotal(summary.getTotal());
-        parentIssue.setSubIssuesCompleted(summary.getCompleted());
-        parentIssue.setSubIssuesPercentCompleted(summary.getPercentCompleted());
+        parentIssue.setSubIssuesTotal(summary.total());
+        parentIssue.setSubIssuesCompleted(summary.completed());
+        parentIssue.setSubIssuesPercentCompleted(summary.percentCompleted());
         issueRepository.save(parentIssue);
 
         logger.debug("Updated parent #{} summary: {}", parentIssue.getNumber(), summary);

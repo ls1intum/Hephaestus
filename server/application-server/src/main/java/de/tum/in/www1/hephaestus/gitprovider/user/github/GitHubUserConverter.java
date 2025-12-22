@@ -37,7 +37,12 @@ import org.springframework.stereotype.Component;
  * <p>
  * Use {@link #update(GHUser, User)} for minimal users (safe).
  * Use {@link #updateFromFullUser(GHUser, User)} for fully-fetched users (accesses all fields).
+ *
+ * @deprecated This converter uses hub4j types and will be removed once sync services are
+ *             migrated to GraphQL. Use DTO-based user processing instead.
  */
+@Deprecated(forRemoval = true)
+@SuppressWarnings("deprecation")
 @Component
 public class GitHubUserConverter extends BaseGitServiceEntityConverter<GHUser, User> {
 

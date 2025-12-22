@@ -19,7 +19,12 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Service for synchronizing GitHub users with the local database.
+ *
+ * @deprecated This service uses hub4j REST API and will be migrated to GraphQL.
+ *             New webhook handlers should use DTO-based user processing.
  */
+@Deprecated(forRemoval = true)
+@SuppressWarnings("deprecation")
 @Service
 public class GitHubUserSyncService {
 

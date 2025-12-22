@@ -44,8 +44,6 @@ import org.springframework.transaction.annotation.Transactional;
  * (see <a href="https://github.com/orgs/community/discussions/165749">
  * Community Discussion #165749</a>). Until webhooks become available,
  * use {@link #syncDependenciesForWorkspace} for bulk GraphQL sync.
- *
- * @see org.kohsuke.github.GHEventPayloadIssueDependencies
  */
 @Service
 public class GitHubIssueDependencySyncService {

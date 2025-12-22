@@ -10,6 +10,11 @@ import org.slf4j.LoggerFactory;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
 
+/**
+ * @deprecated Use webhook DTOs and comment processing services instead.
+ */
+@Deprecated(forRemoval = true)
+@SuppressWarnings("deprecation")
 @Component
 public class GitHubPullRequestReviewCommentConverter
     extends BaseGitServiceEntityConverter<GHPullRequestReviewComment, PullRequestReviewComment> {

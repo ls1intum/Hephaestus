@@ -8,6 +8,10 @@ import org.springframework.core.convert.converter.Converter;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
 
+/**
+ * @deprecated Use webhook DTOs and review processing services instead.
+ */
+@Deprecated(forRemoval = true)
 @Component
 public class GitHubPullRequestReviewConverter implements Converter<GHPullRequestReview, PullRequestReview> {
 

@@ -1,74 +1,107 @@
 package de.tum.in.www1.hephaestus.gitprovider.pullrequest.github;
 
-import de.tum.in.www1.hephaestus.activity.badpracticedetector.BadPracticeDetectorScheduler;
+import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
+import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContextFactory;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
-import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
-import de.tum.in.www1.hephaestus.gitprovider.repository.github.GitHubRepositorySyncService;
-import org.kohsuke.github.GHEvent;
-import org.kohsuke.github.GHEventPayload;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequest.github.dto.GitHubPullRequestDTO;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequest.github.dto.GitHubPullRequestEventDTO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
+/**
+ * Handles all GitHub pull request webhook events.
+ * <p>
+ * This handler uses DTOs directly (no hub4j) for complete field coverage.
+ * Processing is delegated to {@link GitHubPullRequestProcessor}.
+ */
 @Component
-public class GitHubPullRequestMessageHandler extends GitHubMessageHandler<GHEventPayload.PullRequest> {
+public class GitHubPullRequestMessageHandler extends GitHubMessageHandler<GitHubPullRequestEventDTO> {
 
     private static final Logger logger = LoggerFactory.getLogger(GitHubPullRequestMessageHandler.class);
 
-    private final GitHubPullRequestSyncService pullRequestSyncService;
-    private final GitHubRepositorySyncService repositorySyncService;
+    private final ProcessingContextFactory contextFactory;
+    private final GitHubPullRequestProcessor prProcessor;
 
-    private final BadPracticeDetectorScheduler badPracticeDetectorScheduler;
-
-    private GitHubPullRequestMessageHandler(
-        GitHubPullRequestSyncService pullRequestSyncService,
-        GitHubRepositorySyncService repositorySyncService,
-        BadPracticeDetectorScheduler badPracticeDetectorScheduler
+    public GitHubPullRequestMessageHandler(
+        ProcessingContextFactory contextFactory,
+        GitHubPullRequestProcessor prProcessor
     ) {
-        super(GHEventPayload.PullRequest.class);
-        this.pullRequestSyncService = pullRequestSyncService;
-        this.repositorySyncService = repositorySyncService;
-        this.badPracticeDetectorScheduler = badPracticeDetectorScheduler;
+        super(GitHubPullRequestEventDTO.class);
+        this.contextFactory = contextFactory;
+        this.prProcessor = prProcessor;
     }
 
     @Override
-    protected void handleEvent(GHEventPayload.PullRequest eventPayload) {
-        logger.info(
-            "Received pull request event for repository: {}, pull request: {}, action: {}",
-            eventPayload.getRepository().getFullName(),
-            eventPayload.getPullRequest().getNumber(),
-            eventPayload.getAction()
-        );
-        repositorySyncService.processRepository(eventPayload.getRepository());
-        // We don't need to handle the deleted action here, as pull requests are not deleted
-        PullRequest pullRequest =
-            switch (eventPayload.getAction()) {
-                case "labeled" -> handleLabelEvent(eventPayload, true);
-                case "unlabeled" -> handleLabelEvent(eventPayload, false);
-                default -> pullRequestSyncService.processPullRequest(eventPayload.getPullRequest());
-            };
-
-        scheduleBadPracticeDetectionOnEvent(eventPayload, pullRequest);
+    protected String getEventKey() {
+        return "pull_request";
     }
 
     @Override
-    protected GHEvent getHandlerEvent() {
-        return GHEvent.PULL_REQUEST;
-    }
+    protected void handleEvent(GitHubPullRequestEventDTO event) {
+        GitHubPullRequestDTO prDto = event.pullRequest();
 
-    private void scheduleBadPracticeDetectionOnEvent(GHEventPayload.PullRequest eventPayload, PullRequest pullRequest) {
-        switch (eventPayload.getAction()) {
-            case "opened",
-                "ready_for_review",
-                "reopened" -> badPracticeDetectorScheduler.detectBadPracticeForPrWhenOpenedOrReadyForReviewEvent(
-                pullRequest
-            );
-            case "closed" -> badPracticeDetectorScheduler.detectBadPracticeForPrIfClosedEvent(pullRequest);
+        if (prDto == null) {
+            logger.warn("Received pull_request event with missing PR data");
+            return;
         }
+
+        logger.info(
+            "Received pull_request event: action={}, pr=#{}, repo={}",
+            event.action(),
+            prDto.number(),
+            event.repository() != null ? event.repository().fullName() : "unknown"
+        );
+
+        ProcessingContext context = contextFactory.forWebhookEvent(event).orElse(null);
+        if (context == null) {
+            return;
+        }
+
+        routeToProcessor(event, prDto, context);
     }
 
-    private PullRequest handleLabelEvent(GHEventPayload.PullRequest eventPayload, boolean added) {
-        var label = eventPayload.getLabel();
-        return pullRequestSyncService.processPullRequest(eventPayload.getPullRequest(), label, added);
+    private void routeToProcessor(
+        GitHubPullRequestEventDTO event,
+        GitHubPullRequestDTO prDto,
+        ProcessingContext context
+    ) {
+        switch (event.action()) {
+            case "opened",
+                "edited",
+                "assigned",
+                "unassigned",
+                "milestoned",
+                "demilestoned",
+                "auto_merge_enabled",
+                "auto_merge_disabled",
+                "reopened",
+                "review_request_removed",
+                "enqueued",
+                "dequeued" -> prProcessor.process(prDto, context);
+            case "closed" -> prProcessor.processClosed(prDto, context);
+            case "ready_for_review" -> prProcessor.processReadyForReview(prDto, context);
+            case "converted_to_draft" -> prProcessor.processConvertedToDraft(prDto, context);
+            case "synchronize" -> prProcessor.processSynchronize(prDto, context);
+            case "labeled" -> {
+                if (event.label() != null) {
+                    prProcessor.processLabeled(prDto, event.label(), context);
+                } else {
+                    prProcessor.process(prDto, context);
+                }
+            }
+            case "unlabeled" -> {
+                if (event.label() != null) {
+                    prProcessor.processUnlabeled(prDto, event.label(), context);
+                } else {
+                    prProcessor.process(prDto, context);
+                }
+            }
+            case "review_requested" -> prProcessor.process(prDto, context);
+            default -> {
+                logger.debug("Unhandled pull_request action: {}", event.action());
+                prProcessor.process(prDto, context);
+            }
+        }
     }
 }

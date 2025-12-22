@@ -1,0 +1,25 @@
+# GraphQL query for fetching repository collaborators
+# Used by GraphQL-based sync services
+
+query GetRepositoryCollaborators($owner: String!, $name: String!, $first: Int!, $after: String) {
+	repository(owner: $owner, name: $name) {
+		collaborators(first: $first, after: $after) {
+			pageInfo {
+				hasNextPage
+				endCursor
+			}
+			totalCount
+			edges {
+				permission
+				node {
+					id
+					databaseId
+					login
+					avatarUrl
+					name
+					email
+				}
+			}
+		}
+	}
+}

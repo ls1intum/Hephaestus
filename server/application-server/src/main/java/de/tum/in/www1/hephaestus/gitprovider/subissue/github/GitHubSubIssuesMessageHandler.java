@@ -1,94 +1,97 @@
 package de.tum.in.www1.hephaestus.gitprovider.subissue.github;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
+import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContextFactory;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
-import org.kohsuke.github.GHEventPayloadSubIssues;
-import org.kohsuke.github.GHEventPayloadSubIssues.IssueInfo;
-import org.kohsuke.github.GHEventPayloadSubIssues.SubIssuesSummary;
+import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
+import de.tum.in.www1.hephaestus.gitprovider.issue.IssueRepository;
+import de.tum.in.www1.hephaestus.gitprovider.issue.github.GitHubIssueProcessor;
+import de.tum.in.www1.hephaestus.gitprovider.subissue.github.dto.GitHubSubIssuesEventDTO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Handles GitHub sub_issues webhook events for parent-child issue
- * relationships.
+ * Handles GitHub sub_issues webhook events.
  * <p>
- * This handler processes four event types:
- * <ul>
- * <li>{@code sub_issue_added} - A sub-issue was added to a parent issue</li>
- * <li>{@code sub_issue_removed} - A sub-issue was removed from a parent
- * issue</li>
- * <li>{@code parent_issue_added} - A parent issue was assigned to a
- * sub-issue</li>
- * <li>{@code parent_issue_removed} - A parent issue was removed from a
- * sub-issue</li>
- * </ul>
- * <p>
- * Uses the hub4j-compatible {@link GHEventPayloadSubIssues} payload for type
- * safety.
- *
- * @see GHEventPayloadSubIssues
- * @see GitHubSubIssueSyncService
+ * Uses DTOs directly (no hub4j) for complete field coverage.
  */
 @Component
-public class GitHubSubIssuesMessageHandler extends GitHubMessageHandler<GHEventPayloadSubIssues> {
+public class GitHubSubIssuesMessageHandler extends GitHubMessageHandler<GitHubSubIssuesEventDTO> {
 
     private static final Logger logger = LoggerFactory.getLogger(GitHubSubIssuesMessageHandler.class);
 
-    private final GitHubSubIssueSyncService subIssueSyncService;
+    private final ProcessingContextFactory contextFactory;
+    private final GitHubIssueProcessor issueProcessor;
+    private final IssueRepository issueRepository;
 
-    public GitHubSubIssuesMessageHandler(GitHubSubIssueSyncService subIssueSyncService) {
-        super(GHEventPayloadSubIssues.class);
-        this.subIssueSyncService = subIssueSyncService;
-    }
-
-    @Override
-    protected void handleEvent(GHEventPayloadSubIssues payload) {
-        var action = payload.getActionType();
-        long subIssueId = payload.getSubIssueId();
-        long parentIssueId = payload.getParentIssueId();
-
-        // GitHub fires two events for each relationship change:
-        // - SUB_ISSUE_* (from parent's perspective) - PRIMARY
-        // - PARENT_ISSUE_* (from child's perspective) - DUPLICATE
-        // We only process the primary events to avoid double processing.
-        if (!action.isPrimaryEvent()) {
-            logger.debug(
-                "Skipping duplicate {} event (sub_issue={}, parent={}), already processed via SUB_ISSUE_* event",
-                action,
-                subIssueId,
-                parentIssueId
-            );
-            return;
-        }
-
-        logger.info(
-            "Received sub_issues event: action={}, subIssue={}, parentIssue={}",
-            action,
-            subIssueId,
-            parentIssueId
-        );
-
-        // Extract sub_issues_summary from parent issue (if available)
-        SubIssuesSummary parentSummary = extractParentSummary(payload.getParentIssue());
-
-        subIssueSyncService.processSubIssueEvent(subIssueId, parentIssueId, payload.isLinkEvent(), parentSummary);
-    }
-
-    /**
-     * Extracts the sub_issues_summary from the parent issue if available.
-     *
-     * @param parentIssue the parent issue from the payload
-     * @return the summary, or null if not available
-     */
-    private SubIssuesSummary extractParentSummary(IssueInfo parentIssue) {
-        if (parentIssue == null) {
-            return null;
-        }
-        return parentIssue.getSubIssuesSummary();
+    GitHubSubIssuesMessageHandler(
+        ProcessingContextFactory contextFactory,
+        GitHubIssueProcessor issueProcessor,
+        IssueRepository issueRepository
+    ) {
+        super(GitHubSubIssuesEventDTO.class);
+        this.contextFactory = contextFactory;
+        this.issueProcessor = issueProcessor;
+        this.issueRepository = issueRepository;
     }
 
     @Override
     protected String getEventKey() {
         return "sub_issues";
+    }
+
+    @Override
+    @Transactional
+    protected void handleEvent(GitHubSubIssuesEventDTO event) {
+        var subIssueDto = event.subIssue();
+        var parentIssueDto = event.parentIssue();
+
+        if (subIssueDto == null || parentIssueDto == null) {
+            logger.warn("Received sub_issues event with missing data");
+            return;
+        }
+
+        logger.info(
+            "Received sub_issues event: action={}, parent=#{}, sub=#{}, repo={}",
+            event.action(),
+            parentIssueDto.number(),
+            subIssueDto.number(),
+            event.repository() != null ? event.repository().fullName() : "unknown"
+        );
+
+        ProcessingContext context = contextFactory.forWebhookEvent(event).orElse(null);
+        if (context == null) {
+            return;
+        }
+
+        // Ensure both issues exist
+        issueProcessor.process(parentIssueDto, context);
+        issueProcessor.process(subIssueDto, context);
+
+        // Handle sub-issue relationship
+        Issue parentIssue = issueRepository.findById(parentIssueDto.getDatabaseId()).orElse(null);
+        Issue subIssue = issueRepository.findById(subIssueDto.getDatabaseId()).orElse(null);
+
+        if (parentIssue != null && subIssue != null) {
+            switch (event.action()) {
+                case "sub_issue_added", "parent_issue_added" -> {
+                    subIssue.setParentIssue(parentIssue);
+                    issueRepository.save(subIssue);
+                    logger.info("Linked sub-issue #{} to parent #{}", subIssueDto.number(), parentIssueDto.number());
+                }
+                case "sub_issue_removed", "parent_issue_removed" -> {
+                    subIssue.setParentIssue(null);
+                    issueRepository.save(subIssue);
+                    logger.info(
+                        "Unlinked sub-issue #{} from parent #{}",
+                        subIssueDto.number(),
+                        parentIssueDto.number()
+                    );
+                }
+                default -> logger.debug("Unhandled sub_issues action: {}", event.action());
+            }
+        }
     }
 }

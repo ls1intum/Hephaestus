@@ -2,11 +2,14 @@ package de.tum.in.www1.hephaestus.gitprovider.issue.github;
 
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.issue.IssueRepository;
+import de.tum.in.www1.hephaestus.gitprovider.issuetype.IssueType;
+import de.tum.in.www1.hephaestus.gitprovider.issuetype.github.GitHubIssueTypeSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.label.Label;
 import de.tum.in.www1.hephaestus.gitprovider.label.LabelRepository;
 import de.tum.in.www1.hephaestus.gitprovider.label.github.GitHubLabelConverter;
 import de.tum.in.www1.hephaestus.gitprovider.milestone.MilestoneRepository;
 import de.tum.in.www1.hephaestus.gitprovider.milestone.github.GitHubMilestoneConverter;
+import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationRepository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserSyncService;
@@ -26,9 +29,15 @@ import org.kohsuke.github.GHRepository;
 import org.kohsuke.github.PagedIterator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * @deprecated Use webhook handlers and {@link GitHubIssueProcessor} instead.
+ */
+@Deprecated(forRemoval = true)
+@SuppressWarnings("deprecation")
 @Service
 public class GitHubIssueSyncService {
 
@@ -38,29 +47,35 @@ public class GitHubIssueSyncService {
     private final RepositoryRepository repositoryRepository;
     private final LabelRepository labelRepository;
     private final MilestoneRepository milestoneRepository;
+    private final OrganizationRepository organizationRepository;
     private final GitHubIssueConverter issueConverter;
     private final GitHubLabelConverter labelConverter;
     private final GitHubMilestoneConverter milestoneConverter;
     private final GitHubUserSyncService userSyncService;
+    private final GitHubIssueTypeSyncService issueTypeSyncService;
 
     public GitHubIssueSyncService(
         IssueRepository issueRepository,
         RepositoryRepository repositoryRepository,
         LabelRepository labelRepository,
         MilestoneRepository milestoneRepository,
+        OrganizationRepository organizationRepository,
         GitHubIssueConverter issueConverter,
         GitHubLabelConverter labelConverter,
         GitHubMilestoneConverter milestoneConverter,
-        GitHubUserSyncService userSyncService
+        GitHubUserSyncService userSyncService,
+        GitHubIssueTypeSyncService issueTypeSyncService
     ) {
         this.issueRepository = issueRepository;
         this.repositoryRepository = repositoryRepository;
         this.labelRepository = labelRepository;
         this.milestoneRepository = milestoneRepository;
+        this.organizationRepository = organizationRepository;
         this.issueConverter = issueConverter;
         this.labelConverter = labelConverter;
         this.milestoneConverter = milestoneConverter;
         this.userSyncService = userSyncService;
+        this.issueTypeSyncService = issueTypeSyncService;
     }
 
     /**
@@ -100,7 +115,8 @@ public class GitHubIssueSyncService {
     }
 
     /**
-     * Returns a paged iterator for fetching issues from a specific GitHub repository.
+     * Returns a paged iterator for fetching issues from a specific GitHub
+     * repository.
      *
      * @param repository The repository to fetch issues from.
      * @param since      An date to filter issues by their last update.
@@ -122,7 +138,8 @@ public class GitHubIssueSyncService {
      *
      * @param repository  The repository to fetch the issue from.
      * @param issueNumber The number of the issue to fetch.
-     * @return An optional containing the fetched GitHub issue, or an empty optional if the issue could not be fetched.
+     * @return An optional containing the fetched GitHub issue, or an empty optional
+     *         if the issue could not be fetched.
      */
     public Optional<GHIssue> syncIssue(GHRepository repository, int issueNumber) {
         try {
@@ -245,5 +262,46 @@ public class GitHubIssueSyncService {
         result.getAssignees().addAll(resultAssignees);
 
         return issueRepository.save(result);
+    }
+
+    /**
+     * Processes a single GitHub issue with optional issue type linking.
+     * <p>
+     * This overload is used by webhook handlers to pass the issue type from the
+     * payload.
+     *
+     * @param ghIssue     The GitHub issue data to process.
+     * @param ghIssueType The GitHub issue type from the webhook payload (may be
+     *                    null).
+     * @param orgLogin    The organization login for issue type lookup (required if
+     *                    ghIssueType is provided).
+     * @return The updated or newly created Issue entity, or {@code null} if an
+     *         error occurred.
+     */
+    @Transactional
+    public Issue processIssue(GHIssue ghIssue, @Nullable String issueTypeNodeId, @Nullable String orgLogin) {
+        Issue result = processIssue(ghIssue);
+        if (result == null) {
+            return null;
+        }
+
+        // Issue type linking can be added when DTOs are implemented for issue types
+        // For now, skip issue type linking from webhook
+
+        return result;
+    }
+
+    // linkIssueType moved to DTO-based implementation
+
+    /**
+     * Clears the issue type from an issue.
+     *
+     * @param issue The issue to clear the type from.
+     */
+    @Transactional
+    public void clearIssueType(Issue issue) {
+        issue.setIssueType(null);
+        issueRepository.save(issue);
+        logger.info("Cleared issue type for issue #{}", issue.getNumber());
     }
 }

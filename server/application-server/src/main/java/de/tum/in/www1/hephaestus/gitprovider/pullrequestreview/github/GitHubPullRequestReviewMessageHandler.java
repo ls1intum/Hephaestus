@@ -1,54 +1,131 @@
 package de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.github;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
+import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContextFactory;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
-import de.tum.in.www1.hephaestus.gitprovider.pullrequest.github.GitHubPullRequestSyncService;
-import de.tum.in.www1.hephaestus.gitprovider.repository.github.GitHubRepositorySyncService;
-import org.kohsuke.github.GHEvent;
-import org.kohsuke.github.GHEventPayload;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequest.github.GitHubPullRequestProcessor;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReview;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReviewRepository;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.github.dto.GitHubPullRequestReviewEventDTO;
+import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * Handles GitHub pull_request_review webhook events.
+ * <p>
+ * Uses DTOs directly (no hub4j) for complete field coverage.
+ */
 @Component
-public class GitHubPullRequestReviewMessageHandler extends GitHubMessageHandler<GHEventPayload.PullRequestReview> {
+public class GitHubPullRequestReviewMessageHandler extends GitHubMessageHandler<GitHubPullRequestReviewEventDTO> {
 
     private static final Logger logger = LoggerFactory.getLogger(GitHubPullRequestReviewMessageHandler.class);
 
-    private final GitHubPullRequestReviewSyncService pullRequestReviewSyncService;
-    private final GitHubPullRequestSyncService pullRequestSyncService;
-    private final GitHubRepositorySyncService repositorySyncService;
+    private final ProcessingContextFactory contextFactory;
+    private final GitHubPullRequestProcessor prProcessor;
+    private final PullRequestReviewRepository reviewRepository;
+    private final PullRequestRepository prRepository;
+    private final UserRepository userRepository;
 
-    private GitHubPullRequestReviewMessageHandler(
-        GitHubPullRequestReviewSyncService pullRequestReviewSyncService,
-        GitHubPullRequestSyncService pullRequestSyncService,
-        GitHubRepositorySyncService repositorySyncService
+    GitHubPullRequestReviewMessageHandler(
+        ProcessingContextFactory contextFactory,
+        GitHubPullRequestProcessor prProcessor,
+        PullRequestReviewRepository reviewRepository,
+        PullRequestRepository prRepository,
+        UserRepository userRepository
     ) {
-        super(GHEventPayload.PullRequestReview.class);
-        this.pullRequestReviewSyncService = pullRequestReviewSyncService;
-        this.pullRequestSyncService = pullRequestSyncService;
-        this.repositorySyncService = repositorySyncService;
+        super(GitHubPullRequestReviewEventDTO.class);
+        this.contextFactory = contextFactory;
+        this.prProcessor = prProcessor;
+        this.reviewRepository = reviewRepository;
+        this.prRepository = prRepository;
+        this.userRepository = userRepository;
     }
 
     @Override
-    protected void handleEvent(GHEventPayload.PullRequestReview eventPayload) {
-        var pullRequest = eventPayload.getPullRequest();
-        var repository = pullRequest.getRepository();
-        var review = eventPayload.getReview();
+    protected String getEventKey() {
+        return "pull_request_review";
+    }
+
+    @Override
+    @Transactional
+    protected void handleEvent(GitHubPullRequestReviewEventDTO event) {
+        var reviewDto = event.review();
+        var prDto = event.pullRequest();
+
+        if (reviewDto == null || prDto == null) {
+            logger.warn("Received pull_request_review event with missing data");
+            return;
+        }
+
         logger.info(
-            "Received pull request review event for repository: {}, pull request: {}, action: {}, reviewId: {}",
-            repository.getFullName(),
-            pullRequest.getNumber(),
-            eventPayload.getAction(),
-            review.getId()
+            "Received pull_request_review event: action={}, pr=#{}, review={}, repo={}",
+            event.action(),
+            prDto.number(),
+            reviewDto.id(),
+            event.repository() != null ? event.repository().fullName() : "unknown"
         );
-        repositorySyncService.processRepository(repository);
-        pullRequestSyncService.processPullRequest(pullRequest);
-        // We don't need to handle the deleted action here, as reviews are not deleted, they are only dismissed
-        pullRequestReviewSyncService.processPullRequestReview(review, pullRequest, eventPayload.getSender());
+
+        ProcessingContext context = contextFactory.forWebhookEvent(event).orElse(null);
+        if (context == null) {
+            return;
+        }
+
+        // Ensure PR exists
+        prProcessor.process(prDto, context);
+
+        // Process review
+        processReview(reviewDto, prDto.getDatabaseId(), context);
     }
 
-    @Override
-    protected GHEvent getHandlerEvent() {
-        return GHEvent.PULL_REQUEST_REVIEW;
+    private void processReview(
+        GitHubPullRequestReviewEventDTO.GitHubReviewDTO dto,
+        Long prId,
+        ProcessingContext context
+    ) {
+        PullRequest pr = prRepository.findById(prId).orElse(null);
+        if (pr == null) {
+            logger.warn("PR not found for review: prId={}", prId);
+            return;
+        }
+
+        reviewRepository
+            .findById(dto.id())
+            .ifPresentOrElse(
+                review -> {
+                    review.setBody(dto.body());
+                    review.setState(mapState(dto.state()));
+                    reviewRepository.save(review);
+                },
+                () -> {
+                    PullRequestReview review = new PullRequestReview();
+                    review.setId(dto.id());
+                    review.setBody(dto.body());
+                    review.setState(mapState(dto.state()));
+                    review.setSubmittedAt(dto.submittedAt());
+                    review.setHtmlUrl(dto.htmlUrl());
+                    review.setPullRequest(pr);
+
+                    if (dto.author() != null && dto.author().id() != null) {
+                        userRepository.findById(dto.author().id()).ifPresent(review::setAuthor);
+                    }
+
+                    reviewRepository.save(review);
+                }
+            );
+    }
+
+    private PullRequestReview.State mapState(String state) {
+        if (state == null) return PullRequestReview.State.UNKNOWN;
+        return switch (state.toUpperCase()) {
+            case "APPROVED" -> PullRequestReview.State.APPROVED;
+            case "CHANGES_REQUESTED" -> PullRequestReview.State.CHANGES_REQUESTED;
+            case "COMMENTED" -> PullRequestReview.State.COMMENTED;
+            default -> PullRequestReview.State.UNKNOWN;
+        };
     }
 }

@@ -2,7 +2,6 @@ package de.tum.in.www1.hephaestus.workspace;
 
 import de.tum.in.www1.hephaestus.core.LoggingUtils;
 import de.tum.in.www1.hephaestus.core.exception.EntityNotFoundException;
-import de.tum.in.www1.hephaestus.gitprovider.common.github.app.GitHubAppTokenService;
 import de.tum.in.www1.hephaestus.gitprovider.installation.github.GitHubInstallationRepositoryEnumerationService;
 import de.tum.in.www1.hephaestus.gitprovider.issuetype.github.GitHubIssueTypeSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.label.Label;
@@ -11,10 +10,8 @@ import de.tum.in.www1.hephaestus.gitprovider.organization.Organization;
 import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationService;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
-import de.tum.in.www1.hephaestus.gitprovider.repository.github.GitHubRepositorySyncService;
-import de.tum.in.www1.hephaestus.gitprovider.repository.github.RepositorySyncException;
 import de.tum.in.www1.hephaestus.gitprovider.subissue.github.GitHubSubIssueSyncService;
-import de.tum.in.www1.hephaestus.gitprovider.sync.GitHubDataSyncService;
+import de.tum.in.www1.hephaestus.gitprovider.sync.GitHubGraphQlDataSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.sync.NatsConsumerService;
 import de.tum.in.www1.hephaestus.gitprovider.team.Team;
 import de.tum.in.www1.hephaestus.gitprovider.team.TeamInfoDTO;
@@ -23,7 +20,6 @@ import de.tum.in.www1.hephaestus.gitprovider.team.TeamRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserTeamsDTO;
-import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserSyncService;
 import de.tum.in.www1.hephaestus.monitoring.MonitoringScopeFilter;
 import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContextHolder;
@@ -50,8 +46,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-import org.kohsuke.github.GHRepository;
-import org.kohsuke.github.GHRepositorySelection;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
@@ -94,18 +88,15 @@ public class WorkspaceService {
 
     // Services
     private final NatsConsumerService natsConsumerService;
-    private final GitHubRepositorySyncService repositorySyncService;
     private final GitHubInstallationRepositoryEnumerationService installationRepositoryEnumerator;
     private final MonitoringScopeFilter monitoringScopeFilter;
     private final TeamInfoDTOConverter teamInfoDTOConverter;
     private final WorkspaceLeaguePointsRecalculationService workspaceLeaguePointsRecalculationService;
     private final OrganizationService organizationService;
     private final WorkspaceMembershipService workspaceMembershipService;
-    private final GitHubUserSyncService gitHubUserSyncService;
-    private final GitHubAppTokenService gitHubAppTokenService;
 
     // Lazy-loaded dependencies (to break circular references)
-    private final ObjectProvider<GitHubDataSyncService> gitHubDataSyncServiceProvider;
+    private final ObjectProvider<GitHubGraphQlDataSyncService> gitHubGraphQlDataSyncServiceProvider;
     private final ObjectProvider<GitHubIssueTypeSyncService> issueTypeSyncServiceProvider;
     private final ObjectProvider<GitHubSubIssueSyncService> subIssueSyncServiceProvider;
 
@@ -126,16 +117,13 @@ public class WorkspaceService {
         WorkspaceMembershipRepository workspaceMembershipRepository,
         WorkspaceSlugHistoryRepository workspaceSlugHistoryRepository,
         NatsConsumerService natsConsumerService,
-        GitHubRepositorySyncService repositorySyncService,
         GitHubInstallationRepositoryEnumerationService installationRepositoryEnumerator,
         MonitoringScopeFilter monitoringScopeFilter,
         TeamInfoDTOConverter teamInfoDTOConverter,
         WorkspaceLeaguePointsRecalculationService workspaceLeaguePointsRecalculationService,
         OrganizationService organizationService,
         WorkspaceMembershipService workspaceMembershipService,
-        GitHubUserSyncService gitHubUserSyncService,
-        GitHubAppTokenService gitHubAppTokenService,
-        ObjectProvider<GitHubDataSyncService> gitHubDataSyncServiceProvider,
+        ObjectProvider<GitHubGraphQlDataSyncService> gitHubGraphQlDataSyncServiceProvider,
         ObjectProvider<GitHubIssueTypeSyncService> issueTypeSyncServiceProvider,
         ObjectProvider<GitHubSubIssueSyncService> subIssueSyncServiceProvider,
         @Qualifier("monitoringExecutor") AsyncTaskExecutor monitoringExecutor,
@@ -152,25 +140,22 @@ public class WorkspaceService {
         this.workspaceMembershipRepository = workspaceMembershipRepository;
         this.workspaceSlugHistoryRepository = workspaceSlugHistoryRepository;
         this.natsConsumerService = natsConsumerService;
-        this.repositorySyncService = repositorySyncService;
         this.installationRepositoryEnumerator = installationRepositoryEnumerator;
         this.monitoringScopeFilter = monitoringScopeFilter;
         this.teamInfoDTOConverter = teamInfoDTOConverter;
         this.workspaceLeaguePointsRecalculationService = workspaceLeaguePointsRecalculationService;
         this.organizationService = organizationService;
         this.workspaceMembershipService = workspaceMembershipService;
-        this.gitHubUserSyncService = gitHubUserSyncService;
-        this.gitHubAppTokenService = gitHubAppTokenService;
-        this.gitHubDataSyncServiceProvider = gitHubDataSyncServiceProvider;
+        this.gitHubGraphQlDataSyncServiceProvider = gitHubGraphQlDataSyncServiceProvider;
         this.issueTypeSyncServiceProvider = issueTypeSyncServiceProvider;
         this.subIssueSyncServiceProvider = subIssueSyncServiceProvider;
         this.monitoringExecutor = monitoringExecutor;
         this.redirectTtlDays = redirectTtlDays;
     }
 
-    /** Lazy accessor for GitHubDataSyncService to break circular dependency. */
-    private GitHubDataSyncService getGitHubDataSyncService() {
-        return gitHubDataSyncServiceProvider.getObject();
+    /** Lazy accessor for GitHubGraphQlDataSyncService to break circular dependency. */
+    private GitHubGraphQlDataSyncService getGitHubGraphQlDataSyncService() {
+        return gitHubGraphQlDataSyncServiceProvider.getObject();
     }
 
     /** Lazy accessor for GitHubIssueTypeSyncService. */
@@ -270,7 +255,7 @@ public class WorkspaceService {
                 // Workspaces themselves run in parallel using virtual threads.
                 for (var repo : eligibleRepositories) {
                     try {
-                        getGitHubDataSyncService().syncRepositoryToMonitor(repo);
+                        getGitHubGraphQlDataSyncService().syncRepository(repo);
                     } catch (Exception ex) {
                         logger.error(
                             "Error syncing repository {}: {}",
@@ -281,20 +266,12 @@ public class WorkspaceService {
                     }
                 }
 
+                // TODO: User and team sync via GraphQL not yet implemented
                 // Users and teams sync sequentially after all repos
-                try {
-                    logger.info("All repositories synced, now syncing users for workspace id={}", workspace.getId());
-                    getGitHubDataSyncService().syncUsers(workspace);
-                } catch (Exception ex) {
-                    logger.error("Error during syncUsers: {}", LoggingUtils.sanitizeForLog(ex.getMessage()), ex);
-                }
-
-                try {
-                    logger.info("Users synced, now syncing teams for workspace id={}", workspace.getId());
-                    getGitHubDataSyncService().syncTeams(workspace);
-                } catch (Exception ex) {
-                    logger.error("Error during syncTeams: {}", LoggingUtils.sanitizeForLog(ex.getMessage()), ex);
-                }
+                logger.info(
+                    "All repositories synced for workspace id={} (user/team sync pending GraphQL migration)",
+                    workspace.getId()
+                );
 
                 // Sync issue types via GraphQL (organization-level data)
                 try {
@@ -722,7 +699,7 @@ public class WorkspaceService {
     public Workspace ensureForInstallation(
         long installationId,
         String accountLogin,
-        GHRepositorySelection repositorySelection
+        RepositorySelection repositorySelection
     ) {
         // First check if an installation-backed workspace already exists for this
         // installation ID
@@ -865,7 +842,7 @@ public class WorkspaceService {
      * different.
      */
     @Transactional
-    public Optional<Workspace> updateRepositorySelection(long installationId, GHRepositorySelection selection) {
+    public Optional<Workspace> updateRepositorySelection(long installationId, RepositorySelection selection) {
         var workspaceOpt = workspaceRepository.findByInstallationId(installationId);
         if (workspaceOpt.isEmpty() || selection == null) {
             return workspaceOpt;
@@ -963,18 +940,14 @@ public class WorkspaceService {
         repositoryRepository.saveAll(repositories);
     }
 
-    private Optional<GHRepository> fetchRepositoryOrThrow(Long workspaceId, String nameWithOwner) {
-        try {
-            return repositorySyncService.syncRepository(workspaceId, nameWithOwner);
-        } catch (RepositorySyncException syncException) {
-            if (syncException.getReason() == RepositorySyncException.Reason.NOT_FOUND) {
-                throw new EntityNotFoundException("Repository", nameWithOwner);
-            }
-            if (syncException.getReason() == RepositorySyncException.Reason.FORBIDDEN) {
-                throw new RepositoryAccessForbiddenException(nameWithOwner);
-            }
-            throw syncException;
-        }
+    /**
+     * Checks if a repository exists (placeholder until GraphQL repository sync is available).
+     * TODO: Implement proper repository validation via GraphQL API.
+     */
+    private Optional<Repository> fetchRepositoryOrThrow(Long workspaceId, String nameWithOwner) {
+        // For now, check if repository exists in database
+        // Full validation will be implemented when GraphQL repository sync is available
+        return repositoryRepository.findByNameWithOwner(nameWithOwner);
     }
 
     private void rotateOrganizationConsumer(Workspace workspace, String oldLogin, String newLogin) {
@@ -1024,7 +997,7 @@ public class WorkspaceService {
             return;
         }
         if (repositoryAllowed) {
-            getGitHubDataSyncService().syncRepositoryToMonitorAsync(monitor);
+            getGitHubGraphQlDataSyncService().syncRepositoryAsync(monitor);
         } else {
             logger.debug("Repository {} persisted but monitoring disabled by filters.", monitor.getNameWithOwner());
         }
@@ -1141,12 +1114,8 @@ public class WorkspaceService {
         }
 
         snapshots.forEach(snapshot -> {
-            repositorySyncService.upsertFromInstallationPayload(
-                snapshot.id(),
-                snapshot.nameWithOwner(),
-                snapshot.name(),
-                snapshot.isPrivate()
-            );
+            // TODO: Repository upsert from installation payload needs GraphQL migration
+            // For now, just ensure the monitor exists; repository will be synced via GraphQL later
             ensureRepositoryMonitorForInstallation(installationId, snapshot.nameWithOwner(), deferSync);
         });
 
@@ -1616,34 +1585,29 @@ public class WorkspaceService {
     }
 
     /**
-     * Syncs a GitHub user from an installation and returns their user ID for
-     * ownership assignment.
-     * Falls back to checking existing users if GitHub sync fails.
-     * Returns null if the user cannot be synced and doesn't exist locally.
+     * Looks up or creates a user for workspace ownership assignment.
+     * TODO: Implement user sync via GraphQL API when available.
+     * Currently falls back to checking existing users in the database.
+     * Returns null if the user doesn't exist locally.
      */
     private Long syncGitHubUserForOwnership(long installationId, String accountLogin) {
-        try {
-            org.kohsuke.github.GitHub github = gitHubAppTokenService.clientForInstallation(installationId);
-
-            User user = gitHubUserSyncService.syncUser(github, accountLogin);
-
-            if (user != null && user.getId() != null) {
-                logger.info(
-                    "Synced GitHub user '{}' (id={}) as workspace owner.",
-                    LoggingUtils.sanitizeForLog(accountLogin),
-                    user.getId()
-                );
-                return user.getId();
-            }
-        } catch (Exception e) {
-            logger.warn(
-                "Failed to sync GitHub user '{}' for installation {}: {}",
+        // TODO: User sync via GraphQL not yet implemented
+        // For now, just look up existing users in the database
+        var existingUser = userRepository.findByLogin(accountLogin);
+        if (existingUser.isPresent()) {
+            logger.info(
+                "Found existing user '{}' (id={}) for workspace ownership.",
                 LoggingUtils.sanitizeForLog(accountLogin),
-                installationId,
-                LoggingUtils.sanitizeForLog(e.getMessage())
+                existingUser.get().getId()
             );
+            return existingUser.get().getId();
         }
 
-        return userRepository.findByLogin(accountLogin).map(User::getId).orElse(null);
+        logger.warn(
+            "User '{}' not found in database for installation {}. User sync via GraphQL pending implementation.",
+            LoggingUtils.sanitizeForLog(accountLogin),
+            installationId
+        );
+        return null;
     }
 }

@@ -21,7 +21,11 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Service for synchronizing GitHub pull request review comments with the local database.
+ *
+ * @deprecated Use webhook handlers and DTO-based comment processing instead.
  */
+@Deprecated(forRemoval = true)
+@SuppressWarnings("deprecation")
 @Service
 public class GitHubPullRequestReviewCommentSyncService {
 
