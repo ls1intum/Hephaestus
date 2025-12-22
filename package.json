@@ -61,6 +61,7 @@
     "prepare": "husky || true"
   },
   "devDependencies": {
+    "@biomejs/biome": "2.3.8",
     "@commitlint/cli": "19.8.1",
     "@commitlint/config-conventional": "19.8.1",
     "@openapitools/openapi-generator-cli": "2.16.3",

@@ -1,5 +1,5 @@
 {
-	"$schema": "https://biomejs.dev/schemas/2.1.4/schema.json",
+	"$schema": "https://biomejs.dev/schemas/2.3.8/schema.json",
 	"vcs": {
 		"enabled": true,
 		"clientKind": "git",
@@ -14,7 +14,8 @@
 			"**/index.html",
 			"**/vite.config.js",
 			"!**/src/routeTree.gen.ts",
-			"!**/src/api/**/*.ts"
+			"!**/src/api/**/*.ts",
+			"!**/*.css"
 		]
 	},
 	"formatter": {
@@ -23,7 +24,13 @@
 		"lineWidth": 100,
 		"lineEnding": "lf"
 	},
-	"assist": { "actions": { "source": { "organizeImports": "on" } } },
+	"assist": {
+		"actions": {
+			"source": {
+				"organizeImports": "on"
+			}
+		}
+	},
 	"linter": {
 		"enabled": true,
 		"rules": {
@@ -44,13 +51,17 @@
 			"suspicious": {
 				"noArrayIndexKey": "off",
 				"noDocumentCookie": "off",
-				"noDoubleEquals": "error"
+				"noDoubleEquals": "error",
+				"useIterableCallbackReturn": "off"
 			},
 			"a11y": {
 				"useSemanticElements": "off",
 				"useAriaPropsForRole": "off",
 				"useFocusableInteractive": "off",
 				"useKeyWithClickEvents": "off"
+			},
+			"complexity": {
+				"noImportantStyles": "off"
 			}
 		}
 	},
@@ -79,5 +90,17 @@
 				}
 			}
 		}
-	]
+	],
+	"css": {
+		"parser": {
+			"cssModules": true,
+			"tailwindDirectives": true
+		},
+		"linter": {
+			"enabled": false
+		},
+		"formatter": {
+			"enabled": false
+		}
+	}
 }

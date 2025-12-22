@@ -205,8 +205,8 @@ jobs:
           # The package-lock.json from macOS may not include linux platform binaries
           rm -rf node_modules server/intelligence-service/node_modules ~/.npm
           npm install --no-audit --progress=false
-          # Explicitly install the linux platform binary for biome
-          npm install @biomejs/cli-linux-x64@2.3.8 --save-dev --no-audit --progress=false
+          # Install platform binaries from package.json versions (no hardcoding)
+          node scripts/install-platform-binaries.mjs
 
           ISSUES_FOUND=()
 
@@ -457,8 +457,8 @@ jobs:
 
           # Install Linux biome binary - npm ci may restore cached node_modules from macOS
           # which doesn't include the platform-specific binary for Linux
-          # Pin version to match package.json for consistent formatting
-          npm install @biomejs/cli-linux-x64@2.3.8 --save-optional --prefer-offline || true
+          # Uses versions from package.json (no hardcoding)
+          node scripts/install-platform-binaries.mjs
 
           # Start PostgreSQL service for model operations
           echo "🐘 Starting PostgreSQL service..."
