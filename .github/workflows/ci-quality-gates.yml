@@ -506,12 +506,12 @@ jobs:
           docker stop postgres-models && docker rm postgres-models
 
           # Check if generated models match committed versions
-          git add server/intelligence-service/src/shared/db/schema.ts server/intelligence-service/src/shared/db/relations.ts
+          git add server/intelligence-service/src/shared/db/schema.ts
 
-          if ! git diff --cached --quiet server/intelligence-service/src/shared/db/schema.ts server/intelligence-service/src/shared/db/relations.ts; then
+          if ! git diff --cached --quiet server/intelligence-service/src/shared/db/schema.ts; then
             echo "❌ Intelligence-service DB models validation failed - models are out of sync"
             echo "Generated models differ from committed version:"
-            git diff --cached server/intelligence-service/src/shared/db/schema.ts server/intelligence-service/src/shared/db/relations.ts
+            git diff --cached server/intelligence-service/src/shared/db/schema.ts
             echo ""
             echo "Fix: npm run db:generate-models:intelligence-service"
             exit 1

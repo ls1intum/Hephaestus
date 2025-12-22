@@ -345,12 +345,14 @@ export const badPracticeFeedback = pgTable(
 	"bad_practice_feedback",
 	{
 		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
-		id: bigint({ mode: "number" }).primaryKey().generatedByDefaultAsIdentity({
-			name: "bad_practice_feedback_id_seq",
-			startWith: 1,
-			increment: 1,
-			cache: 1,
-		}),
+		id: bigint({ mode: "number" })
+			.primaryKey()
+			.generatedByDefaultAsIdentity({
+				name: "bad_practice_feedback_id_seq",
+				startWith: 1,
+				increment: 1,
+				cache: 1,
+			}),
 		type: varchar({ length: 255 }),
 		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
 		pullRequestBadPracticeId: bigint("pull_request_bad_practice_id", { mode: "number" }),
@@ -370,12 +372,14 @@ export const workspace = pgTable(
 	"workspace",
 	{
 		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
-		id: bigint({ mode: "number" }).primaryKey().generatedByDefaultAsIdentity({
-			name: "workspace_id_seq",
-			startWith: 1,
-			increment: 1,
-			cache: 1,
-		}),
+		id: bigint({ mode: "number" })
+			.primaryKey()
+			.generatedByDefaultAsIdentity({
+				name: "workspace_id_seq",
+				startWith: 1,
+				increment: 1,
+				cache: 1,
+			}),
 		usersSyncedAt: timestamp("users_synced_at", { precision: 6, mode: "string" }),
 		accountLogin: varchar("account_login", { length: 120 }),
 		gitProviderMode: varchar("git_provider_mode", { length: 255 }),
@@ -434,12 +438,14 @@ export const badPracticeDetection = pgTable(
 	"bad_practice_detection",
 	{
 		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
-		id: bigint({ mode: "number" }).primaryKey().generatedByDefaultAsIdentity({
-			name: "bad_practice_detection_id_seq",
-			startWith: 1,
-			increment: 1,
-			cache: 1,
-		}),
+		id: bigint({ mode: "number" })
+			.primaryKey()
+			.generatedByDefaultAsIdentity({
+				name: "bad_practice_detection_id_seq",
+				startWith: 1,
+				increment: 1,
+				cache: 1,
+			}),
 		detectionTime: timestamp("detection_time", {
 			precision: 6,
 			withTimezone: true,
@@ -463,12 +469,14 @@ export const repositoryToMonitor = pgTable(
 	"repository_to_monitor",
 	{
 		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
-		id: bigint({ mode: "number" }).primaryKey().generatedByDefaultAsIdentity({
-			name: "repository_to_monitor_id_seq",
-			startWith: 1,
-			increment: 1,
-			cache: 1,
-		}),
+		id: bigint({ mode: "number" })
+			.primaryKey()
+			.generatedByDefaultAsIdentity({
+				name: "repository_to_monitor_id_seq",
+				startWith: 1,
+				increment: 1,
+				cache: 1,
+			}),
 		issuesAndPullRequestsSyncedAt: timestamp("issues_and_pull_requests_synced_at", {
 			precision: 6,
 			mode: "string",
@@ -505,12 +513,14 @@ export const pullrequestbadpractice = pgTable(
 	"pullrequestbadpractice",
 	{
 		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
-		id: bigint({ mode: "number" }).primaryKey().generatedByDefaultAsIdentity({
-			name: "pullrequestbadpractice_id_seq",
-			startWith: 1,
-			increment: 1,
-			cache: 1,
-		}),
+		id: bigint({ mode: "number" })
+			.primaryKey()
+			.generatedByDefaultAsIdentity({
+				name: "pullrequestbadpractice_id_seq",
+				startWith: 1,
+				increment: 1,
+				cache: 1,
+			}),
 		title: varchar({ length: 255 }),
 		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
 		pullrequestId: bigint("pullrequest_id", { mode: "number" }),
@@ -715,12 +725,14 @@ export const workspaceSlugHistory = pgTable(
 	"workspace_slug_history",
 	{
 		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
-		id: bigint({ mode: "number" }).primaryKey().generatedByDefaultAsIdentity({
-			name: "workspace_slug_history_id_seq",
-			startWith: 1,
-			increment: 1,
-			cache: 1,
-		}),
+		id: bigint({ mode: "number" })
+			.primaryKey()
+			.generatedByDefaultAsIdentity({
+				name: "workspace_slug_history_id_seq",
+				startWith: 1,
+				increment: 1,
+				cache: 1,
+			}),
 		changedAt: timestamp("changed_at", {
 			precision: 6,
 			withTimezone: true,
@@ -758,12 +770,14 @@ export const contributionEvent = pgTable(
 	"contribution_event",
 	{
 		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
-		id: bigint({ mode: "number" }).primaryKey().generatedByDefaultAsIdentity({
-			name: "contribution_event_id_seq",
-			startWith: 1,
-			increment: 1,
-			cache: 1,
-		}),
+		id: bigint({ mode: "number" })
+			.primaryKey()
+			.generatedByDefaultAsIdentity({
+				name: "contribution_event_id_seq",
+				startWith: 1,
+				increment: 1,
+				cache: 1,
+			}),
 		occurredAt: timestamp("occurred_at", {
 			precision: 6,
 			withTimezone: true,

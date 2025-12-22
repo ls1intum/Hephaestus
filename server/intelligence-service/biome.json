@@ -10,6 +10,13 @@
 		"includes": ["src/**", "scripts/**", "test/**", "*.config.ts", "*.config.js"],
 		"ignoreUnknown": false
 	},
+	"assist": {
+		"actions": {
+			"source": {
+				"organizeImports": "on"
+			}
+		}
+	},
 	"formatter": {
 		"enabled": true,
 		"indentStyle": "tab",
@@ -170,7 +177,7 @@
 			}
 		},
 		{
-			"includes": ["src/shared/db/schema.ts", "src/shared/db/relations.ts"],
+			"includes": ["src/shared/db/schema.ts"],
 			"linter": {
 				"enabled": false
 			}

@@ -22,32 +22,6 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const schemaPath = path.resolve(__dirname, "../drizzle/schema.ts");
 
-/**
- * Sort named imports in an import statement for deterministic output.
- * drizzle-kit produces random import order on each run.
- * @param fileContent - The file content
- * @param moduleName - The module name WITHOUT quotes, e.g., "./schema" or "drizzle-orm/pg-core"
- */
-function sortNamedImports(fileContent: string, moduleName: string): string {
-	// Match import { ... } from "module" or '...'
-	// The regex needs to handle multi-line imports with newlines and tabs inside { }
-	const escapedModule = moduleName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-	const importRegex = new RegExp(
-		`import\\s*\\{([^}]+)\\}\\s*from\\s*["']${escapedModule}["']`,
-		"gs",
-	);
-
-	return fileContent.replace(importRegex, (_match, imports: string) => {
-		const sorted = imports
-			.split(",")
-			.map((s) => s.trim())
-			.filter(Boolean)
-			.sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()))
-			.join(",\n\t");
-		return `import {\n\t${sorted},\n} from "${moduleName}"`;
-	});
-}
-
 let content: string;
 try {
 	content = fs.readFileSync(schemaPath, "utf8");
@@ -157,9 +131,6 @@ const removePgTableBlock = (name: string) => {
 removePgTableBlock("databasechangelog");
 removePgTableBlock("databasechangeloglock");
 
-// Sort imports from drizzle-orm/pg-core for deterministic output
-content = sortNamedImports(content, "drizzle-orm/pg-core");
-
 fs.writeFileSync(schemaPath, content, "utf8");
 
 // Delete ./drizzle/relations.ts - we don't use Drizzle relational queries
@@ -198,18 +169,18 @@ try {
 	}
 }
 
-// Run biome format on the generated files to ensure consistent formatting across platforms
+// Run biome check --write to format AND organize imports for consistent output
 import { execSync } from "node:child_process";
 
 const filesToFormat = [schemaDst].filter((f) => fs.existsSync(f));
 if (filesToFormat.length > 0) {
 	try {
-		execSync(`npx biome format --write ${filesToFormat.join(" ")}`, {
+		execSync(`npx biome check --write --unsafe ${filesToFormat.join(" ")}`, {
 			cwd: path.resolve(__dirname, ".."),
 			stdio: "inherit",
 		});
 	} catch (error) {
-		console.warn("[post-introspect] Failed to run biome format:", error);
+		console.warn("[post-introspect] Failed to run biome check:", error);
 	}
 }
 
