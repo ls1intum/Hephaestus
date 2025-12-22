@@ -4,6 +4,7 @@ import de.tum.in.www1.hephaestus.core.LoggingUtils;
 import de.tum.in.www1.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.app.GitHubAppTokenService;
 import de.tum.in.www1.hephaestus.gitprovider.installation.github.GitHubInstallationRepositoryEnumerationService;
+import de.tum.in.www1.hephaestus.gitprovider.issuetype.github.GitHubIssueTypeSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.label.Label;
 import de.tum.in.www1.hephaestus.gitprovider.label.LabelRepository;
 import de.tum.in.www1.hephaestus.gitprovider.organization.Organization;
@@ -12,6 +13,7 @@ import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.github.GitHubRepositorySyncService;
 import de.tum.in.www1.hephaestus.gitprovider.repository.github.RepositorySyncException;
+import de.tum.in.www1.hephaestus.gitprovider.subissue.github.GitHubSubIssueSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.sync.GitHubDataSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.sync.NatsConsumerService;
 import de.tum.in.www1.hephaestus.gitprovider.team.Team;
@@ -62,7 +64,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Central service for workspace management operations.
- * Handles workspace creation, configuration, activation, and synchronization coordination.
+ * Handles workspace creation, configuration, activation, and synchronization
+ * coordination.
  */
 @Service
 public class WorkspaceService {
@@ -103,6 +106,8 @@ public class WorkspaceService {
 
     // Lazy-loaded dependencies (to break circular references)
     private final ObjectProvider<GitHubDataSyncService> gitHubDataSyncServiceProvider;
+    private final ObjectProvider<GitHubIssueTypeSyncService> issueTypeSyncServiceProvider;
+    private final ObjectProvider<GitHubSubIssueSyncService> subIssueSyncServiceProvider;
 
     // Infrastructure
     private final AsyncTaskExecutor monitoringExecutor;
@@ -131,6 +136,8 @@ public class WorkspaceService {
         GitHubUserSyncService gitHubUserSyncService,
         GitHubAppTokenService gitHubAppTokenService,
         ObjectProvider<GitHubDataSyncService> gitHubDataSyncServiceProvider,
+        ObjectProvider<GitHubIssueTypeSyncService> issueTypeSyncServiceProvider,
+        ObjectProvider<GitHubSubIssueSyncService> subIssueSyncServiceProvider,
         @Qualifier("monitoringExecutor") AsyncTaskExecutor monitoringExecutor,
         @Value("${hephaestus.workspace.slug.redirect.ttl-days:30}") int redirectTtlDays
     ) {
@@ -155,6 +162,8 @@ public class WorkspaceService {
         this.gitHubUserSyncService = gitHubUserSyncService;
         this.gitHubAppTokenService = gitHubAppTokenService;
         this.gitHubDataSyncServiceProvider = gitHubDataSyncServiceProvider;
+        this.issueTypeSyncServiceProvider = issueTypeSyncServiceProvider;
+        this.subIssueSyncServiceProvider = subIssueSyncServiceProvider;
         this.monitoringExecutor = monitoringExecutor;
         this.redirectTtlDays = redirectTtlDays;
     }
@@ -164,8 +173,19 @@ public class WorkspaceService {
         return gitHubDataSyncServiceProvider.getObject();
     }
 
+    /** Lazy accessor for GitHubIssueTypeSyncService. */
+    private GitHubIssueTypeSyncService getIssueTypeSyncService() {
+        return issueTypeSyncServiceProvider.getObject();
+    }
+
+    /** Lazy accessor for GitHubSubIssueSyncService. */
+    private GitHubSubIssueSyncService getSubIssueSyncService() {
+        return subIssueSyncServiceProvider.getObject();
+    }
+
     /**
-     * Prepare every workspace and start monitoring/sync routines for those that are ready.
+     * Prepare every workspace and start monitoring/sync routines for those that are
+     * ready.
      * Intended to run after provisioning so the workspace catalog is populated.
      */
     public void activateAllWorkspaces() {
@@ -183,7 +203,8 @@ public class WorkspaceService {
         Set<String> organizationConsumersStarted = ConcurrentHashMap.newKeySet();
 
         // Activate all workspaces in parallel for scalability.
-        // Each workspace's monitoring runs independently and can sync repos concurrently.
+        // Each workspace's monitoring runs independently and can sync repos
+        // concurrently.
         List<CompletableFuture<Void>> activationFutures = prepared
             .stream()
             .filter(workspace -> !shouldSkipActivation(workspace))
@@ -223,8 +244,10 @@ public class WorkspaceService {
             return;
         }
 
-        // Load fresh RepositoryToMonitor entities from database to ensure sync timestamps
-        // are up-to-date. This is critical for respecting cooldown periods across restarts.
+        // Load fresh RepositoryToMonitor entities from database to ensure sync
+        // timestamps
+        // are up-to-date. This is critical for respecting cooldown periods across
+        // restarts.
         List<RepositoryToMonitor> repositoriesToMonitor = repositoryToMonitorRepository.findByWorkspaceId(
             workspace.getId()
         );
@@ -236,7 +259,8 @@ public class WorkspaceService {
         if (runMonitoringOnStartup) {
             logger.info("Running monitoring on startup for workspace id={}", workspace.getId());
 
-            // Set workspace context for the sync operations (enables proper logging via MDC)
+            // Set workspace context for the sync operations (enables proper logging via
+            // MDC)
             WorkspaceContext workspaceContext = WorkspaceContext.fromWorkspace(workspace, Set.of());
             WorkspaceContextHolder.setContext(workspaceContext);
             try {
@@ -272,6 +296,22 @@ public class WorkspaceService {
                     logger.error("Error during syncTeams: {}", LoggingUtils.sanitizeForLog(ex.getMessage()), ex);
                 }
 
+                // Sync issue types via GraphQL (organization-level data)
+                try {
+                    logger.info("Teams synced, now syncing issue types for workspace id={}", workspace.getId());
+                    getIssueTypeSyncService().syncIssueTypesForWorkspace(workspace.getId());
+                } catch (Exception ex) {
+                    logger.error("Error during syncIssueTypes: {}", LoggingUtils.sanitizeForLog(ex.getMessage()), ex);
+                }
+
+                // Sync sub-issue relationships via GraphQL
+                try {
+                    logger.info("Issue types synced, now syncing sub-issues for workspace id={}", workspace.getId());
+                    getSubIssueSyncService().syncSubIssuesForWorkspace(workspace.getId());
+                } catch (Exception ex) {
+                    logger.error("Error during syncSubIssues: {}", LoggingUtils.sanitizeForLog(ex.getMessage()), ex);
+                }
+
                 logger.info("Finished running monitoring on startup for workspace id={}", workspace.getId());
             } finally {
                 // Clear context after sync operations complete
@@ -304,7 +344,8 @@ public class WorkspaceService {
     }
 
     /**
-     * Returns workspaces the current user can see: memberships + publicly viewable workspaces.
+     * Returns workspaces the current user can see: memberships + publicly viewable
+     * workspaces.
      * If no user is authenticated, only publicly viewable workspaces are returned.
      */
     public List<Workspace> listAccessibleWorkspacesForCurrentUser() {
@@ -329,7 +370,8 @@ public class WorkspaceService {
             ? List.of()
             : workspaceRepository.findAllById(workspaceIds);
 
-        // Merge and de-duplicate by ID to avoid duplicate entities with different instances
+        // Merge and de-duplicate by ID to avoid duplicate entities with different
+        // instances
         return Stream.concat(publicWorkspaces.stream(), memberWorkspaces.stream())
             .collect(
                 Collectors.toMap(Workspace::getId, w -> w, (existing, replacement) -> existing, LinkedHashMap::new)
@@ -440,7 +482,8 @@ public class WorkspaceService {
     }
 
     /**
-     * Idempotently ensure a repository monitor exists for a given installation id without issuing extra GitHub fetches.
+     * Idempotently ensure a repository monitor exists for a given installation id
+     * without issuing extra GitHub fetches.
      */
     @Transactional
     public Optional<Workspace> ensureRepositoryMonitorForInstallation(long installationId, String nameWithOwner) {
@@ -451,8 +494,9 @@ public class WorkspaceService {
      * Idempotently ensure a repository monitor exists for a given installation id.
      *
      * @param installationId the GitHub App installation ID
-     * @param nameWithOwner the repository full name (e.g., "owner/repo")
-     * @param deferSync if true, skip immediate sync (use during provisioning when activation will sync in bulk)
+     * @param nameWithOwner  the repository full name (e.g., "owner/repo")
+     * @param deferSync      if true, skip immediate sync (use during provisioning
+     *                       when activation will sync in bulk)
      */
     @Transactional
     public Optional<Workspace> ensureRepositoryMonitorForInstallation(
@@ -470,7 +514,8 @@ public class WorkspaceService {
     }
 
     /**
-     * Remove a repository monitor for a given installation id if it exists. No-op if missing.
+     * Remove a repository monitor for a given installation id if it exists. No-op
+     * if missing.
      */
     @Transactional
     public Optional<Workspace> removeRepositoryMonitorForInstallation(long installationId, String nameWithOwner) {
@@ -515,7 +560,8 @@ public class WorkspaceService {
      * Resolve the workspace slug responsible for a given repository.
      * Priority:
      * 1) Explicit repository monitor (authoritative)
-     * 2) Workspace account login matching repository owner (one-to-one enforced by business model)
+     * 2) Workspace account login matching repository owner (one-to-one enforced by
+     * business model)
      * Returns empty if no unique mapping can be established.
      */
     public Optional<String> resolveWorkspaceSlugForRepository(Repository repository) {
@@ -563,7 +609,8 @@ public class WorkspaceService {
             teamId,
             workspace.getId()
         );
-        // Fetch with collections to avoid LazyInitializationException when calling addLabel()
+        // Fetch with collections to avoid LazyInitializationException when calling
+        // addLabel()
         Optional<Team> optionalTeam = teamRepository.findWithCollectionsById(teamId);
         if (optionalTeam.isEmpty()) {
             return Optional.empty();
@@ -595,7 +642,8 @@ public class WorkspaceService {
             teamId,
             workspace.getId()
         );
-        // Fetch with collections to avoid LazyInitializationException when calling removeLabel()
+        // Fetch with collections to avoid LazyInitializationException when calling
+        // removeLabel()
         Optional<Team> optionalTeam = teamRepository.findWithCollectionsById(teamId);
         if (optionalTeam.isEmpty()) {
             logger.warn("Team not found with ID: {}", teamId);
@@ -633,7 +681,8 @@ public class WorkspaceService {
     }
 
     /**
-     * Reset and recalculate league points for all users by replaying their contributions
+     * Reset and recalculate league points for all users by replaying their
+     * contributions
      * from the first recorded activity until now.
      */
     @Transactional
@@ -675,7 +724,8 @@ public class WorkspaceService {
         String accountLogin,
         GHRepositorySelection repositorySelection
     ) {
-        // First check if an installation-backed workspace already exists for this installation ID
+        // First check if an installation-backed workspace already exists for this
+        // installation ID
         Workspace workspace = workspaceRepository.findByInstallationId(installationId).orElse(null);
 
         if (workspace == null && !isBlank(accountLogin)) {
@@ -741,9 +791,12 @@ public class WorkspaceService {
             String desiredSlug = normalizeSlug(accountLogin);
             String availableSlug = allocateAvailableSlug(desiredSlug, "install-" + installationId + "-" + accountLogin);
 
-            // We intentionally do NOT create a redirect from the desired slug to the allocated slug here,
-            // because the desired slug may already belong to another workspace. Redirecting would leak or
-            // hijack that workspace. Instead, callers must surface the allocated slug to the user.
+            // We intentionally do NOT create a redirect from the desired slug to the
+            // allocated slug here,
+            // because the desired slug may already belong to another workspace. Redirecting
+            // would leak or
+            // hijack that workspace. Instead, callers must surface the allocated slug to
+            // the user.
             workspace = createWorkspace(availableSlug, accountLogin, accountLogin, AccountType.ORG, ownerUserId);
             logger.info(
                 "Created new workspace '{}' for installation {} with owner userId={} (requested slug='{}').",
@@ -775,7 +828,8 @@ public class WorkspaceService {
 
     /**
      * Stop NATS consumer for a workspace tied to an installation.
-     * Used when an installation is deleted to clean up consumers before removing monitors.
+     * Used when an installation is deleted to clean up consumers before removing
+     * monitors.
      */
     public void stopNatsConsumerForInstallation(long installationId) {
         workspaceRepository
@@ -807,7 +861,8 @@ public class WorkspaceService {
     }
 
     /**
-     * Update repository selection for a given installation if provided and different.
+     * Update repository selection for a given installation if provided and
+     * different.
      */
     @Transactional
     public Optional<Workspace> updateRepositorySelection(long installationId, GHRepositorySelection selection) {
@@ -933,7 +988,8 @@ public class WorkspaceService {
             return;
         }
 
-        // Update the workspace consumer - it will pick up the new org login from workspace
+        // Update the workspace consumer - it will pick up the new org login from
+        // workspace
         natsConsumerService.updateWorkspaceConsumer(workspace);
     }
 
@@ -949,8 +1005,9 @@ public class WorkspaceService {
      * Persist a repository monitor and optionally trigger immediate sync.
      *
      * @param workspace the workspace to add the monitor to
-     * @param monitor the repository monitor to persist
-     * @param deferSync if true, skip immediate sync (useful during provisioning when
+     * @param monitor   the repository monitor to persist
+     * @param deferSync if true, skip immediate sync (useful during provisioning
+     *                  when
      *                  activation will sync all repositories in bulk)
      */
     private void persistRepositoryMonitor(Workspace workspace, RepositoryToMonitor monitor, boolean deferSync) {
@@ -1013,7 +1070,8 @@ public class WorkspaceService {
     }
 
     /**
-     * Enumerate all repositories available to the installation when repository selection is ALL and ensure monitors exist.
+     * Enumerate all repositories available to the installation when repository
+     * selection is ALL and ensure monitors exist.
      */
     @Transactional
     public void ensureAllInstallationRepositoriesCovered(long installationId) {
@@ -1021,10 +1079,12 @@ public class WorkspaceService {
     }
 
     /**
-     * Enumerate all repositories available to the installation when repository selection is ALL and ensure monitors exist.
+     * Enumerate all repositories available to the installation when repository
+     * selection is ALL and ensure monitors exist.
      *
      * @param installationId the GitHub App installation ID
-     * @param deferSync if true, skip immediate sync (use during provisioning when activation will sync in bulk)
+     * @param deferSync      if true, skip immediate sync (use during provisioning
+     *                       when activation will sync in bulk)
      */
     @Transactional
     public void ensureAllInstallationRepositoriesCovered(long installationId, boolean deferSync) {
@@ -1494,7 +1554,8 @@ public class WorkspaceService {
         }
 
         String seedInput = (suffixSeed == null ? "" : suffixSeed) + "-" + desiredSlug;
-        // Use longer hash to further reduce birthday collisions when many installations share similar logins
+        // Use longer hash to further reduce birthday collisions when many installations
+        // share similar logins
         String hash = shortHash(seedInput, 10);
         String suffix = "-" + hash;
 
@@ -1555,7 +1616,8 @@ public class WorkspaceService {
     }
 
     /**
-     * Syncs a GitHub user from an installation and returns their user ID for ownership assignment.
+     * Syncs a GitHub user from an installation and returns their user ID for
+     * ownership assignment.
      * Falls back to checking existing users if GitHub sync fails.
      * Returns null if the user cannot be synced and doesn't exist locally.
      */

@@ -1,0 +1,45 @@
+# GraphQL operation for syncing issue dependencies (blockedBy/blocking relationships)
+# Used by GitHubIssueDependencySyncService via documentName("GetIssueDependencies")
+#
+# NOTE (Dec 2025): The issue_dependencies webhook is STILL NOT AVAILABLE.
+# GitHub shipped the "Blocked by" UI without webhook/API event support
+# (see https://github.com/orgs/community/discussions/165749).
+# This GraphQL query is currently the ONLY way to sync blocking relationships.
+
+query GetIssueDependencies(
+	$owner: String!
+	$name: String!
+	$first: Int!
+	$after: String
+) {
+	repository(owner: $owner, name: $name) {
+		issues(first: $first, after: $after, filterBy: { states: [OPEN, CLOSED] }) {
+			pageInfo {
+				hasNextPage
+				endCursor
+			}
+			totalCount
+			nodes {
+				id
+				databaseId
+				number
+				blockedBy(first: 50) {
+					nodes {
+						id
+						databaseId
+						number
+					}
+					totalCount
+				}
+				blocking(first: 50) {
+					nodes {
+						id
+						databaseId
+						number
+					}
+					totalCount
+				}
+			}
+		}
+	}
+}

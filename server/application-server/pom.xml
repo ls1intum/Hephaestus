@@ -348,6 +348,17 @@
             <artifactId>langfuse-java</artifactId>
             <version>0.0.6</version>
         </dependency>
+        <!-- Spring GraphQL Client for GitHub GraphQL API -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-graphql</artifactId>
+        </dependency>
+        <!-- GraphQL Codegen Runtime (base classes for generated code) -->
+        <dependency>
+            <groupId>io.github.kobylynskyi</groupId>
+            <artifactId>graphql-java-codegen</artifactId>
+            <version>5.10.0</version>
+        </dependency>
     </dependencies>
     <dependencyManagement>
         <dependencies>
@@ -381,6 +392,103 @@
                         </path>
                     </annotationProcessorPaths>
                 </configuration>
+            </plugin>
+            <!-- GraphQL Code Generator for GitHub API Client -->
+            <!-- Generates type-safe Java classes from GitHub GraphQL schema -->
+            <!-- Run manually: mvn graphql-codegen:generate -->
+            <!-- Runs automatically during generate-sources phase -->
+            <plugin>
+                <groupId>io.github.kobylynskyi</groupId>
+                <artifactId>graphql-codegen-maven-plugin</artifactId>
+                <version>5.10.0</version>
+                <executions>
+                    <execution>
+                        <id>generate-github-graphql-client</id>
+                        <goals>
+                            <goal>generate</goal>
+                        </goals>
+                        <configuration>
+                            <!-- Schema location -->
+                            <graphqlSchemas>
+                                <rootDir>${project.basedir}/src/main/resources/graphql/github</rootDir>
+                            </graphqlSchemas>
+                            
+                            <!-- Output configuration -->
+                            <outputDir>${project.build.directory}/generated-sources/graphql</outputDir>
+                            <packageName>de.tum.in.www1.hephaestus.gitprovider.graphql.github</packageName>
+                            <apiPackageName>de.tum.in.www1.hephaestus.gitprovider.graphql.github.api</apiPackageName>
+                            <modelPackageName>de.tum.in.www1.hephaestus.gitprovider.graphql.github.model</modelPackageName>
+                            
+                            <!-- Client-side code generation (for consuming GitHub API) -->
+                            <generateClient>true</generateClient>
+                            <generateApis>false</generateApis>
+                            <generateDataFetchingEnvironmentArgumentInApis>false</generateDataFetchingEnvironmentArgumentInApis>
+                            
+                            <!-- Model generation options -->
+                            <generateBuilder>true</generateBuilder>
+                            <generateEqualsAndHashCode>true</generateEqualsAndHashCode>
+                            <generateToString>true</generateToString>
+                            <generateParameterizedFieldsResolvers>false</generateParameterizedFieldsResolvers>
+                            <generateModelsForRootTypes>false</generateModelsForRootTypes>
+                            <generateAllMethodInProjection>true</generateAllMethodInProjection>
+                            
+                            <!-- Skip Relay types that reference missing Query root type -->
+                            <fieldsWithoutResolvers>
+                                <fieldWithoutResolver>node</fieldWithoutResolver>
+                                <fieldWithoutResolver>nodes</fieldWithoutResolver>
+                                <fieldWithoutResolver>relay</fieldWithoutResolver>
+                            </fieldsWithoutResolvers>
+                            
+                            <!-- Java config -->
+                            <generatedLanguage>JAVA</generatedLanguage>
+                            <modelValidationAnnotation>@jakarta.annotation.Generated("graphql-codegen")</modelValidationAnnotation>
+                            
+                            <!-- GitHub-specific scalar mappings -->
+                            <customTypesMapping>
+                                <DateTime>java.time.OffsetDateTime</DateTime>
+                                <Date>java.time.LocalDate</Date>
+                                <URI>java.net.URI</URI>
+                                <HTML>java.lang.String</HTML>
+                                <GitObjectID>java.lang.String</GitObjectID>
+                                <GitSSHRemote>java.lang.String</GitSSHRemote>
+                                <GitTimestamp>java.time.OffsetDateTime</GitTimestamp>
+                                <PreciseDateTime>java.time.OffsetDateTime</PreciseDateTime>
+                                <X509Certificate>java.lang.String</X509Certificate>
+                                <Base64String>java.lang.String</Base64String>
+                                <BigInt>java.math.BigInteger</BigInt>
+                            </customTypesMapping>
+                            
+                            <!-- Naming conventions -->
+                            <modelNameSuffix></modelNameSuffix>
+                            <requestSuffix>Request</requestSuffix>
+                            <responseSuffix>Response</responseSuffix>
+                            <responseProjectionSuffix>ResponseProjection</responseProjectionSuffix>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <!-- Delete Relay files that depend on missing Query root type -->
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>3.4.1</version>
+                <executions>
+                    <execution>
+                        <id>delete-relay-classes</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>exec</goal>
+                        </goals>
+                        <configuration>
+                            <executable>rm</executable>
+                            <arguments>
+                                <argument>-f</argument>
+                                <argument>${project.build.directory}/generated-sources/graphql/de/tum/in/www1/hephaestus/gitprovider/graphql/github/model/RelayQueryRequest.java</argument>
+                                <argument>${project.build.directory}/generated-sources/graphql/de/tum/in/www1/hephaestus/gitprovider/graphql/github/model/RelayQueryResponse.java</argument>
+                            </arguments>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
             <!-- JaCoCo Maven Plugin for Code Coverage -->
             <plugin>

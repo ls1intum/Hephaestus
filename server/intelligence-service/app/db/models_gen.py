@@ -172,6 +172,9 @@ class Organization(Base):
     html_url: Mapped[Optional[str]] = mapped_column(String(255))
     installation_id: Mapped[Optional[int]] = mapped_column(BigInteger)
     name: Mapped[Optional[str]] = mapped_column(String(255))
+    issue_type: Mapped[List["IssueType"]] = relationship(
+        "IssueType", back_populates="organization"
+    )
     repository: Mapped[List["Repository"]] = relationship(
         "Repository", back_populates="organization"
     )
@@ -312,7 +315,7 @@ class PullRequestReviewThread(Base):
     resolved_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime(True))
     root_comment_id: Mapped[Optional[int]] = mapped_column(BigInteger)
     provider_thread_id: Mapped[Optional[int]] = mapped_column(BigInteger)
-    node_id: Mapped[Optional[str]] = mapped_column(String(64))
+    node_id: Mapped[Optional[str]] = mapped_column(String(128))
     path: Mapped[Optional[str]] = mapped_column(Text)
     line: Mapped[Optional[int]] = mapped_column(Integer)
     start_line: Mapped[Optional[int]] = mapped_column(Integer)
@@ -498,6 +501,30 @@ class ContributionEvent(Base):
     actor: Mapped["User"] = relationship("User", back_populates="contribution_event")
 
 
+class IssueType(Base):
+    __tablename__ = "issue_type"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["organization_id"],
+            ["organization.id"],
+            ondelete="CASCADE",
+            name="fk_issue_type_organization",
+        ),
+        PrimaryKeyConstraint("id", name="issue_type_pkey"),
+        Index("idx_issue_type_organization_id", "organization_id"),
+    )
+    id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    name: Mapped[str] = mapped_column(String(128))
+    color: Mapped[str] = mapped_column(String(20))
+    is_enabled: Mapped[bool] = mapped_column(Boolean, server_default=text("true"))
+    organization_id: Mapped[int] = mapped_column(BigInteger)
+    description: Mapped[Optional[str]] = mapped_column(Text)
+    organization: Mapped["Organization"] = relationship(
+        "Organization", back_populates="issue_type"
+    )
+    issue: Mapped[List["Issue"]] = relationship("Issue", back_populates="issue_type_")
+
+
 class Repository(Base):
     __tablename__ = "repository"
     __table_args__ = (
@@ -626,6 +653,8 @@ class Workspace(Base):
     teams_synced_at: Mapped[Optional[datetime.datetime]] = mapped_column(
         TIMESTAMP(True, 6)
     )
+    sub_issues_synced_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime)
+    issue_types_synced_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime)
     chat_thread: Mapped[List["ChatThread"]] = relationship(
         "ChatThread", back_populates="workspace"
     )
@@ -903,15 +932,29 @@ class Issue(Base):
             ["author_id"], ["user.id"], name="fkrwr6v8fiqetuiuvfjcvie8s85"
         ),
         ForeignKeyConstraint(
+            ["issue_type_id"],
+            ["issue_type.id"],
+            ondelete="SET NULL",
+            name="fk_issue_issue_type",
+        ),
+        ForeignKeyConstraint(
             ["merged_by_id"], ["user.id"], name="fkqvnu6vslj5txt8xencru8m6x4"
         ),
         ForeignKeyConstraint(
             ["milestone_id"], ["milestone.id"], name="fk7t1o4tuel06m9bn4dppqmiod6"
         ),
         ForeignKeyConstraint(
+            ["parent_issue_id"],
+            ["issue.id"],
+            ondelete="SET NULL",
+            name="fk_issue_parent_issue",
+        ),
+        ForeignKeyConstraint(
             ["repository_id"], ["repository.id"], name="fk76s4b6ncspm9bk35y49xh4s9t"
         ),
         PrimaryKeyConstraint("id", name="issue_pkey"),
+        Index("idx_issue_issue_type_id", "issue_type_id"),
+        Index("idx_issue_parent_issue_id", "parent_issue_id"),
     )
     issue_type: Mapped[str] = mapped_column(String(31))
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
@@ -949,6 +992,11 @@ class Issue(Base):
     state_reason: Mapped[Optional[str]] = mapped_column(String(32))
     body: Mapped[Optional[str]] = mapped_column(Text)
     bad_practice_summary: Mapped[Optional[str]] = mapped_column(Text)
+    parent_issue_id: Mapped[Optional[int]] = mapped_column(BigInteger)
+    sub_issues_total: Mapped[Optional[int]] = mapped_column(Integer)
+    sub_issues_completed: Mapped[Optional[int]] = mapped_column(Integer)
+    sub_issues_percent_completed: Mapped[Optional[int]] = mapped_column(Integer)
+    issue_type_id: Mapped[Optional[str]] = mapped_column(String(128))
     pull_request_review_comment: Mapped[List["PullRequestReviewComment"]] = (
         relationship("PullRequestReviewComment", back_populates="pull_request")
     )
@@ -958,17 +1006,40 @@ class Issue(Base):
     author: Mapped[Optional["User"]] = relationship(
         "User", foreign_keys=[author_id], back_populates="issue"
     )
+    issue_type_: Mapped[Optional["IssueType"]] = relationship(
+        "IssueType", back_populates="issue"
+    )
     merged_by: Mapped[Optional["User"]] = relationship(
         "User", foreign_keys=[merged_by_id], back_populates="issue_"
     )
     milestone: Mapped[Optional["Milestone"]] = relationship(
         "Milestone", back_populates="issue"
     )
+    parent_issue: Mapped[Optional["Issue"]] = relationship(
+        "Issue", remote_side=[id], back_populates="parent_issue_reverse"
+    )
+    parent_issue_reverse: Mapped[List["Issue"]] = relationship(
+        "Issue", remote_side=[parent_issue_id], back_populates="parent_issue"
+    )
     repository: Mapped[Optional["Repository"]] = relationship(
         "Repository", back_populates="issue"
     )
     user: Mapped[List["User"]] = relationship(
         "User", secondary="issue_assignee", back_populates="issue1"
+    )
+    blocking_issue: Mapped[List["Issue"]] = relationship(
+        "Issue",
+        secondary="issue_blocking",
+        primaryjoin=lambda: Issue.id == t_issue_blocking.c.blocked_issue_id,
+        secondaryjoin=lambda: Issue.id == t_issue_blocking.c.blocking_issue_id,
+        back_populates="blocked_issue",
+    )
+    blocked_issue: Mapped[List["Issue"]] = relationship(
+        "Issue",
+        secondary="issue_blocking",
+        primaryjoin=lambda: Issue.id == t_issue_blocking.c.blocking_issue_id,
+        secondaryjoin=lambda: Issue.id == t_issue_blocking.c.blocked_issue_id,
+        back_populates="blocking_issue",
     )
     label: Mapped[List["Label"]] = relationship(
         "Label", secondary="issue_label", back_populates="issue"
@@ -1049,6 +1120,29 @@ t_issue_assignee = Table(
     ),
     ForeignKeyConstraint(["user_id"], ["user.id"], name="fk2cfu8w8wjb9vosy4hbrme0rqe"),
     PrimaryKeyConstraint("issue_id", "user_id", name="issue_assignee_pkey"),
+)
+t_issue_blocking = Table(
+    "issue_blocking",
+    Base.metadata,
+    Column("blocked_issue_id", BigInteger, primary_key=True, nullable=False),
+    Column("blocking_issue_id", BigInteger, primary_key=True, nullable=False),
+    ForeignKeyConstraint(
+        ["blocked_issue_id"],
+        ["issue.id"],
+        ondelete="CASCADE",
+        name="fk_issue_blocking_blocked",
+    ),
+    ForeignKeyConstraint(
+        ["blocking_issue_id"],
+        ["issue.id"],
+        ondelete="CASCADE",
+        name="fk_issue_blocking_blocking",
+    ),
+    PrimaryKeyConstraint(
+        "blocked_issue_id", "blocking_issue_id", name="pk_issue_blocking"
+    ),
+    Index("idx_issue_blocking_blocked_id", "blocked_issue_id"),
+    Index("idx_issue_blocking_blocking_id", "blocking_issue_id"),
 )
 
 

@@ -9,6 +9,8 @@ import de.tum.in.www1.hephaestus.gitprovider.issue.IssueRepository;
 import de.tum.in.www1.hephaestus.gitprovider.label.Label;
 import de.tum.in.www1.hephaestus.gitprovider.label.LabelRepository;
 import de.tum.in.www1.hephaestus.gitprovider.label.github.GitHubLabelConverter;
+import de.tum.in.www1.hephaestus.gitprovider.organization.Organization;
+import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.testconfig.BaseIntegrationTest;
@@ -20,7 +22,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.kohsuke.github.GHEvent;
-import org.kohsuke.github.GHEventPayload;
+import org.kohsuke.github.GHEventPayloadIssueWithType;
 import org.kohsuke.github.GHIssue;
 import org.kohsuke.github.GHLabel;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -44,6 +46,9 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
     private UserRepository userRepository;
 
     @Autowired
+    private OrganizationRepository organizationRepository;
+
+    @Autowired
     private GitHubLabelConverter labelConverter;
 
     @BeforeEach
@@ -57,7 +62,7 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    void shouldPersistIssueOnOpenedEvent(@GitHubPayload("issues.opened") GHEventPayload.Issue payload)
+    void shouldPersistIssueOnOpenedEvent(@GitHubPayload("issues.opened") GHEventPayloadIssueWithType payload)
         throws Exception {
         handler.handleEvent(payload);
 
@@ -78,8 +83,8 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void shouldUpdateBodyAndCommentsOnEditedEvent(
-        @GitHubPayload("issues.opened") GHEventPayload.Issue opened,
-        @GitHubPayload("issues.edited") GHEventPayload.Issue edited
+        @GitHubPayload("issues.opened") GHEventPayloadIssueWithType opened,
+        @GitHubPayload("issues.edited") GHEventPayloadIssueWithType edited
     ) throws Exception {
         handler.handleEvent(opened);
 
@@ -96,8 +101,8 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void shouldUpdateStateReasonOnClosedEvent(
-        @GitHubPayload("issues.opened") GHEventPayload.Issue opened,
-        @GitHubPayload("issues.closed") GHEventPayload.Issue closed
+        @GitHubPayload("issues.opened") GHEventPayloadIssueWithType opened,
+        @GitHubPayload("issues.closed") GHEventPayloadIssueWithType closed
     ) throws Exception {
         handler.handleEvent(opened);
 
@@ -115,8 +120,8 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void shouldToggleMilestoneOnMilestoneEvents(
-        @GitHubPayload("issues.milestoned") GHEventPayload.Issue milestoned,
-        @GitHubPayload("issues.demilestoned") GHEventPayload.Issue demilestoned
+        @GitHubPayload("issues.milestoned") GHEventPayloadIssueWithType milestoned,
+        @GitHubPayload("issues.demilestoned") GHEventPayloadIssueWithType demilestoned
     ) throws Exception {
         handler.handleEvent(milestoned);
         Issue issue = getIssue(milestoned.getIssue());
@@ -130,8 +135,8 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void shouldToggleLockStateOnLockEvents(
-        @GitHubPayload("issues.locked") GHEventPayload.Issue locked,
-        @GitHubPayload("issues.unlocked") GHEventPayload.Issue unlocked
+        @GitHubPayload("issues.locked") GHEventPayloadIssueWithType locked,
+        @GitHubPayload("issues.unlocked") GHEventPayloadIssueWithType unlocked
     ) throws Exception {
         handler.handleEvent(locked);
         assertThat(getIssue(locked.getIssue()).isLocked()).isTrue();
@@ -141,7 +146,7 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    void shouldRemoveIssueOnDeletedEvent(@GitHubPayload("issues.deleted") GHEventPayload.Issue deleted)
+    void shouldRemoveIssueOnDeletedEvent(@GitHubPayload("issues.deleted") GHEventPayloadIssueWithType deleted)
         throws Exception {
         persistPlaceholderIssue(deleted.getIssue());
 
@@ -151,8 +156,9 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    void shouldClearAssigneesOnUnassignedEvent(@GitHubPayload("issues.unassigned") GHEventPayload.Issue unassigned)
-        throws Exception {
+    void shouldClearAssigneesOnUnassignedEvent(
+        @GitHubPayload("issues.unassigned") GHEventPayloadIssueWithType unassigned
+    ) throws Exception {
         Issue issue = persistPlaceholderIssue(unassigned.getIssue());
 
         User assignee = new User();
@@ -174,8 +180,8 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void shouldDropLabelsOnUnlabeledEvent(
-        @GitHubPayload("issues.labeled") GHEventPayload.Issue labeled,
-        @GitHubPayload("issues.unlabeled") GHEventPayload.Issue unlabeled
+        @GitHubPayload("issues.labeled") GHEventPayloadIssueWithType labeled,
+        @GitHubPayload("issues.unlabeled") GHEventPayloadIssueWithType unlabeled
     ) throws Exception {
         handler.handleEvent(labeled);
         Issue issue = getIssue(labeled.getIssue());
@@ -195,8 +201,8 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void shouldKeepExistingRepositoryOnTransferredEvent(
-        @GitHubPayload("issues.milestoned") GHEventPayload.Issue baseline,
-        @GitHubPayload("issues.transferred") GHEventPayload.Issue transferred
+        @GitHubPayload("issues.milestoned") GHEventPayloadIssueWithType baseline,
+        @GitHubPayload("issues.transferred") GHEventPayloadIssueWithType transferred
     ) throws Exception {
         handler.handleEvent(baseline);
         Issue existing = getIssue(baseline.getIssue());
@@ -206,6 +212,82 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
         Issue afterTransfer = getIssue(transferred.getIssue());
         assertThat(afterTransfer.getRepository().getId()).isEqualTo(originalRepositoryId);
+    }
+
+    // ========================================
+    // Issue Type Tests
+    // ========================================
+
+    @Test
+    void shouldLinkIssueTypeOnTypedEvent(@GitHubPayload("issues.typed") GHEventPayloadIssueWithType typed)
+        throws Exception {
+        // First create the organization so the issue type can be created
+        persistOrganization(typed.getRepository().getOwner().getLogin(), typed.getRepository().getOwner().getId());
+
+        handler.handleEvent(typed);
+
+        Issue issue = getIssue(typed.getIssue());
+        assertThat(issue).isNotNull();
+        assertThat(typed.getIssueType()).isNotNull();
+        assertThat(typed.getIssueType().getName()).isEqualTo("Task");
+        // Issue type should be linked from the handler (if org exists)
+        // Note: The actual linking depends on GitHubIssueTypeSyncService behavior
+        assertThat(issue.getIssueType()).isNotNull();
+        assertThat(issue.getIssueType().getName()).isEqualTo("Task");
+        assertThat(issue.getIssueType().getColor()).isEqualTo(
+            de.tum.in.www1.hephaestus.gitprovider.issuetype.IssueType.Color.YELLOW
+        );
+    }
+
+    @Test
+    void shouldClearIssueTypeOnUntypedEvent(
+        @GitHubPayload("issues.typed") GHEventPayloadIssueWithType typed,
+        @GitHubPayload("issues.untyped") GHEventPayloadIssueWithType untyped
+    ) throws Exception {
+        // First create the organization and link the issue type via typed event
+        persistOrganization(typed.getRepository().getOwner().getLogin(), typed.getRepository().getOwner().getId());
+        handler.handleEvent(typed);
+
+        Issue issueWithType = getIssue(typed.getIssue());
+        assertThat(issueWithType.getIssueType()).isNotNull();
+
+        // Now process untyped event - should clear the type
+        handler.handleEvent(untyped);
+
+        Issue issueWithoutType = getIssue(untyped.getIssue());
+        assertThat(issueWithoutType.getIssueType()).isNull();
+    }
+
+    @Test
+    void shouldParseIssueTypeFromPayload(@GitHubPayload("issues.typed") GHEventPayloadIssueWithType typed) {
+        // Verify the payload parsing works correctly
+        assertThat(typed.isTypedAction()).isTrue();
+        assertThat(typed.isUntypedAction()).isFalse();
+        assertThat(typed.getIssueType()).isNotNull();
+        assertThat(typed.getIssueType().getNodeId()).isEqualTo("IT_kwDODNYmp84Bn3q9");
+        assertThat(typed.getIssueType().getName()).isEqualTo("Task");
+        assertThat(typed.getIssueType().getColor()).isEqualTo("yellow");
+        assertThat(typed.getIssueType().getDescription()).isEqualTo("A specific piece of work");
+        assertThat(typed.getIssueType().isEnabled()).isTrue();
+    }
+
+    @Test
+    void shouldParseUntypedPayload(@GitHubPayload("issues.untyped") GHEventPayloadIssueWithType untyped) {
+        assertThat(untyped.isTypedAction()).isFalse();
+        assertThat(untyped.isUntypedAction()).isTrue();
+    }
+
+    // ========================================
+    // Helper Methods
+    // ========================================
+
+    private void persistOrganization(String login, long id) {
+        var org = new Organization();
+        org.setId(id);
+        org.setGithubId(id);
+        org.setLogin(login);
+        org.setAvatarUrl("https://example.com/avatar.png");
+        organizationRepository.save(org);
     }
 
     private Issue getIssue(GHIssue ghIssue) {

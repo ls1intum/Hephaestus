@@ -26,4 +26,14 @@ public interface RepositoryRepository extends JpaRepository<Repository, Long> {
         @Param("contributorLogin") String contributorLogin,
         @Param("workspaceId") Long workspaceId
     );
+
+    @Query(
+        """
+        SELECT r
+        FROM Repository r
+        WHERE r.organization.workspace.id = :workspaceId
+        ORDER BY r.name ASC
+        """
+    )
+    List<Repository> findActiveByWorkspaceId(@Param("workspaceId") Long workspaceId);
 }

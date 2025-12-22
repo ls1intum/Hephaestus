@@ -5,6 +5,7 @@ import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationSyncServic
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserSyncService;
+import de.tum.in.www1.hephaestus.monitoring.MonitoringScopeFilter;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceMembership.WorkspaceRole;
 import java.io.IOException;
 import java.util.List;
@@ -19,18 +20,25 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Central orchestrator for keeping workspace records in sync with external provisioning sources.
+ * Central orchestrator for keeping workspace records in sync with external
+ * provisioning sources.
  * <p>
  * Responsibilities:
  * <ul>
- *   <li>Bootstrapping PAT-backed workspaces defined via configuration.</li>
- *   <li>Ensuring GitHub App installations are mirrored into local workspaces.</li>
- *   <li>Seeding repositories for installations where Hephaestus monitors selected repos.</li>
+ * <li>Bootstrapping PAT-backed workspaces defined via configuration.</li>
+ * <li>Ensuring GitHub App installations are mirrored into local
+ * workspaces.</li>
+ * <li>Seeding repositories for installations where Hephaestus monitors selected
+ * repos.</li>
  * </ul>
  *
- * <p>PAT workspaces remain the default for local development and coexist alongside GitHub App installations.
- * Once administrative workspace CRUD exists we can revisit how many default PAT entries we bootstrap, but for
- * now this service guarantees at least one workspace for development convenience.
+ * <p>
+ * PAT workspaces remain the default for local development and coexist alongside
+ * GitHub App installations.
+ * Once administrative workspace CRUD exists we can revisit how many default PAT
+ * entries we bootstrap, but for
+ * now this service guarantees at least one workspace for development
+ * convenience.
  */
 @Service
 public class WorkspaceProvisioningService {
@@ -47,6 +55,7 @@ public class WorkspaceProvisioningService {
     private final OrganizationSyncService organizationSyncService;
     private final WorkspaceMembershipRepository workspaceMembershipRepository;
     private final WorkspaceMembershipService workspaceMembershipService;
+    private final MonitoringScopeFilter monitoringScopeFilter;
 
     public WorkspaceProvisioningService(
         WorkspaceProperties workspaceProperties,
@@ -58,7 +67,8 @@ public class WorkspaceProvisioningService {
         UserRepository userRepository,
         OrganizationSyncService organizationSyncService,
         WorkspaceMembershipRepository workspaceMembershipRepository,
-        WorkspaceMembershipService workspaceMembershipService
+        WorkspaceMembershipService workspaceMembershipService,
+        MonitoringScopeFilter monitoringScopeFilter
     ) {
         this.workspaceProperties = workspaceProperties;
         this.workspaceRepository = workspaceRepository;
@@ -70,11 +80,13 @@ public class WorkspaceProvisioningService {
         this.organizationSyncService = organizationSyncService;
         this.workspaceMembershipRepository = workspaceMembershipRepository;
         this.workspaceMembershipService = workspaceMembershipService;
+        this.monitoringScopeFilter = monitoringScopeFilter;
     }
 
     /**
      * Bootstrap the configured PAT-backed workspace when none exist yet.
-     * Pulls account, token, and repository selection from {@link WorkspaceProperties}.
+     * Pulls account, token, and repository selection from
+     * {@link WorkspaceProperties}.
      */
     @Transactional
     public void bootstrapDefaultPatWorkspace() {
@@ -197,7 +209,8 @@ public class WorkspaceProvisioningService {
     }
 
     /**
-     * Mirror each GitHub App installation into a local workspace, including organization metadata and members.
+     * Mirror each GitHub App installation into a local workspace, including
+     * organization metadata and members.
      */
     @Transactional
     public void ensureGitHubAppInstallations() {
@@ -209,9 +222,12 @@ public class WorkspaceProvisioningService {
             return;
         }
 
-        // TODO: Document a helper for migrating a PAT workspace to an installation-backed workspace inside the
-        // future admin tooling. Manual step for now: set installation_id, switch git_provider_mode to
-        // GITHUB_APP_INSTALLATION, and clear personal_access_token before running provisioning again.
+        // TODO: Document a helper for migrating a PAT workspace to an
+        // installation-backed workspace inside the
+        // future admin tooling. Manual step for now: set installation_id, switch
+        // git_provider_mode to
+        // GITHUB_APP_INSTALLATION, and clear personal_access_token before running
+        // provisioning again.
 
         try {
             GitHub asApp = gitHubAppTokenService.clientAsApp();
@@ -261,6 +277,18 @@ public class WorkspaceProvisioningService {
             return;
         }
 
+        String login = account.getLogin();
+
+        // Check monitoring filter EARLY to avoid wasted API calls
+        if (monitoringScopeFilter.isActive() && !monitoringScopeFilter.isOrganizationAllowed(login)) {
+            logger.info(
+                "Skipping installation {} for '{}' - not in allowed-organizations filter",
+                installation.getId(),
+                login
+            );
+            return;
+        }
+
         String accountType;
         try {
             accountType = account.getType();
@@ -283,7 +311,6 @@ public class WorkspaceProvisioningService {
         }
 
         long installationId = installation.getId();
-        String login = account.getLogin();
         GHRepositorySelection selection = installation.getRepositorySelection();
 
         logger.info("Ensuring installation={} for org={} (selection={}).", installationId, login, selection);
@@ -306,7 +333,8 @@ public class WorkspaceProvisioningService {
     }
 
     /**
-     * Syncs a GitHub user using PAT and returns their user ID for ownership assignment.
+     * Syncs a GitHub user using PAT and returns their user ID for ownership
+     * assignment.
      * Falls back to checking existing users if GitHub sync fails.
      */
     private Long syncGitHubUserForPAT(String patToken, String accountLogin) {

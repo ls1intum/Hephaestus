@@ -67,6 +67,12 @@ spring:
     mustache:
         check-template-location: false
 
+    # GraphQL client configuration for GitHub API operations
+    # Operations are colocated with the schema at graphql/github/operations/
+    graphql:
+        client:
+            document-locations: classpath:graphql/github/operations/
+
 springdoc:
     default-produces-media-type: application/json
     writer-with-order-by-keys: true

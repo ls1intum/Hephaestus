@@ -1,5 +1,8 @@
 package de.tum.in.www1.hephaestus.gitprovider.sync;
 
+import de.tum.in.www1.hephaestus.gitprovider.issuedependency.github.GitHubIssueDependencySyncService;
+import de.tum.in.www1.hephaestus.gitprovider.issuetype.github.GitHubIssueTypeSyncService;
+import de.tum.in.www1.hephaestus.gitprovider.subissue.github.GitHubSubIssueSyncService;
 import de.tum.in.www1.hephaestus.monitoring.MonitoringScopeFilter;
 import de.tum.in.www1.hephaestus.workspace.RepositoryToMonitor;
 import de.tum.in.www1.hephaestus.workspace.Workspace;
@@ -19,7 +22,8 @@ import org.springframework.stereotype.Component;
 
 /**
  * Scheduler for periodic GitHub data synchronization across all workspaces.
- * Applies monitoring filters to restrict sync to allowed workspaces and repositories.
+ * Applies monitoring filters to restrict sync to allowed workspaces and
+ * repositories.
  */
 @Order(value = 2)
 @Component
@@ -31,6 +35,9 @@ public class GitHubDataSyncScheduler {
     private final WorkspaceService workspaceService;
     private final GitHubDataSyncService dataSyncService;
     private final MonitoringScopeFilter monitoringScopeFilter;
+    private final GitHubSubIssueSyncService subIssueSyncService;
+    private final GitHubIssueTypeSyncService issueTypeSyncService;
+    private final GitHubIssueDependencySyncService issueDependencySyncService;
 
     /**
      * Scheduled job to sync GitHub data for all active workspaces.
@@ -118,11 +125,50 @@ public class GitHubDataSyncScheduler {
                 }
             }
 
-            // Wrap sync operations with context executor to propagate context to async threads
+            // Wrap sync operations with context executor to propagate context to async
+            // threads
             Runnable syncTask = WorkspaceContextExecutor.wrap(() -> {
                 repositoriesToSync.forEach(dataSyncService::syncRepositoryToMonitor);
                 dataSyncService.syncUsers(workspace);
                 dataSyncService.syncTeams(workspace);
+
+                // Sync sub-issues, issue types, and issue dependencies via GraphQL
+                // These are workspace-level operations (fetched across all repositories)
+                try {
+                    logger.debug("Syncing sub-issue relationships for workspace {}", workspace.getWorkspaceSlug());
+                    subIssueSyncService.syncSubIssuesForWorkspace(workspace.getId());
+                } catch (Exception e) {
+                    logger.error(
+                        "Failed to sync sub-issues for workspace {}: {}",
+                        workspace.getWorkspaceSlug(),
+                        e.getMessage()
+                    );
+                }
+
+                try {
+                    logger.debug("Syncing issue types for workspace {}", workspace.getWorkspaceSlug());
+                    issueTypeSyncService.syncIssueTypesForWorkspace(workspace.getId());
+                } catch (Exception e) {
+                    logger.error(
+                        "Failed to sync issue types for workspace {}: {}",
+                        workspace.getWorkspaceSlug(),
+                        e.getMessage()
+                    );
+                }
+
+                // NOTE (Dec 2025): issue_dependencies webhook is STILL NOT AVAILABLE
+                // (GitHub shipped UI without API/webhook - see Discussion #165749)
+                // GraphQL bulk sync is currently the ONLY way to get dependency data
+                try {
+                    logger.debug("Syncing issue dependencies for workspace {}", workspace.getWorkspaceSlug());
+                    issueDependencySyncService.syncDependenciesForWorkspace(workspace.getId());
+                } catch (Exception e) {
+                    logger.error(
+                        "Failed to sync issue dependencies for workspace {}: {}",
+                        workspace.getWorkspaceSlug(),
+                        e.getMessage()
+                    );
+                }
             });
 
             // Execute synchronously in the scheduler thread

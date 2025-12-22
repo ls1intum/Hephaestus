@@ -2,6 +2,7 @@ package de.tum.in.www1.hephaestus.gitprovider.issue;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.BaseGitServiceEntity;
 import de.tum.in.www1.hephaestus.gitprovider.issuecomment.IssueComment;
+import de.tum.in.www1.hephaestus.gitprovider.issuetype.IssueType;
 import de.tum.in.www1.hephaestus.gitprovider.label.Label;
 import de.tum.in.www1.hephaestus.gitprovider.milestone.Milestone;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
@@ -73,7 +74,8 @@ public class Issue extends BaseGitServiceEntity {
     @Accessors(prefix = { "" })
     private boolean hasPullRequest;
 
-    // The last time the issue and its associated comments were updated (is also used for pull requests with reviews and review comments)
+    // The last time the issue and its associated comments were updated (is also
+    // used for pull requests with reviews and review comments)
     private Instant lastSyncAt;
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -112,6 +114,76 @@ public class Issue extends BaseGitServiceEntity {
     @ToString.Exclude
     private Set<IssueComment> comments = new HashSet<>();
 
+    /**
+     * The parent issue if this is a sub-issue. Null if this is a top-level issue.
+     * Maps to GitHub's Issue.parent GraphQL field.
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "parent_issue_id")
+    @ToString.Exclude
+    private Issue parentIssue;
+
+    /**
+     * Sub-issues of this issue. Empty if this issue has no children.
+     * Maps to GitHub's Issue.subIssues GraphQL connection.
+     */
+    @OneToMany(mappedBy = "parentIssue")
+    @ToString.Exclude
+    private Set<Issue> subIssues = new HashSet<>();
+
+    /**
+     * Total number of sub-issues (from GitHub's sub_issues_summary.total).
+     * This is a denormalized count for efficient querying without loading all
+     * sub-issues.
+     */
+    private Integer subIssuesTotal;
+
+    /**
+     * Number of completed sub-issues (from GitHub's sub_issues_summary.completed).
+     * A sub-issue is considered completed when its state is CLOSED.
+     */
+    private Integer subIssuesCompleted;
+
+    /**
+     * Percentage of sub-issues completed (from GitHub's
+     * sub_issues_summary.percent_completed).
+     * Value between 0 and 100. Null if no sub-issues exist.
+     */
+    private Integer subIssuesPercentCompleted;
+
+    /**
+     * The issue type (category) for this issue.
+     * Managed at the organization level in GitHub.
+     * Maps to GitHub's Issue.issueType GraphQL field.
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "issue_type_id")
+    @ToString.Exclude
+    private IssueType issueType;
+
+    /**
+     * Issues that block this issue from being worked on or completed.
+     * Maps to GitHub's Issue.blockedBy GraphQL connection.
+     * When this issue is blocked, blockedBy contains the blockers.
+     */
+    @ManyToMany
+    @JoinTable(
+        name = "issue_blocking",
+        joinColumns = @JoinColumn(name = "blocked_issue_id"),
+        inverseJoinColumns = @JoinColumn(name = "blocking_issue_id")
+    )
+    @ToString.Exclude
+    private Set<Issue> blockedBy = new HashSet<>();
+
+    /**
+     * Issues that this issue is blocking.
+     * Maps to GitHub's Issue.blocking GraphQL connection.
+     * When this issue blocks others, blocking contains the blocked issues.
+     */
+    @ManyToMany(mappedBy = "blockedBy")
+    @ToString.Exclude
+    private Set<Issue> blocking = new HashSet<>();
+
     public enum State {
         OPEN,
         CLOSED,
@@ -128,17 +200,22 @@ public class Issue extends BaseGitServiceEntity {
         return false;
     }
     /*
-     * Webhook payload data currently ignored while still surfaced by hub4j (no extra REST request required):
+     * Webhook payload data currently ignored while still surfaced by hub4j (no
+     * extra REST request required):
      * Fields:
-     * - issue.closed_by (github/issues.closed.json) via GHIssue#getClosedBy(). Reason: converter never calls getClosedBy().
+     * - issue.closed_by (github/issues.closed.json) via GHIssue#getClosedBy().
+     * Reason: converter never calls getClosedBy().
      * Relationships:
-     * - issue.pull_request stub (github/pull_request.closed.json) via GHIssue#getPullRequest(). Reason: converter ignores the embedded pull-request reference.
+     * - issue.pull_request stub (github/pull_request.closed.json) via
+     * GHIssue#getPullRequest(). Reason: converter ignores the embedded pull-request
+     * reference.
      *
      * Data that would require additional REST fetches (not yet wired):
      * - issue timeline events (GHIssue#listEvents(); follows timeline_url).
      * - issue reaction details (GHIssue#listReactions(); follows reactions.url).
      *
-     * Webhook payload attributes not surfaced by hub4j/github-api 2.0-rc.5 (would require raw JSON parsing or GraphQL):
+     * Webhook payload attributes not surfaced by hub4j/github-api 2.0-rc.5 (would
+     * require raw JSON parsing or GraphQL):
      * Fields:
      * - issue.author_association (github/issues.closed.json).
      * - issue.active_lock_reason (github/issues.locked.json).
@@ -148,13 +225,16 @@ public class Issue extends BaseGitServiceEntity {
      * - issue.reactions total counters (github/issues.closed.json).
      * - issue.formProgress (GraphQL Issue.formProgress.nodes).
      * Relationships:
-     * - Parent/child linkage (sub_issues.* payloads: parent_issue_url, sub_issue objects).
+     * - Parent/child linkage (sub_issues.* payloads: parent_issue_url, sub_issue
+     * objects).
      * - Dependency edges (GraphQL Issue.trackedIn / Issue.tracks).
      * - Issue.projectItems (GraphQL Issue.projectItems / ProjectV2ItemConnection).
-     * - Timeline discussion + commit events (GraphQL Issue.timelineItems variants not bound in hub4j).
+     * - Timeline discussion + commit events (GraphQL Issue.timelineItems variants
+     * not bound in hub4j).
      *
      * Explicitly not persisted today:
      * - issue.timeline_url (pointer for ad-hoc pagination).
-     * - URLs to REST endpoints (e.g. labels_url, events_url) beyond repository association.
+     * - URLs to REST endpoints (e.g. labels_url, events_url) beyond repository
+     * association.
      */
 }

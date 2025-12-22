@@ -47,6 +47,15 @@ public class Workspace {
 
     private Instant membersSyncedAt;
 
+    /** Last sync time for sub-issue relationships (parent-child) via GraphQL */
+    private Instant subIssuesSyncedAt;
+
+    /** Last sync time for organization issue types via GraphQL */
+    private Instant issueTypesSyncedAt;
+
+    /** Last sync time for issue dependencies (blocked_by/blocking) via GraphQL */
+    private Instant issueDependenciesSyncedAt;
+
     @Column(name = "slug", unique = true, nullable = false, length = 64)
     @NotBlank(message = "Workspace slug is required")
     @Pattern(regexp = "^[a-z0-9][a-z0-9-]{2,50}$")
@@ -144,7 +153,8 @@ public class Workspace {
         this.updatedAt = Instant.now();
     }
 
-    //TODO: Only temporary to differentiate between ls1intum <-> orgs installed via GHApp. To be deleted in the future
+    // TODO: Only temporary to differentiate between ls1intum <-> orgs installed via
+    // GHApp. To be deleted in the future
     public enum GitProviderMode {
         PAT_ORG,
         GITHUB_APP_INSTALLATION,

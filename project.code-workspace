@@ -41,12 +41,20 @@
 		"github.copilot.chat.languageContext.fix.typescript.enabled": true,
 		"github.copilot.chat.languageContext.inline.typescript.enabled": true,
 		"github.copilot.chat.languageContext.typescript.enabled": true,
-		"chat.agent.maxRequests": 1000
+		"chat.agent.maxRequests": 1000,
+		"files.associations": {
+			"*.graphql": "graphql",
+			"*.graphqls": "graphql"
+		},
+		"[graphql]": {
+			"editor.formatOnSave": true,
+			"editor.tabSize": 2
+		}
 	},
 	"extensions": {
 		"recommendations": [
 			"github.copilot",
-      "github.copilot-chat",
+			"github.copilot-chat",
 			"vscjava.vscode-java-pack",
 			"redhat.java",
 			"vscjava.vscode-maven",
@@ -57,7 +65,9 @@
 			"davidanson.vscode-markdownlint",
 			"streetsidesoftware.code-spell-checker",
 			"njpwerner.autodocstring",
-			"formulahendry.auto-rename-tag"
+			"formulahendry.auto-rename-tag",
+			"GraphQL.vscode-graphql",
+			"GraphQL.vscode-graphql-syntax"
 		]
-	},
+	}
 }

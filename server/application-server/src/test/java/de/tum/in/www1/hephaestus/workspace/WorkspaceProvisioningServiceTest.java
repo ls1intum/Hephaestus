@@ -13,6 +13,7 @@ import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationSyncServic
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserSyncService;
+import de.tum.in.www1.hephaestus.monitoring.MonitoringScopeFilter;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -51,6 +52,9 @@ class WorkspaceProvisioningServiceTest {
     @Mock
     private WorkspaceMembershipService workspaceMembershipService;
 
+    @Mock
+    private MonitoringScopeFilter monitoringScopeFilter;
+
     private WorkspaceProvisioningService provisioningService;
 
     private WorkspaceProperties workspaceProperties;
@@ -62,7 +66,8 @@ class WorkspaceProvisioningServiceTest {
         workspaceProperties.getDefaultWorkspace().setLogin("aet-org");
         workspaceProperties.getDefaultWorkspace().setToken("pat-token");
 
-        // Inject real properties via reflection because @InjectMocks cannot set them directly
+        // Inject real properties via reflection because @InjectMocks cannot set them
+        // directly
         provisioningService = new WorkspaceProvisioningService(
             workspaceProperties,
             workspaceRepository,
@@ -73,7 +78,8 @@ class WorkspaceProvisioningServiceTest {
             userRepository,
             organizationSyncService,
             workspaceMembershipRepository,
-            workspaceMembershipService
+            workspaceMembershipService,
+            monitoringScopeFilter
         );
     }
 
@@ -118,7 +124,8 @@ class WorkspaceProvisioningServiceTest {
             admin.getId(),
             WorkspaceMembership.WorkspaceRole.ADMIN
         );
-        // Default admin handling should not throw and should not trigger redundant workspace creations
+        // Default admin handling should not throw and should not trigger redundant
+        // workspace creations
         verify(workspaceService).createWorkspace(anyString(), anyString(), anyString(), any(), anyLong());
         assertThat(workspace.getPersonalAccessToken()).isEqualTo("pat-token");
     }

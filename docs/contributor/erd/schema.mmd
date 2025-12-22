@@ -111,11 +111,21 @@ erDiagram
         VARCHAR(32) state_reason
         TEXT body
         TEXT bad_practice_summary
+        BIGINT parent_issue_id FK
+        INTEGER sub_issues_total
+        INTEGER sub_issues_completed
+        INTEGER sub_issues_percent_completed
+        VARCHAR(128) issue_type_id FK
     }
 
     IssueAssignee {
         BIGINT issue_id PK,FK
         BIGINT user_id PK,FK
+    }
+
+    IssueBlocking {
+        BIGINT blocked_issue_id PK,FK
+        BIGINT blocking_issue_id PK,FK
     }
 
     IssueComment {
@@ -132,6 +142,15 @@ erDiagram
     IssueLabel {
         BIGINT issue_id PK,FK
         BIGINT label_id PK,FK
+    }
+
+    IssueType {
+        VARCHAR(128) id PK
+        VARCHAR(128) name "NOT NULL"
+        TEXT description
+        VARCHAR(20) color "NOT NULL"
+        BOOLEAN is_enabled "NOT NULL"
+        BIGINT organization_id FK "NOT NULL"
     }
 
     Label {
@@ -230,7 +249,7 @@ erDiagram
         BIGINT pull_request_id FK "NOT NULL"
         BIGINT root_comment_id FK,UK
         BIGINT provider_thread_id
-        VARCHAR(64) node_id
+        VARCHAR(128) node_id
         TEXT path
         INTEGER line
         INTEGER start_line
@@ -377,6 +396,9 @@ erDiagram
         TIMESTAMPTZ updated_at
         TIMESTAMPTZ members_synced_at
         TIMESTAMPTZ teams_synced_at
+        TIMESTAMP sub_issues_synced_at
+        TIMESTAMP issue_types_synced_at
+        TIMESTAMP issue_dependencies_synced_at
     }
 
     WorkspaceMembership {
@@ -416,11 +438,14 @@ erDiagram
     User ||--o{ Document : has
     Workspace ||--o{ Document : has
     User ||--o{ Issue : authored_by
+    IssueType ||--o{ Issue : has
     User ||--o{ Issue : merged_by
     Milestone ||--o{ Issue : has
+    Issue ||--o{ Issue : has
     Repository ||--o{ Issue : has
     User ||--o{ IssueComment : commented_on
     Issue ||--o{ IssueComment : commented_on
+    Organization ||--o{ IssueType : has
     Repository ||--o{ Label : labeled
     User ||--o{ Milestone : created_by
     Repository ||--o{ Milestone : has
@@ -442,6 +467,8 @@ erDiagram
     %% Many-to-Many relationships
     Issue }o--o{ IssueAssignee : assigned_to
     User }o--o{ IssueAssignee : assigned_to
+    Issue }o--o{ IssueBlocking : has
+    Issue }o--o{ IssueBlocking : has
     Issue }o--o{ IssueLabel : labeled
     Label }o--o{ IssueLabel : labeled
     Issue }o--o{ PullRequestRequestedReviewer : reviewed
