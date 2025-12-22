@@ -17,7 +17,6 @@
 		"prompts:push:dry-run": "tsx scripts/prompts.ts push --dry-run",
 		"prompts:pull": "tsx scripts/prompts.ts pull",
 		"prompts:pull:dry-run": "tsx scripts/prompts.ts pull --dry-run",
-		"test:mentor": "tsx scripts/test-mentor.ts",
 		"test": "vitest run",
 		"test:watch": "vitest",
 		"test:coverage": "vitest run --coverage",

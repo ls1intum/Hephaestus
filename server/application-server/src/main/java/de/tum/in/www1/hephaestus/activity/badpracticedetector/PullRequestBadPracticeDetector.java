@@ -10,6 +10,7 @@ import de.tum.in.www1.hephaestus.intelligenceservice.model.BadPractice;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.DetectorRequest;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.DetectorResponse;
 import jakarta.transaction.Transactional;
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import org.slf4j.Logger;
@@ -100,7 +101,7 @@ public class PullRequestBadPracticeDetector {
         detectorRequest.setTitle(pullRequest.getTitle());
         detectorRequest.setLifecycleState(lifecycleState.getState());
         detectorRequest.setRepositoryName(pullRequest.getRepository().getName());
-        detectorRequest.setPullRequestNumber(java.math.BigDecimal.valueOf(pullRequest.getNumber()));
+        detectorRequest.setPullRequestNumber(BigDecimal.valueOf(pullRequest.getNumber()));
         detectorRequest.setBadPracticeSummary(summary);
         detectorRequest.setBadPractices(
             existingBadPractices.stream().map(this::convertToIntelligenceBadPractice).toList()
