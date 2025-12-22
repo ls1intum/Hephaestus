@@ -90,8 +90,7 @@ export const WithMockData: Story = {
 	parameters: {
 		docs: {
 			description: {
-				story:
-					"Displays mock chat threads grouped by time periods with various thread titles.",
+				story: "Displays mock chat threads grouped by time periods with various thread titles.",
 			},
 		},
 	},

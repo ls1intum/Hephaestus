@@ -37,9 +37,7 @@ export function ProfilePage({
 				<Alert variant="destructive" className="max-w-xl">
 					<XCircleIcon className="h-4 w-4" />
 					<AlertTitle>Something went wrong...</AlertTitle>
-					<AlertDescription>
-						User couldn't be loaded. Please try again later.
-					</AlertDescription>
+					<AlertDescription>User couldn't be loaded. Please try again later.</AlertDescription>
 				</Alert>
 			</div>
 		);

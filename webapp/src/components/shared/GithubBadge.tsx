@@ -1,8 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
-interface GithubBadgeProps
-	extends React.ComponentPropsWithoutRef<typeof Badge> {
+interface GithubBadgeProps extends React.ComponentPropsWithoutRef<typeof Badge> {
 	label: string;
 	color?: string; // Hex color without #
 }
@@ -11,12 +10,7 @@ interface GithubBadgeProps
  * GithubBadge renders a badge with GitHub-like styling, supporting both light and dark themes.
  * This component precisely replicates GitHub's label appearance.
  */
-export function GithubBadge({
-	label,
-	color,
-	className,
-	...props
-}: GithubBadgeProps) {
+export function GithubBadge({ label, color, className, ...props }: GithubBadgeProps) {
 	// Create style object for the badge with GitHub's exact styling
 	let style: React.CSSProperties = {
 		alignItems: "center",
@@ -79,8 +73,7 @@ export function GithubBadge({
 			0,
 			Math.min((perceivedLightness - lightnessThreshold) * -1000, 1),
 		);
-		const lightenBy =
-			(lightnessThreshold - perceivedLightness) * 100 * lightnessSwitch;
+		const lightenBy = (lightnessThreshold - perceivedLightness) * 100 * lightnessSwitch;
 
 		// Set the exact styling from GitHub's implementation
 		style = {
@@ -127,15 +120,11 @@ export function GithubBadge({
 		// Text color exactly as GitHub calculates it
 		// color: hsl(0deg, 0%, calc(max(0, min(calc((1/(0.453 - perceivedLightness))), 1)) * 100%));
 		const textContrast =
-			Math.max(0, Math.min(1 / (lightModeThreshold - perceivedLightness), 1)) *
-			100;
+			Math.max(0, Math.min(1 / (lightModeThreshold - perceivedLightness), 1)) * 100;
 
 		// Border color using GitHub's exact formula
 		// border-color: hsla(180, calc(100 * 1%), calc((70 - 25) * 1%), max(0, min(calc((perceivedLightness - 0.96) * 100), 1)));
-		const borderAlpha = Math.max(
-			0,
-			Math.min((perceivedLightness - borderThreshold) * 100, 1),
-		);
+		const borderAlpha = Math.max(0, Math.min((perceivedLightness - borderThreshold) * 100, 1));
 
 		// Convert RGB to HSL - this is a simplified version
 		const max = Math.max(r, g, b) / 255;

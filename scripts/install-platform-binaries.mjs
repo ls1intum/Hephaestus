@@ -59,7 +59,9 @@ function resolveLightningCssVersion() {
 }
 
 const lightningCssVer = resolveLightningCssVersion();
-const biomeVer = getVersionSafe(() => require('../webapp/package.json').devDependencies['@biomejs/biome'], '@biomejs/biome');
+
+// Biome version from root package.json (single source of truth)
+const biomeVer = getVersionSafe(() => require('../package.json').devDependencies['@biomejs/biome'], '@biomejs/biome');
 
 const pkgs = [];
 if (rollupVer) pkgs.push(`@rollup/rollup-${suffix}@${rollupVer}`);

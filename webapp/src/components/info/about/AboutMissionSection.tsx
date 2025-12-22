@@ -32,17 +32,15 @@ export function AboutMissionSection() {
 
 				<div className="space-y-6">
 					<p className="text-lg leading-relaxed">
-						We help novice developers onboard and grow in agile software teams
-						by combining smart gamification with process-aware AI mentoring. Our
-						guidance is grounded in your actual repository activity and supports
-						self-regulated learning.
+						We help novice developers onboard and grow in agile software teams by combining smart
+						gamification with process-aware AI mentoring. Our guidance is grounded in your actual
+						repository activity and supports self-regulated learning.
 					</p>
 
 					<div className="border-l-4 border-primary pl-6 py-2">
 						<p className="text-lg font-medium">
-							We believe the best software isn't just about code — it's about
-							building teams that practice healthy habits and continuous
-							reflection.
+							We believe the best software isn't just about code — it's about building teams that
+							practice healthy habits and continuous reflection.
 						</p>
 					</div>
 				</div>

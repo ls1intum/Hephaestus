@@ -19,18 +19,11 @@ export interface TeamFilterProps {
 	selectedTeam?: string;
 }
 
-export function TeamFilter({
-	options = [],
-	onTeamChange,
-	selectedTeam = "all",
-}: TeamFilterProps) {
+export function TeamFilter({ options = [], onTeamChange, selectedTeam = "all" }: TeamFilterProps) {
 	return (
 		<div className="space-y-1.5">
 			<Label htmlFor="team">Team</Label>
-			<Select
-				value={selectedTeam}
-				onValueChange={(value) => onTeamChange?.(value)}
-			>
+			<Select value={selectedTeam} onValueChange={(value) => onTeamChange?.(value)}>
 				<SelectTrigger id="team" className="w-full">
 					<SelectValue placeholder="Select Team" />
 				</SelectTrigger>

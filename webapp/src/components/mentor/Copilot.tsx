@@ -2,17 +2,8 @@ import { Sparkles, SquareArrowOutUpRight, SquarePen, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-	Popover,
-	PopoverContent,
-	PopoverTrigger,
-} from "@/components/ui/popover";
-import {
-	Tooltip,
-	TooltipContent,
-	TooltipProvider,
-	TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { MentorIcon } from "./MentorIcon";
 
@@ -74,8 +65,7 @@ export function Copilot({
 			paddingRight: body.style.paddingRight,
 			touchAction: body.style.touchAction,
 		};
-		const scrollBarWidth =
-			window.innerWidth - document.documentElement.clientWidth;
+		const scrollBarWidth = window.innerWidth - document.documentElement.clientWidth;
 		if (scrollBarWidth > 0) body.style.paddingRight = `${scrollBarWidth}px`;
 		body.style.overflow = "hidden";
 		body.style.touchAction = "none";

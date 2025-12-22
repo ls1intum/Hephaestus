@@ -5,11 +5,7 @@ import { LeagueIcon } from "@/components/leaderboard/LeagueIcon";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-	Tooltip,
-	TooltipContent,
-	TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 // Repository images for known repositories
 const REPO_IMAGES: Record<string, string> = {
@@ -42,10 +38,7 @@ export function ProfileHeader({
 
 	// Function to get repository image based on nameWithOwner
 	const getRepositoryImage = (nameWithOwner: string) => {
-		return (
-			REPO_IMAGES[nameWithOwner] ||
-			`https://github.com/${nameWithOwner.split("/")[0]}.png`
-		);
+		return REPO_IMAGES[nameWithOwner] || `https://github.com/${nameWithOwner.split("/")[0]}.png`;
 	};
 	return (
 		<div className="flex items-center justify-between mx-8">
@@ -57,13 +50,8 @@ export function ProfileHeader({
 					</Avatar>
 				) : (
 					<Avatar className="w-24 h-24 ring-2 ring-neutral-100 dark:ring-neutral-800">
-						<AvatarImage
-							src={user?.avatarUrl}
-							alt={`${user?.login}'s avatar`}
-						/>
-						<AvatarFallback>
-							{user?.login?.slice(0, 2)?.toUpperCase()}
-						</AvatarFallback>
+						<AvatarImage src={user?.avatarUrl} alt={`${user?.login}'s avatar`} />
+						<AvatarFallback>{user?.login?.slice(0, 2)?.toUpperCase()}</AvatarFallback>
 					</Avatar>
 				)}
 
@@ -81,9 +69,7 @@ export function ProfileHeader({
 				) : user ? (
 					<div className="flex flex-col gap-1">
 						{/* User name */}
-						<h1 className="text-2xl md:text-3xl font-bold leading-6">
-							{user.name}
-						</h1>
+						<h1 className="text-2xl md:text-3xl font-bold leading-6">{user.name}</h1>
 
 						{/* GitHub profile link */}
 						<a
@@ -109,17 +95,8 @@ export function ProfileHeader({
 								{contributedRepositories.map((repository) => (
 									<Tooltip key={repository.id}>
 										<TooltipTrigger asChild>
-											<Button
-												variant="outline"
-												size="icon"
-												className="size-10 p-1"
-												asChild
-											>
-												<a
-													href={repository.htmlUrl}
-													target="_blank"
-													rel="noopener noreferrer"
-												>
+											<Button variant="outline" size="icon" className="size-10 p-1" asChild>
+												<a href={repository.htmlUrl} target="_blank" rel="noopener noreferrer">
 													<img
 														src={getRepositoryImage(repository.nameWithOwner)}
 														alt={repository.name}

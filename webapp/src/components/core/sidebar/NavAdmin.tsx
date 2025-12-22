@@ -15,10 +15,7 @@ export function NavAdmin({ workspaceSlug }: { workspaceSlug: string }) {
 			<SidebarMenu>
 				<SidebarMenuItem>
 					<SidebarMenuButton asChild tooltip="Manage workspace">
-						<Link
-							to="/w/$workspaceSlug/admin/settings"
-							params={{ workspaceSlug }}
-						>
+						<Link to="/w/$workspaceSlug/admin/settings" params={{ workspaceSlug }}>
 							<Settings2 />
 							<span>Manage workspace</span>
 						</Link>
@@ -26,10 +23,7 @@ export function NavAdmin({ workspaceSlug }: { workspaceSlug: string }) {
 				</SidebarMenuItem>
 				<SidebarMenuItem>
 					<SidebarMenuButton asChild tooltip="Manage members">
-						<Link
-							to="/w/$workspaceSlug/admin/members"
-							params={{ workspaceSlug }}
-						>
+						<Link to="/w/$workspaceSlug/admin/members" params={{ workspaceSlug }}>
 							<BookUser />
 							<span>Manage members</span>
 						</Link>

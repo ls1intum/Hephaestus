@@ -96,12 +96,7 @@ export const SingleChoice: Story = {
 			question: "What's your primary use case?",
 			description: "Pick the option that matches best.",
 			required: true,
-			choices: [
-				"Personal projects",
-				"Professional work",
-				"Team collaboration",
-				"Learning",
-			],
+			choices: ["Personal projects", "Professional work", "Team collaboration", "Learning"],
 		},
 		value: "",
 	},

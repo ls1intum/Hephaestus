@@ -48,11 +48,7 @@ export const Default: Story = {
 	args: {
 		onToggleVisibility: () => {},
 		getCatalogLabels: () => [],
-		children: (
-			<div className="text-sm text-muted-foreground">
-				Repositories/children slot
-			</div>
-		),
+		children: <div className="text-sm text-muted-foreground">Repositories/children slot</div>,
 	},
 };
 

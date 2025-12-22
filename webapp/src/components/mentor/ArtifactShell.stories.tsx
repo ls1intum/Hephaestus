@@ -59,7 +59,6 @@ export const Default: Story = {
 					mode="edit"
 					status="idle"
 					isCurrentVersion={true}
-					currentVersionIndex={0}
 					onSaveContent={fn()}
 					isLoading={false}
 				/>
@@ -82,7 +81,6 @@ export const Streaming: Story = {
 					mode="edit"
 					status="streaming"
 					isCurrentVersion={true}
-					currentVersionIndex={2}
 					onSaveContent={fn()}
 					isLoading={false}
 				/>

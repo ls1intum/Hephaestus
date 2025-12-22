@@ -53,9 +53,7 @@ export function NavMentorThreads({
 			<SidebarGroup>
 				<SidebarGroupLabel>Chat History</SidebarGroupLabel>
 				<SidebarGroupContent>
-					<div className="text-sm text-muted-foreground p-2">
-						No conversations yet
-					</div>
+					<div className="text-sm text-muted-foreground p-2">No conversations yet</div>
 				</SidebarGroupContent>
 			</SidebarGroup>
 		);

@@ -6,9 +6,9 @@
 # Commands:
 #   generate-erd                         - Generate ERD documentation only
 #   draft-changelog                      - Generate changelog diff only
-#   generate-models-intelligence-service - Generate SQLAlchemy models for intelligence service
+#   generate-models-intelligence-service - Introspect existing DB and generate Drizzle schema for intelligence service
 
-set -e  # Exit on any error
+set -eo pipefail  # Exit on any error, including pipeline failures
 
 SCRIPT_DIR="$(dirname "$0")"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
@@ -133,7 +133,11 @@ is_postgres_running() {
         return $?
     fi
 
-    (cd "$APP_SERVER_DIR" && docker compose ps postgres 2>/dev/null | grep -q "Up")
+    # Use subshell to avoid pipefail affecting this check
+    # The function is meant to return false (non-zero) when postgres is not running
+    local output
+    output="$(cd "$APP_SERVER_DIR" && docker compose ps postgres 2>/dev/null)" || return 1
+    echo "$output" | grep -q "Up"
 }
 
 # Check if we're in the right directory
@@ -226,6 +230,11 @@ apply_migrations() {
     SPRING_PROFILES_ACTIVE=local,dev ./mvnw liquibase:update
 }
 
+# Database credentials (configurable via environment variables)
+DB_NAME="${POSTGRES_DB:-hephaestus}"
+DB_USER="${POSTGRES_USER:-root}"
+DB_PASSWORD="${POSTGRES_PASSWORD:-root}"
+
 # Generate ERD documentation
 generate_erd() {
     log_info "Generating ERD documentation..."
@@ -238,46 +247,20 @@ generate_erd() {
     fi
     
     python3 generate_mermaid_erd.py \
-        jdbc:postgresql://localhost:5432/hephaestus \
-        root \
-        root \
+        "jdbc:postgresql://${POSTGRES_HOST}:${POSTGRES_PORT}/${DB_NAME}" \
+        "$DB_USER" \
+        "$DB_PASSWORD" \
         ../docs/contributor/erd/schema.mmd
     
     log_success "ERD documentation updated at 'docs/contributor/erd/schema.mmd'"
 }
 
-# Generate SQLAlchemy models for intelligence service
+# Generate Drizzle schema for intelligence service
 generate_intelligence_service_models() {
-    log_info "Generating SQLAlchemy models for intelligence service..."
-    
-    local intelligence_service_dir="$PROJECT_ROOT/server/intelligence-service"
-    local generate_script="$intelligence_service_dir/scripts/generate_db_models.py"
-    
-    # Check if intelligence service directory exists
-    if [[ ! -d "$intelligence_service_dir" ]]; then
-        log_error "Intelligence service directory not found at: $intelligence_service_dir"
-        exit 1
-    fi
-    
-    # Check if generation script exists
-    if [[ ! -f "$generate_script" ]]; then
-        log_error "Model generation script not found at: $generate_script"
-        exit 1
-    fi
-    
-    cd "$intelligence_service_dir"
-    
-    # Ensure Poetry dependencies are installed
-    if [[ ! -d ".venv" ]] || ! poetry run python -c "import sqlacodegen" 2>/dev/null; then
-        log_info "Installing Poetry dependencies..."
-        poetry install --no-interaction --no-root
-    fi
-    
-    # Use poetry to run the generation script
-    poetry run python scripts/generate_db_models.py
-    poetry run black app/db/models_gen.py
-    
-    log_success "SQLAlchemy models generated for intelligence service"
+    log_info "Generating Drizzle schema for intelligence service..."
+    cd "$PROJECT_ROOT"
+    npm run db:generate-models:intelligence-service
+    log_success "Drizzle schema generated for intelligence service (see server/intelligence-service/src/shared/db)"
 }
 
 # Generate changelog diff with database backup/restore
@@ -311,9 +294,27 @@ generate_changelog_diff() {
         stop_postgres
         local data_dir
         data_dir="$(postgres_data_dir)"
-        local temp_dir="${data_dir}-temp"
+        # Use unique temp dir name with PID to avoid conflicts
+        local temp_dir="${data_dir}-temp-$$"
+        local backup_created=false
+        
+        # Cleanup function to restore database state on failure
+        cleanup_changelog_diff() {
+            if [[ "$backup_created" == "true" && -d "$temp_dir" ]]; then
+                log_warning "Restoring database state after failure..."
+                stop_postgres 2>/dev/null || true
+                rm -rf "$data_dir" 2>/dev/null || true
+                mv "$temp_dir" "$data_dir"
+                log_info "Database state restored."
+            fi
+        }
+        
+        # Set trap to cleanup on error
+        trap cleanup_changelog_diff ERR
+        
         if [[ -d "$data_dir" ]]; then
             mv "$data_dir" "$temp_dir"
+            backup_created=true
         fi
 
         # Start fresh database and apply migrations
@@ -333,6 +334,9 @@ generate_changelog_diff() {
         if [[ -d "$temp_dir" ]]; then
             mv "$temp_dir" "$data_dir"
         fi
+        
+        # Clear the trap after successful completion
+        trap - ERR
     fi
     
     # Check if changelog file was actually generated
@@ -378,9 +382,9 @@ cmd_draft_changelog() {
     log_success "🎉 Changelog diff process completed!"
 }
 
-# Generate SQLAlchemy models for intelligence service
+# Generate Drizzle schema for intelligence service
 cmd_generate_db_models_intelligence_service() {
-    log_info "🚀 Starting SQLAlchemy model generation for intelligence service..."
+    log_info "🚀 Starting Drizzle schema generation for intelligence service..."
     check_environment
     
     # Ensure PostgreSQL is running and ready
@@ -401,7 +405,7 @@ cmd_generate_db_models_intelligence_service() {
     fi
     
     generate_intelligence_service_models
-    log_success "🎉 SQLAlchemy model generation completed successfully!"
+    log_success "🎉 Drizzle schema generation completed successfully!"
 }
 
 # Show usage information
@@ -414,13 +418,13 @@ Usage: $0 [command]
 Commands:
   generate-erd                      Generate ERD documentation only (requires running database)
   draft-changelog                   Generate changelog diff only
-  generate-models-intelligence-service  Generate SQLAlchemy models for intelligence service
+  generate-models-intelligence-service  Generate Drizzle schema for intelligence service
   help                             Show this help message
 
 Examples:
   $0 generate-erd                        # Quick ERD generation during development
   $0 draft-changelog                     # Generate migration before PR
-  $0 generate-models-intelligence-service  # Generate SQLAlchemy models from current schema
+  $0 generate-models-intelligence-service  # Generate Drizzle schema from current DB
 
 EOF
 }
@@ -435,6 +439,7 @@ main() {
             cmd_draft_changelog
             ;;
         "generate-models-intelligence-service")
+            # Use the dedicated command function for consistency
             cmd_generate_db_models_intelligence_service
             ;;
         "help"|"-h"|"--help")

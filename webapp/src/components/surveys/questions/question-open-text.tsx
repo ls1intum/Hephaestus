@@ -1,9 +1,4 @@
-import {
-	Field,
-	FieldContent,
-	FieldError,
-	FieldLabel,
-} from "@/components/ui/field";
+import { Field, FieldContent, FieldError, FieldLabel } from "@/components/ui/field";
 import { Textarea } from "@/components/ui/textarea";
 import type { SurveyQuestion, SurveyResponse } from "@/types/survey";
 import { QuestionDescription } from "../question-description";

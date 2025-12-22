@@ -132,11 +132,7 @@ export function WorkspaceSwitcher({
 										alt={activeWorkspace?.displayName}
 									/>
 									<AvatarFallback className="rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-										{(
-											activeWorkspace?.displayName ||
-											activeWorkspace?.workspaceSlug ||
-											"WS"
-										)
+										{(activeWorkspace?.displayName || activeWorkspace?.workspaceSlug || "WS")
 											.slice(0, 2)
 											.toUpperCase()}
 									</AvatarFallback>
@@ -175,9 +171,7 @@ export function WorkspaceSwitcher({
 											alt={workspace.displayName}
 										/>
 										<AvatarFallback className="rounded-sm text-xs bg-sidebar-primary text-sidebar-primary-foreground">
-											{(workspace.displayName || workspace.workspaceSlug)
-												.slice(0, 2)
-												.toUpperCase()}
+											{(workspace.displayName || workspace.workspaceSlug).slice(0, 2).toUpperCase()}
 										</AvatarFallback>
 									</Avatar>
 								</div>
@@ -188,25 +182,17 @@ export function WorkspaceSwitcher({
 									</span>
 								</div>
 								<DropdownMenuShortcut>
-									{navigator.platform.toLowerCase().includes("mac")
-										? "⌘"
-										: "Ctrl"}
+									{navigator.platform.toLowerCase().includes("mac") ? "⌘" : "Ctrl"}
 									{index + 1}
 								</DropdownMenuShortcut>
 							</DropdownMenuItem>
 						))}
 						<DropdownMenuSeparator />
-						<DropdownMenuItem
-							className="gap-2 p-2"
-							onClick={() => onAddWorkspace?.()}
-							disabled
-						>
+						<DropdownMenuItem className="gap-2 p-2" onClick={() => onAddWorkspace?.()} disabled>
 							<div className="flex size-6 items-center justify-center rounded-md border bg-background">
 								<Plus className="size-4" />
 							</div>
-							<div className="font-medium text-muted-foreground">
-								Add workspace
-							</div>
+							<div className="font-medium text-muted-foreground">Add workspace</div>
 						</DropdownMenuItem>
 					</DropdownMenuContent>
 				</DropdownMenu>

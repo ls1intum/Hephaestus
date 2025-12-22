@@ -11,9 +11,7 @@ import { AdminSettingsPage } from "@/components/admin/AdminSettingsPage";
 import { NoWorkspace } from "@/components/workspace/NoWorkspace";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 
-export const Route = createFileRoute(
-	"/_authenticated/w/$workspaceSlug/admin/_admin/settings",
-)({
+export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/_admin/settings")({
 	component: AdminSettings,
 });
 
@@ -44,8 +42,7 @@ function AdminSettings() {
 
 	// Check if repository management is allowed
 	// For GitHub App Installation workspaces, repositories are managed by the installation
-	const isAppInstallationWorkspace =
-		workspaceData?.gitProviderMode === "GITHUB_APP_INSTALLATION";
+	const isAppInstallationWorkspace = workspaceData?.gitProviderMode === "GITHUB_APP_INSTALLATION";
 
 	// Repositories query
 	const repositoriesQueryOptions = getRepositoriesToMonitorOptions({
@@ -57,8 +54,7 @@ function AdminSettings() {
 		error: repositoriesError,
 	} = useQuery({
 		...repositoriesQueryOptions,
-		enabled:
-			Boolean(workspaceSlug) && (repositoriesQueryOptions.enabled ?? true),
+		enabled: Boolean(workspaceSlug) && (repositoriesQueryOptions.enabled ?? true),
 	});
 
 	// Add repository mutation
@@ -131,21 +127,15 @@ function AdminSettings() {
 	};
 
 	// Format repositories data for the UI component
-	const formattedRepositories: RepositoryItem[] = (repositories || []).map(
-		(repo: string) => ({
-			nameWithOwner: repo,
-		}),
-	);
+	const formattedRepositories: RepositoryItem[] = (repositories || []).map((repo: string) => ({
+		nameWithOwner: repo,
+	}));
 
 	return (
 		<AdminSettingsPage
 			repositories={formattedRepositories}
-			isLoadingRepositories={
-				isWorkspaceLoading || isLoadingRepositories || !workspaceSlug
-			}
-			repositoriesError={
-				(workspaceError as Error | null) ?? (repositoriesError as Error | null)
-			}
+			isLoadingRepositories={isWorkspaceLoading || isLoadingRepositories || !workspaceSlug}
+			repositoriesError={(workspaceError as Error | null) ?? (repositoriesError as Error | null)}
 			addRepositoryError={addRepository.error as Error | null}
 			isAddingRepository={addRepository.isPending}
 			isRemovingRepository={removeRepository.isPending}

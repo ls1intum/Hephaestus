@@ -14,15 +14,14 @@
 body {
 	@apply m-0;
 	font-family:
-		-apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen", "Ubuntu",
-		"Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif;
+		-apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen", "Ubuntu", "Cantarell",
+		"Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif;
 	-webkit-font-smoothing: antialiased;
 	-moz-osx-font-smoothing: grayscale;
 }
 
 code {
-	font-family:
-		source-code-pro, Menlo, Monaco, Consolas, "Courier New", monospace;
+	font-family: source-code-pro, Menlo, Monaco, Consolas, "Courier New", monospace;
 }
 
 :root {
@@ -273,11 +272,7 @@ code {
 .leaderboard-fade-out {
 	position: relative;
 	mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 1) 60%, rgba(0, 0, 0, 0));
-	-webkit-mask-image: linear-gradient(
-		to bottom,
-		rgba(0, 0, 0, 1) 60%,
-		rgba(0, 0, 0, 0)
-	);
+	-webkit-mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 1) 60%, rgba(0, 0, 0, 0));
 }
 
 /* ProseMirror editor styles */
@@ -327,12 +322,7 @@ code {
 	content: "";
 	position: absolute;
 	inset: 0;
-	background: linear-gradient(
-		90deg,
-		transparent,
-		rgba(255, 255, 255, 0.5),
-		transparent
-	);
+	background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.5), transparent);
 	background-size: 200% 100%;
 	animation: shimmer-glide 1.4s linear infinite;
 	pointer-events: none;

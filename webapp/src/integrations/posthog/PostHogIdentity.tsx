@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { usePostHog } from "posthog-js/react";
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useRef } from "react";
 
 import { getUserSettingsOptions } from "@/api/@tanstack/react-query.gen";
 import { useAuth } from "../auth";
@@ -25,15 +25,12 @@ export function PostHogIdentity() {
 	});
 
 	const participatesInResearch = userSettings?.participateInResearch;
-	const shouldDenyTracking = useMemo(() => {
-		if (!isAuthenticated) {
-			return false;
-		}
-		if (isSettingsError) {
-			return true;
-		}
-		return participatesInResearch !== true;
-	}, [isAuthenticated, participatesInResearch, isSettingsError]);
+	// React Compiler handles memoization automatically - no useMemo needed
+	const shouldDenyTracking = !isAuthenticated
+		? false
+		: isSettingsError
+			? true
+			: participatesInResearch !== true;
 
 	useEffect(() => {
 		if (!posthog || !isPosthogEnabled) {
@@ -72,8 +69,7 @@ export function PostHogIdentity() {
 
 		if (userProfile && !hasIdentified.current) {
 			const email = userProfile.email;
-			const name =
-				`${userProfile.firstName || ""} ${userProfile.lastName || ""}`.trim();
+			const name = `${userProfile.firstName || ""} ${userProfile.lastName || ""}`.trim();
 			const username = userProfile.username;
 
 			posthog.identify(userId, {

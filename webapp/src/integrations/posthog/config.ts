@@ -25,10 +25,7 @@ export const sanitizeBoolean = (value?: string | boolean) => {
 	return ["true", "1", "yes", "on"].includes(normalized);
 };
 
-export const posthogProjectApiKey = sanitizeValue(
-	environment.posthog?.projectApiKey,
-);
+export const posthogProjectApiKey = sanitizeValue(environment.posthog?.projectApiKey);
 export const posthogApiHost = sanitizeValue(environment.posthog?.apiHost);
 export const posthogEnabled = sanitizeBoolean(environment.posthog?.enabled);
-export const isPosthogEnabled =
-	posthogEnabled && posthogProjectApiKey.length > 0;
+export const isPosthogEnabled = posthogEnabled && posthogProjectApiKey.length > 0;

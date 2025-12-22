@@ -1,11 +1,5 @@
 import { InfoIcon } from "@primer/octicons-react";
-import {
-	Card,
-	CardContent,
-	CardDescription,
-	CardHeader,
-	CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { stateConfig } from "./utils";
 
 export function BadPracticeLegendCard() {
@@ -17,9 +11,7 @@ export function BadPracticeLegendCard() {
 				<CardTitle>
 					<InfoIcon className="inline mr-2 h-4 w-4" /> Practice Legend
 				</CardTitle>
-				<CardDescription>
-					Understanding the pull request practice indicators
-				</CardDescription>
+				<CardDescription>Understanding the pull request practice indicators</CardDescription>
 			</CardHeader>
 			<CardContent>
 				<div className="space-y-3">
@@ -37,9 +29,8 @@ export function BadPracticeLegendCard() {
 
 					<div className="pt-2 border-t">
 						<p className="text-sm text-muted-foreground">
-							We analyze your pull requests to celebrate what you're doing well
-							and suggest improvements, helping you grow as a developer and
-							level up your development workflow.
+							We analyze your pull requests to celebrate what you're doing well and suggest
+							improvements, helping you grow as a developer and level up your development workflow.
 						</p>
 					</div>
 				</div>

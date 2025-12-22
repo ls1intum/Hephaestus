@@ -9,10 +9,7 @@ export interface LeagueProgressCardProps {
 	onInfoClick?: () => void;
 }
 
-export function LeagueProgressCard({
-	leaguePoints,
-	onInfoClick,
-}: LeagueProgressCardProps) {
+export function LeagueProgressCard({ leaguePoints, onInfoClick }: LeagueProgressCardProps) {
 	// Get current league from points
 	const currentLeague = getLeagueFromPoints(leaguePoints);
 

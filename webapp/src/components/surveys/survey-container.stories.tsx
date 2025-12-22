@@ -2,11 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react";
 import { fn } from "@storybook/test";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import {
-	Popover,
-	PopoverContent,
-	PopoverTrigger,
-} from "@/components/ui/popover";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import type { PostHogSurvey } from "@/types/survey";
 import { SurveyContainer } from "./survey-container";
 
@@ -64,12 +60,7 @@ const branchingSurvey: PostHogSurvey = {
 		{
 			id: "077bc1cc-85e5-4a3a-9283-b386ecf2d299",
 			type: "multiple_choice",
-			choices: [
-				"Tutorials",
-				"Customer case studies",
-				"Product announcements",
-				"Other",
-			],
+			choices: ["Tutorials", "Customer case studies", "Product announcements", "Other"],
 			question: "Which types of content would you like to see more of?",
 			description: "",
 			descriptionContentType: "text",

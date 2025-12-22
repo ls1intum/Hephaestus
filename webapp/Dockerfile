@@ -3,13 +3,25 @@ FROM node:22-alpine AS build
 
 WORKDIR /app
 
-# Copy and install dependencies early to leverage Docker layer caching
-COPY package.json package-lock.json* /app/
+# Copy package.json for dependency installation
+COPY webapp/package.json /app/
 
-RUN npm ci
+# Install dependencies
+# Note: Using npm install instead of npm ci because this is a workspace package
+# and the package-lock.json is at the monorepo root, not in this folder
+RUN npm install --ignore-scripts
 
-# Copy the rest of the application code
-COPY ./ /app/
+# Copy the webapp application code
+COPY webapp/ /app/
+
+# Copy intelligence-service shared types (required for @intelligence-service/* imports)
+COPY server/intelligence-service/src/mentor/ /server/intelligence-service/src/mentor/
+COPY server/intelligence-service/src/shared/ /server/intelligence-service/src/shared/
+
+# Create a symlink so the shared code can resolve node_modules from webapp's dependencies
+# This is needed because imports like 'uuid' and 'ai' in the shared code need to resolve
+# to the webapp's node_modules since we don't install intelligence-service deps in Docker
+RUN ln -s /app/node_modules /server/intelligence-service/node_modules
 
 # Build the React application using the production build script
 # This runs copy-env-prod.js first to use the production environment config
@@ -28,13 +40,13 @@ RUN apk update && \
 COPY --from=build /app/dist /usr/share/nginx/html
 
 # Copy the substitution script into the image
-COPY substitute_env_variables.sh /usr/local/bin/
+COPY webapp/substitute_env_variables.sh /usr/local/bin/
 
 # Make the substitution script executable
 RUN chmod +x /usr/local/bin/substitute_env_variables.sh
 
 # Copy custom Nginx configuration
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY webapp/nginx.conf /etc/nginx/conf.d/default.conf
 
 # Expose port 80
 EXPOSE 80

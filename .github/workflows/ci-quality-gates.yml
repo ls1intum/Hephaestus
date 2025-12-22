@@ -25,7 +25,6 @@ jobs:
             webapp-quality,
             intelligence-service-quality,
             webhook-ingest-quality,
-            docs-quality,
             openapi-validation,
             database-schema-validation,
             database-documentation-validation,
@@ -46,6 +45,7 @@ jobs:
           cache-dependency-path: |
             package-lock.json
             webapp/package-lock.json
+            server/intelligence-service/package-lock.json
 
 
       # Advanced cache setup with fallback
@@ -69,18 +69,6 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-webapp-build-${{ hashFiles('package-lock.json', 'webapp/package-lock.json', 'webapp/biome.json', 'webapp/tsconfig.json', 'webapp/vite.config.js', 'webapp/components.json') }}-
             ${{ runner.os }}-webapp-build-
-
-      - name: Cache docs build artifacts
-        if: matrix.check == 'docs-quality'
-        uses: actions/cache@v4
-        with:
-          path: |
-            docs/node_modules
-            docs/.docusaurus
-          key: ${{ runner.os }}-docs-build-${{ hashFiles('docs/package-lock.json', 'docs/docusaurus.config.ts') }}-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-docs-build-${{ hashFiles('docs/package-lock.json', 'docs/docusaurus.config.ts') }}-
-            ${{ runner.os }}-docs-build-
 
       # application-server code quality and formatting
       - name: application-server formatting & static analysis
@@ -209,29 +197,41 @@ jobs:
           echo "✅ All docs quality checks passed"
 
       # intelligence-service quality checks with comprehensive validation
-      - name: intelligence-service quality & security analysis
+      - name: intelligence-service quality & type checking
         if: matrix.check == 'intelligence-service-quality'
         run: |
           echo "🔍 Running intelligence-service quality checks..."
-          cd server/intelligence-service
-          poetry install --no-interaction --no-root --with dev
+          # Clean install and explicitly install linux biome binary
+          # The package-lock.json from macOS may not include linux platform binaries
+          rm -rf node_modules server/intelligence-service/node_modules ~/.npm
+          npm install --no-audit --progress=false
+          # Install platform binaries from package.json versions (no hardcoding)
+          node scripts/install-platform-binaries.mjs
 
           ISSUES_FOUND=()
 
-          echo "🎨 Checking code formatting..."
-          if ! poetry run black --check --diff .; then
-            echo "❌ Black formatting failed"
-            ISSUES_FOUND+=("Black formatting failed. Run: npm run format:intelligence-service")
+          echo "🎨 Linting (Biome)..."
+          if ! npm -w server/intelligence-service run check; then
+            echo "❌ Biome check failed"
+            ISSUES_FOUND+=("Biome check failed. Run: cd server/intelligence-service && npm run check -- --fix")
           else
-            echo "✅ Black formatting passed"
+            echo "✅ Biome linting passed"
           fi
 
-          echo "🔍 Running linting..."
-          if ! poetry run flake8 . --statistics --count; then
-            echo "❌ Flake8 linting failed. Run: npm run lint:intelligence-service"
-            ISSUES_FOUND+=("Flake8 linting failed. Run: npm run lint:intelligence-service")
+          echo "📊 TypeScript typecheck..."
+          if ! npm -w server/intelligence-service run typecheck; then
+            echo "❌ TypeScript typecheck failed"
+            ISSUES_FOUND+=("TypeScript typecheck failed. Run: cd server/intelligence-service && npm run typecheck")
           else
-            echo "✅ Flake8 linting passed"
+            echo "✅ TypeScript typecheck passed"
+          fi
+
+          echo "🧪 Build check..."
+          if ! npm -w server/intelligence-service run build; then
+            echo "❌ Build failed"
+            ISSUES_FOUND+=("Build failed. Run: cd server/intelligence-service && npm run build")
+          else
+            echo "✅ Build passed"
           fi
 
           if [ ${#ISSUES_FOUND[@]} -gt 0 ]; then
@@ -251,22 +251,25 @@ jobs:
         run: |
           echo "🔍 Running webhook-ingest quality checks..."
           cd server/webhook-ingest
-          poetry install --no-interaction --no-root --with dev
+
+          if [ ! -d ".venv" ]; then
+            poetry install --no-interaction --no-root
+          fi
 
           ISSUES_FOUND=()
 
           echo "🎨 Checking code formatting..."
           if ! poetry run black --check --diff .; then
             echo "❌ Black formatting failed"
-            ISSUES_FOUND+=("Black formatting failed. Run: npm run format:webhook-ingest")
+            ISSUES_FOUND+=("Black formatting failed. Run: cd server/webhook-ingest && poetry run black .")
           else
             echo "✅ Black formatting passed"
           fi
 
           echo "🔍 Running linting..."
           if ! poetry run flake8 . --statistics --count; then
-            echo "❌ Flake8 linting failed. Run: npm run lint:webhook-ingest"
-            ISSUES_FOUND+=("Flake8 linting failed. Run: npm run lint:webhook-ingest")
+            echo "❌ Flake8 linting failed Run: cd server/webhook-ingest && poetry run flake8 ."
+            ISSUES_FOUND+=("Flake8 linting failed")
           else
             echo "✅ Flake8 linting passed"
           fi
@@ -285,16 +288,17 @@ jobs:
       # OpenAPI validation with intelligent auto-commit
       - name: OpenAPI validation & synchronization
         if: matrix.check == 'openapi-validation'
+        env:
+          # Required for intelligence-service OpenAPI export (uses fake provider, no actual API calls)
+          DATABASE_URL: postgresql://fake:fake@localhost:5432/fake
+          MODEL_NAME: fake:model
+          DETECTION_MODEL_NAME: fake:model
         run: |
           echo "🔍 Validating OpenAPI specifications and clients..."
 
-          # Install all dependencies (always, to avoid cache drift)
+          # Install all dependencies including workspaces (always, to avoid cache drift)
+          # The root npm ci handles all workspaces including intelligence-service
           npm ci --prefer-offline --no-audit
-
-          # Setup Python environments
-          cd server/intelligence-service
-          poetry install --no-interaction --no-root --with dev
-          cd ../..
 
           # Setup application-server environment
           cd server/application-server
@@ -442,11 +446,19 @@ jobs:
             echo "✅ ERD documentation validation passed (up-to-date with committed migrations)"
           fi
 
-      # Database models validation - SQLAlchemy models match committed migrations
+      # Database models validation - Drizzle ORM models match committed migrations
       - name: Database models validation
         if: matrix.check == 'database-models-validation'
         run: |
-          echo "🔍 Validating SQLAlchemy models match committed migrations..."
+          echo "🔍 Validating intelligence-service DB models match committed migrations..."
+
+          # Install all dependencies including workspaces for intelligence-service tooling
+          npm ci --prefer-offline --no-audit
+
+          # Install Linux biome binary - npm ci may restore cached node_modules from macOS
+          # which doesn't include the platform-specific binary for Linux
+          # Uses versions from package.json (no hardcoding)
+          node scripts/install-platform-binaries.mjs
 
           # Start PostgreSQL service for model operations
           echo "🐘 Starting PostgreSQL service..."
@@ -483,10 +495,10 @@ jobs:
           fi
           cd ../..
 
-          # Generate SQLAlchemy models from committed migration-based schema
-          echo "📊 Generating SQLAlchemy models from committed migration-based schema..."
+          # Generate intelligence-service DB models from committed migration-based schema
+          echo "📊 Generating intelligence-service DB models from committed migration-based schema..."
           if ! scripts/db-utils.sh generate-models-intelligence-service; then
-            echo "❌ Failed to generate SQLAlchemy models"
+            echo "❌ Failed to generate intelligence-service DB models"
             docker stop postgres-models && docker rm postgres-models
             exit 1
           fi
@@ -495,13 +507,15 @@ jobs:
           docker stop postgres-models && docker rm postgres-models
 
           # Check if generated models match committed versions
-          if ! git diff --quiet server/intelligence-service/app/db/models_gen.py; then
-            echo "❌ SQLAlchemy models validation failed - models are out of sync"
+          git add server/intelligence-service/src/shared/db/schema.ts
+
+          if ! git diff --cached --quiet server/intelligence-service/src/shared/db/schema.ts; then
+            echo "❌ Intelligence-service DB models validation failed - models are out of sync"
             echo "Generated models differ from committed version:"
-            git diff server/intelligence-service/app/db/models_gen.py
+            git diff --cached server/intelligence-service/src/shared/db/schema.ts
             echo ""
             echo "Fix: npm run db:generate-models:intelligence-service"
             exit 1
           else
-            echo "✅ SQLAlchemy models validation passed (models are up-to-date)"
+            echo "✅ Intelligence-service DB models validation passed (models are up-to-date)"
           fi

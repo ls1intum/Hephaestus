@@ -9,37 +9,30 @@
 		"build": "vite build && tsc",
 		"build:prod": "node copy-env-prod.js && vite build && tsc",
 		"serve": "vite preview",
-
 		"test": "vitest run",
 		"test:watch": "vitest",
 		"test:coverage": "vitest run --coverage",
-
 		"typecheck": "tsc --noEmit",
-
 		"format": "biome format --write",
 		"format:check": "biome format",
-
 		"lint": "biome lint",
 		"lint:fix": "biome lint --write",
-
 		"check": "biome check",
 		"check:fix": "biome check --write",
-
 		"ci": "biome ci",
-
 		"storybook": "storybook dev -p 6006",
 		"build-storybook": "storybook build --stats-json",
 		"chromatic": "npx chromatic --exit-zero-on-changes",
 		"chromatic:ci": "npx chromatic --only-changed",
 		"chromatic:dry-run": "npx chromatic --dry-run",
-
 		"openapi-ts": "openapi-ts"
 	},
 	"dependencies": {
-		"@ai-sdk/react": "2.0.8",
+		"@ai-sdk/react": "3.0.1",
 		"@hey-api/client-fetch": "^0.11.0",
 		"@primer/octicons-react": "^19.15.5",
 		"@primer/primitives": "^10.7.0",
+		"ai": "6.0.1",
 		"@radix-ui/react-accordion": "^1.2.12",
 		"@radix-ui/react-alert-dialog": "^1.1.15",
 		"@radix-ui/react-aspect-ratio": "^1.1.7",
@@ -105,12 +98,12 @@
 		"tailwindcss": "^4.1.11",
 		"tailwindcss-animate": "^1.0.7",
 		"usehooks-ts": "^3.1.1",
+		"uuid": "^13.0.0",
 		"vaul": "^1.1.2",
-		"zod": "^3.25.46",
+		"zod": "^3.25.49",
 		"zustand": "^5.0.7"
 	},
 	"devDependencies": {
-		"@biomejs/biome": "2.1.4",
 		"@chromatic-com/storybook": "^3.2.6",
 		"@hey-api/openapi-ts": "^0.80.7",
 		"@storybook/addon-essentials": "^8.6.14",
@@ -127,6 +120,7 @@
 		"@types/node": "^22.15.29",
 		"@types/react": "^19.1.9",
 		"@types/react-dom": "^19.1.7",
+		"@types/uuid": "^10.0.0",
 		"@vitejs/plugin-react": "^4.5.0",
 		"@vitest/browser": "^3.2.4",
 		"@vitest/coverage-v8": "^3.2.4",
@@ -145,4 +139,3 @@
 		"node": ">=22.0"
 	}
 }
-

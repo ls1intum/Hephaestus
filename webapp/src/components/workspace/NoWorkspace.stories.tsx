@@ -8,8 +8,7 @@ const meta: Meta<typeof NoWorkspace> = {
 		layout: "centered",
 		docs: {
 			description: {
-				component:
-					"Empty-state screen shown when a user has no workspace membership.",
+				component: "Empty-state screen shown when a user has no workspace membership.",
 			},
 		},
 	},

@@ -3,13 +3,12 @@ import { useEffect, useRef, useState } from "react";
 import {
 	getDocumentOptions,
 	getDocumentQueryKey,
-	getDocumentVersionOptions,
-	getDocumentVersionQueryKey,
+	getVersionOptions,
+	getVersionQueryKey,
 	updateDocumentMutation,
 } from "@/api/@tanstack/react-query.gen";
 import type { Document } from "@/api/types.gen";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
-import type { DataPart } from "@/lib/types";
 import { useArtifactStore } from "@/stores/artifact-store";
 import { useDocumentsStore } from "@/stores/document-store";
 
@@ -42,8 +41,6 @@ export interface UseDocumentArtifactReturn {
 	onBackToLatestVersion: (() => void) | undefined;
 	/** Save current content to server (mutates latest) */
 	saveContent: (content: string, debounce?: boolean) => void;
-	/** Handle incoming stream parts and optimistically apply to latest content (used by useMentorChat) */
-	onStreamPart: (part: DataPart) => void;
 	/** Open artifact overlay */
 	openOverlay: (rect: DOMRect) => void;
 }
@@ -54,20 +51,10 @@ export function useDocumentArtifact({
 	const { openArtifact } = useArtifactStore();
 	const queryClient = useQueryClient();
 
-	const documentState = useDocumentsStore(
-		(state) => state.documents[documentId],
-	);
-	const draft = useDocumentsStore(
-		(state) => state.documents[documentId]?.draft,
-	);
-	const {
-		setStreaming: setDocStreaming,
-		setEmptyDraft,
-		appendDraftDelta,
-		finishDraft,
-	} = useDocumentsStore.getState();
-	const { workspaceSlug, isLoading: isWorkspaceLoading } =
-		useActiveWorkspaceSlug();
+	const documentState = useDocumentsStore((state) => state.documents[documentId]);
+	const draft = useDocumentsStore((state) => state.documents[documentId]?.draft);
+	const { setStreaming: setDocStreaming } = useDocumentsStore.getState();
+	const { workspaceSlug, isLoading: isWorkspaceLoading } = useActiveWorkspaceSlug();
 
 	// Local selection state: -1 = latest
 	const [selectedIndex, setSelectedIndex] = useState<number>(-1);
@@ -75,8 +62,7 @@ export function useDocumentArtifact({
 
 	// Streaming state
 	const isStreaming = documentState?.isStreaming ?? false;
-	const setStreaming = (streaming: boolean) =>
-		setDocStreaming(documentId, streaming);
+	const setStreaming = (streaming: boolean) => setDocStreaming(documentId, streaming);
 	const [isSaving, setIsSaving] = useState(false);
 
 	// Queries
@@ -102,16 +88,13 @@ export function useDocumentArtifact({
 
 	// Build navigable list that excludes the current latest version number to avoid duplicating "latest" (-1) in the list
 	const navigableNumbersAsc = (() => {
-		if (!versionNumbersAsc.length) return versionNumbersAsc;
+		if (versionNumbersAsc.length === 0) return versionNumbersAsc;
 		const latestNum = latest?.versionNumber;
-		return latestNum == null
-			? versionNumbersAsc
-			: versionNumbersAsc.filter((n) => n !== latestNum);
+		return latestNum == null ? versionNumbersAsc : versionNumbersAsc.filter((n) => n !== latestNum);
 	})();
 
 	// Resolve selected version number by index in the navigable list
-	const selectedVersionNumber =
-		selectedIndex >= 0 ? navigableNumbersAsc[selectedIndex] : undefined;
+	const selectedVersionNumber = selectedIndex >= 0 ? navigableNumbersAsc[selectedIndex] : undefined;
 
 	const {
 		data: selectedVersionDoc,
@@ -123,7 +106,7 @@ export function useDocumentArtifact({
 			selectedIndex >= 0 &&
 			selectedVersionNumber != null &&
 			Boolean(documentId),
-		...getDocumentVersionOptions({
+		...getVersionOptions({
 			path: {
 				workspaceSlug: workspaceSlug ?? "",
 				id: documentId,
@@ -135,9 +118,7 @@ export function useDocumentArtifact({
 	// Derived
 	const selectedVersion = isCurrentVersion ? latest : selectedVersionDoc;
 	const isLoading =
-		isWorkspaceLoading ||
-		loadingLatest ||
-		(selectedIndex >= 0 && loadingSelectedVersion);
+		isWorkspaceLoading || loadingLatest || (selectedIndex >= 0 && loadingSelectedVersion);
 	const error = errorLatest ?? errorSelectedVersion;
 	// Navigation using the sorted navigableNumbersAsc as the source of truth
 	const posInNumbers = selectedIndex >= 0 ? selectedIndex : -1;
@@ -155,7 +136,7 @@ export function useDocumentArtifact({
 		? () => {
 				setSelectedIndex((prev) => {
 					const nav = navRef.current;
-					if (!nav.length) return prev;
+					if (nav.length === 0) return prev;
 					if (prev < 0) {
 						const toIdx = nav.length - 1;
 						return toIdx;
@@ -174,7 +155,7 @@ export function useDocumentArtifact({
 			? () => {
 					setSelectedIndex((prev) => {
 						const nav = navRef.current;
-						if (!nav.length) return prev;
+						if (nav.length === 0) return prev;
 						if (prev >= 0 && prev < nav.length - 1) {
 							const toIdx = prev + 1;
 							return toIdx;
@@ -184,9 +165,7 @@ export function useDocumentArtifact({
 				}
 			: undefined;
 
-	const onBackToLatestVersion = !isCurrentVersion
-		? () => setSelectedIndex(-1)
-		: undefined;
+	const onBackToLatestVersion = !isCurrentVersion ? () => setSelectedIndex(-1) : undefined;
 
 	// Restore selected version as new latest
 	const { mutate: mutateRestore } = useMutation({
@@ -198,7 +177,7 @@ export function useDocumentArtifact({
 				}),
 			});
 			queryClient.invalidateQueries({
-				queryKey: getDocumentVersionQueryKey({
+				queryKey: getVersionQueryKey({
 					path: {
 						workspaceSlug: workspaceSlug ?? "",
 						id: documentId,
@@ -229,9 +208,7 @@ export function useDocumentArtifact({
 	};
 
 	const onRestoreSelectedVersion =
-		!isCurrentVersion && selectedVersionDoc
-			? handleRestoreSelectedVersion
-			: undefined;
+		!isCurrentVersion && selectedVersionDoc ? handleRestoreSelectedVersion : undefined;
 
 	// Save latest content
 	const { mutate: mutateSave } = useMutation({
@@ -264,7 +241,7 @@ export function useDocumentArtifact({
 		const doSave = () => {
 			const currentTitle = latest?.title ?? "Document";
 			mutateSave({
-				body: { content: newContent, kind: "TEXT", title: currentTitle },
+				body: { content: newContent, kind: "text", title: currentTitle },
 				path: { workspaceSlug, id: documentId },
 			});
 		};
@@ -293,52 +270,6 @@ export function useDocumentArtifact({
 		openArtifact(`text:${documentId}`, rect, title);
 	};
 
-	// Streaming handler
-	const onStreamPart = (part: DataPart) => {
-		if (part.type === "data-document-create") {
-			setEmptyDraft(part.data.id, { title: part.data.title });
-		}
-		if (part.type === "data-document-update") {
-			setEmptyDraft(part.data.id);
-		}
-		if (part.type === "data-document-delta") {
-			const draft = useDocumentsStore.getState().documents[part.data.id]?.draft;
-			const draftLength = draft?.content.length ?? 0;
-			if (draftLength + part.data.delta.length > 200 && draftLength <= 200) {
-				const vv = window.visualViewport || {
-					offsetLeft: 0,
-					offsetTop: 0,
-					width: window.innerWidth,
-					height: window.innerHeight,
-				};
-
-				const cx = vv.offsetLeft + vv.width / 2;
-				const cy = vv.offsetTop + vv.height / 2;
-				const centerRect = new DOMRect(cx - 100 / 2, cy - 100 / 2, 100, 100);
-				openArtifact(`text:${part.data.id}`, centerRect, draft?.title);
-			}
-			appendDraftDelta(part.data.id, part.data.delta);
-		}
-		if (part.type === "data-document-finish") {
-			finishDraft(part.data.id);
-			const draft = useDocumentsStore.getState().documents[part.data.id]?.draft;
-			const draftLength = draft?.content.length ?? 0;
-			if (draftLength <= 200) {
-				const vv = window.visualViewport || {
-					offsetLeft: 0,
-					offsetTop: 0,
-					width: window.innerWidth,
-					height: window.innerHeight,
-				};
-
-				const cx = vv.offsetLeft + vv.width / 2;
-				const cy = vv.offsetTop + vv.height / 2;
-				const centerRect = new DOMRect(cx - 100 / 2, cy - 100 / 2, 100, 100);
-				openArtifact(`text:${part.data.id}`, centerRect, draft?.title);
-			}
-		}
-	};
-
 	return {
 		latest,
 		draft,
@@ -358,7 +289,6 @@ export function useDocumentArtifact({
 		onRestoreSelectedVersion,
 		onBackToLatestVersion,
 		saveContent,
-		onStreamPart,
 		openOverlay,
 	};
 }

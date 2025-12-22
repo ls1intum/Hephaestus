@@ -1,8 +1,4 @@
-import {
-	type ComponentPropsWithoutRef,
-	forwardRef,
-	type SVGAttributes,
-} from "react";
+import { type ComponentPropsWithoutRef, forwardRef, type SVGAttributes } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -12,24 +8,23 @@ export type GitHubSignInButtonProps = ComponentPropsWithoutRef<typeof Button>;
  * GitHub-branded sign-in button built from the official mark and label guidance.
  * See https://github.com/logos for usage rules.
  */
-export const GitHubSignInButton = forwardRef<
-	HTMLButtonElement,
-	GitHubSignInButtonProps
->(({ className, children, size = "default", ...props }, ref) => {
-	return (
-		<Button
-			ref={ref}
-			size={size}
-			className="bg-github-black text-github-white dark:bg-github-white dark:text-github-black"
-			{...props}
-		>
-			<GitHubMarkIcon className="!text-github-white dark:!text-github-black" />
-			<span className="text-base font-semibold tracking-tight">
-				{children ?? "Sign in with GitHub"}
-			</span>
-		</Button>
-	);
-});
+export const GitHubSignInButton = forwardRef<HTMLButtonElement, GitHubSignInButtonProps>(
+	({ className, children, size = "default", ...props }, ref) => {
+		return (
+			<Button
+				ref={ref}
+				size={size}
+				className="bg-github-black text-github-white dark:bg-github-white dark:text-github-black"
+				{...props}
+			>
+				<GitHubMarkIcon className="!text-github-white dark:!text-github-black" />
+				<span className="text-base font-semibold tracking-tight">
+					{children ?? "Sign in with GitHub"}
+				</span>
+			</Button>
+		);
+	},
+);
 
 GitHubSignInButton.displayName = "GitHubSignInButton";
 

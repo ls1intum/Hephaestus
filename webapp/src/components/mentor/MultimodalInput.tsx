@@ -8,7 +8,6 @@ import { Textarea } from "@/components/ui/textarea";
 import type { Attachment } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { PreviewAttachment } from "./PreviewAttachment";
-import { SuggestedActions } from "./SuggestedActions";
 
 export interface MultimodalInputProps {
 	/** Current upload/submission status */
@@ -27,8 +26,6 @@ export interface MultimodalInputProps {
 	className?: string;
 	/** Placeholder text for textarea */
 	placeholder?: string;
-	/** Whether to show suggested actions (requires onSuggestedAction handler, disabled in readonly mode) */
-	showSuggestedActions?: boolean;
 	/** Initial input value */
 	initialInput?: string;
 	/** Whether the input should be readonly */
@@ -52,7 +49,6 @@ export function MultimodalInput({
 	onSubmit,
 	className,
 	placeholder = "Send a message...",
-	showSuggestedActions,
 	initialInput = "",
 	readonly = false,
 	disableAttachments = false,
@@ -72,9 +68,6 @@ export function MultimodalInput({
 	useEffect(() => {
 		setInput(initialInput);
 	}, [initialInput]);
-
-	// Show suggested actions if explicitly enabled and not readonly
-	const shouldShowSuggestedActions = showSuggestedActions && !readonly;
 
 	const adjustHeight = () => {
 		if (textareaRef.current) {
@@ -105,21 +98,6 @@ export function MultimodalInput({
 
 	const handleInput = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
 		setInput(event.target.value);
-	};
-
-	const handleSuggestedAction = (actionText: string) => {
-		// Send immediately when a suggested action is clicked
-		onSubmit({ text: actionText, attachments });
-		// Reset UI state after submission
-		setInput("");
-		resetHeight();
-		// After the state flush, adjust to minimal height again
-		requestAnimationFrame(() => {
-			adjustHeight();
-		});
-		if (width && width > 768) {
-			textareaRef.current?.focus();
-		}
 	};
 
 	const submitForm = () => {
@@ -163,8 +141,7 @@ export function MultimodalInput({
 		}
 	}, [status, scrollToBottom]);
 
-	const canSubmit =
-		input.trim().length > 0 && uploadQueue.length === 0 && !readonly;
+	const canSubmit = input.trim().length > 0 && uploadQueue.length === 0 && !readonly;
 
 	return (
 		<div className="relative w-full flex flex-col gap-4">
@@ -192,10 +169,6 @@ export function MultimodalInput({
 					</motion.div>
 				)}
 			</AnimatePresence>
-
-			{shouldShowSuggestedActions && (
-				<SuggestedActions onAction={handleSuggestedAction} />
-			)}
 
 			{!disableAttachments && (
 				<input
@@ -269,11 +242,7 @@ export function MultimodalInput({
 						rows={2}
 						autoFocus={!readonly}
 						onKeyDown={(event) => {
-							if (
-								event.key === "Enter" &&
-								!event.shiftKey &&
-								!event.nativeEvent.isComposing
-							) {
+							if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
 								event.preventDefault();
 
 								if (status !== "ready") {
@@ -292,11 +261,7 @@ export function MultimodalInput({
 				<div className="flex gap-2 justify-between">
 					<div className="flex gap-2">
 						{!disableAttachments && (
-							<AttachmentsButton
-								fileInputRef={fileInputRef}
-								status={status}
-								readonly={readonly}
-							/>
+							<AttachmentsButton fileInputRef={fileInputRef} status={status} readonly={readonly} />
 						)}
 					</div>
 					<div>
@@ -354,13 +319,7 @@ function StopButton({ onStop }: { onStop: () => void }) {
 	);
 }
 
-function SendButton({
-	onSubmit,
-	disabled,
-}: {
-	onSubmit: () => void;
-	disabled: boolean;
-}) {
+function SendButton({ onSubmit, disabled }: { onSubmit: () => void; disabled: boolean }) {
 	return (
 		<Button
 			data-testid="send-button"

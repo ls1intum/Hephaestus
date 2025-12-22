@@ -18,11 +18,7 @@ interface LeaderboardPageProps {
 	teamLabelsById?: Record<number, string>;
 	onTeamChange?: (team: string) => void;
 	onSortChange?: (sort: LeaderboardSortType) => void;
-	onTimeframeChange?: (
-		afterDate: string,
-		beforeDate?: string,
-		timeframe?: string,
-	) => void;
+	onTimeframeChange?: (afterDate: string, beforeDate?: string, timeframe?: string) => void;
 	onUserClick?: (username: string) => void;
 	selectedTeam?: string;
 	selectedSort?: LeaderboardSortType;

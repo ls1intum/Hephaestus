@@ -79,10 +79,7 @@ export function AppSidebar({
 		);
 	} else if (context === "mentor") {
 		contextHeader = (
-			<NavContextHeader
-				title="Mentor"
-				workspaceSlug={activeWorkspace.workspaceSlug}
-			>
+			<NavContextHeader title="Mentor" workspaceSlug={activeWorkspace.workspaceSlug}>
 				<SidebarMenuButton asChild>
 					<Link
 						to="/w/$workspaceSlug/mentor"
@@ -105,13 +102,8 @@ export function AppSidebar({
 	} else {
 		sidebarContent = (
 			<>
-				<NavDashboards
-					username={username}
-					workspaceSlug={activeWorkspace.workspaceSlug}
-				/>
-				{hasMentorAccess && (
-					<NavMentor workspaceSlug={activeWorkspace.workspaceSlug} />
-				)}
+				<NavDashboards username={username} workspaceSlug={activeWorkspace.workspaceSlug} />
+				{hasMentorAccess && <NavMentor workspaceSlug={activeWorkspace.workspaceSlug} />}
 				{isAdmin && <NavAdmin workspaceSlug={activeWorkspace.workspaceSlug} />}
 			</>
 		);

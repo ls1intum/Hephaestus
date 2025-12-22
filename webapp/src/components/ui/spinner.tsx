@@ -9,8 +9,7 @@ interface SpinnerProps extends React.HTMLAttributes<HTMLDivElement> {
 }
 
 function Spinner({ size = "default", className, ...props }: SpinnerProps) {
-	const sizeClass =
-		size === "sm" ? "size-4" : size === "lg" ? "size-8" : "size-6";
+	const sizeClass = size === "sm" ? "size-4" : size === "lg" ? "size-8" : "size-6";
 
 	return (
 		<div
@@ -20,10 +19,7 @@ function Spinner({ size = "default", className, ...props }: SpinnerProps) {
 			className={cn("inline-flex items-center justify-center", className)}
 			{...props}
 		>
-			<Loader2Icon
-				aria-hidden="true"
-				className={cn("animate-spin", sizeClass)}
-			/>
+			<Loader2Icon aria-hidden="true" className={cn("animate-spin", sizeClass)} />
 			<span className="sr-only">Loading...</span>
 		</div>
 	);

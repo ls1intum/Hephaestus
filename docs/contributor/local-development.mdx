@@ -207,33 +207,29 @@ npm -w webapp run openapi-ts
 
 ## Intelligence service (`server/intelligence-service`)
 
-1. Create and activate a virtual environment:
+The intelligence service is a Node.js/TypeScript application using Hono and AI SDK v6. For detailed documentation including AI observability setup with Langfuse, see the dedicated [Intelligence Service guide](/contributor/intelligence-service).
+
+Quick start:
+
+1. Install dependencies:
 
    ```bash
-   python3 -m venv .venv
-   source .venv/bin/activate
+   cd server/intelligence-service
+   npm install
    ```
 
-2. Install dependencies with Poetry:
+2. Configure environment:
 
    ```bash
-   poetry install
+   cp .env.example .env
+   # Edit .env with your DATABASE_URL and LLM provider credentials
    ```
 
-3. Start FastAPI:
+3. Start the development server:
 
    ```bash
-   fastapi dev
+   npm run dev
    ```
 
-   The service is available at [http://127.0.0.1:8000](http://127.0.0.1:8000) with interactive docs at `/docs`.
+   The service is available at [http://localhost:8000](http://localhost:8000) with interactive docs at `/docs`.
 
-### GenAI integrations
-
-Copy `.env.example` to `.env` and add credentials for the GenAI providers (e.g., Ollama, OpenAI) plus optional LangSmith/Langfuse instrumentation.
-
-### FastAPI fundamentals
-
-- Routes live in `app/routers`. Keep dependencies minimal and favour dependency injection for shared services.
-- LangGraph flows sit in `app/mentor`. Regenerate the shared state definitions whenever you introduce new slots.
-- Auto-generated SQLAlchemy models (`app/db/models_gen.py`) must not be edited manually—use `npm run db:generate-models:intelligence-service` after schema changes.

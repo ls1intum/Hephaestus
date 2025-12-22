@@ -8,13 +8,11 @@ export function AboutCallToActionSection() {
 			<Badge className="mb-4" variant="outline">
 				Get Involved
 			</Badge>
-			<h2 className="text-3xl font-bold mb-4">
-				Ready to Forge Something Great?
-			</h2>
+			<h2 className="text-3xl font-bold mb-4">Ready to Forge Something Great?</h2>
 			<p className="text-muted-foreground max-w-2xl mx-auto mb-8">
-				Hephaestus thrives on community contributions from developers of all
-				skill levels. Whether you're fixing bugs, adding features, or improving
-				documentation, your expertise helps shape our platform.
+				Hephaestus thrives on community contributions from developers of all skill levels. Whether
+				you're fixing bugs, adding features, or improving documentation, your expertise helps shape
+				our platform.
 			</p>
 			<div className="flex flex-col sm:flex-row gap-4 justify-center">
 				<Button asChild variant="default" size="lg">

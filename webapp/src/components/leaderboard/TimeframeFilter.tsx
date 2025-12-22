@@ -15,11 +15,7 @@ import type { DateRange } from "react-day-picker";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Label } from "@/components/ui/label";
-import {
-	Popover,
-	PopoverContent,
-	PopoverTrigger,
-} from "@/components/ui/popover";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
 	Select,
 	SelectContent,
@@ -40,11 +36,7 @@ import {
 import { cn } from "@/lib/utils";
 
 export interface TimeframeFilterProps {
-	onTimeframeChange?: (
-		afterDate: string,
-		beforeDate?: string,
-		timeframe?: string,
-	) => void;
+	onTimeframeChange?: (afterDate: string, beforeDate?: string, timeframe?: string) => void;
 	initialAfterDate?: string;
 	initialBeforeDate?: string;
 	leaderboardSchedule?: {
@@ -65,13 +57,7 @@ export interface TimeframeFilterProps {
 }
 
 /** Icon component for each preset type */
-function PresetIcon({
-	preset,
-	className,
-}: {
-	preset: TimeframePreset;
-	className?: string;
-}) {
+function PresetIcon({ preset, className }: { preset: TimeframePreset; className?: string }) {
 	const iconClass = cn("h-4 w-4 shrink-0", className);
 
 	switch (preset) {
@@ -110,28 +96,19 @@ export function TimeframeFilter({
 
 	// Initial preset - captured on first render only via initializer
 	const [selectedPreset, setSelectedPreset] = useState<TimeframePreset>(() =>
-		detectPresetFromDates(
-			initialAfterDate,
-			initialBeforeDate,
-			schedule,
-			enableAllActivityOption,
-		),
+		detectPresetFromDates(initialAfterDate, initialBeforeDate, schedule, enableAllActivityOption),
 	);
 
 	const [customRange, setCustomRange] = useState<DateRange | undefined>(() => {
 		if (selectedPreset === "custom" && initialAfterDate) {
 			const from = parseISO(initialAfterDate);
-			const to = initialBeforeDate
-				? subDays(parseISO(initialBeforeDate), 1)
-				: undefined;
+			const to = initialBeforeDate ? subDays(parseISO(initialBeforeDate), 1) : undefined;
 			return { from, to };
 		}
 		return undefined;
 	});
 
-	const lastEmittedRef = useRef<{ after: string; before?: string } | null>(
-		null,
-	);
+	const lastEmittedRef = useRef<{ after: string; before?: string } | null>(null);
 
 	// Sync preset from external date changes (when user hasn't interacted yet)
 	useEffect(() => {
@@ -180,9 +157,7 @@ export function TimeframeFilter({
 					};
 				} else if (selectedPreset === "this-month") {
 					// For this month, use next month start
-					const monthEnd = startOfMonth(
-						addDays(endOfMonth(dateRange.after), 1),
-					);
+					const monthEnd = startOfMonth(addDays(endOfMonth(dateRange.after), 1));
 					range = {
 						after: formatISO(dateRange.after),
 						before: formatISO(monthEnd),
@@ -204,13 +179,7 @@ export function TimeframeFilter({
 
 		lastEmittedRef.current = range;
 		onTimeframeChange(range.after, range.before, selectedPreset);
-	}, [
-		selectedPreset,
-		customRange,
-		schedule,
-		onTimeframeChange,
-		openEndedPresets,
-	]);
+	}, [selectedPreset, customRange, schedule, onTimeframeChange, openEndedPresets]);
 
 	const handlePresetChange = (value: string) => {
 		const preset = value as TimeframePreset;
@@ -265,9 +234,7 @@ export function TimeframeFilter({
 
 	// Trigger shows detailed label (with dates), dropdown shows simple labels
 	const selectDisplayValue =
-		selectedPreset === "custom"
-			? "Custom range"
-			: formatSelectedLabel(selectedPreset, schedule);
+		selectedPreset === "custom" ? "Custom range" : formatSelectedLabel(selectedPreset, schedule);
 
 	return (
 		<div className="space-y-1.5">
@@ -275,10 +242,7 @@ export function TimeframeFilter({
 			<Select value={selectedPreset} onValueChange={handlePresetChange}>
 				<SelectTrigger id="timeframe" className="w-full">
 					<div className="flex items-center gap-2">
-						<PresetIcon
-							preset={selectedPreset}
-							className="text-muted-foreground"
-						/>
+						<PresetIcon preset={selectedPreset} className="text-muted-foreground" />
 						<SelectValue>{selectDisplayValue}</SelectValue>
 					</div>
 				</SelectTrigger>

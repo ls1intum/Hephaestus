@@ -1,9 +1,6 @@
 import { useLayoutEffect, useMemo } from "react";
 import type { TeamInfo } from "@/api/types.gen";
-import {
-	type Contributor,
-	ContributorGrid,
-} from "@/components/shared/ContributorGrid";
+import { type Contributor, ContributorGrid } from "@/components/shared/ContributorGrid";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -24,9 +21,7 @@ export function TeamsPage({ teams, isLoading }: TeamsPageProps) {
 
 	// Helper function to sort team members alphabetically by name
 	const sortMembers = (team: TeamInfo) => {
-		return [...(team.members ?? [])].sort((a, b) =>
-			a.name.localeCompare(b.name),
-		);
+		return [...(team.members ?? [])].sort((a, b) => a.name.localeCompare(b.name));
 	};
 
 	// Note: We'll build contributors after filtering descendant duplicates
@@ -98,9 +93,7 @@ export function TeamsPage({ teams, isLoading }: TeamsPageProps) {
 			const res = new Set<number>();
 			for (const child of children) {
 				// child's own members
-				(membersByTeamId.get(child.id) ?? new Set<number>()).forEach((id) =>
-					res.add(id),
-				);
+				(membersByTeamId.get(child.id) ?? new Set<number>()).forEach((id) => res.add(id));
 				// descendant members
 				collect(child.id).forEach((id) => res.add(id));
 			}
@@ -128,25 +121,16 @@ export function TeamsPage({ teams, isLoading }: TeamsPageProps) {
 	const renderTeamNode = (team: TeamInfo, depth = 0) => {
 		const children = childrenMap.get(team.id) ?? [];
 		const filteredContributors = getFilteredContributors(team);
-		const hasDescendantMembers =
-			(descendantMemberIdsMap.get(team.id)?.size ?? 0) > 0;
+		const hasDescendantMembers = (descendantMemberIdsMap.get(team.id)?.size ?? 0) > 0;
 		const emptyStateNode = (
 			<div className="py-8 text-center">
-				<p className="text-muted-foreground">
-					No members assigned to this team
-				</p>
+				<p className="text-muted-foreground">No members assigned to this team</p>
 			</div>
 		);
 		const maybeEmptyState =
-			filteredContributors.length === 0 && !hasDescendantMembers
-				? emptyStateNode
-				: undefined;
+			filteredContributors.length === 0 && !hasDescendantMembers ? emptyStateNode : undefined;
 		return (
-			<Card
-				key={team.id}
-				id={`team-${team.id}`}
-				className="flex flex-col gap-3"
-			>
+			<Card key={team.id} id={`team-${team.id}`} className="flex flex-col gap-3">
 				<CardHeader>
 					<CardTitle>{team.name}</CardTitle>
 				</CardHeader>
@@ -157,8 +141,7 @@ export function TeamsPage({ teams, isLoading }: TeamsPageProps) {
 						layout="compact"
 						emptyState={maybeEmptyState}
 					/>
-					{children.length > 0 &&
-						children.map((child) => renderTeamNode(child, depth + 1))}
+					{children.length > 0 && children.map((child) => renderTeamNode(child, depth + 1))}
 				</CardContent>
 			</Card>
 		);
@@ -228,9 +211,7 @@ export function TeamsPage({ teams, isLoading }: TeamsPageProps) {
 
 			{!isLoading && (
 				<>
-					<div className="space-y-4">
-						{roots.map((team) => renderTeamNode(team))}
-					</div>
+					<div className="space-y-4">{roots.map((team) => renderTeamNode(team))}</div>
 
 					{roots.length === 0 && (
 						<div className="py-8 text-center">
@@ -244,10 +225,7 @@ export function TeamsPage({ teams, isLoading }: TeamsPageProps) {
 				Array(3)
 					.fill(null)
 					.map((_, teamIndex) => (
-						<Card
-							key={`loading-team-${teamIndex}`}
-							className="flex flex-col mb-8 gap-3"
-						>
+						<Card key={`loading-team-${teamIndex}`} className="flex flex-col mb-8 gap-3">
 							<CardHeader>
 								<Skeleton className="h-6 w-1/4" />
 							</CardHeader>

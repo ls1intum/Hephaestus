@@ -17,11 +17,7 @@ import { SURVEY_LAYOUT_ID } from "./survey-notification-button";
  * Check if a URL matches the survey's URL condition
  * Replicates PostHog's internal URL matching logic
  */
-function checkUrlMatch(
-	currentUrl: string,
-	pattern: string,
-	matchType?: string,
-): boolean {
+function checkUrlMatch(currentUrl: string, pattern: string, matchType?: string): boolean {
 	const type = matchType || "icontains";
 
 	switch (type) {
@@ -64,17 +60,11 @@ export function PostHogSurveyWidget({
 	const posthog = usePostHog();
 
 	// Zustand store for persistent survey notifications
-	const shouldShowSurvey = useSurveyNotificationStore(
-		(s) => s.shouldShowSurvey,
-	);
+	const shouldShowSurvey = useSurveyNotificationStore((s) => s.shouldShowSurvey);
 	const pendingSurvey = useSurveyNotificationStore((s) => s.pendingSurvey);
 	const clearShowSignal = useSurveyNotificationStore((s) => s.clearShowSignal);
-	const setPendingSurvey = useSurveyNotificationStore(
-		(s) => s.setPendingSurvey,
-	);
-	const clearPendingSurvey = useSurveyNotificationStore(
-		(s) => s.clearPendingSurvey,
-	);
+	const setPendingSurvey = useSurveyNotificationStore((s) => s.setPendingSurvey);
+	const clearPendingSurvey = useSurveyNotificationStore((s) => s.clearPendingSurvey);
 
 	const [survey, setSurvey] = useState<PostHogSurvey | null>(null);
 	const [isVisible, setIsVisible] = useState(false);
@@ -216,9 +206,7 @@ export function PostHogSurveyWidget({
 					}
 
 					if (candidate.conditions?.selector) {
-						const selectorExists = document.querySelector(
-							candidate.conditions.selector,
-						);
+						const selectorExists = document.querySelector(candidate.conditions.selector);
 						if (!selectorExists) {
 							continue;
 						}
@@ -275,13 +263,7 @@ export function PostHogSurveyWidget({
 	}, [autoOpen, posthog, surveyId]);
 
 	useEffect(() => {
-		if (
-			!posthog ||
-			!survey ||
-			!isVisible ||
-			!showWithDelay ||
-			hasTrackedShown.current
-		) {
+		if (!posthog || !survey || !isVisible || !showWithDelay || hasTrackedShown.current) {
 			return;
 		}
 
@@ -304,9 +286,7 @@ export function PostHogSurveyWidget({
 			return submissionId;
 		}
 		const generated =
-			typeof crypto !== "undefined" && crypto.randomUUID
-				? crypto.randomUUID()
-				: `${Date.now()}`;
+			typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}`;
 		setSubmissionId(generated);
 		return generated;
 	};
@@ -334,10 +314,7 @@ export function PostHogSurveyWidget({
 		if (!survey || !posthog) {
 			return;
 		}
-		if (
-			survey.enable_partial_responses === false ||
-			Object.keys(responses).length === 0
-		) {
+		if (survey.enable_partial_responses === false || Object.keys(responses).length === 0) {
 			return;
 		}
 		const id = ensureSubmissionId();
@@ -468,10 +445,7 @@ const buildSurveyEventPayload = ({
 	return payload;
 };
 
-const transformResponseValue = (
-	question: SurveyQuestion,
-	response: SurveyResponse,
-) => {
+const transformResponseValue = (question: SurveyQuestion, response: SurveyResponse) => {
 	if (response === null || response === undefined) {
 		return undefined;
 	}
