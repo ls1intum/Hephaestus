@@ -25,7 +25,7 @@ export default defineConfig(({ command }) => {
 				}),
 		].filter(Boolean), // Filter out falsy values
 		build: {
-			sourcemap: true,
+			sourcemap: false, // Disable sourcemaps for now to reduce build memory usage
 		},
 		optimizeDeps: {
 			exclude: ["storybook-static"],
