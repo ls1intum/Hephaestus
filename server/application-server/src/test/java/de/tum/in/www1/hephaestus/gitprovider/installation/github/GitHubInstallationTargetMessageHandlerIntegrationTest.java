@@ -92,6 +92,66 @@ class GitHubInstallationTargetMessageHandlerIntegrationTest extends BaseIntegrat
         assertThat(event.action()).isEqualTo("renamed");
     }
 
+    @Test
+    @DisplayName("Should handle renamed event for user account")
+    void shouldHandleRenamedEventForUser() throws Exception {
+        // Given - use installation_target_user.json for user account rename
+        GitHubInstallationTargetEventDTO event = loadPayload("installation_target_user");
+        setupTestWorkspace(event.installation().id(), "SoloMaintainer");
+
+        // When
+        handler.handleEvent(event);
+
+        // Then - handler processes without error
+        assertThat(event.action()).isEqualTo("renamed");
+        assertThat(event.targetType()).isEqualTo("User");
+    }
+
+    @Test
+    @DisplayName("Should handle null account gracefully")
+    void shouldHandleNullAccountGracefully() {
+        // Given - event with null account
+        GitHubInstallationTargetEventDTO event = new GitHubInstallationTargetEventDTO(
+            "renamed",
+            null,  // installation
+            null,  // account
+            "Organization",
+            null   // sender
+        );
+
+        // When - should not throw
+        handler.handleEvent(event);
+
+        // Then - handler logs warning but doesn't crash
+    }
+
+    @Test
+    @DisplayName("Should handle unknown action gracefully")
+    void shouldHandleUnknownActionGracefully() throws Exception {
+        // Given - load a valid event and create with unknown action
+        GitHubInstallationTargetEventDTO baseEvent = loadPayload("installation_target");
+        GitHubInstallationTargetEventDTO event = new GitHubInstallationTargetEventDTO(
+            "unknown_action",
+            baseEvent.installation(),
+            baseEvent.account(),
+            baseEvent.targetType(),
+            baseEvent.sender()
+        );
+        setupTestWorkspace(baseEvent.installation().id(), "OldName");
+
+        // When - should not throw
+        handler.handleEvent(event);
+
+        // Then - handler logs debug message for unhandled action
+    }
+
+    @Test
+    @DisplayName("Should return INSTALLATION domain")
+    void shouldReturnInstallationDomain() {
+        assertThat(handler.getDomain())
+            .isEqualTo(de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler.GitHubMessageDomain.INSTALLATION);
+    }
+
     private GitHubInstallationTargetEventDTO loadPayload(String filename) throws IOException {
         ClassPathResource resource = new ClassPathResource("github/" + filename + ".json");
         String json = resource.getContentAsString(StandardCharsets.UTF_8);

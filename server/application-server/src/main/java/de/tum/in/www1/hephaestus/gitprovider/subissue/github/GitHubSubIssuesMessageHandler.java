@@ -3,8 +3,6 @@ package de.tum.in.www1.hephaestus.gitprovider.subissue.github;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContextFactory;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
-import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
-import de.tum.in.www1.hephaestus.gitprovider.issue.IssueRepository;
 import de.tum.in.www1.hephaestus.gitprovider.issue.github.GitHubIssueProcessor;
 import de.tum.in.www1.hephaestus.gitprovider.subissue.github.dto.GitHubSubIssuesEventDTO;
 import org.slf4j.Logger;
@@ -16,6 +14,8 @@ import org.springframework.transaction.annotation.Transactional;
  * Handles GitHub sub_issues webhook events.
  * <p>
  * Uses DTOs directly (no hub4j) for complete field coverage.
+ * <p>
+ * Delegates sub-issue relationship management to {@link GitHubSubIssueSyncService}.
  */
 @Component
 public class GitHubSubIssuesMessageHandler extends GitHubMessageHandler<GitHubSubIssuesEventDTO> {
@@ -24,17 +24,17 @@ public class GitHubSubIssuesMessageHandler extends GitHubMessageHandler<GitHubSu
 
     private final ProcessingContextFactory contextFactory;
     private final GitHubIssueProcessor issueProcessor;
-    private final IssueRepository issueRepository;
+    private final GitHubSubIssueSyncService subIssueSyncService;
 
     GitHubSubIssuesMessageHandler(
         ProcessingContextFactory contextFactory,
         GitHubIssueProcessor issueProcessor,
-        IssueRepository issueRepository
+        GitHubSubIssueSyncService subIssueSyncService
     ) {
         super(GitHubSubIssuesEventDTO.class);
         this.contextFactory = contextFactory;
         this.issueProcessor = issueProcessor;
-        this.issueRepository = issueRepository;
+        this.subIssueSyncService = subIssueSyncService;
     }
 
     @Override
@@ -70,28 +70,22 @@ public class GitHubSubIssuesMessageHandler extends GitHubMessageHandler<GitHubSu
         issueProcessor.process(parentIssueDto, context);
         issueProcessor.process(subIssueDto, context);
 
-        // Handle sub-issue relationship
-        Issue parentIssue = issueRepository.findById(parentIssueDto.getDatabaseId()).orElse(null);
-        Issue subIssue = issueRepository.findById(subIssueDto.getDatabaseId()).orElse(null);
+        // Process sub-issue relationship
+        Long subIssueId = subIssueDto.getDatabaseId();
+        Long parentIssueId = parentIssueDto.getDatabaseId();
 
-        if (parentIssue != null && subIssue != null) {
-            switch (event.action()) {
-                case "sub_issue_added", "parent_issue_added" -> {
-                    subIssue.setParentIssue(parentIssue);
-                    issueRepository.save(subIssue);
-                    logger.info("Linked sub-issue #{} to parent #{}", subIssueDto.number(), parentIssueDto.number());
-                }
-                case "sub_issue_removed", "parent_issue_removed" -> {
-                    subIssue.setParentIssue(null);
-                    issueRepository.save(subIssue);
-                    logger.info(
-                        "Unlinked sub-issue #{} from parent #{}",
-                        subIssueDto.number(),
-                        parentIssueDto.number()
-                    );
-                }
-                default -> logger.debug("Unhandled sub_issues action: {}", event.action());
-            }
+        switch (event.action()) {
+            case "sub_issue_added", "parent_issue_added" -> subIssueSyncService.processSubIssueEvent(
+                subIssueId,
+                parentIssueId,
+                true
+            );
+            case "sub_issue_removed", "parent_issue_removed" -> subIssueSyncService.processSubIssueEvent(
+                subIssueId,
+                parentIssueId,
+                false
+            );
+            default -> logger.debug("Unhandled sub_issues action: {}", event.action());
         }
     }
 }

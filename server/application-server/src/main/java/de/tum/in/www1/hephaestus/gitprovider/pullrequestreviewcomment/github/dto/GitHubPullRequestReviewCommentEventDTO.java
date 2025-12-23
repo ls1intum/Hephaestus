@@ -39,6 +39,18 @@ public record GitHubPullRequestReviewCommentEventDTO(
         @JsonProperty("user") GitHubUserDTO author,
         @JsonProperty("created_at") Instant createdAt,
         @JsonProperty("updated_at") Instant updatedAt,
-        @JsonProperty("pull_request_review_id") Long reviewId
+        @JsonProperty("pull_request_review_id") Long reviewId,
+        @JsonProperty("commit_id") String commitId,
+        @JsonProperty("original_commit_id") String originalCommitId,
+        @JsonProperty("author_association") String authorAssociation,
+        @JsonProperty("line") Integer line,
+        @JsonProperty("original_line") Integer originalLine,
+        @JsonProperty("start_line") Integer startLine,
+        @JsonProperty("original_start_line") Integer originalStartLine,
+        @JsonProperty("side") String side,
+        @JsonProperty("start_side") String startSide,
+        @JsonProperty("position") Integer position,
+        @JsonProperty("original_position") Integer originalPosition,
+        @JsonProperty("in_reply_to_id") Long inReplyToId
     ) {}
 }

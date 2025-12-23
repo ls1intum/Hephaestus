@@ -101,6 +101,48 @@ class GitHubInstallationMessageHandlerIntegrationTest extends BaseIntegrationTes
         assertThat(event.action()).isEqualTo("unsuspend");
     }
 
+    @Test
+    @DisplayName("Should handle null installation gracefully")
+    void shouldHandleNullInstallationGracefully() {
+        // Given - event with null installation
+        GitHubInstallationEventDTO event = new GitHubInstallationEventDTO(
+            "created",
+            null,
+            null,
+            null
+        );
+
+        // When - should not throw
+        handler.handleEvent(event);
+
+        // Then - handler logs warning but doesn't crash
+    }
+
+    @Test
+    @DisplayName("Should handle unknown action gracefully")
+    void shouldHandleUnknownActionGracefully() throws Exception {
+        // Given - load a valid event and parse to get structure, then create with unknown action
+        GitHubInstallationEventDTO baseEvent = loadPayload("installation.created");
+        GitHubInstallationEventDTO event = new GitHubInstallationEventDTO(
+            "unknown_action",
+            baseEvent.installation(),
+            baseEvent.repositories(),
+            baseEvent.sender()
+        );
+
+        // When - should not throw
+        handler.handleEvent(event);
+
+        // Then - handler logs debug message for unhandled action
+    }
+
+    @Test
+    @DisplayName("Should return INSTALLATION domain")
+    void shouldReturnInstallationDomain() {
+        assertThat(handler.getDomain())
+            .isEqualTo(de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler.GitHubMessageDomain.INSTALLATION);
+    }
+
     private GitHubInstallationEventDTO loadPayload(String filename) throws IOException {
         ClassPathResource resource = new ClassPathResource("github/" + filename + ".json");
         String json = resource.getContentAsString(StandardCharsets.UTF_8);

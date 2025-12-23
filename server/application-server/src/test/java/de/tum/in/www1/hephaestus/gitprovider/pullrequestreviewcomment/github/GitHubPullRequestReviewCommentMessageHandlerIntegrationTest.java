@@ -136,7 +136,7 @@ class GitHubPullRequestReviewCommentMessageHandlerIntegrationTest extends BaseIn
         // When
         handler.handleEvent(event);
 
-        // Then
+        // Then - verify comment is created with required fields
         assertThat(commentRepository.findById(event.comment().id()))
             .isPresent()
             .get()
@@ -144,6 +144,12 @@ class GitHubPullRequestReviewCommentMessageHandlerIntegrationTest extends BaseIn
                 assertThat(comment.getId()).isEqualTo(event.comment().id());
                 assertThat(comment.getBody()).isEqualTo(event.comment().body());
                 assertThat(comment.getPath()).isEqualTo(event.comment().path());
+                // Verify thread is created (required FK)
+                assertThat(comment.getThread()).isNotNull();
+                assertThat(comment.getThread().getId()).isNotNull();
+                // Verify required fields are populated
+                assertThat(comment.getCommitId()).isNotEmpty();
+                assertThat(comment.getSide()).isNotNull();
             });
     }
 

@@ -36,6 +36,7 @@ public record GitHubPullRequestReviewEventDTO(
         @JsonProperty("state") String state,
         @JsonProperty("html_url") String htmlUrl,
         @JsonProperty("user") GitHubUserDTO author,
-        @JsonProperty("submitted_at") Instant submittedAt
+        @JsonProperty("submitted_at") Instant submittedAt,
+        @JsonProperty("commit_id") String commitId
     ) {}
 }

@@ -64,10 +64,16 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
     /**
      * Process a GitHub pull request DTO and persist it as a PullRequest entity.
      * Publishes appropriate domain events based on what changed.
+     *
+     * @return the processed PullRequest, or null if the DTO has no valid ID
      */
     @Transactional
     public PullRequest process(GitHubPullRequestDTO dto, ProcessingContext context) {
         Long prId = dto.getDatabaseId();
+        if (prId == null) {
+            logger.warn("Cannot process pull request with null ID");
+            return null;
+        }
         Optional<PullRequest> existingOpt = pullRequestRepository.findById(prId);
 
         PullRequest pr;

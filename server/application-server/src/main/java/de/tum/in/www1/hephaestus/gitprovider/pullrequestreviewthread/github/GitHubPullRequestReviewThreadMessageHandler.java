@@ -4,7 +4,10 @@ import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContextFactory;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.github.GitHubPullRequestProcessor;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewthread.PullRequestReviewThread;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewthread.PullRequestReviewThreadRepository;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewthread.github.dto.GitHubPullRequestReviewThreadEventDTO;
+import java.time.Instant;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -23,14 +26,17 @@ public class GitHubPullRequestReviewThreadMessageHandler
 
     private final ProcessingContextFactory contextFactory;
     private final GitHubPullRequestProcessor prProcessor;
+    private final PullRequestReviewThreadRepository threadRepository;
 
     GitHubPullRequestReviewThreadMessageHandler(
         ProcessingContextFactory contextFactory,
-        GitHubPullRequestProcessor prProcessor
+        GitHubPullRequestProcessor prProcessor,
+        PullRequestReviewThreadRepository threadRepository
     ) {
         super(GitHubPullRequestReviewThreadEventDTO.class);
         this.contextFactory = contextFactory;
         this.prProcessor = prProcessor;
+        this.threadRepository = threadRepository;
     }
 
     @Override
@@ -62,15 +68,47 @@ public class GitHubPullRequestReviewThreadMessageHandler
             return;
         }
 
-        // For now, just ensure PR is up to date
-        // Thread handling can be expanded if needed
+        // Ensure PR exists
         prProcessor.process(prDto, context);
 
-        // Log the thread action
+        // Process thread state changes
         switch (event.action()) {
-            case "resolved" -> logger.info("Thread {} resolved on PR #{}", threadDto.id(), prDto.number());
-            case "unresolved" -> logger.info("Thread {} unresolved on PR #{}", threadDto.id(), prDto.number());
+            case "resolved" -> processResolved(threadDto.id());
+            case "unresolved" -> processUnresolved(threadDto.id());
             default -> logger.debug("Unhandled thread action: {}", event.action());
         }
+    }
+
+    private void processResolved(Long threadId) {
+        if (threadId == null) {
+            logger.warn("Cannot resolve thread: threadId is null");
+            return;
+        }
+        threadRepository.findById(threadId).ifPresentOrElse(
+            thread -> {
+                thread.setState(PullRequestReviewThread.State.RESOLVED);
+                thread.setResolvedAt(Instant.now());
+                threadRepository.save(thread);
+                logger.info("Thread {} resolved", threadId);
+            },
+            () -> logger.debug("Thread {} not found for resolve action, may not have been synced yet", threadId)
+        );
+    }
+
+    private void processUnresolved(Long threadId) {
+        if (threadId == null) {
+            logger.warn("Cannot unresolve thread: threadId is null");
+            return;
+        }
+        threadRepository.findById(threadId).ifPresentOrElse(
+            thread -> {
+                thread.setState(PullRequestReviewThread.State.UNRESOLVED);
+                thread.setResolvedAt(null);
+                thread.setResolvedBy(null);
+                threadRepository.save(thread);
+                logger.info("Thread {} unresolved", threadId);
+            },
+            () -> logger.debug("Thread {} not found for unresolve action, may not have been synced yet", threadId)
+        );
     }
 }

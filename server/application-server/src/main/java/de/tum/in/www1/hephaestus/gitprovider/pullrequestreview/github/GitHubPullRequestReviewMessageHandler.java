@@ -111,7 +111,11 @@ public class GitHubPullRequestReviewMessageHandler extends GitHubMessageHandler<
                 review -> {
                     review.setBody(dto.body());
                     review.setState(mapState(dto.state()));
+                    if (dto.commitId() != null) {
+                        review.setCommitId(dto.commitId());
+                    }
                     reviewRepository.save(review);
+                    logger.debug("Updated review {}", dto.id());
                 },
                 () -> {
                     PullRequestReview review = new PullRequestReview();
@@ -119,14 +123,16 @@ public class GitHubPullRequestReviewMessageHandler extends GitHubMessageHandler<
                     review.setBody(dto.body());
                     review.setState(mapState(dto.state()));
                     review.setSubmittedAt(dto.submittedAt());
-                    review.setHtmlUrl(dto.htmlUrl());
+                    review.setHtmlUrl(dto.htmlUrl() != null ? dto.htmlUrl() : "");
                     review.setPullRequest(pr);
+                    review.setCommitId(dto.commitId());
 
                     if (dto.author() != null && dto.author().id() != null) {
                         userRepository.findById(dto.author().id()).ifPresent(review::setAuthor);
                     }
 
                     reviewRepository.save(review);
+                    logger.debug("Created review {}", dto.id());
                 }
             );
     }

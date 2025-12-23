@@ -33,6 +33,7 @@ public record GitHubPullRequestReviewThreadEventDTO(
         @JsonProperty("node_id") String nodeId,
         @JsonProperty("diff_side") String diffSide,
         @JsonProperty("line") Integer line,
+        @JsonProperty("start_line") Integer startLine,
         @JsonProperty("path") String path
     ) {}
 }

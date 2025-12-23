@@ -1,0 +1,197 @@
+package de.tum.in.www1.hephaestus.gitprovider.github;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequest.github.GitHubPullRequestGraphQlSyncService;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReview;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReviewRepository;
+import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
+import de.tum.in.www1.hephaestus.gitprovider.repository.github.GitHubRepositoryGraphQlSyncService;
+import java.time.Instant;
+import java.util.List;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+
+/**
+ * Live integration tests for GitHub pull request synchronization.
+ * <p>
+ * These tests hit the real GitHub API and require valid credentials.
+ * They are tagged with "live" and will be skipped if credentials are not configured.
+ */
+class GitHubLivePullRequestSyncIntegrationTest extends AbstractGitHubLiveSyncIntegrationTest {
+
+    @Autowired
+    private GitHubRepositoryGraphQlSyncService repositorySyncService;
+
+    @Autowired
+    private GitHubPullRequestGraphQlSyncService pullRequestSyncService;
+
+    @Autowired
+    private PullRequestRepository pullRequestRepository;
+
+    @Autowired
+    private PullRequestReviewRepository pullRequestReviewRepository;
+
+    @Autowired
+    private RepositoryRepository repositoryRepository;
+
+    @Test
+    void syncsNewPullRequests() throws Exception {
+        // 1. Create ephemeral repository with a feature branch and PR
+        var repository = createEphemeralRepository("pr-sync");
+        var repoInfo = fixtureService.getRepositoryInfo(repository.fullName());
+
+        // 2. Create a feature branch with a commit
+        String branchName = "feature-" + nextEphemeralSlug("branch");
+        fixtureService.createBranch(repoInfo.nodeId(), branchName, repoInfo.headCommitSha());
+
+        // Create a file on the feature branch
+        String filePath = "test-" + nextEphemeralSlug("file") + ".txt";
+        String fileContent = "Test content generated at " + Instant.now();
+        fixtureService.createCommitOnBranch(
+            repository.fullName(),
+            branchName,
+            "Add test file",
+            filePath,
+            fileContent
+        );
+
+        // 3. Create pull request
+        String prTitle = "IT pull request " + nextEphemeralSlug("pr");
+        String prBody = "Live integration PR created at " + Instant.now();
+        var createdPR = fixtureService.createPullRequest(
+            repoInfo.nodeId(),
+            prTitle,
+            prBody,
+            branchName,
+            repoInfo.defaultBranch()
+        );
+
+        // 4. Sync repository first
+        repositorySyncService.syncRepository(workspace.getId(), repository.fullName()).orElseThrow();
+        var localRepo = repositoryRepository.findByNameWithOwner(repository.fullName()).orElseThrow();
+
+        // 5. Sync pull requests
+        int syncedCount = pullRequestSyncService.syncPullRequestsForRepository(workspace.getId(), localRepo.getId());
+
+        // 6. Verify
+        assertThat(syncedCount).isGreaterThanOrEqualTo(1);
+
+        PullRequest storedPR = pullRequestRepository.findByRepositoryIdAndNumber(
+            localRepo.getId(),
+            createdPR.number()
+        ).orElseThrow();
+
+        assertThat(storedPR.getTitle()).isEqualTo(prTitle);
+        assertThat(storedPR.getBody()).isEqualTo(prBody);
+        assertThat(storedPR.getNumber()).isEqualTo(createdPR.number());
+        assertThat(storedPR.getState()).isEqualTo(PullRequest.State.OPEN);
+        assertThat(storedPR.getRepository().getId()).isEqualTo(localRepo.getId());
+    }
+
+    @Test
+    void syncsPullRequestReviews() throws Exception {
+        // 1. Create ephemeral repository with PR and review using helper method
+        var repository = createEphemeralRepository("pr-review-sync");
+        var prArtifacts = createPullRequestWithReview(repository);
+
+        // 2. Sync repository first
+        repositorySyncService.syncRepository(workspace.getId(), repository.fullName()).orElseThrow();
+        var localRepo = repositoryRepository.findByNameWithOwner(repository.fullName()).orElseThrow();
+
+        // 3. Sync pull requests
+        int syncedCount = pullRequestSyncService.syncPullRequestsForRepository(workspace.getId(), localRepo.getId());
+        assertThat(syncedCount).isGreaterThanOrEqualTo(1);
+
+        // 4. Verify PR is synced
+        PullRequest storedPR = pullRequestRepository.findByRepositoryIdAndNumber(
+            localRepo.getId(),
+            prArtifacts.pullRequestNumber()
+        ).orElseThrow();
+
+        assertThat(storedPR.getTitle()).isEqualTo(prArtifacts.pullRequestTitle());
+        assertThat(storedPR.getNumber()).isEqualTo(prArtifacts.pullRequestNumber());
+
+        // 5. Verify reviews are synced
+        List<PullRequestReview> reviews = pullRequestReviewRepository.findAll()
+            .stream()
+            .filter(r -> r.getPullRequest() != null && r.getPullRequest().getId().equals(storedPR.getId()))
+            .toList();
+
+        // Note: Reviews should be synced if the PR sync includes review data.
+        // If reviews are synced separately, this verifies the review was created remotely.
+        assertThat(reviews).anyMatch(r ->
+            r.getId().equals(prArtifacts.reviewId()) ||
+            (r.getBody() != null && r.getBody().contains(prArtifacts.reviewBody().substring(0, Math.min(20, prArtifacts.reviewBody().length()))))
+        );
+    }
+
+    @Test
+    void syncsMultiplePullRequests() throws Exception {
+        // 1. Create ephemeral repository
+        var repository = createEphemeralRepository("multi-pr-sync");
+        var repoInfo = fixtureService.getRepositoryInfo(repository.fullName());
+
+        // 2. Create first PR
+        String branchName1 = "feature-" + nextEphemeralSlug("branch1");
+        fixtureService.createBranch(repoInfo.nodeId(), branchName1, repoInfo.headCommitSha());
+        fixtureService.createCommitOnBranch(
+            repository.fullName(),
+            branchName1,
+            "Add file 1",
+            "file1.txt",
+            "Content 1"
+        );
+        String prTitle1 = "IT PR " + nextEphemeralSlug("pr1");
+        var pr1 = fixtureService.createPullRequest(
+            repoInfo.nodeId(),
+            prTitle1,
+            "First PR",
+            branchName1,
+            repoInfo.defaultBranch()
+        );
+
+        // 3. Create second PR
+        String branchName2 = "feature-" + nextEphemeralSlug("branch2");
+        fixtureService.createBranch(repoInfo.nodeId(), branchName2, repoInfo.headCommitSha());
+        fixtureService.createCommitOnBranch(
+            repository.fullName(),
+            branchName2,
+            "Add file 2",
+            "file2.txt",
+            "Content 2"
+        );
+        String prTitle2 = "IT PR " + nextEphemeralSlug("pr2");
+        var pr2 = fixtureService.createPullRequest(
+            repoInfo.nodeId(),
+            prTitle2,
+            "Second PR",
+            branchName2,
+            repoInfo.defaultBranch()
+        );
+
+        // 4. Sync repository first
+        repositorySyncService.syncRepository(workspace.getId(), repository.fullName()).orElseThrow();
+        var localRepo = repositoryRepository.findByNameWithOwner(repository.fullName()).orElseThrow();
+
+        // 5. Sync pull requests
+        int syncedCount = pullRequestSyncService.syncPullRequestsForRepository(workspace.getId(), localRepo.getId());
+
+        // 6. Verify both PRs are synced
+        assertThat(syncedCount).isGreaterThanOrEqualTo(2);
+
+        PullRequest storedPR1 = pullRequestRepository.findByRepositoryIdAndNumber(
+            localRepo.getId(),
+            pr1.number()
+        ).orElseThrow();
+        assertThat(storedPR1.getTitle()).isEqualTo(prTitle1);
+
+        PullRequest storedPR2 = pullRequestRepository.findByRepositoryIdAndNumber(
+            localRepo.getId(),
+            pr2.number()
+        ).orElseThrow();
+        assertThat(storedPR2.getTitle()).isEqualTo(prTitle2);
+    }
+}

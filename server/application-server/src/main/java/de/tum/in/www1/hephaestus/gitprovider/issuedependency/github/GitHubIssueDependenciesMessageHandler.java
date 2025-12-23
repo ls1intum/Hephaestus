@@ -15,7 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>
  * Uses DTOs directly (no hub4j) for complete field coverage.
  * <p>
- * TODO: Full dependency tracking when IssueDependency entity is created.
+ * Delegates dependency relationship management to {@link GitHubIssueDependencySyncService}.
  */
 @Component
 public class GitHubIssueDependenciesMessageHandler extends GitHubMessageHandler<GitHubIssueDependenciesEventDTO> {
@@ -24,14 +24,17 @@ public class GitHubIssueDependenciesMessageHandler extends GitHubMessageHandler<
 
     private final ProcessingContextFactory contextFactory;
     private final GitHubIssueProcessor issueProcessor;
+    private final GitHubIssueDependencySyncService issueDependencySyncService;
 
     GitHubIssueDependenciesMessageHandler(
         ProcessingContextFactory contextFactory,
-        GitHubIssueProcessor issueProcessor
+        GitHubIssueProcessor issueProcessor,
+        GitHubIssueDependencySyncService issueDependencySyncService
     ) {
         super(GitHubIssueDependenciesEventDTO.class);
         this.contextFactory = contextFactory;
         this.issueProcessor = issueProcessor;
+        this.issueDependencySyncService = issueDependencySyncService;
     }
 
     @Override
@@ -67,17 +70,20 @@ public class GitHubIssueDependenciesMessageHandler extends GitHubMessageHandler<
         issueProcessor.process(blockedIssueDto, context);
         issueProcessor.process(blockingIssueDto, context);
 
-        // Log the action - full dependency tracking can be added when entity exists
+        // Process dependency relationship
+        Long blockedIssueId = blockedIssueDto.getDatabaseId();
+        Long blockingIssueId = blockingIssueDto.getDatabaseId();
+
         switch (event.action()) {
-            case "added" -> logger.info(
-                "Dependency added: #{} blocked by #{}",
-                blockedIssueDto.number(),
-                blockingIssueDto.number()
+            case "added" -> issueDependencySyncService.processIssueDependencyEvent(
+                blockedIssueId,
+                blockingIssueId,
+                true
             );
-            case "removed" -> logger.info(
-                "Dependency removed: #{} blocked by #{}",
-                blockedIssueDto.number(),
-                blockingIssueDto.number()
+            case "removed" -> issueDependencySyncService.processIssueDependencyEvent(
+                blockedIssueId,
+                blockingIssueId,
+                false
             );
             default -> logger.debug("Unhandled issue_dependencies action: {}", event.action());
         }

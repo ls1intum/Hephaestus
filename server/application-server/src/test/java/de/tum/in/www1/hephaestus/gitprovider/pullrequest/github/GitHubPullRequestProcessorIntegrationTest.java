@@ -1,0 +1,748 @@
+package de.tum.in.www1.hephaestus.gitprovider.pullrequest.github;
+
+import static org.assertj.core.api.Assertions.*;
+
+import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
+import de.tum.in.www1.hephaestus.gitprovider.common.events.EntityEvents;
+import de.tum.in.www1.hephaestus.gitprovider.label.Label;
+import de.tum.in.www1.hephaestus.gitprovider.label.LabelRepository;
+import de.tum.in.www1.hephaestus.gitprovider.label.github.dto.GitHubLabelDTO;
+import de.tum.in.www1.hephaestus.gitprovider.milestone.Milestone;
+import de.tum.in.www1.hephaestus.gitprovider.milestone.MilestoneRepository;
+import de.tum.in.www1.hephaestus.gitprovider.milestone.github.dto.GitHubMilestoneDTO;
+import de.tum.in.www1.hephaestus.gitprovider.organization.Organization;
+import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationRepository;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequest.github.dto.GitHubPullRequestDTO;
+import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
+import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
+import de.tum.in.www1.hephaestus.gitprovider.user.User;
+import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
+import de.tum.in.www1.hephaestus.gitprovider.user.github.dto.GitHubUserDTO;
+import de.tum.in.www1.hephaestus.testconfig.BaseIntegrationTest;
+import de.tum.in.www1.hephaestus.workspace.AccountType;
+import de.tum.in.www1.hephaestus.workspace.Workspace;
+import de.tum.in.www1.hephaestus.workspace.WorkspaceRepository;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.event.EventListener;
+import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
+
+/**
+ * Integration tests for GitHubPullRequestProcessor.
+ * <p>
+ * Tests the processor independently from the webhook handler to verify:
+ * - Pull request upsert logic (create vs update)
+ * - Domain event publishing (Created, Updated, Closed, Labeled, etc.)
+ * - PR-specific events (Merged, Ready, Drafted, Synchronized)
+ * - Context handling and workspace association
+ * - Author user association and creation
+ * - Label and milestone associations
+ * - Edge cases in DTO processing including the critical getDatabaseId() fallback
+ */
+@DisplayName("GitHub Pull Request Processor")
+@Transactional
+class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
+
+    // IDs from the actual GitHub webhook fixtures
+    private static final Long FIXTURE_ORG_ID = 215361191L;
+    private static final Long FIXTURE_REPO_ID = 998279771L;
+    private static final Long FIXTURE_AUTHOR_ID = 5898705L;
+    private static final Long FIXTURE_PR_ID = 2969820636L;
+    private static final String FIXTURE_ORG_LOGIN = "HephaestusTest";
+    private static final String FIXTURE_REPO_FULL_NAME = "HephaestusTest/TestRepository";
+    private static final String FIXTURE_AUTHOR_LOGIN = "FelixTJDietrich";
+
+    @Autowired
+    private GitHubPullRequestProcessor processor;
+
+    @Autowired
+    private PullRequestRepository pullRequestRepository;
+
+    @Autowired
+    private RepositoryRepository repositoryRepository;
+
+    @Autowired
+    private OrganizationRepository organizationRepository;
+
+    @Autowired
+    private WorkspaceRepository workspaceRepository;
+
+    @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
+    private LabelRepository labelRepository;
+
+    @Autowired
+    private MilestoneRepository milestoneRepository;
+
+    @Autowired
+    private TestPullRequestEventListener eventListener;
+
+    private Repository testRepository;
+    private Workspace testWorkspace;
+    private Organization testOrganization;
+
+    @BeforeEach
+    void setUp() {
+        databaseTestUtils.cleanDatabase();
+        eventListener.clear();
+        setupTestData();
+    }
+
+    private void setupTestData() {
+        // Create organization matching fixture data
+        testOrganization = new Organization();
+        testOrganization.setId(FIXTURE_ORG_ID);
+        testOrganization.setGithubId(FIXTURE_ORG_ID);
+        testOrganization.setLogin(FIXTURE_ORG_LOGIN);
+        testOrganization.setCreatedAt(Instant.now());
+        testOrganization.setUpdatedAt(Instant.now());
+        testOrganization.setName("Hephaestus Test");
+        testOrganization.setAvatarUrl("https://avatars.githubusercontent.com/u/" + FIXTURE_ORG_ID);
+        testOrganization = organizationRepository.save(testOrganization);
+
+        // Create repository matching fixture data
+        testRepository = new Repository();
+        testRepository.setId(FIXTURE_REPO_ID);
+        testRepository.setName("TestRepository");
+        testRepository.setNameWithOwner(FIXTURE_REPO_FULL_NAME);
+        testRepository.setHtmlUrl("https://github.com/" + FIXTURE_REPO_FULL_NAME);
+        testRepository.setVisibility(Repository.Visibility.PUBLIC);
+        testRepository.setDefaultBranch("main");
+        testRepository.setCreatedAt(Instant.now());
+        testRepository.setUpdatedAt(Instant.now());
+        testRepository.setPushedAt(Instant.now());
+        testRepository.setOrganization(testOrganization);
+        testRepository = repositoryRepository.save(testRepository);
+
+        // Create workspace
+        testWorkspace = new Workspace();
+        testWorkspace.setWorkspaceSlug("hephaestus-test");
+        testWorkspace.setDisplayName("Hephaestus Test");
+        testWorkspace.setStatus(Workspace.WorkspaceStatus.ACTIVE);
+        testWorkspace.setIsPubliclyViewable(true);
+        testWorkspace.setOrganization(testOrganization);
+        testWorkspace.setAccountLogin(FIXTURE_ORG_LOGIN);
+        testWorkspace.setAccountType(AccountType.ORG);
+        testWorkspace = workspaceRepository.save(testWorkspace);
+    }
+
+    private ProcessingContext createContext() {
+        return ProcessingContext.forSync(testWorkspace.getId(), testRepository);
+    }
+
+    private GitHubUserDTO createAuthorDto() {
+        return new GitHubUserDTO(
+            FIXTURE_AUTHOR_ID,
+            FIXTURE_AUTHOR_ID,
+            FIXTURE_AUTHOR_LOGIN,
+            "https://avatars.githubusercontent.com/u/" + FIXTURE_AUTHOR_ID,
+            "https://github.com/" + FIXTURE_AUTHOR_LOGIN,
+            null,
+            null
+        );
+    }
+
+    private GitHubPullRequestDTO createBasicPullRequestDto(Long id, int number) {
+        return new GitHubPullRequestDTO(
+            id, // id (webhook style - no databaseId)
+            null, // databaseId (null for webhook payloads)
+            "PR_node_" + id,
+            number,
+            "Test PR #" + number,
+            "This is the body of test PR #" + number,
+            "open",
+            "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/pull/" + number,
+            Instant.parse("2025-11-01T21:42:45Z"),
+            Instant.parse("2025-11-01T21:42:45Z"),
+            null, // closedAt
+            null, // mergedAt
+            false, // isDraft
+            false, // isMerged
+            null, // mergeable
+            0, // additions
+            0, // deletions
+            0, // changedFiles
+            1, // commits
+            0, // commentsCount
+            0, // reviewCommentsCount
+            createAuthorDto(),
+            null, // assignees
+            null, // requestedReviewers
+            null, // labels
+            null, // milestone
+            null, // head
+            null, // base
+            null  // repository
+        );
+    }
+
+    // ==================== Critical: getDatabaseId() Fallback Tests ====================
+
+    @Nested
+    @DisplayName("getDatabaseId() Fallback Logic")
+    class GetDatabaseIdFallback {
+
+        @Test
+        @DisplayName("Should use databaseId when present (GraphQL style)")
+        void shouldUseDatabaseIdWhenPresent() {
+            // Given - GraphQL style DTO with databaseId
+            Long databaseId = 123456789L;
+            GitHubPullRequestDTO dto = new GitHubPullRequestDTO(
+                999L, // id (node id as number, but databaseId is what matters)
+                databaseId, // databaseId
+                "PR_node_xyz",
+                1,
+                "GraphQL PR",
+                "Body",
+                "open",
+                "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/pull/1",
+                Instant.now(),
+                Instant.now(),
+                null, null, false, false, null, 0, 0, 0, 1, 0, 0,
+                createAuthorDto(),
+                null, null, null, null, null, null, null
+            );
+
+            // When
+            PullRequest result = processor.process(dto, createContext());
+
+            // Then - should use databaseId
+            assertThat(result).isNotNull();
+            assertThat(result.getId()).isEqualTo(databaseId);
+            assertThat(pullRequestRepository.findById(databaseId)).isPresent();
+        }
+
+        @Test
+        @DisplayName("Should fallback to id when databaseId is null (Webhook style)")
+        void shouldFallbackToIdWhenDatabaseIdNull() {
+            // Given - Webhook style DTO with only id
+            Long webhookId = FIXTURE_PR_ID;
+            GitHubPullRequestDTO dto = new GitHubPullRequestDTO(
+                webhookId, // id (this is the database ID in webhooks)
+                null, // databaseId is null in webhooks
+                "PR_kwDOO4CKW86xA93c",
+                26,
+                "Webhook PR",
+                "Body",
+                "open",
+                "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/pull/26",
+                Instant.now(),
+                Instant.now(),
+                null, null, false, false, null, 0, 0, 0, 1, 0, 0,
+                createAuthorDto(),
+                null, null, null, null, null, null, null
+            );
+
+            // Verify the fallback works
+            assertThat(dto.getDatabaseId()).isEqualTo(webhookId);
+
+            // When
+            PullRequest result = processor.process(dto, createContext());
+
+            // Then - should use id as fallback
+            assertThat(result).isNotNull();
+            assertThat(result.getId()).isEqualTo(webhookId);
+            assertThat(pullRequestRepository.findById(webhookId)).isPresent();
+        }
+
+        @Test
+        @DisplayName("Should return null when both id and databaseId are null")
+        void shouldReturnNullWhenBothIdsNull() {
+            // Given - malformed DTO with no IDs
+            GitHubPullRequestDTO dto = new GitHubPullRequestDTO(
+                null, // id
+                null, // databaseId
+                "PR_node_xyz",
+                1,
+                "No ID PR",
+                "Body",
+                "open",
+                "https://example.com",
+                Instant.now(),
+                Instant.now(),
+                null, null, false, false, null, 0, 0, 0, 1, 0, 0,
+                createAuthorDto(),
+                null, null, null, null, null, null, null
+            );
+
+            // Verify fallback returns null
+            assertThat(dto.getDatabaseId()).isNull();
+
+            // When
+            PullRequest result = processor.process(dto, createContext());
+
+            // Then
+            assertThat(result).isNull();
+            assertThat(eventListener.getCreatedEvents()).isEmpty();
+        }
+    }
+
+    // ==================== Process (Create/Update) Tests ====================
+
+    @Nested
+    @DisplayName("Process Method - Create")
+    class ProcessMethodCreate {
+
+        @Test
+        @DisplayName("Should create new pull request and publish Created event")
+        void shouldCreateNewPullRequestAndPublishCreatedEvent() {
+            // Given
+            GitHubPullRequestDTO dto = createBasicPullRequestDto(FIXTURE_PR_ID, 26);
+
+            // When
+            PullRequest result = processor.process(dto, createContext());
+
+            // Then
+            assertThat(result).isNotNull();
+            assertThat(result.getId()).isEqualTo(FIXTURE_PR_ID);
+            assertThat(result.getNumber()).isEqualTo(26);
+            assertThat(result.getTitle()).isEqualTo("Test PR #26");
+            assertThat(result.getState()).isEqualTo(PullRequest.State.OPEN);
+            assertThat(result.isDraft()).isFalse();
+            assertThat(result.isMerged()).isFalse();
+            assertThat(result.getRepository().getId()).isEqualTo(FIXTURE_REPO_ID);
+
+            // Verify Created event
+            assertThat(eventListener.getCreatedEvents()).hasSize(1);
+            assertThat(eventListener.getUpdatedEvents()).isEmpty();
+        }
+
+        @Test
+        @DisplayName("Should create author user when processing new pull request")
+        void shouldCreateAuthorWhenProcessingNewPullRequest() {
+            // Given
+            assertThat(userRepository.count()).isZero();
+            GitHubPullRequestDTO dto = createBasicPullRequestDto(FIXTURE_PR_ID, 26);
+
+            // When
+            PullRequest result = processor.process(dto, createContext());
+
+            // Then
+            assertThat(result.getAuthor()).isNotNull();
+            assertThat(result.getAuthor().getLogin()).isEqualTo(FIXTURE_AUTHOR_LOGIN);
+            assertThat(userRepository.findById(FIXTURE_AUTHOR_ID)).isPresent();
+        }
+
+        @Test
+        @DisplayName("Should create labels when processing new pull request with labels")
+        void shouldCreateLabelsWhenProcessingNewPullRequest() {
+            // Given
+            Long labelId = 9568029313L;
+            String labelName = "bug";
+            GitHubLabelDTO labelDto = new GitHubLabelDTO(labelId, "LA_node", labelName, "Bug label", "d73a4a");
+
+            GitHubPullRequestDTO dto = new GitHubPullRequestDTO(
+                FIXTURE_PR_ID, null, "PR_node", 26, "PR with labels", "Body", "open",
+                "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/pull/26",
+                Instant.now(), Instant.now(), null, null, false, false, null, 0, 0, 0, 1, 0, 0,
+                createAuthorDto(),
+                null, null, List.of(labelDto), null, null, null, null
+            );
+
+            // When
+            PullRequest result = processor.process(dto, createContext());
+
+            // Then
+            assertThat(result.getLabels()).hasSize(1);
+            Label label = result.getLabels().iterator().next();
+            assertThat(label.getName()).isEqualTo(labelName);
+            assertThat(labelRepository.findById(labelId)).isPresent();
+        }
+
+        @Test
+        @DisplayName("Should create milestone when processing new pull request with milestone")
+        void shouldCreateMilestoneWhenProcessingNewPullRequest() {
+            // Given
+            Long milestoneId = 14028563L;
+            GitHubMilestoneDTO milestoneDto = new GitHubMilestoneDTO(
+                milestoneId, 2, "v1.0", "First release", "open",
+                Instant.now().plusSeconds(86400 * 30), // dueOn
+                "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/milestone/2"
+            );
+
+            GitHubPullRequestDTO dto = new GitHubPullRequestDTO(
+                FIXTURE_PR_ID, null, "PR_node", 26, "PR with milestone", "Body", "open",
+                "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/pull/26",
+                Instant.now(), Instant.now(), null, null, false, false, null, 0, 0, 0, 1, 0, 0,
+                createAuthorDto(),
+                null, null, null, milestoneDto, null, null, null
+            );
+
+            // When
+            PullRequest result = processor.process(dto, createContext());
+
+            // Then
+            assertThat(result.getMilestone()).isNotNull();
+            assertThat(result.getMilestone().getTitle()).isEqualTo("v1.0");
+            assertThat(milestoneRepository.findById(milestoneId)).isPresent();
+        }
+    }
+
+    // ==================== Process Closed Tests ====================
+
+    @Nested
+    @DisplayName("Process Closed")
+    class ProcessClosed {
+
+        @Test
+        @DisplayName("Should publish Closed event when PR is closed without merge")
+        void shouldPublishClosedEventWhenPRClosedWithoutMerge() {
+            // Given - create PR first
+            processor.process(createBasicPullRequestDto(FIXTURE_PR_ID, 26), createContext());
+            eventListener.clear();
+
+            GitHubPullRequestDTO closedDto = new GitHubPullRequestDTO(
+                FIXTURE_PR_ID, null, "PR_node", 26, "Closed PR", "Body", "closed",
+                "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/pull/26",
+                Instant.now(), Instant.now().plusSeconds(60),
+                Instant.now().plusSeconds(60), null, // closedAt set, mergedAt null
+                false, false, // not merged
+                null, 0, 0, 0, 1, 0, 0,
+                createAuthorDto(),
+                null, null, null, null, null, null, null
+            );
+
+            // When
+            PullRequest result = processor.processClosed(closedDto, createContext());
+
+            // Then
+            assertThat(result.getState()).isEqualTo(PullRequest.State.CLOSED);
+            assertThat(result.isMerged()).isFalse();
+            assertThat(eventListener.getClosedEvents()).hasSize(1);
+            assertThat(eventListener.getMergedEvents()).isEmpty();
+        }
+
+        @Test
+        @DisplayName("Should publish both Closed and Merged events when PR is merged")
+        void shouldPublishMergedEventWhenPRIsMerged() {
+            // Given - create PR first
+            processor.process(createBasicPullRequestDto(FIXTURE_PR_ID, 26), createContext());
+            eventListener.clear();
+
+            Instant now = Instant.now();
+            GitHubPullRequestDTO mergedDto = new GitHubPullRequestDTO(
+                FIXTURE_PR_ID, null, "PR_node", 26, "Merged PR", "Body", "closed",
+                "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/pull/26",
+                now, now.plusSeconds(60),
+                now.plusSeconds(60), now.plusSeconds(60), // both closedAt and mergedAt set
+                false, true, // merged = true
+                null, 10, 5, 3, 2, 0, 0,
+                createAuthorDto(),
+                null, null, null, null, null, null, null
+            );
+
+            // When
+            PullRequest result = processor.processClosed(mergedDto, createContext());
+
+            // Then
+            assertThat(result.getState()).isEqualTo(PullRequest.State.CLOSED);
+            assertThat(result.isMerged()).isTrue();
+            assertThat(eventListener.getClosedEvents()).hasSize(1);
+            assertThat(eventListener.getMergedEvents()).hasSize(1);
+        }
+    }
+
+    // ==================== Process Ready For Review Tests ====================
+
+    @Nested
+    @DisplayName("Process Ready For Review")
+    class ProcessReadyForReview {
+
+        @Test
+        @DisplayName("Should publish PullRequestReady event")
+        void shouldPublishPullRequestReadyEvent() {
+            // Given - create draft PR first
+            GitHubPullRequestDTO draftDto = new GitHubPullRequestDTO(
+                FIXTURE_PR_ID, null, "PR_node", 26, "Draft PR", "Body", "open",
+                "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/pull/26",
+                Instant.now(), Instant.now(), null, null,
+                true, false, // isDraft = true
+                null, 0, 0, 0, 1, 0, 0,
+                createAuthorDto(),
+                null, null, null, null, null, null, null
+            );
+            processor.process(draftDto, createContext());
+            eventListener.clear();
+
+            GitHubPullRequestDTO readyDto = new GitHubPullRequestDTO(
+                FIXTURE_PR_ID, null, "PR_node", 26, "Ready PR", "Body", "open",
+                "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/pull/26",
+                Instant.now(), Instant.now().plusSeconds(60), null, null,
+                false, false, // isDraft = false now
+                null, 5, 2, 1, 1, 0, 0,
+                createAuthorDto(),
+                null, null, null, null, null, null, null
+            );
+
+            // When
+            PullRequest result = processor.processReadyForReview(readyDto, createContext());
+
+            // Then
+            assertThat(result.isDraft()).isFalse();
+            assertThat(eventListener.getReadyEvents()).hasSize(1);
+        }
+    }
+
+    // ==================== Process Converted To Draft Tests ====================
+
+    @Nested
+    @DisplayName("Process Converted To Draft")
+    class ProcessConvertedToDraft {
+
+        @Test
+        @DisplayName("Should publish PullRequestDrafted event")
+        void shouldPublishPullRequestDraftedEvent() {
+            // Given - create PR first
+            processor.process(createBasicPullRequestDto(FIXTURE_PR_ID, 26), createContext());
+            eventListener.clear();
+
+            GitHubPullRequestDTO draftDto = new GitHubPullRequestDTO(
+                FIXTURE_PR_ID, null, "PR_node", 26, "Now Draft PR", "Body", "open",
+                "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/pull/26",
+                Instant.now(), Instant.now().plusSeconds(60), null, null,
+                true, false, // isDraft = true
+                null, 0, 0, 0, 1, 0, 0,
+                createAuthorDto(),
+                null, null, null, null, null, null, null
+            );
+
+            // When
+            PullRequest result = processor.processConvertedToDraft(draftDto, createContext());
+
+            // Then
+            assertThat(result.isDraft()).isTrue();
+            assertThat(eventListener.getDraftedEvents()).hasSize(1);
+        }
+    }
+
+    // ==================== Process Synchronize Tests ====================
+
+    @Nested
+    @DisplayName("Process Synchronize")
+    class ProcessSynchronize {
+
+        @Test
+        @DisplayName("Should publish PullRequestSynchronized event")
+        void shouldPublishPullRequestSynchronizedEvent() {
+            // Given - create PR first
+            processor.process(createBasicPullRequestDto(FIXTURE_PR_ID, 26), createContext());
+            eventListener.clear();
+
+            GitHubPullRequestDTO syncDto = new GitHubPullRequestDTO(
+                FIXTURE_PR_ID, null, "PR_node", 26, "Synced PR", "Body", "open",
+                "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/pull/26",
+                Instant.now(), Instant.now().plusSeconds(60), null, null,
+                false, false,
+                null, 15, 8, 5, 3, // More commits now
+                0, 0,
+                createAuthorDto(),
+                null, null, null, null, null, null, null
+            );
+
+            // When
+            PullRequest result = processor.processSynchronize(syncDto, createContext());
+
+            // Then
+            assertThat(result.getCommits()).isEqualTo(3);
+            assertThat(eventListener.getSynchronizedEvents()).hasSize(1);
+        }
+    }
+
+    // ==================== Process Labeled/Unlabeled Tests ====================
+
+    @Nested
+    @DisplayName("Process Label Events")
+    class ProcessLabelEvents {
+
+        @Test
+        @DisplayName("Should publish Labeled event")
+        void shouldPublishLabeledEvent() {
+            // Given - create PR first
+            processor.process(createBasicPullRequestDto(FIXTURE_PR_ID, 26), createContext());
+            eventListener.clear();
+
+            Long labelId = 9568029313L;
+            GitHubLabelDTO labelDto = new GitHubLabelDTO(labelId, "LA_node", "enhancement", "Enhancement", "0e8a16");
+
+            GitHubPullRequestDTO labeledDto = new GitHubPullRequestDTO(
+                FIXTURE_PR_ID, null, "PR_node", 26, "Labeled PR", "Body", "open",
+                "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/pull/26",
+                Instant.now(), Instant.now().plusSeconds(60), null, null,
+                false, false, null, 0, 0, 0, 1, 0, 0,
+                createAuthorDto(),
+                null, null, List.of(labelDto), null, null, null, null
+            );
+
+            // When
+            processor.processLabeled(labeledDto, labelDto, createContext());
+
+            // Then
+            assertThat(eventListener.getLabeledEvents()).hasSize(1);
+        }
+
+        @Test
+        @DisplayName("Should publish Unlabeled event")
+        void shouldPublishUnlabeledEvent() {
+            // Given - create PR with label first
+            Long labelId = 9568029313L;
+            GitHubLabelDTO labelDto = new GitHubLabelDTO(labelId, "LA_node", "enhancement", "Enhancement", "0e8a16");
+
+            GitHubPullRequestDTO withLabelDto = new GitHubPullRequestDTO(
+                FIXTURE_PR_ID, null, "PR_node", 26, "Labeled PR", "Body", "open",
+                "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/pull/26",
+                Instant.now(), Instant.now(), null, null,
+                false, false, null, 0, 0, 0, 1, 0, 0,
+                createAuthorDto(),
+                null, null, List.of(labelDto), null, null, null, null
+            );
+            processor.process(withLabelDto, createContext());
+            eventListener.clear();
+
+            GitHubPullRequestDTO unlabeledDto = new GitHubPullRequestDTO(
+                FIXTURE_PR_ID, null, "PR_node", 26, "Unlabeled PR", "Body", "open",
+                "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/pull/26",
+                Instant.now(), Instant.now().plusSeconds(60), null, null,
+                false, false, null, 0, 0, 0, 1, 0, 0,
+                createAuthorDto(),
+                null, null, List.of(), null, null, null, null // empty labels
+            );
+
+            // When
+            processor.processUnlabeled(unlabeledDto, labelDto, createContext());
+
+            // Then
+            assertThat(eventListener.getUnlabeledEvents()).hasSize(1);
+        }
+    }
+
+    // ==================== Test Event Listener ====================
+
+    @Component
+    static class TestPullRequestEventListener {
+
+        private final List<EntityEvents.Created<?>> createdEvents = new ArrayList<>();
+        private final List<EntityEvents.Updated<?>> updatedEvents = new ArrayList<>();
+        private final List<EntityEvents.Closed<?>> closedEvents = new ArrayList<>();
+        private final List<EntityEvents.Labeled<?>> labeledEvents = new ArrayList<>();
+        private final List<EntityEvents.Unlabeled<?>> unlabeledEvents = new ArrayList<>();
+        private final List<EntityEvents.PullRequestMerged> mergedEvents = new ArrayList<>();
+        private final List<EntityEvents.PullRequestReady> readyEvents = new ArrayList<>();
+        private final List<EntityEvents.PullRequestDrafted> draftedEvents = new ArrayList<>();
+        private final List<EntityEvents.PullRequestSynchronized> synchronizedEvents = new ArrayList<>();
+
+        @EventListener
+        public void onCreated(EntityEvents.Created<?> event) {
+            if (event.entity() instanceof PullRequest) {
+                createdEvents.add(event);
+            }
+        }
+
+        @EventListener
+        public void onUpdated(EntityEvents.Updated<?> event) {
+            if (event.entity() instanceof PullRequest) {
+                updatedEvents.add(event);
+            }
+        }
+
+        @EventListener
+        public void onClosed(EntityEvents.Closed<?> event) {
+            if (event.entity() instanceof PullRequest) {
+                closedEvents.add(event);
+            }
+        }
+
+        @EventListener
+        public void onLabeled(EntityEvents.Labeled<?> event) {
+            if (event.entity() instanceof PullRequest) {
+                labeledEvents.add(event);
+            }
+        }
+
+        @EventListener
+        public void onUnlabeled(EntityEvents.Unlabeled<?> event) {
+            if (event.entity() instanceof PullRequest) {
+                unlabeledEvents.add(event);
+            }
+        }
+
+        @EventListener
+        public void onMerged(EntityEvents.PullRequestMerged event) {
+            mergedEvents.add(event);
+        }
+
+        @EventListener
+        public void onReady(EntityEvents.PullRequestReady event) {
+            readyEvents.add(event);
+        }
+
+        @EventListener
+        public void onDrafted(EntityEvents.PullRequestDrafted event) {
+            draftedEvents.add(event);
+        }
+
+        @EventListener
+        public void onSynchronized(EntityEvents.PullRequestSynchronized event) {
+            synchronizedEvents.add(event);
+        }
+
+        public List<EntityEvents.Created<?>> getCreatedEvents() {
+            return new ArrayList<>(createdEvents);
+        }
+
+        public List<EntityEvents.Updated<?>> getUpdatedEvents() {
+            return new ArrayList<>(updatedEvents);
+        }
+
+        public List<EntityEvents.Closed<?>> getClosedEvents() {
+            return new ArrayList<>(closedEvents);
+        }
+
+        public List<EntityEvents.Labeled<?>> getLabeledEvents() {
+            return new ArrayList<>(labeledEvents);
+        }
+
+        public List<EntityEvents.Unlabeled<?>> getUnlabeledEvents() {
+            return new ArrayList<>(unlabeledEvents);
+        }
+
+        public List<EntityEvents.PullRequestMerged> getMergedEvents() {
+            return new ArrayList<>(mergedEvents);
+        }
+
+        public List<EntityEvents.PullRequestReady> getReadyEvents() {
+            return new ArrayList<>(readyEvents);
+        }
+
+        public List<EntityEvents.PullRequestDrafted> getDraftedEvents() {
+            return new ArrayList<>(draftedEvents);
+        }
+
+        public List<EntityEvents.PullRequestSynchronized> getSynchronizedEvents() {
+            return new ArrayList<>(synchronizedEvents);
+        }
+
+        public void clear() {
+            createdEvents.clear();
+            updatedEvents.clear();
+            closedEvents.clear();
+            labeledEvents.clear();
+            unlabeledEvents.clear();
+            mergedEvents.clear();
+            readyEvents.clear();
+            draftedEvents.clear();
+            synchronizedEvents.clear();
+        }
+    }
+}

@@ -76,14 +76,16 @@ public class GitHubOrganizationMessageHandler extends GitHubMessageHandler<GitHu
             }
             case "renamed" -> {
                 organizationRepository
-                    .findById(orgDto.id())
+                    .findByGithubId(orgDto.id())
                     .ifPresent(existing -> {
                         existing.setLogin(orgDto.login());
                         organizationRepository.save(existing);
                     });
             }
             case "deleted" -> {
-                organizationRepository.deleteById(orgDto.id());
+                organizationRepository
+                    .findByGithubId(orgDto.id())
+                    .ifPresent(org -> organizationRepository.delete(org));
             }
             default -> {
                 // For other events, update/create the organization
@@ -94,7 +96,7 @@ public class GitHubOrganizationMessageHandler extends GitHubMessageHandler<GitHu
 
     private void processOrganization(GitHubOrganizationEventDTO.GitHubOrganizationDTO dto) {
         organizationRepository
-            .findById(dto.id())
+            .findByGithubId(dto.id())
             .ifPresentOrElse(
                 org -> {
                     if (dto.login() != null) org.setLogin(dto.login());
@@ -103,7 +105,7 @@ public class GitHubOrganizationMessageHandler extends GitHubMessageHandler<GitHu
                 },
                 () -> {
                     Organization org = new Organization();
-                    org.setId(dto.id());
+                    org.setGithubId(dto.id());
                     org.setLogin(dto.login());
                     org.setAvatarUrl(dto.avatarUrl());
                     organizationRepository.save(org);

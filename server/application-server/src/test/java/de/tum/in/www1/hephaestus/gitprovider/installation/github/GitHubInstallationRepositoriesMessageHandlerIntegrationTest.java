@@ -106,6 +106,51 @@ class GitHubInstallationRepositoriesMessageHandlerIntegrationTest extends BaseIn
         assertThat(event.action()).isEqualTo("removed");
     }
 
+    @Test
+    @DisplayName("Should handle null installation gracefully")
+    void shouldHandleNullInstallationGracefully() {
+        // Given - event with null installation
+        GitHubInstallationRepositoriesEventDTO event = new GitHubInstallationRepositoriesEventDTO(
+            "added",
+            null,
+            null,
+            null,
+            null
+        );
+
+        // When - should not throw
+        handler.handleEvent(event);
+
+        // Then - handler logs warning but doesn't crash
+    }
+
+    @Test
+    @DisplayName("Should handle null repository lists gracefully")
+    void shouldHandleNullRepositoryListsGracefully() throws Exception {
+        // Given - load a valid event and create with null lists
+        GitHubInstallationRepositoriesEventDTO baseEvent = loadPayload("installation_repositories.added");
+        GitHubInstallationRepositoriesEventDTO event = new GitHubInstallationRepositoriesEventDTO(
+            "added",
+            baseEvent.installation(),
+            null,  // repositoriesAdded null
+            null,  // repositoriesRemoved null
+            baseEvent.sender()
+        );
+        setupTestWorkspace(baseEvent.installation().id(), "HephaestusTest");
+
+        // When - should not throw
+        handler.handleEvent(event);
+
+        // Then - handler handles null lists gracefully
+    }
+
+    @Test
+    @DisplayName("Should return INSTALLATION domain")
+    void shouldReturnInstallationDomain() {
+        assertThat(handler.getDomain())
+            .isEqualTo(de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler.GitHubMessageDomain.INSTALLATION);
+    }
+
     private GitHubInstallationRepositoriesEventDTO loadPayload(String filename) throws IOException {
         ClassPathResource resource = new ClassPathResource("github/" + filename + ".json");
         String json = resource.getContentAsString(StandardCharsets.UTF_8);

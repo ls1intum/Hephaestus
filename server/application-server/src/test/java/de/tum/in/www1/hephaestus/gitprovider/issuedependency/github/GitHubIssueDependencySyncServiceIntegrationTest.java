@@ -7,6 +7,7 @@ import de.tum.in.www1.hephaestus.gitprovider.issue.IssueRepository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.testconfig.BaseIntegrationTest;
+import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -29,6 +30,9 @@ class GitHubIssueDependencySyncServiceIntegrationTest extends BaseIntegrationTes
 
     @Autowired
     private RepositoryRepository repositoryRepository;
+
+    @Autowired
+    private EntityManager entityManager;
 
     private Repository testRepository;
     private Issue blockedIssue;
@@ -153,6 +157,12 @@ class GitHubIssueDependencySyncServiceIntegrationTest extends BaseIntegrationTes
     void blockingRelationshipShouldAppearOnBothSides() {
         // When
         issueDependencySyncService.processIssueDependencyEvent(blockedIssue.getId(), blockingIssue.getId(), true);
+
+        // Clear persistence context to force fresh fetch from database
+        // This is needed because the inverse side (blocking) of the ManyToMany relationship
+        // is only reflected in the database, not in the in-memory cached entities
+        entityManager.flush();
+        entityManager.clear();
 
         // Then: Check both directions
         Issue refreshedBlocked = issueRepository.findById(blockedIssue.getId()).orElseThrow();
