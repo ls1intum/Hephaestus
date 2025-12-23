@@ -138,6 +138,7 @@ bd sync               # Force sync with JSONL
 ## 2. Toolchain & environment prerequisites
 
 - **Node.js**: Use the exact version from `.node-version` (currently 22.10.0). Stick with npm—the repo maintains `package-lock.json` and uses npm workspaces. The intelligence-service and webhook-ingest are TypeScript services that use npm.
+- **Java**: JDK 21 (see `pom.xml`). Maven wrapper is checked in; **always run builds through `./mvnw`** to ensure consistent Maven versions.
 - **Docker & Docker Compose**: Required for database helper scripts (`scripts/db-utils.sh`) and for spinning up Postgres/Keycloak/NATS locally.
 - **Databases**: Default PostgreSQL DSN is `postgresql://root:root@localhost:5432/hephaestus`. The database helpers spin this up for you via Docker.
 - **Environment variables**: When generating intelligence service OpenAPI specs locally, set `MODEL_NAME=fake:model` and `DETECTION_MODEL_NAME=fake:model` (the service settings expect a provider-qualified model name).
