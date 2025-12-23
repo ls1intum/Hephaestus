@@ -368,6 +368,9 @@ jobs:
           export SPRING_DATASOURCE_USERNAME="root"
           export SPRING_DATASOURCE_PASSWORD="root"
 
+          # Install dependencies (tsx, pg) needed for db-utils.sh scripts
+          npm ci --prefer-offline --no-audit
+
           # Build application-server for schema operations
           echo "🏗️ Building application-server..."
           cd server/application-server
@@ -429,6 +432,9 @@ jobs:
           export SPRING_DATASOURCE_URL="jdbc:postgresql://localhost:5432/hephaestus"
           export SPRING_DATASOURCE_USERNAME="root"
           export SPRING_DATASOURCE_PASSWORD="root"
+
+          # Install dependencies (tsx, pg) needed for db-utils.sh scripts
+          npm ci --prefer-offline --no-audit
 
           # Build application-server for ERD operations
           echo "🏗️ Building application-server..."

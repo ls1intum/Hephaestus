@@ -557,7 +557,7 @@ class MermaidErdGenerator {
 			}
 		}
 
-		return lines.join("\n");
+		return `${lines.join("\n")}\n`;
 	}
 
 	private toEntityName(tableName: string): string {
