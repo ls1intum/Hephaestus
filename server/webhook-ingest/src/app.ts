@@ -43,10 +43,7 @@ app.use(async (c, next) => {
 	const duration = Date.now() - start;
 	const status = c.res.status;
 
-	logger.info(
-		{ requestId, method, path, status, durationMs: duration },
-		"Request completed",
-	);
+	logger.info({ requestId, method, path, status, durationMs: duration }, "Request completed");
 });
 
 // Global error handler
@@ -54,17 +51,11 @@ app.onError((err, c) => {
 	const requestId = c.get("requestId");
 
 	if (err instanceof HTTPException) {
-		logger.warn(
-			{ requestId, status: err.status, message: err.message },
-			"HTTP exception",
-		);
+		logger.warn({ requestId, status: err.status, message: err.message }, "HTTP exception");
 		return c.json({ error: err.message }, err.status);
 	}
 
-	logger.error(
-		{ requestId, error: err.message, stack: err.stack },
-		"Unhandled error",
-	);
+	logger.error({ requestId, error: err.message, stack: err.stack }, "Unhandled error");
 	return c.json({ error: "Internal server error" }, 500);
 });
 

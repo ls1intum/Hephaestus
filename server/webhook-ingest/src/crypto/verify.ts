@@ -57,10 +57,7 @@ export function verifyGitHubSignature(
  * @param secret - The expected webhook secret
  * @returns true if the token matches, false otherwise
  */
-export function verifyGitLabToken(
-	token: string | null | undefined,
-	secret: string,
-): boolean {
+export function verifyGitLabToken(token: string | null | undefined, secret: string): boolean {
 	if (!(token && secret)) {
 		return false;
 	}

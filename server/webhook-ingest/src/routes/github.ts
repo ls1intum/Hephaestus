@@ -33,8 +33,7 @@ function extractSubjectComponents(payload: Record<string, unknown>): {
 		org = (organization.login as string) ?? "?";
 	}
 
-	const action =
-		typeof payload.action === "string" ? (payload.action as string) : undefined;
+	const action = typeof payload.action === "string" ? (payload.action as string) : undefined;
 
 	return { org, repo, action };
 }

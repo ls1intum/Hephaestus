@@ -12,16 +12,12 @@ describe("verifyGitHubSignature", () => {
 		mac.update(payload);
 		const expectedSignature = `sha256=${mac.digest("hex")}`;
 
-		expect(verifyGitHubSignature(expectedSignature, secret, payload)).toBe(
-			true,
-		);
+		expect(verifyGitHubSignature(expectedSignature, secret, payload)).toBe(true);
 	});
 
 	it("should reject invalid SHA-256 signature", () => {
 		const invalidSignature = "sha256=invalid1234567890";
-		expect(verifyGitHubSignature(invalidSignature, secret, payload)).toBe(
-			false,
-		);
+		expect(verifyGitHubSignature(invalidSignature, secret, payload)).toBe(false);
 	});
 
 	it("should verify valid SHA-1 signature", () => {
@@ -29,9 +25,7 @@ describe("verifyGitHubSignature", () => {
 		mac.update(payload);
 		const expectedSignature = `sha1=${mac.digest("hex")}`;
 
-		expect(verifyGitHubSignature(expectedSignature, secret, payload)).toBe(
-			true,
-		);
+		expect(verifyGitHubSignature(expectedSignature, secret, payload)).toBe(true);
 	});
 
 	it("should reject empty signature", () => {
