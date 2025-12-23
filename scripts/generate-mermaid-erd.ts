@@ -629,18 +629,31 @@ class MermaidErdGenerator {
 	}
 }
 
+function sanitizeJdbcUrl(jdbcUrl: string): string {
+	// Strip query parameters that might contain credentials (defense-in-depth)
+	return jdbcUrl.split("?")[0] ?? jdbcUrl;
+}
+
 function parseJdbcUrl(jdbcUrl: string): JdbcInfo {
-	const match = /^jdbc:postgresql:\/\/([^:/]+)(?::(\d+))?\/(.+)$/.exec(jdbcUrl);
+	// Reject JDBC URLs with query parameters (credentials should be passed separately)
+	if (jdbcUrl.includes("?")) {
+		throw new Error(
+			"JDBC URL must not contain query parameters. Pass credentials via --username and --password flags instead.",
+		);
+	}
+
+	// Match: jdbc:postgresql://host[:port]/database
+	const match = /^jdbc:postgresql:\/\/([^:/]+)(?::(\d+))?\/([^?]+)$/.exec(jdbcUrl);
 	if (!match) {
 		throw new Error(
-			`Invalid JDBC URL format: ${jdbcUrl}. Expected jdbc:postgresql://host:port/database`,
+			`Invalid JDBC URL format: ${sanitizeJdbcUrl(jdbcUrl)}. Expected jdbc:postgresql://host:port/database`,
 		);
 	}
 	const host = match[1];
 	const port = match[2] ? Number.parseInt(match[2], 10) : 5432;
 	const database = match[3];
 	if (!host || !database || !Number.isFinite(port)) {
-		throw new Error(`Invalid JDBC URL: ${jdbcUrl}`);
+		throw new Error(`Invalid JDBC URL: ${sanitizeJdbcUrl(jdbcUrl)}`);
 	}
 	return { host, port, database };
 }
@@ -737,7 +750,7 @@ async function main() {
 	};
 
 	logger.debug(
-		`Resolved configuration: jdbcUrl=${resolvedJdbcUrl}, username=${resolvedUsername}, password=${maskSecret(resolvedPassword)}, output=${resolvedOutput}, schema=${options.schema}`,
+		`Resolved configuration: jdbcUrl=${sanitizeJdbcUrl(resolvedJdbcUrl)}, username=${resolvedUsername}, password=${maskSecret(resolvedPassword)}, output=${resolvedOutput}, schema=${options.schema}`,
 	);
 
 	if (options.dryRun) {
