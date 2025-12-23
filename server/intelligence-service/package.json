@@ -60,7 +60,7 @@
 		"@testcontainers/postgresql": "^11.10.0",
 		"@types/node": "25.0.2",
 		"@types/pg": "8.16.0",
-		"@vitest/coverage-v8": "4.0.15",
+		"@vitest/coverage-v8": "4.0.16",
 		"commander": "^14.0.2",
 		"cross-env": "10.1.0",
 		"drizzle-kit": "0.31.8",
@@ -72,7 +72,7 @@
 		"tsc-alias": "1.8.16",
 		"tsx": "4.21.0",
 		"typescript": "5.9.3",
-		"vitest": "4.0.15"
+		"vitest": "4.0.16"
 	},
 	"engines": {
 		"node": ">=22.10.0"
