@@ -13,7 +13,7 @@ import java.util.List;
  * Domain DTO for GitHub pull requests.
  * <p>
  * This is the unified model used by both GraphQL sync and webhook handlers.
- * It's independent of hub4j and can be constructed from any source.
+ * It can be constructed from any source (GraphQL, REST, webhook payload).
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record GitHubPullRequestDTO(
@@ -29,9 +29,12 @@ public record GitHubPullRequestDTO(
     @JsonProperty("updated_at") Instant updatedAt,
     @JsonProperty("closed_at") Instant closedAt,
     @JsonProperty("merged_at") Instant mergedAt,
+    @JsonProperty("merged_by") GitHubUserDTO mergedBy,
+    @JsonProperty("merge_commit_sha") String mergeCommitSha,
     @JsonProperty("draft") boolean isDraft,
     @JsonProperty("merged") boolean isMerged,
     @JsonProperty("mergeable") String mergeable,
+    @JsonProperty("locked") boolean locked,
     @JsonProperty("additions") int additions,
     @JsonProperty("deletions") int deletions,
     @JsonProperty("changed_files") int changedFiles,

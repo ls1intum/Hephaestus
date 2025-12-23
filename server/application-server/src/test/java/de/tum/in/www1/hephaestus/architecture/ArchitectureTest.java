@@ -44,7 +44,11 @@ class ArchitectureTest {
             .haveSimpleNameEndingWith("Service")
             .orShould()
             .haveSimpleNameEndingWith("Scheduler")
-            .because("Services can be either business services or scheduled components")
+            .orShould()
+            .haveSimpleNameEndingWith("Processor")
+            .orShould()
+            .haveSimpleNameEndingWith("Factory")
+            .because("Services can be business services, scheduled components, domain processors, or factories")
             .check(applicationClasses);
 
         classes()

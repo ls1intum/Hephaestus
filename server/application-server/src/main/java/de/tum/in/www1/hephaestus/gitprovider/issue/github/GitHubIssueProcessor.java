@@ -42,7 +42,7 @@ import org.springframework.transaction.annotation.Transactional;
  * <li>Single processing path for all data sources (sync and webhooks)</li>
  * <li>Idempotent operations via upsert pattern</li>
  * <li>Domain events published for reactive feature development</li>
- * <li>No hub4j types - works exclusively with DTOs</li>
+ * <li>Works exclusively with DTOs for complete field coverage</li>
  * </ul>
  */
 @Service

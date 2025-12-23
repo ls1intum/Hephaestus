@@ -21,7 +21,7 @@ import org.springframework.stereotype.Service;
 /**
  * GraphQL-based data synchronization service.
  * <p>
- * This service replaces the deprecated hub4j-based GitHubDataSyncService.
+ * This service provides GraphQL-based synchronization for all GitHub data.
  * It uses GraphQL API exclusively for all GitHub data synchronization.
  */
 @Service

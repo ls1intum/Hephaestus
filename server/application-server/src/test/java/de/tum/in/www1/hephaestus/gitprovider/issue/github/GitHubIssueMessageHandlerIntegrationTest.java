@@ -41,7 +41,7 @@ import org.springframework.transaction.annotation.Transactional;
  * Integration tests for GitHubIssueMessageHandler.
  * <p>
  * Tests the full webhook handling flow using JSON fixtures parsed directly
- * into DTOs (no hub4j dependency). Verifies:
+ * into DTOs using JSON fixtures for complete isolation. Verifies:
  * - Correct routing of webhook actions to processor methods
  * - Issue persistence for all action types
  * - Event publishing through the handler → processor chain
@@ -531,8 +531,7 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
             GitHubIssueEventDTO event = loadPayload("issues.opened");
 
             // When/Then - should not throw
-            assertThatCode(() -> handler.handleEvent(event))
-                .doesNotThrowAnyException();
+            assertThatCode(() -> handler.handleEvent(event)).doesNotThrowAnyException();
         }
 
         @Test
@@ -544,8 +543,7 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
             GitHubIssueEventDTO event = loadPayload("issues.opened");
 
             // When/Then - should not throw, just log warning
-            assertThatCode(() -> handler.handleEvent(event))
-                .doesNotThrowAnyException();
+            assertThatCode(() -> handler.handleEvent(event)).doesNotThrowAnyException();
 
             // Issue should not be persisted since context is null
             assertThat(issueRepository.count()).isZero();

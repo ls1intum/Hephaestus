@@ -27,7 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Integration tests for GitHubMemberMessageHandler.
  * <p>
- * Tests use JSON fixtures parsed directly into DTOs (no hub4j dependency).
+ * Tests use JSON fixtures parsed directly into DTOs using JSON fixtures for complete isolation.
  * This handler processes member (collaborator) events for repository access.
  */
 @DisplayName("GitHub Member Message Handler")

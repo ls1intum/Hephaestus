@@ -4,10 +4,7 @@ import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContextFactory;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.github.GitHubPullRequestProcessor;
-import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewthread.PullRequestReviewThread;
-import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewthread.PullRequestReviewThreadRepository;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewthread.github.dto.GitHubPullRequestReviewThreadEventDTO;
-import java.time.Instant;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -16,7 +13,8 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Handles GitHub pull_request_review_thread webhook events.
  * <p>
- * Uses DTOs directly (no hub4j) for complete field coverage.
+ * Uses DTOs directly for complete field coverage.
+ * Delegates state changes to {@link GitHubPullRequestReviewThreadProcessor}.
  */
 @Component
 public class GitHubPullRequestReviewThreadMessageHandler
@@ -26,17 +24,17 @@ public class GitHubPullRequestReviewThreadMessageHandler
 
     private final ProcessingContextFactory contextFactory;
     private final GitHubPullRequestProcessor prProcessor;
-    private final PullRequestReviewThreadRepository threadRepository;
+    private final GitHubPullRequestReviewThreadProcessor threadProcessor;
 
     GitHubPullRequestReviewThreadMessageHandler(
         ProcessingContextFactory contextFactory,
         GitHubPullRequestProcessor prProcessor,
-        PullRequestReviewThreadRepository threadRepository
+        GitHubPullRequestReviewThreadProcessor threadProcessor
     ) {
         super(GitHubPullRequestReviewThreadEventDTO.class);
         this.contextFactory = contextFactory;
         this.prProcessor = prProcessor;
-        this.threadRepository = threadRepository;
+        this.threadProcessor = threadProcessor;
     }
 
     @Override
@@ -71,44 +69,11 @@ public class GitHubPullRequestReviewThreadMessageHandler
         // Ensure PR exists
         prProcessor.process(prDto, context);
 
-        // Process thread state changes
+        // Delegate thread state changes to processor
         switch (event.action()) {
-            case "resolved" -> processResolved(threadDto.id());
-            case "unresolved" -> processUnresolved(threadDto.id());
+            case "resolved" -> threadProcessor.resolve(threadDto.id());
+            case "unresolved" -> threadProcessor.unresolve(threadDto.id());
             default -> logger.debug("Unhandled thread action: {}", event.action());
         }
-    }
-
-    private void processResolved(Long threadId) {
-        if (threadId == null) {
-            logger.warn("Cannot resolve thread: threadId is null");
-            return;
-        }
-        threadRepository.findById(threadId).ifPresentOrElse(
-            thread -> {
-                thread.setState(PullRequestReviewThread.State.RESOLVED);
-                thread.setResolvedAt(Instant.now());
-                threadRepository.save(thread);
-                logger.info("Thread {} resolved", threadId);
-            },
-            () -> logger.debug("Thread {} not found for resolve action, may not have been synced yet", threadId)
-        );
-    }
-
-    private void processUnresolved(Long threadId) {
-        if (threadId == null) {
-            logger.warn("Cannot unresolve thread: threadId is null");
-            return;
-        }
-        threadRepository.findById(threadId).ifPresentOrElse(
-            thread -> {
-                thread.setState(PullRequestReviewThread.State.UNRESOLVED);
-                thread.setResolvedAt(null);
-                thread.setResolvedBy(null);
-                threadRepository.save(thread);
-                logger.info("Thread {} unresolved", threadId);
-            },
-            () -> logger.debug("Thread {} not found for unresolve action, may not have been synced yet", threadId)
-        );
     }
 }

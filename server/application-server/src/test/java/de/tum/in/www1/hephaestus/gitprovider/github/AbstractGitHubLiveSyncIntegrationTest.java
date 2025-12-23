@@ -22,8 +22,8 @@ import org.springframework.graphql.client.HttpGraphQlClient;
 /**
  * Abstract base class for live GitHub API integration tests using GraphQL and REST.
  * <p>
- * This class replaces the previous hub4j-based approach with pure GraphQL mutations
- * and REST API calls for operations not supported by GraphQL.
+ * This class provides pure GraphQL mutations and REST API calls for operations
+ * not supported by GraphQL.
  */
 abstract class AbstractGitHubLiveSyncIntegrationTest extends BaseGitHubLiveIntegrationTest {
 

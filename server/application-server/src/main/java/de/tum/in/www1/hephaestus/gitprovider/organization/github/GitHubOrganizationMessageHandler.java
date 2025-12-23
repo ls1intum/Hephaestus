@@ -1,11 +1,11 @@
 package de.tum.in.www1.hephaestus.gitprovider.organization.github;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
-import de.tum.in.www1.hephaestus.gitprovider.organization.Organization;
-import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationRepository;
+import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationMembershipRepository;
 import de.tum.in.www1.hephaestus.gitprovider.organization.github.dto.GitHubOrganizationEventDTO;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
-import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
+import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserProcessor;
+import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -14,20 +14,27 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Handles GitHub organization webhook events.
  * <p>
- * Uses DTOs directly (no hub4j) for complete field coverage.
+ * Uses DTOs directly for complete field coverage.
+ * Delegates all business logic to {@link GitHubOrganizationProcessor} and {@link GitHubUserProcessor}.
  */
 @Component
 public class GitHubOrganizationMessageHandler extends GitHubMessageHandler<GitHubOrganizationEventDTO> {
 
     private static final Logger logger = LoggerFactory.getLogger(GitHubOrganizationMessageHandler.class);
 
-    private final OrganizationRepository organizationRepository;
-    private final UserRepository userRepository;
+    private final GitHubOrganizationProcessor organizationProcessor;
+    private final GitHubUserProcessor userProcessor;
+    private final OrganizationMembershipRepository membershipRepository;
 
-    GitHubOrganizationMessageHandler(OrganizationRepository organizationRepository, UserRepository userRepository) {
+    GitHubOrganizationMessageHandler(
+        GitHubOrganizationProcessor organizationProcessor,
+        GitHubUserProcessor userProcessor,
+        OrganizationMembershipRepository membershipRepository
+    ) {
         super(GitHubOrganizationEventDTO.class);
-        this.organizationRepository = organizationRepository;
-        this.userRepository = userRepository;
+        this.organizationProcessor = organizationProcessor;
+        this.userProcessor = userProcessor;
+        this.membershipRepository = membershipRepository;
     }
 
     @Override
@@ -56,60 +63,24 @@ public class GitHubOrganizationMessageHandler extends GitHubMessageHandler<GitHu
             case "member_added" -> {
                 if (event.membership() != null && event.membership().user() != null) {
                     var userDto = event.membership().user();
-                    // Ensure user exists
-                    if (!userRepository.existsById(userDto.id())) {
-                        User user = new User();
-                        user.setId(userDto.id());
-                        user.setLogin(userDto.login());
-                        user.setAvatarUrl(userDto.avatarUrl());
-                        // Use login as fallback for name if null (name is @NonNull)
-                        user.setName(userDto.name() != null ? userDto.name() : userDto.login());
-                        userRepository.save(user);
-                    }
-                    logger.info("Member added to org {}: {}", orgDto.login(), userDto.login());
+                    User user = userProcessor.ensureExists(userDto);
+                    String role = event.membership().role() != null
+                        ? event.membership().role().toUpperCase()
+                        : "MEMBER";
+                    membershipRepository.upsertMembership(orgDto.id(), user.getId(), role);
+                    logger.info("Member added to org {}: {} with role {}", orgDto.login(), userDto.login(), role);
                 }
             }
             case "member_removed" -> {
                 if (event.membership() != null && event.membership().user() != null) {
-                    logger.info("Member removed from org {}: {}", orgDto.login(), event.membership().user().login());
+                    var userDto = event.membership().user();
+                    membershipRepository.deleteByOrganizationIdAndUserIdIn(orgDto.id(), List.of(userDto.id()));
+                    logger.info("Member removed from org {}: {}", orgDto.login(), userDto.login());
                 }
             }
-            case "renamed" -> {
-                organizationRepository
-                    .findByGithubId(orgDto.id())
-                    .ifPresent(existing -> {
-                        existing.setLogin(orgDto.login());
-                        organizationRepository.save(existing);
-                    });
-            }
-            case "deleted" -> {
-                organizationRepository
-                    .findByGithubId(orgDto.id())
-                    .ifPresent(org -> organizationRepository.delete(org));
-            }
-            default -> {
-                // For other events, update/create the organization
-                processOrganization(orgDto);
-            }
+            case "renamed" -> organizationProcessor.rename(orgDto.id(), orgDto.login());
+            case "deleted" -> organizationProcessor.delete(orgDto.id());
+            default -> organizationProcessor.process(orgDto);
         }
-    }
-
-    private void processOrganization(GitHubOrganizationEventDTO.GitHubOrganizationDTO dto) {
-        organizationRepository
-            .findByGithubId(dto.id())
-            .ifPresentOrElse(
-                org -> {
-                    if (dto.login() != null) org.setLogin(dto.login());
-                    if (dto.avatarUrl() != null) org.setAvatarUrl(dto.avatarUrl());
-                    organizationRepository.save(org);
-                },
-                () -> {
-                    Organization org = new Organization();
-                    org.setGithubId(dto.id());
-                    org.setLogin(dto.login());
-                    org.setAvatarUrl(dto.avatarUrl());
-                    organizationRepository.save(org);
-                }
-            );
     }
 }

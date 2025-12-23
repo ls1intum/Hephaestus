@@ -2,10 +2,6 @@ package de.tum.in.www1.hephaestus.gitprovider.issue.github;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
-import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.IssueConnection;
-import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.IssueState;
-import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.Label;
-import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.User;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.issue.github.dto.GitHubIssueDTO;
 import de.tum.in.www1.hephaestus.gitprovider.issue.github.dto.GitHubIssueTypeDTO;
@@ -15,10 +11,13 @@ import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.github.dto.GitHubUserDTO;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.graphql.client.ClientGraphQlResponse;
 import org.springframework.graphql.client.HttpGraphQlClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,7 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Service for synchronizing GitHub issues via GraphQL API.
  * <p>
- * This service replaces the deprecated hub4j-based GitHubIssueSyncService.
+ * This service provides GraphQL-based issue synchronization.
  * It fetches issues via GraphQL and uses GitHubIssueProcessor for persistence.
  */
 @Service
@@ -59,6 +58,7 @@ public class GitHubIssueGraphQlSyncService {
      * @return number of issues synced
      */
     @Transactional
+    @SuppressWarnings("unchecked")
     public int syncIssuesForRepository(Long workspaceId, Long repositoryId) {
         Repository repository = repositoryRepository.findById(repositoryId).orElse(null);
         if (repository == null) {
@@ -83,31 +83,44 @@ public class GitHubIssueGraphQlSyncService {
             boolean hasNextPage = true;
 
             while (hasNextPage) {
-                IssueConnection response = client
+                ClientGraphQlResponse response = client
                     .documentName(GET_ISSUES_DOCUMENT)
                     .variable("owner", owner)
                     .variable("name", name)
                     .variable("first", GRAPHQL_PAGE_SIZE)
                     .variable("after", cursor)
-                    .retrieve("repository.issues")
-                    .toEntity(IssueConnection.class)
+                    .execute()
                     .block(GRAPHQL_TIMEOUT);
 
-                if (response == null || response.getNodes() == null) {
+                if (response == null || !response.isValid()) {
+                    logger.warn(
+                        "Invalid GraphQL response for issues: {}",
+                        response != null ? response.getErrors() : "null"
+                    );
                     break;
                 }
 
-                for (var graphQlIssue : response.getNodes()) {
-                    GitHubIssueDTO dto = convertToDTO(graphQlIssue);
+                Map<String, Object> issuesData = response.field("repository.issues").toEntity(Map.class);
+                if (issuesData == null) {
+                    break;
+                }
+
+                List<Map<String, Object>> nodes = (List<Map<String, Object>>) issuesData.get("nodes");
+                if (nodes == null || nodes.isEmpty()) {
+                    break;
+                }
+
+                for (Map<String, Object> issueData : nodes) {
+                    GitHubIssueDTO dto = convertMapToDTO(issueData);
                     Issue issue = issueProcessor.process(dto, context);
                     if (issue != null) {
                         totalSynced++;
                     }
                 }
 
-                var pageInfo = response.getPageInfo();
-                hasNextPage = pageInfo != null && Boolean.TRUE.equals(pageInfo.getHasNextPage());
-                cursor = pageInfo != null ? pageInfo.getEndCursor() : null;
+                Map<String, Object> pageInfo = (Map<String, Object>) issuesData.get("pageInfo");
+                hasNextPage = pageInfo != null && Boolean.TRUE.equals(pageInfo.get("hasNextPage"));
+                cursor = pageInfo != null ? (String) pageInfo.get("endCursor") : null;
             }
 
             logger.info("Synced {} issues for repository {}", totalSynced, repository.getNameWithOwner());
@@ -123,34 +136,37 @@ public class GitHubIssueGraphQlSyncService {
         }
     }
 
-    private GitHubIssueDTO convertToDTO(de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.Issue graphQlIssue) {
+    @SuppressWarnings("unchecked")
+    private GitHubIssueDTO convertMapToDTO(Map<String, Object> issueData) {
         // Convert author
         GitHubUserDTO author = null;
-        var graphQlAuthor = graphQlIssue.getAuthor();
-        if (graphQlAuthor instanceof User graphQlUser) {
+        Map<String, Object> authorData = (Map<String, Object>) issueData.get("author");
+        if (authorData != null) {
             author = new GitHubUserDTO(
-                null, // id
-                graphQlUser.getDatabaseId() != null ? graphQlUser.getDatabaseId().longValue() : null, // databaseId
-                graphQlUser.getLogin(), // login
-                graphQlUser.getAvatarUrl() != null ? graphQlUser.getAvatarUrl().toString() : null, // avatarUrl
-                null, // htmlUrl
-                graphQlUser.getName(), // name
-                graphQlUser.getEmail() // email
+                null,
+                authorData.get("databaseId") != null ? ((Number) authorData.get("databaseId")).longValue() : null,
+                (String) authorData.get("login"),
+                (String) authorData.get("avatarUrl"),
+                null,
+                (String) authorData.get("name"),
+                (String) authorData.get("email")
             );
         }
 
         // Convert labels
         List<GitHubLabelDTO> labels = new ArrayList<>();
-        if (graphQlIssue.getLabels() != null && graphQlIssue.getLabels().getNodes() != null) {
-            for (Label l : graphQlIssue.getLabels().getNodes()) {
-                if (l != null) {
+        Map<String, Object> labelsData = (Map<String, Object>) issueData.get("labels");
+        if (labelsData != null) {
+            List<Map<String, Object>> labelNodes = (List<Map<String, Object>>) labelsData.get("nodes");
+            if (labelNodes != null) {
+                for (Map<String, Object> labelData : labelNodes) {
                     labels.add(
                         new GitHubLabelDTO(
-                            null, // id - GraphQL doesn't return databaseId for labels
-                            l.getId(), // nodeId
-                            l.getName(),
-                            l.getDescription(),
-                            l.getColor()
+                            null,
+                            (String) labelData.get("id"),
+                            (String) labelData.get("name"),
+                            (String) labelData.get("description"),
+                            (String) labelData.get("color")
                         )
                     );
                 }
@@ -159,47 +175,51 @@ public class GitHubIssueGraphQlSyncService {
 
         // Convert milestone
         GitHubMilestoneDTO milestone = null;
-        var graphQlMilestone = graphQlIssue.getMilestone();
-        if (graphQlMilestone != null) {
+        Map<String, Object> milestoneData = (Map<String, Object>) issueData.get("milestone");
+        if (milestoneData != null) {
             milestone = new GitHubMilestoneDTO(
-                null, // id - GraphQL doesn't return databaseId for milestones
-                graphQlMilestone.getNumber(),
-                graphQlMilestone.getTitle(),
-                graphQlMilestone.getDescription(),
-                convertMilestoneState(graphQlMilestone.getState()),
-                graphQlMilestone.getDueOn() != null ? graphQlMilestone.getDueOn().toInstant() : null,
-                graphQlMilestone.getUrl() != null ? graphQlMilestone.getUrl().toString() : null
+                null,
+                milestoneData.get("number") != null ? ((Number) milestoneData.get("number")).intValue() : 0,
+                (String) milestoneData.get("title"),
+                (String) milestoneData.get("description"),
+                convertMilestoneState((String) milestoneData.get("state")),
+                milestoneData.get("dueOn") != null ? Instant.parse((String) milestoneData.get("dueOn")) : null,
+                (String) milestoneData.get("url")
             );
         }
 
         // Convert issue type
         GitHubIssueTypeDTO issueType = null;
-        var graphQlIssueType = graphQlIssue.getIssueType();
-        if (graphQlIssueType != null) {
+        Map<String, Object> issueTypeData = (Map<String, Object>) issueData.get("issueType");
+        if (issueTypeData != null) {
             issueType = new GitHubIssueTypeDTO(
-                null, // id
-                graphQlIssueType.getId(), // nodeId
-                graphQlIssueType.getName(),
-                graphQlIssueType.getDescription(),
-                graphQlIssueType.getColor() != null ? graphQlIssueType.getColor().name() : null,
-                Boolean.TRUE.equals(graphQlIssueType.getIsEnabled())
+                null,
+                (String) issueTypeData.get("id"),
+                (String) issueTypeData.get("name"),
+                (String) issueTypeData.get("description"),
+                (String) issueTypeData.get("color"),
+                Boolean.TRUE.equals(issueTypeData.get("isEnabled"))
             );
         }
 
         // Convert assignees
         List<GitHubUserDTO> assignees = new ArrayList<>();
-        if (graphQlIssue.getAssignees() != null && graphQlIssue.getAssignees().getNodes() != null) {
-            for (User a : graphQlIssue.getAssignees().getNodes()) {
-                if (a != null) {
+        Map<String, Object> assigneesData = (Map<String, Object>) issueData.get("assignees");
+        if (assigneesData != null) {
+            List<Map<String, Object>> assigneeNodes = (List<Map<String, Object>>) assigneesData.get("nodes");
+            if (assigneeNodes != null) {
+                for (Map<String, Object> assigneeData : assigneeNodes) {
                     assignees.add(
                         new GitHubUserDTO(
-                            null, // id
-                            a.getDatabaseId() != null ? a.getDatabaseId().longValue() : null, // databaseId
-                            a.getLogin(),
-                            a.getAvatarUrl() != null ? a.getAvatarUrl().toString() : null,
-                            null, // htmlUrl
-                            a.getName(),
-                            null // email
+                            null,
+                            assigneeData.get("databaseId") != null
+                                ? ((Number) assigneeData.get("databaseId")).longValue()
+                                : null,
+                            (String) assigneeData.get("login"),
+                            (String) assigneeData.get("avatarUrl"),
+                            null,
+                            (String) assigneeData.get("name"),
+                            null
                         )
                     );
                 }
@@ -207,56 +227,71 @@ public class GitHubIssueGraphQlSyncService {
         }
 
         return new GitHubIssueDTO(
-            null, // id
-            graphQlIssue.getDatabaseId() != null ? graphQlIssue.getDatabaseId().longValue() : null, // databaseId
-            graphQlIssue.getId(), // nodeId
-            graphQlIssue.getNumber(),
-            graphQlIssue.getTitle(),
-            graphQlIssue.getBody(),
-            convertState(graphQlIssue.getState()),
-            convertStateReason(graphQlIssue.getStateReason()),
-            graphQlIssue.getUrl() != null ? graphQlIssue.getUrl().toString() : null,
-            0, // commentsCount - not fetched
-            graphQlIssue.getCreatedAt() != null ? graphQlIssue.getCreatedAt().toInstant() : null,
-            graphQlIssue.getUpdatedAt() != null ? graphQlIssue.getUpdatedAt().toInstant() : null,
-            graphQlIssue.getClosedAt() != null ? graphQlIssue.getClosedAt().toInstant() : null,
+            null,
+            parseLong(issueData.get("fullDatabaseId")),
+            (String) issueData.get("id"),
+            parseIntOrDefault(issueData.get("number"), 0),
+            (String) issueData.get("title"),
+            (String) issueData.get("body"),
+            convertState((String) issueData.get("state")),
+            convertStateReason((String) issueData.get("stateReason")),
+            (String) issueData.get("url"),
+            0,
+            parseInstant(issueData.get("createdAt")),
+            parseInstant(issueData.get("updatedAt")),
+            parseInstant(issueData.get("closedAt")),
             author,
             assignees,
             labels,
             milestone,
             issueType,
-            null // repository - already in context
+            null
         );
     }
 
-    private String convertState(IssueState state) {
+    private Long parseLong(Object value) {
+        if (value == null) return null;
+        if (value instanceof Number) return ((Number) value).longValue();
+        if (value instanceof String) return Long.parseLong((String) value);
+        return null;
+    }
+
+    private int parseIntOrDefault(Object value, int defaultValue) {
+        if (value == null) return defaultValue;
+        if (value instanceof Number) return ((Number) value).intValue();
+        if (value instanceof String) return Integer.parseInt((String) value);
+        return defaultValue;
+    }
+
+    private Instant parseInstant(Object value) {
+        if (value == null) return null;
+        if (value instanceof String) return Instant.parse((String) value);
+        return null;
+    }
+
+    private String convertState(String state) {
         if (state == null) {
             return "open";
         }
         return switch (state) {
-            case OPEN -> "open";
-            case CLOSED -> "closed";
+            case "OPEN" -> "open";
+            case "CLOSED" -> "closed";
+            default -> state.toLowerCase();
         };
     }
 
-    private String convertStateReason(
-        de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.IssueStateReason stateReason
-    ) {
-        if (stateReason == null) {
-            return null;
-        }
-        return stateReason.name();
+    private String convertStateReason(String stateReason) {
+        return stateReason; // Pass through as-is
     }
 
-    private String convertMilestoneState(
-        de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.MilestoneState state
-    ) {
+    private String convertMilestoneState(String state) {
         if (state == null) {
             return "open";
         }
         return switch (state) {
-            case OPEN -> "open";
-            case CLOSED -> "closed";
+            case "OPEN" -> "open";
+            case "CLOSED" -> "closed";
+            default -> state.toLowerCase();
         };
     }
 }

@@ -9,9 +9,10 @@ import org.springframework.stereotype.Component;
 /**
  * Handles GitHub installation webhook events.
  * <p>
- * Uses DTOs directly (no hub4j) for complete field coverage.
- * TODO: Implement full workspace provisioning when WorkspaceProvisioningService
- * is migrated
+ * Uses DTOs directly for complete field coverage.
+ * <p>
+ * <b>Future work:</b> Implement full workspace provisioning when WorkspaceProvisioningService
+ * is available.
  */
 @Component
 public class GitHubInstallationMessageHandler extends GitHubMessageHandler<GitHubInstallationEventDTO> {
@@ -48,8 +49,7 @@ public class GitHubInstallationMessageHandler extends GitHubMessageHandler<GitHu
             installation.account() != null ? installation.account().login() : "unknown"
         );
 
-        // TODO: Implement workspace provisioning when WorkspaceProvisioningService is
-        // migrated to DTOs
+        // Future: Workspace provisioning will be implemented here
         switch (event.action()) {
             case "created" -> logger.info(
                 "App installed for account: {}",

@@ -32,7 +32,7 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Integration tests for GitHubLabelMessageHandler.
  * <p>
- * Tests use JSON fixtures parsed directly into DTOs (no hub4j dependency).
+ * Tests use JSON fixtures parsed directly into DTOs using JSON fixtures for complete isolation.
  * Fixtures are real GitHub webhook payloads from HephaestusTest/TestRepository.
  */
 @DisplayName("GitHub Label Message Handler")
@@ -227,12 +227,7 @@ class GitHubLabelMessageHandlerIntegrationTest extends BaseIntegrationTest {
         @DisplayName("Should handle null label in event gracefully")
         void shouldHandleNullLabelGracefully() {
             // Given - event with null label
-            GitHubLabelEventDTO event = new GitHubLabelEventDTO(
-                "created",
-                null,
-                createTestRepoRef(),
-                null
-            );
+            GitHubLabelEventDTO event = new GitHubLabelEventDTO("created", null, createTestRepoRef(), null);
 
             // When/Then - should not throw, just log warning
             assertThatCode(() -> handler.handleEvent(event)).doesNotThrowAnyException();
@@ -252,12 +247,7 @@ class GitHubLabelMessageHandlerIntegrationTest extends BaseIntegrationTest {
                 "Test description",
                 "ff0000"
             );
-            GitHubLabelEventDTO event = new GitHubLabelEventDTO(
-                "created",
-                labelDto,
-                null,
-                null
-            );
+            GitHubLabelEventDTO event = new GitHubLabelEventDTO("created", labelDto, null, null);
 
             // When/Then - should not throw
             assertThatCode(() -> handler.handleEvent(event)).doesNotThrowAnyException();
@@ -275,12 +265,7 @@ class GitHubLabelMessageHandlerIntegrationTest extends BaseIntegrationTest {
                 null, // null description
                 "abcdef"
             );
-            GitHubLabelEventDTO event = new GitHubLabelEventDTO(
-                "created",
-                labelDto,
-                createTestRepoRef(),
-                null
-            );
+            GitHubLabelEventDTO event = new GitHubLabelEventDTO("created", labelDto, createTestRepoRef(), null);
 
             // When
             handler.handleEvent(event);
@@ -316,20 +301,11 @@ class GitHubLabelMessageHandlerIntegrationTest extends BaseIntegrationTest {
                 null, // setting to null
                 "123456"
             );
-            GitHubLabelEventDTO event = new GitHubLabelEventDTO(
-                "edited",
-                labelDto,
-                createTestRepoRef(),
-                null
-            );
+            GitHubLabelEventDTO event = new GitHubLabelEventDTO("edited", labelDto, createTestRepoRef(), null);
             handler.handleEvent(event);
 
             // Then - description should be null now
-            assertThat(labelRepository.findById(labelId))
-                .isPresent()
-                .get()
-                .extracting(Label::getDescription)
-                .isNull();
+            assertThat(labelRepository.findById(labelId)).isPresent().get().extracting(Label::getDescription).isNull();
         }
 
         @Test
@@ -415,10 +391,7 @@ class GitHubLabelMessageHandlerIntegrationTest extends BaseIntegrationTest {
             handler.handleEvent(event);
 
             // When
-            var foundLabel = labelRepository.findByRepositoryIdAndName(
-                FIXTURE_REPO_ID,
-                event.label().name()
-            );
+            var foundLabel = labelRepository.findByRepositoryIdAndName(FIXTURE_REPO_ID, event.label().name());
 
             // Then
             assertThat(foundLabel)
@@ -465,12 +438,7 @@ class GitHubLabelMessageHandlerIntegrationTest extends BaseIntegrationTest {
                 "Updated description",
                 "ff0000"
             );
-            GitHubLabelEventDTO editEvent = new GitHubLabelEventDTO(
-                "edited",
-                editedDto,
-                createTestRepoRef(),
-                null
-            );
+            GitHubLabelEventDTO editEvent = new GitHubLabelEventDTO("edited", editedDto, createTestRepoRef(), null);
             handler.handleEvent(editEvent);
 
             // Then - issue should still have the label (now with updated name)

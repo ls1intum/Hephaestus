@@ -24,8 +24,13 @@ import org.springframework.transaction.annotation.Transactional;
  * <li>Single processing path for all data sources (sync and webhooks)</li>
  * <li>Idempotent operations via upsert pattern</li>
  * <li>Domain events published for reactive feature development</li>
- * <li>No hub4j types - works exclusively with DTOs</li>
+ * <li>Works exclusively with DTOs for complete field coverage</li>
  * </ul>
+ * <p>
+ * <b>Note on Label IDs:</b>
+ * GitHub's GraphQL API does not expose databaseId for labels, only node_id.
+ * This processor supports both ID-based lookup (for webhook events which provide databaseId)
+ * and name-based lookup (for GraphQL sync where only name is reliably available).
  */
 @Service
 public class GitHubLabelProcessor {
@@ -42,7 +47,11 @@ public class GitHubLabelProcessor {
 
     /**
      * Process a GitHub label DTO and persist it as a Label entity.
+     * Uses ID-based lookup when id is available (webhooks), otherwise falls back to name-based lookup.
      * Publishes appropriate domain events based on what changed.
+     * <p>
+     * For new labels from GraphQL (which doesn't provide databaseId), a deterministic ID is generated
+     * from the repository ID and label name to ensure consistency.
      *
      * @param dto the GitHub label DTO
      * @param repository the repository this label belongs to
@@ -51,21 +60,35 @@ public class GitHubLabelProcessor {
      */
     @Transactional
     public Label process(GitHubLabelDTO dto, Repository repository, ProcessingContext context) {
-        if (dto == null || dto.id() == null) {
-            logger.warn("Label DTO is null or missing id, skipping");
+        if (dto == null || dto.name() == null) {
+            logger.warn("Label DTO is null or missing name, skipping");
             return null;
         }
 
-        Optional<Label> existingOpt = labelRepository.findById(dto.id());
+        // Find existing label: prefer ID lookup (from webhooks), fall back to name lookup (for GraphQL)
+        Optional<Label> existingOpt;
+        if (dto.id() != null) {
+            existingOpt = labelRepository.findById(dto.id());
+        } else {
+            existingOpt = labelRepository.findByRepositoryIdAndName(repository.getId(), dto.name());
+        }
         boolean isNew = existingOpt.isEmpty();
 
         Label label = existingOpt.orElseGet(Label::new);
 
         // Set or update fields
-        label.setId(dto.id());
-        label.setName(dto.name());
-        label.setColor(dto.color());
-        label.setDescription(dto.description());
+        // For labels, all fields including description are always updated (null values are allowed)
+        if (dto.id() != null) {
+            label.setId(dto.id());
+        } else if (isNew) {
+            // Generate deterministic ID for new labels from GraphQL (which doesn't provide databaseId)
+            label.setId(generateDeterministicId(repository.getId(), dto.name()));
+        }
+        label.setName(dto.name()); // name is always required
+        if (dto.color() != null) {
+            label.setColor(dto.color());
+        }
+        label.setDescription(dto.description()); // labels allow clearing description to null
         label.setRepository(repository);
 
         Label saved = labelRepository.save(label);
@@ -77,6 +100,24 @@ public class GitHubLabelProcessor {
 
         logger.debug("Processed label {} ({}): {}", saved.getName(), saved.getId(), isNew ? "created" : "updated");
         return saved;
+    }
+
+    /**
+     * Generates a deterministic ID for labels synced via GraphQL.
+     * GitHub's GraphQL API doesn't expose databaseId for labels, so we generate
+     * a consistent ID based on the repository ID and label name.
+     * <p>
+     * The generated ID is negative to avoid collision with actual GitHub databaseIds.
+     *
+     * @param repositoryId the repository's database ID
+     * @param labelName the label's name
+     * @return a deterministic negative Long ID
+     */
+    private Long generateDeterministicId(Long repositoryId, String labelName) {
+        // Use a combination of repo ID and label name hash to generate a unique negative ID
+        // Negative IDs won't collide with GitHub's positive databaseIds
+        long hash = repositoryId * 31L + labelName.hashCode();
+        return -Math.abs(hash);
     }
 
     /**

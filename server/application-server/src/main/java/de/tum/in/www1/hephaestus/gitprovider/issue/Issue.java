@@ -199,42 +199,4 @@ public class Issue extends BaseGitServiceEntity {
     public boolean isPullRequest() {
         return false;
     }
-    /*
-     * Webhook payload data currently ignored while still surfaced by hub4j (no
-     * extra REST request required):
-     * Fields:
-     * - issue.closed_by (github/issues.closed.json) via GHIssue#getClosedBy().
-     * Reason: converter never calls getClosedBy().
-     * Relationships:
-     * - issue.pull_request stub (github/pull_request.closed.json) via
-     * GHIssue#getPullRequest(). Reason: converter ignores the embedded pull-request
-     * reference.
-     *
-     * Data that would require additional REST fetches (not yet wired):
-     * - issue timeline events (GHIssue#listEvents(); follows timeline_url).
-     * - issue reaction details (GHIssue#listReactions(); follows reactions.url).
-     *
-     * Webhook payload attributes not surfaced by hub4j/github-api 2.0-rc.5 (would
-     * require raw JSON parsing or GraphQL):
-     * Fields:
-     * - issue.author_association (github/issues.closed.json).
-     * - issue.active_lock_reason (github/issues.locked.json).
-     * - issue.type (github/issues.typed.json).
-     * - issue.issue_dependencies_summary (github/issues.transferred.json).
-     * - issue.sub_issues_summary (github/issues.closed.json).
-     * - issue.reactions total counters (github/issues.closed.json).
-     * - issue.formProgress (GraphQL Issue.formProgress.nodes).
-     * Relationships:
-     * - Parent/child linkage (sub_issues.* payloads: parent_issue_url, sub_issue
-     * objects).
-     * - Dependency edges (GraphQL Issue.trackedIn / Issue.tracks).
-     * - Issue.projectItems (GraphQL Issue.projectItems / ProjectV2ItemConnection).
-     * - Timeline discussion + commit events (GraphQL Issue.timelineItems variants
-     * not bound in hub4j).
-     *
-     * Explicitly not persisted today:
-     * - issue.timeline_url (pointer for ad-hoc pagination).
-     * - URLs to REST endpoints (e.g. labels_url, events_url) beyond repository
-     * association.
-     */
 }

@@ -13,7 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Handles GitHub issue_dependencies webhook events.
  * <p>
- * Uses DTOs directly (no hub4j) for complete field coverage.
+ * Uses DTOs directly for complete field coverage.
  * <p>
  * Delegates dependency relationship management to {@link GitHubIssueDependencySyncService}.
  */

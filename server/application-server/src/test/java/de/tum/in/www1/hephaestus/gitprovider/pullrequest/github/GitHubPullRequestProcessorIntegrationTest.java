@@ -168,9 +168,12 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
             Instant.parse("2025-11-01T21:42:45Z"),
             null, // closedAt
             null, // mergedAt
+            null, // mergedBy
+            null, // mergeCommitSha
             false, // isDraft
             false, // isMerged
             null, // mergeable
+            false, // locked
             0, // additions
             0, // deletions
             0, // changedFiles
@@ -184,7 +187,7 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
             null, // milestone
             null, // head
             null, // base
-            null  // repository
+            null // repository
         );
     }
 
@@ -210,9 +213,28 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
                 "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/pull/1",
                 Instant.now(),
                 Instant.now(),
-                null, null, false, false, null, 0, 0, 0, 1, 0, 0,
+                null,
+                null,
+                null,
+                null,
+                false,
+                false,
+                null,
+                false,
+                0,
+                0,
+                0,
+                1,
+                0,
+                0,
                 createAuthorDto(),
-                null, null, null, null, null, null, null
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null
             );
 
             // When
@@ -240,9 +262,28 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
                 "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/pull/26",
                 Instant.now(),
                 Instant.now(),
-                null, null, false, false, null, 0, 0, 0, 1, 0, 0,
+                null,
+                null,
+                null,
+                null,
+                false,
+                false,
+                null,
+                false,
+                0,
+                0,
+                0,
+                1,
+                0,
+                0,
                 createAuthorDto(),
-                null, null, null, null, null, null, null
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null
             );
 
             // Verify the fallback works
@@ -272,9 +313,28 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
                 "https://example.com",
                 Instant.now(),
                 Instant.now(),
-                null, null, false, false, null, 0, 0, 0, 1, 0, 0,
+                null,
+                null,
+                null,
+                null,
+                false,
+                false,
+                null,
+                false,
+                0,
+                0,
+                0,
+                1,
+                0,
+                0,
                 createAuthorDto(),
-                null, null, null, null, null, null, null
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null
             );
 
             // Verify fallback returns null
@@ -344,11 +404,38 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
             GitHubLabelDTO labelDto = new GitHubLabelDTO(labelId, "LA_node", labelName, "Bug label", "d73a4a");
 
             GitHubPullRequestDTO dto = new GitHubPullRequestDTO(
-                FIXTURE_PR_ID, null, "PR_node", 26, "PR with labels", "Body", "open",
+                FIXTURE_PR_ID,
+                null,
+                "PR_node",
+                26,
+                "PR with labels",
+                "Body",
+                "open",
                 "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/pull/26",
-                Instant.now(), Instant.now(), null, null, false, false, null, 0, 0, 0, 1, 0, 0,
+                Instant.now(),
+                Instant.now(),
+                null,
+                null,
+                null,
+                null,
+                false,
+                false,
+                null,
+                false,
+                0,
+                0,
+                0,
+                1,
+                0,
+                0,
                 createAuthorDto(),
-                null, null, List.of(labelDto), null, null, null, null
+                null,
+                null,
+                List.of(labelDto),
+                null,
+                null,
+                null,
+                null
             );
 
             // When
@@ -367,17 +454,48 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
             // Given
             Long milestoneId = 14028563L;
             GitHubMilestoneDTO milestoneDto = new GitHubMilestoneDTO(
-                milestoneId, 2, "v1.0", "First release", "open",
+                milestoneId,
+                2,
+                "v1.0",
+                "First release",
+                "open",
                 Instant.now().plusSeconds(86400 * 30), // dueOn
                 "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/milestone/2"
             );
 
             GitHubPullRequestDTO dto = new GitHubPullRequestDTO(
-                FIXTURE_PR_ID, null, "PR_node", 26, "PR with milestone", "Body", "open",
+                FIXTURE_PR_ID,
+                null,
+                "PR_node",
+                26,
+                "PR with milestone",
+                "Body",
+                "open",
                 "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/pull/26",
-                Instant.now(), Instant.now(), null, null, false, false, null, 0, 0, 0, 1, 0, 0,
+                Instant.now(),
+                Instant.now(),
+                null,
+                null,
+                null,
+                null,
+                false,
+                false,
+                null,
+                false,
+                0,
+                0,
+                0,
+                1,
+                0,
+                0,
                 createAuthorDto(),
-                null, null, null, milestoneDto, null, null, null
+                null,
+                null,
+                null,
+                milestoneDto,
+                null,
+                null,
+                null
             );
 
             // When
@@ -404,14 +522,38 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
             eventListener.clear();
 
             GitHubPullRequestDTO closedDto = new GitHubPullRequestDTO(
-                FIXTURE_PR_ID, null, "PR_node", 26, "Closed PR", "Body", "closed",
+                FIXTURE_PR_ID,
+                null,
+                "PR_node",
+                26,
+                "Closed PR",
+                "Body",
+                "closed",
                 "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/pull/26",
-                Instant.now(), Instant.now().plusSeconds(60),
-                Instant.now().plusSeconds(60), null, // closedAt set, mergedAt null
-                false, false, // not merged
-                null, 0, 0, 0, 1, 0, 0,
+                Instant.now(),
+                Instant.now().plusSeconds(60),
+                Instant.now().plusSeconds(60),
+                null, // closedAt set, mergedAt null
+                null,
+                null, // mergedBy, mergeCommitSha
+                false,
+                false, // not merged
+                null,
+                false,
+                0,
+                0,
+                0,
+                1,
+                0,
+                0,
                 createAuthorDto(),
-                null, null, null, null, null, null, null
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null
             );
 
             // When
@@ -433,14 +575,38 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
 
             Instant now = Instant.now();
             GitHubPullRequestDTO mergedDto = new GitHubPullRequestDTO(
-                FIXTURE_PR_ID, null, "PR_node", 26, "Merged PR", "Body", "closed",
+                FIXTURE_PR_ID,
+                null,
+                "PR_node",
+                26,
+                "Merged PR",
+                "Body",
+                "closed",
                 "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/pull/26",
-                now, now.plusSeconds(60),
-                now.plusSeconds(60), now.plusSeconds(60), // both closedAt and mergedAt set
-                false, true, // merged = true
-                null, 10, 5, 3, 2, 0, 0,
+                now,
+                now.plusSeconds(60),
+                now.plusSeconds(60),
+                now.plusSeconds(60), // both closedAt and mergedAt set
+                null,
+                null, // mergedBy, mergeCommitSha
+                false,
+                true, // merged = true
+                null,
+                false,
+                10,
+                5,
+                3,
+                2,
+                0,
+                0,
                 createAuthorDto(),
-                null, null, null, null, null, null, null
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null
             );
 
             // When
@@ -465,25 +631,75 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
         void shouldPublishPullRequestReadyEvent() {
             // Given - create draft PR first
             GitHubPullRequestDTO draftDto = new GitHubPullRequestDTO(
-                FIXTURE_PR_ID, null, "PR_node", 26, "Draft PR", "Body", "open",
+                FIXTURE_PR_ID,
+                null,
+                "PR_node",
+                26,
+                "Draft PR",
+                "Body",
+                "open",
                 "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/pull/26",
-                Instant.now(), Instant.now(), null, null,
-                true, false, // isDraft = true
-                null, 0, 0, 0, 1, 0, 0,
+                Instant.now(),
+                Instant.now(),
+                null,
+                null,
+                null,
+                null, // mergedBy, mergeCommitSha
+                true,
+                false, // isDraft = true
+                null,
+                false,
+                0,
+                0,
+                0,
+                1,
+                0,
+                0,
                 createAuthorDto(),
-                null, null, null, null, null, null, null
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null
             );
             processor.process(draftDto, createContext());
             eventListener.clear();
 
             GitHubPullRequestDTO readyDto = new GitHubPullRequestDTO(
-                FIXTURE_PR_ID, null, "PR_node", 26, "Ready PR", "Body", "open",
+                FIXTURE_PR_ID,
+                null,
+                "PR_node",
+                26,
+                "Ready PR",
+                "Body",
+                "open",
                 "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/pull/26",
-                Instant.now(), Instant.now().plusSeconds(60), null, null,
-                false, false, // isDraft = false now
-                null, 5, 2, 1, 1, 0, 0,
+                Instant.now(),
+                Instant.now().plusSeconds(60),
+                null,
+                null,
+                null,
+                null, // mergedBy, mergeCommitSha
+                false,
+                false, // isDraft = false now
+                null,
+                false,
+                5,
+                2,
+                1,
+                1,
+                0,
+                0,
                 createAuthorDto(),
-                null, null, null, null, null, null, null
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null
             );
 
             // When
@@ -509,13 +725,38 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
             eventListener.clear();
 
             GitHubPullRequestDTO draftDto = new GitHubPullRequestDTO(
-                FIXTURE_PR_ID, null, "PR_node", 26, "Now Draft PR", "Body", "open",
+                FIXTURE_PR_ID,
+                null,
+                "PR_node",
+                26,
+                "Now Draft PR",
+                "Body",
+                "open",
                 "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/pull/26",
-                Instant.now(), Instant.now().plusSeconds(60), null, null,
-                true, false, // isDraft = true
-                null, 0, 0, 0, 1, 0, 0,
+                Instant.now(),
+                Instant.now().plusSeconds(60),
+                null,
+                null,
+                null,
+                null, // mergedBy, mergeCommitSha
+                true,
+                false, // isDraft = true
+                null,
+                false,
+                0,
+                0,
+                0,
+                1,
+                0,
+                0,
                 createAuthorDto(),
-                null, null, null, null, null, null, null
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null
             );
 
             // When
@@ -541,14 +782,38 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
             eventListener.clear();
 
             GitHubPullRequestDTO syncDto = new GitHubPullRequestDTO(
-                FIXTURE_PR_ID, null, "PR_node", 26, "Synced PR", "Body", "open",
+                FIXTURE_PR_ID,
+                null,
+                "PR_node",
+                26,
+                "Synced PR",
+                "Body",
+                "open",
                 "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/pull/26",
-                Instant.now(), Instant.now().plusSeconds(60), null, null,
-                false, false,
-                null, 15, 8, 5, 3, // More commits now
-                0, 0,
+                Instant.now(),
+                Instant.now().plusSeconds(60),
+                null,
+                null,
+                null,
+                null, // mergedBy, mergeCommitSha
+                false,
+                false,
+                null,
+                false,
+                15,
+                8,
+                5,
+                3, // More commits now
+                0,
+                0,
                 createAuthorDto(),
-                null, null, null, null, null, null, null
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null
             );
 
             // When
@@ -577,12 +842,38 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
             GitHubLabelDTO labelDto = new GitHubLabelDTO(labelId, "LA_node", "enhancement", "Enhancement", "0e8a16");
 
             GitHubPullRequestDTO labeledDto = new GitHubPullRequestDTO(
-                FIXTURE_PR_ID, null, "PR_node", 26, "Labeled PR", "Body", "open",
+                FIXTURE_PR_ID,
+                null,
+                "PR_node",
+                26,
+                "Labeled PR",
+                "Body",
+                "open",
                 "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/pull/26",
-                Instant.now(), Instant.now().plusSeconds(60), null, null,
-                false, false, null, 0, 0, 0, 1, 0, 0,
+                Instant.now(),
+                Instant.now().plusSeconds(60),
+                null,
+                null,
+                null,
+                null,
+                false,
+                false,
+                null,
+                false,
+                0,
+                0,
+                0,
+                1,
+                0,
+                0,
                 createAuthorDto(),
-                null, null, List.of(labelDto), null, null, null, null
+                null,
+                null,
+                List.of(labelDto),
+                null,
+                null,
+                null,
+                null
             );
 
             // When
@@ -600,23 +891,75 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
             GitHubLabelDTO labelDto = new GitHubLabelDTO(labelId, "LA_node", "enhancement", "Enhancement", "0e8a16");
 
             GitHubPullRequestDTO withLabelDto = new GitHubPullRequestDTO(
-                FIXTURE_PR_ID, null, "PR_node", 26, "Labeled PR", "Body", "open",
+                FIXTURE_PR_ID,
+                null,
+                "PR_node",
+                26,
+                "Labeled PR",
+                "Body",
+                "open",
                 "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/pull/26",
-                Instant.now(), Instant.now(), null, null,
-                false, false, null, 0, 0, 0, 1, 0, 0,
+                Instant.now(),
+                Instant.now(),
+                null,
+                null,
+                null,
+                null,
+                false,
+                false,
+                null,
+                false,
+                0,
+                0,
+                0,
+                1,
+                0,
+                0,
                 createAuthorDto(),
-                null, null, List.of(labelDto), null, null, null, null
+                null,
+                null,
+                List.of(labelDto),
+                null,
+                null,
+                null,
+                null
             );
             processor.process(withLabelDto, createContext());
             eventListener.clear();
 
             GitHubPullRequestDTO unlabeledDto = new GitHubPullRequestDTO(
-                FIXTURE_PR_ID, null, "PR_node", 26, "Unlabeled PR", "Body", "open",
+                FIXTURE_PR_ID,
+                null,
+                "PR_node",
+                26,
+                "Unlabeled PR",
+                "Body",
+                "open",
                 "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/pull/26",
-                Instant.now(), Instant.now().plusSeconds(60), null, null,
-                false, false, null, 0, 0, 0, 1, 0, 0,
+                Instant.now(),
+                Instant.now().plusSeconds(60),
+                null,
+                null,
+                null,
+                null,
+                false,
+                false,
+                null,
+                false,
+                0,
+                0,
+                0,
+                1,
+                0,
+                0,
                 createAuthorDto(),
-                null, null, List.of(), null, null, null, null // empty labels
+                null,
+                null,
+                List.of(),
+                null,
+                null,
+                null,
+                null // empty labels
             );
 
             // When

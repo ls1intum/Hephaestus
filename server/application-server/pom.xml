@@ -216,7 +216,6 @@
             <artifactId>therapi-runtime-javadoc</artifactId>
             <version>0.15.0</version>
         </dependency>
-        <!-- Hub4j dependency REMOVED - all GitHub API access now uses GraphQL/REST directly -->
         <dependency>
             <groupId>io.hypersistence</groupId>
             <artifactId>hypersistence-utils-hibernate-63</artifactId>

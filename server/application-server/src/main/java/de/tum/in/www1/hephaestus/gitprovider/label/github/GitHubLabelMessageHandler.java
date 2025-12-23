@@ -3,8 +3,6 @@ package de.tum.in.www1.hephaestus.gitprovider.label.github;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContextFactory;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
-import de.tum.in.www1.hephaestus.gitprovider.label.Label;
-import de.tum.in.www1.hephaestus.gitprovider.label.LabelRepository;
 import de.tum.in.www1.hephaestus.gitprovider.label.github.dto.GitHubLabelDTO;
 import de.tum.in.www1.hephaestus.gitprovider.label.github.dto.GitHubLabelEventDTO;
 import org.slf4j.Logger;
@@ -15,7 +13,8 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Handles GitHub label webhook events.
  * <p>
- * Uses DTOs directly (no hub4j) for complete field coverage.
+ * Uses DTOs directly and delegates to {@link GitHubLabelProcessor}
+ * for processing, ensuring a single source of truth for label processing logic.
  */
 @Component
 public class GitHubLabelMessageHandler extends GitHubMessageHandler<GitHubLabelEventDTO> {
@@ -23,12 +22,12 @@ public class GitHubLabelMessageHandler extends GitHubMessageHandler<GitHubLabelE
     private static final Logger logger = LoggerFactory.getLogger(GitHubLabelMessageHandler.class);
 
     private final ProcessingContextFactory contextFactory;
-    private final LabelRepository labelRepository;
+    private final GitHubLabelProcessor labelProcessor;
 
-    GitHubLabelMessageHandler(ProcessingContextFactory contextFactory, LabelRepository labelRepository) {
+    GitHubLabelMessageHandler(ProcessingContextFactory contextFactory, GitHubLabelProcessor labelProcessor) {
         super(GitHubLabelEventDTO.class);
         this.contextFactory = contextFactory;
-        this.labelRepository = labelRepository;
+        this.labelProcessor = labelProcessor;
     }
 
     @Override
@@ -59,29 +58,9 @@ public class GitHubLabelMessageHandler extends GitHubMessageHandler<GitHubLabelE
         }
 
         if ("deleted".equals(event.action())) {
-            labelRepository.deleteById(labelDto.id());
+            labelProcessor.delete(labelDto.id(), context);
         } else {
-            processLabel(labelDto, context);
+            labelProcessor.process(labelDto, context.repository(), context);
         }
-    }
-
-    private Label processLabel(GitHubLabelDTO dto, ProcessingContext context) {
-        return labelRepository
-            .findById(dto.id())
-            .map(label -> {
-                if (dto.name() != null) label.setName(dto.name());
-                if (dto.color() != null) label.setColor(dto.color());
-                label.setDescription(dto.description());
-                return labelRepository.save(label);
-            })
-            .orElseGet(() -> {
-                Label label = new Label();
-                label.setId(dto.id());
-                label.setName(dto.name());
-                label.setColor(dto.color());
-                label.setDescription(dto.description());
-                label.setRepository(context.repository());
-                return labelRepository.save(label);
-            });
     }
 }

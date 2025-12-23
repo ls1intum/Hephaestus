@@ -13,7 +13,7 @@ import java.util.List;
  * Domain DTO for GitHub issues.
  * <p>
  * This is the unified model used by both GraphQL sync and webhook handlers.
- * It's independent of hub4j and can be constructed from any source.
+ * It can be constructed from any source (GraphQL, REST, webhook payload).
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record GitHubIssueDTO(

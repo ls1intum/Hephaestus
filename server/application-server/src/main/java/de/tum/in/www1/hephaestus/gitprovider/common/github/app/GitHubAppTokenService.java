@@ -27,7 +27,7 @@ import org.springframework.web.reactive.function.client.WebClient;
 
 /**
  * Service for generating GitHub App JWT tokens and installation access tokens.
- * Uses GitHub REST API directly without hub4j dependency.
+ * Uses GitHub REST API directly for token management.
  */
 @Service
 public class GitHubAppTokenService {

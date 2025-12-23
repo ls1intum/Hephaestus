@@ -12,7 +12,7 @@ import org.springframework.web.reactive.function.client.WebClient;
 
 /**
  * Enumerates repositories accessible to a GitHub App installation so we can backfill monitors.
- * Uses GitHub REST API directly without hub4j dependency.
+ * Uses GitHub REST API directly for repository enumeration.
  */
 @Service
 public class GitHubInstallationRepositoryEnumerationService {

@@ -19,7 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Integration tests for GitHubInstallationMessageHandler.
  * <p>
- * Tests use JSON fixtures parsed directly into DTOs (no hub4j dependency).
+ * Tests use JSON fixtures parsed directly into DTOs using JSON fixtures for complete isolation.
  */
 @DisplayName("GitHub Installation Message Handler")
 @Transactional
@@ -105,16 +105,10 @@ class GitHubInstallationMessageHandlerIntegrationTest extends BaseIntegrationTes
     @DisplayName("Should handle null installation gracefully")
     void shouldHandleNullInstallationGracefully() {
         // Given - event with null installation
-        GitHubInstallationEventDTO event = new GitHubInstallationEventDTO(
-            "created",
-            null,
-            null,
-            null
-        );
+        GitHubInstallationEventDTO event = new GitHubInstallationEventDTO("created", null, null, null);
 
         // When - should not throw
         handler.handleEvent(event);
-
         // Then - handler logs warning but doesn't crash
     }
 
@@ -132,15 +126,15 @@ class GitHubInstallationMessageHandlerIntegrationTest extends BaseIntegrationTes
 
         // When - should not throw
         handler.handleEvent(event);
-
         // Then - handler logs debug message for unhandled action
     }
 
     @Test
     @DisplayName("Should return INSTALLATION domain")
     void shouldReturnInstallationDomain() {
-        assertThat(handler.getDomain())
-            .isEqualTo(de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler.GitHubMessageDomain.INSTALLATION);
+        assertThat(handler.getDomain()).isEqualTo(
+            de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler.GitHubMessageDomain.INSTALLATION
+        );
     }
 
     private GitHubInstallationEventDTO loadPayload(String filename) throws IOException {

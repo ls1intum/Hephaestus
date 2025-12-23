@@ -214,13 +214,13 @@ class GitHubLabelProcessorIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("Should return null for DTO with null ID")
-        void shouldReturnNullForDtoWithNullId() {
-            // Given
+        @DisplayName("Should create label with generated ID when DTO has null ID (GraphQL sync scenario)")
+        void shouldCreateLabelWithGeneratedIdWhenDtoHasNullId() {
+            // Given - DTO without ID (like GraphQL sync)
             GitHubLabelDTO dto = new GitHubLabelDTO(
-                null, // null ID
+                null, // null ID - simulates GraphQL response
                 "LA_node",
-                "name",
+                "graphql-synced-label",
                 "desc",
                 "000000"
             );
@@ -228,9 +228,45 @@ class GitHubLabelProcessorIntegrationTest extends BaseIntegrationTest {
             // When
             Label result = processor.process(dto, testRepository, createContext());
 
-            // Then
-            assertThat(result).isNull();
-            assertThat(eventListener.getProcessedEvents()).isEmpty();
+            // Then - label should be created with a generated negative ID
+            assertThat(result).isNotNull();
+            assertThat(result.getId()).isNotNull();
+            assertThat(result.getId()).isNegative(); // Generated IDs are negative to avoid collision
+            assertThat(result.getName()).isEqualTo("graphql-synced-label");
+            assertThat(eventListener.getProcessedEvents()).hasSize(1);
+        }
+
+        @Test
+        @DisplayName("Should update existing label by name when DTO has null ID")
+        void shouldUpdateExistingLabelByNameWhenDtoHasNullId() {
+            // Given - existing label
+            Long existingId = 999888777L;
+            Label existingLabel = new Label();
+            existingLabel.setId(existingId);
+            existingLabel.setName("existing-label");
+            existingLabel.setColor("111111");
+            existingLabel.setDescription("old description");
+            existingLabel.setRepository(testRepository);
+            labelRepository.save(existingLabel);
+
+            // DTO without ID (like GraphQL sync) but matching name
+            GitHubLabelDTO dto = new GitHubLabelDTO(
+                null, // null ID
+                "LA_node",
+                "existing-label", // same name
+                "new description",
+                "222222"
+            );
+
+            // When
+            Label result = processor.process(dto, testRepository, createContext());
+
+            // Then - should update existing label, not create new one
+            assertThat(result).isNotNull();
+            assertThat(result.getId()).isEqualTo(existingId); // keeps original ID
+            assertThat(result.getDescription()).isEqualTo("new description");
+            assertThat(result.getColor()).isEqualTo("222222");
+            assertThat(labelRepository.count()).isEqualTo(1);
         }
 
         @Test
@@ -328,8 +364,7 @@ class GitHubLabelProcessorIntegrationTest extends BaseIntegrationTest {
             assertThat(labelRepository.findById(nonExistentId)).isEmpty();
 
             // When/Then - should not throw
-            assertThatCode(() -> processor.delete(nonExistentId, createContext()))
-                .doesNotThrowAnyException();
+            assertThatCode(() -> processor.delete(nonExistentId, createContext())).doesNotThrowAnyException();
 
             // No event published
             assertThat(eventListener.getDeletedEvents()).isEmpty();
@@ -339,8 +374,7 @@ class GitHubLabelProcessorIntegrationTest extends BaseIntegrationTest {
         @DisplayName("Should handle null label ID")
         void shouldHandleNullLabelId() {
             // When/Then - should not throw
-            assertThatCode(() -> processor.delete(null, createContext()))
-                .doesNotThrowAnyException();
+            assertThatCode(() -> processor.delete(null, createContext())).doesNotThrowAnyException();
 
             // No event published
             assertThat(eventListener.getDeletedEvents()).isEmpty();

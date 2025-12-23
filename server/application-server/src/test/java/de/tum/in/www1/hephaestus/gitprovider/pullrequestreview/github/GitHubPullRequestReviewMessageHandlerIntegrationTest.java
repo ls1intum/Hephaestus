@@ -29,7 +29,7 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Integration tests for GitHubPullRequestReviewMessageHandler.
  * <p>
- * Tests use JSON fixtures parsed directly into DTOs (no hub4j dependency).
+ * Tests use JSON fixtures parsed directly into DTOs using JSON fixtures for complete isolation.
  */
 @DisplayName("GitHub Pull Request Review Message Handler")
 @Transactional
@@ -176,7 +176,7 @@ class GitHubPullRequestReviewMessageHandlerIntegrationTest extends BaseIntegrati
         // Given - load dismissed event first to get the correct review ID
         GitHubPullRequestReviewEventDTO dismissEvent = loadPayload("pull_request_review.dismissed");
         createTestPullRequest(dismissEvent.pullRequest().getDatabaseId(), dismissEvent.pullRequest().number());
-        
+
         // Create the review first (simulate submitted state) with the ID that will be dismissed
         PullRequest pr = pullRequestRepository.findById(dismissEvent.pullRequest().getDatabaseId()).orElseThrow();
         PullRequestReview existingReview = new PullRequestReview();

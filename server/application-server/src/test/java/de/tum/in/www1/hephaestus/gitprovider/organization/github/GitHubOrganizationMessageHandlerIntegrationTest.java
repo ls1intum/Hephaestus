@@ -25,7 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Integration tests for GitHubOrganizationMessageHandler.
  * <p>
- * Tests use JSON fixtures parsed directly into DTOs (no hub4j dependency).
+ * Tests use JSON fixtures parsed directly into DTOs using JSON fixtures for complete isolation.
  */
 @DisplayName("GitHub Organization Message Handler")
 @Transactional

@@ -18,10 +18,10 @@ import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
+import de.tum.in.www1.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.in.www1.hephaestus.workspace.AccountType;
 import de.tum.in.www1.hephaestus.workspace.Workspace;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceRepository;
-import de.tum.in.www1.hephaestus.testconfig.BaseIntegrationTest;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
@@ -44,7 +44,7 @@ import org.springframework.transaction.annotation.Transactional;
  * Integration tests for GitHubPullRequestMessageHandler.
  * <p>
  * Tests the full webhook handling flow using JSON fixtures parsed directly
- * into DTOs (no hub4j dependency). Verifies:
+ * into DTOs using JSON fixtures for complete isolation. Verifies:
  * - Correct routing of webhook actions to processor methods
  * - Pull request persistence for all action types
  * - Event publishing through the handler → processor chain
@@ -505,8 +505,7 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
             GitHubPullRequestEventDTO event = loadPayload("pull_request.opened");
 
             // When/Then - should not throw
-            assertThatCode(() -> handler.handleEvent(event))
-                .doesNotThrowAnyException();
+            assertThatCode(() -> handler.handleEvent(event)).doesNotThrowAnyException();
         }
 
         @Test
@@ -518,8 +517,7 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
             GitHubPullRequestEventDTO event = loadPayload("pull_request.opened");
 
             // When/Then - should not throw, just log warning
-            assertThatCode(() -> handler.handleEvent(event))
-                .doesNotThrowAnyException();
+            assertThatCode(() -> handler.handleEvent(event)).doesNotThrowAnyException();
 
             // PR should not be persisted since context is null
             assertThat(pullRequestRepository.count()).isZero();
@@ -586,12 +584,11 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
                 null, // sender
                 null, // label
                 null, // requestedReviewer
-                null  // changes
+                null // changes
             );
 
             // When/Then - should not throw
-            assertThatCode(() -> handler.handleEvent(event))
-                .doesNotThrowAnyException();
+            assertThatCode(() -> handler.handleEvent(event)).doesNotThrowAnyException();
 
             // PR should not be persisted
             assertThat(pullRequestRepository.count()).isZero();

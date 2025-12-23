@@ -32,7 +32,7 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Integration tests for GitHubMilestoneMessageHandler.
  * <p>
- * Tests use JSON fixtures parsed directly into DTOs (no hub4j dependency).
+ * Tests use JSON fixtures parsed directly into DTOs using JSON fixtures for complete isolation.
  * Fixtures are real GitHub webhook payloads from HephaestusTest/TestRepository.
  */
 @DisplayName("GitHub Milestone Message Handler")
@@ -268,12 +268,7 @@ class GitHubMilestoneMessageHandlerIntegrationTest extends BaseIntegrationTest {
         @DisplayName("Should handle null milestone in event gracefully")
         void shouldHandleNullMilestoneGracefully() {
             // Given - event with null milestone
-            GitHubMilestoneEventDTO event = new GitHubMilestoneEventDTO(
-                "created",
-                null,
-                createTestRepoRef(),
-                null
-            );
+            GitHubMilestoneEventDTO event = new GitHubMilestoneEventDTO("created", null, createTestRepoRef(), null);
 
             // When/Then - should not throw, just log warning
             assertThatCode(() -> handler.handleEvent(event)).doesNotThrowAnyException();
@@ -295,12 +290,7 @@ class GitHubMilestoneMessageHandlerIntegrationTest extends BaseIntegrationTest {
                 null,
                 "https://example.com"
             );
-            GitHubMilestoneEventDTO event = new GitHubMilestoneEventDTO(
-                "created",
-                milestoneDto,
-                null,
-                null
-            );
+            GitHubMilestoneEventDTO event = new GitHubMilestoneEventDTO("created", milestoneDto, null, null);
 
             // When/Then - should not throw
             assertThatCode(() -> handler.handleEvent(event)).doesNotThrowAnyException();

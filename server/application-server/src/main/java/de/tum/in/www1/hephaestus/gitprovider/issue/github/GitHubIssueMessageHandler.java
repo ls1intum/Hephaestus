@@ -12,8 +12,8 @@ import org.springframework.stereotype.Component;
 /**
  * Handles all GitHub issue webhook events.
  * <p>
- * This handler uses DTOs directly (no hub4j) to ensure all fields are captured,
- * including issue types which hub4j doesn't support.
+ * This handler uses DTOs directly to ensure all fields are captured,
+ * including issue types which require direct JSON parsing.
  * <p>
  * Processing is delegated to {@link GitHubIssueProcessor} which handles:
  * <ul>

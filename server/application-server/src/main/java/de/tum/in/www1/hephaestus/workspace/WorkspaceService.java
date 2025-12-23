@@ -966,6 +966,56 @@ public class WorkspaceService {
         natsConsumerService.updateWorkspaceConsumer(workspace);
     }
 
+    /**
+     * Creates or updates a Repository entity from an installation repository snapshot.
+     * This ensures the repository exists in the database with basic metadata from the installation payload.
+     *
+     * @param snapshot the installation repository snapshot
+     * @param workspace the workspace this repository belongs to
+     */
+    private void ensureRepositoryFromSnapshot(
+        GitHubInstallationRepositoryEnumerationService.InstallationRepositorySnapshot snapshot,
+        Workspace workspace
+    ) {
+        if (snapshot == null || isBlank(snapshot.nameWithOwner())) {
+            return;
+        }
+
+        var existingRepo = repositoryRepository.findByNameWithOwner(snapshot.nameWithOwner());
+        if (existingRepo.isPresent()) {
+            // Repository already exists, update basic fields if needed
+            Repository repo = existingRepo.get();
+            boolean changed = false;
+
+            if (repo.getName() == null || !repo.getName().equals(snapshot.name())) {
+                repo.setName(snapshot.name());
+                changed = true;
+            }
+            if (repo.isPrivate() != snapshot.isPrivate()) {
+                repo.setPrivate(snapshot.isPrivate());
+                changed = true;
+            }
+
+            if (changed) {
+                repositoryRepository.save(repo);
+            }
+        } else {
+            // Create new repository with basic metadata from installation payload
+            Repository repo = new Repository();
+            repo.setId(snapshot.id());
+            repo.setNameWithOwner(snapshot.nameWithOwner());
+            repo.setName(snapshot.name());
+            repo.setPrivate(snapshot.isPrivate());
+            repo.setDefaultBranch("main"); // Will be updated by GraphQL sync
+            repo.setHtmlUrl("https://github.com/" + snapshot.nameWithOwner());
+            repo.setVisibility(snapshot.isPrivate() ? Repository.Visibility.PRIVATE : Repository.Visibility.PUBLIC);
+            repo.setPushedAt(Instant.now()); // Placeholder, will be updated by sync
+
+            repositoryRepository.save(repo);
+            logger.debug("Created repository {} from installation snapshot", snapshot.nameWithOwner());
+        }
+    }
+
     private boolean shouldUseNats(Workspace workspace) {
         return isNatsEnabled && workspace != null;
     }
@@ -1114,8 +1164,8 @@ public class WorkspaceService {
         }
 
         snapshots.forEach(snapshot -> {
-            // TODO: Repository upsert from installation payload needs GraphQL migration
-            // For now, just ensure the monitor exists; repository will be synced via GraphQL later
+            // Create or update Repository entity from installation payload
+            ensureRepositoryFromSnapshot(snapshot, workspace);
             ensureRepositoryMonitorForInstallation(installationId, snapshot.nameWithOwner(), deferSync);
         });
 

@@ -29,7 +29,7 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Integration tests for GitHubPullRequestReviewThreadMessageHandler.
  * <p>
- * Tests use JSON fixtures parsed directly into DTOs (no hub4j dependency).
+ * Tests use JSON fixtures parsed directly into DTOs using JSON fixtures for complete isolation.
  */
 @DisplayName("GitHub Pull Request Review Thread Message Handler")
 @Transactional
@@ -133,7 +133,7 @@ class GitHubPullRequestReviewThreadMessageHandlerIntegrationTest extends BaseInt
         // Note: GitHub thread webhooks don't include numeric thread ID, only node_id
         // We use a synthetic thread ID for testing (e.g., based on first comment ID)
         Long syntheticThreadId = 2494208170L; // First comment ID from fixture
-        
+
         // Create the thread in UNRESOLVED state first
         PullRequestReviewThread thread = new PullRequestReviewThread();
         thread.setId(syntheticThreadId);
@@ -183,7 +183,7 @@ class GitHubPullRequestReviewThreadMessageHandlerIntegrationTest extends BaseInt
         // Given - create a thread directly
         createTestPullRequest(12345L, 1);
         Long threadId = 100L;
-        
+
         PullRequestReviewThread thread = new PullRequestReviewThread();
         thread.setId(threadId);
         thread.setPullRequest(testPullRequest);

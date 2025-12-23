@@ -12,7 +12,7 @@ import org.springframework.stereotype.Component;
 /**
  * Handles all GitHub pull request webhook events.
  * <p>
- * This handler uses DTOs directly (no hub4j) for complete field coverage.
+ * This handler uses DTOs directly for complete field coverage.
  * Processing is delegated to {@link GitHubPullRequestProcessor}.
  */
 @Component

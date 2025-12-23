@@ -38,7 +38,7 @@ import org.springframework.transaction.annotation.Transactional;
  * <li>Single processing path for all data sources (sync and webhooks)</li>
  * <li>Idempotent operations via upsert pattern</li>
  * <li>Domain events published for reactive feature development</li>
- * <li>No hub4j types - works exclusively with DTOs</li>
+ * <li>Works exclusively with DTOs for complete field coverage</li>
  * </ul>
  */
 @Service
@@ -200,6 +200,8 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
         pr.setMergedAt(dto.mergedAt());
         pr.setDraft(dto.isDraft());
         pr.setMerged(dto.isMerged());
+        pr.setMergeCommitSha(dto.mergeCommitSha());
+        pr.setLocked(dto.locked());
         pr.setAdditions(dto.additions());
         pr.setDeletions(dto.deletions());
         pr.setChangedFiles(dto.changedFiles());
@@ -212,6 +214,12 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
         if (dto.author() != null) {
             User author = findOrCreateUser(dto.author());
             pr.setAuthor(author);
+        }
+
+        // Link merged by user
+        if (dto.mergedBy() != null) {
+            User mergedBy = findOrCreateUser(dto.mergedBy());
+            pr.setMergedBy(mergedBy);
         }
 
         // Link assignees
@@ -296,6 +304,23 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
         if (!Objects.equals(pr.getMergedAt(), dto.mergedAt())) {
             pr.setMergedAt(dto.mergedAt());
             changedFields.add("mergedAt");
+        }
+
+        if (!Objects.equals(pr.getMergeCommitSha(), dto.mergeCommitSha())) {
+            pr.setMergeCommitSha(dto.mergeCommitSha());
+            changedFields.add("mergeCommitSha");
+        }
+
+        if (pr.isLocked() != dto.locked()) {
+            pr.setLocked(dto.locked());
+            changedFields.add("locked");
+        }
+
+        // Update mergedBy
+        if (dto.mergedBy() != null && pr.getMergedBy() == null) {
+            User mergedBy = findOrCreateUser(dto.mergedBy());
+            pr.setMergedBy(mergedBy);
+            changedFields.add("mergedBy");
         }
 
         if (pr.getAdditions() != dto.additions()) {

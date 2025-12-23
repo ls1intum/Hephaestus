@@ -19,7 +19,7 @@ import org.springframework.web.reactive.function.client.WebClient;
  * Central orchestrator for keeping workspace records in sync with external
  * provisioning sources.
  * <p>
- * Uses GitHub REST API directly without hub4j dependency.
+ * Uses GitHub REST API directly for workspace provisioning.
  */
 @Service
 public class WorkspaceProvisioningService {

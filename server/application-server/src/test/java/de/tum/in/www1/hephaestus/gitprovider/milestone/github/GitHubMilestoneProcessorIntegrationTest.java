@@ -242,13 +242,13 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("Should return null for DTO with null ID")
-        void shouldReturnNullForDtoWithNullId() {
-            // Given
+        @DisplayName("Should create milestone with generated ID when DTO has null ID (GraphQL sync scenario)")
+        void shouldCreateMilestoneWithGeneratedIdWhenDtoHasNullId() {
+            // Given - DTO without ID (like GraphQL sync)
             GitHubMilestoneDTO dto = new GitHubMilestoneDTO(
-                null, // null ID
+                null, // null ID - simulates GraphQL response
                 1,
-                "title",
+                "GraphQL Synced Milestone",
                 "desc",
                 "open",
                 null,
@@ -256,11 +256,51 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
             );
 
             // When
-            Milestone result = processor.process(dto, testRepository, createCreatorDto(), createContext());
+            Milestone result = processor.process(dto, testRepository, null, createContext());
 
-            // Then
-            assertThat(result).isNull();
-            assertThat(eventListener.getProcessedEvents()).isEmpty();
+            // Then - milestone should be created with a generated negative ID
+            assertThat(result).isNotNull();
+            assertThat(result.getId()).isNotNull();
+            assertThat(result.getId()).isNegative(); // Generated IDs are negative to avoid collision
+            assertThat(result.getNumber()).isEqualTo(1);
+            assertThat(result.getTitle()).isEqualTo("GraphQL Synced Milestone");
+            assertThat(eventListener.getProcessedEvents()).hasSize(1);
+        }
+
+        @Test
+        @DisplayName("Should update existing milestone by number when DTO has null ID")
+        void shouldUpdateExistingMilestoneByNumberWhenDtoHasNullId() {
+            // Given - existing milestone
+            Long existingId = 999888777L;
+            Milestone existingMilestone = new Milestone();
+            existingMilestone.setId(existingId);
+            existingMilestone.setNumber(42);
+            existingMilestone.setTitle("Existing Milestone");
+            existingMilestone.setState(Milestone.State.OPEN);
+            existingMilestone.setDescription("old description");
+            existingMilestone.setRepository(testRepository);
+            milestoneRepository.save(existingMilestone);
+
+            // DTO without ID (like GraphQL sync) but matching number
+            GitHubMilestoneDTO dto = new GitHubMilestoneDTO(
+                null, // null ID
+                42, // same number
+                "Updated Title",
+                "new description",
+                "open",
+                null,
+                "https://example.com"
+            );
+
+            // When
+            Milestone result = processor.process(dto, testRepository, null, createContext());
+
+            // Then - should update existing milestone, not create new one
+            assertThat(result).isNotNull();
+            assertThat(result.getId()).isEqualTo(existingId); // keeps original ID
+            assertThat(result.getTitle()).isEqualTo("Updated Title");
+            assertThat(result.getDescription()).isEqualTo("new description");
+            assertThat(milestoneRepository.count()).isEqualTo(1);
         }
 
         @Test
@@ -514,8 +554,7 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
             assertThat(milestoneRepository.findById(nonExistentId)).isEmpty();
 
             // When/Then - should not throw
-            assertThatCode(() -> processor.delete(nonExistentId, createContext()))
-                .doesNotThrowAnyException();
+            assertThatCode(() -> processor.delete(nonExistentId, createContext())).doesNotThrowAnyException();
 
             // No event published
             assertThat(eventListener.getDeletedEvents()).isEmpty();
@@ -525,8 +564,7 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
         @DisplayName("Should handle null milestone ID")
         void shouldHandleNullMilestoneId() {
             // When/Then - should not throw
-            assertThatCode(() -> processor.delete(null, createContext()))
-                .doesNotThrowAnyException();
+            assertThatCode(() -> processor.delete(null, createContext())).doesNotThrowAnyException();
 
             // No event published
             assertThat(eventListener.getDeletedEvents()).isEmpty();

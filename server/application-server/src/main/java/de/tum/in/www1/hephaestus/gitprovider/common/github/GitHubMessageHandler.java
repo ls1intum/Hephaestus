@@ -6,7 +6,6 @@ import io.nats.client.MessageHandler;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
-import java.util.Locale;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,7 +18,6 @@ import org.springframework.stereotype.Component;
  * Subclasses just implement {@link #handleEvent(Object)} and specify the event
  * key.
  * <p>
- * <b>Migration Note:</b> This class no longer uses hub4j for parsing.
  * All webhook payloads are parsed directly to DTOs using Jackson ObjectMapper.
  *
  * @param <T> The DTO type for the webhook event (e.g., GitHubIssueEventDTO)
@@ -61,7 +59,6 @@ public abstract class GitHubMessageHandler<T> implements MessageHandler {
 
     /**
      * Parse the webhook payload JSON directly to the DTO type using Jackson.
-     * This replaces the hub4j-based parsing.
      */
     private T parsePayload(String payload) throws IOException {
         return objectMapper.readValue(payload, payloadType);

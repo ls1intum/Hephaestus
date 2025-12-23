@@ -26,7 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Service for synchronizing GitHub pull requests via GraphQL API.
  * <p>
- * This service replaces the deprecated hub4j-based GitHubPullRequestSyncService.
+ * This service provides GraphQL-based pull request synchronization.
  * It fetches PRs via GraphQL and uses GitHubPullRequestProcessor for persistence.
  */
 @Service
@@ -234,9 +234,12 @@ public class GitHubPullRequestGraphQlSyncService {
             graphQlPr.getUpdatedAt() != null ? graphQlPr.getUpdatedAt().toInstant() : null, // updatedAt
             graphQlPr.getClosedAt() != null ? graphQlPr.getClosedAt().toInstant() : null, // closedAt
             graphQlPr.getMergedAt() != null ? graphQlPr.getMergedAt().toInstant() : null, // mergedAt
+            null, // mergedBy - not fetched via GraphQL
+            graphQlPr.getMergeCommit() != null ? graphQlPr.getMergeCommit().getOid() : null, // mergeCommitSha
             Boolean.TRUE.equals(graphQlPr.getIsDraft()), // isDraft
             graphQlPr.getMergedAt() != null, // isMerged
             null, // mergeable - not fetched via GraphQL
+            graphQlPr.getLocked(), // locked
             graphQlPr.getAdditions(), // additions
             graphQlPr.getDeletions(), // deletions
             graphQlPr.getChangedFiles(), // changedFiles

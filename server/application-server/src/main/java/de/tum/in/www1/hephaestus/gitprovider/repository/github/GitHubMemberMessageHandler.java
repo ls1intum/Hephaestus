@@ -3,9 +3,12 @@ package de.tum.in.www1.hephaestus.gitprovider.repository.github;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContextFactory;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
+import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
+import de.tum.in.www1.hephaestus.gitprovider.repository.collaborator.RepositoryCollaborator;
+import de.tum.in.www1.hephaestus.gitprovider.repository.collaborator.RepositoryCollaboratorRepository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.github.dto.GitHubMemberEventDTO;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
-import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
+import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserProcessor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -14,7 +17,9 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Handles GitHub member webhook events (repository collaborator changes).
  * <p>
- * Uses DTOs directly (no hub4j) for complete field coverage.
+ * Uses DTOs directly for complete field coverage.
+ * Delegates user creation to {@link GitHubUserProcessor}.
+ * Persists collaborator relationships to the database.
  */
 @Component
 public class GitHubMemberMessageHandler extends GitHubMessageHandler<GitHubMemberEventDTO> {
@@ -22,12 +27,18 @@ public class GitHubMemberMessageHandler extends GitHubMessageHandler<GitHubMembe
     private static final Logger logger = LoggerFactory.getLogger(GitHubMemberMessageHandler.class);
 
     private final ProcessingContextFactory contextFactory;
-    private final UserRepository userRepository;
+    private final GitHubUserProcessor userProcessor;
+    private final RepositoryCollaboratorRepository collaboratorRepository;
 
-    GitHubMemberMessageHandler(ProcessingContextFactory contextFactory, UserRepository userRepository) {
+    GitHubMemberMessageHandler(
+        ProcessingContextFactory contextFactory,
+        GitHubUserProcessor userProcessor,
+        RepositoryCollaboratorRepository collaboratorRepository
+    ) {
         super(GitHubMemberEventDTO.class);
         this.contextFactory = contextFactory;
-        this.userRepository = userRepository;
+        this.userProcessor = userProcessor;
+        this.collaboratorRepository = collaboratorRepository;
     }
 
     @Override
@@ -57,30 +68,68 @@ public class GitHubMemberMessageHandler extends GitHubMessageHandler<GitHubMembe
             return;
         }
 
-        // Ensure user exists
-        if (!userRepository.existsById(memberDto.id())) {
-            User user = new User();
-            user.setId(memberDto.id());
-            user.setLogin(memberDto.login());
-            user.setAvatarUrl(memberDto.avatarUrl());
-            // Use login as fallback for name if null (name is @NonNull)
-            user.setName(memberDto.name() != null ? memberDto.name() : memberDto.login());
-            userRepository.save(user);
+        // Ensure user exists via processor
+        User user = userProcessor.ensureExists(memberDto);
+        if (user == null) {
+            logger.warn("Could not create or find user for member: {}", memberDto.login());
+            return;
         }
 
-        // Log the action - actual collaborator tracking can be added later
+        Repository repository = context.repository();
+
         switch (event.action()) {
-            case "added" -> logger.info(
-                "Collaborator added to {}: {}",
-                context.repository().getNameWithOwner(),
-                memberDto.login()
-            );
-            case "removed" -> logger.info(
-                "Collaborator removed from {}: {}",
-                context.repository().getNameWithOwner(),
-                memberDto.login()
-            );
+            case "added" -> handleCollaboratorAdded(repository, user, event);
+            case "removed" -> handleCollaboratorRemoved(repository, user);
             default -> logger.debug("Unhandled member action: {}", event.action());
+        }
+    }
+
+    private void handleCollaboratorAdded(Repository repository, User user, GitHubMemberEventDTO event) {
+        // Extract permission from event changes
+        String permissionValue = event.getPermission();
+        RepositoryCollaborator.Permission permission = RepositoryCollaborator.Permission.fromGitHubValue(
+            permissionValue
+        );
+
+        // Check if collaborator already exists
+        var existingCollaborator = collaboratorRepository.findByRepositoryIdAndUserId(repository.getId(), user.getId());
+
+        if (existingCollaborator.isPresent()) {
+            // Update permission if changed
+            RepositoryCollaborator collaborator = existingCollaborator.get();
+            collaborator.updatePermission(permission);
+            collaboratorRepository.save(collaborator);
+            logger.info(
+                "Updated collaborator permission for {} in {}: {}",
+                user.getLogin(),
+                repository.getNameWithOwner(),
+                permission
+            );
+        } else {
+            // Create new collaborator
+            RepositoryCollaborator collaborator = new RepositoryCollaborator(repository, user, permission);
+            collaboratorRepository.save(collaborator);
+            logger.info(
+                "Added collaborator {} to {} with permission {}",
+                user.getLogin(),
+                repository.getNameWithOwner(),
+                permission
+            );
+        }
+    }
+
+    private void handleCollaboratorRemoved(Repository repository, User user) {
+        var existingCollaborator = collaboratorRepository.findByRepositoryIdAndUserId(repository.getId(), user.getId());
+
+        if (existingCollaborator.isPresent()) {
+            collaboratorRepository.delete(existingCollaborator.get());
+            logger.info("Removed collaborator {} from {}", user.getLogin(), repository.getNameWithOwner());
+        } else {
+            logger.debug(
+                "Collaborator {} not found in {} - may have been already removed",
+                user.getLogin(),
+                repository.getNameWithOwner()
+            );
         }
     }
 }

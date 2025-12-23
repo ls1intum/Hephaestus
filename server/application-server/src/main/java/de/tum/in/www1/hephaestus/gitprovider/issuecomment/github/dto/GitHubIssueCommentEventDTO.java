@@ -35,6 +35,7 @@ public record GitHubIssueCommentEventDTO(
         @JsonProperty("html_url") String htmlUrl,
         @JsonProperty("body") String body,
         @JsonProperty("user") GitHubUserDTO author,
+        @JsonProperty("author_association") String authorAssociation,
         @JsonProperty("created_at") Instant createdAt,
         @JsonProperty("updated_at") Instant updatedAt
     ) {}

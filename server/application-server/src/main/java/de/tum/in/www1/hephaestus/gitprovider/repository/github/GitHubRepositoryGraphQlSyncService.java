@@ -8,6 +8,7 @@ import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.workspace.Workspace;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceRepository;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.Map;
 import java.util.Optional;
 import org.slf4j.Logger;
@@ -40,8 +41,10 @@ public class GitHubRepositoryGraphQlSyncService {
                 url
                 visibility
                 isArchived
+                isDisabled
                 isFork
                 isPrivate
+                pushedAt
                 defaultBranchRef {
                     name
                 }
@@ -150,13 +153,39 @@ public class GitHubRepositoryGraphQlSyncService {
             repository.setHtmlUrl((String) repoData.get("url"));
             repository.setOrganization(organization);
 
+            // Set private status
+            Boolean isPrivate = (Boolean) repoData.get("isPrivate");
+            repository.setPrivate(isPrivate != null && isPrivate);
+
+            // Set archived status
+            Boolean isArchived = (Boolean) repoData.get("isArchived");
+            repository.setArchived(isArchived != null && isArchived);
+
+            // Set disabled status
+            Boolean isDisabled = (Boolean) repoData.get("isDisabled");
+            repository.setDisabled(isDisabled != null && isDisabled);
+
+            // Set pushed at timestamp
+            String pushedAtStr = (String) repoData.get("pushedAt");
+            if (pushedAtStr != null) {
+                repository.setPushedAt(Instant.parse(pushedAtStr));
+            } else {
+                repository.setPushedAt(Instant.now());
+            }
+
             Map<String, Object> defaultBranch = (Map<String, Object>) repoData.get("defaultBranchRef");
             if (defaultBranch != null) {
                 repository.setDefaultBranch((String) defaultBranch.get("name"));
+            } else {
+                repository.setDefaultBranch("main");
             }
 
             String visibility = (String) repoData.get("visibility");
-            repository.setVisibility(Repository.Visibility.valueOf(visibility));
+            if (visibility != null) {
+                repository.setVisibility(Repository.Visibility.valueOf(visibility));
+            } else {
+                repository.setVisibility(Repository.Visibility.PRIVATE);
+            }
 
             repository = repositoryRepository.save(repository);
             logger.debug("Synced repository: {}", nameWithOwner);
@@ -169,15 +198,28 @@ public class GitHubRepositoryGraphQlSyncService {
     }
 
     private Organization ensureOrganization(Map<String, Object> ownerData) {
-        Long databaseId = ((Number) ownerData.get("databaseId")).longValue();
+        Number dbIdNum = (Number) ownerData.get("databaseId");
+        if (dbIdNum == null) {
+            // User repositories may not have a databaseId in the owner if it's a personal account
+            // In this case, skip organization linking
+            return null;
+        }
+
+        Long databaseId = dbIdNum.longValue();
         String login = (String) ownerData.get("login");
         String name = (String) ownerData.get("name");
         String url = (String) ownerData.get("url");
         String avatarUrl = (String) ownerData.get("avatarUrl");
 
-        Organization organization = organizationRepository.findByGithubId(databaseId).orElseGet(Organization::new);
+        Organization organization = organizationRepository
+            .findByGithubId(databaseId)
+            .orElseGet(() -> {
+                Organization org = new Organization();
+                org.setId(databaseId); // Set entity ID
+                org.setGithubId(databaseId);
+                return org;
+            });
 
-        organization.setGithubId(databaseId);
         organization.setLogin(login);
         organization.setName(name != null ? name : login);
         organization.setHtmlUrl(url);

@@ -180,7 +180,7 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
             null, // labels
             null, // milestone
             null, // issueType
-            null  // repository
+            null // repository
         );
     }
 
@@ -210,7 +210,11 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
                 Instant.now(),
                 null,
                 createAuthorDto(),
-                null, null, null, null, null
+                null,
+                null,
+                null,
+                null,
+                null
             );
 
             // When
@@ -242,7 +246,11 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
                 Instant.now(),
                 null,
                 createAuthorDto(),
-                null, null, null, null, null
+                null,
+                null,
+                null,
+                null,
+                null
             );
 
             // Verify the fallback works
@@ -276,7 +284,11 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
                 Instant.now(),
                 null,
                 createAuthorDto(),
-                null, null, null, null, null
+                null,
+                null,
+                null,
+                null,
+                null
             );
 
             // Verify fallback returns null
@@ -377,10 +389,25 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
             // Given
             Long issueId = 333444555L;
             GitHubIssueDTO dto = new GitHubIssueDTO(
-                issueId, null, "node", 3, "Title", null, // null body
-                "open", null, "https://example.com", 0,
-                Instant.now(), Instant.now(), null,
-                createAuthorDto(), null, null, null, null, null
+                issueId,
+                null,
+                "node",
+                3,
+                "Title",
+                null, // null body
+                "open",
+                null,
+                "https://example.com",
+                0,
+                Instant.now(),
+                Instant.now(),
+                null,
+                createAuthorDto(),
+                null,
+                null,
+                null,
+                null,
+                null
             );
 
             // When
@@ -396,11 +423,25 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
             // Given
             Long issueId = 444555666L;
             GitHubIssueDTO dto = new GitHubIssueDTO(
-                issueId, null, "node", 4, "Title", "Body",
-                "open", null, "https://example.com", 0,
-                Instant.now(), Instant.now(), null,
+                issueId,
+                null,
+                "node",
+                4,
+                "Title",
+                "Body",
+                "open",
+                null,
+                "https://example.com",
+                0,
+                Instant.now(),
+                Instant.now(),
+                null,
                 null, // null author
-                null, null, null, null, null
+                null,
+                null,
+                null,
+                null,
+                null
             );
 
             // When
@@ -417,17 +458,27 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
             // Given
             Long issueId = 555666777L;
             Long labelId = 9567656085L;
-            GitHubLabelDTO labelDto = new GitHubLabelDTO(
-                labelId, "LA_node", "bug", "Bug label", "ff0000"
-            );
+            GitHubLabelDTO labelDto = new GitHubLabelDTO(labelId, "LA_node", "bug", "Bug label", "ff0000");
             GitHubIssueDTO dto = new GitHubIssueDTO(
-                issueId, null, "node", 5, "Title", "Body",
-                "open", null, "https://example.com", 0,
-                Instant.now(), Instant.now(), null,
+                issueId,
+                null,
+                "node",
+                5,
+                "Title",
+                "Body",
+                "open",
+                null,
+                "https://example.com",
+                0,
+                Instant.now(),
+                Instant.now(),
+                null,
                 createAuthorDto(),
                 null,
                 List.of(labelDto),
-                null, null, null
+                null,
+                null,
+                null
             );
 
             // When
@@ -446,17 +497,34 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
             Long issueId = 666777888L;
             Long assigneeId = 888999111L;
             GitHubUserDTO assigneeDto = new GitHubUserDTO(
-                assigneeId, assigneeId, "assignee1",
-                "https://avatars.example.com", "https://github.com/assignee1",
-                null, null
+                assigneeId,
+                assigneeId,
+                "assignee1",
+                "https://avatars.example.com",
+                "https://github.com/assignee1",
+                null,
+                null
             );
             GitHubIssueDTO dto = new GitHubIssueDTO(
-                issueId, null, "node", 6, "Title", "Body",
-                "open", null, "https://example.com", 0,
-                Instant.now(), Instant.now(), null,
+                issueId,
+                null,
+                "node",
+                6,
+                "Title",
+                "Body",
+                "open",
+                null,
+                "https://example.com",
+                0,
+                Instant.now(),
+                Instant.now(),
+                null,
                 createAuthorDto(),
                 List.of(assigneeDto),
-                null, null, null, null
+                null,
+                null,
+                null,
+                null
             );
 
             // When
@@ -475,19 +543,34 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
             Long issueId = 777888999L;
             Long milestoneId = 14028563L;
             GitHubMilestoneDTO milestoneDto = new GitHubMilestoneDTO(
-                milestoneId, 2, "Webhook Fixtures",
-                "Milestone description", "open",
+                milestoneId,
+                2,
+                "Webhook Fixtures",
+                "Milestone description",
+                "open",
                 Instant.parse("2025-12-31T08:00:00Z"),
                 "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/milestone/2"
             );
             GitHubIssueDTO dto = new GitHubIssueDTO(
-                issueId, null, "node", 7, "Title", "Body",
-                "open", null, "https://example.com", 0,
-                Instant.now(), Instant.now(), null,
+                issueId,
+                null,
+                "node",
+                7,
+                "Title",
+                "Body",
+                "open",
+                null,
+                "https://example.com",
+                0,
+                Instant.now(),
+                Instant.now(),
+                null,
                 createAuthorDto(),
-                null, null,
+                null,
+                null,
                 milestoneDto,
-                null, null
+                null,
+                null
             );
 
             // When
@@ -524,10 +607,25 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
             eventListener.clear();
 
             GitHubIssueDTO dto = new GitHubIssueDTO(
-                issueId, null, "node", 20, "New Title", "New body",
-                "open", null, "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/issues/20",
-                0, Instant.now(), Instant.now(), null,
-                createAuthorDto(), null, null, null, null, null
+                issueId,
+                null,
+                "node",
+                20,
+                "New Title",
+                "New body",
+                "open",
+                null,
+                "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/issues/20",
+                0,
+                Instant.now(),
+                Instant.now(),
+                null,
+                createAuthorDto(),
+                null,
+                null,
+                null,
+                null,
+                null
             );
 
             // When
@@ -568,10 +666,25 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
 
             // Same data
             GitHubIssueDTO dto = new GitHubIssueDTO(
-                issueId, null, "node", 20, "Same Title", "Same body",
-                "open", null, "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/issues/20",
-                5, Instant.parse("2025-11-01T21:42:45Z"), Instant.parse("2025-11-01T21:42:45Z"), null,
-                createAuthorDto(), null, null, null, null, null
+                issueId,
+                null,
+                "node",
+                20,
+                "Same Title",
+                "Same body",
+                "open",
+                null,
+                "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/issues/20",
+                5,
+                Instant.parse("2025-11-01T21:42:45Z"),
+                Instant.parse("2025-11-01T21:42:45Z"),
+                null,
+                createAuthorDto(),
+                null,
+                null,
+                null,
+                null,
+                null
             );
 
             // When
@@ -623,14 +736,34 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
             // Now add milestone
             Long milestoneId = 14028563L;
             GitHubMilestoneDTO milestoneDto = new GitHubMilestoneDTO(
-                milestoneId, 2, "New Milestone", "Desc", "open", null,
+                milestoneId,
+                2,
+                "New Milestone",
+                "Desc",
+                "open",
+                null,
                 "https://example.com/milestone/2"
             );
             GitHubIssueDTO dto = new GitHubIssueDTO(
-                issueId, null, "node", 8, "Issue", null,
-                "open", null, "https://example.com", 0,
-                Instant.now(), Instant.now(), null,
-                null, null, null, milestoneDto, null, null
+                issueId,
+                null,
+                "node",
+                8,
+                "Issue",
+                null,
+                "open",
+                null,
+                "https://example.com",
+                0,
+                Instant.now(),
+                Instant.now(),
+                null,
+                null,
+                null,
+                null,
+                milestoneDto,
+                null,
+                null
             );
 
             // When
@@ -672,10 +805,25 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
 
             // Update with null milestone
             GitHubIssueDTO dto = new GitHubIssueDTO(
-                issueId, null, "node", 9, "Issue", null,
-                "open", null, "https://example.com", 0,
-                Instant.now(), Instant.now(), null,
-                null, null, null, null, null, null
+                issueId,
+                null,
+                "node",
+                9,
+                "Issue",
+                null,
+                "open",
+                null,
+                "https://example.com",
+                0,
+                Instant.now(),
+                Instant.now(),
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null
             );
 
             // When
@@ -701,11 +849,25 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
             // Given
             Long issueId = FIXTURE_ISSUE_ID;
             GitHubIssueDTO dto = new GitHubIssueDTO(
-                issueId, null, "node", 20, "Title", "Body",
-                "closed", "completed", // closed with reason
-                "https://example.com", 0,
-                Instant.now(), Instant.now(), Instant.now(),
-                createAuthorDto(), null, null, null, null, null
+                issueId,
+                null,
+                "node",
+                20,
+                "Title",
+                "Body",
+                "closed",
+                "completed", // closed with reason
+                "https://example.com",
+                0,
+                Instant.now(),
+                Instant.now(),
+                Instant.now(),
+                createAuthorDto(),
+                null,
+                null,
+                null,
+                null,
+                null
             );
 
             // When
@@ -742,11 +904,25 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
             eventListener.clear();
 
             GitHubIssueDTO dto = new GitHubIssueDTO(
-                issueId, null, "node", 2, "Reopened Issue", null,
-                "open", "reopened",
-                "https://example.com", 0,
-                Instant.now(), Instant.now(), null,
-                null, null, null, null, null, null
+                issueId,
+                null,
+                "node",
+                2,
+                "Reopened Issue",
+                null,
+                "open",
+                "reopened",
+                "https://example.com",
+                0,
+                Instant.now(),
+                Instant.now(),
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null
             );
 
             // When
@@ -756,8 +932,9 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
             assertThat(result.getState()).isEqualTo(Issue.State.OPEN);
 
             // Verify Updated event with "state" in changedFields
-            assertThat(eventListener.getUpdatedEvents())
-                .anySatisfy(event -> assertThat(event.changedFields()).contains("state"));
+            assertThat(eventListener.getUpdatedEvents()).anySatisfy(event ->
+                assertThat(event.changedFields()).contains("state")
+            );
         }
 
         @Test
@@ -766,11 +943,25 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
             // Given
             Long issueId = 333444555L;
             GitHubIssueDTO dto = new GitHubIssueDTO(
-                issueId, null, "node", 3, "Title", "Body",
-                "closed", "not_planned",
-                "https://example.com", 0,
-                Instant.now(), Instant.now(), Instant.now(),
-                createAuthorDto(), null, null, null, null, null
+                issueId,
+                null,
+                "node",
+                3,
+                "Title",
+                "Body",
+                "closed",
+                "not_planned",
+                "https://example.com",
+                0,
+                Instant.now(),
+                Instant.now(),
+                Instant.now(),
+                createAuthorDto(),
+                null,
+                null,
+                null,
+                null,
+                null
             );
 
             // When
@@ -798,9 +989,7 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
             eventListener.clear();
 
             Long labelId = 9567656085L;
-            GitHubLabelDTO labelDto = new GitHubLabelDTO(
-                labelId, "LA_node", "enhancement", "Enhancement", "84b6eb"
-            );
+            GitHubLabelDTO labelDto = new GitHubLabelDTO(labelId, "LA_node", "enhancement", "Enhancement", "84b6eb");
 
             // When
             processor.processLabeled(issueDto, labelDto, createContext());
@@ -820,14 +1009,27 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
             // Given - create issue with label
             Long issueId = FIXTURE_ISSUE_ID;
             Long labelId = 9567656085L;
-            GitHubLabelDTO labelDto = new GitHubLabelDTO(
-                labelId, "LA_node", "bug", "Bug", "ff0000"
-            );
+            GitHubLabelDTO labelDto = new GitHubLabelDTO(labelId, "LA_node", "bug", "Bug", "ff0000");
             GitHubIssueDTO issueDto = new GitHubIssueDTO(
-                issueId, null, "node", 20, "Title", "Body",
-                "open", null, "https://example.com", 0,
-                Instant.now(), Instant.now(), null,
-                createAuthorDto(), null, List.of(labelDto), null, null, null
+                issueId,
+                null,
+                "node",
+                20,
+                "Title",
+                "Body",
+                "open",
+                null,
+                "https://example.com",
+                0,
+                Instant.now(),
+                Instant.now(),
+                null,
+                createAuthorDto(),
+                null,
+                List.of(labelDto),
+                null,
+                null,
+                null
             );
             processor.process(issueDto, createContext());
 
@@ -860,8 +1062,12 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
             GitHubIssueDTO issueDto = createBasicIssueDto(issueId, 20);
 
             GitHubIssueTypeDTO typeDto = new GitHubIssueTypeDTO(
-                27228861L, "IT_kwDODNYmp84Bn3q9", "Task",
-                "A specific piece of work", "yellow", true
+                27228861L,
+                "IT_kwDODNYmp84Bn3q9",
+                "Task",
+                "A specific piece of work",
+                "yellow",
+                true
             );
 
             // When
@@ -966,8 +1172,7 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
             GitHubIssueDTO dto = createBasicIssueDto(nonExistentId, 99);
 
             // When/Then - should not throw
-            assertThatCode(() -> processor.processDeleted(dto))
-                .doesNotThrowAnyException();
+            assertThatCode(() -> processor.processDeleted(dto)).doesNotThrowAnyException();
         }
 
         @Test
@@ -975,15 +1180,29 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
         void processDeletedShouldHandleNullId() {
             // Given
             GitHubIssueDTO dto = new GitHubIssueDTO(
-                null, null, "node", 1, "Title", null,
-                "open", null, "https://example.com", 0,
-                Instant.now(), Instant.now(), null,
-                null, null, null, null, null, null
+                null,
+                null,
+                "node",
+                1,
+                "Title",
+                null,
+                "open",
+                null,
+                "https://example.com",
+                0,
+                Instant.now(),
+                Instant.now(),
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null
             );
 
             // When/Then - should not throw
-            assertThatCode(() -> processor.processDeleted(dto))
-                .doesNotThrowAnyException();
+            assertThatCode(() -> processor.processDeleted(dto)).doesNotThrowAnyException();
         }
     }
 
@@ -998,9 +1217,25 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
         void shouldHandleNullDtoIds() {
             // When - DTO with null IDs (getDatabaseId() will return null)
             GitHubIssueDTO nullIdDto = new GitHubIssueDTO(
-                null, null, null, 0, null, null,
-                null, null, null, 0, null, null, null,
-                null, null, null, null, null, null
+                null,
+                null,
+                null,
+                0,
+                null,
+                null,
+                null,
+                null,
+                null,
+                0,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null
             );
 
             Issue result = processor.process(nullIdDto, createContext());
@@ -1015,11 +1250,25 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
             // Given
             Long issueId = 111222333L;
             GitHubIssueDTO dto = new GitHubIssueDTO(
-                issueId, null, "node", 1, "Title", null,
+                issueId,
+                null,
+                "node",
+                1,
+                "Title",
+                null,
                 null, // null state
-                null, "https://example.com", 0,
-                Instant.now(), Instant.now(), null,
-                null, null, null, null, null, null
+                null,
+                "https://example.com",
+                0,
+                Instant.now(),
+                Instant.now(),
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null
             );
 
             // When
@@ -1035,11 +1284,25 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
             // Given
             Long issueId = 222333444L;
             GitHubIssueDTO dto = new GitHubIssueDTO(
-                issueId, null, "node", 2, "Title", null,
+                issueId,
+                null,
+                "node",
+                2,
+                "Title",
+                null,
                 "UNKNOWN_STATE",
-                null, "https://example.com", 0,
-                Instant.now(), Instant.now(), null,
-                null, null, null, null, null, null
+                null,
+                "https://example.com",
+                0,
+                Instant.now(),
+                Instant.now(),
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null
             );
 
             // When
@@ -1055,11 +1318,25 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
             // Given
             Long issueId = 333444555L;
             GitHubIssueDTO dto = new GitHubIssueDTO(
-                issueId, null, "node", 3, "Title", null,
-                "closed", "some_weird_reason",
-                "https://example.com", 0,
-                Instant.now(), Instant.now(), Instant.now(),
-                null, null, null, null, null, null
+                issueId,
+                null,
+                "node",
+                3,
+                "Title",
+                null,
+                "closed",
+                "some_weird_reason",
+                "https://example.com",
+                0,
+                Instant.now(),
+                Instant.now(),
+                Instant.now(),
+                null,
+                null,
+                null,
+                null,
+                null,
+                null
             );
 
             // When
@@ -1075,12 +1352,25 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
             // Given
             Long issueId = 444555666L;
             GitHubIssueDTO dto = new GitHubIssueDTO(
-                issueId, null, "node", 4, "Title", null,
-                "open", null, "https://example.com", 0,
-                Instant.now(), Instant.now(), null,
+                issueId,
+                null,
+                "node",
+                4,
+                "Title",
+                null,
+                "open",
+                null,
+                "https://example.com",
+                0,
+                Instant.now(),
+                Instant.now(),
+                null,
                 createAuthorDto(),
                 List.of(), // empty assignees
-                null, null, null, null
+                null,
+                null,
+                null,
+                null
             );
 
             // When
@@ -1096,13 +1386,25 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
             // Given
             Long issueId = 555666777L;
             GitHubIssueDTO dto = new GitHubIssueDTO(
-                issueId, null, "node", 5, "Title", null,
-                "open", null, "https://example.com", 0,
-                Instant.now(), Instant.now(), null,
+                issueId,
+                null,
+                "node",
+                5,
+                "Title",
+                null,
+                "open",
+                null,
+                "https://example.com",
+                0,
+                Instant.now(),
+                Instant.now(),
+                null,
                 createAuthorDto(),
                 null,
                 List.of(), // empty labels
-                null, null, null
+                null,
+                null,
+                null
             );
 
             // When

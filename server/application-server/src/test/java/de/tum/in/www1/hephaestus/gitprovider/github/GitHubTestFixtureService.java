@@ -20,7 +20,6 @@ import org.springframework.web.reactive.function.client.WebClient;
  * Test fixture service that creates GitHub resources via GraphQL mutations
  * and REST API (for resources not supported by GraphQL mutations).
  * <p>
- * This service replaces hub4j for test fixture creation in live integration tests.
  * All resources are created using authenticated API calls.
  * <p>
  * This is NOT a Spring bean - instantiate it manually in tests with a token.
@@ -122,9 +121,10 @@ public class GitHubTestFixtureService {
      */
     public void deleteRepository(String fullName) {
         try {
+            String[] parts = fullName.split("/");
             restClient
                 .delete()
-                .uri("/repos/{fullName}", fullName)
+                .uri("/repos/{owner}/{repo}", parts[0], parts[1])
                 .retrieve()
                 .toBodilessEntity()
                 .block(Duration.ofSeconds(30));
@@ -240,9 +240,10 @@ public class GitHubTestFixtureService {
             "open"
         );
 
+        String[] parts = fullName.split("/");
         MilestoneResponse response = restClient
             .post()
-            .uri("/repos/{fullName}/milestones", fullName)
+            .uri("/repos/{owner}/{repo}/milestones", parts[0], parts[1])
             .contentType(MediaType.APPLICATION_JSON)
             .bodyValue(body)
             .retrieve()
@@ -260,9 +261,10 @@ public class GitHubTestFixtureService {
      * Closes a milestone via REST API.
      */
     public void closeMilestone(String fullName, int milestoneNumber) {
+        String[] parts = fullName.split("/");
         restClient
             .patch()
-            .uri("/repos/{fullName}/milestones/{number}", fullName, milestoneNumber)
+            .uri("/repos/{owner}/{repo}/milestones/{number}", parts[0], parts[1], milestoneNumber)
             .contentType(MediaType.APPLICATION_JSON)
             .bodyValue(Map.of("state", "closed"))
             .retrieve()
@@ -274,9 +276,10 @@ public class GitHubTestFixtureService {
      * Deletes a milestone via REST API.
      */
     public void deleteMilestone(String fullName, int milestoneNumber) {
+        String[] parts = fullName.split("/");
         restClient
             .delete()
-            .uri("/repos/{fullName}/milestones/{number}", fullName, milestoneNumber)
+            .uri("/repos/{owner}/{repo}/milestones/{number}", parts[0], parts[1], milestoneNumber)
             .retrieve()
             .toBodilessEntity()
             .block(Duration.ofSeconds(30));
@@ -286,9 +289,12 @@ public class GitHubTestFixtureService {
      * Lists milestones to check if one exists.
      */
     public List<MilestoneResponse> listMilestones(String fullName, String state) {
+        String[] parts = fullName.split("/");
         return restClient
             .get()
-            .uri(uri -> uri.path("/repos/{fullName}/milestones").queryParam("state", state).build(fullName))
+            .uri(uri ->
+                uri.path("/repos/{owner}/{repo}/milestones").queryParam("state", state).build(parts[0], parts[1])
+            )
             .retrieve()
             .bodyToFlux(MilestoneResponse.class)
             .collectList()
@@ -699,9 +705,10 @@ public class GitHubTestFixtureService {
      * Adds a collaborator to a repository.
      */
     public void addCollaborator(String fullName, String username, String permission) {
+        String[] parts = fullName.split("/");
         restClient
             .put()
-            .uri("/repos/{fullName}/collaborators/{username}", fullName, username)
+            .uri("/repos/{owner}/{repo}/collaborators/{username}", parts[0], parts[1], username)
             .contentType(MediaType.APPLICATION_JSON)
             .bodyValue(Map.of("permission", permission))
             .retrieve()
@@ -713,9 +720,10 @@ public class GitHubTestFixtureService {
      * Removes a collaborator from a repository.
      */
     public void removeCollaborator(String fullName, String username) {
+        String[] parts = fullName.split("/");
         restClient
             .delete()
-            .uri("/repos/{fullName}/collaborators/{username}", fullName, username)
+            .uri("/repos/{owner}/{repo}/collaborators/{username}", parts[0], parts[1], username)
             .retrieve()
             .toBodilessEntity()
             .block(Duration.ofSeconds(30));
@@ -880,7 +888,9 @@ public class GitHubTestFixtureService {
 
     private void createInitialCommit(String fullName) {
         String[] parts = fullName.split("/");
-        String readmeContent = "# " + parts[1] + "\n\nTemporary repository for integration testing.";
+        String owner = parts[0];
+        String repo = parts[1];
+        String readmeContent = "# " + repo + "\n\nTemporary repository for integration testing.";
 
         // First try to get default branch - if it exists, repo is already initialized
         try {
@@ -893,6 +903,7 @@ public class GitHubTestFixtureService {
         }
 
         // Create initial commit via REST (file creation)
+        // Use separate path variables to avoid URL encoding issues with slash
         Map<String, Object> body = Map.of(
             "message",
             "Initial commit",
@@ -902,7 +913,7 @@ public class GitHubTestFixtureService {
 
         restClient
             .put()
-            .uri("/repos/{fullName}/contents/README.md", fullName)
+            .uri("/repos/{owner}/{repo}/contents/README.md", owner, repo)
             .contentType(MediaType.APPLICATION_JSON)
             .bodyValue(body)
             .retrieve()

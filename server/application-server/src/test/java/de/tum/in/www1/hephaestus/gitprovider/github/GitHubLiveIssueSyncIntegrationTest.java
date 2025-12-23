@@ -86,7 +86,8 @@ class GitHubLiveIssueSyncIntegrationTest extends AbstractGitHubLiveSyncIntegrati
         assertThat(storedIssue.getNumber()).isEqualTo(createdIssue.issueNumber());
 
         // 5. Verify comment is synced
-        List<IssueComment> comments = issueCommentRepository.findAll()
+        List<IssueComment> comments = issueCommentRepository
+            .findAll()
             .stream()
             .filter(c -> c.getIssue() != null && c.getIssue().getId().equals(storedIssue.getId()))
             .toList();
@@ -94,9 +95,14 @@ class GitHubLiveIssueSyncIntegrationTest extends AbstractGitHubLiveSyncIntegrati
         // Note: If comments are not synced via the issue sync service,
         // this assertion verifies the comment was at least created remotely.
         // A separate comment sync service may be needed for full comment sync.
-        assertThat(comments).anyMatch(c ->
-            c.getId().equals(createdIssue.commentId()) ||
-            c.getBody().contains(createdIssue.commentBody().substring(0, Math.min(20, createdIssue.commentBody().length())))
+        assertThat(comments).anyMatch(
+            c ->
+                c.getId().equals(createdIssue.commentId()) ||
+                c
+                    .getBody()
+                    .contains(
+                        createdIssue.commentBody().substring(0, Math.min(20, createdIssue.commentBody().length()))
+                    )
         );
     }
 

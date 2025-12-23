@@ -67,4 +67,20 @@ public interface GitHubWebhookEvent {
     default boolean isUnassigned() {
         return "unassigned".equals(action());
     }
+
+    default boolean isCreated() {
+        return "created".equals(action());
+    }
+
+    default boolean isDismissed() {
+        return "dismissed".equals(action());
+    }
+
+    default boolean isResolved() {
+        return "resolved".equals(action());
+    }
+
+    default boolean isUnresolved() {
+        return "unresolved".equals(action());
+    }
 }

@@ -90,4 +90,12 @@ public interface PullRequestRepository extends JpaRepository<PullRequest, Long> 
         """
     )
     Set<Integer> findAllSyncedPullRequestNumbers(@Param("repositoryId") long repositoryId);
+
+    /**
+     * Finds all pull requests belonging to a repository.
+     *
+     * @param repositoryId the repository ID
+     * @return list of pull requests for the repository
+     */
+    List<PullRequest> findAllByRepository_Id(Long repositoryId);
 }

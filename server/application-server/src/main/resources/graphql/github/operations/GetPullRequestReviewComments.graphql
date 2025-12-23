@@ -1,0 +1,75 @@
+# GraphQL query for fetching pull request review comments via review threads
+# Used by GraphQL-based sync services
+
+query GetPullRequestReviewComments($owner: String!, $name: String!, $number: Int!, $first: Int!, $after: String) {
+	repository(owner: $owner, name: $name) {
+		pullRequest(number: $number) {
+			reviewThreads(first: $first, after: $after) {
+				pageInfo {
+					hasNextPage
+					endCursor
+				}
+				totalCount
+				nodes {
+					id
+					path
+					line
+					startLine
+					originalLine
+					originalStartLine
+					diffSide
+					startDiffSide
+					isResolved
+					isOutdated
+					isCollapsed
+					
+					# Comments in this thread
+					comments(first: 100) {
+						totalCount
+						nodes {
+							id
+							fullDatabaseId
+							body
+							path
+							line
+							originalLine
+							startLine
+							originalStartLine
+							diffHunk
+							createdAt
+							updatedAt
+							state
+							
+							# Author
+							author {
+								... on User {
+									id
+									databaseId
+									login
+									avatarUrl
+									name
+									email
+								}
+							}
+							
+							# Author association
+							authorAssociation
+							
+							# Reply to (for threading)
+							replyTo {
+								id
+								fullDatabaseId
+							}
+							
+							# Associated review
+							pullRequestReview {
+								id
+								databaseId
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+}

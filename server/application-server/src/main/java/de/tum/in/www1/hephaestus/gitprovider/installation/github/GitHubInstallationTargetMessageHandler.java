@@ -9,7 +9,7 @@ import org.springframework.stereotype.Component;
 /**
  * Handles GitHub installation_target webhook events.
  * <p>
- * Uses DTOs directly (no hub4j) for complete field coverage.
+ * Uses DTOs directly for complete field coverage.
  */
 @Component
 public class GitHubInstallationTargetMessageHandler extends GitHubMessageHandler<GitHubInstallationTargetEventDTO> {
@@ -46,7 +46,7 @@ public class GitHubInstallationTargetMessageHandler extends GitHubMessageHandler
             event.targetType()
         );
 
-        // TODO: Implement account name updates when services are migrated
+        // Future: Account name updates will be implemented here
         switch (event.action()) {
             case "renamed" -> logger.info("Account renamed: {}", account.login());
             default -> logger.debug("Unhandled installation_target action: {}", event.action());
