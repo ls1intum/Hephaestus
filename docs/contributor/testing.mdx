@@ -123,7 +123,7 @@ Documenting each new controller integration test in this format keeps future wor
 Reusable webhook JSON lives in `src/test/resources/github`. Use `@GitHubPayload("event.name")` to inject them, or extract new samples with:
 
 ```bash
-python3 scripts/nats_extract_examples.py
+npm run nats:extract-examples
 ```
 
 Available examples include `label.created`, `repository.created`, `create`, `push`, and more—consult the folder before recording new payloads.

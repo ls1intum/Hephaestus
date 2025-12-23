@@ -58,7 +58,7 @@ class NATSClient {
 			this.connectionHealthy = false;
 			logger.info("NATS connection closed");
 		});
-		
+
 		// Track connection status in the background
 		this.trackStatus();
 
@@ -145,10 +145,7 @@ class NATSClient {
 		const ack = await this.js.publish(subject, message, {
 			headers: msgHeaders,
 		});
-		logger.debug(
-			{ subject, seq: ack.seq, stream: ack.stream },
-			"Published message",
-		);
+		logger.debug({ subject, seq: ack.seq, stream: ack.stream }, "Published message");
 	}
 
 	private async publishWithTimeout(
@@ -169,10 +166,7 @@ class NATSClient {
 		});
 
 		try {
-			await Promise.race([
-				this.publish(subject, message, headerMap),
-				timeoutPromise,
-			]);
+			await Promise.race([this.publish(subject, message, headerMap), timeoutPromise]);
 		} finally {
 			if (timeoutId) {
 				clearTimeout(timeoutId);
@@ -195,18 +189,10 @@ class NATSClient {
 			}
 
 			try {
-				await this.publishWithTimeout(
-					subject,
-					message,
-					headerMap,
-					remainingMs,
-				);
+				await this.publishWithTimeout(subject, message, headerMap, remainingMs);
 				return;
 			} catch (error) {
-				const waitTime = Math.min(
-					RETRY_BASE_DELAY_MS * 2 ** attempt,
-					remainingMs,
-				);
+				const waitTime = Math.min(RETRY_BASE_DELAY_MS * 2 ** attempt, remainingMs);
 				logger.error(
 					{
 						error,
@@ -225,9 +211,7 @@ class NATSClient {
 			}
 		}
 
-		throw new Error(
-			`Failed to publish to ${subject} within ${PUBLISH_TIMEOUT_MS}ms`,
-		);
+		throw new Error(`Failed to publish to ${subject} within ${PUBLISH_TIMEOUT_MS}ms`);
 	}
 
 	async close(): Promise<void> {

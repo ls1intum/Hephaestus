@@ -10,9 +10,7 @@ describe("buildGitLabSubject", () => {
 			},
 		};
 
-		expect(buildGitLabSubject(payload)).toBe(
-			"gitlab.group~subgroup.myproject.push",
-		);
+		expect(buildGitLabSubject(payload)).toBe("gitlab.group~subgroup.myproject.push");
 	});
 
 	it("should build subject from top-level path_with_namespace", () => {
@@ -32,9 +30,7 @@ describe("buildGitLabSubject", () => {
 			},
 		};
 
-		expect(buildGitLabSubject(payload)).toBe(
-			"gitlab.parent~child.?.group_member",
-		);
+		expect(buildGitLabSubject(payload)).toBe("gitlab.parent~child.?.group_member");
 	});
 
 	it("should parse from object_attributes url", () => {
@@ -46,9 +42,7 @@ describe("buildGitLabSubject", () => {
 			},
 		};
 
-		expect(buildGitLabSubject(payload)).toBe(
-			"gitlab.ga84xah.codereviewtest.note",
-		);
+		expect(buildGitLabSubject(payload)).toBe("gitlab.ga84xah.codereviewtest.note");
 	});
 
 	it("should sanitize dots in paths", () => {

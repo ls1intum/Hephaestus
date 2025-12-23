@@ -12,7 +12,10 @@ function sanitizeParts(path: string): string[] {
 /**
  * Extract namespace and project from project-scoped payload.
  */
-function extractFromProject(payload: Record<string, unknown>): { namespace: string | null; project: string | null } {
+function extractFromProject(payload: Record<string, unknown>): {
+	namespace: string | null;
+	project: string | null;
+} {
 	const project = (payload.project as Record<string, unknown>) || {};
 	const pathWithNamespace =
 		(payload.path_with_namespace as string) || (project.path_with_namespace as string);
@@ -32,7 +35,10 @@ function extractFromProject(payload: Record<string, unknown>): { namespace: stri
 /**
  * Extract namespace from group-scoped payload.
  */
-function extractFromGroup(payload: Record<string, unknown>): { namespace: string | null; project: string | null } {
+function extractFromGroup(payload: Record<string, unknown>): {
+	namespace: string | null;
+	project: string | null;
+} {
 	const group = (payload.group as Record<string, unknown>) || {};
 	const groupPath =
 		(group.full_path as string) || (group.path as string) || (group.group_path as string);
@@ -49,9 +55,10 @@ function extractFromGroup(payload: Record<string, unknown>): { namespace: string
 /**
  * Extract namespace and project from object_attributes URL.
  */
-function extractFromObjectAttributes(
-	payload: Record<string, unknown>,
-): { namespace: string | null; project: string | null } {
+function extractFromObjectAttributes(payload: Record<string, unknown>): {
+	namespace: string | null;
+	project: string | null;
+} {
 	const objectAttributes = (payload.object_attributes as Record<string, unknown>) || {};
 	const hasProject = objectAttributes.project_id !== undefined;
 	const url = (objectAttributes.url as string) || "";
@@ -87,7 +94,9 @@ function extractFromObjectAttributes(
  */
 export function buildGitLabSubject(payload: Record<string, unknown>): string {
 	const eventName = (
-		(payload.object_kind as string) || (payload.event_name as string) || "unknown"
+		(payload.object_kind as string) ||
+		(payload.event_name as string) ||
+		"unknown"
 	).toLowerCase();
 
 	// Try extraction strategies in order of priority

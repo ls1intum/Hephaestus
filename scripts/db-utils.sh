@@ -147,8 +147,18 @@ check_environment() {
         exit 1
     fi
     
-    if [[ ! -f "$SCRIPTS_DIR/generate_mermaid_erd.py" ]]; then
+    if [[ ! -f "$SCRIPTS_DIR/generate-mermaid-erd.ts" ]]; then
         log_error "ERD generation script not found."
+        exit 1
+    fi
+
+    if ! node -e "require.resolve('tsx')" >/dev/null 2>&1; then
+        log_error "Missing node dependency 'tsx'. Run 'npm install' before generating the ERD."
+        exit 1
+    fi
+
+    if ! node -e "require.resolve('pg')" >/dev/null 2>&1; then
+        log_error "Missing node dependency 'pg'. Run 'npm install' before generating the ERD."
         exit 1
     fi
 }
@@ -239,14 +249,8 @@ DB_PASSWORD="${POSTGRES_PASSWORD:-root}"
 generate_erd() {
     log_info "Generating ERD documentation..."
     cd "$SCRIPTS_DIR"
-    
-    # Check if Python dependencies are available, install if needed
-    if ! python3 -c "import psycopg" 2>/dev/null; then
-        log_info "Installing Python dependencies..."
-        python3 -m pip install -r requirements.txt --break-system-packages --quiet
-    fi
-    
-    python3 generate_mermaid_erd.py \
+
+    node --import tsx generate-mermaid-erd.ts \
         "jdbc:postgresql://${POSTGRES_HOST}:${POSTGRES_PORT}/${DB_NAME}" \
         "$DB_USER" \
         "$DB_PASSWORD" \

@@ -3,12 +3,14 @@
  *
  * Initializes NATS connection and starts the HTTP server.
  */
+import process from "node:process";
 import { serve } from "@hono/node-server";
 
 import app from "@/app";
 import env from "@/env";
 import logger from "@/logger";
 import { natsClient } from "@/nats/client";
+
 const port = env.PORT;
 
 // Shutdown timeout to prevent hanging indefinitely

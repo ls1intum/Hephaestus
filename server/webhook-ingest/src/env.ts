@@ -1,4 +1,5 @@
 import path from "node:path";
+import process from "node:process";
 import { config } from "dotenv";
 import { expand } from "dotenv-expand";
 import { z } from "zod";
@@ -14,9 +15,7 @@ expand(
 const EnvSchema = z.object({
 	NODE_ENV: z.string().default("development"),
 	PORT: z.coerce.number().default(4200),
-	LOG_LEVEL: z
-		.enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"])
-		.default("info"),
+	LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"]).default("info"),
 
 	// NATS configuration
 	NATS_URL: z.string().url().default("nats://nats-server:4222"),

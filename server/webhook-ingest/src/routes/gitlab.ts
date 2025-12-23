@@ -49,9 +49,7 @@ gitlab.post("/", async (c) => {
 	// Build subject from payload
 	const subject = buildGitLabSubject(payload);
 	const payloadEventType =
-		(payload.object_kind as string) ||
-		(payload.event_name as string) ||
-		undefined;
+		(payload.object_kind as string) || (payload.event_name as string) || undefined;
 
 	// Build headers for deduplication and tracing
 	// GitLab provides these headers (per GitLab docs):
