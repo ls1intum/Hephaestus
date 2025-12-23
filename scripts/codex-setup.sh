@@ -147,10 +147,6 @@ install_node_dependencies() {
     (cd "$ROOT_DIR" && npm install)
 }
 
-bootstrap_python() {
-    echo "ℹ️  Bootstrapping Python development environments..."
-    (cd "$ROOT_DIR" && npm run bootstrap:py)
-}
 
 initialize_local_postgres() {
     if use_local_db; then
@@ -168,7 +164,6 @@ initialize_local_postgres() {
 install_java_maven
 install_postgres
 install_node_dependencies
-bootstrap_python
 initialize_local_postgres
 
 echo "✅ Setup completed successfully."

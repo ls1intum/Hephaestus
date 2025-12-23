@@ -70,7 +70,6 @@ Write `openapi.yaml` to the service root:
 npm run openapi:export
 ```
 
-This mirrors the Python service’s `export_openapi_specs.py` flow by generating schemas from the same app definition.
 
 ## Notes
 

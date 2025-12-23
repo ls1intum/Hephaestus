@@ -1,0 +1,79 @@
+{
+  "compilerOptions": {
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Target & Module
+    // ═══════════════════════════════════════════════════════════════════════════
+    "target": "ES2023",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": [
+      "ES2023"
+    ],
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Path Aliases
+    // ═══════════════════════════════════════════════════════════════════════════
+    "baseUrl": "./",
+    "paths": {
+      "@/*": [
+        "./src/*"
+      ]
+    },
+    // ═══════════════════════════════════════════════════════════════════════════
+    // STRICTEST Type Checking (from @tsconfig/strictest + extras)
+    // ═══════════════════════════════════════════════════════════════════════════
+    "strict": true,
+    "allowUnusedLabels": false,
+    "allowUnreachableCode": false,
+    "exactOptionalPropertyTypes": false,
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitOverride": true,
+    "noImplicitReturns": true,
+    "noPropertyAccessFromIndexSignature": false,
+    "noUncheckedIndexedAccess": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "forceConsistentCasingInFileNames": true,
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Module Interop
+    // ═══════════════════════════════════════════════════════════════════════════
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": false,
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Output
+    // ═══════════════════════════════════════════════════════════════════════════
+    "outDir": "./dist",
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Type Roots
+    // ═══════════════════════════════════════════════════════════════════════════
+    "typeRoots": [
+      "../../node_modules/@types",
+      "./node_modules/@types"
+    ],
+    "types": [
+      "node"
+    ],
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Performance
+    // ═══════════════════════════════════════════════════════════════════════════
+    "skipLibCheck": true,
+    "incremental": true
+  },
+  "include": [
+    "src/**/*",
+    "test/**/*",
+    "*.config.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist"
+  ],
+  "tsc-alias": {
+    "resolveFullPaths": true
+  }
+}

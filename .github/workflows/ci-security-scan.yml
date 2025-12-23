@@ -43,7 +43,7 @@ jobs:
         if: matrix.scan-type == 'sast'
         uses: github/codeql-action/init@v3
         with:
-          languages: java-kotlin, javascript-typescript, python
+          languages: java-kotlin, javascript-typescript
           queries: security-extended
           build-mode: none
 
@@ -75,8 +75,9 @@ jobs:
           cd ../server/intelligence-service
           npx tsc --noEmit
 
-          # Python (webhook-ingest) - CodeQL can analyze Python without building
-          # No build step required
+          # Node.js (webhook-ingest) - TypeScript build for CodeQL
+          cd ../webhook-ingest
+          npx tsc --noEmit
 
           echo "✅ Build completed"
 
