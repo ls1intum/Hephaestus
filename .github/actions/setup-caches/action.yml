@@ -28,12 +28,13 @@ runs:
           ~/.npm
           webapp/node_modules
           server/webhook-ingest/node_modules
+          server/intelligence-service/node_modules
           node_modules
-        key: ${{ inputs.os }}-node-${{ hashFiles('package-lock.json', 'webapp/package-lock.json', 'server/webhook-ingest/package.json', 'webapp/biome.json', 'webapp/tsconfig.json', 'webapp/vite.config.js', 'webapp/components.json') }}-${{ inputs.cache-type }}
+        # npm workspaces: single root lockfile contains all workspace deps
+        key: ${{ inputs.os }}-node-${{ hashFiles('package-lock.json', 'webapp/package.json', 'server/webhook-ingest/package.json', 'server/intelligence-service/package.json') }}-${{ inputs.cache-type }}
         restore-keys: |
-          ${{ inputs.os }}-node-${{ hashFiles('package-lock.json', 'webapp/package-lock.json', 'server/webhook-ingest/package.json') }}-${{ inputs.cache-type }}
-          ${{ inputs.os }}-node-${{ hashFiles('package-lock.json', 'webapp/package-lock.json') }}-${{ inputs.cache-type }}
-
+          ${{ inputs.os }}-node-${{ hashFiles('package-lock.json') }}-${{ inputs.cache-type }}
+          ${{ inputs.os }}-node-
 
     # Java/Maven caching
     - name: Set up JDK 21

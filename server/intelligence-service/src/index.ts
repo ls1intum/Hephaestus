@@ -17,7 +17,7 @@ import { pool } from "./shared/db";
 const logger = pino({ level: env.LOG_LEVEL });
 const port = env.PORT;
 
-// Fail-fast: Validate database configuration at startup (2025 best practice)
+// Fail-fast: Validate database configuration at startup
 if (env.DATABASE_URL.includes("placeholder")) {
 	logger.fatal(
 		"DATABASE_URL contains placeholder value. Set a real database URL before starting the server.",
