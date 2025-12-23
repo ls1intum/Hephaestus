@@ -2,6 +2,8 @@ package de.tum.in.www1.hephaestus.gitprovider.issue.github.dto;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.IssueType;
+import org.springframework.lang.Nullable;
 
 /**
  * DTO for GitHub issue type.
@@ -28,5 +30,25 @@ public record GitHubIssueTypeDTO(
         }
         // For GraphQL where id is already the node ID string
         return id != null ? String.valueOf(id) : null;
+    }
+
+    // ========== STATIC FACTORY METHODS FOR GRAPHQL RESPONSES ==========
+
+    /**
+     * Creates a GitHubIssueTypeDTO from a GraphQL IssueType model.
+     */
+    @Nullable
+    public static GitHubIssueTypeDTO fromIssueType(@Nullable IssueType issueType) {
+        if (issueType == null) {
+            return null;
+        }
+        return new GitHubIssueTypeDTO(
+            null,
+            issueType.getId(),
+            issueType.getName(),
+            issueType.getDescription(),
+            issueType.getColor() != null ? issueType.getColor().name().toLowerCase() : null,
+            issueType.getIsEnabled()
+        );
     }
 }

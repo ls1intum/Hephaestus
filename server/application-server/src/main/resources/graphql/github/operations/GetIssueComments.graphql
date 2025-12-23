@@ -1,5 +1,6 @@
 # GraphQL query for fetching issue comments
-# Used by GraphQL-based sync services
+# Uses fullDatabaseId for comment (BigInt) since databaseId (Int) can overflow for newer GitHub entities.
+# User/Bot still use databaseId as fullDatabaseId is not available on Actor types.
 
 query GetIssueComments($owner: String!, $name: String!, $number: Int!, $first: Int!, $after: String) {
 	repository(owner: $owner, name: $name) {
@@ -12,7 +13,7 @@ query GetIssueComments($owner: String!, $name: String!, $number: Int!, $first: I
 				totalCount
 				nodes {
 					id
-					databaseId
+					fullDatabaseId
 					body
 					url
 					createdAt
@@ -20,7 +21,14 @@ query GetIssueComments($owner: String!, $name: String!, $number: Int!, $first: I
 					
 					# Author
 					author {
+						__typename
 						... on User {
+							id
+							databaseId
+							login
+							avatarUrl
+						}
+						... on Bot {
 							id
 							databaseId
 							login

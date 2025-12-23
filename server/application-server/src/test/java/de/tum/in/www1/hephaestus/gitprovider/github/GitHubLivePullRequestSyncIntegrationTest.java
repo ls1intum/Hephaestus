@@ -4,12 +4,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
-import de.tum.in.www1.hephaestus.gitprovider.pullrequest.github.GitHubPullRequestGraphQlSyncService;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequest.github.GitHubPullRequestSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReview;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReviewRepository;
-import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.github.GitHubPullRequestReviewGraphQlSyncService;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.github.GitHubPullRequestReviewSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
-import de.tum.in.www1.hephaestus.gitprovider.repository.github.GitHubRepositoryGraphQlSyncService;
+import de.tum.in.www1.hephaestus.gitprovider.repository.github.GitHubRepositorySyncService;
 import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -24,13 +24,13 @@ import org.springframework.beans.factory.annotation.Autowired;
 class GitHubLivePullRequestSyncIntegrationTest extends AbstractGitHubLiveSyncIntegrationTest {
 
     @Autowired
-    private GitHubRepositoryGraphQlSyncService repositorySyncService;
+    private GitHubRepositorySyncService repositorySyncService;
 
     @Autowired
-    private GitHubPullRequestGraphQlSyncService pullRequestSyncService;
+    private GitHubPullRequestSyncService pullRequestSyncService;
 
     @Autowired
-    private GitHubPullRequestReviewGraphQlSyncService reviewSyncService;
+    private GitHubPullRequestReviewSyncService reviewSyncService;
 
     @Autowired
     private PullRequestRepository pullRequestRepository;
@@ -72,7 +72,7 @@ class GitHubLivePullRequestSyncIntegrationTest extends AbstractGitHubLiveSyncInt
         var localRepo = repositoryRepository.findByNameWithOwner(repository.fullName()).orElseThrow();
 
         // 5. Sync pull requests
-        int syncedCount = pullRequestSyncService.syncPullRequestsForRepository(workspace.getId(), localRepo.getId());
+        int syncedCount = pullRequestSyncService.syncForRepository(workspace.getId(), localRepo.getId());
 
         // 6. Verify
         assertThat(syncedCount).isGreaterThanOrEqualTo(1);
@@ -99,7 +99,7 @@ class GitHubLivePullRequestSyncIntegrationTest extends AbstractGitHubLiveSyncInt
         var localRepo = repositoryRepository.findByNameWithOwner(repository.fullName()).orElseThrow();
 
         // 3. Sync pull requests
-        int syncedCount = pullRequestSyncService.syncPullRequestsForRepository(workspace.getId(), localRepo.getId());
+        int syncedCount = pullRequestSyncService.syncForRepository(workspace.getId(), localRepo.getId());
         assertThat(syncedCount).isGreaterThanOrEqualTo(1);
 
         // 4. Verify PR is synced
@@ -111,7 +111,7 @@ class GitHubLivePullRequestSyncIntegrationTest extends AbstractGitHubLiveSyncInt
         assertThat(storedPR.getNumber()).isEqualTo(prArtifacts.pullRequestNumber());
 
         // 5. Sync reviews separately
-        reviewSyncService.syncReviewsForPullRequest(workspace.getId(), storedPR);
+        reviewSyncService.syncForPullRequest(workspace.getId(), storedPR);
 
         // 6. Verify reviews are synced
         List<PullRequestReview> reviews = pullRequestReviewRepository
@@ -170,7 +170,7 @@ class GitHubLivePullRequestSyncIntegrationTest extends AbstractGitHubLiveSyncInt
         var localRepo = repositoryRepository.findByNameWithOwner(repository.fullName()).orElseThrow();
 
         // 5. Sync pull requests
-        int syncedCount = pullRequestSyncService.syncPullRequestsForRepository(workspace.getId(), localRepo.getId());
+        int syncedCount = pullRequestSyncService.syncForRepository(workspace.getId(), localRepo.getId());
 
         // 6. Verify both PRs are synced
         assertThat(syncedCount).isGreaterThanOrEqualTo(2);

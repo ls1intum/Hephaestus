@@ -3,10 +3,14 @@ package de.tum.in.www1.hephaestus.gitprovider.issuecomment.github.dto;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubWebhookEvent;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.IssueComment;
 import de.tum.in.www1.hephaestus.gitprovider.issue.github.dto.GitHubIssueDTO;
 import de.tum.in.www1.hephaestus.gitprovider.repository.github.dto.GitHubRepositoryRefDTO;
 import de.tum.in.www1.hephaestus.gitprovider.user.github.dto.GitHubUserDTO;
+import java.net.URI;
 import java.time.Instant;
+import java.time.OffsetDateTime;
+import org.springframework.lang.Nullable;
 
 /**
  * DTO for GitHub issue_comment webhook events.
@@ -27,6 +31,7 @@ public record GitHubIssueCommentEventDTO(
 
     /**
      * DTO for the comment within the event.
+     * Provides factory methods for creating from both REST (webhook) and GraphQL responses.
      */
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record GitHubCommentDTO(
@@ -38,5 +43,38 @@ public record GitHubIssueCommentEventDTO(
         @JsonProperty("author_association") String authorAssociation,
         @JsonProperty("created_at") Instant createdAt,
         @JsonProperty("updated_at") Instant updatedAt
-    ) {}
+    ) {
+        // ========== STATIC FACTORY METHODS FOR GRAPHQL RESPONSES ==========
+
+        /**
+         * Creates a GitHubCommentDTO from a GraphQL IssueComment model.
+         * Uses fullDatabaseId instead of databaseId to avoid integer overflow (GitHub IDs exceed 32-bit).
+         */
+        @Nullable
+        public static GitHubCommentDTO fromIssueComment(@Nullable IssueComment comment) {
+            if (comment == null) {
+                return null;
+            }
+            return new GitHubCommentDTO(
+                comment.getFullDatabaseId() != null ? comment.getFullDatabaseId().longValue() : null,
+                comment.getId(),
+                uriToString(comment.getUrl()),
+                comment.getBody(),
+                GitHubUserDTO.fromActor(comment.getAuthor()),
+                comment.getAuthorAssociation() != null ? comment.getAuthorAssociation().name() : null,
+                toInstant(comment.getCreatedAt()),
+                toInstant(comment.getUpdatedAt())
+            );
+        }
+
+        @Nullable
+        private static String uriToString(@Nullable URI uri) {
+            return uri != null ? uri.toString() : null;
+        }
+
+        @Nullable
+        private static Instant toInstant(@Nullable OffsetDateTime dateTime) {
+            return dateTime != null ? dateTime.toInstant() : null;
+        }
+    }
 }

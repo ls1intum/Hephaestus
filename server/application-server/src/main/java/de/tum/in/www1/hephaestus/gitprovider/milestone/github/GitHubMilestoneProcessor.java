@@ -2,7 +2,6 @@ package de.tum.in.www1.hephaestus.gitprovider.milestone.github;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.events.EntityEvents;
-import de.tum.in.www1.hephaestus.gitprovider.common.github.GraphQlParsingUtils;
 import de.tum.in.www1.hephaestus.gitprovider.milestone.Milestone;
 import de.tum.in.www1.hephaestus.gitprovider.milestone.MilestoneRepository;
 import de.tum.in.www1.hephaestus.gitprovider.milestone.github.dto.GitHubMilestoneDTO;
@@ -178,8 +177,17 @@ public class GitHubMilestoneProcessor {
             });
     }
 
+    /**
+     * Converts a GitHub API milestone state string to Milestone.State enum.
+     */
     private Milestone.State parseState(String state) {
-        return GraphQlParsingUtils.parseMilestoneStateEnum(state);
+        if (state == null) {
+            return Milestone.State.OPEN;
+        }
+        return switch (state.toUpperCase()) {
+            case "CLOSED" -> Milestone.State.CLOSED;
+            default -> Milestone.State.OPEN;
+        };
     }
 
     @Nullable

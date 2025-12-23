@@ -11,7 +11,7 @@ import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationService;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.gitprovider.subissue.github.GitHubSubIssueSyncService;
-import de.tum.in.www1.hephaestus.gitprovider.sync.GitHubGraphQlDataSyncService;
+import de.tum.in.www1.hephaestus.gitprovider.sync.GitHubDataSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.sync.NatsConsumerService;
 import de.tum.in.www1.hephaestus.gitprovider.team.Team;
 import de.tum.in.www1.hephaestus.gitprovider.team.TeamInfoDTO;
@@ -96,7 +96,7 @@ public class WorkspaceService {
     private final WorkspaceMembershipService workspaceMembershipService;
 
     // Lazy-loaded dependencies (to break circular references)
-    private final ObjectProvider<GitHubGraphQlDataSyncService> gitHubGraphQlDataSyncServiceProvider;
+    private final ObjectProvider<GitHubDataSyncService> gitHubGraphQlDataSyncServiceProvider;
     private final ObjectProvider<GitHubIssueTypeSyncService> issueTypeSyncServiceProvider;
     private final ObjectProvider<GitHubSubIssueSyncService> subIssueSyncServiceProvider;
 
@@ -123,7 +123,7 @@ public class WorkspaceService {
         WorkspaceLeaguePointsRecalculationService workspaceLeaguePointsRecalculationService,
         OrganizationService organizationService,
         WorkspaceMembershipService workspaceMembershipService,
-        ObjectProvider<GitHubGraphQlDataSyncService> gitHubGraphQlDataSyncServiceProvider,
+        ObjectProvider<GitHubDataSyncService> gitHubGraphQlDataSyncServiceProvider,
         ObjectProvider<GitHubIssueTypeSyncService> issueTypeSyncServiceProvider,
         ObjectProvider<GitHubSubIssueSyncService> subIssueSyncServiceProvider,
         @Qualifier("monitoringExecutor") AsyncTaskExecutor monitoringExecutor,
@@ -153,8 +153,8 @@ public class WorkspaceService {
         this.redirectTtlDays = redirectTtlDays;
     }
 
-    /** Lazy accessor for GitHubGraphQlDataSyncService to break circular dependency. */
-    private GitHubGraphQlDataSyncService getGitHubGraphQlDataSyncService() {
+    /** Lazy accessor for GitHubDataSyncService to break circular dependency. */
+    private GitHubDataSyncService getGitHubDataSyncService() {
         return gitHubGraphQlDataSyncServiceProvider.getObject();
     }
 
@@ -255,7 +255,7 @@ public class WorkspaceService {
                 // Workspaces themselves run in parallel using virtual threads.
                 for (var repo : eligibleRepositories) {
                     try {
-                        getGitHubGraphQlDataSyncService().syncRepository(repo);
+                        getGitHubDataSyncService().syncRepository(repo);
                     } catch (Exception ex) {
                         logger.error(
                             "Error syncing repository {}: {}",
@@ -1047,7 +1047,7 @@ public class WorkspaceService {
             return;
         }
         if (repositoryAllowed) {
-            getGitHubGraphQlDataSyncService().syncRepositoryAsync(monitor);
+            getGitHubDataSyncService().syncRepositoryAsync(monitor);
         } else {
             logger.debug("Repository {} persisted but monitoring disabled by filters.", monitor.getNameWithOwner());
         }

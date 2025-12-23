@@ -5,7 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import de.tum.in.www1.hephaestus.gitprovider.label.LabelRepository;
 import de.tum.in.www1.hephaestus.gitprovider.label.github.GitHubLabelSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
-import de.tum.in.www1.hephaestus.gitprovider.repository.github.GitHubRepositoryGraphQlSyncService;
+import de.tum.in.www1.hephaestus.gitprovider.repository.github.GitHubRepositorySyncService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
@@ -17,7 +17,7 @@ class GitHubLiveLabelSyncIntegrationTest extends AbstractGitHubLiveSyncIntegrati
     private static final String LABEL_DESCRIPTION = "Focused label sync coverage";
 
     @Autowired
-    private GitHubRepositoryGraphQlSyncService repositorySyncService;
+    private GitHubRepositorySyncService repositorySyncService;
 
     @Autowired
     private GitHubLabelSyncService labelSyncService;

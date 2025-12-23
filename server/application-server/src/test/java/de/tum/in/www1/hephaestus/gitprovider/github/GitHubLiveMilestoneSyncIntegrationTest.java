@@ -6,14 +6,14 @@ import de.tum.in.www1.hephaestus.gitprovider.milestone.Milestone;
 import de.tum.in.www1.hephaestus.gitprovider.milestone.MilestoneRepository;
 import de.tum.in.www1.hephaestus.gitprovider.milestone.github.GitHubMilestoneSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
-import de.tum.in.www1.hephaestus.gitprovider.repository.github.GitHubRepositoryGraphQlSyncService;
+import de.tum.in.www1.hephaestus.gitprovider.repository.github.GitHubRepositorySyncService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
 class GitHubLiveMilestoneSyncIntegrationTest extends AbstractGitHubLiveSyncIntegrationTest {
 
     @Autowired
-    private GitHubRepositoryGraphQlSyncService repositorySyncService;
+    private GitHubRepositorySyncService repositorySyncService;
 
     @Autowired
     private GitHubMilestoneSyncService milestoneSyncService;

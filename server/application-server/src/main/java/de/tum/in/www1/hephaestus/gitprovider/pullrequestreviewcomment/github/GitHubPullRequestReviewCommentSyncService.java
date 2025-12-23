@@ -37,11 +37,9 @@ import org.springframework.transaction.annotation.Transactional;
  * creates/updates threads based on GraphQL data and associates comments with them.
  */
 @Service
-public class GitHubPullRequestReviewCommentGraphQlSyncService {
+public class GitHubPullRequestReviewCommentSyncService {
 
-    private static final Logger logger = LoggerFactory.getLogger(
-        GitHubPullRequestReviewCommentGraphQlSyncService.class
-    );
+    private static final Logger logger = LoggerFactory.getLogger(GitHubPullRequestReviewCommentSyncService.class);
     private static final int GRAPHQL_PAGE_SIZE = 50;
     private static final Duration GRAPHQL_TIMEOUT = Duration.ofSeconds(60);
     private static final String GET_PR_REVIEW_COMMENTS_DOCUMENT = "GetPullRequestReviewComments";
@@ -52,7 +50,7 @@ public class GitHubPullRequestReviewCommentGraphQlSyncService {
     private final GitHubGraphQlClientProvider graphQlClientProvider;
     private final GitHubPullRequestReviewCommentProcessor commentProcessor;
 
-    public GitHubPullRequestReviewCommentGraphQlSyncService(
+    public GitHubPullRequestReviewCommentSyncService(
         RepositoryRepository repositoryRepository,
         PullRequestRepository pullRequestRepository,
         PullRequestReviewThreadRepository threadRepository,

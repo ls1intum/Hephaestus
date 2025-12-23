@@ -2,12 +2,23 @@ package de.tum.in.www1.hephaestus.gitprovider.issue.github.dto;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.Issue;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.IssueState;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.IssueStateReason;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.IssueType;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.UserConnection;
 import de.tum.in.www1.hephaestus.gitprovider.label.github.dto.GitHubLabelDTO;
 import de.tum.in.www1.hephaestus.gitprovider.milestone.github.dto.GitHubMilestoneDTO;
 import de.tum.in.www1.hephaestus.gitprovider.repository.github.dto.GitHubRepositoryRefDTO;
 import de.tum.in.www1.hephaestus.gitprovider.user.github.dto.GitHubUserDTO;
+import java.math.BigInteger;
+import java.net.URI;
 import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
+import org.springframework.lang.Nullable;
 
 /**
  * Domain DTO for GitHub issues.
@@ -42,5 +53,84 @@ public record GitHubIssueDTO(
      */
     public Long getDatabaseId() {
         return databaseId != null ? databaseId : id;
+    }
+
+    // ========== STATIC FACTORY METHODS FOR GRAPHQL RESPONSES ==========
+
+    /**
+     * Creates a GitHubIssueDTO from a GraphQL Issue model.
+     *
+     * @param issue the GraphQL Issue (may be null)
+     * @return GitHubIssueDTO or null if issue is null
+     */
+    @Nullable
+    public static GitHubIssueDTO fromIssue(@Nullable Issue issue) {
+        if (issue == null) {
+            return null;
+        }
+
+        return new GitHubIssueDTO(
+            null,
+            toLong(issue.getFullDatabaseId()),
+            issue.getId(),
+            issue.getNumber(),
+            issue.getTitle(),
+            issue.getBody(),
+            convertState(issue.getState()),
+            convertStateReason(issue.getStateReason()),
+            uriToString(issue.getUrl()),
+            0, // comments count
+            toInstant(issue.getCreatedAt()),
+            toInstant(issue.getUpdatedAt()),
+            toInstant(issue.getClosedAt()),
+            GitHubUserDTO.fromActor(issue.getAuthor()),
+            extractAssignees(issue.getAssignees()),
+            GitHubLabelDTO.fromLabelConnection(issue.getLabels()),
+            GitHubMilestoneDTO.fromMilestone(issue.getMilestone()),
+            GitHubIssueTypeDTO.fromIssueType(issue.getIssueType()),
+            null
+        );
+    }
+
+    // ========== CONVERSION HELPERS ==========
+
+    @Nullable
+    private static Long toLong(@Nullable BigInteger value) {
+        if (value == null) {
+            return null;
+        }
+        return value.longValueExact();
+    }
+
+    @Nullable
+    private static Instant toInstant(@Nullable OffsetDateTime dateTime) {
+        return dateTime != null ? dateTime.toInstant() : null;
+    }
+
+    @Nullable
+    private static String uriToString(@Nullable URI uri) {
+        return uri != null ? uri.toString() : null;
+    }
+
+    private static String convertState(@Nullable IssueState state) {
+        if (state == null) {
+            return "open";
+        }
+        return state.name().toLowerCase();
+    }
+
+    @Nullable
+    private static String convertStateReason(@Nullable IssueStateReason stateReason) {
+        if (stateReason == null) {
+            return null;
+        }
+        return stateReason.name().toLowerCase();
+    }
+
+    private static List<GitHubUserDTO> extractAssignees(@Nullable UserConnection connection) {
+        if (connection == null || connection.getNodes() == null) {
+            return Collections.emptyList();
+        }
+        return connection.getNodes().stream().map(GitHubUserDTO::fromUser).filter(Objects::nonNull).toList();
     }
 }

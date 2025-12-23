@@ -33,9 +33,9 @@ import org.springframework.transaction.annotation.Transactional;
  * {@link TeamMembership} records for each member returned by the GraphQL query.
  */
 @Service
-public class GitHubTeamGraphQlSyncService {
+public class GitHubTeamSyncService {
 
-    private static final Logger logger = LoggerFactory.getLogger(GitHubTeamGraphQlSyncService.class);
+    private static final Logger logger = LoggerFactory.getLogger(GitHubTeamSyncService.class);
     private static final int GRAPHQL_PAGE_SIZE = 100;
     private static final Duration GRAPHQL_TIMEOUT = Duration.ofSeconds(30);
     private static final String GET_ORGANIZATION_TEAMS_DOCUMENT = "GetOrganizationTeams";
@@ -46,7 +46,7 @@ public class GitHubTeamGraphQlSyncService {
     private final GitHubTeamProcessor teamProcessor;
     private final GitHubUserProcessor userProcessor;
 
-    public GitHubTeamGraphQlSyncService(
+    public GitHubTeamSyncService(
         TeamRepository teamRepository,
         TeamMembershipRepository teamMembershipRepository,
         GitHubGraphQlClientProvider graphQlClientProvider,

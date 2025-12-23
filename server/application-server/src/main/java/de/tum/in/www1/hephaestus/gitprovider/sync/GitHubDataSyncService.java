@@ -1,9 +1,9 @@
 package de.tum.in.www1.hephaestus.gitprovider.sync;
 
-import de.tum.in.www1.hephaestus.gitprovider.issue.github.GitHubIssueGraphQlSyncService;
+import de.tum.in.www1.hephaestus.gitprovider.issue.github.GitHubIssueSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.label.github.GitHubLabelSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.milestone.github.GitHubMilestoneSyncService;
-import de.tum.in.www1.hephaestus.gitprovider.pullrequest.github.GitHubPullRequestGraphQlSyncService;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequest.github.GitHubPullRequestSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.workspace.RepositoryToMonitor;
@@ -21,40 +21,35 @@ import org.springframework.stereotype.Service;
 /**
  * GraphQL-based data synchronization service.
  * <p>
- * This service provides GraphQL-based synchronization for all GitHub data.
- * It uses GraphQL API exclusively for all GitHub data synchronization.
+ * Orchestrates synchronization of all GitHub data using typed GraphQL models.
  */
 @Service
-public class GitHubGraphQlDataSyncService {
+public class GitHubDataSyncService {
 
-    private static final Logger logger = LoggerFactory.getLogger(GitHubGraphQlDataSyncService.class);
+    private static final Logger log = LoggerFactory.getLogger(GitHubDataSyncService.class);
 
-    // Configuration
     private final int syncCooldownInMinutes;
 
-    // Repositories
     private final WorkspaceRepository workspaceRepository;
     private final RepositoryToMonitorRepository repositoryToMonitorRepository;
     private final RepositoryRepository repositoryRepository;
 
-    // GraphQL Sync services
     private final GitHubLabelSyncService labelSyncService;
     private final GitHubMilestoneSyncService milestoneSyncService;
-    private final GitHubIssueGraphQlSyncService issueSyncService;
-    private final GitHubPullRequestGraphQlSyncService pullRequestSyncService;
+    private final GitHubIssueSyncService issueSyncService;
+    private final GitHubPullRequestSyncService pullRequestSyncService;
 
-    // Async executor
     private final AsyncTaskExecutor monitoringExecutor;
 
-    public GitHubGraphQlDataSyncService(
+    public GitHubDataSyncService(
         @Value("${monitoring.sync-cooldown-in-minutes}") int syncCooldownInMinutes,
         WorkspaceRepository workspaceRepository,
         RepositoryToMonitorRepository repositoryToMonitorRepository,
         RepositoryRepository repositoryRepository,
         GitHubLabelSyncService labelSyncService,
         GitHubMilestoneSyncService milestoneSyncService,
-        GitHubIssueGraphQlSyncService issueSyncService,
-        GitHubPullRequestGraphQlSyncService pullRequestSyncService,
+        GitHubIssueSyncService issueSyncService,
+        GitHubPullRequestSyncService pullRequestSyncService,
         @Qualifier("monitoringExecutor") AsyncTaskExecutor monitoringExecutor
     ) {
         this.syncCooldownInMinutes = syncCooldownInMinutes;
@@ -86,35 +81,35 @@ public class GitHubGraphQlDataSyncService {
 
         Repository repository = repositoryRepository.findByNameWithOwner(nameWithOwner).orElse(null);
         if (repository == null) {
-            logger.warn("Repository {} not found in database, skipping sync", nameWithOwner);
+            log.warn("Repository {} not found in database, skipping sync", nameWithOwner);
             return;
         }
 
         Long repositoryId = repository.getId();
-        logger.info("Starting GraphQL sync for repository {}", nameWithOwner);
+        log.info("Starting GraphQL sync for repository {}", nameWithOwner);
 
         try {
             // Sync labels
             int labelsCount = labelSyncService.syncLabelsForRepository(workspaceId, repositoryId);
-            logger.debug("Synced {} labels for {}", labelsCount, nameWithOwner);
+            log.debug("Synced {} labels for {}", labelsCount, nameWithOwner);
 
             // Sync milestones
             int milestonesCount = milestoneSyncService.syncMilestonesForRepository(workspaceId, repositoryId);
-            logger.debug("Synced {} milestones for {}", milestonesCount, nameWithOwner);
+            log.debug("Synced {} milestones for {}", milestonesCount, nameWithOwner);
 
             // Sync issues
-            int issuesCount = issueSyncService.syncIssuesForRepository(workspaceId, repositoryId);
-            logger.debug("Synced {} issues for {}", issuesCount, nameWithOwner);
+            int issuesCount = issueSyncService.syncForRepository(workspaceId, repositoryId);
+            log.debug("Synced {} issues for {}", issuesCount, nameWithOwner);
 
             // Sync pull requests
-            int prsCount = pullRequestSyncService.syncPullRequestsForRepository(workspaceId, repositoryId);
-            logger.debug("Synced {} pull requests for {}", prsCount, nameWithOwner);
+            int prsCount = pullRequestSyncService.syncForRepository(workspaceId, repositoryId);
+            log.debug("Synced {} pull requests for {}", prsCount, nameWithOwner);
 
             // Update sync timestamp
             repositoryToMonitor.setIssuesAndPullRequestsSyncedAt(Instant.now());
             repositoryToMonitorRepository.save(repositoryToMonitor);
 
-            logger.info(
+            log.info(
                 "Completed GraphQL sync for {}: {} labels, {} milestones, {} issues, {} PRs",
                 nameWithOwner,
                 labelsCount,
@@ -123,7 +118,7 @@ public class GitHubGraphQlDataSyncService {
                 prsCount
             );
         } catch (Exception e) {
-            logger.error("Error syncing repository {} via GraphQL: {}", nameWithOwner, e.getMessage(), e);
+            log.error("Error syncing repository {} via GraphQL: {}", nameWithOwner, e.getMessage(), e);
         }
     }
 
@@ -133,12 +128,12 @@ public class GitHubGraphQlDataSyncService {
     public void syncAllRepositories(Workspace workspace) {
         workspace = workspaceRepository.findById(workspace.getId()).orElse(null);
         if (workspace == null) {
-            logger.warn("Workspace no longer exists; skipping sync.");
+            log.warn("Workspace no longer exists; skipping sync.");
             return;
         }
 
         var repositoriesToMonitor = repositoryToMonitorRepository.findByWorkspaceId(workspace.getId());
-        logger.info(
+        log.info(
             "Syncing {} repositories for workspace {}",
             repositoriesToMonitor.size(),
             workspace.getWorkspaceSlug()

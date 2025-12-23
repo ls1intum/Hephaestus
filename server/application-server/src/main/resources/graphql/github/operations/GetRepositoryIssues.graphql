@@ -33,6 +33,7 @@ query GetRepositoryIssues($owner: String!, $name: String!, $first: Int!, $after:
 				
 				# Author
 				author {
+					__typename
 					... on User {
 						id
 						databaseId
@@ -40,6 +41,12 @@ query GetRepositoryIssues($owner: String!, $name: String!, $first: Int!, $after:
 						avatarUrl
 						name
 						email
+					}
+					... on Bot {
+						id
+						databaseId
+						login
+						avatarUrl
 					}
 				}
 				

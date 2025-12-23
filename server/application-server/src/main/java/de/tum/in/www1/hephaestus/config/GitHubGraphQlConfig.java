@@ -58,11 +58,24 @@ public class GitHubGraphQlConfig {
 
     @Bean
     public WebClient gitHubGraphQlWebClient(ObjectMapper baseObjectMapper) {
-        // Create a custom ObjectMapper for GitHub GraphQL that uses Long for integers
-        // GitHub databaseId values exceed 32-bit int range (>3.5 billion)
+        // Create a custom ObjectMapper for GitHub GraphQL that:
+        // 1. Uses Long for integers (GitHub databaseId values exceed 32-bit int range)
+        // 2. Registers mixins for polymorphic interface deserialization (Actor, RequestedReviewer, RepositoryOwner)
         ObjectMapper graphQlObjectMapper = baseObjectMapper
             .copy()
-            .configure(com.fasterxml.jackson.databind.DeserializationFeature.USE_LONG_FOR_INTS, true);
+            .configure(com.fasterxml.jackson.databind.DeserializationFeature.USE_LONG_FOR_INTS, true)
+            .addMixIn(
+                de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.Actor.class,
+                de.tum.in.www1.hephaestus.config.jackson.GitHubActorMixin.class
+            )
+            .addMixIn(
+                de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.RequestedReviewer.class,
+                de.tum.in.www1.hephaestus.config.jackson.GitHubRequestedReviewerMixin.class
+            )
+            .addMixIn(
+                de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.RepositoryOwner.class,
+                de.tum.in.www1.hephaestus.config.jackson.GitHubRepositoryOwnerMixin.class
+            );
 
         ExchangeStrategies strategies = ExchangeStrategies.builder()
             .codecs(config -> {

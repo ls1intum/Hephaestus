@@ -33,7 +33,7 @@ public class GitHubDataSyncScheduler {
     private static final Logger logger = LoggerFactory.getLogger(GitHubDataSyncScheduler.class);
 
     private final WorkspaceService workspaceService;
-    private final GitHubGraphQlDataSyncService dataSyncService;
+    private final GitHubDataSyncService dataSyncService;
     private final MonitoringScopeFilter monitoringScopeFilter;
     private final GitHubSubIssueSyncService subIssueSyncService;
     private final GitHubIssueTypeSyncService issueTypeSyncService;

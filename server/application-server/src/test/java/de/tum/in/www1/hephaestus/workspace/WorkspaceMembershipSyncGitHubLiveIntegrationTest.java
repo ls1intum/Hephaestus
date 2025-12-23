@@ -5,7 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import de.tum.in.www1.hephaestus.gitprovider.github.AbstractGitHubLiveSyncIntegrationTest;
 import de.tum.in.www1.hephaestus.gitprovider.organization.Organization;
 import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationMembershipRepository;
-import de.tum.in.www1.hephaestus.gitprovider.organization.github.GitHubOrganizationGraphQlSyncService;
+import de.tum.in.www1.hephaestus.gitprovider.organization.github.GitHubOrganizationSyncService;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,7 +18,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 class WorkspaceMembershipSyncGitHubLiveIntegrationTest extends AbstractGitHubLiveSyncIntegrationTest {
 
     @Autowired
-    private GitHubOrganizationGraphQlSyncService orgSyncService;
+    private GitHubOrganizationSyncService orgSyncService;
 
     @Autowired
     private OrganizationMembershipRepository organizationMembershipRepository;

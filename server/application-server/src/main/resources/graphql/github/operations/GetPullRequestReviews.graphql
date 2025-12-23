@@ -1,5 +1,6 @@
 # GraphQL query for fetching pull request reviews
-# Used by GraphQL-based sync services
+# Uses fullDatabaseId for reviews and comments (BigInt) since databaseId (Int) can overflow.
+# User/Bot still use databaseId as fullDatabaseId is not available on Actor types.
 
 query GetPullRequestReviews($owner: String!, $name: String!, $number: Int!, $first: Int!, $after: String) {
 	repository(owner: $owner, name: $name) {
@@ -12,7 +13,7 @@ query GetPullRequestReviews($owner: String!, $name: String!, $number: Int!, $fir
 				totalCount
 				nodes {
 					id
-					databaseId
+					fullDatabaseId
 					body
 					state
 					url
@@ -20,9 +21,21 @@ query GetPullRequestReviews($owner: String!, $name: String!, $number: Int!, $fir
 					updatedAt
 					submittedAt
 					
+					# Commit
+					commit {
+						oid
+					}
+					
 					# Author
 					author {
+						__typename
 						... on User {
+							id
+							databaseId
+							login
+							avatarUrl
+						}
+						... on Bot {
 							id
 							databaseId
 							login
@@ -35,7 +48,7 @@ query GetPullRequestReviews($owner: String!, $name: String!, $number: Int!, $fir
 						totalCount
 						nodes {
 							id
-							databaseId
+							fullDatabaseId
 							body
 							path
 							position
@@ -46,7 +59,14 @@ query GetPullRequestReviews($owner: String!, $name: String!, $number: Int!, $fir
 							
 							# Comment author
 							author {
+								__typename
 								... on User {
+									id
+									databaseId
+									login
+									avatarUrl
+								}
+								... on Bot {
 									id
 									databaseId
 									login

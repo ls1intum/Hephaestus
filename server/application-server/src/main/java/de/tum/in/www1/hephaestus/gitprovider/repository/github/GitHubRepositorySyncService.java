@@ -1,6 +1,7 @@
 package de.tum.in.www1.hephaestus.gitprovider.repository.github;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.RepositoryOwner;
 import de.tum.in.www1.hephaestus.gitprovider.organization.Organization;
 import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationRepository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
@@ -8,13 +9,12 @@ import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.workspace.Workspace;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceRepository;
 import java.time.Duration;
-import java.time.Instant;
-import java.util.Map;
 import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.graphql.client.ClientGraphQlResponse;
 import org.springframework.graphql.client.HttpGraphQlClient;
+import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,9 +25,9 @@ import org.springframework.transaction.annotation.Transactional;
  * the corresponding Repository entity in the database.
  */
 @Service
-public class GitHubRepositoryGraphQlSyncService {
+public class GitHubRepositorySyncService {
 
-    private static final Logger logger = LoggerFactory.getLogger(GitHubRepositoryGraphQlSyncService.class);
+    private static final Logger logger = LoggerFactory.getLogger(GitHubRepositorySyncService.class);
 
     private static final String REPOSITORY_QUERY =
         """
@@ -77,7 +77,7 @@ public class GitHubRepositoryGraphQlSyncService {
     private final OrganizationRepository organizationRepository;
     private final WorkspaceRepository workspaceRepository;
 
-    public GitHubRepositoryGraphQlSyncService(
+    public GitHubRepositorySyncService(
         GitHubGraphQlClientProvider graphQlClientProvider,
         RepositoryRepository repositoryRepository,
         OrganizationRepository organizationRepository,
@@ -110,15 +110,15 @@ public class GitHubRepositoryGraphQlSyncService {
             return Optional.empty();
         }
 
-        String owner = parts[0];
-        String name = parts[1];
+        String repoOwner = parts[0];
+        String repoName = parts[1];
 
         try {
             HttpGraphQlClient client = graphQlClientProvider.forWorkspace(workspaceId);
             ClientGraphQlResponse response = client
                 .document(REPOSITORY_QUERY)
-                .variable("owner", owner)
-                .variable("name", name)
+                .variable("owner", repoOwner)
+                .variable("name", repoName)
                 .execute()
                 .block(Duration.ofSeconds(30));
 
@@ -131,58 +131,59 @@ public class GitHubRepositoryGraphQlSyncService {
                 return Optional.empty();
             }
 
-            Map<String, Object> repoData = response.field("repository").toEntity(Map.class);
+            // Use typed GraphQL model for type-safe parsing
+            var repoData = response
+                .field("repository")
+                .toEntity(de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.Repository.class);
             if (repoData == null) {
                 logger.warn("Repository {} not found on GitHub", nameWithOwner);
                 return Optional.empty();
             }
 
             // Ensure organization exists
-            Map<String, Object> ownerData = (Map<String, Object>) repoData.get("owner");
-            Organization organization = ensureOrganization(ownerData);
+            RepositoryOwner owner = repoData.getOwner();
+            Organization organization = ensureOrganization(owner);
 
-            // Create or update repository
-            // Repository.id is the GitHub database ID (BaseGitServiceEntity pattern)
-            Long githubDatabaseId = ((Number) repoData.get("databaseId")).longValue();
+            // Create or update repository using typed accessors
+            Long githubDatabaseId = repoData.getDatabaseId() != null ? repoData.getDatabaseId().longValue() : null;
+            if (githubDatabaseId == null) {
+                logger.warn("Repository {} missing databaseId", nameWithOwner);
+                return Optional.empty();
+            }
+
             Repository repository = repositoryRepository.findById(githubDatabaseId).orElseGet(Repository::new);
 
             repository.setId(githubDatabaseId);
-            repository.setName((String) repoData.get("name"));
-            repository.setNameWithOwner((String) repoData.get("nameWithOwner"));
-            repository.setDescription((String) repoData.get("description"));
-            repository.setHtmlUrl((String) repoData.get("url"));
+            repository.setName(repoData.getName());
+            repository.setNameWithOwner(repoData.getNameWithOwner());
+            repository.setDescription(repoData.getDescription());
+            repository.setHtmlUrl(repoData.getUrl() != null ? repoData.getUrl().toString() : null);
             repository.setOrganization(organization);
 
             // Set private status
-            Boolean isPrivate = (Boolean) repoData.get("isPrivate");
-            repository.setPrivate(isPrivate != null && isPrivate);
+            repository.setPrivate(repoData.getIsPrivate());
 
             // Set archived status
-            Boolean isArchived = (Boolean) repoData.get("isArchived");
-            repository.setArchived(isArchived != null && isArchived);
+            repository.setArchived(repoData.getIsArchived());
 
             // Set disabled status
-            Boolean isDisabled = (Boolean) repoData.get("isDisabled");
-            repository.setDisabled(isDisabled != null && isDisabled);
+            repository.setDisabled(repoData.getIsDisabled());
 
             // Set pushed at timestamp
-            String pushedAtStr = (String) repoData.get("pushedAt");
-            if (pushedAtStr != null) {
-                repository.setPushedAt(Instant.parse(pushedAtStr));
-            } else {
-                repository.setPushedAt(Instant.now());
+            if (repoData.getPushedAt() != null) {
+                repository.setPushedAt(repoData.getPushedAt().toInstant());
             }
 
-            Map<String, Object> defaultBranch = (Map<String, Object>) repoData.get("defaultBranchRef");
-            if (defaultBranch != null) {
-                repository.setDefaultBranch((String) defaultBranch.get("name"));
+            // Set default branch
+            if (repoData.getDefaultBranchRef() != null) {
+                repository.setDefaultBranch(repoData.getDefaultBranchRef().getName());
             } else {
                 repository.setDefaultBranch("main");
             }
 
-            String visibility = (String) repoData.get("visibility");
-            if (visibility != null) {
-                repository.setVisibility(Repository.Visibility.valueOf(visibility));
+            // Set visibility
+            if (repoData.getVisibility() != null) {
+                repository.setVisibility(Repository.Visibility.valueOf(repoData.getVisibility().name()));
             } else {
                 repository.setVisibility(Repository.Visibility.PRIVATE);
             }
@@ -197,34 +198,75 @@ public class GitHubRepositoryGraphQlSyncService {
         }
     }
 
-    private Organization ensureOrganization(Map<String, Object> ownerData) {
-        Number dbIdNum = (Number) ownerData.get("databaseId");
-        if (dbIdNum == null) {
-            // User repositories may not have a databaseId in the owner if it's a personal account
-            // In this case, skip organization linking
+    /**
+     * Ensures the organization exists, creating it if necessary.
+     * Uses typed RepositoryOwner model for type-safe access.
+     */
+    @Nullable
+    private Organization ensureOrganization(RepositoryOwner owner) {
+        if (owner == null) {
             return null;
         }
 
-        Long databaseId = dbIdNum.longValue();
-        String login = (String) ownerData.get("login");
-        String name = (String) ownerData.get("name");
-        String url = (String) ownerData.get("url");
-        String avatarUrl = (String) ownerData.get("avatarUrl");
+        // RepositoryOwner can be Organization or User
+        // Only handle Organization type for organization linking
+        if (owner instanceof de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.Organization graphQlOrg) {
+            Integer dbId = graphQlOrg.getDatabaseId();
+            if (dbId == null) {
+                return null;
+            }
 
-        Organization organization = organizationRepository
-            .findByGithubId(databaseId)
-            .orElseGet(() -> {
-                Organization org = new Organization();
-                org.setId(databaseId); // Set entity ID
-                org.setGithubId(databaseId);
-                return org;
-            });
+            Long databaseId = dbId.longValue();
+            String login = graphQlOrg.getLogin();
+            String name = graphQlOrg.getName();
+            String url = graphQlOrg.getUrl() != null ? graphQlOrg.getUrl().toString() : null;
+            String avatarUrl = graphQlOrg.getAvatarUrl() != null ? graphQlOrg.getAvatarUrl().toString() : null;
 
-        organization.setLogin(login);
-        organization.setName(name != null ? name : login);
-        organization.setHtmlUrl(url);
-        organization.setAvatarUrl(avatarUrl);
+            Organization organization = organizationRepository
+                .findByGithubId(databaseId)
+                .orElseGet(() -> {
+                    Organization org = new Organization();
+                    org.setId(databaseId);
+                    org.setGithubId(databaseId);
+                    return org;
+                });
 
-        return organizationRepository.save(organization);
+            organization.setLogin(login);
+            organization.setName(name != null ? name : login);
+            organization.setHtmlUrl(url);
+            organization.setAvatarUrl(avatarUrl);
+
+            return organizationRepository.save(organization);
+        } else if (owner instanceof de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.User graphQlUser) {
+            // User repositories - create a "virtual" organization from the user
+            Integer dbId = graphQlUser.getDatabaseId();
+            if (dbId == null) {
+                return null;
+            }
+
+            Long databaseId = dbId.longValue();
+            String login = graphQlUser.getLogin();
+            String name = graphQlUser.getName();
+            String url = graphQlUser.getUrl() != null ? graphQlUser.getUrl().toString() : null;
+            String avatarUrl = graphQlUser.getAvatarUrl() != null ? graphQlUser.getAvatarUrl().toString() : null;
+
+            Organization organization = organizationRepository
+                .findByGithubId(databaseId)
+                .orElseGet(() -> {
+                    Organization org = new Organization();
+                    org.setId(databaseId);
+                    org.setGithubId(databaseId);
+                    return org;
+                });
+
+            organization.setLogin(login);
+            organization.setName(name != null ? name : login);
+            organization.setHtmlUrl(url);
+            organization.setAvatarUrl(avatarUrl);
+
+            return organizationRepository.save(organization);
+        }
+
+        return null;
     }
 }

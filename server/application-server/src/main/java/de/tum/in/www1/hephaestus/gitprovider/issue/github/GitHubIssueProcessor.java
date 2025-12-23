@@ -3,7 +3,6 @@ package de.tum.in.www1.hephaestus.gitprovider.issue.github;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.events.EntityEvents;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.BaseGitHubProcessor;
-import de.tum.in.www1.hephaestus.gitprovider.common.github.GraphQlParsingUtils;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.issue.IssueRepository;
 import de.tum.in.www1.hephaestus.gitprovider.issue.github.dto.GitHubIssueDTO;
@@ -352,13 +351,34 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
         return changedFields;
     }
 
+    /**
+     * Converts a GitHub API state string to Issue.State enum.
+     */
     private Issue.State convertState(String state) {
-        return GraphQlParsingUtils.parseIssueState(state);
+        if (state == null) {
+            return Issue.State.OPEN;
+        }
+        return switch (state.toUpperCase()) {
+            case "CLOSED", "MERGED" -> Issue.State.CLOSED;
+            default -> Issue.State.OPEN;
+        };
     }
 
+    /**
+     * Converts a GitHub API state reason string to Issue.StateReason enum.
+     * Returns UNKNOWN for unrecognized values to preserve data integrity.
+     */
     @Nullable
     private Issue.StateReason convertStateReason(String stateReason) {
-        return GraphQlParsingUtils.parseIssueStateReason(stateReason);
+        if (stateReason == null) {
+            return null;
+        }
+        return switch (stateReason.toUpperCase()) {
+            case "COMPLETED" -> Issue.StateReason.COMPLETED;
+            case "REOPENED" -> Issue.StateReason.REOPENED;
+            case "NOT_PLANNED" -> Issue.StateReason.NOT_PLANNED;
+            default -> Issue.StateReason.UNKNOWN;
+        };
     }
 
     @Nullable

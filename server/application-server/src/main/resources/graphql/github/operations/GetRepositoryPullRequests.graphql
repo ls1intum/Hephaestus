@@ -34,6 +34,7 @@ query GetRepositoryPullRequests($owner: String!, $name: String!, $first: Int!, $
 				
 				# Author
 				author {
+					__typename
 					... on User {
 						id
 						databaseId
@@ -42,11 +43,24 @@ query GetRepositoryPullRequests($owner: String!, $name: String!, $first: Int!, $
 						name
 						email
 					}
+					... on Bot {
+						id
+						databaseId
+						login
+						avatarUrl
+					}
 				}
 				
 				# Merged by
 				mergedBy {
+					__typename
 					... on User {
+						id
+						databaseId
+						login
+						avatarUrl
+					}
+					... on Bot {
 						id
 						databaseId
 						login
@@ -69,7 +83,14 @@ query GetRepositoryPullRequests($owner: String!, $name: String!, $first: Int!, $
 				reviewRequests(first: 20) {
 					nodes {
 						requestedReviewer {
+							__typename
 							... on User {
+								id
+								databaseId
+								login
+								avatarUrl
+							}
+							... on Bot {
 								id
 								databaseId
 								login

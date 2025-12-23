@@ -4,12 +4,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.issue.IssueRepository;
-import de.tum.in.www1.hephaestus.gitprovider.issue.github.GitHubIssueGraphQlSyncService;
+import de.tum.in.www1.hephaestus.gitprovider.issue.github.GitHubIssueSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.issuecomment.IssueComment;
 import de.tum.in.www1.hephaestus.gitprovider.issuecomment.IssueCommentRepository;
-import de.tum.in.www1.hephaestus.gitprovider.issuecomment.github.GitHubIssueCommentGraphQlSyncService;
+import de.tum.in.www1.hephaestus.gitprovider.issuecomment.github.GitHubIssueCommentSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
-import de.tum.in.www1.hephaestus.gitprovider.repository.github.GitHubRepositoryGraphQlSyncService;
+import de.tum.in.www1.hephaestus.gitprovider.repository.github.GitHubRepositorySyncService;
 import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -24,13 +24,13 @@ import org.springframework.beans.factory.annotation.Autowired;
 class GitHubLiveIssueSyncIntegrationTest extends AbstractGitHubLiveSyncIntegrationTest {
 
     @Autowired
-    private GitHubRepositoryGraphQlSyncService repositorySyncService;
+    private GitHubRepositorySyncService repositorySyncService;
 
     @Autowired
-    private GitHubIssueGraphQlSyncService issueSyncService;
+    private GitHubIssueSyncService issueSyncService;
 
     @Autowired
-    private GitHubIssueCommentGraphQlSyncService issueCommentSyncService;
+    private GitHubIssueCommentSyncService issueCommentSyncService;
 
     @Autowired
     private IssueRepository issueRepository;
@@ -57,7 +57,7 @@ class GitHubLiveIssueSyncIntegrationTest extends AbstractGitHubLiveSyncIntegrati
         var localRepo = repositoryRepository.findByNameWithOwner(repository.fullName()).orElseThrow();
 
         // 4. Sync issues
-        int syncedCount = issueSyncService.syncIssuesForRepository(workspace.getId(), localRepo.getId());
+        int syncedCount = issueSyncService.syncForRepository(workspace.getId(), localRepo.getId());
 
         // 5. Verify
         assertThat(syncedCount).isGreaterThanOrEqualTo(1);
@@ -81,7 +81,7 @@ class GitHubLiveIssueSyncIntegrationTest extends AbstractGitHubLiveSyncIntegrati
         var localRepo = repositoryRepository.findByNameWithOwner(repository.fullName()).orElseThrow();
 
         // 3. Sync issues (this should include comments via the issue processor)
-        int syncedCount = issueSyncService.syncIssuesForRepository(workspace.getId(), localRepo.getId());
+        int syncedCount = issueSyncService.syncForRepository(workspace.getId(), localRepo.getId());
         assertThat(syncedCount).isGreaterThanOrEqualTo(1);
 
         // 4. Verify issue is synced
@@ -93,7 +93,7 @@ class GitHubLiveIssueSyncIntegrationTest extends AbstractGitHubLiveSyncIntegrati
         storedIssue.setRepository(localRepo);
 
         // 6. Sync comments separately (comments are synced via a different service)
-        issueCommentSyncService.syncCommentsForIssue(workspace.getId(), storedIssue);
+        issueCommentSyncService.syncForIssue(workspace.getId(), storedIssue);
 
         // 7. Verify comment is synced
         List<IssueComment> comments = issueCommentRepository
@@ -133,7 +133,7 @@ class GitHubLiveIssueSyncIntegrationTest extends AbstractGitHubLiveSyncIntegrati
         var localRepo = repositoryRepository.findByNameWithOwner(repository.fullName()).orElseThrow();
 
         // 4. Sync issues
-        int syncedCount = issueSyncService.syncIssuesForRepository(workspace.getId(), localRepo.getId());
+        int syncedCount = issueSyncService.syncForRepository(workspace.getId(), localRepo.getId());
 
         // 5. Verify both issues are synced
         assertThat(syncedCount).isGreaterThanOrEqualTo(2);

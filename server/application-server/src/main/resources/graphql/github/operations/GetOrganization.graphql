@@ -3,6 +3,7 @@
 
 query GetOrganization($login: String!) {
 	organization(login: $login) {
+		__typename
 		id
 		databaseId
 		login
@@ -21,6 +22,7 @@ query GetOrganization($login: String!) {
 			edges {
 				role
 				node {
+					__typename
 					id
 					databaseId
 					login

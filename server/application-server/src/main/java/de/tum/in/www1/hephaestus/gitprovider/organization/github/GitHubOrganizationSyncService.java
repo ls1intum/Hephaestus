@@ -30,9 +30,9 @@ import org.springframework.transaction.annotation.Transactional;
  * membership records for each member returned by the GraphQL query.
  */
 @Service
-public class GitHubOrganizationGraphQlSyncService {
+public class GitHubOrganizationSyncService {
 
-    private static final Logger logger = LoggerFactory.getLogger(GitHubOrganizationGraphQlSyncService.class);
+    private static final Logger logger = LoggerFactory.getLogger(GitHubOrganizationSyncService.class);
     private static final Duration GRAPHQL_TIMEOUT = Duration.ofSeconds(30);
     private static final String GET_ORGANIZATION_DOCUMENT = "GetOrganization";
 
@@ -41,7 +41,7 @@ public class GitHubOrganizationGraphQlSyncService {
     private final GitHubUserProcessor userProcessor;
     private final OrganizationMembershipRepository organizationMembershipRepository;
 
-    public GitHubOrganizationGraphQlSyncService(
+    public GitHubOrganizationSyncService(
         GitHubGraphQlClientProvider graphQlClientProvider,
         GitHubOrganizationProcessor organizationProcessor,
         GitHubUserProcessor userProcessor,
