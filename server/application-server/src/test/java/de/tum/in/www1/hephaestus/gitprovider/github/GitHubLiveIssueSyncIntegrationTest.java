@@ -7,6 +7,7 @@ import de.tum.in.www1.hephaestus.gitprovider.issue.IssueRepository;
 import de.tum.in.www1.hephaestus.gitprovider.issue.github.GitHubIssueGraphQlSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.issuecomment.IssueComment;
 import de.tum.in.www1.hephaestus.gitprovider.issuecomment.IssueCommentRepository;
+import de.tum.in.www1.hephaestus.gitprovider.issuecomment.github.GitHubIssueCommentGraphQlSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.github.GitHubRepositoryGraphQlSyncService;
 import java.time.Instant;
@@ -27,6 +28,9 @@ class GitHubLiveIssueSyncIntegrationTest extends AbstractGitHubLiveSyncIntegrati
 
     @Autowired
     private GitHubIssueGraphQlSyncService issueSyncService;
+
+    @Autowired
+    private GitHubIssueCommentGraphQlSyncService issueCommentSyncService;
 
     @Autowired
     private IssueRepository issueRepository;
@@ -85,7 +89,13 @@ class GitHubLiveIssueSyncIntegrationTest extends AbstractGitHubLiveSyncIntegrati
         assertThat(storedIssue.getTitle()).isEqualTo(createdIssue.issueTitle());
         assertThat(storedIssue.getNumber()).isEqualTo(createdIssue.issueNumber());
 
-        // 5. Verify comment is synced
+        // 5. Set the repository explicitly to avoid lazy loading issues
+        storedIssue.setRepository(localRepo);
+
+        // 6. Sync comments separately (comments are synced via a different service)
+        issueCommentSyncService.syncCommentsForIssue(workspace.getId(), storedIssue);
+
+        // 7. Verify comment is synced
         List<IssueComment> comments = issueCommentRepository
             .findAll()
             .stream()

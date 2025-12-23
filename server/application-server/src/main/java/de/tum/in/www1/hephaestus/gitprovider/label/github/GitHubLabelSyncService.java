@@ -4,10 +4,14 @@ import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.LabelConnection;
 import de.tum.in.www1.hephaestus.gitprovider.label.Label;
+import de.tum.in.www1.hephaestus.gitprovider.label.LabelRepository;
 import de.tum.in.www1.hephaestus.gitprovider.label.github.dto.GitHubLabelDTO;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import java.time.Duration;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.graphql.client.HttpGraphQlClient;
@@ -31,15 +35,18 @@ public class GitHubLabelSyncService {
     private final RepositoryRepository repositoryRepository;
     private final GitHubGraphQlClientProvider graphQlClientProvider;
     private final GitHubLabelProcessor labelProcessor;
+    private final LabelRepository labelRepository;
 
     public GitHubLabelSyncService(
         RepositoryRepository repositoryRepository,
         GitHubGraphQlClientProvider graphQlClientProvider,
-        GitHubLabelProcessor labelProcessor
+        GitHubLabelProcessor labelProcessor,
+        LabelRepository labelRepository
     ) {
         this.repositoryRepository = repositoryRepository;
         this.graphQlClientProvider = graphQlClientProvider;
         this.labelProcessor = labelProcessor;
+        this.labelRepository = labelRepository;
     }
 
     /**
@@ -72,6 +79,7 @@ public class GitHubLabelSyncService {
             int totalSynced = 0;
             String cursor = null;
             boolean hasNextPage = true;
+            Set<String> syncedNodeIds = new HashSet<>();
 
             while (hasNextPage) {
                 LabelConnection response = client
@@ -93,6 +101,7 @@ public class GitHubLabelSyncService {
                     Label label = labelProcessor.process(dto, repository, context);
                     if (label != null) {
                         totalSynced++;
+                        syncedNodeIds.add(label.getName());
                     }
                 }
 
@@ -101,7 +110,15 @@ public class GitHubLabelSyncService {
                 cursor = pageInfo != null ? pageInfo.getEndCursor() : null;
             }
 
-            logger.info("Synced {} labels for repository {}", totalSynced, repository.getNameWithOwner());
+            // Remove stale labels (labels in DB that no longer exist on GitHub)
+            int removedCount = removeStaleLabels(repositoryId, syncedNodeIds);
+
+            logger.info(
+                "Synced {} labels for repository {} (removed {} stale)",
+                totalSynced,
+                repository.getNameWithOwner(),
+                removedCount
+            );
             return totalSynced;
         } catch (Exception e) {
             logger.error(
@@ -112,6 +129,29 @@ public class GitHubLabelSyncService {
             );
             return 0;
         }
+    }
+
+    /**
+     * Removes labels from the local database that no longer exist on GitHub.
+     *
+     * @param repositoryId the repository ID
+     * @param syncedNames the set of label names that were synced from GitHub
+     * @return number of stale labels removed
+     */
+    private int removeStaleLabels(Long repositoryId, Set<String> syncedNames) {
+        List<Label> existingLabels = labelRepository.findAllByRepository_Id(repositoryId);
+        int removedCount = 0;
+
+        for (Label existingLabel : existingLabels) {
+            // If label name was not in the sync results, it's stale
+            if (!syncedNames.contains(existingLabel.getName())) {
+                labelRepository.delete(existingLabel);
+                removedCount++;
+                logger.debug("Removed stale label: {}", existingLabel.getName());
+            }
+        }
+
+        return removedCount;
     }
 
     /**

@@ -1,5 +1,7 @@
 package de.tum.in.www1.hephaestus.gitprovider.issue.github;
 
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GraphQlParsingUtils.*;
+
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
@@ -10,9 +12,6 @@ import de.tum.in.www1.hephaestus.gitprovider.milestone.github.dto.GitHubMileston
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.github.dto.GitHubUserDTO;
-import java.time.Duration;
-import java.time.Instant;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import org.slf4j.Logger;
@@ -25,15 +24,13 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Service for synchronizing GitHub issues via GraphQL API.
  * <p>
- * This service provides GraphQL-based issue synchronization.
- * It fetches issues via GraphQL and uses GitHubIssueProcessor for persistence.
+ * This service fetches issues via GraphQL and uses GitHubIssueProcessor for persistence.
+ * Uses Map-based parsing to handle GitHub's large database IDs (exceeding 32-bit int).
  */
 @Service
 public class GitHubIssueGraphQlSyncService {
 
     private static final Logger logger = LoggerFactory.getLogger(GitHubIssueGraphQlSyncService.class);
-    private static final int GRAPHQL_PAGE_SIZE = 50;
-    private static final Duration GRAPHQL_TIMEOUT = Duration.ofSeconds(60);
     private static final String GET_ISSUES_DOCUMENT = "GetRepositoryIssues";
 
     private final RepositoryRepository repositoryRepository;
@@ -66,8 +63,8 @@ public class GitHubIssueGraphQlSyncService {
             return 0;
         }
 
-        String[] parts = repository.getNameWithOwner().split("/");
-        if (parts.length != 2) {
+        String[] parts = parseRepositoryName(repository.getNameWithOwner());
+        if (parts == null) {
             logger.warn("Invalid repository nameWithOwner: {}", repository.getNameWithOwner());
             return 0;
         }
@@ -87,10 +84,10 @@ public class GitHubIssueGraphQlSyncService {
                     .documentName(GET_ISSUES_DOCUMENT)
                     .variable("owner", owner)
                     .variable("name", name)
-                    .variable("first", GRAPHQL_PAGE_SIZE)
+                    .variable("first", DEFAULT_PAGE_SIZE)
                     .variable("after", cursor)
                     .execute()
-                    .block(GRAPHQL_TIMEOUT);
+                    .block(DEFAULT_TIMEOUT);
 
                 if (response == null || !response.isValid()) {
                     logger.warn(
@@ -119,8 +116,8 @@ public class GitHubIssueGraphQlSyncService {
                 }
 
                 Map<String, Object> pageInfo = (Map<String, Object>) issuesData.get("pageInfo");
-                hasNextPage = pageInfo != null && Boolean.TRUE.equals(pageInfo.get("hasNextPage"));
-                cursor = pageInfo != null ? (String) pageInfo.get("endCursor") : null;
+                hasNextPage = pageInfo != null && parseBoolean(pageInfo.get("hasNextPage"));
+                cursor = pageInfo != null ? getString(pageInfo, "endCursor") : null;
             }
 
             logger.info("Synced {} issues for repository {}", totalSynced, repository.getNameWithOwner());
@@ -138,160 +135,55 @@ public class GitHubIssueGraphQlSyncService {
 
     @SuppressWarnings("unchecked")
     private GitHubIssueDTO convertMapToDTO(Map<String, Object> issueData) {
-        // Convert author
-        GitHubUserDTO author = null;
-        Map<String, Object> authorData = (Map<String, Object>) issueData.get("author");
-        if (authorData != null) {
-            author = new GitHubUserDTO(
-                null,
-                authorData.get("databaseId") != null ? ((Number) authorData.get("databaseId")).longValue() : null,
-                (String) authorData.get("login"),
-                (String) authorData.get("avatarUrl"),
-                null,
-                (String) authorData.get("name"),
-                (String) authorData.get("email")
-            );
-        }
+        // Parse author
+        GitHubUserDTO author = parseUser((Map<String, Object>) issueData.get("author"));
 
-        // Convert labels
-        List<GitHubLabelDTO> labels = new ArrayList<>();
-        Map<String, Object> labelsData = (Map<String, Object>) issueData.get("labels");
-        if (labelsData != null) {
-            List<Map<String, Object>> labelNodes = (List<Map<String, Object>>) labelsData.get("nodes");
-            if (labelNodes != null) {
-                for (Map<String, Object> labelData : labelNodes) {
-                    labels.add(
-                        new GitHubLabelDTO(
-                            null,
-                            (String) labelData.get("id"),
-                            (String) labelData.get("name"),
-                            (String) labelData.get("description"),
-                            (String) labelData.get("color")
-                        )
-                    );
-                }
-            }
-        }
+        // Parse labels
+        List<GitHubLabelDTO> labels = parseLabelList((Map<String, Object>) issueData.get("labels"));
 
-        // Convert milestone
-        GitHubMilestoneDTO milestone = null;
-        Map<String, Object> milestoneData = (Map<String, Object>) issueData.get("milestone");
-        if (milestoneData != null) {
-            milestone = new GitHubMilestoneDTO(
-                null,
-                milestoneData.get("number") != null ? ((Number) milestoneData.get("number")).intValue() : 0,
-                (String) milestoneData.get("title"),
-                (String) milestoneData.get("description"),
-                convertMilestoneState((String) milestoneData.get("state")),
-                milestoneData.get("dueOn") != null ? Instant.parse((String) milestoneData.get("dueOn")) : null,
-                (String) milestoneData.get("url")
-            );
-        }
+        // Parse milestone
+        GitHubMilestoneDTO milestone = parseMilestone((Map<String, Object>) issueData.get("milestone"));
 
-        // Convert issue type
-        GitHubIssueTypeDTO issueType = null;
-        Map<String, Object> issueTypeData = (Map<String, Object>) issueData.get("issueType");
-        if (issueTypeData != null) {
-            issueType = new GitHubIssueTypeDTO(
-                null,
-                (String) issueTypeData.get("id"),
-                (String) issueTypeData.get("name"),
-                (String) issueTypeData.get("description"),
-                (String) issueTypeData.get("color"),
-                Boolean.TRUE.equals(issueTypeData.get("isEnabled"))
-            );
-        }
+        // Parse issue type
+        GitHubIssueTypeDTO issueType = parseIssueType((Map<String, Object>) issueData.get("issueType"));
 
-        // Convert assignees
-        List<GitHubUserDTO> assignees = new ArrayList<>();
-        Map<String, Object> assigneesData = (Map<String, Object>) issueData.get("assignees");
-        if (assigneesData != null) {
-            List<Map<String, Object>> assigneeNodes = (List<Map<String, Object>>) assigneesData.get("nodes");
-            if (assigneeNodes != null) {
-                for (Map<String, Object> assigneeData : assigneeNodes) {
-                    assignees.add(
-                        new GitHubUserDTO(
-                            null,
-                            assigneeData.get("databaseId") != null
-                                ? ((Number) assigneeData.get("databaseId")).longValue()
-                                : null,
-                            (String) assigneeData.get("login"),
-                            (String) assigneeData.get("avatarUrl"),
-                            null,
-                            (String) assigneeData.get("name"),
-                            null
-                        )
-                    );
-                }
-            }
-        }
+        // Parse assignees
+        List<GitHubUserDTO> assignees = parseUserList((Map<String, Object>) issueData.get("assignees"));
 
         return new GitHubIssueDTO(
-            null,
-            parseLong(issueData.get("fullDatabaseId")),
-            (String) issueData.get("id"),
-            parseIntOrDefault(issueData.get("number"), 0),
-            (String) issueData.get("title"),
-            (String) issueData.get("body"),
-            convertState((String) issueData.get("state")),
-            convertStateReason((String) issueData.get("stateReason")),
-            (String) issueData.get("url"),
-            0,
-            parseInstant(issueData.get("createdAt")),
-            parseInstant(issueData.get("updatedAt")),
-            parseInstant(issueData.get("closedAt")),
-            author,
-            assignees,
-            labels,
-            milestone,
-            issueType,
-            null
+            null, // id
+            parseLong(issueData.get("fullDatabaseId")), // databaseId
+            getString(issueData, "id"), // nodeId
+            parseIntOrDefault(issueData.get("number"), 0), // number
+            getString(issueData, "title"), // title
+            getString(issueData, "body"), // body
+            convertState(getString(issueData, "state")), // state
+            getString(issueData, "stateReason"), // stateReason - pass through as-is
+            getString(issueData, "url"), // htmlUrl
+            0, // commentsCount - not fetched
+            parseInstant(issueData.get("createdAt")), // createdAt
+            parseInstant(issueData.get("updatedAt")), // updatedAt
+            parseInstant(issueData.get("closedAt")), // closedAt
+            author, // author
+            assignees, // assignees
+            labels, // labels
+            milestone, // milestone
+            issueType, // issueType
+            null // repository - in context
         );
     }
 
-    private Long parseLong(Object value) {
-        if (value == null) return null;
-        if (value instanceof Number) return ((Number) value).longValue();
-        if (value instanceof String) return Long.parseLong((String) value);
-        return null;
-    }
-
-    private int parseIntOrDefault(Object value, int defaultValue) {
-        if (value == null) return defaultValue;
-        if (value instanceof Number) return ((Number) value).intValue();
-        if (value instanceof String) return Integer.parseInt((String) value);
-        return defaultValue;
-    }
-
-    private Instant parseInstant(Object value) {
-        if (value == null) return null;
-        if (value instanceof String) return Instant.parse((String) value);
-        return null;
-    }
-
-    private String convertState(String state) {
-        if (state == null) {
-            return "open";
+    private GitHubIssueTypeDTO parseIssueType(Map<String, Object> issueTypeData) {
+        if (issueTypeData == null) {
+            return null;
         }
-        return switch (state) {
-            case "OPEN" -> "open";
-            case "CLOSED" -> "closed";
-            default -> state.toLowerCase();
-        };
-    }
-
-    private String convertStateReason(String stateReason) {
-        return stateReason; // Pass through as-is
-    }
-
-    private String convertMilestoneState(String state) {
-        if (state == null) {
-            return "open";
-        }
-        return switch (state) {
-            case "OPEN" -> "open";
-            case "CLOSED" -> "closed";
-            default -> state.toLowerCase();
-        };
+        return new GitHubIssueTypeDTO(
+            null,
+            getString(issueTypeData, "id"),
+            getString(issueTypeData, "name"),
+            getString(issueTypeData, "description"),
+            getString(issueTypeData, "color"),
+            parseBoolean(issueTypeData.get("isEnabled"))
+        );
     }
 }

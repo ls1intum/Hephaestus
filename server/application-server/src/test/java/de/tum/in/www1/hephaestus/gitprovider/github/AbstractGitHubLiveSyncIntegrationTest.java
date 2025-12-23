@@ -25,7 +25,7 @@ import org.springframework.graphql.client.HttpGraphQlClient;
  * This class provides pure GraphQL mutations and REST API calls for operations
  * not supported by GraphQL.
  */
-abstract class AbstractGitHubLiveSyncIntegrationTest extends BaseGitHubLiveIntegrationTest {
+public abstract class AbstractGitHubLiveSyncIntegrationTest extends BaseGitHubLiveIntegrationTest {
 
     private static final Logger logger = LoggerFactory.getLogger(AbstractGitHubLiveSyncIntegrationTest.class);
 

@@ -1,10 +1,8 @@
 package de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.github;
 
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GraphQlParsingUtils.*;
+
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
-import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.Actor;
-import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.PullRequestReviewConnection;
-import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.PullRequestReviewState;
-import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.User;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReview;
@@ -12,10 +10,11 @@ import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.github.dto.GitHub
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.github.dto.GitHubUserDTO;
-import java.time.Duration;
 import java.util.List;
+import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.graphql.client.ClientGraphQlResponse;
 import org.springframework.graphql.client.HttpGraphQlClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,15 +23,13 @@ import org.springframework.transaction.annotation.Transactional;
  * Service for synchronizing GitHub pull request reviews via GraphQL API.
  * <p>
  * This service fetches pull request reviews via GraphQL and uses
- * GitHubPullRequestReviewProcessor for persistence. It supports syncing
- * reviews for a single PR or all PRs in a repository.
+ * GitHubPullRequestReviewProcessor for persistence. Uses Map-based parsing
+ * to handle GitHub's polymorphic Actor interface.
  */
 @Service
 public class GitHubPullRequestReviewGraphQlSyncService {
 
     private static final Logger logger = LoggerFactory.getLogger(GitHubPullRequestReviewGraphQlSyncService.class);
-    private static final int GRAPHQL_PAGE_SIZE = 50;
-    private static final Duration GRAPHQL_TIMEOUT = Duration.ofSeconds(60);
     private static final String GET_PR_REVIEWS_DOCUMENT = "GetPullRequestReviews";
 
     private final RepositoryRepository repositoryRepository;
@@ -99,6 +96,7 @@ public class GitHubPullRequestReviewGraphQlSyncService {
      * @return number of reviews synced
      */
     @Transactional
+    @SuppressWarnings("unchecked")
     public int syncReviewsForPullRequest(Long workspaceId, PullRequest pullRequest) {
         if (pullRequest == null) {
             logger.warn("Pull request is null, cannot sync reviews");
@@ -111,8 +109,8 @@ public class GitHubPullRequestReviewGraphQlSyncService {
             return 0;
         }
 
-        String[] parts = repository.getNameWithOwner().split("/");
-        if (parts.length != 2) {
+        String[] parts = parseRepositoryName(repository.getNameWithOwner());
+        if (parts == null) {
             logger.warn("Invalid repository nameWithOwner: {}", repository.getNameWithOwner());
             return 0;
         }
@@ -127,23 +125,36 @@ public class GitHubPullRequestReviewGraphQlSyncService {
             boolean hasNextPage = true;
 
             while (hasNextPage) {
-                PullRequestReviewConnection response = client
+                ClientGraphQlResponse response = client
                     .documentName(GET_PR_REVIEWS_DOCUMENT)
                     .variable("owner", owner)
                     .variable("name", name)
                     .variable("number", pullRequest.getNumber())
-                    .variable("first", GRAPHQL_PAGE_SIZE)
+                    .variable("first", DEFAULT_PAGE_SIZE)
                     .variable("after", cursor)
-                    .retrieve("repository.pullRequest.reviews")
-                    .toEntity(PullRequestReviewConnection.class)
-                    .block(GRAPHQL_TIMEOUT);
+                    .execute()
+                    .block(DEFAULT_TIMEOUT);
 
-                if (response == null || response.getNodes() == null) {
+                if (response == null || !response.isValid()) {
+                    logger.warn(
+                        "Invalid GraphQL response for PR reviews: {}",
+                        response != null ? response.getErrors() : "null"
+                    );
                     break;
                 }
 
-                for (var graphQlReview : response.getNodes()) {
-                    GitHubReviewDTO dto = convertToDTO(graphQlReview);
+                Map<String, Object> reviewsData = response.field("repository.pullRequest.reviews").toEntity(Map.class);
+                if (reviewsData == null) {
+                    break;
+                }
+
+                List<Map<String, Object>> nodes = (List<Map<String, Object>>) reviewsData.get("nodes");
+                if (nodes == null || nodes.isEmpty()) {
+                    break;
+                }
+
+                for (Map<String, Object> reviewData : nodes) {
+                    GitHubReviewDTO dto = convertMapToDTO(reviewData);
                     if (dto != null) {
                         PullRequestReview review = reviewProcessor.process(dto, pullRequest.getId());
                         if (review != null) {
@@ -152,9 +163,9 @@ public class GitHubPullRequestReviewGraphQlSyncService {
                     }
                 }
 
-                var pageInfo = response.getPageInfo();
-                hasNextPage = pageInfo != null && Boolean.TRUE.equals(pageInfo.getHasNextPage());
-                cursor = pageInfo != null ? pageInfo.getEndCursor() : null;
+                Map<String, Object> pageInfo = (Map<String, Object>) reviewsData.get("pageInfo");
+                hasNextPage = pageInfo != null && parseBoolean(pageInfo.get("hasNextPage"));
+                cursor = pageInfo != null ? getString(pageInfo, "endCursor") : null;
             }
 
             logger.debug(
@@ -176,66 +187,31 @@ public class GitHubPullRequestReviewGraphQlSyncService {
         }
     }
 
-    /**
-     * Converts a GraphQL PullRequestReview to a GitHubReviewDTO.
-     *
-     * @param graphQlReview the GraphQL pull request review
-     * @return the DTO for processing, or null if databaseId is missing
-     */
-    private GitHubReviewDTO convertToDTO(
-        de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.PullRequestReview graphQlReview
-    ) {
-        if (graphQlReview == null) {
-            return null;
-        }
+    @SuppressWarnings("unchecked")
+    private GitHubReviewDTO convertMapToDTO(Map<String, Object> reviewData) {
+        // Parse author
+        GitHubUserDTO author = parseUser((Map<String, Object>) reviewData.get("author"));
 
-        // databaseId is required for persistence
-        Integer databaseId = graphQlReview.getDatabaseId();
-        if (databaseId == null) {
-            logger.warn("Review has no databaseId, skipping: nodeId={}", graphQlReview.getId());
-            return null;
-        }
-
-        // Convert author
-        GitHubUserDTO author = null;
-        Actor graphQlAuthor = graphQlReview.getAuthor();
-        if (graphQlAuthor instanceof User graphQlUser) {
-            author = new GitHubUserDTO(
-                null, // id (node_id)
-                graphQlUser.getDatabaseId() != null ? graphQlUser.getDatabaseId().longValue() : null, // databaseId
-                graphQlUser.getLogin(), // login
-                graphQlUser.getAvatarUrl() != null ? graphQlUser.getAvatarUrl().toString() : null, // avatarUrl
-                null, // htmlUrl
-                null, // name
-                null // email
-            );
-        }
-
-        // Convert state
-        String state = convertState(graphQlReview.getState());
+        // Parse state
+        String state = getString(reviewData, "state");
 
         return new GitHubReviewDTO(
-            databaseId.longValue(), // id
-            graphQlReview.getId(), // nodeId
-            graphQlReview.getBody(), // body
-            state, // state
-            graphQlReview.getUrl() != null ? graphQlReview.getUrl().toString() : null, // htmlUrl
-            author, // author
-            graphQlReview.getSubmittedAt() != null ? graphQlReview.getSubmittedAt().toInstant() : null, // submittedAt
-            null // commitId - not directly available in the GraphQL query, would need to fetch commit.oid
+            parseLong(reviewData.get("databaseId")), // id
+            getString(reviewData, "id"), // nodeId
+            getString(reviewData, "body"), // body
+            convertReviewState(state), // state
+            getString(reviewData, "url"), // htmlUrl
+            author, // user
+            parseInstant(reviewData.get("submittedAt")), // submittedAt
+            getString(reviewData, "commitId") // commitId
         );
     }
 
-    /**
-     * Converts a GraphQL PullRequestReviewState to its string representation.
-     *
-     * @param state the GraphQL review state
-     * @return the string representation
-     */
-    private String convertState(PullRequestReviewState state) {
+    private String convertReviewState(String state) {
         if (state == null) {
-            return null;
+            return "PENDING";
         }
-        return state.name();
+        // GraphQL returns the state in uppercase, keep as-is
+        return state;
     }
 }

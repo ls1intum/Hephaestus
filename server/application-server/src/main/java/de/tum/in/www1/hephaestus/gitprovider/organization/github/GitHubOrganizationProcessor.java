@@ -50,6 +50,7 @@ public class GitHubOrganizationProcessor {
             .findByGithubId(dto.id())
             .orElseGet(() -> {
                 Organization org = new Organization();
+                org.setId(dto.id()); // Set the primary key ID
                 org.setGithubId(dto.id());
                 return org;
             });

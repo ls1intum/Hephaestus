@@ -1,11 +1,9 @@
 package de.tum.in.www1.hephaestus.gitprovider.pullrequest.github;
 
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GraphQlParsingUtils.*;
+
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
-import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.Label;
-import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.PullRequestConnection;
-import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.PullRequestState;
-import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.User;
 import de.tum.in.www1.hephaestus.gitprovider.label.github.dto.GitHubLabelDTO;
 import de.tum.in.www1.hephaestus.gitprovider.milestone.github.dto.GitHubMilestoneDTO;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
@@ -14,11 +12,11 @@ import de.tum.in.www1.hephaestus.gitprovider.pullrequest.github.dto.GitHubPullRe
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.github.dto.GitHubUserDTO;
-import java.time.Duration;
-import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.graphql.client.ClientGraphQlResponse;
 import org.springframework.graphql.client.HttpGraphQlClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,15 +24,13 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Service for synchronizing GitHub pull requests via GraphQL API.
  * <p>
- * This service provides GraphQL-based pull request synchronization.
- * It fetches PRs via GraphQL and uses GitHubPullRequestProcessor for persistence.
+ * This service fetches PRs via GraphQL and uses GitHubPullRequestProcessor for persistence.
+ * Uses Map-based parsing to handle GitHub's large database IDs (exceeding 32-bit int).
  */
 @Service
 public class GitHubPullRequestGraphQlSyncService {
 
     private static final Logger logger = LoggerFactory.getLogger(GitHubPullRequestGraphQlSyncService.class);
-    private static final int GRAPHQL_PAGE_SIZE = 50;
-    private static final Duration GRAPHQL_TIMEOUT = Duration.ofSeconds(60);
     private static final String GET_PRS_DOCUMENT = "GetRepositoryPullRequests";
 
     private final RepositoryRepository repositoryRepository;
@@ -59,6 +55,7 @@ public class GitHubPullRequestGraphQlSyncService {
      * @return number of pull requests synced
      */
     @Transactional
+    @SuppressWarnings("unchecked")
     public int syncPullRequestsForRepository(Long workspaceId, Long repositoryId) {
         Repository repository = repositoryRepository.findById(repositoryId).orElse(null);
         if (repository == null) {
@@ -66,8 +63,8 @@ public class GitHubPullRequestGraphQlSyncService {
             return 0;
         }
 
-        String[] parts = repository.getNameWithOwner().split("/");
-        if (parts.length != 2) {
+        String[] parts = parseRepositoryName(repository.getNameWithOwner());
+        if (parts == null) {
             logger.warn("Invalid repository nameWithOwner: {}", repository.getNameWithOwner());
             return 0;
         }
@@ -83,31 +80,44 @@ public class GitHubPullRequestGraphQlSyncService {
             boolean hasNextPage = true;
 
             while (hasNextPage) {
-                PullRequestConnection response = client
+                ClientGraphQlResponse response = client
                     .documentName(GET_PRS_DOCUMENT)
                     .variable("owner", owner)
                     .variable("name", name)
-                    .variable("first", GRAPHQL_PAGE_SIZE)
+                    .variable("first", DEFAULT_PAGE_SIZE)
                     .variable("after", cursor)
-                    .retrieve("repository.pullRequests")
-                    .toEntity(PullRequestConnection.class)
-                    .block(GRAPHQL_TIMEOUT);
+                    .execute()
+                    .block(DEFAULT_TIMEOUT);
 
-                if (response == null || response.getNodes() == null) {
+                if (response == null || !response.isValid()) {
+                    logger.warn(
+                        "Invalid GraphQL response for pull requests: {}",
+                        response != null ? response.getErrors() : "null"
+                    );
                     break;
                 }
 
-                for (var graphQlPr : response.getNodes()) {
-                    GitHubPullRequestDTO dto = convertToDTO(graphQlPr);
+                Map<String, Object> prsData = response.field("repository.pullRequests").toEntity(Map.class);
+                if (prsData == null) {
+                    break;
+                }
+
+                List<Map<String, Object>> nodes = (List<Map<String, Object>>) prsData.get("nodes");
+                if (nodes == null || nodes.isEmpty()) {
+                    break;
+                }
+
+                for (Map<String, Object> prData : nodes) {
+                    GitHubPullRequestDTO dto = convertMapToDTO(prData);
                     PullRequest pr = pullRequestProcessor.process(dto, context);
                     if (pr != null) {
                         totalSynced++;
                     }
                 }
 
-                var pageInfo = response.getPageInfo();
-                hasNextPage = pageInfo != null && Boolean.TRUE.equals(pageInfo.getHasNextPage());
-                cursor = pageInfo != null ? pageInfo.getEndCursor() : null;
+                Map<String, Object> pageInfo = (Map<String, Object>) prsData.get("pageInfo");
+                hasNextPage = pageInfo != null && parseBoolean(pageInfo.get("hasNextPage"));
+                cursor = pageInfo != null ? getString(pageInfo, "endCursor") : null;
             }
 
             logger.info("Synced {} pull requests for repository {}", totalSynced, repository.getNameWithOwner());
@@ -123,126 +133,53 @@ public class GitHubPullRequestGraphQlSyncService {
         }
     }
 
-    private GitHubPullRequestDTO convertToDTO(
-        de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.PullRequest graphQlPr
-    ) {
-        // Convert author
-        GitHubUserDTO author = null;
-        var graphQlAuthor = graphQlPr.getAuthor();
-        if (graphQlAuthor instanceof User graphQlUser) {
-            author = new GitHubUserDTO(
-                null,
-                graphQlUser.getDatabaseId() != null ? graphQlUser.getDatabaseId().longValue() : null,
-                graphQlUser.getLogin(),
-                graphQlUser.getAvatarUrl() != null ? graphQlUser.getAvatarUrl().toString() : null,
-                null,
-                graphQlUser.getName(),
-                graphQlUser.getEmail()
-            );
-        }
+    @SuppressWarnings("unchecked")
+    private GitHubPullRequestDTO convertMapToDTO(Map<String, Object> prData) {
+        // Parse author
+        GitHubUserDTO author = parseUser((Map<String, Object>) prData.get("author"));
 
-        // Convert merged by
-        GitHubUserDTO mergedBy = null;
-        var graphQlMergedBy = graphQlPr.getMergedBy();
-        if (graphQlMergedBy instanceof User graphQlUser) {
-            mergedBy = new GitHubUserDTO(
-                null,
-                graphQlUser.getDatabaseId() != null ? graphQlUser.getDatabaseId().longValue() : null,
-                graphQlUser.getLogin(),
-                graphQlUser.getAvatarUrl() != null ? graphQlUser.getAvatarUrl().toString() : null,
-                null,
-                null,
-                null
-            );
-        }
+        // Parse merged by
+        GitHubUserDTO mergedBy = parseUser((Map<String, Object>) prData.get("mergedBy"));
 
-        // Convert labels
-        List<GitHubLabelDTO> labels = new ArrayList<>();
-        if (graphQlPr.getLabels() != null && graphQlPr.getLabels().getNodes() != null) {
-            for (Label l : graphQlPr.getLabels().getNodes()) {
-                if (l != null) {
-                    labels.add(new GitHubLabelDTO(null, l.getId(), l.getName(), l.getDescription(), l.getColor()));
-                }
-            }
-        }
+        // Parse labels
+        List<GitHubLabelDTO> labels = parseLabelList((Map<String, Object>) prData.get("labels"));
 
-        // Convert milestone
-        GitHubMilestoneDTO milestone = null;
-        var graphQlMilestone = graphQlPr.getMilestone();
-        if (graphQlMilestone != null) {
-            milestone = new GitHubMilestoneDTO(
-                null,
-                graphQlMilestone.getNumber(),
-                graphQlMilestone.getTitle(),
-                graphQlMilestone.getDescription(),
-                convertMilestoneState(graphQlMilestone.getState()),
-                graphQlMilestone.getDueOn() != null ? graphQlMilestone.getDueOn().toInstant() : null,
-                graphQlMilestone.getUrl() != null ? graphQlMilestone.getUrl().toString() : null
-            );
-        }
+        // Parse milestone
+        GitHubMilestoneDTO milestone = parseMilestone((Map<String, Object>) prData.get("milestone"));
 
-        // Convert assignees
-        List<GitHubUserDTO> assignees = new ArrayList<>();
-        if (graphQlPr.getAssignees() != null && graphQlPr.getAssignees().getNodes() != null) {
-            for (User a : graphQlPr.getAssignees().getNodes()) {
-                if (a != null) {
-                    assignees.add(
-                        new GitHubUserDTO(
-                            null,
-                            a.getDatabaseId() != null ? a.getDatabaseId().longValue() : null,
-                            a.getLogin(),
-                            a.getAvatarUrl() != null ? a.getAvatarUrl().toString() : null,
-                            null,
-                            a.getName(),
-                            null
-                        )
-                    );
-                }
-            }
-        }
+        // Parse assignees
+        List<GitHubUserDTO> assignees = parseUserList((Map<String, Object>) prData.get("assignees"));
 
-        // Convert requested reviewers
-        List<GitHubUserDTO> requestedReviewers = new ArrayList<>();
-        if (graphQlPr.getReviewRequests() != null && graphQlPr.getReviewRequests().getNodes() != null) {
-            for (var rr : graphQlPr.getReviewRequests().getNodes()) {
-                if (rr != null && rr.getRequestedReviewer() instanceof User reviewer) {
-                    requestedReviewers.add(
-                        new GitHubUserDTO(
-                            null,
-                            reviewer.getDatabaseId() != null ? reviewer.getDatabaseId().longValue() : null,
-                            reviewer.getLogin(),
-                            reviewer.getAvatarUrl() != null ? reviewer.getAvatarUrl().toString() : null,
-                            null,
-                            null,
-                            null
-                        )
-                    );
-                }
-            }
-        }
+        // Parse requested reviewers
+        List<GitHubUserDTO> requestedReviewers = parseRequestedReviewers(
+            (Map<String, Object>) prData.get("reviewRequests")
+        );
+
+        // Determine if merged
+        boolean isMerged = prData.get("mergedAt") != null;
 
         return new GitHubPullRequestDTO(
             null, // id
-            graphQlPr.getDatabaseId() != null ? graphQlPr.getDatabaseId().longValue() : null, // databaseId
-            graphQlPr.getId(), // nodeId
-            graphQlPr.getNumber(), // number
-            graphQlPr.getTitle(), // title
-            graphQlPr.getBody(), // body
-            convertState(graphQlPr.getState()), // state
-            graphQlPr.getUrl() != null ? graphQlPr.getUrl().toString() : null, // htmlUrl
-            graphQlPr.getCreatedAt() != null ? graphQlPr.getCreatedAt().toInstant() : null, // createdAt
-            graphQlPr.getUpdatedAt() != null ? graphQlPr.getUpdatedAt().toInstant() : null, // updatedAt
-            graphQlPr.getClosedAt() != null ? graphQlPr.getClosedAt().toInstant() : null, // closedAt
-            graphQlPr.getMergedAt() != null ? graphQlPr.getMergedAt().toInstant() : null, // mergedAt
-            null, // mergedBy - not fetched via GraphQL
-            graphQlPr.getMergeCommit() != null ? graphQlPr.getMergeCommit().getOid() : null, // mergeCommitSha
-            Boolean.TRUE.equals(graphQlPr.getIsDraft()), // isDraft
-            graphQlPr.getMergedAt() != null, // isMerged
-            null, // mergeable - not fetched via GraphQL
-            graphQlPr.getLocked(), // locked
-            graphQlPr.getAdditions(), // additions
-            graphQlPr.getDeletions(), // deletions
-            graphQlPr.getChangedFiles(), // changedFiles
+            parseLong(prData.get("fullDatabaseId")), // databaseId
+            getString(prData, "id"), // nodeId
+            parseIntOrDefault(prData.get("number"), 0), // number
+            getString(prData, "title"), // title
+            getString(prData, "body"), // body
+            convertState(getString(prData, "state")), // state
+            getString(prData, "url"), // htmlUrl
+            parseInstant(prData.get("createdAt")), // createdAt
+            parseInstant(prData.get("updatedAt")), // updatedAt
+            parseInstant(prData.get("closedAt")), // closedAt
+            parseInstant(prData.get("mergedAt")), // mergedAt
+            mergedBy, // mergedBy
+            null, // mergeCommitSha - not fetching nested commit
+            parseBoolean(prData.get("isDraft")), // isDraft
+            isMerged, // isMerged
+            null, // mergeable - not fetched
+            parseBoolean(prData.get("locked")), // locked
+            parseIntOrDefault(prData.get("additions"), 0), // additions
+            parseIntOrDefault(prData.get("deletions"), 0), // deletions
+            parseIntOrDefault(prData.get("changedFiles"), 0), // changedFiles
             0, // commits - not fetched
             0, // commentsCount - not fetched
             0, // reviewCommentsCount - not fetched
@@ -251,8 +188,8 @@ public class GitHubPullRequestGraphQlSyncService {
             requestedReviewers, // requestedReviewers
             labels, // labels
             milestone, // milestone
-            createBranchRef(graphQlPr.getHeadRefName(), graphQlPr.getHeadRefOid()), // head
-            createBranchRef(graphQlPr.getBaseRefName(), graphQlPr.getBaseRefOid()), // base
+            createBranchRef(getString(prData, "headRefName"), getString(prData, "headRefOid")), // head
+            createBranchRef(getString(prData, "baseRefName"), getString(prData, "baseRefOid")), // base
             null // repository - in context
         );
     }
@@ -261,33 +198,6 @@ public class GitHubPullRequestGraphQlSyncService {
         if (refName == null) {
             return null;
         }
-        return new GitHubBranchRefDTO(
-            refName,
-            sha,
-            null // label
-        );
-    }
-
-    private String convertState(PullRequestState state) {
-        if (state == null) {
-            return "open";
-        }
-        return switch (state) {
-            case OPEN -> "open";
-            case CLOSED -> "closed";
-            case MERGED -> "closed"; // Merged PRs are considered closed
-        };
-    }
-
-    private String convertMilestoneState(
-        de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.MilestoneState state
-    ) {
-        if (state == null) {
-            return "open";
-        }
-        return switch (state) {
-            case OPEN -> "open";
-            case CLOSED -> "closed";
-        };
+        return new GitHubBranchRefDTO(refName, sha, null);
     }
 }

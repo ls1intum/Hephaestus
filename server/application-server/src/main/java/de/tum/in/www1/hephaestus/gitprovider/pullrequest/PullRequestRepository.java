@@ -69,7 +69,7 @@ public interface PullRequestRepository extends JpaRepository<PullRequest, Long> 
         SELECT p
         FROM PullRequest p
         LEFT JOIN FETCH p.labels
-        JOIN FETCH p.author
+        LEFT JOIN FETCH p.author
         LEFT JOIN FETCH p.assignees
         LEFT JOIN FETCH p.repository
         WHERE p.repository.id = :repositoryId AND p.number = :number

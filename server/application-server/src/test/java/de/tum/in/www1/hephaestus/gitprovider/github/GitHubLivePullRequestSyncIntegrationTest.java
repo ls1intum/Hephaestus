@@ -7,6 +7,7 @@ import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.github.GitHubPullRequestGraphQlSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReview;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReviewRepository;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.github.GitHubPullRequestReviewGraphQlSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.github.GitHubRepositoryGraphQlSyncService;
 import java.time.Instant;
@@ -27,6 +28,9 @@ class GitHubLivePullRequestSyncIntegrationTest extends AbstractGitHubLiveSyncInt
 
     @Autowired
     private GitHubPullRequestGraphQlSyncService pullRequestSyncService;
+
+    @Autowired
+    private GitHubPullRequestReviewGraphQlSyncService reviewSyncService;
 
     @Autowired
     private PullRequestRepository pullRequestRepository;
@@ -106,15 +110,17 @@ class GitHubLivePullRequestSyncIntegrationTest extends AbstractGitHubLiveSyncInt
         assertThat(storedPR.getTitle()).isEqualTo(prArtifacts.pullRequestTitle());
         assertThat(storedPR.getNumber()).isEqualTo(prArtifacts.pullRequestNumber());
 
-        // 5. Verify reviews are synced
+        // 5. Sync reviews separately
+        reviewSyncService.syncReviewsForPullRequest(workspace.getId(), storedPR);
+
+        // 6. Verify reviews are synced
         List<PullRequestReview> reviews = pullRequestReviewRepository
             .findAll()
             .stream()
             .filter(r -> r.getPullRequest() != null && r.getPullRequest().getId().equals(storedPR.getId()))
             .toList();
 
-        // Note: Reviews should be synced if the PR sync includes review data.
-        // If reviews are synced separately, this verifies the review was created remotely.
+        // Reviews should now be synced from the separate sync call
         assertThat(reviews).anyMatch(
             r ->
                 r.getId().equals(prArtifacts.reviewId()) ||
