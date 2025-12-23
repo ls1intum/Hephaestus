@@ -21,8 +21,8 @@ const EnvSchema = z.object({
 	NATS_URL: z.string().url().default("nats://nats-server:4222"),
 	NATS_AUTH_TOKEN: z.string().optional(),
 
-	// Webhook secrets
-	WEBHOOK_SECRET: z.string().min(1, "WEBHOOK_SECRET is required"),
+	// Webhook secrets (HMAC-SHA256 requires minimum 32 bytes/256 bits per NIST SP 800-107)
+	WEBHOOK_SECRET: z.string().min(32, "WEBHOOK_SECRET must be at least 32 characters for HMAC-SHA256 security"),
 
 	// Stream configuration
 	STREAM_MAX_AGE_DAYS: z.coerce.number().default(180),
