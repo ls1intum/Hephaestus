@@ -22,7 +22,9 @@ const EnvSchema = z.object({
 	NATS_AUTH_TOKEN: z.string().optional(),
 
 	// Webhook secrets (HMAC-SHA256 requires minimum 32 bytes/256 bits per NIST SP 800-107)
-	WEBHOOK_SECRET: z.string().min(32, "WEBHOOK_SECRET must be at least 32 characters for HMAC-SHA256 security"),
+	WEBHOOK_SECRET: z
+		.string()
+		.min(32, "WEBHOOK_SECRET must be at least 32 characters for HMAC-SHA256 security"),
 
 	// Stream configuration
 	STREAM_MAX_AGE_DAYS: z.coerce.number().default(180),
