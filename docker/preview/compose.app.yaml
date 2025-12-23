@@ -47,6 +47,7 @@ services:
   # ---------------------------------------------------------------------------
   postgres:
     image: postgres:17-alpine
+    hostname: postgres
     restart: unless-stopped
     environment:
       POSTGRES_DB: hephaestus
@@ -181,13 +182,13 @@ services:
     build:
       context: ./server/intelligence-service
       dockerfile: Dockerfile
+    hostname: intelligence-service
     restart: unless-stopped
     environment:
       NODE_ENV: production
       PORT: 8000
       LOG_LEVEL: info
-      # Database - Coolify provides SERVICE_NAME_POSTGRES with the correct container name
-      DATABASE_URL: postgresql://hephaestus:${POSTGRES_PASSWORD:-hephaestus-preview}@${SERVICE_NAME_POSTGRES:-postgres}:5432/hephaestus
+      DATABASE_URL: postgresql://hephaestus:${POSTGRES_PASSWORD:-hephaestus-preview}@postgres:5432/hephaestus
       # AI Models
       MODEL_NAME: ${MODEL_NAME:?Required}
       DETECTION_MODEL_NAME: ${DETECTION_MODEL_NAME:?Required}
@@ -226,17 +227,16 @@ services:
     build:
       context: ./server/application-server
       dockerfile: Dockerfile
+    hostname: application-server
     restart: unless-stopped
     environment:
       SPRING_PROFILES_ACTIVE: prod
       # URL - Coolify provides SERVICE_FQDN_WEBAPP
       APPLICATION_HOST_URL: https://${SERVICE_FQDN_WEBAPP}
-      # Database - Coolify provides SERVICE_NAME_POSTGRES with the correct container name
-      DATABASE_URL: postgresql://${SERVICE_NAME_POSTGRES:-postgres}:5432/hephaestus
+      DATABASE_URL: postgresql://postgres:5432/hephaestus
       DATABASE_USERNAME: hephaestus
       DATABASE_PASSWORD: ${POSTGRES_PASSWORD:-hephaestus-preview}
-      # Internal service - Coolify provides SERVICE_NAME_INTELLIGENCE_SERVICE
-      INTELLIGENCE_SERVICE_URL: http://${SERVICE_NAME_INTELLIGENCE_SERVICE:-intelligence-service}:8000
+      INTELLIGENCE_SERVICE_URL: http://intelligence-service:8000
       # Shared infrastructure (must match shared-infra service names with UUID suffix)
       # When "Connect to Predefined Network" is enabled, use the full container names
       NATS_SERVER: nats://nats-server:4222
@@ -296,6 +296,7 @@ services:
     build:
       context: .
       dockerfile: webapp/Dockerfile
+    hostname: webapp
     restart: unless-stopped
     environment:
       APPLICATION_VERSION: preview
