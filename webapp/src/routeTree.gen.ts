@@ -8,8 +8,6 @@
 // You should NOT make any changes in this file as it will be overwritten.
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
-import { createFileRoute } from '@tanstack/react-router'
-
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as LandingRouteImport } from './routes/landing'
@@ -29,13 +27,6 @@ import { Route as AuthenticatedWWorkspaceSlugUserUsernameBestPracticesRouteImpor
 import { Route as AuthenticatedWWorkspaceSlugAdminAdminTeamsRouteImport } from './routes/_authenticated/w/$workspaceSlug/admin/_admin/teams'
 import { Route as AuthenticatedWWorkspaceSlugAdminAdminSettingsRouteImport } from './routes/_authenticated/w/$workspaceSlug/admin/_admin/settings'
 import { Route as AuthenticatedWWorkspaceSlugAdminAdminMembersRouteImport } from './routes/_authenticated/w/$workspaceSlug/admin/_admin/members'
-
-const AuthenticatedMentorRouteImport = createFileRoute(
-  '/_authenticated/mentor',
-)()
-const AuthenticatedWWorkspaceSlugAdminRouteImport = createFileRoute(
-  '/_authenticated/w/$workspaceSlug/admin',
-)()
 
 const PrivacyRoute = PrivacyRouteImport.update({
   id: '/privacy',
@@ -61,11 +52,6 @@ const AuthenticatedRoute = AuthenticatedRouteImport.update({
   id: '/_authenticated',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AuthenticatedMentorRoute = AuthenticatedMentorRouteImport.update({
-  id: '/mentor',
-  path: '/mentor',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
 const AuthenticatedIndexRoute = AuthenticatedIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -78,13 +64,8 @@ const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
 } as any)
 const AuthenticatedMentorMentor_accessRoute =
   AuthenticatedMentorMentor_accessRouteImport.update({
-    id: '/_mentor_access',
-    getParentRoute: () => AuthenticatedMentorRoute,
-  } as any)
-const AuthenticatedWWorkspaceSlugAdminRoute =
-  AuthenticatedWWorkspaceSlugAdminRouteImport.update({
-    id: '/w/$workspaceSlug/admin',
-    path: '/w/$workspaceSlug/admin',
+    id: '/mentor/_mentor_access',
+    path: '/mentor',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
 const AuthenticatedWWorkspaceSlugIndexRoute =
@@ -113,8 +94,9 @@ const AuthenticatedWWorkspaceSlugMentorThreadIdRoute =
   } as any)
 const AuthenticatedWWorkspaceSlugAdminAdminRoute =
   AuthenticatedWWorkspaceSlugAdminAdminRouteImport.update({
-    id: '/_admin',
-    getParentRoute: () => AuthenticatedWWorkspaceSlugAdminRoute,
+    id: '/w/$workspaceSlug/admin/_admin',
+    path: '/w/$workspaceSlug/admin',
+    getParentRoute: () => AuthenticatedRoute,
   } as any)
 const AuthenticatedWWorkspaceSlugUserUsernameIndexRoute =
   AuthenticatedWWorkspaceSlugUserUsernameIndexRouteImport.update({
@@ -194,10 +176,8 @@ export interface FileRoutesById {
   '/privacy': typeof PrivacyRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
-  '/_authenticated/mentor': typeof AuthenticatedMentorRouteWithChildren
   '/_authenticated/mentor/_mentor_access': typeof AuthenticatedMentorMentor_accessRoute
   '/_authenticated/w/$workspaceSlug/': typeof AuthenticatedWWorkspaceSlugIndexRoute
-  '/_authenticated/w/$workspaceSlug/admin': typeof AuthenticatedWWorkspaceSlugAdminRouteWithChildren
   '/_authenticated/w/$workspaceSlug/admin/_admin': typeof AuthenticatedWWorkspaceSlugAdminAdminRouteWithChildren
   '/_authenticated/w/$workspaceSlug/mentor/$threadId': typeof AuthenticatedWWorkspaceSlugMentorThreadIdRoute
   '/_authenticated/w/$workspaceSlug/mentor/': typeof AuthenticatedWWorkspaceSlugMentorIndexRoute
@@ -256,10 +236,8 @@ export interface FileRouteTypes {
     | '/privacy'
     | '/_authenticated/settings'
     | '/_authenticated/'
-    | '/_authenticated/mentor'
     | '/_authenticated/mentor/_mentor_access'
     | '/_authenticated/w/$workspaceSlug/'
-    | '/_authenticated/w/$workspaceSlug/admin'
     | '/_authenticated/w/$workspaceSlug/admin/_admin'
     | '/_authenticated/w/$workspaceSlug/mentor/$threadId'
     | '/_authenticated/w/$workspaceSlug/mentor/'
@@ -316,13 +294,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/_authenticated/mentor': {
-      id: '/_authenticated/mentor'
-      path: '/mentor'
-      fullPath: '/mentor'
-      preLoaderRoute: typeof AuthenticatedMentorRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
     '/_authenticated/': {
       id: '/_authenticated/'
       path: '/'
@@ -342,13 +313,6 @@ declare module '@tanstack/react-router' {
       path: '/mentor'
       fullPath: '/mentor'
       preLoaderRoute: typeof AuthenticatedMentorMentor_accessRouteImport
-      parentRoute: typeof AuthenticatedMentorRoute
-    }
-    '/_authenticated/w/$workspaceSlug/admin': {
-      id: '/_authenticated/w/$workspaceSlug/admin'
-      path: '/w/$workspaceSlug/admin'
-      fullPath: '/w/$workspaceSlug/admin'
-      preLoaderRoute: typeof AuthenticatedWWorkspaceSlugAdminRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/w/$workspaceSlug/': {
@@ -384,7 +348,7 @@ declare module '@tanstack/react-router' {
       path: '/w/$workspaceSlug/admin'
       fullPath: '/w/$workspaceSlug/admin'
       preLoaderRoute: typeof AuthenticatedWWorkspaceSlugAdminAdminRouteImport
-      parentRoute: typeof AuthenticatedWWorkspaceSlugAdminRoute
+      parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/w/$workspaceSlug/user/$username/': {
       id: '/_authenticated/w/$workspaceSlug/user/$username/'
@@ -424,17 +388,6 @@ declare module '@tanstack/react-router' {
   }
 }
 
-interface AuthenticatedMentorRouteChildren {
-  AuthenticatedMentorMentor_accessRoute: typeof AuthenticatedMentorMentor_accessRoute
-}
-
-const AuthenticatedMentorRouteChildren: AuthenticatedMentorRouteChildren = {
-  AuthenticatedMentorMentor_accessRoute: AuthenticatedMentorMentor_accessRoute,
-}
-
-const AuthenticatedMentorRouteWithChildren =
-  AuthenticatedMentorRoute._addFileChildren(AuthenticatedMentorRouteChildren)
-
 interface AuthenticatedWWorkspaceSlugAdminAdminRouteChildren {
   AuthenticatedWWorkspaceSlugAdminAdminMembersRoute: typeof AuthenticatedWWorkspaceSlugAdminAdminMembersRoute
   AuthenticatedWWorkspaceSlugAdminAdminSettingsRoute: typeof AuthenticatedWWorkspaceSlugAdminAdminSettingsRoute
@@ -456,27 +409,12 @@ const AuthenticatedWWorkspaceSlugAdminAdminRouteWithChildren =
     AuthenticatedWWorkspaceSlugAdminAdminRouteChildren,
   )
 
-interface AuthenticatedWWorkspaceSlugAdminRouteChildren {
-  AuthenticatedWWorkspaceSlugAdminAdminRoute: typeof AuthenticatedWWorkspaceSlugAdminAdminRouteWithChildren
-}
-
-const AuthenticatedWWorkspaceSlugAdminRouteChildren: AuthenticatedWWorkspaceSlugAdminRouteChildren =
-  {
-    AuthenticatedWWorkspaceSlugAdminAdminRoute:
-      AuthenticatedWWorkspaceSlugAdminAdminRouteWithChildren,
-  }
-
-const AuthenticatedWWorkspaceSlugAdminRouteWithChildren =
-  AuthenticatedWWorkspaceSlugAdminRoute._addFileChildren(
-    AuthenticatedWWorkspaceSlugAdminRouteChildren,
-  )
-
 interface AuthenticatedRouteChildren {
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
-  AuthenticatedMentorRoute: typeof AuthenticatedMentorRouteWithChildren
+  AuthenticatedMentorMentor_accessRoute: typeof AuthenticatedMentorMentor_accessRoute
   AuthenticatedWWorkspaceSlugIndexRoute: typeof AuthenticatedWWorkspaceSlugIndexRoute
-  AuthenticatedWWorkspaceSlugAdminRoute: typeof AuthenticatedWWorkspaceSlugAdminRouteWithChildren
+  AuthenticatedWWorkspaceSlugAdminAdminRoute: typeof AuthenticatedWWorkspaceSlugAdminAdminRouteWithChildren
   AuthenticatedWWorkspaceSlugMentorThreadIdRoute: typeof AuthenticatedWWorkspaceSlugMentorThreadIdRoute
   AuthenticatedWWorkspaceSlugMentorIndexRoute: typeof AuthenticatedWWorkspaceSlugMentorIndexRoute
   AuthenticatedWWorkspaceSlugTeamsIndexRoute: typeof AuthenticatedWWorkspaceSlugTeamsIndexRoute
@@ -487,10 +425,10 @@ interface AuthenticatedRouteChildren {
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
-  AuthenticatedMentorRoute: AuthenticatedMentorRouteWithChildren,
+  AuthenticatedMentorMentor_accessRoute: AuthenticatedMentorMentor_accessRoute,
   AuthenticatedWWorkspaceSlugIndexRoute: AuthenticatedWWorkspaceSlugIndexRoute,
-  AuthenticatedWWorkspaceSlugAdminRoute:
-    AuthenticatedWWorkspaceSlugAdminRouteWithChildren,
+  AuthenticatedWWorkspaceSlugAdminAdminRoute:
+    AuthenticatedWWorkspaceSlugAdminAdminRouteWithChildren,
   AuthenticatedWWorkspaceSlugMentorThreadIdRoute:
     AuthenticatedWWorkspaceSlugMentorThreadIdRoute,
   AuthenticatedWWorkspaceSlugMentorIndexRoute:
