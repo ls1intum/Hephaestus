@@ -6,9 +6,8 @@ FROM base AS builder
 RUN apk add --no-cache gcompat
 WORKDIR /app
 
-# Copy minimal files needed for install and build
-COPY package.json tsconfig.json vitest.config.ts ./
-COPY test ./test
+# Copy files needed for install and build
+COPY package.json tsconfig.json ./
 COPY src ./src
 
 # Install deps, build, and prune dev deps for smaller runtime
