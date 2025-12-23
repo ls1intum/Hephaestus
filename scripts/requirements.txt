@@ -1,5 +1,5 @@
 # Supporting Scripts Dependencies
 # Modern PostgreSQL adapter with binary wheels
-psycopg[binary]==3.2.9
+psycopg[binary]==3.3.2
 # NATS client for webhook example extraction
 nats-py==2.9.0
