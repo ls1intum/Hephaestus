@@ -19,13 +19,13 @@ query GetSubIssuesForRepository(
 			totalCount
 			nodes {
 				id
-				databaseId
+				fullDatabaseId
 				number
 				title
 				state
 				parent {
 					id
-					databaseId
+					fullDatabaseId
 					number
 				}
 				subIssuesSummary {

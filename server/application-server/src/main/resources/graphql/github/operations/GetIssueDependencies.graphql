@@ -21,12 +21,12 @@ query GetIssueDependencies(
 			totalCount
 			nodes {
 				id
-				databaseId
+				fullDatabaseId
 				number
 				blockedBy(first: 50) {
 					nodes {
 						id
-						databaseId
+						fullDatabaseId
 						number
 					}
 					totalCount
@@ -34,7 +34,7 @@ query GetIssueDependencies(
 				blocking(first: 50) {
 					nodes {
 						id
-						databaseId
+						fullDatabaseId
 						number
 					}
 					totalCount

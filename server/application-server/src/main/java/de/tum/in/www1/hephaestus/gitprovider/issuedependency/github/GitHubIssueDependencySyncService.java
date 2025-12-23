@@ -272,11 +272,11 @@ public class GitHubIssueDependencySyncService {
     private int processIssueDependencies(
         de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.Issue graphQlIssue
     ) {
-        if (graphQlIssue.getDatabaseId() == null) {
+        if (graphQlIssue.getFullDatabaseId() == null) {
             return 0;
         }
 
-        long issueId = graphQlIssue.getDatabaseId().longValue();
+        long issueId = graphQlIssue.getFullDatabaseId().longValue();
         Optional<Issue> issueOpt = issueRepository.findById(issueId);
         if (issueOpt.isEmpty()) {
             return 0;
@@ -293,8 +293,8 @@ public class GitHubIssueDependencySyncService {
         Set<Long> blockedByIds = blockedBy
             .getNodes()
             .stream()
-            .filter(node -> node.getDatabaseId() != null)
-            .map(node -> node.getDatabaseId().longValue())
+            .filter(node -> node.getFullDatabaseId() != null)
+            .map(node -> node.getFullDatabaseId().longValue())
             .collect(Collectors.toSet());
 
         return syncBlockedByRelationships(issue, blockedByIds);

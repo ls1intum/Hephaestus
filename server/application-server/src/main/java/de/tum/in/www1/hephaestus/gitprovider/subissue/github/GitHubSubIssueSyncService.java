@@ -341,8 +341,8 @@ public class GitHubSubIssueSyncService {
         de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.Issue graphQlIssue,
         Repository repository
     ) {
-        long issueDatabaseId = graphQlIssue.getDatabaseId().longValue();
-        long parentDatabaseId = graphQlIssue.getParent().getDatabaseId().longValue();
+        long issueDatabaseId = graphQlIssue.getFullDatabaseId().longValue();
+        long parentDatabaseId = graphQlIssue.getParent().getFullDatabaseId().longValue();
 
         Optional<Issue> issueOpt = issueRepository.findById(issueDatabaseId);
         Optional<Issue> parentOpt = issueRepository.findById(parentDatabaseId);
@@ -376,7 +376,7 @@ public class GitHubSubIssueSyncService {
             return;
         }
 
-        long databaseId = graphQlIssue.getDatabaseId().longValue();
+        long databaseId = graphQlIssue.getFullDatabaseId().longValue();
         issueRepository
             .findById(databaseId)
             .ifPresent(issue -> {
