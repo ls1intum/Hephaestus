@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.12.1](https://github.com/ls1intum/Hephaestus/compare/v0.12.0...v0.12.1) (2025-12-23)
+
+### 🐛 Bug Fixes
+
+* trigger patch release ([7d29081](https://github.com/ls1intum/Hephaestus/commit/7d2908120935bab94b11c03759609beba5fb8eed))
+
 ## [0.12.0](https://github.com/ls1intum/Hephaestus/compare/v0.11.1...v0.12.0) (2025-12-16)
 
 ### 🐛 Bug Fixes
