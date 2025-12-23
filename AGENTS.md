@@ -132,14 +132,13 @@ bd sync               # Force sync with JSONL
 - `server/application-server/`: Spring Boot 3.5, Liquibase-managed PostgreSQL schema, synchronous + reactive APIs, generated OpenAPI spec in `openapi.yaml`.
 - `webapp/`: React 19 + TanStack Router/Query, Tailwind 4 UI kit (`src/components/ui`), generated API client in `src/api/**`.
 - `server/intelligence-service/`: TypeScript/Hono service orchestrating AI models via Vercel AI SDK. OpenAPI spec is exported and mirrored into the Java client under the application server.
-- `server/webhook-ingest/`: FastAPI webhook intake that forwards events into NATS JetStream.
+- `server/webhook-ingest/`: Hono/TypeScript webhook intake that forwards events into NATS JetStream.
 - `docs/`: Contributor docs (including the ERD that `db:generate-erd-docs` regenerates).
 
 ## 2. Toolchain & environment prerequisites
 
-- **Node.js**: Use the exact version from `.node-version` (currently 22.10.0). Stick with npm—the repo maintains `package-lock.json` and uses npm workspaces.
-- **Java**: JDK 21 (see `pom.xml`). Maven wrapper is checked in; **always run builds through `./mvnw`** (Maven wrapper) to ensure consistent Maven versions.
-- **Python**: Python 3.13 with Poetry 2.x. The webhook-ingest service uses a virtualenv inside its folder (`.venv`). Run `npm run bootstrap:py` before formatting/linting to ensure dev dependencies are installed.
+- **Node.js**: Use the exact version from `.node-version` (currently 22.10.0). Stick with npm—the repo maintains `package-lock.json` and uses npm workspaces. The intelligence-service and webhook-ingest are TypeScript services that use npm.
+- **Java**: JDK 21 (see `pom.xml`). Maven wrapper is checked in; **always run builds through `./mvnw`** to ensure consistent Maven versions.
 - **Docker & Docker Compose**: Required for database helper scripts (`scripts/db-utils.sh`) and for spinning up Postgres/Keycloak/NATS locally.
 - **Databases**: Default PostgreSQL DSN is `postgresql://root:root@localhost:5432/hephaestus`. The database helpers spin this up for you via Docker.
 - **Environment variables**: When generating intelligence service OpenAPI specs locally, set `MODEL_NAME=fake:model` and `DETECTION_MODEL_NAME=fake:model` (the service settings expect a provider-qualified model name).
@@ -152,9 +151,9 @@ Run the relevant commands locally before opening a PR:
 
 | Concern | Command | Description |
 | --- | --- | --- |
-| Format everything | `npm run format` | Apply formatting to Java + Python + webapp |
+| Format everything | `npm run format` | Apply formatting to Java + TypeScript + webapp |
 | Check formatting | `npm run format:check` | Verify formatting without changes (CI) |
-| Lint everything | `npm run lint` | Format check + flake8 + Biome + typecheck |
+| Lint everything | `npm run lint` | Format check + Biome + typecheck |
 | Full check | `npm run check` | Comprehensive: format + lint + typecheck |
 | CI check | `npm run ci` | CI-optimized check across all services |
 
@@ -250,17 +249,18 @@ Regeneration is destructive; stash local edits before running these commands. Ch
 ## 8. Intelligence service expectations (TypeScript)
 
 - Uses Hono as the HTTP framework with Vercel AI SDK for LLM orchestration.
-- Settings live in `src/env.ts`; `MODEL_NAME` and `DETECTION_MODEL_NAME` must be provider-qualified (`openai:gpt-4o`, `anthropic:claude-sonnet-4-20250514`, etc.).
+- Settings live in `src/env.ts`; `MODEL_NAME` and `DETECTION_MODEL_NAME` must be provider-qualified (`openai:gpt-5-mini`, `azure:gpt-5-mini`, etc.).
 - Drizzle ORM for database access; schema is auto-generated via `npm run db:introspect` from the application-server's Liquibase-managed PostgreSQL.
 - OpenAPI spec is exported via `npm run openapi:export`.
 - Formatting: run `npm run format:intelligence-service`. Biome handles linting and formatting.
 
-## 9. Webhook ingest service expectations (Python)
+## 9. Webhook ingest service expectations (TypeScript)
 
-- Uses FastAPI with NATS JetStream (`nats-py`). Keep NATS subject naming consistent with the README (`github.<owner>.<repo>.<event>`).
-- Uses Poetry with in-project virtualenv. Run `poetry install --with dev --no-root` before running tooling.
-- Configuration via environment variables (see README). When adding config, extend `pyproject.toml` and `.env` templates accordingly.
-- Formatting: run `npm run format:webhook-ingest`. Add type hints for mypy.
+- Uses Hono as the HTTP framework with `@nats-io/jetstream` for NATS publishing. Keep NATS subject naming consistent (`github.<owner>.<repo>.<event>`, `gitlab.<namespace>.<project>.<event>`).
+- Security: HMAC-SHA256 signature verification for GitHub, token verification for GitLab. Uses `crypto.timingSafeEqual()` to prevent timing attacks.
+- Configuration via environment variables with Zod validation (see `src/env.ts`). When adding config, extend the Zod schema.
+- Uses Biome for linting/formatting. Run `npm run check:webhook-ingest` for full validation.
+- Tests: Run `npm run test:webhook-ingest` (Vitest).
 
 ## 10. Documentation & assets
 

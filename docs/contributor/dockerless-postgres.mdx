@@ -22,7 +22,6 @@ What the script does:
 
 - Installs PostgreSQL server/client packages via `apt-get` when they are missing.
 - Installs top-level npm dependencies (`npm install`).
-- Bootstraps the shared Python tooling (`npm run bootstrap:py`).
 - Creates and initialises a managed database cluster in `server/application-server/postgres-data-local/` using `scripts/local-postgres.sh`.
 
 > If `sudo` is unavailable, run the script as the root user. The script exits early rather than attempting a partial install.

@@ -246,32 +246,48 @@ jobs:
           echo "✅ intelligence-service quality checks passed"
 
       # webhook-ingest quality checks with comprehensive validation
-      - name: webhook-ingest quality & security analysis
+      - name: webhook-ingest quality & type checking
         if: matrix.check == 'webhook-ingest-quality'
         run: |
           echo "🔍 Running webhook-ingest quality checks..."
-          cd server/webhook-ingest
-
-          if [ ! -d ".venv" ]; then
-            poetry install --no-interaction --no-root
-          fi
+          # Clean install and explicitly install linux biome binary
+          rm -rf node_modules server/webhook-ingest/node_modules ~/.npm
+          npm install --no-audit --progress=false
+          # Install platform binaries from package.json versions (no hardcoding)
+          node scripts/install-platform-binaries.mjs
 
           ISSUES_FOUND=()
 
-          echo "🎨 Checking code formatting..."
-          if ! poetry run black --check --diff .; then
-            echo "❌ Black formatting failed"
-            ISSUES_FOUND+=("Black formatting failed. Run: cd server/webhook-ingest && poetry run black .")
+          echo "🎨 Linting (Biome)..."
+          if ! npm -w server/webhook-ingest run check; then
+            echo "❌ Biome check failed"
+            ISSUES_FOUND+=("Biome check failed. Run: cd server/webhook-ingest && npm run check -- --fix")
           else
-            echo "✅ Black formatting passed"
+            echo "✅ Biome linting passed"
           fi
 
-          echo "🔍 Running linting..."
-          if ! poetry run flake8 . --statistics --count; then
-            echo "❌ Flake8 linting failed Run: cd server/webhook-ingest && poetry run flake8 ."
-            ISSUES_FOUND+=("Flake8 linting failed")
+          echo "📊 TypeScript typecheck..."
+          if ! npm -w server/webhook-ingest run typecheck; then
+            echo "❌ TypeScript typecheck failed"
+            ISSUES_FOUND+=("TypeScript typecheck failed. Run: cd server/webhook-ingest && npm run typecheck")
           else
-            echo "✅ Flake8 linting passed"
+            echo "✅ TypeScript typecheck passed"
+          fi
+
+          echo "🧪 Running tests..."
+          if ! npm -w server/webhook-ingest run test; then
+            echo "❌ Tests failed"
+            ISSUES_FOUND+=("Tests failed. Run: cd server/webhook-ingest && npm run test")
+          else
+            echo "✅ Tests passed"
+          fi
+
+          echo "🏗️ Build check..."
+          if ! npm -w server/webhook-ingest run build; then
+            echo "❌ Build failed"
+            ISSUES_FOUND+=("Build failed. Run: cd server/webhook-ingest && npm run build")
+          else
+            echo "✅ Build passed"
           fi
 
           if [ ${#ISSUES_FOUND[@]} -gt 0 ]; then
@@ -352,6 +368,9 @@ jobs:
           export SPRING_DATASOURCE_USERNAME="root"
           export SPRING_DATASOURCE_PASSWORD="root"
 
+          # Install dependencies (tsx, pg) needed for db-utils.sh scripts
+          npm ci --prefer-offline --no-audit
+
           # Build application-server for schema operations
           echo "🏗️ Building application-server..."
           cd server/application-server
@@ -413,6 +432,9 @@ jobs:
           export SPRING_DATASOURCE_URL="jdbc:postgresql://localhost:5432/hephaestus"
           export SPRING_DATASOURCE_USERNAME="root"
           export SPRING_DATASOURCE_PASSWORD="root"
+
+          # Install dependencies (tsx, pg) needed for db-utils.sh scripts
+          npm ci --prefer-offline --no-audit
 
           # Build application-server for ERD operations
           echo "🏗️ Building application-server..."

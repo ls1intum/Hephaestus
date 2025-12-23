@@ -12,8 +12,8 @@ This guide covers the minimum configuration required to deploy Hephaestus in pro
 The production stack consists of:
 
 - **Application server** (Spring Boot)
-- **Intelligence service** (FastAPI)
-- **Webhook ingest** (NATS consumers)
+- **Intelligence service** (TypeScript + Hono)
+- **Webhook ingest** (Hono/TypeScript → NATS JetStream)
 - **React webapp** (served via nginx)
 - **PostgreSQL 16**
 - **Keycloak** (with GitHub as identity provider)

@@ -41,8 +41,6 @@ dependencies:
       - "**/package.json"
       - "**/package-lock.json"
       - "**/pom.xml"
-      - "**/pyproject.toml"
-      - "**/poetry.lock"
       - "renovate.json"
 
 feature:

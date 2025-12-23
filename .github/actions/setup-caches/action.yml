@@ -14,25 +14,27 @@ runs:
   steps:
     # Node.js caching
     - name: Setup Node.js
-      if: contains(fromJSON('["application-server-quality", "webapp-quality", "webapp-visual", "openapi-validation", "docs-quality", "intelligence-service-quality"]'), inputs.cache-type)
+      if: contains(fromJSON('["application-server-quality", "webapp-quality", "webapp-visual", "openapi-validation", "docs-quality", "intelligence-service-quality", "webhook-ingest-quality"]'), inputs.cache-type)
       uses: actions/setup-node@v4
       with:
         node-version-file: '.node-version'
         cache: "npm"
 
     - name: Cache Node.js dependencies
-      if: contains(fromJSON('["application-server-quality", "webapp-quality", "webapp-visual", "openapi-validation"]'), inputs.cache-type)
+      if: contains(fromJSON('["application-server-quality", "webapp-quality", "webapp-visual", "openapi-validation", "webhook-ingest-quality", "intelligence-service-quality"]'), inputs.cache-type)
       uses: actions/cache@v4
       with:
         path: |
           ~/.npm
           webapp/node_modules
+          server/webhook-ingest/node_modules
+          server/intelligence-service/node_modules
           node_modules
-        key: ${{ inputs.os }}-node-${{ hashFiles('package-lock.json', 'webapp/package-lock.json', 'webapp/biome.json', 'webapp/tsconfig.json', 'webapp/vite.config.js', 'webapp/components.json') }}-${{ inputs.cache-type }}
+        # npm workspaces: single root lockfile contains all workspace deps
+        key: ${{ inputs.os }}-node-${{ hashFiles('package-lock.json', 'webapp/package.json', 'server/webhook-ingest/package.json', 'server/intelligence-service/package.json') }}-${{ inputs.cache-type }}
         restore-keys: |
-          ${{ inputs.os }}-node-${{ hashFiles('package-lock.json', 'webapp/package-lock.json', 'webapp/biome.json', 'webapp/tsconfig.json', 'webapp/vite.config.js', 'webapp/components.json') }}-${{ inputs.cache-type }}
-          ${{ inputs.os }}-node-${{ hashFiles('package-lock.json', 'webapp/package-lock.json') }}-${{ inputs.cache-type }}
-
+          ${{ inputs.os }}-node-${{ hashFiles('package-lock.json') }}-${{ inputs.cache-type }}
+          ${{ inputs.os }}-node-
 
     # Java/Maven caching
     - name: Set up JDK 21
@@ -54,30 +56,3 @@ runs:
         restore-keys: |
           ${{ inputs.os }}-maven-${{ hashFiles('server/application-server/pom.xml') || 'no-pom' }}-
           ${{ inputs.os }}-maven-
-
-    # Python/Poetry caching
-    - name: Set up Python 3.13
-      if: contains(fromJSON('["webhook-ingest-quality", "database-schema-validation", "database-documentation-validation", "database-models-validation"]'), inputs.cache-type)
-      uses: actions/setup-python@v4
-      with:
-        python-version: 3.13
-        
-    - name: Install Poetry
-      if: contains(fromJSON('["webhook-ingest-quality", "database-schema-validation", "database-documentation-validation", "database-models-validation"]'), inputs.cache-type)
-      uses: snok/install-poetry@v1
-      with:
-        version: 2.1.1
-        virtualenvs-create: true
-        virtualenvs-in-project: true
-
-    - name: Cache Poetry dependencies
-      if: contains(fromJSON('["webhook-ingest-quality", "database-schema-validation", "database-documentation-validation", "database-models-validation"]'), inputs.cache-type)
-      uses: actions/cache@v4
-      with:
-        path: |
-          ~/.cache/pypoetry
-          server/webhook-ingest/.venv
-        key: ${{ inputs.os }}-poetry-${{ hashFiles('server/webhook-ingest/poetry.lock') || 'no-poetry-lock' }}-${{ inputs.cache-type }}
-        restore-keys: |
-          ${{ inputs.os }}-poetry-${{ hashFiles('server/webhook-ingest/poetry.lock') || 'no-poetry-lock' }}-
-          ${{ inputs.os }}-poetry-

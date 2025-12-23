@@ -40,7 +40,7 @@ jobs:
             docker-file: "./server/webhook-ingest/Dockerfile"
             docker-context: "./server/webhook-ingest"
             title: "Hephaestus Webhook Ingest"
-            description: "Python-based webhook processor for Hephaestus"
+            description: "Hono/TypeScript-based webhook processor for Hephaestus"
     uses: ls1intum/.github/.github/workflows/build-and-push-docker-image.yml@main
     with:
       image-name: "${{ matrix.component.image-name }}"
