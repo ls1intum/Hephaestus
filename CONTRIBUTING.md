@@ -88,7 +88,7 @@ We use **Semantic Release** to automatically version and release our application
 
 - `webapp`: React frontend
 - `server`: Java application server
-- `ai`: Python intelligence service
+- `ai`: TypeScript intelligence service
 - `webhooks`: Webhook ingestion service
 - `docs`: Documentation
 
