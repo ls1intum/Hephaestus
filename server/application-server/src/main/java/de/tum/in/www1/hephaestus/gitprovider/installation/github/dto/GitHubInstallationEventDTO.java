@@ -31,6 +31,7 @@ public record GitHubInstallationEventDTO(
         @JsonProperty("id") Long id,
         @JsonProperty("app_id") Long appId,
         @JsonProperty("target_type") String targetType,
+        @JsonProperty("repository_selection") String repositorySelection,
         @JsonProperty("permissions") Object permissions,
         @JsonProperty("events") List<String> events,
         @JsonProperty("account") GitHubAccountDTO account
