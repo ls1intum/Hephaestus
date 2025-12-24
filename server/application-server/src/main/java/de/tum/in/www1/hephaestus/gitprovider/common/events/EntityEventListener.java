@@ -9,10 +9,7 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 
 /**
- * Infrastructure-level event listener for logging and metrics.
- * <p>
- * Feature-specific reactions to events should be in their own listeners
- * within their respective packages (e.g., BadPracticeEventListener in activity).
+ * Logs entity lifecycle events for debugging and audit trails.
  */
 @Component
 public class EntityEventListener {
