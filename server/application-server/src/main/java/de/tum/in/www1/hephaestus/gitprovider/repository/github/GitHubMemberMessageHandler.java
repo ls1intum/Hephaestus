@@ -2,8 +2,8 @@ package de.tum.in.www1.hephaestus.gitprovider.repository.github;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContextFactory;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventAction;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
-import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubWebhookAction;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.collaborator.RepositoryCollaborator;
 import de.tum.in.www1.hephaestus.gitprovider.repository.collaborator.RepositoryCollaboratorRepository;
@@ -75,8 +75,8 @@ public class GitHubMemberMessageHandler extends GitHubMessageHandler<GitHubMembe
         Repository repository = context.repository();
 
         switch (event.actionType()) {
-            case ADDED -> handleCollaboratorAdded(repository, user, event);
-            case REMOVED -> handleCollaboratorRemoved(repository, user);
+            case GitHubEventAction.Member.ADDED -> handleCollaboratorAdded(repository, user, event);
+            case GitHubEventAction.Member.REMOVED -> handleCollaboratorRemoved(repository, user);
             default -> logger.debug("Unhandled member action: {}", event.action());
         }
     }

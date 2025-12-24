@@ -1,7 +1,7 @@
 package de.tum.in.www1.hephaestus.gitprovider.organization.github;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventAction;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
-import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubWebhookAction;
 import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationMembershipRepository;
 import de.tum.in.www1.hephaestus.gitprovider.organization.github.dto.GitHubOrganizationEventDTO;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
@@ -58,7 +58,7 @@ public class GitHubOrganizationMessageHandler extends GitHubMessageHandler<GitHu
         logger.info("Received organization event: action={}, org={}", event.action(), orgDto.login());
 
         switch (event.actionType()) {
-            case MEMBER_ADDED -> {
+            case GitHubEventAction.Organization.MEMBER_ADDED -> {
                 if (event.membership() != null && event.membership().user() != null) {
                     var userDto = event.membership().user();
                     User user = userProcessor.ensureExists(userDto);
@@ -69,15 +69,15 @@ public class GitHubOrganizationMessageHandler extends GitHubMessageHandler<GitHu
                     logger.info("Member added to org {}: {} with role {}", orgDto.login(), userDto.login(), role);
                 }
             }
-            case MEMBER_REMOVED -> {
+            case GitHubEventAction.Organization.MEMBER_REMOVED -> {
                 if (event.membership() != null && event.membership().user() != null) {
                     var userDto = event.membership().user();
                     membershipRepository.deleteByOrganizationIdAndUserIdIn(orgDto.id(), List.of(userDto.id()));
                     logger.info("Member removed from org {}: {}", orgDto.login(), userDto.login());
                 }
             }
-            case RENAMED -> organizationProcessor.rename(orgDto.id(), orgDto.login());
-            case DELETED -> organizationProcessor.delete(orgDto.id());
+            case GitHubEventAction.Organization.RENAMED -> organizationProcessor.rename(orgDto.id(), orgDto.login());
+            case GitHubEventAction.Organization.DELETED -> organizationProcessor.delete(orgDto.id());
             default -> organizationProcessor.process(orgDto);
         }
     }

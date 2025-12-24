@@ -2,6 +2,7 @@ package de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.github.dt
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventAction;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubWebhookEvent;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.github.dto.GitHubPullRequestDTO;
 import de.tum.in.www1.hephaestus.gitprovider.repository.github.dto.GitHubRepositoryRefDTO;
@@ -20,6 +21,10 @@ public record GitHubPullRequestReviewCommentEventDTO(
     @JsonProperty("sender") GitHubUserDTO sender
 )
     implements GitHubWebhookEvent {
+    public GitHubEventAction.PullRequestReviewComment actionType() {
+        return GitHubEventAction.PullRequestReviewComment.fromString(action);
+    }
+
     @Override
     public GitHubRepositoryRefDTO repository() {
         return repository;

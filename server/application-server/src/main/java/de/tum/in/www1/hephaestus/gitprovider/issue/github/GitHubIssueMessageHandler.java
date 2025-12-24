@@ -2,8 +2,8 @@ package de.tum.in.www1.hephaestus.gitprovider.issue.github;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContextFactory;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventAction;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
-import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubWebhookAction;
 import de.tum.in.www1.hephaestus.gitprovider.issue.github.dto.GitHubIssueDTO;
 import de.tum.in.www1.hephaestus.gitprovider.issue.github.dto.GitHubIssueEventDTO;
 import org.slf4j.Logger;
@@ -12,16 +12,6 @@ import org.springframework.stereotype.Component;
 
 /**
  * Handles all GitHub issue webhook events.
- * <p>
- * This handler uses DTOs directly to ensure all fields are captured,
- * including issue types which require direct JSON parsing.
- * <p>
- * Processing is delegated to {@link GitHubIssueProcessor} which handles:
- * <ul>
- * <li>DTO to entity conversion</li>
- * <li>Persistence</li>
- * <li>Domain event publishing</li>
- * </ul>
  */
 @Component
 public class GitHubIssueMessageHandler extends GitHubMessageHandler<GitHubIssueEventDTO> {
@@ -68,39 +58,39 @@ public class GitHubIssueMessageHandler extends GitHubMessageHandler<GitHubIssueE
 
     private void routeToProcessor(GitHubIssueEventDTO event, GitHubIssueDTO issueDto, ProcessingContext context) {
         switch (event.actionType()) {
-            case OPENED,
-                EDITED,
-                ASSIGNED,
-                UNASSIGNED,
-                MILESTONED,
-                DEMILESTONED,
-                PINNED,
-                UNPINNED,
-                LOCKED,
-                UNLOCKED,
-                TRANSFERRED -> issueProcessor.process(issueDto, context);
-            case CLOSED -> issueProcessor.processClosed(issueDto, context);
-            case REOPENED -> issueProcessor.processReopened(issueDto, context);
-            case DELETED -> issueProcessor.processDeleted(issueDto);
-            case LABELED -> {
+            case GitHubEventAction.Issue.OPENED,
+                GitHubEventAction.Issue.EDITED,
+                GitHubEventAction.Issue.ASSIGNED,
+                GitHubEventAction.Issue.UNASSIGNED,
+                GitHubEventAction.Issue.MILESTONED,
+                GitHubEventAction.Issue.DEMILESTONED,
+                GitHubEventAction.Issue.PINNED,
+                GitHubEventAction.Issue.UNPINNED,
+                GitHubEventAction.Issue.LOCKED,
+                GitHubEventAction.Issue.UNLOCKED,
+                GitHubEventAction.Issue.TRANSFERRED -> issueProcessor.process(issueDto, context);
+            case GitHubEventAction.Issue.CLOSED -> issueProcessor.processClosed(issueDto, context);
+            case GitHubEventAction.Issue.REOPENED -> issueProcessor.processReopened(issueDto, context);
+            case GitHubEventAction.Issue.DELETED -> issueProcessor.processDeleted(issueDto);
+            case GitHubEventAction.Issue.LABELED -> {
                 if (event.label() != null) {
                     issueProcessor.processLabeled(issueDto, event.label(), context);
                 } else {
                     issueProcessor.process(issueDto, context);
                 }
             }
-            case UNLABELED -> {
+            case GitHubEventAction.Issue.UNLABELED -> {
                 if (event.label() != null) {
                     issueProcessor.processUnlabeled(issueDto, event.label(), context);
                 } else {
                     issueProcessor.process(issueDto, context);
                 }
             }
-            case TYPED -> {
+            case GitHubEventAction.Issue.TYPED -> {
                 String orgLogin = event.repository().fullName().split("/")[0];
                 issueProcessor.processTyped(issueDto, event.issueType(), orgLogin, context);
             }
-            case UNKNOWN -> {
+            case GitHubEventAction.Issue.UNKNOWN -> {
                 // Handle "untyped" action which isn't in the enum
                 if ("untyped".equals(event.action())) {
                     issueProcessor.processUntyped(issueDto, context);

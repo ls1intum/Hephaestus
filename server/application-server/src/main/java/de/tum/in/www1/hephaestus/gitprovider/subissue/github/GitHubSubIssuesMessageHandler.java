@@ -2,8 +2,8 @@ package de.tum.in.www1.hephaestus.gitprovider.subissue.github;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContextFactory;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventAction;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
-import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubWebhookAction;
 import de.tum.in.www1.hephaestus.gitprovider.issue.github.GitHubIssueProcessor;
 import de.tum.in.www1.hephaestus.gitprovider.subissue.github.dto.GitHubSubIssuesEventDTO;
 import org.slf4j.Logger;
@@ -67,22 +67,17 @@ public class GitHubSubIssuesMessageHandler extends GitHubMessageHandler<GitHubSu
         issueProcessor.process(parentIssueDto, context);
         issueProcessor.process(subIssueDto, context);
 
-        // Process sub-issue relationship
+        // Process sub-issue relationship using the SubIssue action enum
         Long subIssueId = subIssueDto.getDatabaseId();
         Long parentIssueId = parentIssueDto.getDatabaseId();
+        GitHubEventAction.SubIssue action = event.actionType();
 
-        switch (event.actionType()) {
-            case SUB_ISSUE_ADDED, PARENT_ISSUE_ADDED -> subIssueSyncService.processSubIssueEvent(
-                subIssueId,
-                parentIssueId,
-                true
-            );
-            case SUB_ISSUE_REMOVED, PARENT_ISSUE_REMOVED -> subIssueSyncService.processSubIssueEvent(
-                subIssueId,
-                parentIssueId,
-                false
-            );
-            default -> logger.debug("Unhandled sub_issues action: {}", event.action());
+        if (action.isAdded()) {
+            subIssueSyncService.processSubIssueEvent(subIssueId, parentIssueId, true);
+        } else if (action.isRemoved()) {
+            subIssueSyncService.processSubIssueEvent(subIssueId, parentIssueId, false);
+        } else {
+            logger.debug("Unhandled sub_issues action: {}", event.action());
         }
     }
 }

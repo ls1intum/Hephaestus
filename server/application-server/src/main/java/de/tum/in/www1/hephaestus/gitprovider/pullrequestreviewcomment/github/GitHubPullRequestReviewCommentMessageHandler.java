@@ -2,8 +2,8 @@ package de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.github;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContextFactory;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventAction;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
-import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubWebhookAction;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.github.GitHubPullRequestProcessor;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.github.dto.GitHubPullRequestReviewCommentEventDTO;
 import org.slf4j.Logger;
@@ -69,9 +69,12 @@ public class GitHubPullRequestReviewCommentMessageHandler
 
         // Delegate to processor based on action
         switch (event.actionType()) {
-            case DELETED -> commentProcessor.processDeleted(commentDto.id());
-            case CREATED -> commentProcessor.processCreated(commentDto, prDto.getDatabaseId());
-            case EDITED -> commentProcessor.processEdited(commentDto);
+            case GitHubEventAction.PullRequestReviewComment.DELETED -> commentProcessor.processDeleted(commentDto.id());
+            case GitHubEventAction.PullRequestReviewComment.CREATED -> commentProcessor.processCreated(
+                commentDto,
+                prDto.getDatabaseId()
+            );
+            case GitHubEventAction.PullRequestReviewComment.EDITED -> commentProcessor.processEdited(commentDto);
             default -> logger.debug("Unhandled comment action: {}", event.action());
         }
     }

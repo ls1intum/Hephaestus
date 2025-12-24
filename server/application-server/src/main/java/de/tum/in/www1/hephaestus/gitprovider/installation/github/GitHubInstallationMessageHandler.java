@@ -1,7 +1,7 @@
 package de.tum.in.www1.hephaestus.gitprovider.installation.github;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventAction;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
-import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubWebhookAction;
 import de.tum.in.www1.hephaestus.gitprovider.installation.github.dto.GitHubInstallationEventDTO;
 import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationService;
 import de.tum.in.www1.hephaestus.workspace.RepositorySelection;
@@ -59,10 +59,10 @@ public class GitHubInstallationMessageHandler extends GitHubMessageHandler<GitHu
             accountLogin != null ? accountLogin : "unknown"
         );
 
-        GitHubWebhookAction action = event.actionType();
+        GitHubEventAction.Installation action = event.actionType();
 
         // Handle deletion early - no workspace provisioning needed
-        if (action == GitHubWebhookAction.DELETED) {
+        if (action == GitHubEventAction.Installation.DELETED) {
             logger.info("App uninstalled from account: {}", accountLogin);
             // Future: Handle workspace cleanup
             return;

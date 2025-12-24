@@ -1,7 +1,7 @@
 package de.tum.in.www1.hephaestus.gitprovider.installation.github;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventAction;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
-import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubWebhookAction;
 import de.tum.in.www1.hephaestus.gitprovider.installation.github.dto.GitHubInstallationTargetEventDTO;
 import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationService;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceService;
@@ -42,7 +42,7 @@ public class GitHubInstallationTargetMessageHandler extends GitHubMessageHandler
 
     @Override
     protected void handleEvent(GitHubInstallationTargetEventDTO event) {
-        if (!event.isAction(GitHubWebhookAction.RENAMED)) {
+        if (event.actionType() != GitHubEventAction.InstallationTarget.RENAMED) {
             return;
         }
 

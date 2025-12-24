@@ -1,7 +1,7 @@
 package de.tum.in.www1.hephaestus.gitprovider.team.github;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventAction;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
-import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubWebhookAction;
 import de.tum.in.www1.hephaestus.gitprovider.team.Team;
 import de.tum.in.www1.hephaestus.gitprovider.team.TeamRepository;
 import de.tum.in.www1.hephaestus.gitprovider.team.github.dto.GitHubMembershipEventDTO;
@@ -83,8 +83,8 @@ public class GitHubMembershipMessageHandler extends GitHubMessageHandler<GitHubM
 
         // Handle the membership action
         switch (event.actionType()) {
-            case ADDED -> handleMemberAdded(team, user);
-            case REMOVED -> handleMemberRemoved(team, user);
+            case GitHubEventAction.Membership.ADDED -> handleMemberAdded(team, user);
+            case GitHubEventAction.Membership.REMOVED -> handleMemberRemoved(team, user);
             default -> logger.debug("Unhandled membership action: {}", event.action());
         }
     }

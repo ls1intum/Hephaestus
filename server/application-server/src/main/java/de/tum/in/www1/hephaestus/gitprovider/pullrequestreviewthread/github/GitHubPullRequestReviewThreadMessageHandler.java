@@ -2,8 +2,8 @@ package de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewthread.github;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContextFactory;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventAction;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
-import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubWebhookAction;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.github.GitHubPullRequestProcessor;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewthread.github.dto.GitHubPullRequestReviewThreadEventDTO;
 import org.slf4j.Logger;
@@ -69,8 +69,8 @@ public class GitHubPullRequestReviewThreadMessageHandler
 
         // Delegate thread state changes to processor
         switch (event.actionType()) {
-            case RESOLVED -> threadProcessor.resolve(threadDto.id());
-            case UNRESOLVED -> threadProcessor.unresolve(threadDto.id());
+            case GitHubEventAction.PullRequestReviewThread.RESOLVED -> threadProcessor.resolve(threadDto.id());
+            case GitHubEventAction.PullRequestReviewThread.UNRESOLVED -> threadProcessor.unresolve(threadDto.id());
             default -> logger.debug("Unhandled thread action: {}", event.action());
         }
     }

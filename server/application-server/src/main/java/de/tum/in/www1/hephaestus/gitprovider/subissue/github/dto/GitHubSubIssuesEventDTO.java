@@ -2,6 +2,7 @@ package de.tum.in.www1.hephaestus.gitprovider.subissue.github.dto;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventAction;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubWebhookEvent;
 import de.tum.in.www1.hephaestus.gitprovider.issue.github.dto.GitHubIssueDTO;
 import de.tum.in.www1.hephaestus.gitprovider.repository.github.dto.GitHubRepositoryRefDTO;
@@ -19,6 +20,10 @@ public record GitHubSubIssuesEventDTO(
     @JsonProperty("sender") GitHubUserDTO sender
 )
     implements GitHubWebhookEvent {
+    public GitHubEventAction.SubIssue actionType() {
+        return GitHubEventAction.SubIssue.fromString(action);
+    }
+
     @Override
     public GitHubRepositoryRefDTO repository() {
         return repository;

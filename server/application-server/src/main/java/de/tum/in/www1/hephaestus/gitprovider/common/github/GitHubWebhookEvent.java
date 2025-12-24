@@ -5,6 +5,7 @@ import org.springframework.lang.Nullable;
 
 /**
  * Common interface for all GitHub webhook event DTOs.
+ * Subinterfaces provide event-specific action types.
  */
 public interface GitHubWebhookEvent {
     /** The webhook action string (e.g., "opened", "closed"). */
@@ -13,14 +14,4 @@ public interface GitHubWebhookEvent {
     /** The repository where this event occurred (null for installation events). */
     @Nullable
     GitHubRepositoryRefDTO repository();
-
-    /** Get the action as a type-safe enum. */
-    default GitHubWebhookAction actionType() {
-        return GitHubWebhookAction.fromString(action());
-    }
-
-    /** Check if action matches the given type. */
-    default boolean isAction(GitHubWebhookAction expectedAction) {
-        return actionType() == expectedAction;
-    }
 }

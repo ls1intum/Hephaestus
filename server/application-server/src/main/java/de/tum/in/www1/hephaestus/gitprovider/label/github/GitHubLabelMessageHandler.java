@@ -2,8 +2,8 @@ package de.tum.in.www1.hephaestus.gitprovider.label.github;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContextFactory;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventAction;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
-import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubWebhookAction;
 import de.tum.in.www1.hephaestus.gitprovider.label.github.dto.GitHubLabelDTO;
 import de.tum.in.www1.hephaestus.gitprovider.label.github.dto.GitHubLabelEventDTO;
 import org.slf4j.Logger;
@@ -55,7 +55,7 @@ public class GitHubLabelMessageHandler extends GitHubMessageHandler<GitHubLabelE
             return;
         }
 
-        if (event.isAction(GitHubWebhookAction.DELETED)) {
+        if (event.actionType() == GitHubEventAction.Label.DELETED) {
             labelProcessor.delete(labelDto.id(), context);
         } else {
             labelProcessor.process(labelDto, context.repository(), context);

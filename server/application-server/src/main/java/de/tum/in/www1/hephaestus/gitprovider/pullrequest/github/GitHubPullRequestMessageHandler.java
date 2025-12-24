@@ -2,8 +2,8 @@ package de.tum.in.www1.hephaestus.gitprovider.pullrequest.github;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContextFactory;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventAction;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
-import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubWebhookAction;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.github.dto.GitHubPullRequestDTO;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.github.dto.GitHubPullRequestEventDTO;
 import org.slf4j.Logger;
@@ -65,31 +65,34 @@ public class GitHubPullRequestMessageHandler extends GitHubMessageHandler<GitHub
         ProcessingContext context
     ) {
         switch (event.actionType()) {
-            case OPENED,
-                EDITED,
-                ASSIGNED,
-                UNASSIGNED,
-                MILESTONED,
-                DEMILESTONED,
-                AUTO_MERGE_ENABLED,
-                AUTO_MERGE_DISABLED,
-                REOPENED,
-                REVIEW_REQUEST_REMOVED,
-                ENQUEUED,
-                DEQUEUED,
-                REVIEW_REQUESTED -> prProcessor.process(prDto, context);
-            case CLOSED -> prProcessor.processClosed(prDto, context);
-            case READY_FOR_REVIEW -> prProcessor.processReadyForReview(prDto, context);
-            case CONVERTED_TO_DRAFT -> prProcessor.processConvertedToDraft(prDto, context);
-            case SYNCHRONIZE -> prProcessor.processSynchronize(prDto, context);
-            case LABELED -> {
+            case GitHubEventAction.PullRequest.OPENED,
+                GitHubEventAction.PullRequest.EDITED,
+                GitHubEventAction.PullRequest.ASSIGNED,
+                GitHubEventAction.PullRequest.UNASSIGNED,
+                GitHubEventAction.PullRequest.MILESTONED,
+                GitHubEventAction.PullRequest.DEMILESTONED,
+                GitHubEventAction.PullRequest.AUTO_MERGE_ENABLED,
+                GitHubEventAction.PullRequest.AUTO_MERGE_DISABLED,
+                GitHubEventAction.PullRequest.REOPENED,
+                GitHubEventAction.PullRequest.REVIEW_REQUEST_REMOVED,
+                GitHubEventAction.PullRequest.ENQUEUED,
+                GitHubEventAction.PullRequest.DEQUEUED,
+                GitHubEventAction.PullRequest.REVIEW_REQUESTED -> prProcessor.process(prDto, context);
+            case GitHubEventAction.PullRequest.CLOSED -> prProcessor.processClosed(prDto, context);
+            case GitHubEventAction.PullRequest.READY_FOR_REVIEW -> prProcessor.processReadyForReview(prDto, context);
+            case GitHubEventAction.PullRequest.CONVERTED_TO_DRAFT -> prProcessor.processConvertedToDraft(
+                prDto,
+                context
+            );
+            case GitHubEventAction.PullRequest.SYNCHRONIZE -> prProcessor.processSynchronize(prDto, context);
+            case GitHubEventAction.PullRequest.LABELED -> {
                 if (event.label() != null) {
                     prProcessor.processLabeled(prDto, event.label(), context);
                 } else {
                     prProcessor.process(prDto, context);
                 }
             }
-            case UNLABELED -> {
+            case GitHubEventAction.PullRequest.UNLABELED -> {
                 if (event.label() != null) {
                     prProcessor.processUnlabeled(prDto, event.label(), context);
                 } else {

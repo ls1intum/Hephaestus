@@ -2,8 +2,8 @@ package de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.github;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContextFactory;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventAction;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
-import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubWebhookAction;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.github.GitHubPullRequestProcessor;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.github.dto.GitHubPullRequestReviewEventDTO;
 import org.slf4j.Logger;
@@ -67,7 +67,7 @@ public class GitHubPullRequestReviewMessageHandler extends GitHubMessageHandler<
         prProcessor.process(prDto, context);
 
         // Delegate to processor based on action
-        if (event.isAction(GitHubWebhookAction.DISMISSED)) {
+        if (event.actionType() == GitHubEventAction.PullRequestReview.DISMISSED) {
             reviewProcessor.processDismissed(reviewDto.id());
         } else {
             reviewProcessor.process(reviewDto, prDto.getDatabaseId());

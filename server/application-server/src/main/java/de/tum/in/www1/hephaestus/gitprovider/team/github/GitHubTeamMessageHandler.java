@@ -1,7 +1,7 @@
 package de.tum.in.www1.hephaestus.gitprovider.team.github;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventAction;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
-import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubWebhookAction;
 import de.tum.in.www1.hephaestus.gitprovider.team.github.dto.GitHubTeamEventDTO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -51,8 +51,8 @@ public class GitHubTeamMessageHandler extends GitHubMessageHandler<GitHubTeamEve
         );
 
         switch (event.actionType()) {
-            case DELETED -> teamProcessor.delete(teamDto.id());
-            case CREATED, EDITED -> teamProcessor.process(
+            case GitHubEventAction.Team.DELETED -> teamProcessor.delete(teamDto.id());
+            case GitHubEventAction.Team.CREATED, GitHubEventAction.Team.EDITED -> teamProcessor.process(
                 teamDto,
                 event.organization() != null ? event.organization().login() : null
             );

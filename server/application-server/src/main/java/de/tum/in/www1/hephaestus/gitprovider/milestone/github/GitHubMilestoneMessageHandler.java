@@ -2,8 +2,8 @@ package de.tum.in.www1.hephaestus.gitprovider.milestone.github;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContextFactory;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventAction;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
-import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubWebhookAction;
 import de.tum.in.www1.hephaestus.gitprovider.milestone.github.dto.GitHubMilestoneDTO;
 import de.tum.in.www1.hephaestus.gitprovider.milestone.github.dto.GitHubMilestoneEventDTO;
 import org.slf4j.Logger;
@@ -58,7 +58,7 @@ public class GitHubMilestoneMessageHandler extends GitHubMessageHandler<GitHubMi
             return;
         }
 
-        if (event.isAction(GitHubWebhookAction.DELETED)) {
+        if (event.actionType() == GitHubEventAction.Milestone.DELETED) {
             milestoneProcessor.delete(milestoneDto.id(), context);
         } else {
             milestoneProcessor.process(milestoneDto, context.repository(), null, context);

@@ -2,6 +2,7 @@ package de.tum.in.www1.hephaestus.gitprovider.installation.github.dto;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventAction;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubWebhookEvent;
 import de.tum.in.www1.hephaestus.gitprovider.repository.github.dto.GitHubRepositoryRefDTO;
 import de.tum.in.www1.hephaestus.gitprovider.user.github.dto.GitHubUserDTO;
@@ -18,6 +19,10 @@ public record GitHubInstallationEventDTO(
     @JsonProperty("sender") GitHubUserDTO sender
 )
     implements GitHubWebhookEvent {
+    public GitHubEventAction.Installation actionType() {
+        return GitHubEventAction.Installation.fromString(action);
+    }
+
     @Override
     public GitHubRepositoryRefDTO repository() {
         return null; // Installation events don't have a single repository

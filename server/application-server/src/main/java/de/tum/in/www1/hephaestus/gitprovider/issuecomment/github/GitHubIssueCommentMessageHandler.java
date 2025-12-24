@@ -2,8 +2,8 @@ package de.tum.in.www1.hephaestus.gitprovider.issuecomment.github;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContextFactory;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventAction;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
-import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubWebhookAction;
 import de.tum.in.www1.hephaestus.gitprovider.issue.github.GitHubIssueProcessor;
 import de.tum.in.www1.hephaestus.gitprovider.issuecomment.github.dto.GitHubIssueCommentEventDTO;
 import org.slf4j.Logger;
@@ -67,7 +67,7 @@ public class GitHubIssueCommentMessageHandler extends GitHubMessageHandler<GitHu
         issueProcessor.process(issueDto, context);
 
         // Handle comment action
-        if (event.isAction(GitHubWebhookAction.DELETED)) {
+        if (event.actionType() == GitHubEventAction.IssueComment.DELETED) {
             commentProcessor.delete(commentDto.id(), context);
         } else {
             commentProcessor.process(commentDto, issueDto.getDatabaseId(), context);

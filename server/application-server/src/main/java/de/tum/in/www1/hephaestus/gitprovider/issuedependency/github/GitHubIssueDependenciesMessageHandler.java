@@ -2,8 +2,8 @@ package de.tum.in.www1.hephaestus.gitprovider.issuedependency.github;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContextFactory;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventAction;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
-import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubWebhookAction;
 import de.tum.in.www1.hephaestus.gitprovider.issue.github.GitHubIssueProcessor;
 import de.tum.in.www1.hephaestus.gitprovider.issuedependency.github.dto.GitHubIssueDependenciesEventDTO;
 import org.slf4j.Logger;
@@ -72,8 +72,12 @@ public class GitHubIssueDependenciesMessageHandler extends GitHubMessageHandler<
         Long blockingIssueId = blockingIssueDto.getDatabaseId();
 
         switch (event.actionType()) {
-            case ADDED -> issueDependencySyncService.processIssueDependencyEvent(blockedIssueId, blockingIssueId, true);
-            case REMOVED -> issueDependencySyncService.processIssueDependencyEvent(
+            case GitHubEventAction.IssueDependency.ADDED -> issueDependencySyncService.processIssueDependencyEvent(
+                blockedIssueId,
+                blockingIssueId,
+                true
+            );
+            case GitHubEventAction.IssueDependency.REMOVED -> issueDependencySyncService.processIssueDependencyEvent(
                 blockedIssueId,
                 blockingIssueId,
                 false
