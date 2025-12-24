@@ -3,6 +3,7 @@ package de.tum.in.www1.hephaestus.gitprovider.repository.github;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContextFactory;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubWebhookAction;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.collaborator.RepositoryCollaborator;
 import de.tum.in.www1.hephaestus.gitprovider.repository.collaborator.RepositoryCollaboratorRepository;
@@ -16,10 +17,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Handles GitHub member webhook events (repository collaborator changes).
- * <p>
- * Uses DTOs directly for complete field coverage.
- * Delegates user creation to {@link GitHubUserProcessor}.
- * Persists collaborator relationships to the database.
  */
 @Component
 public class GitHubMemberMessageHandler extends GitHubMessageHandler<GitHubMemberEventDTO> {
@@ -77,9 +74,9 @@ public class GitHubMemberMessageHandler extends GitHubMessageHandler<GitHubMembe
 
         Repository repository = context.repository();
 
-        switch (event.action()) {
-            case "added" -> handleCollaboratorAdded(repository, user, event);
-            case "removed" -> handleCollaboratorRemoved(repository, user);
+        switch (event.actionType()) {
+            case ADDED -> handleCollaboratorAdded(repository, user, event);
+            case REMOVED -> handleCollaboratorRemoved(repository, user);
             default -> logger.debug("Unhandled member action: {}", event.action());
         }
     }

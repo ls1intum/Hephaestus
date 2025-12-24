@@ -61,6 +61,10 @@ public enum GitHubWebhookAction {
     RESOLVED,
     UNRESOLVED,
 
+    // Review specific
+    DISMISSED,
+    SUBMITTED,
+
     // Sub-issues specific
     SUB_ISSUE_ADDED,
     SUB_ISSUE_REMOVED,
@@ -117,6 +121,8 @@ public enum GitHubWebhookAction {
             case "unsuspend" -> UNSUSPEND;
             case "resolved" -> RESOLVED;
             case "unresolved" -> UNRESOLVED;
+            case "dismissed" -> DISMISSED;
+            case "submitted" -> SUBMITTED;
             case "sub_issue_added" -> SUB_ISSUE_ADDED;
             case "sub_issue_removed" -> SUB_ISSUE_REMOVED;
             case "parent_issue_added" -> PARENT_ISSUE_ADDED;

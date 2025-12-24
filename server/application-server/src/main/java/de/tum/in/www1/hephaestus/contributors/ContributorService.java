@@ -1,5 +1,7 @@
 package de.tum.in.www1.hephaestus.contributors;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -18,7 +20,6 @@ import org.springframework.web.reactive.function.client.WebClient;
 
 /**
  * Service for fetching Hephaestus project contributors from GitHub.
- * Results are cached and periodically refreshed.
  */
 @Service
 public class ContributorService {
@@ -107,12 +108,36 @@ public class ContributorService {
                 return;
             }
 
-            ContributorDTO dto = contributor.toContributorDTO();
+            // Fetch full user details to get the name
+            String fullName = fetchUserFullName(login);
+            ContributorDTO dto = contributor.toContributorDTO(fullName);
             accumulator.putIfAbsent(dto.id(), dto);
         } catch (Exception e) {
             logger.error("Error converting contributor to DTO: {}", e.getMessage());
         }
     }
+
+    private String fetchUserFullName(String login) {
+        if (login == null) {
+            return null;
+        }
+        try {
+            GitHubUserResponse user = webClient
+                .get()
+                .uri("/users/{login}", login)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + githubAuthToken)
+                .retrieve()
+                .bodyToMono(GitHubUserResponse.class)
+                .block();
+            return user != null ? user.name() : null;
+        } catch (Exception e) {
+            logger.debug("Failed to fetch full name for user {}: {}", login, e.getMessage());
+            return null;
+        }
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    private record GitHubUserResponse(@JsonProperty("login") String login, @JsonProperty("name") String name) {}
 
     private List<ContributorDTO> sortContributors(Map<Long, ContributorDTO> uniqueContributors) {
         if (uniqueContributors.isEmpty()) {

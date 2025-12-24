@@ -3,6 +3,7 @@ package de.tum.in.www1.hephaestus.gitprovider.label.github;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContextFactory;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubWebhookAction;
 import de.tum.in.www1.hephaestus.gitprovider.label.github.dto.GitHubLabelDTO;
 import de.tum.in.www1.hephaestus.gitprovider.label.github.dto.GitHubLabelEventDTO;
 import org.slf4j.Logger;
@@ -12,9 +13,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Handles GitHub label webhook events.
- * <p>
- * Uses DTOs directly and delegates to {@link GitHubLabelProcessor}
- * for processing, ensuring a single source of truth for label processing logic.
  */
 @Component
 public class GitHubLabelMessageHandler extends GitHubMessageHandler<GitHubLabelEventDTO> {
@@ -57,7 +55,7 @@ public class GitHubLabelMessageHandler extends GitHubMessageHandler<GitHubLabelE
             return;
         }
 
-        if ("deleted".equals(event.action())) {
+        if (event.isAction(GitHubWebhookAction.DELETED)) {
             labelProcessor.delete(labelDto.id(), context);
         } else {
             labelProcessor.process(labelDto, context.repository(), context);

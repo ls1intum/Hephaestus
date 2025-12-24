@@ -3,6 +3,7 @@ package de.tum.in.www1.hephaestus.gitprovider.issuedependency.github;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContextFactory;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubWebhookAction;
 import de.tum.in.www1.hephaestus.gitprovider.issue.github.GitHubIssueProcessor;
 import de.tum.in.www1.hephaestus.gitprovider.issuedependency.github.dto.GitHubIssueDependenciesEventDTO;
 import org.slf4j.Logger;
@@ -12,10 +13,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Handles GitHub issue_dependencies webhook events.
- * <p>
- * Uses DTOs directly for complete field coverage.
- * <p>
- * Delegates dependency relationship management to {@link GitHubIssueDependencySyncService}.
  */
 @Component
 public class GitHubIssueDependenciesMessageHandler extends GitHubMessageHandler<GitHubIssueDependenciesEventDTO> {
@@ -74,13 +71,9 @@ public class GitHubIssueDependenciesMessageHandler extends GitHubMessageHandler<
         Long blockedIssueId = blockedIssueDto.getDatabaseId();
         Long blockingIssueId = blockingIssueDto.getDatabaseId();
 
-        switch (event.action()) {
-            case "added" -> issueDependencySyncService.processIssueDependencyEvent(
-                blockedIssueId,
-                blockingIssueId,
-                true
-            );
-            case "removed" -> issueDependencySyncService.processIssueDependencyEvent(
+        switch (event.actionType()) {
+            case ADDED -> issueDependencySyncService.processIssueDependencyEvent(blockedIssueId, blockingIssueId, true);
+            case REMOVED -> issueDependencySyncService.processIssueDependencyEvent(
                 blockedIssueId,
                 blockingIssueId,
                 false

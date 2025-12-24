@@ -27,11 +27,15 @@ public record ContributorDTO(
         @JsonProperty("html_url") String htmlUrl,
         @JsonProperty("contributions") int contributions
     ) {
-        public ContributorDTO toContributorDTO() {
+        /**
+         * Converts to ContributorDTO with full name from user API.
+         * Falls back to login if name is not available.
+         */
+        public ContributorDTO toContributorDTO(String fullName) {
             return new ContributorDTO(
                 id,
                 login,
-                login, // Use login as name (full name requires separate API call)
+                fullName != null && !fullName.isBlank() ? fullName : login,
                 avatarUrl,
                 htmlUrl,
                 contributions

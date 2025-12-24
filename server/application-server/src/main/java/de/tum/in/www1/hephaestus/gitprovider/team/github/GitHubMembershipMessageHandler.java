@@ -1,6 +1,7 @@
 package de.tum.in.www1.hephaestus.gitprovider.team.github;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubWebhookAction;
 import de.tum.in.www1.hephaestus.gitprovider.team.Team;
 import de.tum.in.www1.hephaestus.gitprovider.team.TeamRepository;
 import de.tum.in.www1.hephaestus.gitprovider.team.github.dto.GitHubMembershipEventDTO;
@@ -15,10 +16,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Handles GitHub membership webhook events (team member changes).
- * <p>
- * Uses DTOs directly for complete field coverage.
- * Delegates user creation to {@link GitHubUserProcessor}.
- * Persists team memberships when members are added or removed from teams.
  */
 @Component
 public class GitHubMembershipMessageHandler extends GitHubMessageHandler<GitHubMembershipEventDTO> {
@@ -85,9 +82,9 @@ public class GitHubMembershipMessageHandler extends GitHubMessageHandler<GitHubM
         }
 
         // Handle the membership action
-        switch (event.action()) {
-            case "added" -> handleMemberAdded(team, user);
-            case "removed" -> handleMemberRemoved(team, user);
+        switch (event.actionType()) {
+            case ADDED -> handleMemberAdded(team, user);
+            case REMOVED -> handleMemberRemoved(team, user);
             default -> logger.debug("Unhandled membership action: {}", event.action());
         }
     }

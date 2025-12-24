@@ -3,6 +3,7 @@ package de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewthread.github;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContextFactory;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubWebhookAction;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.github.GitHubPullRequestProcessor;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewthread.github.dto.GitHubPullRequestReviewThreadEventDTO;
 import org.slf4j.Logger;
@@ -12,9 +13,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Handles GitHub pull_request_review_thread webhook events.
- * <p>
- * Uses DTOs directly for complete field coverage.
- * Delegates state changes to {@link GitHubPullRequestReviewThreadProcessor}.
  */
 @Component
 public class GitHubPullRequestReviewThreadMessageHandler
@@ -70,9 +68,9 @@ public class GitHubPullRequestReviewThreadMessageHandler
         prProcessor.process(prDto, context);
 
         // Delegate thread state changes to processor
-        switch (event.action()) {
-            case "resolved" -> threadProcessor.resolve(threadDto.id());
-            case "unresolved" -> threadProcessor.unresolve(threadDto.id());
+        switch (event.actionType()) {
+            case RESOLVED -> threadProcessor.resolve(threadDto.id());
+            case UNRESOLVED -> threadProcessor.unresolve(threadDto.id());
             default -> logger.debug("Unhandled thread action: {}", event.action());
         }
     }

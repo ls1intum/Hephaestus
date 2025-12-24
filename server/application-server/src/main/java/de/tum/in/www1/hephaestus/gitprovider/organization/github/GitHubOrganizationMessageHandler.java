@@ -1,6 +1,7 @@
 package de.tum.in.www1.hephaestus.gitprovider.organization.github;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubWebhookAction;
 import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationMembershipRepository;
 import de.tum.in.www1.hephaestus.gitprovider.organization.github.dto.GitHubOrganizationEventDTO;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
@@ -13,9 +14,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Handles GitHub organization webhook events.
- * <p>
- * Uses DTOs directly for complete field coverage.
- * Delegates all business logic to {@link GitHubOrganizationProcessor} and {@link GitHubUserProcessor}.
  */
 @Component
 public class GitHubOrganizationMessageHandler extends GitHubMessageHandler<GitHubOrganizationEventDTO> {
@@ -59,8 +57,8 @@ public class GitHubOrganizationMessageHandler extends GitHubMessageHandler<GitHu
 
         logger.info("Received organization event: action={}, org={}", event.action(), orgDto.login());
 
-        switch (event.action()) {
-            case "member_added" -> {
+        switch (event.actionType()) {
+            case MEMBER_ADDED -> {
                 if (event.membership() != null && event.membership().user() != null) {
                     var userDto = event.membership().user();
                     User user = userProcessor.ensureExists(userDto);
@@ -71,15 +69,15 @@ public class GitHubOrganizationMessageHandler extends GitHubMessageHandler<GitHu
                     logger.info("Member added to org {}: {} with role {}", orgDto.login(), userDto.login(), role);
                 }
             }
-            case "member_removed" -> {
+            case MEMBER_REMOVED -> {
                 if (event.membership() != null && event.membership().user() != null) {
                     var userDto = event.membership().user();
                     membershipRepository.deleteByOrganizationIdAndUserIdIn(orgDto.id(), List.of(userDto.id()));
                     logger.info("Member removed from org {}: {}", orgDto.login(), userDto.login());
                 }
             }
-            case "renamed" -> organizationProcessor.rename(orgDto.id(), orgDto.login());
-            case "deleted" -> organizationProcessor.delete(orgDto.id());
+            case RENAMED -> organizationProcessor.rename(orgDto.id(), orgDto.login());
+            case DELETED -> organizationProcessor.delete(orgDto.id());
             default -> organizationProcessor.process(orgDto);
         }
     }

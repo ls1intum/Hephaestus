@@ -1,6 +1,7 @@
 package de.tum.in.www1.hephaestus.gitprovider.team.github;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubWebhookAction;
 import de.tum.in.www1.hephaestus.gitprovider.team.github.dto.GitHubTeamEventDTO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -9,9 +10,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Handles GitHub team webhook events.
- * <p>
- * Uses DTOs directly for complete field coverage.
- * Delegates all business logic to {@link GitHubTeamProcessor}.
  */
 @Component
 public class GitHubTeamMessageHandler extends GitHubMessageHandler<GitHubTeamEventDTO> {
@@ -52,9 +50,9 @@ public class GitHubTeamMessageHandler extends GitHubMessageHandler<GitHubTeamEve
             event.organization() != null ? event.organization().login() : "unknown"
         );
 
-        switch (event.action()) {
-            case "deleted" -> teamProcessor.delete(teamDto.id());
-            case "created", "edited" -> teamProcessor.process(
+        switch (event.actionType()) {
+            case DELETED -> teamProcessor.delete(teamDto.id());
+            case CREATED, EDITED -> teamProcessor.process(
                 teamDto,
                 event.organization() != null ? event.organization().login() : null
             );

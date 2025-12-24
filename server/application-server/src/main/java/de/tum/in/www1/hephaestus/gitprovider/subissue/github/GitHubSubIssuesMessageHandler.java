@@ -3,6 +3,7 @@ package de.tum.in.www1.hephaestus.gitprovider.subissue.github;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContextFactory;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubWebhookAction;
 import de.tum.in.www1.hephaestus.gitprovider.issue.github.GitHubIssueProcessor;
 import de.tum.in.www1.hephaestus.gitprovider.subissue.github.dto.GitHubSubIssuesEventDTO;
 import org.slf4j.Logger;
@@ -12,10 +13,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Handles GitHub sub_issues webhook events.
- * <p>
- * Uses DTOs directly for complete field coverage.
- * <p>
- * Delegates sub-issue relationship management to {@link GitHubSubIssueSyncService}.
  */
 @Component
 public class GitHubSubIssuesMessageHandler extends GitHubMessageHandler<GitHubSubIssuesEventDTO> {
@@ -74,13 +71,13 @@ public class GitHubSubIssuesMessageHandler extends GitHubMessageHandler<GitHubSu
         Long subIssueId = subIssueDto.getDatabaseId();
         Long parentIssueId = parentIssueDto.getDatabaseId();
 
-        switch (event.action()) {
-            case "sub_issue_added", "parent_issue_added" -> subIssueSyncService.processSubIssueEvent(
+        switch (event.actionType()) {
+            case SUB_ISSUE_ADDED, PARENT_ISSUE_ADDED -> subIssueSyncService.processSubIssueEvent(
                 subIssueId,
                 parentIssueId,
                 true
             );
-            case "sub_issue_removed", "parent_issue_removed" -> subIssueSyncService.processSubIssueEvent(
+            case SUB_ISSUE_REMOVED, PARENT_ISSUE_REMOVED -> subIssueSyncService.processSubIssueEvent(
                 subIssueId,
                 parentIssueId,
                 false

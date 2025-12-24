@@ -3,6 +3,7 @@ package de.tum.in.www1.hephaestus.gitprovider.milestone.github;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContextFactory;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubWebhookAction;
 import de.tum.in.www1.hephaestus.gitprovider.milestone.github.dto.GitHubMilestoneDTO;
 import de.tum.in.www1.hephaestus.gitprovider.milestone.github.dto.GitHubMilestoneEventDTO;
 import org.slf4j.Logger;
@@ -12,9 +13,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Handles GitHub milestone webhook events.
- * <p>
- * Uses DTOs directly and delegates to {@link GitHubMilestoneProcessor}
- * for processing, ensuring a single source of truth for milestone processing logic.
  */
 @Component
 public class GitHubMilestoneMessageHandler extends GitHubMessageHandler<GitHubMilestoneEventDTO> {
@@ -60,7 +58,7 @@ public class GitHubMilestoneMessageHandler extends GitHubMessageHandler<GitHubMi
             return;
         }
 
-        if ("deleted".equals(event.action())) {
+        if (event.isAction(GitHubWebhookAction.DELETED)) {
             milestoneProcessor.delete(milestoneDto.id(), context);
         } else {
             milestoneProcessor.process(milestoneDto, context.repository(), null, context);

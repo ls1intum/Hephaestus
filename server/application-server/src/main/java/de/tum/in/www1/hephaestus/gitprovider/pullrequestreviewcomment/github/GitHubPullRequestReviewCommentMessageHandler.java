@@ -3,6 +3,7 @@ package de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.github;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContextFactory;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubWebhookAction;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.github.GitHubPullRequestProcessor;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.github.dto.GitHubPullRequestReviewCommentEventDTO;
 import org.slf4j.Logger;
@@ -12,9 +13,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Handles GitHub pull_request_review_comment webhook events.
- * <p>
- * Uses DTOs directly and delegates to {@link GitHubPullRequestReviewCommentProcessor}
- * for processing, ensuring a single source of truth for review comment processing logic.
  */
 @Component
 public class GitHubPullRequestReviewCommentMessageHandler
@@ -70,10 +68,10 @@ public class GitHubPullRequestReviewCommentMessageHandler
         prProcessor.process(prDto, context);
 
         // Delegate to processor based on action
-        switch (event.action()) {
-            case "deleted" -> commentProcessor.processDeleted(commentDto.id());
-            case "created" -> commentProcessor.processCreated(commentDto, prDto.getDatabaseId());
-            case "edited" -> commentProcessor.processEdited(commentDto);
+        switch (event.actionType()) {
+            case DELETED -> commentProcessor.processDeleted(commentDto.id());
+            case CREATED -> commentProcessor.processCreated(commentDto, prDto.getDatabaseId());
+            case EDITED -> commentProcessor.processEdited(commentDto);
             default -> logger.debug("Unhandled comment action: {}", event.action());
         }
     }

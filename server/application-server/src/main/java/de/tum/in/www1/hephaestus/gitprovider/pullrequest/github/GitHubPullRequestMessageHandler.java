@@ -3,6 +3,7 @@ package de.tum.in.www1.hephaestus.gitprovider.pullrequest.github;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContextFactory;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubWebhookAction;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.github.dto.GitHubPullRequestDTO;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.github.dto.GitHubPullRequestEventDTO;
 import org.slf4j.Logger;
@@ -11,9 +12,6 @@ import org.springframework.stereotype.Component;
 
 /**
  * Handles all GitHub pull request webhook events.
- * <p>
- * This handler uses DTOs directly for complete field coverage.
- * Processing is delegated to {@link GitHubPullRequestProcessor}.
  */
 @Component
 public class GitHubPullRequestMessageHandler extends GitHubMessageHandler<GitHubPullRequestEventDTO> {
@@ -66,38 +64,38 @@ public class GitHubPullRequestMessageHandler extends GitHubMessageHandler<GitHub
         GitHubPullRequestDTO prDto,
         ProcessingContext context
     ) {
-        switch (event.action()) {
-            case "opened",
-                "edited",
-                "assigned",
-                "unassigned",
-                "milestoned",
-                "demilestoned",
-                "auto_merge_enabled",
-                "auto_merge_disabled",
-                "reopened",
-                "review_request_removed",
-                "enqueued",
-                "dequeued" -> prProcessor.process(prDto, context);
-            case "closed" -> prProcessor.processClosed(prDto, context);
-            case "ready_for_review" -> prProcessor.processReadyForReview(prDto, context);
-            case "converted_to_draft" -> prProcessor.processConvertedToDraft(prDto, context);
-            case "synchronize" -> prProcessor.processSynchronize(prDto, context);
-            case "labeled" -> {
+        switch (event.actionType()) {
+            case OPENED,
+                EDITED,
+                ASSIGNED,
+                UNASSIGNED,
+                MILESTONED,
+                DEMILESTONED,
+                AUTO_MERGE_ENABLED,
+                AUTO_MERGE_DISABLED,
+                REOPENED,
+                REVIEW_REQUEST_REMOVED,
+                ENQUEUED,
+                DEQUEUED,
+                REVIEW_REQUESTED -> prProcessor.process(prDto, context);
+            case CLOSED -> prProcessor.processClosed(prDto, context);
+            case READY_FOR_REVIEW -> prProcessor.processReadyForReview(prDto, context);
+            case CONVERTED_TO_DRAFT -> prProcessor.processConvertedToDraft(prDto, context);
+            case SYNCHRONIZE -> prProcessor.processSynchronize(prDto, context);
+            case LABELED -> {
                 if (event.label() != null) {
                     prProcessor.processLabeled(prDto, event.label(), context);
                 } else {
                     prProcessor.process(prDto, context);
                 }
             }
-            case "unlabeled" -> {
+            case UNLABELED -> {
                 if (event.label() != null) {
                     prProcessor.processUnlabeled(prDto, event.label(), context);
                 } else {
                     prProcessor.process(prDto, context);
                 }
             }
-            case "review_requested" -> prProcessor.process(prDto, context);
             default -> {
                 logger.debug("Unhandled pull_request action: {}", event.action());
                 prProcessor.process(prDto, context);

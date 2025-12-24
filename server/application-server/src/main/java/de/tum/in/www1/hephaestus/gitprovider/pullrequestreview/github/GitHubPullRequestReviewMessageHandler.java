@@ -3,6 +3,7 @@ package de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.github;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContextFactory;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubWebhookAction;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.github.GitHubPullRequestProcessor;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.github.dto.GitHubPullRequestReviewEventDTO;
 import org.slf4j.Logger;
@@ -12,9 +13,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Handles GitHub pull_request_review webhook events.
- * <p>
- * Uses DTOs directly and delegates to {@link GitHubPullRequestReviewProcessor}
- * for processing, ensuring a single source of truth for review processing logic.
  */
 @Component
 public class GitHubPullRequestReviewMessageHandler extends GitHubMessageHandler<GitHubPullRequestReviewEventDTO> {
@@ -69,7 +67,7 @@ public class GitHubPullRequestReviewMessageHandler extends GitHubMessageHandler<
         prProcessor.process(prDto, context);
 
         // Delegate to processor based on action
-        if ("dismissed".equals(event.action())) {
+        if (event.isAction(GitHubWebhookAction.DISMISSED)) {
             reviewProcessor.processDismissed(reviewDto.id());
         } else {
             reviewProcessor.process(reviewDto, prDto.getDatabaseId());

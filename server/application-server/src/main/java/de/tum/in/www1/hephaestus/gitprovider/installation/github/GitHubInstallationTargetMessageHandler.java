@@ -1,6 +1,7 @@
 package de.tum.in.www1.hephaestus.gitprovider.installation.github;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubWebhookAction;
 import de.tum.in.www1.hephaestus.gitprovider.installation.github.dto.GitHubInstallationTargetEventDTO;
 import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationService;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceService;
@@ -11,8 +12,6 @@ import org.springframework.stereotype.Component;
 
 /**
  * Handles GitHub installation_target webhook events.
- * <p>
- * Processes account rename events to keep workspace and organization metadata in sync.
  */
 @Component
 public class GitHubInstallationTargetMessageHandler extends GitHubMessageHandler<GitHubInstallationTargetEventDTO> {
@@ -43,7 +42,7 @@ public class GitHubInstallationTargetMessageHandler extends GitHubMessageHandler
 
     @Override
     protected void handleEvent(GitHubInstallationTargetEventDTO event) {
-        if (!"renamed".equalsIgnoreCase(event.action())) {
+        if (!event.isAction(GitHubWebhookAction.RENAMED)) {
             return;
         }
 
