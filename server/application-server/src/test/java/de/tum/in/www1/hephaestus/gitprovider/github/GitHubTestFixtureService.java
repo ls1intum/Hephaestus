@@ -520,6 +520,9 @@ public class GitHubTestFixtureService {
      * Creates a branch (ref) via GraphQL mutation.
      */
     public void createBranch(String repositoryNodeId, String branchName, String commitSha) {
+        if (commitSha == null) {
+            throw new IllegalArgumentException("Cannot create branch: commitSha is null. Repository may be empty.");
+        }
         String mutation =
             """
             mutation CreateRef($input: CreateRefInput!) {
