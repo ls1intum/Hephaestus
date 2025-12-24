@@ -104,8 +104,8 @@ public class GitHubPullRequestReviewProcessor {
         review.setPullRequest(pr);
         review.setCommitId(dto.commitId());
 
-        if (dto.author() != null && dto.author().id() != null) {
-            userRepository.findById(dto.author().id()).ifPresent(review::setAuthor);
+        if (dto.author() != null && dto.author().getDatabaseId() != null) {
+            userRepository.findById(dto.author().getDatabaseId()).ifPresent(review::setAuthor);
         }
 
         PullRequestReview saved = reviewRepository.save(review);

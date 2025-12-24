@@ -168,8 +168,8 @@ public class GitHubPullRequestReviewCommentProcessor {
         }
 
         // Link author if present
-        if (dto.author() != null && dto.author().id() != null) {
-            userRepository.findById(dto.author().id()).ifPresent(comment::setAuthor);
+        if (dto.author() != null && dto.author().getDatabaseId() != null) {
+            userRepository.findById(dto.author().getDatabaseId()).ifPresent(comment::setAuthor);
         }
 
         // Link to parent comment if this is a reply

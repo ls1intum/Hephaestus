@@ -3,6 +3,7 @@ package de.tum.in.www1.hephaestus.gitprovider.installation.github;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler.GitHubMessageDomain;
 import de.tum.in.www1.hephaestus.gitprovider.installation.github.dto.GitHubInstallationEventDTO;
 import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationRepository;
 import de.tum.in.www1.hephaestus.testconfig.BaseIntegrationTest;
@@ -132,9 +133,7 @@ class GitHubInstallationMessageHandlerIntegrationTest extends BaseIntegrationTes
     @Test
     @DisplayName("Should return INSTALLATION domain")
     void shouldReturnInstallationDomain() {
-        assertThat(handler.getDomain()).isEqualTo(
-            de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler.GitHubMessageDomain.INSTALLATION
-        );
+        assertThat(handler.getDomain()).isEqualTo(GitHubMessageDomain.INSTALLATION);
     }
 
     private GitHubInstallationEventDTO loadPayload(String filename) throws IOException {

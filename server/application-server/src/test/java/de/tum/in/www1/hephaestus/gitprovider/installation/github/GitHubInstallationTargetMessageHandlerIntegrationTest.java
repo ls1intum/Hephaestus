@@ -3,6 +3,7 @@ package de.tum.in.www1.hephaestus.gitprovider.installation.github;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler.GitHubMessageDomain;
 import de.tum.in.www1.hephaestus.gitprovider.installation.github.dto.GitHubInstallationTargetEventDTO;
 import de.tum.in.www1.hephaestus.gitprovider.organization.Organization;
 import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationRepository;
@@ -116,6 +117,7 @@ class GitHubInstallationTargetMessageHandlerIntegrationTest extends BaseIntegrat
             null, // installation
             null, // account
             "Organization",
+            null, // changes
             null // sender
         );
 
@@ -134,6 +136,7 @@ class GitHubInstallationTargetMessageHandlerIntegrationTest extends BaseIntegrat
             baseEvent.installation(),
             baseEvent.account(),
             baseEvent.targetType(),
+            baseEvent.changes(),
             baseEvent.sender()
         );
         setupTestWorkspace(baseEvent.installation().id(), "OldName");
@@ -146,9 +149,7 @@ class GitHubInstallationTargetMessageHandlerIntegrationTest extends BaseIntegrat
     @Test
     @DisplayName("Should return INSTALLATION domain")
     void shouldReturnInstallationDomain() {
-        assertThat(handler.getDomain()).isEqualTo(
-            de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler.GitHubMessageDomain.INSTALLATION
-        );
+        assertThat(handler.getDomain()).isEqualTo(GitHubMessageDomain.INSTALLATION);
     }
 
     private GitHubInstallationTargetEventDTO loadPayload(String filename) throws IOException {

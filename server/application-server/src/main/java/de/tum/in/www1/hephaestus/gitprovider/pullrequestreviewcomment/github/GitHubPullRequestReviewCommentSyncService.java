@@ -349,12 +349,8 @@ public class GitHubPullRequestReviewCommentSyncService {
             }
         }
 
-        // Map side from DiffSide enum
-        String side = mapDiffSideToString(graphQlComment.getSubjectType() != null ? null : null);
         // GraphQL comment doesn't have direct side field, use thread's side
-        if (thread != null && thread.getSide() != null) {
-            side = thread.getSide().name();
-        }
+        String side = (thread != null && thread.getSide() != null) ? thread.getSide().name() : null;
 
         return new GitHubReviewCommentDTO(
             databaseId, // id

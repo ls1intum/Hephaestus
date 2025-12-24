@@ -116,9 +116,9 @@ public class GitHubIssueCommentProcessor {
         comment.setIssue(issue);
 
         // Link author if present and not already set
-        if (dto.author() != null && dto.author().id() != null && comment.getAuthor() == null) {
+        if (dto.author() != null && dto.author().getDatabaseId() != null && comment.getAuthor() == null) {
             userRepository
-                .findById(dto.author().id())
+                .findById(dto.author().getDatabaseId())
                 .ifPresent(user -> {
                     comment.setAuthor(user);
                     changedFields.add("author");

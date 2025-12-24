@@ -2,22 +2,33 @@ package de.tum.in.www1.hephaestus.gitprovider.installation.github;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
 import de.tum.in.www1.hephaestus.gitprovider.installation.github.dto.GitHubInstallationTargetEventDTO;
+import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationService;
+import de.tum.in.www1.hephaestus.workspace.WorkspaceService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
 
 /**
  * Handles GitHub installation_target webhook events.
  * <p>
- * Uses DTOs directly for complete field coverage.
+ * Processes account rename events to keep workspace and organization metadata in sync.
  */
 @Component
 public class GitHubInstallationTargetMessageHandler extends GitHubMessageHandler<GitHubInstallationTargetEventDTO> {
 
     private static final Logger logger = LoggerFactory.getLogger(GitHubInstallationTargetMessageHandler.class);
 
-    GitHubInstallationTargetMessageHandler() {
+    private final WorkspaceService workspaceService;
+    private final OrganizationService organizationService;
+
+    GitHubInstallationTargetMessageHandler(
+        @Lazy WorkspaceService workspaceService,
+        OrganizationService organizationService
+    ) {
         super(GitHubInstallationTargetEventDTO.class);
+        this.workspaceService = workspaceService;
+        this.organizationService = organizationService;
     }
 
     @Override
@@ -32,24 +43,53 @@ public class GitHubInstallationTargetMessageHandler extends GitHubMessageHandler
 
     @Override
     protected void handleEvent(GitHubInstallationTargetEventDTO event) {
-        var account = event.account();
-
-        if (account == null) {
-            logger.warn("Received installation_target event with missing data");
+        if (!"renamed".equalsIgnoreCase(event.action())) {
             return;
         }
 
-        logger.info(
-            "Received installation_target event: action={}, account={}, targetType={}",
-            event.action(),
-            account.login(),
-            event.targetType()
-        );
+        var installation = event.installation();
+        var account = event.account();
 
-        // Future: Account name updates will be implemented here
-        switch (event.action()) {
-            case "renamed" -> logger.info("Account renamed: {}", account.login());
-            default -> logger.debug("Unhandled installation_target action: {}", event.action());
+        if (installation == null || account == null) {
+            logger.warn("installation_target payload missing installation/account block");
+            return;
         }
+
+        long installationId = installation.id();
+        String newLogin = account.login();
+
+        if (newLogin == null || newLogin.isBlank()) {
+            logger.warn("installation_target event {} ignored because login is empty", installationId);
+            return;
+        }
+
+        String previousLogin = null;
+        if (event.changes() != null && event.changes().login() != null) {
+            previousLogin = event.changes().login().from();
+        }
+
+        workspaceService.handleInstallationTargetRename(installationId, previousLogin, newLogin);
+        upsertOrganization(event, installationId, newLogin);
+
+        logger.info(
+            "Handled installation_target rename for installation {}: {} -> {}",
+            installationId,
+            previousLogin,
+            newLogin
+        );
+    }
+
+    private void upsertOrganization(GitHubInstallationTargetEventDTO event, long installationId, String login) {
+        if (!"Organization".equalsIgnoreCase(event.targetType())) {
+            return;
+        }
+
+        var account = event.account();
+        if (account == null || account.id() == null) {
+            logger.warn("installation_target event {} missing account details for organization upsert", installationId);
+            return;
+        }
+
+        organizationService.upsertIdentityAndAttachInstallation(account.id(), login, installationId);
     }
 }

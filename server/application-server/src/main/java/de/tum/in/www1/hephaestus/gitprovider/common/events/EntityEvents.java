@@ -4,6 +4,7 @@ import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.issuetype.IssueType;
 import de.tum.in.www1.hephaestus.gitprovider.label.Label;
+import de.tum.in.www1.hephaestus.gitprovider.milestone.Milestone;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import java.util.Set;
 
@@ -146,12 +147,7 @@ public final class EntityEvents {
     /**
      * Published when a milestone is processed (created or updated).
      */
-    public record MilestoneProcessed(
-        de.tum.in.www1.hephaestus.gitprovider.milestone.Milestone milestone,
-        boolean isNew,
-        Long workspaceId,
-        Long repositoryId
-    ) {}
+    public record MilestoneProcessed(Milestone milestone, boolean isNew, Long workspaceId, Long repositoryId) {}
 
     /**
      * Published when a milestone is deleted.
