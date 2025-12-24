@@ -3,6 +3,7 @@ package de.tum.in.www1.hephaestus.gitprovider.issue.github;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContextFactory;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubWebhookAction;
 import de.tum.in.www1.hephaestus.gitprovider.issue.github.dto.GitHubIssueDTO;
 import de.tum.in.www1.hephaestus.gitprovider.issue.github.dto.GitHubIssueEventDTO;
 import org.slf4j.Logger;
@@ -66,40 +67,48 @@ public class GitHubIssueMessageHandler extends GitHubMessageHandler<GitHubIssueE
     }
 
     private void routeToProcessor(GitHubIssueEventDTO event, GitHubIssueDTO issueDto, ProcessingContext context) {
-        switch (event.action()) {
-            case "opened",
-                "edited",
-                "assigned",
-                "unassigned",
-                "milestoned",
-                "demilestoned",
-                "pinned",
-                "unpinned",
-                "locked",
-                "unlocked",
-                "transferred" -> issueProcessor.process(issueDto, context);
-            case "closed" -> issueProcessor.processClosed(issueDto, context);
-            case "reopened" -> issueProcessor.processReopened(issueDto, context);
-            case "deleted" -> issueProcessor.processDeleted(issueDto);
-            case "labeled" -> {
+        switch (event.actionType()) {
+            case OPENED,
+                EDITED,
+                ASSIGNED,
+                UNASSIGNED,
+                MILESTONED,
+                DEMILESTONED,
+                PINNED,
+                UNPINNED,
+                LOCKED,
+                UNLOCKED,
+                TRANSFERRED -> issueProcessor.process(issueDto, context);
+            case CLOSED -> issueProcessor.processClosed(issueDto, context);
+            case REOPENED -> issueProcessor.processReopened(issueDto, context);
+            case DELETED -> issueProcessor.processDeleted(issueDto);
+            case LABELED -> {
                 if (event.label() != null) {
                     issueProcessor.processLabeled(issueDto, event.label(), context);
                 } else {
                     issueProcessor.process(issueDto, context);
                 }
             }
-            case "unlabeled" -> {
+            case UNLABELED -> {
                 if (event.label() != null) {
                     issueProcessor.processUnlabeled(issueDto, event.label(), context);
                 } else {
                     issueProcessor.process(issueDto, context);
                 }
             }
-            case "typed" -> {
+            case TYPED -> {
                 String orgLogin = event.repository().fullName().split("/")[0];
                 issueProcessor.processTyped(issueDto, event.issueType(), orgLogin, context);
             }
-            case "untyped" -> issueProcessor.processUntyped(issueDto, context);
+            case UNKNOWN -> {
+                // Handle "untyped" action which isn't in the enum
+                if ("untyped".equals(event.action())) {
+                    issueProcessor.processUntyped(issueDto, context);
+                } else {
+                    logger.debug("Unhandled issue action: {}", event.action());
+                    issueProcessor.process(issueDto, context);
+                }
+            }
             default -> {
                 logger.debug("Unhandled issue action: {}", event.action());
                 issueProcessor.process(issueDto, context);
