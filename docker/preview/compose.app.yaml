@@ -312,6 +312,8 @@ services:
       APPLICATION_VERSION: preview
       # Coolify provides SERVICE_FQDN_WEBAPP automatically
       APPLICATION_CLIENT_URL: https://${SERVICE_FQDN_WEBAPP}
+      GIT_BRANCH: ${COOLIFY_BRANCH:-}
+      GIT_COMMIT: ${SOURCE_COMMIT:-}
       # Coolify provides SERVICE_FQDN_APPLICATION_SERVER (e.g., {{pr_id}}.api.example.com)
       APPLICATION_SERVER_URL: https://${SERVICE_FQDN_APPLICATION_SERVER}
       # Shared Keycloak
