@@ -1,15 +1,28 @@
-<!DOCTYPE html>
-<html lang="en" data-color-mode="auto" data-light-theme="light" data-dark-theme="dark" class="scroll-smooth bg-sidebar">
+<!doctype html>
+<html
+  lang="en"
+  data-color-mode="auto"
+  data-light-theme="light"
+  data-dark-theme="dark"
+  class="scroll-smooth bg-sidebar"
+>
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" href="/favicon.ico" />
     <meta name="theme-color" content="#000000" />
     <link rel="apple-touch-icon" href="/logo192.png" />
+    <!-- Runtime environment config - MUST load before app bundle to set window.__ENV__ -->
+    <!-- Path is rewritten to content-hashed version at container startup -->
+    <!-- e.g., /env-config.js becomes /env-config.a1b2c3d4.js for optimal caching -->
+    <script src="/env-config.js"></script>
     <script>
-      const link = document.createElement('link');
-      link.rel = 'manifest';
-      link.href = window.location.hostname === 'localhost' ? '/manifest-dev.json' : '/manifest.json';
+      const link = document.createElement("link");
+      link.rel = "manifest";
+      link.href =
+        window.location.hostname === "localhost"
+          ? "/manifest-dev.json"
+          : "/manifest.json";
       document.head.appendChild(link);
     </script>
     <title>Hephaestus</title>
