@@ -9,91 +9,91 @@
 // The entrypoint.sh automatically extracts vars from this file.
 
 declare global {
-  interface Window {
-    __ENV__?: RuntimeEnvVars;
-  }
+	interface Window {
+		__ENV__?: RuntimeEnvVars;
+	}
 }
 
 interface RuntimeEnvVars {
-  APPLICATION_VERSION?: string;
-  APPLICATION_CLIENT_URL?: string;
-  APPLICATION_SERVER_URL?: string;
-  SENTRY_ENVIRONMENT?: string;
-  SENTRY_DSN?: string;
-  KEYCLOAK_URL?: string;
-  KEYCLOAK_REALM?: string;
-  KEYCLOAK_CLIENT_ID?: string;
-  POSTHOG_ENABLED?: string;
-  POSTHOG_PROJECT_API_KEY?: string;
-  POSTHOG_API_HOST?: string;
-  LEGAL_IMPRINT_HTML?: string;
-  LEGAL_PRIVACY_HTML?: string;
-  TANSTACK_DEVTOOLS_ENABLED?: string;
-  GIT_BRANCH?: string;
-  GIT_COMMIT?: string;
-  DEPLOYED_AT?: string;
+	APPLICATION_VERSION?: string;
+	APPLICATION_CLIENT_URL?: string;
+	APPLICATION_SERVER_URL?: string;
+	SENTRY_ENVIRONMENT?: string;
+	SENTRY_DSN?: string;
+	KEYCLOAK_URL?: string;
+	KEYCLOAK_REALM?: string;
+	KEYCLOAK_CLIENT_ID?: string;
+	POSTHOG_ENABLED?: string;
+	POSTHOG_PROJECT_API_KEY?: string;
+	POSTHOG_API_HOST?: string;
+	LEGAL_IMPRINT_HTML?: string;
+	LEGAL_PRIVACY_HTML?: string;
+	TANSTACK_DEVTOOLS_ENABLED?: string;
+	GIT_BRANCH?: string;
+	GIT_COMMIT?: string;
+	DEPLOYED_AT?: string;
 }
 
 // Dev defaults (used when window.__ENV__ is not set)
 const defaults: RuntimeEnvVars = {
-  APPLICATION_VERSION: "DEV",
-  APPLICATION_CLIENT_URL: "http://localhost:4200",
-  APPLICATION_SERVER_URL: "http://localhost:8080",
-  SENTRY_ENVIRONMENT: "local",
-  SENTRY_DSN: "https://289f1f62feeb4f70a8878dc0101825cd@sentry.ase.in.tum.de/3",
-  KEYCLOAK_URL: "http://localhost:8081",
-  KEYCLOAK_REALM: "hephaestus",
-  KEYCLOAK_CLIENT_ID: "hephaestus",
-  POSTHOG_ENABLED: "false",
-  POSTHOG_PROJECT_API_KEY: "",
-  POSTHOG_API_HOST: "",
-  LEGAL_IMPRINT_HTML: "<p>This is the imprint.</p>",
-  LEGAL_PRIVACY_HTML: "<p>This is the privacy policy.</p>",
-  TANSTACK_DEVTOOLS_ENABLED: "true",
-  GIT_BRANCH: "",
-  GIT_COMMIT: "",
-  DEPLOYED_AT: "",
+	APPLICATION_VERSION: "DEV",
+	APPLICATION_CLIENT_URL: "http://localhost:4200",
+	APPLICATION_SERVER_URL: "http://localhost:8080",
+	SENTRY_ENVIRONMENT: "local",
+	SENTRY_DSN: "https://289f1f62feeb4f70a8878dc0101825cd@sentry.ase.in.tum.de/3",
+	KEYCLOAK_URL: "http://localhost:8081",
+	KEYCLOAK_REALM: "hephaestus",
+	KEYCLOAK_CLIENT_ID: "hephaestus",
+	POSTHOG_ENABLED: "false",
+	POSTHOG_PROJECT_API_KEY: "",
+	POSTHOG_API_HOST: "",
+	LEGAL_IMPRINT_HTML: "<p>This is the imprint.</p>",
+	LEGAL_PRIVACY_HTML: "<p>This is the privacy policy.</p>",
+	TANSTACK_DEVTOOLS_ENABLED: "true",
+	GIT_BRANCH: "",
+	GIT_COMMIT: "",
+	DEPLOYED_AT: "",
 };
 
 const env = (key: keyof RuntimeEnvVars): string =>
-  window.__ENV__?.[key] ?? defaults[key] ?? "";
+	window.__ENV__?.[key] ?? defaults[key] ?? "";
 
 const environment = {
-  version: env("APPLICATION_VERSION").replace(/^v/, "") || "DEV",
-  clientUrl: env("APPLICATION_CLIENT_URL"),
-  serverUrl: env("APPLICATION_SERVER_URL"),
+	version: env("APPLICATION_VERSION").replace(/^v/, "") || "DEV",
+	clientUrl: env("APPLICATION_CLIENT_URL"),
+	serverUrl: env("APPLICATION_SERVER_URL"),
 
-  buildInfo: {
-    branch: env("GIT_BRANCH"),
-    commit: env("GIT_COMMIT"),
-    deployedAt: env("DEPLOYED_AT"),
-  },
+	buildInfo: {
+		branch: env("GIT_BRANCH"),
+		commit: env("GIT_COMMIT"),
+		deployedAt: env("DEPLOYED_AT"),
+	},
 
-  sentry: {
-    environment: env("SENTRY_ENVIRONMENT"),
-    dsn: env("SENTRY_DSN"),
-  },
+	sentry: {
+		environment: env("SENTRY_ENVIRONMENT"),
+		dsn: env("SENTRY_DSN"),
+	},
 
-  keycloak: {
-    url: env("KEYCLOAK_URL"),
-    realm: env("KEYCLOAK_REALM"),
-    clientId: env("KEYCLOAK_CLIENT_ID"),
-  },
+	keycloak: {
+		url: env("KEYCLOAK_URL"),
+		realm: env("KEYCLOAK_REALM"),
+		clientId: env("KEYCLOAK_CLIENT_ID"),
+	},
 
-  posthog: {
-    enabled: env("POSTHOG_ENABLED") === "true",
-    projectApiKey: env("POSTHOG_PROJECT_API_KEY"),
-    apiHost: env("POSTHOG_API_HOST"),
-  },
+	posthog: {
+		enabled: env("POSTHOG_ENABLED") === "true",
+		projectApiKey: env("POSTHOG_PROJECT_API_KEY"),
+		apiHost: env("POSTHOG_API_HOST"),
+	},
 
-  legal: {
-    imprintHtml: env("LEGAL_IMPRINT_HTML"),
-    privacyHtml: env("LEGAL_PRIVACY_HTML"),
-  },
+	legal: {
+		imprintHtml: env("LEGAL_IMPRINT_HTML"),
+		privacyHtml: env("LEGAL_PRIVACY_HTML"),
+	},
 
-  devtools: {
-    tanstack: env("TANSTACK_DEVTOOLS_ENABLED") === "true",
-  },
+	devtools: {
+		tanstack: env("TANSTACK_DEVTOOLS_ENABLED") === "true",
+	},
 };
 
 export default environment;
