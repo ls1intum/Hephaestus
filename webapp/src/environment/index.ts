@@ -55,8 +55,7 @@ const defaults: RuntimeEnvVars = {
 	DEPLOYED_AT: "",
 };
 
-const env = (key: keyof RuntimeEnvVars): string =>
-	window.__ENV__?.[key] ?? defaults[key] ?? "";
+const env = (key: keyof RuntimeEnvVars): string => window.__ENV__?.[key] ?? defaults[key] ?? "";
 
 const environment = {
 	version: env("APPLICATION_VERSION").replace(/^v/, "") || "DEV",
