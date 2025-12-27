@@ -12,7 +12,7 @@
     </parent>
     <groupId>de.tum.in.www1</groupId>
     <artifactId>hephaestus</artifactId>
-    <version>0.12.1</version>
+    <version>0.12.2</version>
     <name>Hephaestus</name>
     <description>AI-driven learning for better software development</description>
     <url/>
