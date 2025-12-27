@@ -46,6 +46,16 @@ main() {
     log "Restored specific GIT_BRANCH from build artifact: $GIT_BRANCH"
   fi
 
+  # Heuristic to detect PR deployment and fix GIT_BRANCH if it defaulted to "main"
+  # Coolify PR deployments often report branch as "main" (target) instead of source.
+  if [[ "${GIT_BRANCH:-}" == "main" && -n "${SERVICE_FQDN_WEBAPP:-}" ]]; then
+    # Match pattern like pr622. or pr-622. (Coolify default usually pr<id>.)
+    if [[ "$SERVICE_FQDN_WEBAPP" =~ ^pr-?([0-9]+) ]]; then
+       export GIT_BRANCH="PR-${BASH_REMATCH[1]}"
+       log "Detected PR deployment from FQDN. Overriding GIT_BRANCH to: $GIT_BRANCH"
+    fi
+  fi
+
   log "Generating runtime config..."
 
   # Extract all env var names from TypeScript (single source of truth)
