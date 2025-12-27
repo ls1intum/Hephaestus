@@ -12,6 +12,10 @@
     <link rel="icon" href="/favicon.ico" />
     <meta name="theme-color" content="#000000" />
     <link rel="apple-touch-icon" href="/logo192.png" />
+    <!-- Runtime environment config - MUST load before app bundle to set window.__ENV__ -->
+    <!-- Path is rewritten to content-hashed version at container startup -->
+    <!-- e.g., /env-config.js becomes /env-config.a1b2c3d4.js for optimal caching -->
+    <script src="/env-config.js"></script>
     <script>
       const link = document.createElement("link");
       link.rel = "manifest";
@@ -25,9 +29,6 @@
   </head>
   <body class="bg-sidebar">
     <div id="app"></div>
-    <!-- Runtime environment config - path is rewritten to content-hashed version at container startup -->
-    <!-- e.g., /env-config.js becomes /env-config.a1b2c3d4.js for optimal caching -->
-    <script src="/env-config.js"></script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
