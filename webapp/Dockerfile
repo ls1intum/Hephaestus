@@ -1,43 +1,25 @@
-# Stage 1: Build the React application
+# Stage 1: Build
 FROM node:22-alpine AS build
-
 WORKDIR /app
-
-# Copy and install dependencies early to leverage Docker layer caching
-COPY package.json package-lock.json* /app/
-
+COPY package.json package-lock.json* ./
 RUN npm ci
+COPY . .
+RUN npm run build
 
-# Copy the rest of the application code
-COPY ./ /app/
-
-# Build the React application using the production build script
-# This runs copy-env-prod.js first to use the production environment config
-RUN npm run build:prod
-
-# Stage 2: Serve the app with Nginx
+# Stage 2: Serve
 FROM nginx:stable-alpine
-
-# Install necessary packages and explicitly update libxml2 for security fixes
-RUN apk update && \
-    apk upgrade && \
-    apk add --no-cache bash grep sed perl libxml2>=2.13.4-r6 && \
+RUN apk update && apk upgrade && \
+    apk add --no-cache bash sed && \
     rm -rf /var/cache/apk/*
 
-# Copy built React app from the build stage 
 COPY --from=build /app/dist /usr/share/nginx/html
+COPY docker/entrypoint.sh /entrypoint.sh
+COPY docker/nginx.conf /etc/nginx/conf.d/default.conf
 
-# Copy the substitution script into the image
-COPY substitute_env_variables.sh /usr/local/bin/
+# Copy TypeScript source for entrypoint.sh to extract env var names (single source of truth)
+COPY src/environment/index.ts /app/src/environment/index.ts
 
-# Make the substitution script executable
-RUN chmod +x /usr/local/bin/substitute_env_variables.sh
+RUN chmod +x /entrypoint.sh
 
-# Copy custom Nginx configuration
-COPY nginx.conf /etc/nginx/conf.d/default.conf
-
-# Expose port 80
 EXPOSE 80
-
-# Set the substitution script to run before starting Nginx
-ENTRYPOINT ["/bin/bash", "-c", "/usr/local/bin/substitute_env_variables.sh && exec nginx -g 'daemon off;'"]
+ENTRYPOINT ["/bin/bash", "-c", "/entrypoint.sh && exec nginx -g 'daemon off;'"]
