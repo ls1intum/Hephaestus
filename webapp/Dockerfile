@@ -13,6 +13,15 @@ RUN npm install --ignore-scripts
 # Copy the webapp application code
 COPY webapp/ /app/
 
+# Copy .git directory to extract version information
+# This invalidates cache on every commit, ensuring accurate version info
+COPY .git /tmp/.git
+RUN apk add --no-cache git && \
+    mkdir -p /app/dist && \
+    git --git-dir /tmp/.git rev-parse HEAD > /app/dist/git_commit && \
+    git --git-dir /tmp/.git rev-parse --abbrev-ref HEAD > /app/dist/git_branch && \
+    rm -rf /tmp/.git
+
 # Copy intelligence-service shared types (required for @intelligence-service/* imports)
 COPY server/intelligence-service/src/mentor/ /server/intelligence-service/src/mentor/
 COPY server/intelligence-service/src/shared/ /server/intelligence-service/src/shared/
@@ -27,12 +36,6 @@ RUN npm run build
 
 # Stage 2: Serve
 FROM nginx:stable-alpine
-
-# Bake git metadata into the image using build arguments provided by Coolify
-ARG COOLIFY_BRANCH
-ARG SOURCE_COMMIT
-ENV GIT_BRANCH=$COOLIFY_BRANCH
-ENV GIT_COMMIT=$SOURCE_COMMIT
 
 RUN apk update && apk upgrade && \
     apk add --no-cache bash sed grep && \

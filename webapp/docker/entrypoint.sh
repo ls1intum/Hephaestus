@@ -42,6 +42,18 @@ main() {
   fi
   log "Found ${#all_vars[@]} vars: ${all_vars[*]}"
 
+  # Backfill git metadata from files embedded during build (if available)
+  if [[ -f "${HTML_DIR}/git_commit" ]]; then
+    export GIT_COMMIT=$(cat "${HTML_DIR}/git_commit")
+    log "Loaded GIT_COMMIT from build artifact: ${GIT_COMMIT}"
+    rm "${HTML_DIR}/git_commit"
+  fi
+  if [[ -f "${HTML_DIR}/git_branch" ]]; then
+    export GIT_BRANCH=$(cat "${HTML_DIR}/git_branch")
+    log "Loaded GIT_BRANCH from build artifact: ${GIT_BRANCH}"
+    rm "${HTML_DIR}/git_branch"
+  fi
+
   # Auto-generate deployment timestamp for preview environments
   if [[ -n "${GIT_BRANCH:-}" && -z "${DEPLOYED_AT:-}" ]]; then
     export DEPLOYED_AT=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
