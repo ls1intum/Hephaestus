@@ -37,6 +37,10 @@ public class ScoringService {
             .collect(Collectors.toUnmodifiableSet());
     }
 
+    public double calculateReviewScore(PullRequestReview pullRequestReview) {
+        return calculateReviewScore(List.of(pullRequestReview));
+    }
+
     public double calculateReviewScore(List<PullRequestReview> pullRequestReviews) {
         return calculateReviewScore(pullRequestReviews, 0);
     }
@@ -52,7 +56,7 @@ public class ScoringService {
         }
 
         // All reviews are for the same pull request
-        int complexityScore = calculateComplexityScore(pullRequestReviews.get(0).getPullRequest());
+        int complexityScore = calculateComplexityScore(pullRequestReviews.getFirst().getPullRequest());
 
         double approvalScore = eligibleReviews
             .stream()
