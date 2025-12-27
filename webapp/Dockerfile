@@ -31,8 +31,9 @@ FROM nginx:stable-alpine
 # Bake git metadata into the image using build arguments provided by Coolify
 ARG COOLIFY_BRANCH
 ARG SOURCE_COMMIT
-ENV GIT_BRANCH=$COOLIFY_BRANCH
-ENV GIT_COMMIT=$SOURCE_COMMIT
+# Use distinct names to avoid runtime overrides by Coolify
+ENV BUILD_GIT_BRANCH=$COOLIFY_BRANCH
+ENV BUILD_GIT_COMMIT=$SOURCE_COMMIT
 
 RUN apk update && apk upgrade && \
     apk add --no-cache bash sed grep && \

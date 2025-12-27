@@ -30,6 +30,22 @@ extract_env_vars() {
 }
 
 main() {
+  # Recover git metadata from build-time variables if runtime vars are empty/missing
+  # Coolify tends to inject empty GIT_COMMIT/SOURCE_COMMIT at runtime, overriding baked ENV vars.
+  if [[ -z "${GIT_COMMIT:-}" && -n "${BUILD_GIT_COMMIT:-}" ]]; then
+    export GIT_COMMIT="$BUILD_GIT_COMMIT"
+    log "Restored GIT_COMMIT from build artifact: $GIT_COMMIT"
+  fi
+  
+  if [[ -z "${GIT_BRANCH:-}" && -n "${BUILD_GIT_BRANCH:-}" ]]; then
+    export GIT_BRANCH="$BUILD_GIT_BRANCH"
+    log "Restored GIT_BRANCH from build artifact: $GIT_BRANCH"
+  elif [[ "${GIT_BRANCH:-}" == "main" && -n "${BUILD_GIT_BRANCH:-}" && "${BUILD_GIT_BRANCH}" != "main" ]]; then
+    # Prefer specific branch from build if runtime says generic "main"
+    export GIT_BRANCH="$BUILD_GIT_BRANCH"
+    log "Restored specific GIT_BRANCH from build artifact: $GIT_BRANCH"
+  fi
+
   log "Generating runtime config..."
 
   # Extract all env var names from TypeScript (single source of truth)
