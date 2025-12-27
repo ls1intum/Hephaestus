@@ -1,87 +1,87 @@
 ---
 mode: agent
-description: Analyze and resolve PR review comments with critical thinking
+description: Fetch, analyze, and resolve PR review comments with full code context
 ---
 
 # Resolve Review Comments
 
-## 1. Fetch & Display
+Address review comments on the current PR (works for any reviewer: human, Copilot, CodeRabbit, etc.).
+
+## 1. Get PR
 
 ```bash
-PR=$(PAGER=cat gh pr view --json number,url -q '"\(.url)"') && echo "$PR"
+PAGER=cat gh pr view --json number,url,title --jq '"#\(.number): \(.title)\n\(.url)"'
+```
+
+If no PR exists, run `/land-pr` first.
+
+## 2. Fetch Unresolved Comments
+
+```bash
+PR_NUMBER=$(PAGER=cat gh pr view --json number -q .number)
+OWNER=$(PAGER=cat gh repo view --json owner -q .owner.login)
+REPO=$(PAGER=cat gh repo view --json name -q .name)
 
 PAGER=cat gh api graphql -f query='
-query($owner: String!, $repo: String!, $pr: Int!) {
+query($owner: String!, $repo: String!, $number: Int!) {
   repository(owner: $owner, name: $repo) {
-    pullRequest(number: $pr) {
-      reviewThreads(first: 100) {
+    pullRequest(number: $number) {
+      reviewThreads(first: 50) {
         nodes {
           id
           isResolved
           path
           line
-          comments(first: 10) { nodes { author { login } body } }
+          comments(first: 3) {
+            nodes { body diffHunk author { login } }
+          }
         }
       }
     }
   }
-}' -F owner="$(PAGER=cat gh repo view --json owner -q .owner.login)" \
-   -F repo="$(PAGER=cat gh repo view --json name -q .name)" \
-   -F pr="$(PAGER=cat gh pr view --json number -q .number)" \
-  | jq '[.data.repository.pullRequest.reviewThreads.nodes[] | select(.isResolved == false)] | to_entries | .[] | "\(.key+1). [\(.value.path):\(.value.line // "file")] \(.value.comments.nodes[0].author.login): \(.value.comments.nodes[0].body[:100])..." | "\(.value.id)"'
+}' -F owner="$OWNER" -F repo="$REPO" -F number="$PR_NUMBER" \
+  | jq '[.data.repository.pullRequest.reviewThreads.nodes[] | select(.isResolved == false)]'
 ```
 
-## 2. Evaluate Each Comment
+## 3. Address Each Comment
 
-For EACH unresolved thread, ask:
+Read `diffHunk` (code context) and `body` (feedback):
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│ Is this feedback CORRECT?                                   │
-├──────────────┬──────────────────────────────────────────────┤
-│ YES, valid   │ → Fix it, then resolve                       │
-│ NO, wrong    │ → Don't fix. Note why. Resolve.              │
-│ MAYBE        │ → Read the code. Decide. No middle ground.   │
-└──────────────┴──────────────────────────────────────────────┘
+| Situation | Action |
+|-----------|--------|
+| Already fixed | Resolve thread |
+| Valid issue | Fix code, then resolve |
+| Disagree | Reply with reasoning, leave open |
 
-│ Is this feedback IMPORTANT?                                 │
-├──────────────┬──────────────────────────────────────────────┤
-│ Bug/security │ → Must fix                                   │
-│ Correctness  │ → Should fix                                 │
-│ Style/nitpick│ → Fix if trivial, skip if bike-shedding     │
-│ Over-eng     │ → Skip. Complexity isn't free.               │
-└──────────────┴──────────────────────────────────────────────┘
-```
-
-**Red flags for REJECTING feedback:**
-
-- Adds complexity for hypothetical edge cases
-- "Consider adding..." without concrete benefit
-- Defensive programming for impossible states
-- Suggests rewriting working code for style preference
-- Reviewer misunderstood the code
-
-**Signs to ACCEPT feedback:**
-
-- Points out actual bug or incorrect behavior
-- Security concern with realistic attack vector
-- Missing error handling that will cause runtime failure
-- Objective improvement (perf, correctness) with evidence
-
-## 3. Resolve Threads
-
-After fixing (or deciding not to fix), resolve each thread:
+## 4. Resolve Thread
 
 ```bash
-PAGER=cat gh api graphql -f query='mutation($id: ID!) { resolveReviewThread(input: {threadId: $id}) { thread { isResolved } } }' -f id="THREAD_ID"
+PAGER=cat gh api graphql -f query='
+mutation($threadId: ID!) {
+  resolveReviewThread(input: {threadId: $threadId}) {
+    thread { isResolved }
+  }
+}' -f threadId="<THREAD_ID>"
 ```
 
-## 4. Verify
+## 5. Verify
 
 ```bash
-PAGER=cat gh pr view --json reviewDecision,reviewRequests -q '"Decision: \(.reviewDecision // "NONE")\nPending: \(.reviewRequests | length)"'
+PR_NUMBER=$(PAGER=cat gh pr view --json number -q .number)
+OWNER=$(PAGER=cat gh repo view --json owner -q .owner.login)
+REPO=$(PAGER=cat gh repo view --json name -q .name)
+
+PAGER=cat gh api graphql -f query='
+query($owner: String!, $repo: String!, $number: Int!) {
+  repository(owner: $owner, name: $repo) {
+    pullRequest(number: $number) {
+      reviewThreads(first: 50) {
+        nodes { isResolved }
+      }
+    }
+  }
+}' -F owner="$OWNER" -F repo="$REPO" -F number="$PR_NUMBER" \
+  | jq '[.data.repository.pullRequest.reviewThreads.nodes[] | select(.isResolved == false)] | length'
 ```
 
----
-
-**Remember:** Your job is to ship correct code, not to satisfy every reviewer comment. Reject bad feedback politely but firmly.
+Output should be `0`.
