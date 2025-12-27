@@ -51,7 +51,30 @@ main() {
   if [[ "${GIT_BRANCH:-}" == "main" && -n "${SERVICE_FQDN_WEBAPP:-}" ]]; then
     # Match pattern like pr622. or pr-622. (Coolify default usually pr<id>.)
     if [[ "$SERVICE_FQDN_WEBAPP" =~ ^pr-?([0-9]+) ]]; then
-       export GIT_BRANCH="PR-${BASH_REMATCH[1]}"
+       local pr_id="${BASH_REMATCH[1]}"
+       local detected_branch="PR-${pr_id}"
+
+       # Try to resolve actual branch name via GitHub API if token is available
+       if [[ -n "${GH_AUTH_TOKEN:-}" ]]; then
+         local api_url="https://api.github.com/repos/ls1intum/Hephaestus/pulls/${pr_id}"
+         local pr_json
+         if pr_json=$(curl -sS -H "Authorization: Bearer $GH_AUTH_TOKEN" "$api_url"); then
+           # Extract head.ref safely using grep/sed (no jq in image)
+           # JSON format: "head": { ... "ref": "branch-name", ... }
+           local branch_ref
+           branch_ref=$(echo "$pr_json" | sed -n '/"head": {/,/}/p' | grep '"ref":' | head -1 | sed -E 's/.*"ref": "([^"]+)".*/\1/')
+           if [[ -n "$branch_ref" ]]; then
+             detected_branch="$branch_ref"
+             log "Resolved real branch from GitHub API: $detected_branch"
+           else
+             log "WARNING: Failed to parse branch from GitHub API response"
+           fi
+         else
+           log "WARNING: Failed to fetch PR details from GitHub API"
+         fi
+       fi
+
+       export GIT_BRANCH="$detected_branch"
        log "Detected PR deployment from FQDN. Overriding GIT_BRANCH to: $GIT_BRANCH"
     fi
   fi
