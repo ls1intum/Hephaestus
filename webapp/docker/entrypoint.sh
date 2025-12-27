@@ -13,7 +13,7 @@ escape_for_js() {
     char="${input:i:1}"
     case "$char" in
       $'\n') output+="\\n" ;; $'\r') output+="\\r" ;; $'\t') output+="\\t" ;;
-      '"') output+="\\\"" ;; '\\') output+="\\\\" ;; *) output+="$char" ;;
+      '"') output+="\\\"" ;; '\\') output+="\\\\" ;; '/') output+="\\/" ;; *) output+="$char" ;;
     esac
   done
   printf '%s' "$output"
@@ -92,7 +92,7 @@ main() {
   log "Created ${filename}"
 
   if [[ -f "$INDEX_HTML" ]]; then
-    sed -i "s|/env-config\(\.[a-f0-9]*\)\?\.js|/${filename}|g" "$INDEX_HTML"
+    sed -Ei "s|/env-config(\.[a-f0-9]{8})?\.js|/${filename}|g" "$INDEX_HTML"
     grep -q "$filename" "$INDEX_HTML" || { log "ERROR: Failed to update index.html"; exit 1; }
     log "Updated index.html"
   fi

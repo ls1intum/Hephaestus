@@ -28,7 +28,7 @@ RUN npm run build
 # Stage 2: Serve
 FROM nginx:stable-alpine
 RUN apk update && apk upgrade && \
-    apk add --no-cache bash sed && \
+    apk add --no-cache bash sed grep && \
     rm -rf /var/cache/apk/*
 
 COPY --from=build /app/dist /usr/share/nginx/html
