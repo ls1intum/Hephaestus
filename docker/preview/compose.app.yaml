@@ -303,6 +303,9 @@ services:
     build:
       context: .
       dockerfile: webapp/Dockerfile
+      args:
+        COOLIFY_BRANCH: ${COOLIFY_BRANCH:-}
+        SOURCE_COMMIT: ${SOURCE_COMMIT:-}
     hostname: webapp
     restart: unless-stopped
     environment:
