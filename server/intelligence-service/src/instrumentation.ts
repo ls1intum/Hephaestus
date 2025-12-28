@@ -5,10 +5,24 @@ import { isTelemetryEnabled } from "@/shared/ai/telemetry";
 
 // Inline logger for instrumentation - can't import shared logger due to module load order
 // (instrumentation must load before env is parsed)
+// Keep redaction paths aligned with logger.ts
 const logger = pino({
 	name: "instrumentation",
 	redact: {
-		paths: ["*.token", "*.secret", "*.password", "*.apiKey"],
+		paths: [
+			"*.token",
+			"*.secret",
+			"*.password",
+			"*.apiKey",
+			"*.api_key",
+			"*.authorization",
+			"*.Authorization",
+			"*.connectionString",
+			"*.DATABASE_URL",
+			"*.OPENAI_API_KEY",
+			"*.ANTHROPIC_API_KEY",
+			"*.AZURE_API_KEY",
+		],
 		censor: "[REDACTED]",
 	},
 });
