@@ -1,5 +1,8 @@
 package de.tum.in.www1.hephaestus.core.exception;
 
+import de.tum.in.www1.hephaestus.workspace.exception.RepositoryAlreadyMonitoredException;
+import de.tum.in.www1.hephaestus.workspace.exception.WorkspaceLifecycleViolationException;
+import de.tum.in.www1.hephaestus.workspace.exception.WorkspaceSlugConflictException;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.Path;
@@ -7,7 +10,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
-import java.util.stream.StreamSupport;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.Ordered;
@@ -18,6 +20,7 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 /**
  * Global exception handler providing RFC 7807 ProblemDetail responses for all controllers.
@@ -41,6 +44,12 @@ public class GlobalControllerAdvice {
         return problem(HttpStatus.NOT_FOUND, "Resource not found", exception.getMessage());
     }
 
+    @ExceptionHandler(NoResourceFoundException.class)
+    ProblemDetail handleNoResourceFound(NoResourceFoundException exception) {
+        logger.debug("No resource found: {}", exception.getMessage());
+        return problem(HttpStatus.NOT_FOUND, "Resource not found", exception.getMessage());
+    }
+
     @ExceptionHandler(AccessForbiddenException.class)
     ProblemDetail handleForbidden(AccessForbiddenException exception) {
         logger.warn("Access forbidden: {}", exception.getMessage());
@@ -57,6 +66,28 @@ public class GlobalControllerAdvice {
     ProblemDetail handleIllegalState(IllegalStateException exception) {
         logger.warn("Illegal state: {}", exception.getMessage());
         return problem(HttpStatus.CONFLICT, "Invalid state", exception.getMessage());
+    }
+
+    // ========================================================================
+    // WORKSPACE-SPECIFIC CONFLICT EXCEPTIONS
+    // ========================================================================
+
+    @ExceptionHandler(WorkspaceSlugConflictException.class)
+    ProblemDetail handleWorkspaceSlugConflict(WorkspaceSlugConflictException exception) {
+        logger.debug("Workspace slug conflict: {}", exception.getMessage());
+        return problem(HttpStatus.CONFLICT, "Workspace slug conflict", exception.getMessage());
+    }
+
+    @ExceptionHandler(RepositoryAlreadyMonitoredException.class)
+    ProblemDetail handleRepositoryAlreadyMonitored(RepositoryAlreadyMonitoredException exception) {
+        logger.debug("Repository already monitored: {}", exception.getMessage());
+        return problem(HttpStatus.CONFLICT, "Repository already monitored", exception.getMessage());
+    }
+
+    @ExceptionHandler(WorkspaceLifecycleViolationException.class)
+    ProblemDetail handleWorkspaceLifecycleViolation(WorkspaceLifecycleViolationException exception) {
+        logger.debug("Workspace lifecycle violation: {}", exception.getMessage());
+        return problem(HttpStatus.CONFLICT, "Workspace lifecycle violation", exception.getMessage());
     }
 
     // ========================================================================

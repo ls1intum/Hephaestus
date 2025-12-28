@@ -125,12 +125,15 @@ public class WorkspaceSlugService {
      *
      * @param workspace the workspace being renamed
      * @param oldSlug the previous slug
+     * @param newSlug the new slug
      */
     @Transactional
-    public void recordRename(Workspace workspace, String oldSlug) {
+    public void recordRename(Workspace workspace, String oldSlug, String newSlug) {
         WorkspaceSlugHistory historyEntry = new WorkspaceSlugHistory();
         historyEntry.setWorkspace(workspace);
         historyEntry.setOldSlug(oldSlug);
+        historyEntry.setNewSlug(newSlug);
+        historyEntry.setChangedAt(Instant.now());
         historyEntry.setRedirectExpiresAt(Instant.now().plusSeconds(redirectTtlDays * 86400L));
         workspaceSlugHistoryRepository.save(historyEntry);
 

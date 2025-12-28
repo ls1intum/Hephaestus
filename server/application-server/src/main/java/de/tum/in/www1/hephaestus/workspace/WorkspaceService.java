@@ -1451,7 +1451,7 @@ public class WorkspaceService {
             throw new WorkspaceSlugConflictException(newSlug);
         }
 
-        workspaceSlugService.recordRename(workspace, currentSlug);
+        workspaceSlugService.recordRename(workspace, currentSlug, newSlug);
 
         workspace.setWorkspaceSlug(newSlug);
         Workspace saved = workspaceRepository.save(workspace);
