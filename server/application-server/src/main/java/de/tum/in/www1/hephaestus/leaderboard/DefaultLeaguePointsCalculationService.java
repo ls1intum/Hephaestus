@@ -1,5 +1,7 @@
 package de.tum.in.www1.hephaestus.leaderboard;
 
+import static de.tum.in.www1.hephaestus.shared.LeaguePointsConstants.*;
+
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import java.time.Instant;
@@ -15,23 +17,13 @@ public class DefaultLeaguePointsCalculationService implements LeaguePointsCalcul
 
     private static final Logger logger = LoggerFactory.getLogger(DefaultLeaguePointsCalculationService.class);
 
-    private static final int DEFAULT_POINTS = LeaguePointsCalculationService.POINTS_DEFAULT;
-    private static final int POINTS_THRESHOLD_HIGH = LeaguePointsCalculationService.POINTS_THRESHOLD_HIGH;
-    private static final int POINTS_THRESHOLD_LOW = LeaguePointsCalculationService.POINTS_THRESHOLD_LOW;
-    private static final int DECAY_MINIMUM = LeaguePointsCalculationService.DECAY_MINIMUM;
-    private static final double DECAY_FACTOR = LeaguePointsCalculationService.DECAY_FACTOR;
-    private static final double K_FACTOR_NEW_PLAYER = LeaguePointsCalculationService.K_FACTOR_NEW_PLAYER;
-    private static final double K_FACTOR_LOW_POINTS = LeaguePointsCalculationService.K_FACTOR_LOW_POINTS;
-    private static final double K_FACTOR_MEDIUM_POINTS = LeaguePointsCalculationService.K_FACTOR_MEDIUM_POINTS;
-    private static final double K_FACTOR_HIGH_POINTS = LeaguePointsCalculationService.K_FACTOR_HIGH_POINTS;
-
     @Override
     public int calculateNewPoints(User user, int currentLeaguePoints, LeaderboardEntryDTO entry) {
         Objects.requireNonNull(user, "user must not be null");
         Objects.requireNonNull(entry, "entry must not be null");
 
         int storedPoints = currentLeaguePoints;
-        int effectivePoints = storedPoints == 0 ? DEFAULT_POINTS : storedPoints;
+        int effectivePoints = storedPoints == 0 ? POINTS_DEFAULT : storedPoints;
         double kFactor = getKFactor(user, effectivePoints);
         int decay = calculateDecay(effectivePoints);
         int performanceBonus = calculatePerformanceBonus(entry.score());

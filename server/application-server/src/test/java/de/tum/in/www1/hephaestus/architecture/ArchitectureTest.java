@@ -3,6 +3,7 @@ package de.tum.in.www1.hephaestus.architecture;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.*;
 import static com.tngtech.archunit.library.GeneralCodingRules.*;
 import static com.tngtech.archunit.library.dependencies.SlicesRuleDefinition.slices;
+import static de.tum.in.www1.hephaestus.architecture.ArchitectureTestConstants.*;
 
 import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
@@ -15,11 +16,10 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
- * Comprehensive architectural constraints for the Hephaestus codebase.
+ * Core Architecture Tests - Critical architectural invariants.
  *
- * <p>These tests enforce critical architectural invariants that prevent
- * architectural erosion and maintain system integrity. Tests are organized
- * by strategic importance:
+ * <p>These tests enforce fundamental architectural constraints that prevent
+ * architectural erosion and maintain system integrity:
  *
  * <h2>Test Categories (Priority Order)</h2>
  * <ol>
@@ -29,13 +29,14 @@ import org.junit.jupiter.api.Test;
  *   <li><b>Coding Standards</b> - General code quality</li>
  * </ol>
  *
+ * <p>All thresholds are defined in {@link ArchitectureTestConstants}.
+ *
+ * @see ArchitectureTestConstants
  * @see <a href="https://www.archunit.org/userguide/html/000_Index.html">ArchUnit User Guide</a>
  */
-@DisplayName("Architecture")
+@DisplayName("Core Architecture")
 @Tag("architecture")
 class ArchitectureTest {
-
-    private static final String BASE_PACKAGE = "de.tum.in.www1.hephaestus";
 
     private static JavaClasses classes;
 

@@ -1,7 +1,7 @@
 package de.tum.in.www1.hephaestus.architecture;
 
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.*;
-import static com.tngtech.archunit.library.freeze.FreezingArchRule.freeze;
+import static de.tum.in.www1.hephaestus.architecture.ArchitectureTestConstants.*;
 
 import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaClasses;
@@ -20,21 +20,20 @@ import org.junit.jupiter.api.Test;
 /**
  * Code Quality Tests - Detect anti-patterns and code smells.
  *
- * <p>These tests enforce quality standards identified in code audits:
+ * <p>These tests enforce quality standards:
  * <ul>
  *   <li>God class detection (SRP violations)</li>
  *   <li>Constructor parameter limits</li>
- *   <li>Return type safety (Optional vs null)</li>
+ *   <li>Return type safety</li>
  * </ul>
+ *
+ * <p>All thresholds are defined in {@link ArchitectureTestConstants}.
+ *
+ * @see ArchitectureTestConstants
  */
 @DisplayName("Code Quality")
 @Tag("architecture")
 class CodeQualityTest {
-
-    private static final String BASE_PACKAGE = "de.tum.in.www1.hephaestus";
-
-    // Industry standard thresholds
-    private static final int MAX_CONSTRUCTOR_PARAMS = 12;
 
     private static JavaClasses classes;
 
@@ -58,13 +57,12 @@ class CodeQualityTest {
          * Services should not have excessive constructor parameters.
          *
          * <p>More than 12 dependencies indicates a God class that needs splitting.
-         * This is a leading indicator of SRP violations.
          */
         @Test
-        @DisplayName("Services have max 12 constructor dependencies (frozen)")
+        @DisplayName("Services have max 12 constructor dependencies")
         void servicesHaveLimitedConstructorParams() {
             ArchCondition<JavaClass> haveLimitedParams = new ArchCondition<>(
-                "have at most " + MAX_CONSTRUCTOR_PARAMS + " constructor parameters"
+                "have at most " + MAX_SERVICE_DEPENDENCIES + " constructor parameters"
             ) {
                 @Override
                 public void check(JavaClass javaClass, ConditionEvents events) {
@@ -75,7 +73,7 @@ class CodeQualityTest {
                         .max()
                         .orElse(0);
 
-                    if (maxParams > MAX_CONSTRUCTOR_PARAMS) {
+                    if (maxParams > MAX_SERVICE_DEPENDENCIES) {
                         events.add(
                             SimpleConditionEvent.violated(
                                 javaClass,
@@ -83,7 +81,7 @@ class CodeQualityTest {
                                     "GOD CLASS: %s has %d constructor params (max %d) - split into smaller services",
                                     javaClass.getSimpleName(),
                                     maxParams,
-                                    MAX_CONSTRUCTOR_PARAMS
+                                    MAX_SERVICE_DEPENDENCIES
                                 )
                             )
                         );
@@ -101,8 +99,7 @@ class CodeQualityTest {
                 .should(haveLimitedParams)
                 .because("God classes with many dependencies violate SRP and are hard to test");
 
-            // Frozen to track existing violations
-            freeze(rule).check(classes);
+            rule.check(classes);
         }
 
         /**
@@ -111,7 +108,9 @@ class CodeQualityTest {
         @Test
         @DisplayName("Controllers have max 5 dependencies")
         void controllersAreThin() {
-            ArchCondition<JavaClass> haveFewDeps = new ArchCondition<>("have at most 5 constructor parameters") {
+            ArchCondition<JavaClass> haveFewDeps = new ArchCondition<>(
+                "have at most " + MAX_CONTROLLER_DEPENDENCIES + " constructor parameters"
+            ) {
                 @Override
                 public void check(JavaClass javaClass, ConditionEvents events) {
                     long maxParams = javaClass
@@ -121,14 +120,15 @@ class CodeQualityTest {
                         .max()
                         .orElse(0);
 
-                    if (maxParams > 5) {
+                    if (maxParams > MAX_CONTROLLER_DEPENDENCIES) {
                         events.add(
                             SimpleConditionEvent.violated(
                                 javaClass,
                                 String.format(
-                                    "FAT CONTROLLER: %s has %d dependencies - consider service extraction",
+                                    "FAT CONTROLLER: %s has %d dependencies (max %d) - extract to services",
                                     javaClass.getSimpleName(),
-                                    maxParams
+                                    maxParams,
+                                    MAX_CONTROLLER_DEPENDENCIES
                                 )
                             )
                         );
@@ -142,7 +142,7 @@ class CodeQualityTest {
                 .should(haveFewDeps)
                 .because("Controllers should delegate to services, not orchestrate many dependencies");
 
-            freeze(rule).check(classes);
+            rule.check(classes);
         }
     }
 

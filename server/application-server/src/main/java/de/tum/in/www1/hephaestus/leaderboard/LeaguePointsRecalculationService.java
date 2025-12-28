@@ -1,5 +1,7 @@
 package de.tum.in.www1.hephaestus.leaderboard;
 
+import static de.tum.in.www1.hephaestus.shared.LeaguePointsConstants.POINTS_DEFAULT;
+
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.workspace.LeaguePointsRecalculator;
@@ -64,7 +66,7 @@ public class LeaguePointsRecalculationService implements LeaguePointsRecalculato
         Long workspaceId = workspace.getId();
         logger.info("Recalculating league points per member for workspace id={}", workspaceId);
 
-        workspaceMembershipService.resetLeaguePoints(workspaceId, LeaguePointsCalculationService.POINTS_DEFAULT);
+        workspaceMembershipService.resetLeaguePoints(workspaceId, POINTS_DEFAULT);
 
         List<WorkspaceMembership> memberships = workspaceMembershipRepository.findAllWithUserByWorkspaceId(workspaceId);
         if (memberships.isEmpty()) {
@@ -87,7 +89,7 @@ public class LeaguePointsRecalculationService implements LeaguePointsRecalculato
                 .findByLoginWithEagerMergedPullRequests(memberUser.getLogin())
                 .orElse(memberUser);
             memberUsersById.put(userId, hydratedUser);
-            currentPointsByUserId.put(userId, LeaguePointsCalculationService.POINTS_DEFAULT);
+            currentPointsByUserId.put(userId, POINTS_DEFAULT);
             Instant firstContribution = workspaceContributionActivityService
                 .findFirstContributionInstant(workspaceId, userId)
                 .orElse(null);
@@ -174,7 +176,7 @@ public class LeaguePointsRecalculationService implements LeaguePointsRecalculato
             return;
         }
 
-        int currentPoints = currentPointsByUserId.getOrDefault(userId, LeaguePointsCalculationService.POINTS_DEFAULT);
+        int currentPoints = currentPointsByUserId.getOrDefault(userId, POINTS_DEFAULT);
         int newPoints = leaguePointsCalculationService.calculateNewPoints(memberUser, currentPoints, entry);
         currentPointsByUserId.put(userId, newPoints);
         workspaceMembershipService.updateLeaguePoints(workspaceId, memberUser, newPoints);

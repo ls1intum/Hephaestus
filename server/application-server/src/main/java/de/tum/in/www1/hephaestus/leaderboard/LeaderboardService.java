@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.leaderboard;
 
+import static de.tum.in.www1.hephaestus.shared.LeaguePointsConstants.POINTS_DEFAULT;
 import static java.util.function.Function.identity;
 
 import de.tum.in.www1.hephaestus.gitprovider.issuecomment.IssueComment;
@@ -200,12 +201,7 @@ public class LeaderboardService {
             Long userId = ranking.get(index);
             int score = scoresByUserId.getOrDefault(userId, 0);
             UserInfoDTO userDto = Optional.ofNullable(usersById.get(userId))
-                .map(user ->
-                    UserInfoDTO.fromUser(
-                        user,
-                        leaguePointsByUserId.getOrDefault(userId, LeaguePointsCalculationService.POINTS_DEFAULT)
-                    )
-                )
+                .map(user -> UserInfoDTO.fromUser(user, leaguePointsByUserId.getOrDefault(userId, POINTS_DEFAULT)))
                 .orElse(null);
             List<PullRequestReview> userReviews = reviewsByUserId.getOrDefault(userId, Collections.emptyList());
             List<IssueComment> userIssueComments = issueCommentsByUserId.getOrDefault(userId, Collections.emptyList());
@@ -376,14 +372,8 @@ public class LeaderboardService {
         Map<Long, Integer> leaguePointsByUserId
     ) {
         return (e1, e2) -> {
-            int e1LeaguePoints = leaguePointsByUserId.getOrDefault(
-                e1.getKey(),
-                LeaguePointsCalculationService.POINTS_DEFAULT
-            );
-            int e2LeaguePoints = leaguePointsByUserId.getOrDefault(
-                e2.getKey(),
-                LeaguePointsCalculationService.POINTS_DEFAULT
-            );
+            int e1LeaguePoints = leaguePointsByUserId.getOrDefault(e1.getKey(), POINTS_DEFAULT);
+            int e2LeaguePoints = leaguePointsByUserId.getOrDefault(e2.getKey(), POINTS_DEFAULT);
             int leagueCompare = Integer.compare(e2LeaguePoints, e1LeaguePoints);
             if (leagueCompare != 0) {
                 return leagueCompare;

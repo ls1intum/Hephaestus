@@ -1,6 +1,7 @@
 package de.tum.in.www1.hephaestus.architecture;
 
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.*;
+import static de.tum.in.www1.hephaestus.architecture.ArchitectureTestConstants.*;
 
 import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaClasses;
@@ -22,29 +23,21 @@ import org.junit.jupiter.api.Test;
  *
  * <p>These tests enforce adherence to SOLID principles:
  * <ul>
- *   <li><b>S</b>ingle Responsibility Principle</li>
- *   <li><b>O</b>pen/Closed Principle</li>
- *   <li><b>L</b>iskov Substitution Principle</li>
- *   <li><b>I</b>nterface Segregation Principle</li>
- *   <li><b>D</b>ependency Inversion Principle</li>
+ *   <li><b>S</b>ingle Responsibility Principle - Limited methods and dependencies</li>
+ *   <li><b>O</b>pen/Closed Principle - Extension over modification</li>
+ *   <li><b>L</b>iskov Substitution Principle - Proper inheritance hierarchies</li>
+ *   <li><b>I</b>nterface Segregation Principle - Focused interfaces</li>
+ *   <li><b>D</b>ependency Inversion Principle - Depend on abstractions</li>
  * </ul>
  *
+ * <p>All thresholds are defined in {@link ArchitectureTestConstants}.
+ *
+ * @see ArchitectureTestConstants
  * @see <a href="https://en.wikipedia.org/wiki/SOLID">SOLID Principles</a>
  */
 @DisplayName("SOLID Principles")
 @Tag("architecture")
 class SolidPrinciplesTest {
-
-    private static final String BASE_PACKAGE = "de.tum.in.www1.hephaestus";
-
-    // Thresholds based on industry standards - no exceptions allowed
-    private static final int MAX_CLASS_METHODS = 25;
-    private static final int MAX_SERVICE_DEPENDENCIES = 12;
-    private static final int MAX_INTERFACE_METHODS = 8;
-    private static final int MAX_SPI_METHODS = 8; // Higher for lifecycle SPIs with event methods
-
-    // Generated code packages to exclude
-    private static final String GRAPHQL_GENERATED_PACKAGE = "..graphql..model..";
 
     private static JavaClasses classes;
 
@@ -74,16 +67,17 @@ class SolidPrinciplesTest {
         @DisplayName("Classes have limited methods (max 25)")
         void classesHaveLimitedMethods() {
             ArchCondition<JavaClass> haveLimitedMethods = new ArchCondition<>(
-                "have at most " + MAX_CLASS_METHODS + " methods"
+                "have at most " + MAX_SERVICE_METHODS + " methods"
             ) {
                 @Override
                 public void check(JavaClass javaClass, ConditionEvents events) {
-                    // Count only methods declared in this class (not inherited)
+                    // Count only business methods declared in this class (not inherited)
                     int methodCount = (int) javaClass
                         .getMethods()
                         .stream()
                         .filter(m -> m.getOwner().equals(javaClass)) // Only methods declared in this class
                         .filter(m -> !m.getName().startsWith("$")) // Exclude synthetic methods
+                        .filter(m -> !m.getName().startsWith("lambda$")) // Exclude lambda methods
                         .filter(m -> !m.getName().equals("equals"))
                         .filter(m -> !m.getName().equals("hashCode"))
                         .filter(m -> !m.getName().equals("toString"))
@@ -91,9 +85,10 @@ class SolidPrinciplesTest {
                         .filter(m -> !m.getName().startsWith("set"))
                         .filter(m -> !m.getName().startsWith("is"))
                         .filter(m -> !m.getName().equals("<init>")) // Exclude constructors
+                        .filter(m -> !m.getName().equals("<clinit>")) // Exclude static initializers
                         .count();
 
-                    if (methodCount > MAX_CLASS_METHODS) {
+                    if (methodCount > MAX_SERVICE_METHODS) {
                         events.add(
                             SimpleConditionEvent.violated(
                                 javaClass,
@@ -101,7 +96,7 @@ class SolidPrinciplesTest {
                                     "%s has %d methods (max %d) - consider splitting",
                                     javaClass.getSimpleName(),
                                     methodCount,
-                                    MAX_CLASS_METHODS
+                                    MAX_SERVICE_METHODS
                                 )
                             )
                         );
@@ -371,7 +366,7 @@ class SolidPrinciplesTest {
                 .and()
                 .resideOutsideOfPackage("..intelligenceservice..")
                 .and()
-                .resideOutsideOfPackage(GRAPHQL_GENERATED_PACKAGE) // Exclude generated GraphQL interfaces
+                .resideOutsideOfPackage(GENERATED_GRAPHQL_PACKAGE) // Exclude generated GraphQL interfaces
                 .should(haveLimitedMethods)
                 .because("Interfaces should be small and focused (ISP)");
 

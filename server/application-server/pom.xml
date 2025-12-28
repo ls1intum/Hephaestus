@@ -37,7 +37,7 @@
         <maven.test.skip>false</maven.test.skip>
         <hephaestus.surefire.timeout>180</hephaestus.surefire.timeout>
         
-        <!-- Tag filtering: exclude live tests by default, include only specific test types -->
+        <!-- Tag filtering: unit tests by default, exclude live tests -->
         <surefire.excludedGroups>live</surefire.excludedGroups>
         <surefire.includedGroups>unit</surefire.includedGroups>
         <failsafe.excludedGroups>live</failsafe.excludedGroups>
@@ -47,6 +47,7 @@
         <skipCoverage>true</skipCoverage>
         <jacoco.line.coverage.minimum>0.00</jacoco.line.coverage.minimum>
         <jacoco.branch.coverage.minimum>0.00</jacoco.branch.coverage.minimum>
+
 
         <!-- Encoding -->
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -575,7 +576,7 @@
                 <artifactId>maven-surefire-plugin</artifactId>
                 <configuration>
                     <!-- Memory and JVM settings - @{argLine} is replaced by JaCoCo -->
-                    <argLine>@{argLine} -Xmx1024m -Dspring.profiles.active=test -Dfile.encoding=UTF-8
+                    <argLine>@{argLine} -Xmx2048m -Dspring.profiles.active=test -Dfile.encoding=UTF-8
                         -XX:+EnableDynamicAgentLoading
                     </argLine>
                     <!-- Test output -->
@@ -759,6 +760,32 @@
                 <!-- Override defaults to run ONLY live tests -->
                 <surefire.excludedGroups></surefire.excludedGroups>
                 <surefire.includedGroups>live</surefire.includedGroups>
+                <failsafe.excludedGroups></failsafe.excludedGroups>
+                <failsafe.includedGroups></failsafe.includedGroups>
+            </properties>
+        </profile>
+        
+        <!--
+            Architecture Tests Profile
+            
+            Runs ONLY architecture tests that verify structural constraints using ArchUnit.
+            These tests scan all compiled classes and can be memory-intensive.
+            
+            Usage:
+              ./mvnw test -Parchitecture-tests
+            
+            These tests verify:
+            - Module boundaries (gitprovider isolation, SPI patterns)
+            - SOLID principles (SRP, DIP, ISP)
+            - Spring best practices (layered architecture, security)
+            - Code quality (complexity limits, naming conventions)
+        -->
+        <profile>
+            <id>architecture-tests</id>
+            <properties>
+                <!-- Override defaults to run ONLY architecture tests -->
+                <surefire.excludedGroups></surefire.excludedGroups>
+                <surefire.includedGroups>architecture</surefire.includedGroups>
                 <failsafe.excludedGroups></failsafe.excludedGroups>
                 <failsafe.includedGroups></failsafe.includedGroups>
             </properties>

@@ -3,6 +3,7 @@ package de.tum.in.www1.hephaestus.architecture;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.*;
 import static com.tngtech.archunit.library.Architectures.layeredArchitecture;
 import static com.tngtech.archunit.library.dependencies.SlicesRuleDefinition.slices;
+import static de.tum.in.www1.hephaestus.architecture.ArchitectureTestConstants.*;
 
 import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaClasses;
@@ -22,9 +23,9 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 /**
- * Advanced Architecture Tests - Phase 2 of the architecture fitness functions.
+ * Spring & DDD Architecture Tests.
  *
- * <p>These tests address the gaps identified in the Architecture Grading Rubric:
+ * <p>These tests enforce Spring best practices and DDD patterns:
  * <ul>
  *   <li>Layered architecture enforcement</li>
  *   <li>DTO boundary protection</li>
@@ -34,13 +35,14 @@ import org.springframework.web.bind.annotation.*;
  *   <li>Package structure conventions</li>
  * </ul>
  *
+ * <p>All thresholds are defined in {@link ArchitectureTestConstants}.
+ *
+ * @see ArchitectureTestConstants
  * @see ArchitectureTest for core architecture tests
  */
-@DisplayName("Advanced Architecture")
+@DisplayName("Spring & DDD Architecture")
 @Tag("architecture")
 class AdvancedArchitectureTest {
-
-    private static final String BASE_PACKAGE = "de.tum.in.www1.hephaestus";
 
     private static JavaClasses classes;
     private static JavaClasses classesWithTests;
