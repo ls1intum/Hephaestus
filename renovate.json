@@ -184,15 +184,40 @@
       "groupName": "React ecosystem"
     },
     {
-      "description": "Testing libraries",
+      "description": "Testing libraries (webapp) - pinned to Vitest 3.x for Storybook compatibility",
       "matchPackageNames": [
         "@testing-library/**",
         "vitest",
-        "@vitest/**",
+        "@vitest/**"
+      ],
+      "matchFileNames": [
+        "webapp/package.json"
+      ],
+      "groupName": "Webapp testing libraries",
+      "allowedVersions": "<4.0.0",
+      "prBodyNotes": [
+        "⚠️ Webapp uses Vitest 3.x due to @storybook/experimental-addon-test peer dependency (requires vitest ^2.1.1 || ^3.0.0)"
+      ]
+    },
+    {
+      "description": "Testing libraries (services) - can use latest Vitest",
+      "matchPackageNames": [
+        "vitest",
+        "@vitest/**"
+      ],
+      "matchFileNames": [
+        "server/intelligence-service/**",
+        "server/webhook-ingest/**"
+      ],
+      "groupName": "Service testing libraries"
+    },
+    {
+      "description": "Playwright",
+      "matchPackageNames": [
         "playwright",
         "@playwright/**"
       ],
-      "groupName": "Testing libraries"
+      "groupName": "Playwright"
     },
     {
       "description": "Build tools",
@@ -220,6 +245,57 @@
         "@hey-api/**"
       ],
       "groupName": "OpenAPI tools"
+    },
+    {
+      "description": "AI SDK ecosystem - keep aligned across services",
+      "matchPackageNames": [
+        "ai",
+        "@ai-sdk/**"
+      ],
+      "groupName": "AI SDK"
+    },
+    {
+      "description": "Hono framework - keep aligned across services",
+      "matchPackageNames": [
+        "hono",
+        "@hono/**"
+      ],
+      "groupName": "Hono framework"
+    },
+    {
+      "description": "Zod (webapp) - pinned to 3.x for TanStack compatibility",
+      "matchPackageNames": [
+        "zod"
+      ],
+      "matchFileNames": [
+        "webapp/package.json"
+      ],
+      "allowedVersions": "<4.0.0",
+      "prBodyNotes": [
+        "⚠️ Webapp uses Zod 3.x due to @tanstack/zod-adapter peer dependency (requires zod@^3.23.8)"
+      ]
+    },
+    {
+      "description": "Zod (services) - can use latest Zod 4.x",
+      "matchPackageNames": [
+        "zod"
+      ],
+      "matchFileNames": [
+        "server/intelligence-service/**",
+        "server/webhook-ingest/**"
+      ],
+      "groupName": "Service Zod"
+    },
+    {
+      "description": "Shared workspace tooling - keep aligned",
+      "matchPackageNames": [
+        "@types/node",
+        "tsx",
+        "pino",
+        "pino-pretty",
+        "dotenv"
+      ],
+      "groupName": "Shared workspace tooling"
     },
     {
       "description": "GitHub Actions - automerge after CI",
