@@ -35,6 +35,7 @@ public class WorkspaceController {
 
     private final WorkspaceService workspaceService;
     private final WorkspaceLifecycleService workspaceLifecycleService;
+    private final WorkspaceRepositoryMonitorService workspaceRepositoryMonitorService;
 
     @GetMapping
     @Operation(summary = "Fetch a workspace by slug")
@@ -188,7 +189,11 @@ public class WorkspaceController {
         content = @Content(array = @ArraySchema(schema = @Schema(implementation = String.class)))
     )
     public ResponseEntity<List<String>> getRepositoriesToMonitor(WorkspaceContext workspaceContext) {
-        var repositories = workspaceService.getRepositoriesToMonitor(workspaceContext).stream().sorted().toList();
+        var repositories = workspaceRepositoryMonitorService
+            .getMonitoredRepositories(workspaceContext)
+            .stream()
+            .sorted()
+            .toList();
         return ResponseEntity.ok(repositories);
     }
 
@@ -200,7 +205,7 @@ public class WorkspaceController {
         @PathVariable String owner,
         @PathVariable String name
     ) {
-        workspaceService.addRepositoryToMonitor(workspaceContext, owner + '/' + name);
+        workspaceRepositoryMonitorService.addRepositoryToMonitor(workspaceContext, owner + '/' + name);
         URI location = ServletUriComponentsBuilder.fromCurrentRequest().build().toUri();
         return ResponseEntity.created(location).build();
     }
@@ -213,7 +218,7 @@ public class WorkspaceController {
         @PathVariable String owner,
         @PathVariable String name
     ) {
-        workspaceService.removeRepositoryToMonitor(workspaceContext, owner + '/' + name);
+        workspaceRepositoryMonitorService.removeRepositoryFromMonitor(workspaceContext, owner + '/' + name);
         return ResponseEntity.noContent().build();
     }
 

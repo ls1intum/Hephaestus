@@ -20,7 +20,7 @@ class WorkspaceRepositoryCoverageIntegrationTest extends BaseIntegrationTest {
     private static final long INSTALLATION_ID = 9912345L;
 
     @Autowired
-    private WorkspaceService workspaceService;
+    private WorkspaceRepositoryMonitorService workspaceRepositoryMonitorService;
 
     @Autowired
     private WorkspaceRepository workspaceRepository;
@@ -52,7 +52,7 @@ class WorkspaceRepositoryCoverageIntegrationTest extends BaseIntegrationTest {
             )
         );
 
-        workspaceService.ensureAllInstallationRepositoriesCovered(INSTALLATION_ID);
+        workspaceRepositoryMonitorService.ensureAllInstallationRepositoriesCovered(INSTALLATION_ID);
 
         List<RepositoryToMonitor> monitors = repositoryToMonitorRepository.findByWorkspaceId(workspace.getId());
         assertThat(monitors)
@@ -72,7 +72,7 @@ class WorkspaceRepositoryCoverageIntegrationTest extends BaseIntegrationTest {
             List.of(snapshot(3L, "HephaestusTest/HelloWorld", "HelloWorld", true))
         );
 
-        workspaceService.ensureAllInstallationRepositoriesCovered(INSTALLATION_ID);
+        workspaceRepositoryMonitorService.ensureAllInstallationRepositoriesCovered(INSTALLATION_ID);
 
         List<RepositoryToMonitor> monitors = repositoryToMonitorRepository.findByWorkspaceId(workspace.getId());
         assertThat(monitors)

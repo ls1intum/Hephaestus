@@ -102,7 +102,11 @@ class WorkspaceServiceIntegrationTest extends AbstractWorkspaceIntegrationTest {
         workspace.setPersonalAccessToken(null);
         workspaceRepository.save(workspace);
 
-        Workspace promoted = workspaceService.ensureForInstallation(95711017L, "ls1intum", RepositorySelection.ALL);
+        Workspace promoted = workspaceInstallationService.createOrUpdateFromInstallation(
+            95711017L,
+            "ls1intum",
+            RepositorySelection.ALL
+        );
 
         Workspace persisted = workspaceRepository.findById(promoted.getId()).orElseThrow();
 

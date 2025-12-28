@@ -175,7 +175,11 @@ class WorkspaceSlugRenameIntegrationTest extends AbstractWorkspaceIntegrationTes
 
         workspaceService.renameSlug(workspace.getId(), "install-alpha-renamed");
 
-        Workspace created = workspaceService.ensureForInstallation(999L, "install-alpha", RepositorySelection.ALL);
+        Workspace created = workspaceInstallationService.createOrUpdateFromInstallation(
+            999L,
+            "install-alpha",
+            RepositorySelection.ALL
+        );
 
         assertThat(created).as("workspace should be created with fallback slug").isNotNull();
         assertThat(created.getWorkspaceSlug()).isNotEqualTo("install-alpha");
@@ -193,7 +197,11 @@ class WorkspaceSlugRenameIntegrationTest extends AbstractWorkspaceIntegrationTes
         persistUser("install-owner-collision");
         persistUser("collision");
 
-        Workspace linked = workspaceService.ensureForInstallation(1111L, "collision", RepositorySelection.ALL);
+        Workspace linked = workspaceInstallationService.createOrUpdateFromInstallation(
+            1111L,
+            "collision",
+            RepositorySelection.ALL
+        );
 
         assertThat(linked).isNotNull();
         assertThat(linked.getId()).isEqualTo(existing.getId());

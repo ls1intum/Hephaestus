@@ -37,21 +37,14 @@ class SolidPrinciplesTest {
 
     private static final String BASE_PACKAGE = "de.tum.in.www1.hephaestus";
 
-    // Thresholds based on industry standards and project needs
-    private static final int MAX_CLASS_METHODS = 30;
-    private static final int MAX_FACADE_METHODS = 70; // Facade services aggregate many operations
-    private static final int MAX_SERVICE_DEPENDENCIES = 25; // Facade services may have more
+    // Thresholds based on industry standards - no exceptions allowed
+    private static final int MAX_CLASS_METHODS = 25;
+    private static final int MAX_SERVICE_DEPENDENCIES = 12;
     private static final int MAX_INTERFACE_METHODS = 8;
-    private static final int MAX_SPI_METHODS = 8; // Event listeners may have lifecycle methods
+    private static final int MAX_SPI_METHODS = 8; // Higher for lifecycle SPIs with event methods
 
     // Generated code packages to exclude
     private static final String GRAPHQL_GENERATED_PACKAGE = "..graphql..model..";
-
-    // Facade services that intentionally aggregate many operations
-    // These are central orchestration points with higher method limits
-    private static final java.util.Set<String> FACADE_SERVICES = java.util.Set.of(
-        "WorkspaceService" // Central facade for all workspace operations
-    );
 
     private static JavaClasses classes;
 
@@ -75,34 +68,32 @@ class SolidPrinciplesTest {
          * Classes should not have too many methods.
          *
          * <p>A class with many methods likely has multiple responsibilities.
-         * Target: max 30 methods per class.
+         * Target: max 25 methods per class.
          */
         @Test
-        @DisplayName("Classes have limited methods (max 30, 50 for facades)")
+        @DisplayName("Classes have limited methods (max 25)")
         void classesHaveLimitedMethods() {
             ArchCondition<JavaClass> haveLimitedMethods = new ArchCondition<>(
-                "have at most " + MAX_CLASS_METHODS + " methods (or " + MAX_FACADE_METHODS + " for facades)"
+                "have at most " + MAX_CLASS_METHODS + " methods"
             ) {
                 @Override
                 public void check(JavaClass javaClass, ConditionEvents events) {
+                    // Count only methods declared in this class (not inherited)
                     int methodCount = (int) javaClass
                         .getMethods()
                         .stream()
-                        .filter(m -> !m.getName().startsWith("$"))
+                        .filter(m -> m.getOwner().equals(javaClass)) // Only methods declared in this class
+                        .filter(m -> !m.getName().startsWith("$")) // Exclude synthetic methods
                         .filter(m -> !m.getName().equals("equals"))
                         .filter(m -> !m.getName().equals("hashCode"))
                         .filter(m -> !m.getName().equals("toString"))
                         .filter(m -> !m.getName().startsWith("get"))
                         .filter(m -> !m.getName().startsWith("set"))
                         .filter(m -> !m.getName().startsWith("is"))
+                        .filter(m -> !m.getName().equals("<init>")) // Exclude constructors
                         .count();
 
-                    // Facade services have a higher limit
-                    int maxMethods = FACADE_SERVICES.contains(javaClass.getSimpleName())
-                        ? MAX_FACADE_METHODS
-                        : MAX_CLASS_METHODS;
-
-                    if (methodCount > maxMethods) {
+                    if (methodCount > MAX_CLASS_METHODS) {
                         events.add(
                             SimpleConditionEvent.violated(
                                 javaClass,
@@ -110,7 +101,7 @@ class SolidPrinciplesTest {
                                     "%s has %d methods (max %d) - consider splitting",
                                     javaClass.getSimpleName(),
                                     methodCount,
-                                    maxMethods
+                                    MAX_CLASS_METHODS
                                 )
                             )
                         );
@@ -133,7 +124,7 @@ class SolidPrinciplesTest {
          * Services should have limited dependencies.
          *
          * <p>A service with many injected dependencies is likely doing too much.
-         * Target: max 10 constructor parameters.
+         * Target: max 12 constructor parameters.
          */
         @Test
         @DisplayName("Services have limited dependencies (max 10)")

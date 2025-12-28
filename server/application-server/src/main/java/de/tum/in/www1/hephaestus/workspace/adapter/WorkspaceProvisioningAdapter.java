@@ -3,7 +3,7 @@ package de.tum.in.www1.hephaestus.workspace.adapter;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.WorkspaceProvisioningListener;
 import de.tum.in.www1.hephaestus.workspace.RepositorySelection;
 import de.tum.in.www1.hephaestus.workspace.Workspace;
-import de.tum.in.www1.hephaestus.workspace.WorkspaceService;
+import de.tum.in.www1.hephaestus.workspace.WorkspaceInstallationService;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -14,10 +14,10 @@ public class WorkspaceProvisioningAdapter implements WorkspaceProvisioningListen
 
     private static final Logger logger = LoggerFactory.getLogger(WorkspaceProvisioningAdapter.class);
 
-    private final WorkspaceService workspaceService;
+    private final WorkspaceInstallationService workspaceInstallationService;
 
-    public WorkspaceProvisioningAdapter(WorkspaceService workspaceService) {
-        this.workspaceService = workspaceService;
+    public WorkspaceProvisioningAdapter(WorkspaceInstallationService workspaceInstallationService) {
+        this.workspaceInstallationService = workspaceInstallationService;
     }
 
     @Override
@@ -28,7 +28,7 @@ public class WorkspaceProvisioningAdapter implements WorkspaceProvisioningListen
         }
 
         RepositorySelection selection = RepositorySelection.SELECTED; // Default selection
-        Workspace workspace = workspaceService.ensureForInstallation(
+        Workspace workspace = workspaceInstallationService.createOrUpdateFromInstallation(
             installation.installationId(),
             installation.accountLogin(),
             selection
@@ -50,8 +50,8 @@ public class WorkspaceProvisioningAdapter implements WorkspaceProvisioningListen
         }
 
         // Stop NATS consumer and mark workspace as appropriate
-        workspaceService.stopNatsConsumerForInstallation(installationId);
-        workspaceService.updateStatusForInstallation(installationId, Workspace.WorkspaceStatus.SUSPENDED);
+        workspaceInstallationService.stopNatsForInstallation(installationId);
+        workspaceInstallationService.updateWorkspaceStatus(installationId, Workspace.WorkspaceStatus.SUSPENDED);
         logger.info("Handled installation deletion for installation {}", installationId);
     }
 
@@ -99,7 +99,7 @@ public class WorkspaceProvisioningAdapter implements WorkspaceProvisioningListen
             return;
         }
 
-        workspaceService.handleInstallationTargetRename(installationId, oldLogin, newLogin);
+        workspaceInstallationService.handleAccountRename(installationId, oldLogin, newLogin);
     }
 
     @Override
@@ -109,7 +109,7 @@ public class WorkspaceProvisioningAdapter implements WorkspaceProvisioningListen
             return;
         }
 
-        workspaceService.updateStatusForInstallation(installationId, Workspace.WorkspaceStatus.SUSPENDED);
+        workspaceInstallationService.updateWorkspaceStatus(installationId, Workspace.WorkspaceStatus.SUSPENDED);
         logger.debug("Installation {} suspended", installationId);
     }
 
@@ -120,7 +120,7 @@ public class WorkspaceProvisioningAdapter implements WorkspaceProvisioningListen
             return;
         }
 
-        workspaceService.updateStatusForInstallation(installationId, Workspace.WorkspaceStatus.ACTIVE);
+        workspaceInstallationService.updateWorkspaceStatus(installationId, Workspace.WorkspaceStatus.ACTIVE);
         logger.debug("Installation {} activated", installationId);
     }
 
@@ -132,7 +132,7 @@ public class WorkspaceProvisioningAdapter implements WorkspaceProvisioningListen
         }
 
         RepositorySelection repoSelection = parseRepositorySelection(selection);
-        workspaceService.updateRepositorySelection(installationId, repoSelection);
+        workspaceInstallationService.updateRepositorySelection(installationId, repoSelection);
         logger.debug("Updated repository selection for installation {} to {}", installationId, repoSelection);
     }
 

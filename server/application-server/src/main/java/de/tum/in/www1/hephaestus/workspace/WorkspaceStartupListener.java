@@ -18,14 +18,14 @@ public class WorkspaceStartupListener {
     private static final Logger logger = LoggerFactory.getLogger(WorkspaceStartupListener.class);
 
     private final WorkspaceProvisioningService provisioningService;
-    private final WorkspaceService workspaceService;
+    private final WorkspaceActivationService workspaceActivationService;
 
     public WorkspaceStartupListener(
         WorkspaceProvisioningService provisioningService,
-        WorkspaceService workspaceService
+        WorkspaceActivationService workspaceActivationService
     ) {
         this.provisioningService = provisioningService;
-        this.workspaceService = workspaceService;
+        this.workspaceActivationService = workspaceActivationService;
     }
 
     @EventListener(ApplicationReadyEvent.class)
@@ -33,6 +33,6 @@ public class WorkspaceStartupListener {
         logger.info("Starting workspace provisioning.");
         provisioningService.bootstrapDefaultPatWorkspace();
         provisioningService.ensureGitHubAppInstallations();
-        workspaceService.activateAllWorkspaces();
+        workspaceActivationService.activateAllWorkspaces();
     }
 }

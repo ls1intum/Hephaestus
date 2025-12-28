@@ -29,6 +29,8 @@ public class WorkspaceProvisioningService {
     private final WorkspaceRepository workspaceRepository;
     private final RepositoryToMonitorRepository repositoryToMonitorRepository;
     private final WorkspaceService workspaceService;
+    private final WorkspaceInstallationService workspaceInstallationService;
+    private final WorkspaceRepositoryMonitorService workspaceRepositoryMonitorService;
     private final GitHubAppTokenService gitHubAppTokenService;
     private final UserRepository userRepository;
     private final WorkspaceMembershipRepository workspaceMembershipRepository;
@@ -41,6 +43,8 @@ public class WorkspaceProvisioningService {
         WorkspaceRepository workspaceRepository,
         RepositoryToMonitorRepository repositoryToMonitorRepository,
         WorkspaceService workspaceService,
+        WorkspaceInstallationService workspaceInstallationService,
+        WorkspaceRepositoryMonitorService workspaceRepositoryMonitorService,
         GitHubAppTokenService gitHubAppTokenService,
         UserRepository userRepository,
         WorkspaceMembershipRepository workspaceMembershipRepository,
@@ -51,6 +55,8 @@ public class WorkspaceProvisioningService {
         this.workspaceRepository = workspaceRepository;
         this.repositoryToMonitorRepository = repositoryToMonitorRepository;
         this.workspaceService = workspaceService;
+        this.workspaceInstallationService = workspaceInstallationService;
+        this.workspaceRepositoryMonitorService = workspaceRepositoryMonitorService;
         this.gitHubAppTokenService = gitHubAppTokenService;
         this.userRepository = userRepository;
         this.workspaceMembershipRepository = workspaceMembershipRepository;
@@ -290,12 +296,16 @@ public class WorkspaceProvisioningService {
 
         logger.info("Ensuring installation={} for org={} (selection={}).", installationId, login, selection);
 
-        Workspace workspace = workspaceService.ensureForInstallation(installationId, login, selection);
+        Workspace workspace = workspaceInstallationService.createOrUpdateFromInstallation(
+            installationId,
+            login,
+            selection
+        );
         workspace = workspaceService.updateAccountLogin(workspace.getId(), login);
 
         logger.info("Organization sync for workspace {} will be handled via webhooks", workspace.getWorkspaceSlug());
 
-        workspaceService.ensureAllInstallationRepositoriesCovered(installationId, true);
+        workspaceRepositoryMonitorService.ensureAllInstallationRepositoriesCovered(installationId, true);
     }
 
     private boolean isBlank(String value) {

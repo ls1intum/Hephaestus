@@ -214,31 +214,17 @@ class AdvancedArchitectureTest {
     class SecurityTests {
 
         /**
-         * All REST controller public methods should have security annotations
-         * or be in controllers that use global security configuration.
+         * All REST controller public methods should have security annotations.
          *
          * <p>Every endpoint must explicitly declare its security requirements
-         * or use controller-level/global security config.
+         * via @PreAuthorize at class or method level. No exceptions allowed.
          */
         @Test
         @DisplayName("Controller methods have security annotations")
         void controllerMethodsHaveSecurityAnnotations() {
-            // Controllers that are secured via Spring Security config (all endpoints require auth)
-            java.util.Set<String> globallySecuredControllers = java.util.Set.of(
-                "AccountController", // All operations require authenticated user
-                "ContributorController", // Workspace-scoped, secured by filter
-                "WorkspaceRegistryController", // Workspace creation requires auth
-                "MentorProxyController" // Proxy with its own auth handling
-            );
-
             ArchCondition<JavaMethod> haveSecurityAnnotation = new ArchCondition<>("have security annotation") {
                 @Override
                 public void check(JavaMethod method, ConditionEvents events) {
-                    // Skip globally secured controllers
-                    if (globallySecuredControllers.contains(method.getOwner().getSimpleName())) {
-                        return;
-                    }
-
                     boolean hasMapping =
                         method.isAnnotatedWith(GetMapping.class) ||
                         method.isAnnotatedWith(PostMapping.class) ||

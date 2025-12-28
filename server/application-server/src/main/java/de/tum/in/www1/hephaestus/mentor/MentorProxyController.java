@@ -23,6 +23,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -51,6 +52,7 @@ import reactor.core.publisher.Mono;
 @WorkspaceScopedController
 @Hidden
 @RequestMapping("/mentor")
+@PreAuthorize("isAuthenticated()")
 public class MentorProxyController {
 
     private static final Logger log = LoggerFactory.getLogger(MentorProxyController.class);

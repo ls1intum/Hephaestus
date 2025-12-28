@@ -31,6 +31,12 @@ class WorkspaceProvisioningServiceTest {
     private WorkspaceService workspaceService;
 
     @Mock
+    private WorkspaceInstallationService workspaceInstallationService;
+
+    @Mock
+    private WorkspaceRepositoryMonitorService workspaceRepositoryMonitorService;
+
+    @Mock
     private GitHubAppTokenService gitHubAppTokenService;
 
     @Mock
@@ -63,6 +69,8 @@ class WorkspaceProvisioningServiceTest {
             workspaceRepository,
             repositoryToMonitorRepository,
             workspaceService,
+            workspaceInstallationService,
+            workspaceRepositoryMonitorService,
             gitHubAppTokenService,
             userRepository,
             workspaceMembershipRepository,
