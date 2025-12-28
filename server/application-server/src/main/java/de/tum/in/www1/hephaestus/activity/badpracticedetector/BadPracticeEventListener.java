@@ -10,14 +10,7 @@ import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
 /**
- * Listens for pull request events and triggers bad practice detection.
- * <p>
- * This listener is in the activity package because bad practice detection
- * is an application-level feature that reacts to gitprovider domain events.
- * This keeps the gitprovider module focused on data sync without knowledge
- * of consuming features.
- * <p>
- * Uses type-safe DomainEvent.PullRequestEvent subtypes - no instanceof checks needed!
+ * Listens for PR events and triggers real-time bad practice detection.
  */
 @Component
 public class BadPracticeEventListener {
@@ -35,7 +28,7 @@ public class BadPracticeEventListener {
     public void onPullRequestCreated(DomainEvent.PullRequestCreated event) {
         EventPayload.PullRequestData pr = event.pullRequest();
         logger.info(
-            "PR #{} created in {} - triggering initial bad practice detection",
+            "PR #{} created in {} - triggering bad practice detection",
             pr.number(),
             pr.repository().nameWithOwner()
         );
@@ -46,31 +39,25 @@ public class BadPracticeEventListener {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onPullRequestUpdated(DomainEvent.PullRequestUpdated event) {
         EventPayload.PullRequestData pr = event.pullRequest();
-        boolean significantChange =
-            event.changedFields().contains("title") ||
-            event.changedFields().contains("body") ||
-            event.changedFields().contains("labels");
-
-        if (significantChange) {
-            logger.info(
-                "PR #{} had significant update ({}) - re-running bad practice detection",
-                pr.number(),
-                event.changedFields()
-            );
-            detectBadPracticesSafely(pr.id(), pr.number());
-        }
+        logger.info(
+            "PR #{} updated in {} - triggering bad practice detection",
+            pr.number(),
+            pr.repository().nameWithOwner()
+        );
+        detectBadPracticesSafely(pr.id(), pr.number());
     }
 
     @Async
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onPullRequestLabeled(DomainEvent.PullRequestLabeled event) {
         EventPayload.PullRequestData pr = event.pullRequest();
-        String labelName = event.label().name().toLowerCase();
-        if (labelName.contains("ready") || labelName.contains("review")) {
-            logger.debug(
-                "PR #{} labeled with '{}' - re-running bad practice detection",
+        String labelName = event.label() != null ? event.label().name() : "";
+        if (labelName.toLowerCase().contains("ready") || labelName.toLowerCase().contains("review")) {
+            logger.info(
+                "PR #{} labeled with '{}' in {} - triggering bad practice detection",
                 pr.number(),
-                event.label().name()
+                labelName,
+                pr.repository().nameWithOwner()
             );
             detectBadPracticesSafely(pr.id(), pr.number());
         }
@@ -80,7 +67,11 @@ public class BadPracticeEventListener {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onPullRequestReady(DomainEvent.PullRequestReady event) {
         EventPayload.PullRequestData pr = event.pullRequest();
-        logger.info("PR #{} is ready for review - ensuring bad practices are up to date", pr.number());
+        logger.info(
+            "PR #{} marked ready for review in {} - triggering bad practice detection",
+            pr.number(),
+            pr.repository().nameWithOwner()
+        );
         detectBadPracticesSafely(pr.id(), pr.number());
     }
 
@@ -88,7 +79,11 @@ public class BadPracticeEventListener {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onPullRequestSynchronized(DomainEvent.PullRequestSynchronized event) {
         EventPayload.PullRequestData pr = event.pullRequest();
-        logger.debug("PR #{} synchronized (new commits) - re-running bad practice detection", pr.number());
+        logger.info(
+            "PR #{} synchronized in {} - triggering bad practice detection",
+            pr.number(),
+            pr.repository().nameWithOwner()
+        );
         detectBadPracticesSafely(pr.id(), pr.number());
     }
 
@@ -108,7 +103,7 @@ public class BadPracticeEventListener {
         try {
             badPracticeDetector.detectAndSyncBadPractices(pullRequestId);
         } catch (Exception e) {
-            logger.error("Error detecting bad practices for PR #{}: {}", pullRequestNumber, e.getMessage());
+            logger.error("Error detecting bad practices for PR #{}: {}", pullRequestNumber, e.getMessage(), e);
         }
     }
 }

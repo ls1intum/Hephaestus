@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.gitprovider.issue.github;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.NatsMessageDeserializer;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContextFactory;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventAction;
@@ -22,8 +23,12 @@ public class GitHubIssueMessageHandler extends GitHubMessageHandler<GitHubIssueE
     private final ProcessingContextFactory contextFactory;
     private final GitHubIssueProcessor issueProcessor;
 
-    public GitHubIssueMessageHandler(ProcessingContextFactory contextFactory, GitHubIssueProcessor issueProcessor) {
-        super(GitHubIssueEventDTO.class);
+    public GitHubIssueMessageHandler(
+        ProcessingContextFactory contextFactory,
+        GitHubIssueProcessor issueProcessor,
+        NatsMessageDeserializer deserializer
+    ) {
+        super(GitHubIssueEventDTO.class, deserializer);
         this.contextFactory = contextFactory;
         this.issueProcessor = issueProcessor;
     }

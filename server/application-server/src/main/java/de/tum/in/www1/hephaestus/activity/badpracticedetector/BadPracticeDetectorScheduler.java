@@ -4,6 +4,7 @@ import de.tum.in.www1.hephaestus.gitprovider.label.Label;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
+import de.tum.in.www1.hephaestus.notification.MailService;
 import de.tum.in.www1.hephaestus.workspace.RepositoryToMonitorRepository;
 import de.tum.in.www1.hephaestus.workspace.Workspace;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceRepository;
@@ -21,7 +22,6 @@ import org.keycloak.representations.idm.UserRepresentation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.scheduling.TaskScheduler;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -41,7 +41,7 @@ public class BadPracticeDetectorScheduler {
 
     private final TaskScheduler taskScheduler;
     private final PullRequestBadPracticeDetector pullRequestBadPracticeDetector;
-    private final ApplicationEventPublisher eventPublisher;
+    private final MailService mailService;
     private final Keycloak keycloak;
     private final RepositoryToMonitorRepository repositoryToMonitorRepository;
     private final WorkspaceRepository workspaceRepository;
@@ -54,7 +54,7 @@ public class BadPracticeDetectorScheduler {
     public BadPracticeDetectorScheduler(
         TaskScheduler taskScheduler,
         PullRequestBadPracticeDetector pullRequestBadPracticeDetector,
-        ApplicationEventPublisher eventPublisher,
+        MailService mailService,
         Keycloak keycloak,
         RepositoryToMonitorRepository repositoryToMonitorRepository,
         WorkspaceRepository workspaceRepository,
@@ -63,7 +63,7 @@ public class BadPracticeDetectorScheduler {
     ) {
         this.taskScheduler = taskScheduler;
         this.pullRequestBadPracticeDetector = pullRequestBadPracticeDetector;
-        this.eventPublisher = eventPublisher;
+        this.mailService = mailService;
         this.keycloak = keycloak;
         this.repositoryToMonitorRepository = repositoryToMonitorRepository;
         this.workspaceRepository = workspaceRepository;
@@ -211,7 +211,7 @@ public class BadPracticeDetectorScheduler {
     ) {
         BadPracticeDetectorTask badPracticeDetectorTask = new BadPracticeDetectorTask();
         badPracticeDetectorTask.setPullRequestBadPracticeDetector(pullRequestBadPracticeDetector);
-        badPracticeDetectorTask.setEventPublisher(eventPublisher);
+        badPracticeDetectorTask.setMailService(mailService);
         badPracticeDetectorTask.setPullRequest(pullRequest);
         badPracticeDetectorTask.setSendBadPracticeDetectionEmail(sendBadPracticeDetectionEmail);
         resolveWorkspaceSlugForRepository(pullRequest.getRepository()).ifPresent(

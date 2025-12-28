@@ -12,7 +12,6 @@ import java.util.ArrayList;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
@@ -26,8 +25,11 @@ public class SlackMessageService {
 
     private static final Logger logger = LoggerFactory.getLogger(SlackMessageService.class);
 
-    @Autowired
-    private App slackApp;
+    private final App slackApp;
+
+    public SlackMessageService(App slackApp) {
+        this.slackApp = slackApp;
+    }
 
     /**
      * Gets all members of the Slack workspace.

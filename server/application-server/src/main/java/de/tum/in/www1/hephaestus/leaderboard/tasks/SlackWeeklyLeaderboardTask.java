@@ -29,6 +29,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 /**
@@ -37,36 +38,42 @@ import org.springframework.stereotype.Component;
  * @see SlackMessageService
  */
 @Component
+@ConditionalOnProperty(prefix = "hephaestus.leaderboard.notification", name = "enabled", havingValue = "true")
 public class SlackWeeklyLeaderboardTask implements Runnable {
 
     private static final Logger logger = LoggerFactory.getLogger(SlackWeeklyLeaderboardTask.class);
 
-    @Value("${hephaestus.leaderboard.notification.team}")
-    private String team;
+    private final String team;
+    private final String channelId;
+    private final boolean runScheduledMessage;
+    private final String hephaestusUrl;
+    private final String scheduledDay;
+    private final String scheduledTime;
+    private final SlackMessageService slackMessageService;
+    private final LeaderboardService leaderboardService;
+    private final WorkspaceRepository workspaceRepository;
 
-    @Value("${hephaestus.leaderboard.notification.channel-id}")
-    private String channelId;
-
-    @Value("${hephaestus.leaderboard.notification.enabled}")
-    private boolean runScheduledMessage;
-
-    @Value("${hephaestus.host-url:localhost:8080}")
-    private String hephaestusUrl;
-
-    @Value("${hephaestus.leaderboard.schedule.day}")
-    private String scheduledDay;
-
-    @Value("${hephaestus.leaderboard.schedule.time}")
-    private String scheduledTime;
-
-    @Autowired(required = false)
-    private SlackMessageService slackMessageService;
-
-    @Autowired
-    private LeaderboardService leaderboardService;
-
-    @Autowired
-    private WorkspaceRepository workspaceRepository;
+    public SlackWeeklyLeaderboardTask(
+        @Value("${hephaestus.leaderboard.notification.team}") String team,
+        @Value("${hephaestus.leaderboard.notification.channel-id}") String channelId,
+        @Value("${hephaestus.leaderboard.notification.enabled}") boolean runScheduledMessage,
+        @Value("${hephaestus.host-url:localhost:8080}") String hephaestusUrl,
+        @Value("${hephaestus.leaderboard.schedule.day}") String scheduledDay,
+        @Value("${hephaestus.leaderboard.schedule.time}") String scheduledTime,
+        @Autowired(required = false) SlackMessageService slackMessageService,
+        LeaderboardService leaderboardService,
+        WorkspaceRepository workspaceRepository
+    ) {
+        this.team = team;
+        this.channelId = channelId;
+        this.runScheduledMessage = runScheduledMessage;
+        this.hephaestusUrl = hephaestusUrl;
+        this.scheduledDay = scheduledDay;
+        this.scheduledTime = scheduledTime;
+        this.slackMessageService = slackMessageService;
+        this.leaderboardService = leaderboardService;
+        this.workspaceRepository = workspaceRepository;
+    }
 
     /**
      * Test the Slack connection.

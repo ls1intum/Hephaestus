@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.gitprovider.repository.github;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.NatsMessageDeserializer;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContextFactory;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventAction;
@@ -30,9 +31,10 @@ public class GitHubMemberMessageHandler extends GitHubMessageHandler<GitHubMembe
     GitHubMemberMessageHandler(
         ProcessingContextFactory contextFactory,
         GitHubUserProcessor userProcessor,
-        RepositoryCollaboratorRepository collaboratorRepository
+        RepositoryCollaboratorRepository collaboratorRepository,
+        NatsMessageDeserializer deserializer
     ) {
-        super(GitHubMemberEventDTO.class);
+        super(GitHubMemberEventDTO.class, deserializer);
         this.contextFactory = contextFactory;
         this.userProcessor = userProcessor;
         this.collaboratorRepository = collaboratorRepository;

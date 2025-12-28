@@ -17,6 +17,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 
 /**
  * Service for fetching Hephaestus project contributors from GitHub.
@@ -59,8 +60,8 @@ public class ContributorService {
             Map<Long, ContributorDTO> uniqueContributors = new LinkedHashMap<>();
             collectContributorsForRepository("ls1intum", "Hephaestus", uniqueContributors);
             return sortContributors(uniqueContributors);
-        } catch (Exception e) {
-            logger.error("Error fetching global contributors: {}", e.getMessage());
+        } catch (WebClientResponseException e) {
+            logger.error("HTTP error fetching global contributors: {} - {}", e.getStatusCode(), e.getMessage(), e);
             return new ArrayList<>();
         }
     }
@@ -85,8 +86,15 @@ public class ContributorService {
                     safelyAddContributor(contributor, accumulator);
                 }
             }
-        } catch (Exception e) {
-            logger.warn("Failed to fetch contributors for repository {}/{}: {}", owner, repo, e.getMessage());
+        } catch (WebClientResponseException e) {
+            logger.warn(
+                "HTTP error fetching contributors for repository {}/{}: {} - {}",
+                owner,
+                repo,
+                e.getStatusCode(),
+                e.getMessage(),
+                e
+            );
         }
     }
 
@@ -112,8 +120,8 @@ public class ContributorService {
             String fullName = fetchUserFullName(login);
             ContributorDTO dto = contributor.toContributorDTO(fullName);
             accumulator.putIfAbsent(dto.id(), dto);
-        } catch (Exception e) {
-            logger.error("Error converting contributor to DTO: {}", e.getMessage());
+        } catch (IllegalArgumentException e) {
+            logger.error("Error converting contributor to DTO: {}", e.getMessage(), e);
         }
     }
 
@@ -130,8 +138,13 @@ public class ContributorService {
                 .bodyToMono(GitHubUserResponse.class)
                 .block();
             return user != null ? user.name() : null;
-        } catch (Exception e) {
-            logger.debug("Failed to fetch full name for user {}: {}", login, e.getMessage());
+        } catch (WebClientResponseException e) {
+            logger.debug(
+                "HTTP error fetching full name for user {}: {} - {}",
+                login,
+                e.getStatusCode(),
+                e.getMessage()
+            );
             return null;
         }
     }

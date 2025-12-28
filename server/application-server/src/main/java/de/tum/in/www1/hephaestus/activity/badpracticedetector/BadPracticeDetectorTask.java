@@ -5,10 +5,12 @@ import de.tum.in.www1.hephaestus.activity.model.PullRequestBadPractice;
 import de.tum.in.www1.hephaestus.activity.model.PullRequestBadPracticeState;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
+import de.tum.in.www1.hephaestus.notification.MailService;
+import de.tum.in.www1.hephaestus.shared.badpractice.BadPracticeInfo;
+import de.tum.in.www1.hephaestus.shared.badpractice.BadPracticeNotificationData;
 import java.util.List;
 import lombok.Getter;
 import lombok.Setter;
-import org.springframework.context.ApplicationEventPublisher;
 
 @Getter
 @Setter
@@ -16,7 +18,7 @@ public class BadPracticeDetectorTask implements Runnable {
 
     private PullRequestBadPracticeDetector pullRequestBadPracticeDetector;
 
-    private ApplicationEventPublisher eventPublisher;
+    private MailService mailService;
 
     private PullRequest pullRequest;
 
@@ -45,10 +47,31 @@ public class BadPracticeDetectorTask implements Runnable {
             .toList();
 
         if (sendBadPracticeDetectionEmail && !unResolvedBadPractices.isEmpty()) {
+            // Convert entities to DTOs to break circular dependency
+            List<BadPracticeInfo> badPracticeInfos = unResolvedBadPractices
+                .stream()
+                .map(bp ->
+                    new BadPracticeInfo(
+                        bp.getId(),
+                        bp.getTitle(),
+                        bp.getDescription(),
+                        bp.getState() != null ? bp.getState().name() : null
+                    )
+                )
+                .toList();
+
             for (User user : pullRequest.getAssignees()) {
-                eventPublisher.publishEvent(
-                    BadPracticesDetectedEvent.create(user, pullRequest, unResolvedBadPractices, workspaceSlug)
+                BadPracticeNotificationData notificationData = new BadPracticeNotificationData(
+                    user.getLogin(),
+                    null, // email will be fetched from Keycloak
+                    pullRequest.getNumber(),
+                    pullRequest.getTitle(),
+                    pullRequest.getHtmlUrl(),
+                    pullRequest.getRepository() != null ? pullRequest.getRepository().getName() : null,
+                    workspaceSlug,
+                    badPracticeInfos
                 );
+                mailService.sendBadPracticesDetectedInPullRequestEmail(notificationData);
             }
         }
     }

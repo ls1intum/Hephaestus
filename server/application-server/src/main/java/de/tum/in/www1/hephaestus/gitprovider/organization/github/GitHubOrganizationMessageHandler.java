@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.gitprovider.organization.github;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.NatsMessageDeserializer;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventAction;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
 import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationMembershipRepository;
@@ -27,9 +28,10 @@ public class GitHubOrganizationMessageHandler extends GitHubMessageHandler<GitHu
     GitHubOrganizationMessageHandler(
         GitHubOrganizationProcessor organizationProcessor,
         GitHubUserProcessor userProcessor,
-        OrganizationMembershipRepository membershipRepository
+        OrganizationMembershipRepository membershipRepository,
+        NatsMessageDeserializer deserializer
     ) {
-        super(GitHubOrganizationEventDTO.class);
+        super(GitHubOrganizationEventDTO.class, deserializer);
         this.organizationProcessor = organizationProcessor;
         this.userProcessor = userProcessor;
         this.membershipRepository = membershipRepository;

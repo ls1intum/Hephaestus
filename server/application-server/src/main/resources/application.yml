@@ -87,6 +87,10 @@ logging:
 hephaestus:
     host-url: https://hephaestus.ase.cit.tum.de/
 
+    cors:
+        allowed-origins:
+            - ${CLIENT_HOST:http://localhost:4200}
+
     webapp:
         url: ${CLIENT_HOST:http://localhost:4200}
     

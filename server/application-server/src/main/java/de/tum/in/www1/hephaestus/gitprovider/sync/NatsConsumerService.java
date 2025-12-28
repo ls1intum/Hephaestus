@@ -143,7 +143,7 @@ public class NatsConsumerService {
                 Thread.currentThread().interrupt();
                 return;
             } catch (IOException e) {
-                logger.error("NATS connection error: {}", e.getMessage());
+                logger.error("NATS connection error: {}", e.getMessage(), e);
                 backoffBeforeRetry();
             }
         }
@@ -261,7 +261,7 @@ public class NatsConsumerService {
                 cleanupConsumer(consumer.consumerName);
                 logger.info("Stopped consumer for workspace id={}", workspaceId);
             } catch (Exception e) {
-                logger.error("Error stopping consumer for workspace id={}: {}", workspaceId, e.getMessage());
+                logger.error("Error stopping consumer for workspace id={}: {}", workspaceId, e.getMessage(), e);
             }
         });
     }
@@ -479,7 +479,7 @@ public class NatsConsumerService {
                 natsConnection = Nats.connect(buildNatsOptions());
                 logger.info("Connected to NATS server.");
             } catch (IOException | InterruptedException e) {
-                logger.error("Failed to connect to NATS server: {}", e.getMessage());
+                logger.error("Failed to connect to NATS server: {}", e.getMessage(), e);
                 throw new RuntimeException("Failed to establish NATS connection", e);
             }
         }

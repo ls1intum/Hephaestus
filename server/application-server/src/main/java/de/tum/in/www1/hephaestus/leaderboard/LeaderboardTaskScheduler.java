@@ -29,23 +29,28 @@ public class LeaderboardTaskScheduler {
 
     private static final Logger logger = LoggerFactory.getLogger(LeaderboardTaskScheduler.class);
 
-    @Value("${hephaestus.leaderboard.notification.enabled}")
-    private boolean runScheduledMessage;
+    private final boolean runScheduledMessage;
+    private final String scheduledDay;
+    private final String scheduledTime;
+    private final ThreadPoolTaskScheduler taskScheduler;
+    private final SlackWeeklyLeaderboardTask slackWeeklyLeaderboardTask;
+    private final LeaguePointsUpdateTask leaguePointsUpdateTask;
 
-    @Value("${hephaestus.leaderboard.schedule.day}")
-    private String scheduledDay;
-
-    @Value("${hephaestus.leaderboard.schedule.time}")
-    private String scheduledTime;
-
-    @Autowired
-    private ThreadPoolTaskScheduler taskScheduler;
-
-    @Autowired
-    private SlackWeeklyLeaderboardTask slackWeeklyLeaderboardTask;
-
-    @Autowired
-    private LeaguePointsUpdateTask leaguePointsUpdateTask;
+    public LeaderboardTaskScheduler(
+        @Value("${hephaestus.leaderboard.notification.enabled}") boolean runScheduledMessage,
+        @Value("${hephaestus.leaderboard.schedule.day}") String scheduledDay,
+        @Value("${hephaestus.leaderboard.schedule.time}") String scheduledTime,
+        ThreadPoolTaskScheduler taskScheduler,
+        @Autowired(required = false) SlackWeeklyLeaderboardTask slackWeeklyLeaderboardTask,
+        LeaguePointsUpdateTask leaguePointsUpdateTask
+    ) {
+        this.runScheduledMessage = runScheduledMessage;
+        this.scheduledDay = scheduledDay;
+        this.scheduledTime = scheduledTime;
+        this.taskScheduler = taskScheduler;
+        this.slackWeeklyLeaderboardTask = slackWeeklyLeaderboardTask;
+        this.leaguePointsUpdateTask = leaguePointsUpdateTask;
+    }
 
     @EventListener(ApplicationReadyEvent.class)
     public void activateTaskScheduler() {

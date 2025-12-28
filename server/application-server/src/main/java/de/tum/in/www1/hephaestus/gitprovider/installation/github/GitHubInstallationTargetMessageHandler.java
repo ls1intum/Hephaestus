@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.gitprovider.installation.github;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.NatsMessageDeserializer;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventAction;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.WorkspaceProvisioningListener;
@@ -22,9 +23,10 @@ public class GitHubInstallationTargetMessageHandler extends GitHubMessageHandler
 
     GitHubInstallationTargetMessageHandler(
         WorkspaceProvisioningListener provisioningListener,
-        OrganizationService organizationService
+        OrganizationService organizationService,
+        NatsMessageDeserializer deserializer
     ) {
-        super(GitHubInstallationTargetEventDTO.class);
+        super(GitHubInstallationTargetEventDTO.class, deserializer);
         this.provisioningListener = provisioningListener;
         this.organizationService = organizationService;
     }

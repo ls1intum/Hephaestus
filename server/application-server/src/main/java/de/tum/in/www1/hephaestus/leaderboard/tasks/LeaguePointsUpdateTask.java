@@ -16,7 +16,6 @@ import java.util.List;
 import java.util.function.Consumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -25,26 +24,31 @@ public class LeaguePointsUpdateTask implements Runnable {
 
     private static final Logger logger = LoggerFactory.getLogger(LeaguePointsUpdateTask.class);
 
-    @Value("${hephaestus.leaderboard.schedule.day}")
-    private String scheduledDay;
+    private final String scheduledDay;
+    private final String scheduledTime;
+    private final UserRepository userRepository;
+    private final LeaderboardService leaderboardService;
+    private final LeaguePointsCalculationService leaguePointsCalculationService;
+    private final WorkspaceMembershipService workspaceMembershipService;
+    private final WorkspaceRepository workspaceRepository;
 
-    @Value("${hephaestus.leaderboard.schedule.time}")
-    private String scheduledTime;
-
-    @Autowired
-    private UserRepository userRepository;
-
-    @Autowired
-    private LeaderboardService leaderboardService;
-
-    @Autowired
-    private LeaguePointsCalculationService leaguePointsCalculationService;
-
-    @Autowired
-    private WorkspaceMembershipService workspaceMembershipService;
-
-    @Autowired
-    private WorkspaceRepository workspaceRepository;
+    public LeaguePointsUpdateTask(
+        @Value("${hephaestus.leaderboard.schedule.day}") String scheduledDay,
+        @Value("${hephaestus.leaderboard.schedule.time}") String scheduledTime,
+        UserRepository userRepository,
+        LeaderboardService leaderboardService,
+        LeaguePointsCalculationService leaguePointsCalculationService,
+        WorkspaceMembershipService workspaceMembershipService,
+        WorkspaceRepository workspaceRepository
+    ) {
+        this.scheduledDay = scheduledDay;
+        this.scheduledTime = scheduledTime;
+        this.userRepository = userRepository;
+        this.leaderboardService = leaderboardService;
+        this.leaguePointsCalculationService = leaguePointsCalculationService;
+        this.workspaceMembershipService = workspaceMembershipService;
+        this.workspaceRepository = workspaceRepository;
+    }
 
     @Override
     @Transactional

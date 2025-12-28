@@ -25,14 +25,7 @@ import de.tum.in.www1.hephaestus.gitprovider.user.UserTeamsDTO;
 import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContextHolder;
 import de.tum.in.www1.hephaestus.workspace.exception.*;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
-import java.time.LocalTime;
-import java.time.format.DateTimeFormatter;
-import java.time.format.DateTimeParseException;
-import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -44,7 +37,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.slf4j.Logger;
@@ -69,10 +61,6 @@ public class WorkspaceService {
 
     private static final boolean DEFAULT_PUBLIC_VISIBILITY = false;
 
-    private static final int SLUG_HISTORY_RETENTION = 5;
-
-    private static final Pattern SLACK_CHANNEL_ID_PATTERN = Pattern.compile("^[CGD][A-Z0-9]{8,}$");
-
     // Configuration
     private final boolean isNatsEnabled;
     private final boolean runMonitoringOnStartup;
@@ -85,9 +73,10 @@ public class WorkspaceService {
     private final RepositoryRepository repositoryRepository;
     private final LabelRepository labelRepository;
     private final WorkspaceMembershipRepository workspaceMembershipRepository;
-    private final WorkspaceSlugHistoryRepository workspaceSlugHistoryRepository;
 
     // Services
+    private final WorkspaceSlugService workspaceSlugService;
+    private final WorkspaceSettingsService workspaceSettingsService;
     private final NatsConsumerService natsConsumerService;
     private final GitHubInstallationRepositoryEnumerationService installationRepositoryEnumerator;
     private final WorkspaceScopeFilter workspaceScopeFilter;
@@ -104,8 +93,6 @@ public class WorkspaceService {
     // Infrastructure
     private final AsyncTaskExecutor monitoringExecutor;
 
-    private final int redirectTtlDays;
-
     public WorkspaceService(
         @Value("${nats.enabled}") boolean isNatsEnabled,
         @Value("${monitoring.run-on-startup}") boolean runMonitoringOnStartup,
@@ -116,7 +103,8 @@ public class WorkspaceService {
         RepositoryRepository repositoryRepository,
         LabelRepository labelRepository,
         WorkspaceMembershipRepository workspaceMembershipRepository,
-        WorkspaceSlugHistoryRepository workspaceSlugHistoryRepository,
+        WorkspaceSlugService workspaceSlugService,
+        WorkspaceSettingsService workspaceSettingsService,
         NatsConsumerService natsConsumerService,
         GitHubInstallationRepositoryEnumerationService installationRepositoryEnumerator,
         WorkspaceScopeFilter workspaceScopeFilter,
@@ -127,8 +115,7 @@ public class WorkspaceService {
         ObjectProvider<GitHubDataSyncService> gitHubDataSyncServiceProvider,
         ObjectProvider<GitHubIssueTypeSyncService> issueTypeSyncServiceProvider,
         ObjectProvider<GitHubSubIssueSyncService> subIssueSyncServiceProvider,
-        @Qualifier("monitoringExecutor") AsyncTaskExecutor monitoringExecutor,
-        @Value("${hephaestus.workspace.slug.redirect.ttl-days:30}") int redirectTtlDays
+        @Qualifier("monitoringExecutor") AsyncTaskExecutor monitoringExecutor
     ) {
         this.isNatsEnabled = isNatsEnabled;
         this.runMonitoringOnStartup = runMonitoringOnStartup;
@@ -139,7 +126,8 @@ public class WorkspaceService {
         this.repositoryRepository = repositoryRepository;
         this.labelRepository = labelRepository;
         this.workspaceMembershipRepository = workspaceMembershipRepository;
-        this.workspaceSlugHistoryRepository = workspaceSlugHistoryRepository;
+        this.workspaceSlugService = workspaceSlugService;
+        this.workspaceSettingsService = workspaceSettingsService;
         this.natsConsumerService = natsConsumerService;
         this.installationRepositoryEnumerator = installationRepositoryEnumerator;
         this.workspaceScopeFilter = workspaceScopeFilter;
@@ -151,7 +139,6 @@ public class WorkspaceService {
         this.issueTypeSyncServiceProvider = issueTypeSyncServiceProvider;
         this.subIssueSyncServiceProvider = subIssueSyncServiceProvider;
         this.monitoringExecutor = monitoringExecutor;
-        this.redirectTtlDays = redirectTtlDays;
     }
 
     /** Lazy accessor for GitHubDataSyncService to break circular dependency. */
@@ -793,8 +780,11 @@ public class WorkspaceService {
                 return null;
             }
 
-            String desiredSlug = normalizeSlug(accountLogin);
-            String availableSlug = allocateAvailableSlug(desiredSlug, "install-" + installationId + "-" + accountLogin);
+            String desiredSlug = workspaceSlugService.normalize(accountLogin);
+            String availableSlug = workspaceSlugService.allocate(
+                desiredSlug,
+                "install-" + installationId + "-" + accountLogin
+            );
 
             // We intentionally do NOT create a redirect from the desired slug to the
             // allocated slug here,
@@ -1321,10 +1311,10 @@ public class WorkspaceService {
         AccountType accountType,
         Long ownerUserId
     ) {
-        String slug = normalizeSlug(rawSlug);
-        validateSlug(slug);
+        String slug = workspaceSlugService.normalize(rawSlug);
+        workspaceSlugService.validate(slug);
 
-        if (hasActiveHistory(slug)) {
+        if (!workspaceSlugService.isAvailable(slug)) {
             throw new WorkspaceSlugConflictException(slug);
         }
 
@@ -1368,61 +1358,18 @@ public class WorkspaceService {
         return slug;
     }
 
-    @Transactional
     public Workspace updateSchedule(String slug, Integer day, String time) {
-        Workspace workspace = workspaceRepository
-            .findByWorkspaceSlug(slug)
-            .orElseThrow(() -> new EntityNotFoundException("Workspace", slug));
-
-        if (day != null) {
-            if (day < 1 || day > 7) {
-                throw new IllegalArgumentException("Day must be between 1 (Monday) and 7 (Sunday), got: " + day);
-            }
-            workspace.setLeaderboardScheduleDay(day);
-        }
-
-        if (time != null) {
-            try {
-                LocalTime parsed = LocalTime.parse(time, DateTimeFormatter.ofPattern("HH:mm"));
-                workspace.setLeaderboardScheduleTime(parsed.toString());
-            } catch (DateTimeParseException ex) {
-                throw new IllegalArgumentException("Time must be in HH:mm format (00:00 to 23:59), got: " + time);
-            }
-        }
-
-        return workspaceRepository.save(workspace);
+        Workspace workspace = requireWorkspace(slug);
+        return workspaceSettingsService.updateSchedule(workspace.getId(), day, time);
     }
 
     public Workspace updateSchedule(WorkspaceContext workspaceContext, Integer day, String time) {
         return updateSchedule(requireSlug(workspaceContext), day, time);
     }
 
-    @Transactional
     public Workspace updateNotifications(String slug, Boolean enabled, String team, String channelId) {
-        Workspace workspace = workspaceRepository
-            .findByWorkspaceSlug(slug)
-            .orElseThrow(() -> new EntityNotFoundException("Workspace", slug));
-
-        if (enabled != null) {
-            workspace.setLeaderboardNotificationEnabled(enabled);
-        }
-
-        if (team != null) {
-            workspace.setLeaderboardNotificationTeam(team);
-        }
-
-        if (channelId != null) {
-            String trimmedChannelId = channelId.trim();
-            if (!SLACK_CHANNEL_ID_PATTERN.matcher(trimmedChannelId).matches()) {
-                throw new IllegalArgumentException(
-                    "Slack channel ID must start with 'C' (public), 'G' (private), or 'D' (DM) followed by at least 8 alphanumerics, got: " +
-                    trimmedChannelId
-                );
-            }
-            workspace.setLeaderboardNotificationChannelId(trimmedChannelId);
-        }
-
-        return workspaceRepository.save(workspace);
+        Workspace workspace = requireWorkspace(slug);
+        return workspaceSettingsService.updateNotifications(workspace.getId(), enabled, team, channelId);
     }
 
     public Workspace updateNotifications(
@@ -1434,35 +1381,18 @@ public class WorkspaceService {
         return updateNotifications(requireSlug(workspaceContext), enabled, team, channelId);
     }
 
-    @Transactional
     public Workspace updateToken(String slug, String personalAccessToken) {
-        Workspace workspace = workspaceRepository
-            .findByWorkspaceSlug(slug)
-            .orElseThrow(() -> new EntityNotFoundException("Workspace", slug));
-
-        // TODO: Validate token with GitHub API before storing
-        // TODO: Consider encrypting the token at rest
-        // TODO: Add audit log entry for security tracking
-        workspace.setPersonalAccessToken(personalAccessToken);
-
-        return workspaceRepository.save(workspace);
+        Workspace workspace = requireWorkspace(slug);
+        return workspaceSettingsService.updateToken(workspace.getId(), personalAccessToken);
     }
 
     public Workspace updateToken(WorkspaceContext workspaceContext, String personalAccessToken) {
         return updateToken(requireSlug(workspaceContext), personalAccessToken);
     }
 
-    @Transactional
     public Workspace updateSlackCredentials(String slug, String slackToken, String slackSigningSecret) {
-        Workspace workspace = workspaceRepository
-            .findByWorkspaceSlug(slug)
-            .orElseThrow(() -> new EntityNotFoundException("Workspace", slug));
-
-        // TODO: Validate Slack token by calling Slack API (auth.test)
-        workspace.setSlackToken(slackToken);
-        workspace.setSlackSigningSecret(slackSigningSecret);
-
-        return workspaceRepository.save(workspace);
+        Workspace workspace = requireWorkspace(slug);
+        return workspaceSettingsService.updateSlackCredentials(workspace.getId(), slackToken, slackSigningSecret);
     }
 
     public Workspace updateSlackCredentials(
@@ -1473,15 +1403,9 @@ public class WorkspaceService {
         return updateSlackCredentials(requireSlug(workspaceContext), slackToken, slackSigningSecret);
     }
 
-    @Transactional
     public Workspace updatePublicVisibility(String slug, Boolean isPubliclyViewable) {
-        Workspace workspace = workspaceRepository
-            .findByWorkspaceSlug(slug)
-            .orElseThrow(() -> new EntityNotFoundException("Workspace", slug));
-
-        workspace.setIsPubliclyViewable(isPubliclyViewable);
-
-        return workspaceRepository.save(workspace);
+        Workspace workspace = requireWorkspace(slug);
+        return workspaceSettingsService.updatePublicVisibility(workspace.getId(), isPubliclyViewable);
     }
 
     public Workspace updatePublicVisibility(WorkspaceContext workspaceContext, Boolean isPubliclyViewable) {
@@ -1502,7 +1426,7 @@ public class WorkspaceService {
 
     @Transactional
     public Workspace renameSlug(Long workspaceId, String newSlug) {
-        validateSlug(newSlug);
+        workspaceSlugService.validate(newSlug);
 
         Workspace workspace = workspaceRepository
             .findById(workspaceId)
@@ -1523,22 +1447,11 @@ public class WorkspaceService {
             throw new WorkspaceSlugConflictException(newSlug);
         }
 
-        if (hasActiveHistory(newSlug)) {
+        if (!workspaceSlugService.isAvailable(newSlug)) {
             throw new WorkspaceSlugConflictException(newSlug);
         }
 
-        WorkspaceSlugHistory history = new WorkspaceSlugHistory();
-        history.setWorkspace(workspace);
-        history.setOldSlug(currentSlug);
-        history.setNewSlug(newSlug);
-        Instant now = Instant.now();
-        history.setChangedAt(now);
-        if (redirectTtlDays > 0) {
-            history.setRedirectExpiresAt(now.plus(redirectTtlDays, ChronoUnit.DAYS));
-        }
-        workspaceSlugHistoryRepository.save(history);
-
-        pruneSlugHistory(workspace);
+        workspaceSlugService.recordRename(workspace, currentSlug);
 
         workspace.setWorkspaceSlug(newSlug);
         Workspace saved = workspaceRepository.save(workspace);
@@ -1558,108 +1471,6 @@ public class WorkspaceService {
             throw new IllegalArgumentException("Owner user id must not be null when creating a workspace.");
         }
         workspaceMembershipService.createMembership(workspace, ownerUserId, WorkspaceMembership.WorkspaceRole.OWNER);
-    }
-
-    private void pruneSlugHistory(Workspace workspace) {
-        List<WorkspaceSlugHistory> history = workspaceSlugHistoryRepository.findByWorkspaceOrderByChangedAtDesc(
-            workspace
-        );
-        if (history.size() <= SLUG_HISTORY_RETENTION) {
-            return;
-        }
-
-        List<WorkspaceSlugHistory> excess = history.subList(SLUG_HISTORY_RETENTION, history.size());
-        workspaceSlugHistoryRepository.deleteAllInBatch(excess);
-    }
-
-    private String normalizeSlug(String slug) {
-        if (slug == null) {
-            return null;
-        }
-        String normalized = slug.trim().toLowerCase();
-        normalized = normalized
-            .replace('_', '-')
-            .replaceAll("\\s+", "-")
-            .replaceAll("-{2,}", "-")
-            .replaceAll("^-|-$", "");
-        return normalized;
-    }
-
-    private void validateSlug(String slug) {
-        if (slug == null) {
-            throw new InvalidWorkspaceSlugException("null");
-        }
-        if (!slug.matches("^[a-z0-9][a-z0-9-]{2,50}$")) {
-            throw new InvalidWorkspaceSlugException(slug);
-        }
-    }
-
-    private String allocateAvailableSlug(String desiredSlug, String suffixSeed) {
-        String normalized = normalizeSlug(desiredSlug);
-        if (isSlugFree(normalized)) {
-            return normalized;
-        }
-
-        String seedInput = (suffixSeed == null ? "" : suffixSeed) + "-" + desiredSlug;
-        // Use longer hash to further reduce birthday collisions when many installations
-        // share similar logins
-        String hash = shortHash(seedInput, 10);
-        String suffix = "-" + hash;
-
-        String candidate = buildSlugCandidate(normalized, suffix, 0);
-        if (candidate != null) {
-            return candidate;
-        }
-
-        for (int attempt = 1; attempt <= 50; attempt++) {
-            candidate = buildSlugCandidate(normalized, suffix + "-" + attempt, attempt);
-            if (candidate != null) {
-                return candidate;
-            }
-        }
-
-        throw new WorkspaceSlugConflictException(desiredSlug);
-    }
-
-    private String buildSlugCandidate(String baseSlug, String suffix, int attempt) {
-        int maxBaseLen = Math.max(3, 51 - suffix.length());
-        String base = baseSlug.length() > maxBaseLen ? baseSlug.substring(0, maxBaseLen) : baseSlug;
-        String candidate = normalizeSlug(base + suffix);
-        if (candidate.length() < 3) {
-            return null;
-        }
-        return isSlugFree(candidate) ? candidate : null;
-    }
-
-    private String shortHash(String input, int length) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] hashBytes = digest.digest(input.getBytes(StandardCharsets.UTF_8));
-            String hex = bytesToHex(hashBytes);
-            return hex.substring(0, Math.min(length, hex.length()));
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException("SHA-256 not available", e);
-        }
-    }
-
-    private String bytesToHex(byte[] bytes) {
-        StringBuilder sb = new StringBuilder(bytes.length * 2);
-        for (byte b : bytes) {
-            sb.append(String.format("%02x", b));
-        }
-        return sb.toString();
-    }
-
-    private boolean isSlugFree(String slug) {
-        return !workspaceRepository.existsByWorkspaceSlug(slug) && !hasActiveHistory(slug);
-    }
-
-    private boolean hasActiveHistory(String slug) {
-        Instant now = Instant.now();
-        return (
-            workspaceSlugHistoryRepository.existsByOldSlugAndRedirectExpiresAtIsNull(slug) ||
-            workspaceSlugHistoryRepository.existsByOldSlugAndRedirectExpiresAtAfter(slug, now)
-        );
     }
 
     /**

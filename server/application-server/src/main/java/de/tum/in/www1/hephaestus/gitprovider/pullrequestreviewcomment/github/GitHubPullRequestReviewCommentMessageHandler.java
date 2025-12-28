@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.github;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.NatsMessageDeserializer;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContextFactory;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventAction;
@@ -27,9 +28,10 @@ public class GitHubPullRequestReviewCommentMessageHandler
     GitHubPullRequestReviewCommentMessageHandler(
         ProcessingContextFactory contextFactory,
         GitHubPullRequestProcessor prProcessor,
-        GitHubPullRequestReviewCommentProcessor commentProcessor
+        GitHubPullRequestReviewCommentProcessor commentProcessor,
+        NatsMessageDeserializer deserializer
     ) {
-        super(GitHubPullRequestReviewCommentEventDTO.class);
+        super(GitHubPullRequestReviewCommentEventDTO.class, deserializer);
         this.contextFactory = contextFactory;
         this.prProcessor = prProcessor;
         this.commentProcessor = commentProcessor;

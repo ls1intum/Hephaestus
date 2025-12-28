@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Stream;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.convert.converter.Converter;
@@ -27,6 +28,9 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 @EnableWebSecurity
 @EnableMethodSecurity(prePostEnabled = true)
 public class SecurityConfig {
+
+    @Value("${hephaestus.cors.allowed-origins:http://localhost:4200}")
+    private List<String> allowedOrigins;
 
     interface AuthoritiesConverter extends Converter<Map<String, Object>, Collection<GrantedAuthority>> {}
 
@@ -74,6 +78,13 @@ public class SecurityConfig {
             .csrf(csrf -> csrf.disable())
             .cors(cors -> cors.configurationSource(corsConfigurationSource()));
 
+        http.headers(headers ->
+            headers
+                .frameOptions(frameOptions -> frameOptions.deny())
+                .contentTypeOptions(contentType -> {})
+                .httpStrictTransportSecurity(hsts -> hsts.includeSubDomains(true).maxAgeInSeconds(31536000))
+        );
+
         http.authorizeHttpRequests(requests -> {
             // Public read for slugged workspace paths (filter enforces membership/public visibility).
             requests.requestMatchers(HttpMethod.GET, "/workspaces/*/**").permitAll();
@@ -96,8 +107,13 @@ public class SecurityConfig {
     @Bean
     CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.applyPermitDefaultValues();
+        configuration.setAllowedOrigins(allowedOrigins);
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD", "PATCH"));
+        configuration.setAllowedHeaders(
+            List.of("Authorization", "Content-Type", "Accept", "X-Requested-With", "Origin")
+        );
+        configuration.setAllowCredentials(true);
+        configuration.setMaxAge(3600L);
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
         return source;

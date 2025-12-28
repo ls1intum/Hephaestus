@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.gitprovider.team.github;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.NatsMessageDeserializer;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventAction;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
 import de.tum.in.www1.hephaestus.gitprovider.team.Team;
@@ -29,9 +30,10 @@ public class GitHubMembershipMessageHandler extends GitHubMessageHandler<GitHubM
     GitHubMembershipMessageHandler(
         GitHubUserProcessor userProcessor,
         TeamRepository teamRepository,
-        TeamMembershipRepository teamMembershipRepository
+        TeamMembershipRepository teamMembershipRepository,
+        NatsMessageDeserializer deserializer
     ) {
-        super(GitHubMembershipEventDTO.class);
+        super(GitHubMembershipEventDTO.class, deserializer);
         this.userProcessor = userProcessor;
         this.teamRepository = teamRepository;
         this.teamMembershipRepository = teamMembershipRepository;

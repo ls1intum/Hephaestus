@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.gitprovider.installation.github;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.NatsMessageDeserializer;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
 import de.tum.in.www1.hephaestus.gitprovider.installation.github.dto.GitHubInstallationRepositoriesEventDTO;
 import de.tum.in.www1.hephaestus.gitprovider.repository.github.dto.GitHubRepositoryRefDTO;
@@ -20,8 +21,8 @@ public class GitHubInstallationRepositoriesMessageHandler
 
     private static final Logger logger = LoggerFactory.getLogger(GitHubInstallationRepositoriesMessageHandler.class);
 
-    GitHubInstallationRepositoriesMessageHandler() {
-        super(GitHubInstallationRepositoriesEventDTO.class);
+    GitHubInstallationRepositoriesMessageHandler(NatsMessageDeserializer deserializer) {
+        super(GitHubInstallationRepositoriesEventDTO.class, deserializer);
     }
 
     @Override

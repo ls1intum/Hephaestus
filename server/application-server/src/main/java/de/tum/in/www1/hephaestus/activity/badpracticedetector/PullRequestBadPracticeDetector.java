@@ -15,7 +15,6 @@ import java.time.Instant;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -27,17 +26,25 @@ public class PullRequestBadPracticeDetector {
     private static final String READY_FOR_REVIEW = "ready for review";
     private static final String READY_TO_MERGE = "ready to merge";
 
-    @Autowired
-    private PullRequestRepository pullRequestRepository;
+    private final PullRequestRepository pullRequestRepository;
 
-    @Autowired
-    private BadPracticeDetectionRepository badPracticeDetectionRepository;
+    private final BadPracticeDetectionRepository badPracticeDetectionRepository;
 
-    @Autowired
-    private PullRequestTemplateGetter pullRequestTemplateGetter;
+    private final PullRequestTemplateGetter pullRequestTemplateGetter;
 
-    @Autowired
-    private DetectorApi detectorApi;
+    private final DetectorApi detectorApi;
+
+    public PullRequestBadPracticeDetector(
+        PullRequestRepository pullRequestRepository,
+        BadPracticeDetectionRepository badPracticeDetectionRepository,
+        PullRequestTemplateGetter pullRequestTemplateGetter,
+        DetectorApi detectorApi
+    ) {
+        this.pullRequestRepository = pullRequestRepository;
+        this.badPracticeDetectionRepository = badPracticeDetectionRepository;
+        this.pullRequestTemplateGetter = pullRequestTemplateGetter;
+        this.detectorApi = detectorApi;
+    }
 
     /**
      * Detects bad practices for a given pull request ID and syncs the results with the
@@ -69,15 +76,10 @@ public class PullRequestBadPracticeDetector {
     public DetectionResult detectAndSyncBadPractices(PullRequest pullRequest) {
         logger.info("Detecting bad practices for pull request: {}", pullRequest.getId());
 
-        // Check if PR was updated since last detection by querying BadPracticeDetection
-        BadPracticeDetection lastDetection = badPracticeDetectionRepository.findMostRecentByPullRequestId(
-            pullRequest.getId()
-        );
         if (
             pullRequest.getUpdatedAt() != null &&
-            lastDetection != null &&
-            lastDetection.getDetectionTime() != null &&
-            pullRequest.getUpdatedAt().isBefore(lastDetection.getDetectionTime())
+            pullRequest.getLastDetectionTime() != null &&
+            pullRequest.getUpdatedAt().isBefore(pullRequest.getLastDetectionTime())
         ) {
             logger.info("Pull request has not been updated since last detection. Skipping detection.");
             return DetectionResult.ERROR_NO_UPDATE_ON_PULLREQUEST;
@@ -134,8 +136,9 @@ public class PullRequestBadPracticeDetector {
 
         DetectorResponse detectorResponse = detectorApi.detectBadPractices(detectorRequest);
 
-        // Note: Detection metadata (summary, timestamp) is stored in BadPracticeDetection,
-        // not on the PullRequest entity itself, to keep gitprovider entities clean.
+        pullRequest.setLastDetectionTime(Instant.now());
+        pullRequest.setBadPracticeSummary(detectorResponse.getBadPracticeSummary());
+        pullRequestRepository.save(pullRequest);
 
         List<PullRequestBadPractice> detectedBadPractices = detectorResponse
             .getBadPractices()

@@ -1,22 +1,20 @@
 package de.tum.in.www1.hephaestus.gitprovider.common.github;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import de.tum.in.www1.hephaestus.gitprovider.common.NatsMessageDeserializer;
 import io.nats.client.Message;
 import io.nats.client.MessageHandler;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 /**
  * Base class for GitHub webhook message handlers.
  * <p>
- * This class handles NATS message routing and JSON parsing using Jackson.
- * Subclasses just implement {@link #handleEvent(Object)} and specify the event
- * key.
+ * This class handles NATS message routing and JSON parsing using the centralized
+ * {@link NatsMessageDeserializer}. Subclasses just implement {@link #handleEvent(Object)}
+ * and specify the event key.
  * <p>
  * All webhook payloads are parsed directly to DTOs using Jackson ObjectMapper.
  *
@@ -28,12 +26,11 @@ public abstract class GitHubMessageHandler<T> implements MessageHandler {
     private static final Logger logger = LoggerFactory.getLogger(GitHubMessageHandler.class);
 
     private final Class<T> payloadType;
+    private final NatsMessageDeserializer deserializer;
 
-    @Autowired
-    private ObjectMapper objectMapper;
-
-    protected GitHubMessageHandler(Class<T> payloadType) {
+    protected GitHubMessageHandler(Class<T> payloadType, NatsMessageDeserializer deserializer) {
         this.payloadType = payloadType;
+        this.deserializer = deserializer;
     }
 
     @Override
@@ -45,23 +42,14 @@ public abstract class GitHubMessageHandler<T> implements MessageHandler {
             return;
         }
 
-        String payload = new String(msg.getData(), StandardCharsets.UTF_8);
-
         try {
-            T eventPayload = parsePayload(payload);
+            T eventPayload = deserializer.deserialize(msg, payloadType);
             handleEvent(eventPayload);
         } catch (IOException e) {
             logger.error("Failed to parse payload for subject {}: {}", subject, e.getMessage(), e);
         } catch (Exception e) {
             logger.error("Unexpected error while handling message for subject {}: {}", subject, e.getMessage(), e);
         }
-    }
-
-    /**
-     * Parse the webhook payload JSON directly to the DTO type using Jackson.
-     */
-    private T parsePayload(String payload) throws IOException {
-        return objectMapper.readValue(payload, payloadType);
     }
 
     /**

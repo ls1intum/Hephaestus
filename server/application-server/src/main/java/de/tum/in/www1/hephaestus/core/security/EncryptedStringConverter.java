@@ -49,8 +49,16 @@ public class EncryptedStringConverter implements AttributeConverter<String, Stri
     private final SecretKey secretKey;
     private final boolean enabled;
 
-    public EncryptedStringConverter(@Value("${hephaestus.security.encryption-key:}") String encryptionKey) {
+    public EncryptedStringConverter(
+        @Value("${hephaestus.security.encryption-key:}") String encryptionKey,
+        @Value("${spring.profiles.active:}") String activeProfiles
+    ) {
         if (encryptionKey == null || encryptionKey.isBlank()) {
+            if (activeProfiles != null && activeProfiles.contains("prod")) {
+                throw new IllegalStateException(
+                    "Encryption key is required in production! Set hephaestus.security.encryption-key"
+                );
+            }
             logger.warn(
                 "Encryption key not configured - sensitive data will NOT be encrypted at rest. " +
                 "Set hephaestus.security.encryption-key in production!"

@@ -1,12 +1,12 @@
 package de.tum.in.www1.hephaestus.notification;
 
-import de.tum.in.www1.hephaestus.activity.badpracticedetector.BadPracticesDetectedEvent;
+import de.tum.in.www1.hephaestus.shared.badpractice.BadPracticeInfo;
+import de.tum.in.www1.hephaestus.shared.badpractice.BadPracticeNotificationData;
 import java.util.List;
 import org.keycloak.admin.client.Keycloak;
 import org.keycloak.representations.idm.UserRepresentation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
@@ -22,66 +22,75 @@ public class MailService {
 
     private final Keycloak keycloak;
 
-    @Value("${keycloak.realm}")
-    private String realm;
+    private final String realm;
 
-    @Autowired
-    public MailService(JavaMailSender javaMailSender, MailConfig mailConfig, Keycloak keycloak) {
+    public MailService(
+        JavaMailSender javaMailSender,
+        MailConfig mailConfig,
+        Keycloak keycloak,
+        @Value("${keycloak.realm}") String realm
+    ) {
         this.javaMailSender = javaMailSender;
         this.mailConfig = mailConfig;
         this.keycloak = keycloak;
+        this.realm = realm;
     }
 
-    /**
-     * Sends an email notification when bad practices are detected in a pull request.
-     *
-     * @param event The event containing user, pull request, and bad practice data
-     */
-    public void sendBadPracticesDetectedEmail(BadPracticesDetectedEvent event) {
-        var user = event.user();
-        var pullRequest = event.pullRequest();
-        var badPractices = event.badPractices();
-        String workspaceSlug = event.workspaceSlug();
-
-        logger.info("Sending bad practice detected email to user: {}", user.login());
+    public void sendBadPracticesDetectedInPullRequestEmail(BadPracticeNotificationData notificationData) {
+        logger.info("Sending bad practice detected email to user: {}", notificationData.userLogin());
         String email;
 
-        try {
-            UserRepresentation keyCloakUser = keycloak
-                .realm(realm)
-                .users()
-                .searchByUsername(user.login(), true)
-                .getFirst();
+        if (notificationData.userEmail() != null && !notificationData.userEmail().isBlank()) {
+            email = notificationData.userEmail();
+        } else {
+            try {
+                var keyCloakUser = keycloak
+                    .realm(realm)
+                    .users()
+                    .searchByUsername(notificationData.userLogin(), true)
+                    .getFirst();
 
-            email = keyCloakUser.getEmail();
-        } catch (Exception e) {
-            logger.error("Failed to find user in Keycloak: {}", user.login(), e);
-            return;
+                email = keyCloakUser.getEmail();
+            } catch (Exception e) {
+                logger.error("Failed to find user in Keycloak: {}", notificationData.userLogin(), e);
+                return;
+            }
         }
 
         String subject =
             "Hephaestus: " +
-            getBadPracticeString(badPractices) +
+            getBadPracticeString(notificationData.badPractices()) +
             " detected in your pull request #" +
-            pullRequest.number();
+            notificationData.pullRequestNumber();
 
-        if (workspaceSlug == null || workspaceSlug.isBlank()) {
-            logger.warn("Skipping email send because workspace slug is missing for PR {}", pullRequest.number());
+        if (notificationData.workspaceSlug() == null || notificationData.workspaceSlug().isBlank()) {
+            logger.warn(
+                "Skipping email send because workspace slug is missing for PR {}",
+                notificationData.pullRequestNumber()
+            );
             return;
         }
 
-        MailBuilder mailBuilder = new MailBuilder(mailConfig, user, email, subject, "bad-practices-detected");
+        MailBuilder mailBuilder = new MailBuilder(
+            mailConfig,
+            notificationData.userLogin(),
+            email,
+            subject,
+            "bad-practices-detected"
+        );
         mailBuilder
-            .fillPlaceholder(user, "user")
-            .fillPlaceholder(pullRequest, "pullRequest")
-            .fillPlaceholder(badPractices, "badPractices")
-            .fillPlaceholder(getBadPracticeString(badPractices), "badPracticeString")
-            .fillPlaceholder(pullRequest.repositoryName(), "repository")
-            .fillPlaceholder(workspaceSlug, "workspaceSlug")
+            .fillPlaceholder(notificationData.userLogin(), "userLogin")
+            .fillPlaceholder(notificationData.pullRequestNumber(), "pullRequestNumber")
+            .fillPlaceholder(notificationData.pullRequestTitle(), "pullRequestTitle")
+            .fillPlaceholder(notificationData.pullRequestUrl(), "pullRequestUrl")
+            .fillPlaceholder(notificationData.badPractices(), "badPractices")
+            .fillPlaceholder(getBadPracticeString(notificationData.badPractices()), "badPracticeString")
+            .fillPlaceholder(notificationData.repositoryName(), "repository")
+            .fillPlaceholder(notificationData.workspaceSlug(), "workspaceSlug")
             .send(javaMailSender);
     }
 
-    private String getBadPracticeString(List<BadPracticesDetectedEvent.BadPracticeData> badPractices) {
+    private String getBadPracticeString(List<BadPracticeInfo> badPractices) {
         int size = badPractices == null ? 0 : badPractices.size();
         if (size == 1) {
             return "1 bad practice";

@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.gitprovider.milestone.github;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.NatsMessageDeserializer;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContextFactory;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventAction;
@@ -24,9 +25,10 @@ public class GitHubMilestoneMessageHandler extends GitHubMessageHandler<GitHubMi
 
     GitHubMilestoneMessageHandler(
         ProcessingContextFactory contextFactory,
-        GitHubMilestoneProcessor milestoneProcessor
+        GitHubMilestoneProcessor milestoneProcessor,
+        NatsMessageDeserializer deserializer
     ) {
-        super(GitHubMilestoneEventDTO.class);
+        super(GitHubMilestoneEventDTO.class, deserializer);
         this.contextFactory = contextFactory;
         this.milestoneProcessor = milestoneProcessor;
     }

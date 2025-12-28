@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.gitprovider.team.github;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.NatsMessageDeserializer;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventAction;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
@@ -19,8 +20,8 @@ public class GitHubTeamMessageHandler extends GitHubMessageHandler<GitHubTeamEve
 
     private final GitHubTeamProcessor teamProcessor;
 
-    GitHubTeamMessageHandler(GitHubTeamProcessor teamProcessor) {
-        super(GitHubTeamEventDTO.class);
+    GitHubTeamMessageHandler(GitHubTeamProcessor teamProcessor, NatsMessageDeserializer deserializer) {
+        super(GitHubTeamEventDTO.class, deserializer);
         this.teamProcessor = teamProcessor;
     }
 

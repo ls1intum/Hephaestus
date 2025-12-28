@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.gitprovider.pullrequest.github;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.NatsMessageDeserializer;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContextFactory;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventAction;
@@ -24,9 +25,10 @@ public class GitHubPullRequestMessageHandler extends GitHubMessageHandler<GitHub
 
     public GitHubPullRequestMessageHandler(
         ProcessingContextFactory contextFactory,
-        GitHubPullRequestProcessor prProcessor
+        GitHubPullRequestProcessor prProcessor,
+        NatsMessageDeserializer deserializer
     ) {
-        super(GitHubPullRequestEventDTO.class);
+        super(GitHubPullRequestEventDTO.class, deserializer);
         this.contextFactory = contextFactory;
         this.prProcessor = prProcessor;
     }

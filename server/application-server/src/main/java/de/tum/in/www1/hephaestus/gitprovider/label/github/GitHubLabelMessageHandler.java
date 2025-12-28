@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.gitprovider.label.github;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.NatsMessageDeserializer;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContextFactory;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventAction;
@@ -22,8 +23,12 @@ public class GitHubLabelMessageHandler extends GitHubMessageHandler<GitHubLabelE
     private final ProcessingContextFactory contextFactory;
     private final GitHubLabelProcessor labelProcessor;
 
-    GitHubLabelMessageHandler(ProcessingContextFactory contextFactory, GitHubLabelProcessor labelProcessor) {
-        super(GitHubLabelEventDTO.class);
+    GitHubLabelMessageHandler(
+        ProcessingContextFactory contextFactory,
+        GitHubLabelProcessor labelProcessor,
+        NatsMessageDeserializer deserializer
+    ) {
+        super(GitHubLabelEventDTO.class, deserializer);
         this.contextFactory = contextFactory;
         this.labelProcessor = labelProcessor;
     }
