@@ -4,7 +4,6 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestInfoDTO;
 import de.tum.in.www1.hephaestus.gitprovider.team.TeamInfoDTO;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserInfoDTO;
-import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.List;
 import org.springframework.lang.NonNull;
 

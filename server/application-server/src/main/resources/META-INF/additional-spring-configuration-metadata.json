@@ -1,0 +1,140 @@
+{
+  "properties": [
+    {
+      "name": "hephaestus.intelligence-service.url",
+      "type": "java.lang.String",
+      "description": "Base URL of the intelligence service"
+    },
+    {
+      "name": "hephaestus.mail.from",
+      "type": "java.lang.String",
+      "description": "Email sender address"
+    },
+    {
+      "name": "hephaestus.mail.enabled",
+      "type": "java.lang.Boolean",
+      "description": "Whether email sending is enabled"
+    },
+    {
+      "name": "hephaestus.leaderboard.schedule.cron",
+      "type": "java.lang.String",
+      "description": "Cron expression for leaderboard calculation"
+    },
+    {
+      "name": "hephaestus.leaderboard.self-review-author-logins",
+      "type": "java.util.List",
+      "description": "List of bot logins whose PRs are excluded from self-review scoring"
+    },
+    {
+      "name": "hephaestus.git-sync.schedule.cron",
+      "type": "java.lang.String",
+      "description": "Cron expression for git sync"
+    },
+    {
+      "name": "hephaestus.git-sync.sync-on-startup.enabled",
+      "type": "java.lang.Boolean",
+      "description": "Whether to sync on startup"
+    },
+    {
+      "name": "hephaestus.git-sync.sync-on-startup.full-sync",
+      "type": "java.lang.Boolean",
+      "description": "Whether to do a full sync on startup"
+    },
+    {
+      "name": "hephaestus.detector.schedule.cron",
+      "type": "java.lang.String",
+      "description": "Cron expression for detector"
+    },
+    {
+      "name": "keycloak.enabled",
+      "type": "java.lang.Boolean",
+      "description": "Whether Keycloak integration is enabled"
+    },
+    {
+      "name": "keycloak.server-url",
+      "type": "java.lang.String",
+      "description": "Keycloak server URL"
+    },
+    {
+      "name": "keycloak.realm",
+      "type": "java.lang.String",
+      "description": "Keycloak realm"
+    },
+    {
+      "name": "keycloak.client-id",
+      "type": "java.lang.String",
+      "description": "Keycloak client ID"
+    },
+    {
+      "name": "keycloak.client-secret",
+      "type": "java.lang.String",
+      "description": "Keycloak client secret"
+    },
+    {
+      "name": "nats.enabled",
+      "type": "java.lang.Boolean",
+      "description": "Whether NATS integration is enabled"
+    },
+    {
+      "name": "nats.server",
+      "type": "java.lang.String",
+      "description": "NATS server URL"
+    },
+    {
+      "name": "nats.stream-name",
+      "type": "java.lang.String",
+      "description": "NATS stream name"
+    },
+    {
+      "name": "nats.durable-name",
+      "type": "java.lang.String",
+      "description": "NATS durable consumer name"
+    },
+    {
+      "name": "monitoring.environment",
+      "type": "java.lang.String",
+      "description": "Monitoring environment name"
+    },
+    {
+      "name": "github.webhook-secret",
+      "type": "java.lang.String",
+      "description": "GitHub webhook secret"
+    },
+    {
+      "name": "github.app.id",
+      "type": "java.lang.String",
+      "description": "GitHub App ID"
+    },
+    {
+      "name": "github.app.private-key",
+      "type": "java.lang.String",
+      "description": "GitHub App private key"
+    },
+    {
+      "name": "github.app.name",
+      "type": "java.lang.String",
+      "description": "GitHub App name"
+    },
+    {
+      "name": "slack.enabled",
+      "type": "java.lang.Boolean",
+      "description": "Whether Slack integration is enabled"
+    },
+    {
+      "name": "slack.bot-token",
+      "type": "java.lang.String",
+      "description": "Slack bot token"
+    },
+    {
+      "name": "slack.signing-secret",
+      "type": "java.lang.String",
+      "description": "Slack signing secret"
+    },
+    {
+      "name": "spring.graphql.client.http.url",
+      "type": "java.lang.String",
+      "description": "GraphQL client HTTP URL"
+    }
+  ],
+  "hints": []
+}

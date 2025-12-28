@@ -43,7 +43,6 @@ class GitHubIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
 
     private static final Long TEST_ORG_ID = 215361191L;
     private static final Long TEST_REPO_ID = 998279771L;
-    private static final Long TEST_WORKSPACE_ID = 1L;
     private static final Long TEST_ISSUE_ID = 123456789L;
     private static final Long TEST_COMMENT_ID = 987654321L;
     private static final String TEST_ORG_LOGIN = "HephaestusTest";

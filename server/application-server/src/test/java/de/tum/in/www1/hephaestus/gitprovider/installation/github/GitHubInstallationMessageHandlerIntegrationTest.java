@@ -5,9 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler.GitHubMessageDomain;
 import de.tum.in.www1.hephaestus.gitprovider.installation.github.dto.GitHubInstallationEventDTO;
-import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationRepository;
 import de.tum.in.www1.hephaestus.testconfig.BaseIntegrationTest;
-import de.tum.in.www1.hephaestus.workspace.WorkspaceRepository;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import org.junit.jupiter.api.BeforeEach;
@@ -28,12 +26,6 @@ class GitHubInstallationMessageHandlerIntegrationTest extends BaseIntegrationTes
 
     @Autowired
     private GitHubInstallationMessageHandler handler;
-
-    @Autowired
-    private WorkspaceRepository workspaceRepository;
-
-    @Autowired
-    private OrganizationRepository organizationRepository;
 
     @Autowired
     private ObjectMapper objectMapper;

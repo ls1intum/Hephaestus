@@ -5,7 +5,6 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -25,6 +24,7 @@ import org.springframework.web.reactive.function.client.WebClient;
  * <p>
  * This is NOT a Spring bean - instantiate it manually in tests with a token.
  */
+@SuppressWarnings("unchecked")
 public class GitHubTestFixtureService {
 
     private static final Logger log = LoggerFactory.getLogger(GitHubTestFixtureService.class);
@@ -600,7 +600,6 @@ public class GitHubTestFixtureService {
             );
         }
 
-        String repositoryId = infoResponse.field("repository.id").toEntity(String.class);
         String expectedHeadOid = infoResponse.field("repository.ref.target.oid").toEntity(String.class);
 
         String mutation =

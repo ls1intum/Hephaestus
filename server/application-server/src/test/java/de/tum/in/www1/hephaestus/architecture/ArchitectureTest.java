@@ -1,7 +1,5 @@
 package de.tum.in.www1.hephaestus.architecture;
 
-import static com.tngtech.archunit.base.DescribedPredicate.describe;
-import static com.tngtech.archunit.core.domain.JavaClass.Predicates.resideInAPackage;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.*;
 import static com.tngtech.archunit.library.GeneralCodingRules.*;
 import static com.tngtech.archunit.library.dependencies.SlicesRuleDefinition.slices;

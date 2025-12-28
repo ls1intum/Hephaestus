@@ -54,8 +54,6 @@ public record GitHubPullRequestReviewCommentEventDTO(
         @JsonProperty("original_start_line") Integer originalStartLine,
         @JsonProperty("side") String side,
         @JsonProperty("start_side") String startSide,
-        @JsonProperty("position") Integer position,
-        @JsonProperty("original_position") Integer originalPosition,
         @JsonProperty("in_reply_to_id") Long inReplyToId
     ) {}
 }

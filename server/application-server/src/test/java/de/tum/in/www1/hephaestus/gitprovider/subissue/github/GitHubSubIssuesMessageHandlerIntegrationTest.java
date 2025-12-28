@@ -138,11 +138,7 @@ class GitHubSubIssuesMessageHandlerIntegrationTest extends BaseIntegrationTest {
         GitHubSubIssuesEventDTO event = loadPayload("sub_issues.sub_issue_removed");
 
         // Create parent issue and sub issue
-        Issue parent = createTestIssue(
-            event.parentIssue().getDatabaseId(),
-            event.parentIssue().number(),
-            "Parent Issue"
-        );
+        createTestIssue(event.parentIssue().getDatabaseId(), event.parentIssue().number(), "Parent Issue");
         createTestIssue(event.subIssue().getDatabaseId(), event.subIssue().number(), "Sub Issue");
 
         // When

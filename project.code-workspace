@@ -26,12 +26,17 @@
 		}
 	],
 	"settings": {
-		"java.compile.nullAnalysis.mode": "automatic",
+		"java.compile.nullAnalysis.mode": "disabled",
 		"java.configuration.updateBuildConfiguration": "automatic",
 		"java.completion.importOrder": [
 			"#"
 		],
 		"java.debug.settings.onBuildFailureProceed": true,
+		"java.settings.url": ".vscode/java-settings.prefs",
+		"java.project.sourcePaths": [
+			"src/main/java",
+			"src/test/java"
+		],
 		"scm.defaultViewMode": "tree",
 		"diffEditor.renderSideBySide": false,
 		"github.copilot.chat.summarizeAgentConversationHistory.enabled": false,
@@ -46,7 +51,14 @@
 		"[graphql]": {
 			"editor.formatOnSave": true,
 			"editor.tabSize": 2
-		}
+		},
+		"yaml.validate": true,
+		"yaml.schemas": {
+			"https://json.schemastore.org/liquibase-3.2.json": "**/db/changelog/*.yaml"
+		},
+		"spring-boot.ls.problem.application-yaml.YAML_SHOULD_ESCAPE": "IGNORE",
+		"spring-boot.ls.problem.application-yaml.YAML_SYNTAX_ERROR": "IGNORE",
+		"spring-boot.ls.problem.application-yaml.YAML_UNKNOWN_PROPERTY": "IGNORE"
 	},
 	"extensions": {
 		"recommendations": [

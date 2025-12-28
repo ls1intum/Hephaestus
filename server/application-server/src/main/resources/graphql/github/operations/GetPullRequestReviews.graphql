@@ -3,80 +3,82 @@
 # User/Bot still use databaseId as fullDatabaseId is not available on Actor types.
 
 query GetPullRequestReviews($owner: String!, $name: String!, $number: Int!, $first: Int!, $after: String) {
-	repository(owner: $owner, name: $name) {
-		pullRequest(number: $number) {
-			reviews(first: $first, after: $after) {
-				pageInfo {
-					hasNextPage
-					endCursor
-				}
-				totalCount
-				nodes {
-					id
-					fullDatabaseId
-					body
-					state
-					url
-					createdAt
-					updatedAt
-					submittedAt
-					
-					# Commit
-					commit {
-						oid
-					}
-					
-					# Author
-					author {
-						__typename
-						... on User {
-							id
-							databaseId
-							login
-							avatarUrl
-						}
-						... on Bot {
-							id
-							databaseId
-							login
-							avatarUrl
-						}
-					}
-					
-					# Comments in review
-					comments(first: 100) {
-						totalCount
-						nodes {
-							id
-							fullDatabaseId
-							body
-							path
-							position
-							line
-							diffHunk
-							createdAt
-							updatedAt
-							
-							# Comment author
-							author {
-								__typename
-								... on User {
-									id
-									databaseId
-									login
-									avatarUrl
-								}
-								... on Bot {
-									id
-									databaseId
-									login
-									avatarUrl
-								}
-							}
-						}
-					}
-				}
-			}
-		}
-	}
+    repository(owner: $owner, name: $name) {
+        pullRequest(number: $number) {
+            reviews(first: $first, after: $after) {
+                pageInfo {
+                    hasNextPage
+                    endCursor
+                }
+                totalCount
+                nodes {
+                    id
+                    fullDatabaseId
+                    body
+                    state
+                    url
+                    createdAt
+                    updatedAt
+                    submittedAt
+
+                    # Commit
+                    commit {
+                        oid
+                    }
+
+                    # Author
+                    author {
+                        __typename
+                        ... on User {
+                            id
+                            databaseId
+                            login
+                            avatarUrl
+                        }
+                        ... on Bot {
+                            id
+                            databaseId
+                            login
+                            avatarUrl
+                        }
+                    }
+
+                    # Comments in review
+                    comments(first: 100) {
+                        totalCount
+                        nodes {
+                            id
+                            fullDatabaseId
+                            body
+                            path
+                            line
+                            originalLine
+                            startLine
+                            originalStartLine
+                            diffHunk
+                            createdAt
+                            updatedAt
+
+                            # Comment author
+                            author {
+                                __typename
+                                ... on User {
+                                    id
+                                    databaseId
+                                    login
+                                    avatarUrl
+                                }
+                                ... on Bot {
+                                    id
+                                    databaseId
+                                    login
+                                    avatarUrl
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 }

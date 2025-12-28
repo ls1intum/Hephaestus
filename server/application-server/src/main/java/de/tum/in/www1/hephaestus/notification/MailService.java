@@ -4,7 +4,6 @@ import de.tum.in.www1.hephaestus.shared.badpractice.BadPracticeInfo;
 import de.tum.in.www1.hephaestus.shared.badpractice.BadPracticeNotificationData;
 import java.util.List;
 import org.keycloak.admin.client.Keycloak;
-import org.keycloak.representations.idm.UserRepresentation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;

@@ -79,12 +79,6 @@ public class PullRequestReviewComment extends BaseGitServiceEntity {
     @Enumerated(EnumType.STRING)
     private PullRequestReviewComment.Side side;
 
-    // The line index in the diff to which the comment applies. This field is deprecated; use `line` instead.
-    private int position;
-
-    // The index of the original line in the diff to which the comment applies. This field is deprecated; use `original_line` instead.
-    private int originalPosition;
-
     @ManyToOne
     @JoinColumn(name = "author_id")
     @ToString.Exclude

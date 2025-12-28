@@ -164,8 +164,6 @@ public class GitHubPullRequestReviewCommentProcessor {
         comment.setSide(mapSide(dto.side()));
         comment.setLine(dto.line() != null ? dto.line() : 0);
         comment.setOriginalLine(dto.originalLine() != null ? dto.originalLine() : comment.getLine());
-        comment.setPosition(dto.position() != null ? dto.position() : 0);
-        comment.setOriginalPosition(dto.originalPosition() != null ? dto.originalPosition() : comment.getPosition());
 
         // Optional multi-line fields
         if (dto.startLine() != null) {

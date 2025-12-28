@@ -5,7 +5,6 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.IssueState;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.IssueStateReason;
-import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.IssueType;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.UserConnection;
 import de.tum.in.www1.hephaestus.gitprovider.label.github.dto.GitHubLabelDTO;
 import de.tum.in.www1.hephaestus.gitprovider.milestone.github.dto.GitHubMilestoneDTO;

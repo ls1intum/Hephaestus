@@ -17,8 +17,6 @@ import java.security.spec.PKCS8EncodedKeySpec;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
@@ -32,7 +30,6 @@ import org.springframework.web.reactive.function.client.WebClient;
 @Service
 public class GitHubAppTokenService {
 
-    private static final Logger logger = LoggerFactory.getLogger(GitHubAppTokenService.class);
     private static final String GITHUB_API_BASE_URL = "https://api.github.com";
 
     private final long appId;

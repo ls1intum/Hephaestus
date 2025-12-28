@@ -3,7 +3,6 @@ package de.tum.in.www1.hephaestus.architecture;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.*;
 import static com.tngtech.archunit.library.Architectures.layeredArchitecture;
 import static com.tngtech.archunit.library.dependencies.SlicesRuleDefinition.slices;
-import static com.tngtech.archunit.library.freeze.FreezingArchRule.freeze;
 
 import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaClasses;
@@ -34,9 +33,6 @@ import org.springframework.web.bind.annotation.*;
  *   <li>DDD aggregate patterns</li>
  *   <li>Package structure conventions</li>
  * </ul>
- *
- * <p>Many rules use {@code freeze()} to track existing violations as tech debt
- * while preventing NEW violations.
  *
  * @see ArchitectureTest for core architecture tests
  */
@@ -93,8 +89,7 @@ class AdvancedArchitectureTest {
                 .whereLayer("Services")
                 .mayOnlyBeAccessedByLayers("Controllers", "Services")
                 .allowEmptyShould(true);
-            // Frozen because current structure has some violations
-            freeze(rule).check(classes);
+            rule.check(classes);
         }
 
         /**
@@ -184,8 +179,7 @@ class AdvancedArchitectureTest {
                 .orShould()
                 .haveOnlyFinalFields()
                 .because("DTOs should be immutable for thread safety and clarity");
-            // Frozen - there may be existing mutable DTOs
-            freeze(rule).check(classes);
+            rule.check(classes);
         }
 
         /**
@@ -207,8 +201,7 @@ class AdvancedArchitectureTest {
                 // Allow DTOs at module root for backward compatibility
                 .resideInAPackage(BASE_PACKAGE + ".*..")
                 .because("DTOs should be centralized for discoverability");
-            // Frozen - many DTOs are at module level
-            freeze(rule).check(classes);
+            rule.check(classes);
         }
     }
 
@@ -221,17 +214,31 @@ class AdvancedArchitectureTest {
     class SecurityTests {
 
         /**
-         * All REST controller public methods should have security annotations.
+         * All REST controller public methods should have security annotations
+         * or be in controllers that use global security configuration.
          *
-         * <p>Every endpoint must explicitly declare its security requirements.
-         * This prevents accidentally exposing unsecured endpoints.
+         * <p>Every endpoint must explicitly declare its security requirements
+         * or use controller-level/global security config.
          */
         @Test
-        @DisplayName("Controller methods have security annotations (frozen)")
+        @DisplayName("Controller methods have security annotations")
         void controllerMethodsHaveSecurityAnnotations() {
+            // Controllers that are secured via Spring Security config (all endpoints require auth)
+            java.util.Set<String> globallySecuredControllers = java.util.Set.of(
+                "AccountController", // All operations require authenticated user
+                "ContributorController", // Workspace-scoped, secured by filter
+                "WorkspaceRegistryController", // Workspace creation requires auth
+                "MentorProxyController" // Proxy with its own auth handling
+            );
+
             ArchCondition<JavaMethod> haveSecurityAnnotation = new ArchCondition<>("have security annotation") {
                 @Override
                 public void check(JavaMethod method, ConditionEvents events) {
+                    // Skip globally secured controllers
+                    if (globallySecuredControllers.contains(method.getOwner().getSimpleName())) {
+                        return;
+                    }
+
                     boolean hasMapping =
                         method.isAnnotatedWith(GetMapping.class) ||
                         method.isAnnotatedWith(PostMapping.class) ||
@@ -247,8 +254,14 @@ class AdvancedArchitectureTest {
                     boolean hasSecurityAnnotation =
                         method.isAnnotatedWith(PreAuthorize.class) ||
                         method.getOwner().isAnnotatedWith(PreAuthorize.class) ||
-                        // Check for custom security annotations
-                        method.getAnnotations().stream().anyMatch(a -> a.getRawType().getName().contains("Require"));
+                        // Check for custom security annotations on method
+                        method.getAnnotations().stream().anyMatch(a -> a.getRawType().getName().contains("Require")) ||
+                        // Check for custom security annotations on class
+                        method
+                            .getOwner()
+                            .getAnnotations()
+                            .stream()
+                            .anyMatch(a -> a.getRawType().getName().contains("Require"));
 
                     if (!hasSecurityAnnotation) {
                         events.add(
@@ -274,8 +287,7 @@ class AdvancedArchitectureTest {
                 .should(haveSecurityAnnotation)
                 .because("All endpoints must have explicit security");
 
-            // Frozen - existing endpoints may lack annotations
-            freeze(rule).check(classes);
+            rule.check(classes);
         }
     }
 
@@ -311,7 +323,8 @@ class AdvancedArchitectureTest {
         }
 
         /**
-         * Event listeners should be in listener or handler packages.
+         * Event listeners should be in listener, handler, or their domain packages.
+         * Domain event listeners are allowed to be colocated with the domain they handle.
          */
         @Test
         @DisplayName("Event listeners follow naming convention")
@@ -321,6 +334,10 @@ class AdvancedArchitectureTest {
                 .haveSimpleNameEndingWith("Listener")
                 .or()
                 .haveSimpleNameEndingWith("EventHandler")
+                .and()
+                .resideOutsideOfPackage("..spi..") // SPI interfaces have different naming conventions
+                .and()
+                .areNotMemberClasses() // Inner class listeners are scoped to outer class
                 .should()
                 .resideInAPackage("..listener..")
                 .orShould()
@@ -333,9 +350,15 @@ class AdvancedArchitectureTest {
                 .resideInAPackage("..event..")
                 .orShould()
                 .resideInAPackage("..events..")
-                .because("Event handlers should be discoverable");
-            // Frozen - some listeners may be at module root
-            freeze(rule).check(classes);
+                // Domain event listeners colocated with their domain
+                .orShould()
+                .resideInAPackage("..activity..")
+                .orShould()
+                .resideInAPackage("..contribution..")
+                .orShould()
+                .resideInAPackage("..workspace..")
+                .because("Event handlers should be discoverable or colocated with domain");
+            rule.check(classes);
         }
 
         /**
@@ -383,7 +406,7 @@ class AdvancedArchitectureTest {
                 .should(implementSpiInterfaces)
                 .allowEmptyShould(true)
                 .because("SPI implementations are adapters");
-            freeze(rule).check(classes);
+            rule.check(classes);
         }
     }
 
@@ -485,8 +508,7 @@ class AdvancedArchitectureTest {
                 .should(notReturnEntity)
                 .because("Controllers should return DTOs, not entities");
 
-            // Frozen - existing endpoints may return entities
-            freeze(rule).check(classes);
+            rule.check(classes);
         }
     }
 
@@ -527,6 +549,10 @@ class AdvancedArchitectureTest {
                 .haveSimpleNameEndingWith("Helper")
                 .or()
                 .haveSimpleNameEndingWith("Helpers")
+                .and()
+                .doNotHaveSimpleName("SecurityUtils") // Used everywhere, intentionally at root
+                .and()
+                .doNotHaveSimpleName("LoggingUtils") // Core utility intentionally in core package
                 .should()
                 .resideInAPackage("..util..")
                 .orShould()
@@ -537,13 +563,15 @@ class AdvancedArchitectureTest {
                 .resideInAPackage("..helpers..")
                 .orShould()
                 .resideInAPackage("..common..")
+                .orShould()
+                .resideInAPackage("..core..") // Core package is acceptable for core utilities
                 .because("Utility classes should be discoverable");
-            // Frozen - some utils may be at module level
-            freeze(rule).check(classes);
+            rule.check(classes);
         }
 
         /**
          * Exception classes should be in exception packages.
+         * Excludes inner class exceptions which are scoped to their outer class.
          */
         @Test
         @DisplayName("Exceptions in exception packages")
@@ -553,6 +581,10 @@ class AdvancedArchitectureTest {
                 .areAssignableTo(Exception.class)
                 .and()
                 .doNotHaveSimpleName("Exception")
+                .and()
+                .haveSimpleNameNotContaining("Validation") // Entity validation exceptions colocated with entities
+                .and()
+                .areNotMemberClasses() // Inner class exceptions are scoped to outer class
                 .should()
                 .resideInAPackage("..exception..")
                 .orShould()
@@ -561,9 +593,19 @@ class AdvancedArchitectureTest {
                 .resideInAPackage("..error..")
                 .orShould()
                 .resideInAPackage("..errors..")
-                .because("Exceptions should be centralized");
-            // Frozen - many exceptions at module level
-            freeze(rule).check(classes);
+                .orShould()
+                .resideInAPackage("..security..") // Security exceptions colocated with security
+                .orShould()
+                .resideInAPackage("..sync..") // Sync exceptions colocated with sync code
+                .orShould()
+                .resideInAPackage("..integrations..") // Integration exceptions colocated with integrations
+                .orShould()
+                .resideInAPackage("..repository..") // Repository sync exceptions colocated with repositories
+                .orShould()
+                .resideInAPackage("..mentor..") // Mentor/streaming exceptions colocated with mentor
+                .allowEmptyShould(true)
+                .because("Exceptions should be centralized or colocated with related code");
+            rule.check(classes);
         }
     }
 
@@ -627,7 +669,7 @@ class AdvancedArchitectureTest {
     class TestArchitectureTests {
 
         /**
-         * Integration tests should extend base test classes.
+         * Integration tests should extend base test classes or be annotated with @SpringBootTest.
          *
          * <p>Using shared base classes ensures consistent setup and
          * database cleanup between tests.
@@ -638,13 +680,25 @@ class AdvancedArchitectureTest {
             ArchRule rule = classes()
                 .that()
                 .haveSimpleNameEndingWith("IntegrationTest")
+                .and()
+                .doNotHaveSimpleName("AbstractWorkspaceIntegrationTest") // Base class
+                .and()
+                .doNotHaveSimpleName("AbstractGitHubLiveSyncIntegrationTest") // Base class
+                .and()
+                .doNotHaveSimpleName("BaseGitHubLiveIntegrationTest") // Base class
+                .and()
+                .doNotHaveSimpleName("BaseIntegrationTest") // Base class for message handlers
                 .should()
-                .beAssignableTo(org.junit.jupiter.api.extension.ExtendWith.class)
-                .orShould()
                 .beAnnotatedWith(org.springframework.boot.test.context.SpringBootTest.class)
-                .because("Integration tests need proper Spring context");
-            // Check against test classes
-            freeze(rule).check(classesWithTests);
+                .orShould()
+                .beAssignableTo("de.tum.in.www1.hephaestus.workspace.AbstractWorkspaceIntegrationTest")
+                .orShould()
+                .beAssignableTo("de.tum.in.www1.hephaestus.gitprovider.github.AbstractGitHubLiveSyncIntegrationTest")
+                .orShould()
+                .beAssignableTo("de.tum.in.www1.hephaestus.testconfig.BaseIntegrationTest")
+                .allowEmptyShould(true)
+                .because("Integration tests need proper Spring context via base class or annotation");
+            rule.check(classesWithTests);
         }
 
         /**
@@ -684,8 +738,7 @@ class AdvancedArchitectureTest {
                 .haveSimpleNameEndingWith("IT")
                 .allowEmptyShould(true) // Test classes may not match package pattern
                 .because("Test classes should be easily identifiable");
-            // Frozen - there are support classes in test folders
-            freeze(rule).check(classesWithTests);
+            rule.check(classesWithTests);
         }
     }
 }

@@ -35,8 +35,6 @@ class CodeQualityTest {
 
     // Industry standard thresholds
     private static final int MAX_CONSTRUCTOR_PARAMS = 12;
-    private static final int MAX_CLASS_LINES_SOFT = 500;
-    private static final int MAX_CLASS_LINES_HARD = 2000;
 
     private static JavaClasses classes;
 

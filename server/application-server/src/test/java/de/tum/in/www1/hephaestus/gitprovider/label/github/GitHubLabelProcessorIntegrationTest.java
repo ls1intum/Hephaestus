@@ -42,7 +42,6 @@ class GitHubLabelProcessorIntegrationTest extends BaseIntegrationTest {
 
     private static final Long TEST_ORG_ID = 215361191L;
     private static final Long TEST_REPO_ID = 998279771L;
-    private static final Long TEST_WORKSPACE_ID = 1L;
     private static final String TEST_ORG_LOGIN = "HephaestusTest";
     private static final String TEST_REPO_FULL_NAME = "HephaestusTest/TestRepository";
 

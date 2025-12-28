@@ -36,6 +36,7 @@ import org.springframework.transaction.annotation.Transactional;
  * which is more accurate than the synthetic threading from webhooks. This service
  * creates/updates threads based on GraphQL data and associates comments with them.
  */
+@SuppressWarnings("deprecation")
 @Service
 public class GitHubPullRequestReviewCommentSyncService {
 
@@ -372,8 +373,6 @@ public class GitHubPullRequestReviewCommentSyncService {
             graphQlComment.getOriginalStartLine(), // originalStartLine
             side, // side
             null, // startSide
-            graphQlComment.getPosition(), // position
-            graphQlComment.getOriginalPosition(), // originalPosition
             inReplyToId // inReplyToId
         );
     }
@@ -402,15 +401,5 @@ public class GitHubPullRequestReviewCommentSyncService {
             case LEFT -> PullRequestReviewComment.Side.LEFT;
             case RIGHT -> PullRequestReviewComment.Side.RIGHT;
         };
-    }
-
-    /**
-     * Maps a DiffSide to string representation.
-     */
-    private String mapDiffSideToString(DiffSide diffSide) {
-        if (diffSide == null) {
-            return null;
-        }
-        return diffSide.name();
     }
 }

@@ -8,7 +8,6 @@ import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.issue.IssueRepository;
 import de.tum.in.www1.hephaestus.gitprovider.issue.github.dto.GitHubIssueEventDTO;
 import de.tum.in.www1.hephaestus.gitprovider.issuetype.IssueType;
-import de.tum.in.www1.hephaestus.gitprovider.issuetype.IssueTypeRepository;
 import de.tum.in.www1.hephaestus.gitprovider.label.LabelRepository;
 import de.tum.in.www1.hephaestus.gitprovider.milestone.MilestoneRepository;
 import de.tum.in.www1.hephaestus.gitprovider.organization.Organization;
@@ -86,9 +85,6 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private WorkspaceRepository workspaceRepository;
-
-    @Autowired
-    private IssueTypeRepository issueTypeRepository;
 
     @Autowired
     private ObjectMapper objectMapper;

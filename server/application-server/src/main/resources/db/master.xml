@@ -38,5 +38,6 @@
     <include file="./changelog/1765851336797_changelog.xml" relativeToChangelogFile="true"/>
     <include file="./changelog/1766231004215_changelog.xml" relativeToChangelogFile="true"/>
     <include file="./changelog/1766837518000_changelog.xml" relativeToChangelogFile="true"/>
+    <include file="./changelog/1766951769000_changelog.xml" relativeToChangelogFile="true"/>
     <include file="./changelog/1767052800000_add_missing_indexes.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog>

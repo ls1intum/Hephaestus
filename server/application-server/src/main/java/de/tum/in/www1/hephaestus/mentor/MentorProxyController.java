@@ -28,9 +28,9 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.reactive.function.client.ClientResponse;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 /**
  * Transparent proxy for mentor endpoints to the intelligence service.
@@ -147,7 +147,7 @@ public class MentorProxyController {
                 h.addAll(outHeaders);
             })
             .bodyValue(safeBody)
-            .exchange()
+            .exchangeToMono(clientResp -> Mono.just(clientResp))
             .block();
 
         if (clientResponse == null) {

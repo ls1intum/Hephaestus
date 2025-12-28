@@ -364,6 +364,11 @@
                 <configuration>
                     <source>${java.version}</source>
                     <target>${java.version}</target>
+                    <!-- Suppress warnings for generated code using deprecated GitHub API values -->
+                    <compilerArgs>
+                        <arg>-Xlint:all,-deprecation</arg>
+                    </compilerArgs>
+                    <showWarnings>false</showWarnings>
                     <annotationProcessorPaths>
                         <path>
                             <groupId>com.github.therapi</groupId>
@@ -489,6 +494,28 @@
                                 <argument>-f</argument>
                                 <argument>${project.build.directory}/generated-sources/graphql/de/tum/in/www1/hephaestus/gitprovider/graphql/github/model/RelayQueryRequest.java</argument>
                                 <argument>${project.build.directory}/generated-sources/graphql/de/tum/in/www1/hephaestus/gitprovider/graphql/github/model/RelayQueryResponse.java</argument>
+                            </arguments>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>add-suppress-warnings-to-deprecated-classes</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>exec</goal>
+                        </goals>
+                        <configuration>
+                            <!-- Add @SuppressWarnings("deprecation") to classes using deprecated GitHub API fields -->
+                            <executable>bash</executable>
+                            <arguments>
+                                <argument>-c</argument>
+                                <argument>
+                                    for f in ProjectPendingCardsParametrizedInput IssueProjectCardsParametrizedInput PullRequestProjectCardsParametrizedInput ProjectColumnCardsParametrizedInput; do
+                                        file="${project.build.directory}/generated-sources/graphql/de/tum/in/www1/hephaestus/gitprovider/graphql/github/model/$f.java"
+                                        if [ -f "$file" ]; then
+                                            sed -i '' 's/^public class /@SuppressWarnings("deprecation")\npublic class /' "$file" 2>/dev/null || sed -i 's/^public class /@SuppressWarnings("deprecation")\npublic class /' "$file"
+                                        fi
+                                    done
+                                </argument>
                             </arguments>
                         </configuration>
                     </execution>
