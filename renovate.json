@@ -108,9 +108,9 @@
       ]
     },
     {
-      "description": "Intelligence Service (Python)",
+      "description": "Intelligence Service (TypeScript)",
       "matchManagers": [
-        "poetry"
+        "npm"
       ],
       "matchFileNames": [
         "server/intelligence-service/**"
@@ -122,9 +122,9 @@
       ]
     },
     {
-      "description": "Webhook Ingest (Python)",
+      "description": "Webhook Ingest (TypeScript)",
       "matchManagers": [
-        "poetry"
+        "npm"
       ],
       "matchFileNames": [
         "server/webhook-ingest/**"

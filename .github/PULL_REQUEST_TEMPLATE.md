@@ -22,7 +22,7 @@ AFTER API CHANGES:
 AFTER DATABASE/ENTITY CHANGES:
   npm run db:draft-changelog          # Generate Liquibase migration
   npm run db:generate-erd-docs        # Update ERD documentation  
-  npm run db:generate-models:intelligence-service  # Sync SQLAlchemy models
+  npm run db:generate-models:intelligence-service  # Sync Drizzle schema
 -->
 
 ## Description

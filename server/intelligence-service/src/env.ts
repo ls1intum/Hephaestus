@@ -21,7 +21,11 @@ const EnvSchema = z
 		LOG_LEVEL: z
 			.enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"])
 			.default("info"),
-		DATABASE_URL: z.string().url(),
+		// DATABASE_URL is required at runtime but has a placeholder default for OpenAPI export
+		DATABASE_URL: z
+			.string()
+			.url()
+			.default("postgresql://placeholder:placeholder@localhost:5432/placeholder"),
 
 		// Verbose logging - logs request/response bodies to file
 		VERBOSE_LOGGING: z

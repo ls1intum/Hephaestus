@@ -5,7 +5,7 @@ title: Local Development
 description: Prepare your workstation and run each Hephaestus service locally.
 ---
 
-Hephaestus supports full-stack development across Java, TypeScript, and Python. This guide focuses on the development environment; production operations are covered in the [Admin Guide](/admin/production-setup).
+Hephaestus supports full-stack development across Java and TypeScript. This guide focuses on the development environment; production operations are covered in the [Admin Guide](/admin/production-setup).
 
 ## Prerequisites
 
@@ -13,9 +13,8 @@ Install and configure the following tools before you attempt a local build:
 
 1. **Java JDK 21** – Required for the Spring Boot application server.
 2. **Docker Desktop** – Used for PostgreSQL, Keycloak, and NATS containers.
-3. **Node.js LTS (>= 22.10)** and **npm (>= 10.8)** – For the React client.
-4. **Python (>= 3.13)** and **Poetry (>= 2.0)** – For the FastAPI intelligence service.
-5. **NATS CLI (optional)** – Helpful when debugging webhook messages.
+3. **Node.js LTS (>= 22.10)** and **npm (>= 10.8)** – For the React client and TypeScript services.
+4. **NATS CLI (optional)** – Helpful when debugging webhook messages.
 
 ## Recommended IDE setup
 
@@ -23,11 +22,11 @@ Open the repository using the `project.code-workspace` file in VS Code and insta
 
 - Java Extension Pack
 - Spring Boot tools
-- Python and Poetry support
+- Node.js + TypeScript tooling
 - ESLint + Prettier
 - Tailwind CSS IntelliSense
 
-JetBrains alternatives such as IntelliJ (Java), WebStorm (React), and PyCharm (Python) work equally well.
+JetBrains alternatives such as IntelliJ (Java) and WebStorm (React/TypeScript) work equally well.
 
 ## Application server
 
@@ -147,7 +146,7 @@ Keycloak runs in Docker as part of the development compose stack. The bundled re
 
 ### Webhook ingest service
 
-When you run `docker/compose.core.yaml` or the `server/webhook-ingest/compose.yaml` stack, set the webhook secrets up front so signature checks succeed:
+When you run `docker/compose.core.yaml` or start the webhook ingest service locally, set the webhook secrets up front so signature checks succeed:
 
 ```bash
 cp docker/.env.example docker/.env
@@ -156,6 +155,15 @@ echo "WEBHOOK_SECRET=$WEBHOOK_SECRET" >> docker/.env
 ```
 
 The value must match the secret configured on your GitHub and GitLab webhooks (validated via `X-Hub-Signature-256` when available).
+
+To run the webhook ingest service locally:
+
+```bash
+cd server/webhook-ingest
+cp .env.example .env
+npm install
+npm run dev
+```
 
 ## Web client (`webapp`)
 
@@ -232,4 +240,3 @@ Quick start:
    ```
 
    The service is available at [http://localhost:8000](http://localhost:8000) with interactive docs at `/docs`.
-
