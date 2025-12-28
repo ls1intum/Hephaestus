@@ -36,14 +36,18 @@ public class AccountController {
     private final AccountService accountService;
     private final Keycloak keycloak;
     private final UserRepository userRepository;
+    private final String realm;
 
-    @Value("${keycloak.realm}")
-    private String realm;
-
-    public AccountController(AccountService accountService, Keycloak keycloak, UserRepository userRepository) {
+    public AccountController(
+        AccountService accountService,
+        Keycloak keycloak,
+        UserRepository userRepository,
+        @Value("${keycloak.realm}") String realm
+    ) {
         this.accountService = accountService;
         this.keycloak = keycloak;
         this.userRepository = userRepository;
+        this.realm = realm;
     }
 
     @DeleteMapping

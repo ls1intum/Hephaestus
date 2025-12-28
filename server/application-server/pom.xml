@@ -377,6 +377,26 @@
                     </annotationProcessorPaths>
                 </configuration>
             </plugin>
+            <!-- Build Helper to add generated sources to IDE -->
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>build-helper-maven-plugin</artifactId>
+                <version>3.6.0</version>
+                <executions>
+                    <execution>
+                        <id>add-graphql-source</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>add-source</goal>
+                        </goals>
+                        <configuration>
+                            <sources>
+                                <source>${project.build.directory}/generated-sources/graphql</source>
+                            </sources>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
             <!-- GraphQL Code Generator for GitHub API Client -->
             <!-- Generates type-safe Java classes from GitHub GraphQL schema -->
             <!-- Run manually: mvn graphql-codegen:generate -->

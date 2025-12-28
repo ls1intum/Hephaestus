@@ -34,6 +34,7 @@ import org.hibernate.validator.constraints.*;
 })
 @JsonTypeName("ThreadDetail_messages_inner_parts_inner")
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
+@SuppressWarnings("unused")
 public class ThreadDetailMessagesInnerPartsInner extends HashMap<String, Object> {
   public static final String JSON_PROPERTY_TYPE = "type";
   private String type;

@@ -1,9 +1,10 @@
 package de.tum.in.www1.hephaestus.architecture;
 
+import static com.tngtech.archunit.base.DescribedPredicate.describe;
+import static com.tngtech.archunit.core.domain.JavaClass.Predicates.resideInAPackage;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.*;
 import static com.tngtech.archunit.library.GeneralCodingRules.*;
 import static com.tngtech.archunit.library.dependencies.SlicesRuleDefinition.slices;
-import static com.tngtech.archunit.library.freeze.FreezingArchRule.freeze;
 
 import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
@@ -27,17 +28,10 @@ import org.junit.jupiter.api.Test;
  *   <li><b>Structural Integrity</b> - Cycle detection, layering violations</li>
  *   <li><b>Module Boundaries</b> - Bounded context isolation, SPI patterns</li>
  *   <li><b>Spring Patterns</b> - Framework best practices</li>
- *   <li><b>Coding Standards</b> - General code quality (frozen for tech debt)</li>
+ *   <li><b>Coding Standards</b> - General code quality</li>
  * </ol>
  *
- * <h2>FreezingArchRule Pattern</h2>
- * <p>Rules wrapped with {@code freeze()} track existing violations and only
- * fail on NEW violations (technical debt ratcheting). This allows gradual
- * improvement without blocking development. Frozen violations are stored
- * in {@code src/test/resources/archunit_store/} and must be committed.
- *
  * @see <a href="https://www.archunit.org/userguide/html/000_Index.html">ArchUnit User Guide</a>
- * @see <a href="https://www.archunit.org/userguide/html/000_Index.html#_freezing_arch_rules">FreezingArchRule</a>
  */
 @DisplayName("Architecture")
 @Tag("architecture")
@@ -262,63 +256,59 @@ class ArchitectureTest {
     }
 
     // ========================================================================
-    // CODING STANDARDS - Technical debt tracking with freezing
+    // CODING STANDARDS - Core quality rules
     // ========================================================================
 
     @Nested
-    @DisplayName("Coding Standards (Frozen)")
-    class CodingStandardsFrozen {
+    @DisplayName("Coding Standards (Core)")
+    class CodingStandardsCore {
 
         /**
          * No console output - use SLF4J.
-         *
-         * <p>Frozen rule: existing violations are tracked, only NEW violations fail.
          */
         @Test
-        @DisplayName("No System.out/err (frozen)")
+        @DisplayName("No System.out/err")
         void noSystemOutOrErr() {
             ArchRule rule = NO_CLASSES_SHOULD_ACCESS_STANDARD_STREAMS.because(
                 "Use SLF4J (LoggerFactory.getLogger) instead of System.out/err"
             );
-            freeze(rule).check(classes);
+            rule.check(classes);
         }
 
         /**
-         * No generic exceptions.
-         *
-         * <p>Frozen rule: existing violations are tracked, only NEW violations fail.
+         * No generic exceptions (excludes generated intelligenceservice client code).
          */
         @Test
-        @DisplayName("No generic exceptions (frozen)")
+        @DisplayName("No generic exceptions")
         void noGenericExceptions() {
-            ArchRule rule = NO_CLASSES_SHOULD_THROW_GENERIC_EXCEPTIONS.because(
-                "Use specific exception types for better error handling"
-            );
-            freeze(rule).check(classes);
+            ArchRule rule = noClasses()
+                .that()
+                .resideOutsideOfPackage("..intelligenceservice..")
+                .should(THROW_GENERIC_EXCEPTIONS)
+                .because("Use specific exception types for better error handling");
+            rule.check(classes);
         }
 
         /**
          * No field injection.
-         *
-         * <p>Frozen rule: existing violations are tracked, only NEW violations fail.
          */
         @Test
-        @DisplayName("No field injection (frozen)")
+        @DisplayName("No field injection")
         void noFieldInjection() {
             ArchRule rule = NO_CLASSES_SHOULD_USE_FIELD_INJECTION.because(
                 "Constructor injection makes dependencies explicit and testable"
             );
-            freeze(rule).check(classes);
+            rule.check(classes);
         }
     }
 
     // ========================================================================
-    // CODING STANDARDS - Strict (no violations allowed)
+    // CODING STANDARDS - Logging and dependencies
     // ========================================================================
 
     @Nested
-    @DisplayName("Coding Standards (Strict)")
-    class CodingStandardsStrict {
+    @DisplayName("Coding Standards (Logging)")
+    class CodingStandardsLogging {
 
         /**
          * No Joda Time usage.

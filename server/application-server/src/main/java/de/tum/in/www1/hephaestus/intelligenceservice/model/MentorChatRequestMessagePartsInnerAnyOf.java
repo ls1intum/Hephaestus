@@ -33,6 +33,7 @@ import org.hibernate.validator.constraints.*;
 })
 @JsonTypeName("mentorChat_request_message_parts_inner_anyOf")
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
+@SuppressWarnings("unused")
 public class MentorChatRequestMessagePartsInnerAnyOf {
   /**
    * Gets or Sets type

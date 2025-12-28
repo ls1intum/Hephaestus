@@ -235,7 +235,7 @@ public class MentorProxyController {
                         outputStream.flush();
                     } catch (IOException e) {
                         log.debug("Client disconnected during SSE streaming: {}", e.getMessage());
-                        throw new RuntimeException("Client disconnected", e);
+                        throw new StreamingException("Client disconnected", e);
                     }
                 })
                 .doOnError(e -> log.debug("SSE stream error: {}", e.getMessage()))
@@ -249,7 +249,7 @@ public class MentorProxyController {
                 .blockLast(); // Safe to block here - we're on a servlet thread
         } catch (IOException e) {
             log.debug("SSE streaming initialization failed: {}", e.getMessage());
-        } catch (RuntimeException e) {
+        } catch (StreamingException e) {
             // Client disconnected - this is expected behavior, not an error
             log.debug("SSE streaming terminated: {}", e.getMessage());
         }

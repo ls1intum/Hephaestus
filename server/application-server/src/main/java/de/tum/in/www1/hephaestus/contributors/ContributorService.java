@@ -29,16 +29,18 @@ public class ContributorService {
     private static final String GITHUB_API_BASE = "https://api.github.com";
 
     private final WebClient webClient;
+    private final String githubAuthToken;
 
-    @Value("${github.meta.auth-token:}")
-    private String githubAuthToken;
-
-    public ContributorService(WebClient.Builder webClientBuilder) {
+    public ContributorService(
+        WebClient.Builder webClientBuilder,
+        @Value("${github.meta.auth-token:}") String githubAuthToken
+    ) {
         this.webClient = webClientBuilder
             .baseUrl(GITHUB_API_BASE)
             .defaultHeader(HttpHeaders.ACCEPT, "application/vnd.github+json")
             .defaultHeader("X-GitHub-Api-Version", "2022-11-28")
             .build();
+        this.githubAuthToken = githubAuthToken;
     }
 
     /**

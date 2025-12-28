@@ -38,6 +38,7 @@ import org.hibernate.validator.constraints.*;
   DocumentSummary.JSON_PROPERTY_USER_ID
 })
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
+@SuppressWarnings("unused")
 public class DocumentSummary {
   public static final String JSON_PROPERTY_ID = "id";
   private UUID id;

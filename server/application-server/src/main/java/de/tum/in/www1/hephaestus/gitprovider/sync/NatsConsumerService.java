@@ -64,29 +64,14 @@ public class NatsConsumerService {
 
     private final AtomicBoolean shuttingDown = new AtomicBoolean(false);
 
-    @Value("${nats.enabled}")
-    private boolean isNatsEnabled;
-
-    @Value("${nats.timeframe}")
-    private int timeframe;
-
-    @Value("${nats.server}")
-    private String natsServer;
-
-    @Value("${nats.durable-consumer-name}")
-    private String durableConsumerName;
-
-    @Value("${nats.consumer.ack-wait-minutes:5}")
-    private int consumerAckWaitMinutes;
-
-    @Value("${nats.consumer.max-ack-pending:500}")
-    private int maxAckPending;
-
-    @Value("${nats.consumer.reconnect-delay-seconds:2}")
-    private int reconnectDelaySeconds;
-
-    @Value("${nats.consumer.request-timeout-seconds:10}")
-    private int requestTimeoutSeconds;
+    private final boolean isNatsEnabled;
+    private final int timeframe;
+    private final String natsServer;
+    private final String durableConsumerName;
+    private final int consumerAckWaitMinutes;
+    private final int maxAckPending;
+    private final int reconnectDelaySeconds;
+    private final int requestTimeoutSeconds;
 
     private Connection natsConnection;
 
@@ -107,10 +92,26 @@ public class NatsConsumerService {
 
     public NatsConsumerService(
         @org.springframework.context.annotation.Lazy GitHubMessageHandlerRegistry handlerRegistry,
-        NatsSubscriptionProvider subscriptionProvider
+        NatsSubscriptionProvider subscriptionProvider,
+        @Value("${nats.enabled}") boolean isNatsEnabled,
+        @Value("${nats.timeframe}") int timeframe,
+        @Value("${nats.server}") String natsServer,
+        @Value("${nats.durable-consumer-name}") String durableConsumerName,
+        @Value("${nats.consumer.ack-wait-minutes:5}") int consumerAckWaitMinutes,
+        @Value("${nats.consumer.max-ack-pending:500}") int maxAckPending,
+        @Value("${nats.consumer.reconnect-delay-seconds:2}") int reconnectDelaySeconds,
+        @Value("${nats.consumer.request-timeout-seconds:10}") int requestTimeoutSeconds
     ) {
         this.handlerRegistry = handlerRegistry;
         this.subscriptionProvider = subscriptionProvider;
+        this.isNatsEnabled = isNatsEnabled;
+        this.timeframe = timeframe;
+        this.natsServer = natsServer;
+        this.durableConsumerName = durableConsumerName;
+        this.consumerAckWaitMinutes = consumerAckWaitMinutes;
+        this.maxAckPending = maxAckPending;
+        this.reconnectDelaySeconds = reconnectDelaySeconds;
+        this.requestTimeoutSeconds = requestTimeoutSeconds;
     }
 
     @EventListener(ApplicationReadyEvent.class)
@@ -480,7 +481,7 @@ public class NatsConsumerService {
                 logger.info("Connected to NATS server.");
             } catch (IOException | InterruptedException e) {
                 logger.error("Failed to connect to NATS server: {}", e.getMessage(), e);
-                throw new RuntimeException("Failed to establish NATS connection", e);
+                throw new NatsConnectionException("Failed to establish NATS connection", e);
             }
         }
     }

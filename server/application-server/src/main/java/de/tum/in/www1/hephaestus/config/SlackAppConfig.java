@@ -9,11 +9,16 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class SlackAppConfig {
 
-    @Value("${slack.token}")
-    private String botToken;
+    private final String botToken;
+    private final String signingSecret;
 
-    @Value("${slack.signing-secret}")
-    private String signingSecret;
+    public SlackAppConfig(
+        @Value("${slack.token}") String botToken,
+        @Value("${slack.signing-secret}") String signingSecret
+    ) {
+        this.botToken = botToken;
+        this.signingSecret = signingSecret;
+    }
 
     @Bean
     public App initSlackApp() {

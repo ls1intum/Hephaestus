@@ -31,6 +31,7 @@ import org.hibernate.validator.constraints.*;
   VoteMessageRequest.JSON_PROPERTY_IS_UPVOTED
 })
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
+@SuppressWarnings("unused")
 public class VoteMessageRequest {
   public static final String JSON_PROPERTY_IS_UPVOTED = "isUpvoted";
   private Boolean isUpvoted;

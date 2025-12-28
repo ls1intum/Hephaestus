@@ -16,6 +16,8 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.validation.FieldError;
@@ -24,9 +26,15 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 /**
- * Centralized error mapper for workspace endpoints to keep responses consistent.
+ * Centralized error mapper for workspace-related exceptions across all endpoints.
+ * <p>
+ * This advice has highest precedence to ensure workspace-specific exceptions
+ * are handled before the global fallback handler. It applies globally because
+ * workspace exceptions can originate from various controllers during workspace
+ * context resolution.
  */
-@RestControllerAdvice(basePackages = "de.tum.in.www1.hephaestus.workspace")
+@RestControllerAdvice
+@Order(Ordered.HIGHEST_PRECEDENCE)
 public class WorkspaceControllerAdvice {
 
     private static final Logger logger = LoggerFactory.getLogger(WorkspaceControllerAdvice.class);

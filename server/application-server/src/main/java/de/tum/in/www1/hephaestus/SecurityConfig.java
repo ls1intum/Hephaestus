@@ -29,8 +29,13 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 @EnableMethodSecurity(prePostEnabled = true)
 public class SecurityConfig {
 
-    @Value("${hephaestus.cors.allowed-origins:http://localhost:4200}")
-    private List<String> allowedOrigins;
+    private final List<String> allowedOrigins;
+
+    public SecurityConfig(
+        @Value("${hephaestus.cors.allowed-origins:http://localhost:4200}") List<String> allowedOrigins
+    ) {
+        this.allowedOrigins = allowedOrigins;
+    }
 
     interface AuthoritiesConverter extends Converter<Map<String, Object>, Collection<GrantedAuthority>> {}
 

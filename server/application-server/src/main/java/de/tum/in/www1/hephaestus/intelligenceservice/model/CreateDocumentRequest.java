@@ -34,6 +34,7 @@ import org.hibernate.validator.constraints.*;
   CreateDocumentRequest.JSON_PROPERTY_KIND
 })
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
+@SuppressWarnings("unused")
 public class CreateDocumentRequest {
   public static final String JSON_PROPERTY_TITLE = "title";
   private String title;

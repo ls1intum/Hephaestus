@@ -41,20 +41,48 @@ async function walk(dir) {
   return files.flat();
 }
 
+/**
+ * Adds @SuppressWarnings("unused") annotation to the class to suppress unused import warnings.
+ * This is necessary because the OpenAPI generator produces imports that may not be used in every file.
+ */
+function addSuppressWarnings(content) {
+  // Add @SuppressWarnings("unused") before the class declaration if not already present
+  if (content.includes('@SuppressWarnings')) {
+    return content;
+  }
+  // Match class/enum/interface declarations preceded by @jakarta.annotation.Generated
+  // and add @SuppressWarnings before them
+  const classPattern = /(@jakarta\.annotation\.Generated\([^)]+\)\s*\n)(public\s+(?:class|enum|interface)\s+)/g;
+  return content.replace(classPattern, '$1@SuppressWarnings("unused")\n$2');
+}
+
 async function processFile(filePath) {
-  const content = await fs.readFile(filePath, 'utf8');
-  if (!content.includes('The version of the OpenAPI document:')) {
-    return false;
+  let content = await fs.readFile(filePath, 'utf8');
+  let changed = false;
+
+  // Update version documentation
+  if (content.includes('The version of the OpenAPI document:')) {
+    const updated = content.replace(
+      /^\s*\* The version of the OpenAPI document.*$/gm,
+      ` * ${replacementText}`,
+    );
+    if (updated !== content) {
+      content = updated;
+      changed = true;
+    }
   }
-  const updated = content.replace(
-    /^\s*\* The version of the OpenAPI document.*$/gm,
-    ` * ${replacementText}`,
-  );
-  if (updated === content) {
-    return false;
+
+  // Add @SuppressWarnings to suppress unused import warnings
+  const withSuppressWarnings = addSuppressWarnings(content);
+  if (withSuppressWarnings !== content) {
+    content = withSuppressWarnings;
+    changed = true;
   }
-  await fs.writeFile(filePath, updated, 'utf8');
-  return true;
+
+  if (changed) {
+    await fs.writeFile(filePath, content, 'utf8');
+  }
+  return changed;
 }
 
 async function main() {

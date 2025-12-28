@@ -6,6 +6,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.util.MultiValueMap;
 
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
+@SuppressWarnings("unused")
 public class HttpBearerAuth implements Authentication {
     private final String scheme;
     private Supplier<String> tokenSupplier;

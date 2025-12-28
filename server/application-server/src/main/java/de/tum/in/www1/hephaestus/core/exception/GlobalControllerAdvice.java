@@ -1,8 +1,5 @@
 package de.tum.in.www1.hephaestus.core.exception;
 
-import de.tum.in.www1.hephaestus.workspace.exception.RepositoryAlreadyMonitoredException;
-import de.tum.in.www1.hephaestus.workspace.exception.WorkspaceLifecycleViolationException;
-import de.tum.in.www1.hephaestus.workspace.exception.WorkspaceSlugConflictException;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.Path;
@@ -66,28 +63,6 @@ public class GlobalControllerAdvice {
     ProblemDetail handleIllegalState(IllegalStateException exception) {
         logger.warn("Illegal state: {}", exception.getMessage());
         return problem(HttpStatus.CONFLICT, "Invalid state", exception.getMessage());
-    }
-
-    // ========================================================================
-    // WORKSPACE-SPECIFIC CONFLICT EXCEPTIONS
-    // ========================================================================
-
-    @ExceptionHandler(WorkspaceSlugConflictException.class)
-    ProblemDetail handleWorkspaceSlugConflict(WorkspaceSlugConflictException exception) {
-        logger.debug("Workspace slug conflict: {}", exception.getMessage());
-        return problem(HttpStatus.CONFLICT, "Workspace slug conflict", exception.getMessage());
-    }
-
-    @ExceptionHandler(RepositoryAlreadyMonitoredException.class)
-    ProblemDetail handleRepositoryAlreadyMonitored(RepositoryAlreadyMonitoredException exception) {
-        logger.debug("Repository already monitored: {}", exception.getMessage());
-        return problem(HttpStatus.CONFLICT, "Repository already monitored", exception.getMessage());
-    }
-
-    @ExceptionHandler(WorkspaceLifecycleViolationException.class)
-    ProblemDetail handleWorkspaceLifecycleViolation(WorkspaceLifecycleViolationException exception) {
-        logger.debug("Workspace lifecycle violation: {}", exception.getMessage());
-        return problem(HttpStatus.CONFLICT, "Workspace lifecycle violation", exception.getMessage());
     }
 
     // ========================================================================
