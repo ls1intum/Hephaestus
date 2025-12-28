@@ -45,5 +45,5 @@ HEALTHCHECK --interval=30s --timeout=10s --retries=5 --start-period=3s \
 # Use dumb-init as entrypoint for proper signal handling
 # This ensures SIGTERM is properly forwarded to the Node.js process
 ENTRYPOINT ["dumb-init", "--"]
-CMD ["node", "/app/dist/src/index.js"]
+CMD ["node", "/app/dist/index.js"]
 
