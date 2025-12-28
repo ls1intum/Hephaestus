@@ -48,7 +48,7 @@ body:
       options:
         - Webapp (React UI)
         - Application Server (Java/Spring)
-        - Intelligence Service (Python/AI)
+        - Intelligence Service (TypeScript/AI)
         - Webhook Ingest
         - Don't know
     validations:

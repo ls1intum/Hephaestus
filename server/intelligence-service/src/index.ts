@@ -7,15 +7,36 @@
 import "./instrumentation";
 
 import { serve } from "@hono/node-server";
-import pino from "pino";
 
 import app from "./app";
 import env from "./env";
 import { shutdownTelemetry } from "./instrumentation";
+import logger from "./logger";
 import { pool } from "./shared/db";
 
-const logger = pino({ level: env.LOG_LEVEL });
 const port = env.PORT;
+
+// Fail-fast: Validate database configuration at startup
+if (env.DATABASE_URL.includes("placeholder")) {
+	logger.fatal(
+		"DATABASE_URL contains placeholder value. Set a real database URL before starting the server.",
+	);
+	process.exit(1);
+}
+
+// Validate database connectivity before accepting requests
+async function validateDatabaseConnection(): Promise<void> {
+	try {
+		await pool.query("SELECT 1");
+		logger.info("Database connection validated");
+	} catch (error) {
+		logger.fatal({ error }, "Failed to connect to database at startup");
+		process.exit(1);
+	}
+}
+
+await validateDatabaseConnection();
+
 logger.info(`Server is running on http://localhost:${port}`);
 
 const server = serve({

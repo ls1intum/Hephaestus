@@ -12,8 +12,7 @@ set -euo pipefail
 #   - root package-lock.json (top-level version)
 #   - Java source: server/application-server/src/main/java/de/tum/in/www1/hephaestus/OpenAPIConfiguration.java
 #   - YAML config: server/application-server/src/main/resources/application.yml
-#   - Python projects: server/intelligence-service/pyproject.toml & server/webhook-ingest/pyproject.toml
-#   - Python app: server/intelligence-service/app/main.py
+#   - server/intelligence-service/openapi.yaml
 #   - Maven POM: server/application-server/pom.xml (preserving -SNAPSHOT)
 #   - OpenAPI docs: server/application-server/openapi.yaml & server/intelligence-service/openapi.yaml
 #   - All files containing "The version of the OpenAPI document:" (only in these directories):
@@ -156,19 +155,17 @@ if [[ -f server/application-server/src/main/resources/application.yml ]]; then
     sed_inplace "s#(version: *\")[0-9]+(\.[0-9]+){2}(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?\"#\1${NEW_VERSION}\"#" server/application-server/src/main/resources/application.yml
 fi
 
-# Update server/intelligence-service/pyproject.toml
-if [[ -f server/intelligence-service/pyproject.toml ]]; then
-    sed_inplace "s#(version *= *\")[0-9]+(\.[0-9]+){2}(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?\"#\1${NEW_VERSION}\"#" server/intelligence-service/pyproject.toml
-fi
-
-# Update server/webhook-ingest/pyproject.toml
-if [[ -f server/webhook-ingest/pyproject.toml ]]; then
-    sed_inplace "s#(version *= *\")[0-9]+(\.[0-9]+){2}(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?\"#\1${NEW_VERSION}\"#" server/webhook-ingest/pyproject.toml
-fi
-
-# Update server/intelligence-service/app/main.py (if it exists)
-if [[ -f server/intelligence-service/app/main.py ]]; then
-    sed_inplace "s#(version *= *\")[0-9]+(\.[0-9]+){2}(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?\"#\1${NEW_VERSION}\"#" server/intelligence-service/app/main.py
+# Update server/webhook-ingest/package.json
+if [[ -f server/webhook-ingest/package.json ]]; then
+    awk -v old_version="$CURRENT_VERSION" -v new_version="$NEW_VERSION" '
+        BEGIN {found_name = 0}
+        /"name": "webhook-ingest"/ {found_name = 1}
+        found_name && /"version":/ {
+            sub("\"version\": \"" old_version "\"", "\"version\": \"" new_version "\"")
+            found_name = 0
+        }
+        {print}
+    ' server/webhook-ingest/package.json > server/webhook-ingest/package.json.tmp && mv server/webhook-ingest/package.json.tmp server/webhook-ingest/package.json
 fi
 
 # Update Maven POM (only update the project version for hephaestus) (if it exists)

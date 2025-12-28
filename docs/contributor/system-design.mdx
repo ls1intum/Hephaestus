@@ -18,8 +18,8 @@ Open the `.mdj` file in StarUML, adjust the relevant diagram, then export the SV
 The platform is intentionally layered. Internally we distinguish between:
 
 - **Application Server** - Spring Boot, integrates with Git providers, manages the leaderboard, and exposes the primary REST API.
-- **Intelligence Service** - FastAPI + LangGraph powered mentor logic that produces conversational guidance and artifacts.
-- **Webhook Ingest** - NATS-based ingestion for GitHub events, decoupling external webhooks from downstream processing.
+- **Intelligence Service** - TypeScript + Hono mentor logic that produces conversational guidance and artifacts.
+- **Webhook Ingest** - NATS-based ingestion for GitHub/GitLab events, decoupling external webhooks from downstream processing.
 - **User Management** - Keycloak identity realm configured with GitHub as identity provider.
 
 Externally we integrate with code hosting (GitHub today, GitLab planned), Slack/email notifications, and the analytics stack used for anonymised usage metrics. Data enters through webhooks, gets enriched via API calls, and surfaces in the React client.

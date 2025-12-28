@@ -1,0 +1,42 @@
+# Dependencies
+node_modules
+
+# Build output
+dist
+
+# Test/Coverage
+coverage
+test
+*.test.ts
+vitest.config.ts
+
+# Logs
+*.log
+npm-debug.log*
+
+# Environment files (security)
+.env
+.env.*
+!.env.example
+
+# IDE/Editor
+.vscode
+.idea
+*.swp
+*.swo
+
+# Git
+.git
+.gitignore
+
+# Docker
+Dockerfile*
+docker-compose*
+.dockerignore
+
+# Documentation
+README.md
+*.md
+
+# TypeScript build info
+*.tsbuildinfo

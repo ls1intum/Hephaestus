@@ -2,7 +2,7 @@
 id: coding-guidelines
 sidebar_position: 6
 title: Coding & Design Guidelines
-description: Shared principles for the React client, Spring Boot server, and FastAPI intelligence service.
+description: Shared principles for the React client, Spring Boot server, and TypeScript intelligence service.
 ---
 
 These guidelines keep every service aligned. Keep changes focused. Mention any deviation in your pull request. Raise follow-up issues when you discover gaps.
@@ -76,19 +76,19 @@ These guidelines keep every service aligned. Keep changes focused. Mention any d
 
 ## Intelligence service (`/server/intelligence-service`)
 
-- LangGraph orchestration resides in `app/mentor/run.py`. Nodes live in `app/mentor/nodes/**`. Shared state types live in `app/mentor/state.py`.
-- Regenerate SQLAlchemy models by running `npm run db:generate-models:intelligence-service`. Never edit `app/db/models_gen.py` by hand.
-- Keep FastAPI routers thin. Push business logic into services or nodes. Define request and response models in `app/models/**`.
-- Load configuration via `app/settings.py`. Secrets belong in `.env`, which you create from `.env.example`.
-- Manage dependencies with Poetry. Run `poetry install --no-root` once and reuse the virtual environment via `poetry shell`.
-- Format with `poetry run black .` and lint with `poetry run flake8 .`. Run `poetry run mypy` before pushing when you add new types.
-- Add or update service tests with `pytest` under `app/tests/**`. Use `httpx.AsyncClient` to exercise FastAPI routers.
+- Uses Hono for HTTP routing and Vercel AI SDK for model orchestration.
+- Settings live in `src/env.ts`; `MODEL_NAME` and `DETECTION_MODEL_NAME` must be provider-qualified (`openai:gpt-5-mini`, `azure:gpt-5-mini`, etc.).
+- Drizzle ORM for database access; regenerate the schema with `npm run db:generate-models:intelligence-service` (writes to `src/shared/db/schema.ts`).
+- Export the OpenAPI spec with `npm run openapi:export` after API changes.
+- Format and lint with Biome (`npm run format:intelligence-service`, `npm run check:intelligence-service`).
+- Add or update service tests with Vitest (`npm -w server/intelligence-service run test`).
 
 ## Webhook ingest service (`/server/webhook-ingest`)
 
-- The service listens for GitHub events and publishes to NATS JetStream.
-- Configure secrets through environment variables defined in `.env.example`.
-- Format and lint with Poetry (`poetry run black .`, `poetry run flake8 .`).
+- Uses Hono for HTTP routing and `@nats-io/jetstream` for NATS publishing.
+- Verify GitHub signatures via HMAC-SHA256 and GitLab tokens via constant-time comparison.
+- Configure settings via Zod in `src/env.ts` and keep `.env.example` up to date.
+- Format and lint with Biome (`npm run check:webhook-ingest`) and run tests with Vitest.
 
 ## Docs site (`/docs`)
 
@@ -102,7 +102,7 @@ These guidelines keep every service aligned. Keep changes focused. Mention any d
 - Liquibase changesets live in `server/application-server/src/main/resources/config/liquibase`.
 - Prefer `renameColumn` or `modifyDataType` when evolving schemas so data survives deployments.
 - Add indexes before backfilling large tables. Profile long migrations locally.
-- After schema updates, regenerate the ERD, refresh the FastAPI models, and run server tests that touch the affected tables.
+- After schema updates, regenerate the ERD, refresh the Drizzle schema, and run server tests that touch the affected tables.
 
 ## Observability and security
 

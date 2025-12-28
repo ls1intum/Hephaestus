@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.12.3](https://github.com/ls1intum/Hephaestus/compare/v0.12.2...v0.12.3) (2025-12-28)
+
+### 🐛 Bug Fixes
+
+* **webhooks:** correct entrypoint path in dockerfile ([#624](https://github.com/ls1intum/Hephaestus/issues/624)) ([c458f3d](https://github.com/ls1intum/Hephaestus/commit/c458f3d615226c176cf5bf69fff76508cd5c3f0f))
+
 ## [0.12.2](https://github.com/ls1intum/Hephaestus/compare/v0.12.1...v0.12.2) (2025-12-27)
 
 ### 🐛 Bug Fixes

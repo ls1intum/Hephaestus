@@ -27,9 +27,6 @@
 	],
 	"settings": {
 		"java.compile.nullAnalysis.mode": "automatic",
-		"python.terminal.activateEnvironment": true,
-		"python.terminal.activateEnvInCurrentTerminal": true,
-		"python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
 		"java.configuration.updateBuildConfiguration": "automatic",
 		"java.completion.importOrder": [
 			"#"
@@ -58,7 +55,6 @@
 			"vscjava.vscode-java-pack",
 			"redhat.java",
 			"vscjava.vscode-maven",
-			"ms-python.python",
 			"bradlc.vscode-tailwindcss",
 			"dbaeumer.vscode-eslint",
 			"github.vscode-pull-request-github",
