@@ -7,7 +7,7 @@ import { connect } from "@nats-io/transport-node";
 import env from "@/env";
 import logger from "@/logger";
 
-// Stream configuration matching legacy service (days to nanoseconds)
+// Stream retention configuration (days to nanoseconds)
 const streamMaxAgeNs = nanos(env.STREAM_MAX_AGE_DAYS * 24 * 60 * 60 * 1000);
 const STREAM_MAX_MSGS = env.STREAM_MAX_MSGS;
 
