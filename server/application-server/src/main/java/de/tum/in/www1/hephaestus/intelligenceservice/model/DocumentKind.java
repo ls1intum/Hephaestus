@@ -25,6 +25,7 @@ import com.fasterxml.jackson.annotation.JsonValue;
 /**
  * Gets or Sets DocumentKind
  */
+@SuppressWarnings("all")
 public enum DocumentKind {
   
   TEXT("text");
