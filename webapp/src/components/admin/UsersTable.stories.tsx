@@ -167,6 +167,7 @@ export const UsersWithoutTeams: Story = {
 				teams: [],
 				user: {
 					id: "user-6",
+					login: "john",
 					name: "John Doe",
 					email: "john@example.com",
 				},
@@ -179,6 +180,7 @@ export const UsersWithoutTeams: Story = {
 				teams: [],
 				user: {
 					id: "user-7",
+					login: "jane",
 					name: "Jane Smith",
 					email: "jane@example.com",
 				},

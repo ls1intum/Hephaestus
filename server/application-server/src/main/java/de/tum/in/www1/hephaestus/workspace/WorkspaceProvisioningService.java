@@ -329,9 +329,9 @@ public class WorkspaceProvisioningService {
             .orElseThrow(() ->
                 new IllegalStateException(
                     "Cannot assign owner for PAT workspace: GitHub user '" +
-                    accountLogin +
-                    "' could not be synced and does not exist locally. " +
-                    "Ensure the user exists in the system before creating the workspace."
+                        accountLogin +
+                        "' could not be synced and does not exist locally. " +
+                        "Ensure the user exists in the system before creating the workspace."
                 )
             );
     }

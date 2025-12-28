@@ -159,7 +159,7 @@ public class BadPracticeDetectorScheduler {
             if (keycloakRoleChecksHealthy.compareAndSet(true, false)) {
                 logger.info(
                     "Disabling automatic detection role checks after Keycloak responded with {}. " +
-                    "Set KEYCLOAK credentials or restart the server to re-enable.",
+                        "Set KEYCLOAK credentials or restart the server to re-enable.",
                     e.getMessage()
                 );
             } else {

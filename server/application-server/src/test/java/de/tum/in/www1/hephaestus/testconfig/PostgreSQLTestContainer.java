@@ -96,14 +96,13 @@ public final class PostgreSQLTestContainer {
             newContainer.getDatabaseName()
         );
 
-        Runtime.getRuntime()
-            .addShutdownHook(
-                new Thread(() -> {
-                    if (newContainer.isRunning()) {
-                        newContainer.stop();
-                    }
-                })
-            );
+        Runtime.getRuntime().addShutdownHook(
+            new Thread(() -> {
+                if (newContainer.isRunning()) {
+                    newContainer.stop();
+                }
+            })
+        );
 
         return newContainer;
     }

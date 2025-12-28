@@ -199,7 +199,10 @@ class GitHubLiveRepositorySyncIntegrationTest extends AbstractGitHubLiveSyncInte
         assertThat(collaboratorUserIdsBeforeSync).contains(collaboratorUserId);
         var collaboratorUser = userRepository.findById(collaboratorUserId).orElseThrow();
         assertThat(collaboratorUser.getLogin().toLowerCase()).isIn(
-            seededMembers.stream().map(member -> member.getLogin().toLowerCase()).toList()
+            seededMembers
+                .stream()
+                .map(member -> member.getLogin().toLowerCase())
+                .toList()
         );
 
         workspace = workspaceRepository.findById(workspace.getId()).orElseThrow();

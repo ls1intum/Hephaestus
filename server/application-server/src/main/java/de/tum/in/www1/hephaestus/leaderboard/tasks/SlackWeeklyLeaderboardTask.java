@@ -104,11 +104,18 @@ public class SlackWeeklyLeaderboardTask implements Runnable {
         logger.debug(
             "Top 3 Users of the last week for workspace {}: {}",
             workspace.getWorkspaceSlug(),
-            top3.stream().map(entry -> entry.user() != null ? entry.user().name() : "<team>").toList()
+            top3
+                .stream()
+                .map(entry -> entry.user() != null ? entry.user().name() : "<team>")
+                .toList()
         );
 
         List<User> allSlackUsers = slackMessageService != null ? slackMessageService.getAllMembers() : List.of();
-        return top3.stream().map(mapToSlackUser(allSlackUsers)).filter(user -> user != null).toList();
+        return top3
+            .stream()
+            .map(mapToSlackUser(allSlackUsers))
+            .filter(user -> user != null)
+            .toList();
     }
 
     private Function<LeaderboardEntryDTO, User> mapToSlackUser(List<User> allSlackUsers) {
@@ -226,14 +233,14 @@ public class SlackWeeklyLeaderboardTask implements Runnable {
                 section.text(
                     markdownText(
                         "Last week's review leaderboard is finalized. See where you landed <" +
-                        workspaceBase +
-                        "?after=" +
-                        encode(formatDateForURL(after)) +
-                        "&before=" +
-                        encode(formatDateForURL(before)) +
-                        "&team=" +
-                        encode(teamFilter) +
-                        "|here>."
+                            workspaceBase +
+                            "?after=" +
+                            encode(formatDateForURL(after)) +
+                            "&before=" +
+                            encode(formatDateForURL(before)) +
+                            "&team=" +
+                            encode(teamFilter) +
+                            "|here>."
                     )
                 )
             ),

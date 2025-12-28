@@ -2,7 +2,7 @@
  * Open text survey question for collecting free-form feedback.
  */
 import type { Meta, StoryObj } from "@storybook/react";
-import { fn } from "@storybook/test";
+import { fn } from "storybook/test";
 import { QuestionOpenText } from "./question-open-text";
 
 const meta = {

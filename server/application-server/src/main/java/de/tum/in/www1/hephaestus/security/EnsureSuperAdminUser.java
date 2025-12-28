@@ -24,5 +24,4 @@ import org.springframework.security.access.prepost.PreAuthorize;
 @Retention(RetentionPolicy.RUNTIME)
 @Documented
 @PreAuthorize("hasAuthority('admin')")
-public @interface EnsureSuperAdminUser {
-}
+public @interface EnsureSuperAdminUser {}

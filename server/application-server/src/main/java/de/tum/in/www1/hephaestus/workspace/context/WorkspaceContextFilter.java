@@ -277,7 +277,8 @@ public class WorkspaceContextFilter implements Filter {
         boolean isPublic = Boolean.TRUE.equals(workspace.getIsPubliclyViewable());
         boolean hasMembership = userRepository
             .getCurrentUser()
-            .flatMap(user -> workspaceMembershipRepository.findByWorkspace_IdAndUser_Id(workspace.getId(), user.getId())
+            .flatMap(user ->
+                workspaceMembershipRepository.findByWorkspace_IdAndUser_Id(workspace.getId(), user.getId())
             )
             .isPresent();
 

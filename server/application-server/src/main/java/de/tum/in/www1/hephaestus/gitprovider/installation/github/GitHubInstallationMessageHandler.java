@@ -113,10 +113,10 @@ public class GitHubInstallationMessageHandler extends GitHubMessageHandler<GHEve
             Set<String> protectedRepositories = rawRepositories == null
                 ? Collections.emptySet()
                 : rawRepositories
-                    .stream()
-                    .map(GHEventPayload.Installation.Repository::getFullName)
-                    .filter(fullName -> fullName != null && !fullName.isBlank())
-                    .collect(Collectors.toSet());
+                      .stream()
+                      .map(GHEventPayload.Installation.Repository::getFullName)
+                      .filter(fullName -> fullName != null && !fullName.isBlank())
+                      .collect(Collectors.toSet());
             workspaceService.ensureAllInstallationRepositoriesCovered(installationId, protectedRepositories);
         }
     }

@@ -82,7 +82,11 @@ class GitHubInstallationMessageHandlerIntegrationTest extends BaseIntegrationTes
         EnumeratorStubConfig.snapshots = List.of(extraRepo);
 
         // Precondition
-        var fullNames = payload.getRawRepositories().stream().map(r -> r.getFullName()).toList();
+        var fullNames = payload
+            .getRawRepositories()
+            .stream()
+            .map(r -> r.getFullName())
+            .toList();
         fullNames.forEach(n -> assertThat(repositoryRepository.findByNameWithOwner(n)).isEmpty());
         assertThat(repositoryToMonitorRepository.findByWorkspaceId(workspace.getId())).isEmpty();
         assertThat(workspace.getGithubRepositorySelection()).isNull();
@@ -104,7 +108,10 @@ class GitHubInstallationMessageHandlerIntegrationTest extends BaseIntegrationTes
         );
         // organization should be linked to installation
         assertThat(
-            organizationRepository.findByInstallationId(installationId).map(org -> org.getLogin()).orElse(null)
+            organizationRepository
+                .findByInstallationId(installationId)
+                .map(org -> org.getLogin())
+                .orElse(null)
         ).isEqualTo(payload.getInstallation().getAccount().getLogin());
     }
 

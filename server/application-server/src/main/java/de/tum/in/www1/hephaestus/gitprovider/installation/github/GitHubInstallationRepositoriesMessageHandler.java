@@ -70,7 +70,10 @@ public class GitHubInstallationRepositoriesMessageHandler
 
         // Delete any removed repositories
         if (removed != null && !removed.isEmpty()) {
-            var ids = removed.stream().map(r -> r.getId()).toList();
+            var ids = removed
+                .stream()
+                .map(r -> r.getId())
+                .toList();
             repositorySyncService.deleteRepositoriesByIds(ids);
             if (installationId != null) {
                 removed.forEach(r ->

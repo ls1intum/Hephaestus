@@ -102,7 +102,11 @@ class GitHubTeamMessageHandlerIntegrationTest extends BaseIntegrationTest {
         teamHandler.handleEvent(payload);
 
         var team = teamRepo.findById(teamId).orElseThrow();
-        var perm = team.getRepoPermissions().stream().filter(p -> p.getRepository().getId().equals(repoId)).findFirst();
+        var perm = team
+            .getRepoPermissions()
+            .stream()
+            .filter(p -> p.getRepository().getId().equals(repoId))
+            .findFirst();
         assertThat(perm).isPresent();
         assertThat(perm.get().getPermission()).isEqualTo(TeamRepositoryPermission.PermissionLevel.ADMIN);
     }
@@ -120,7 +124,11 @@ class GitHubTeamMessageHandlerIntegrationTest extends BaseIntegrationTest {
         teamHandler.handleEvent(payload);
 
         var team = teamRepo.findById(teamId).orElseThrow();
-        var perm = team.getRepoPermissions().stream().filter(p -> p.getRepository().getId().equals(repoId)).findFirst();
+        var perm = team
+            .getRepoPermissions()
+            .stream()
+            .filter(p -> p.getRepository().getId().equals(repoId))
+            .findFirst();
         assertThat(perm).isPresent();
         assertThat(perm.get().getPermission()).isEqualTo(TeamRepositoryPermission.PermissionLevel.WRITE);
     }
@@ -138,7 +146,11 @@ class GitHubTeamMessageHandlerIntegrationTest extends BaseIntegrationTest {
         teamHandler.handleEvent(payload);
 
         var team = teamRepo.findById(teamId).orElseThrow();
-        var perm = team.getRepoPermissions().stream().filter(p -> p.getRepository().getId().equals(repoId)).findFirst();
+        var perm = team
+            .getRepoPermissions()
+            .stream()
+            .filter(p -> p.getRepository().getId().equals(repoId))
+            .findFirst();
         assertThat(perm).isNotPresent();
     }
 }

@@ -425,7 +425,9 @@ public class LeaderboardService {
             .filter(issueComment -> {
                 Long issueAuthorId = issueComment.getIssue() == null
                     ? null
-                    : issueComment.getIssue().getAuthor() == null ? null : issueComment.getIssue().getAuthor().getId();
+                    : issueComment.getIssue().getAuthor() == null
+                        ? null
+                        : issueComment.getIssue().getAuthor().getId();
                 Long commentAuthorId = issueComment.getAuthor() == null ? null : issueComment.getAuthor().getId();
                 return issueAuthorId != null && commentAuthorId != null && !issueAuthorId.equals(commentAuthorId);
             })
@@ -671,7 +673,10 @@ public class LeaderboardService {
         );
 
         int score = entries.stream().mapToInt(LeaderboardEntryDTO::score).sum();
-        int leaguePoints = entries.stream().mapToInt(e -> e.user() == null ? 0 : e.user().leaguePoints()).sum();
+        int leaguePoints = entries
+            .stream()
+            .mapToInt(e -> e.user() == null ? 0 : e.user().leaguePoints())
+            .sum();
         int numberOfReviewedPRs = entries.stream().mapToInt(LeaderboardEntryDTO::numberOfReviewedPRs).sum();
         int numberOfApprovals = entries.stream().mapToInt(LeaderboardEntryDTO::numberOfApprovals).sum();
         int numberOfChangeRequests = entries.stream().mapToInt(LeaderboardEntryDTO::numberOfChangeRequests).sum();

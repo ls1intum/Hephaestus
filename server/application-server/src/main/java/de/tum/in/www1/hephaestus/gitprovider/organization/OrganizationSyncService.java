@@ -128,10 +128,10 @@ public class OrganizationSyncService {
 
         Organization organization = context.workspace().getInstallationId() != null
             ? organizationService.upsertIdentityAndAttachInstallation(
-                ghOrg.getId(),
-                ghOrg.getLogin(),
-                context.workspace().getInstallationId()
-            )
+                  ghOrg.getId(),
+                  ghOrg.getLogin(),
+                  context.workspace().getInstallationId()
+              )
             : organizationService.upsertIdentity(ghOrg.getId(), ghOrg.getLogin());
         organizationConverter.update(ghOrg, organization);
         organization = organizationRepository.save(organization);
@@ -249,7 +249,10 @@ public class OrganizationSyncService {
         }
 
         List<Long> current = membershipRepository.findUserIdsByOrganizationId(organization.getGithubId());
-        List<Long> toRemove = current.stream().filter(id -> !seen.contains(id)).toList();
+        List<Long> toRemove = current
+            .stream()
+            .filter(id -> !seen.contains(id))
+            .toList();
         if (!toRemove.isEmpty()) {
             membershipRepository.deleteByOrganizationIdAndUserIdIn(organization.getGithubId(), toRemove);
         }

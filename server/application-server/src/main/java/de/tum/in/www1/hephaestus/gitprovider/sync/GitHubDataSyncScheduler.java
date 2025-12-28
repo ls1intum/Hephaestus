@@ -49,7 +49,10 @@ public class GitHubDataSyncScheduler {
             .filter(monitoringScopeFilter::isWorkspaceAllowed)
             .toList();
 
-        int skippedByStatus = (int) allWorkspaces.stream().filter(w -> w.getStatus() != WorkspaceStatus.ACTIVE).count();
+        int skippedByStatus = (int) allWorkspaces
+            .stream()
+            .filter(w -> w.getStatus() != WorkspaceStatus.ACTIVE)
+            .count();
         int skippedByFilter = allWorkspaces.size() - skippedByStatus - workspacesToSync.size();
 
         if (workspacesToSync.isEmpty()) {
