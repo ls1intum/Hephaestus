@@ -37,7 +37,7 @@ import org.hibernate.validator.constraints.*;
   DetectorResponse.JSON_PROPERTY_TRACE_ID
 })
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
-@SuppressWarnings("unused")
+@SuppressWarnings("all")
 public class DetectorResponse {
   public static final String JSON_PROPERTY_BAD_PRACTICE_SUMMARY = "badPracticeSummary";
   private String badPracticeSummary;

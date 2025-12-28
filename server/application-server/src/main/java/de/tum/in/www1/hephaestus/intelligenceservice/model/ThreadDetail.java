@@ -43,7 +43,7 @@ import org.hibernate.validator.constraints.*;
   ThreadDetail.JSON_PROPERTY_MESSAGES
 })
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
-@SuppressWarnings("unused")
+@SuppressWarnings("all")
 public class ThreadDetail {
   public static final String JSON_PROPERTY_ID = "id";
   private UUID id;

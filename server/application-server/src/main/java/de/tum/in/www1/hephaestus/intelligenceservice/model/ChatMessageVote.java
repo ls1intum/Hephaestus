@@ -36,7 +36,7 @@ import org.hibernate.validator.constraints.*;
   ChatMessageVote.JSON_PROPERTY_UPDATED_AT
 })
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
-@SuppressWarnings("unused")
+@SuppressWarnings("all")
 public class ChatMessageVote {
   public static final String JSON_PROPERTY_MESSAGE_ID = "messageId";
   private UUID messageId;
