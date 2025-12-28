@@ -7,7 +7,5 @@ export const Route = createFileRoute("/privacy")({
 });
 
 export function PrivacyContainer() {
-	return (
-		<LegalPage title="Privacy Policy" content={environment.legal.privacyHtml} />
-	);
+	return <LegalPage title="Privacy Policy" content={environment.legal.privacyHtml} />;
 }

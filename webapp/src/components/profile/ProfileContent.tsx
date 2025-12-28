@@ -1,10 +1,6 @@
 import { CodeReviewIcon, GitPullRequestIcon } from "@primer/octicons-react";
 import { Link } from "@tanstack/react-router";
-import type {
-	PullRequestBaseInfo,
-	PullRequestInfo,
-	PullRequestReviewInfo,
-} from "@/api/types.gen";
+import type { PullRequestBaseInfo, PullRequestInfo, PullRequestReviewInfo } from "@/api/types.gen";
 import { ActivityBadges } from "@/components/leaderboard/ActivityBadges";
 import { Button } from "@/components/ui/button";
 import type { LeaderboardSchedule } from "@/lib/timeframe";
@@ -43,21 +39,13 @@ export function ProfileContent({
 	schedule,
 }: ProfileContentProps) {
 	// Generate skeleton arrays for loading state
-	const skeletonReviews = isLoading
-		? Array.from({ length: 3 }, (_, i) => ({ id: i }))
-		: [];
+	const skeletonReviews = isLoading ? Array.from({ length: 3 }, (_, i) => ({ id: i })) : [];
 
-	const skeletonPullRequests = isLoading
-		? Array.from({ length: 2 }, (_, i) => ({ id: i }))
-		: [];
+	const skeletonPullRequests = isLoading ? Array.from({ length: 2 }, (_, i) => ({ id: i })) : [];
 
-	const filteredReviewActivity = isLoading
-		? skeletonReviews
-		: (reviewActivity ?? []);
+	const filteredReviewActivity = isLoading ? skeletonReviews : (reviewActivity ?? []);
 
-	const displayPullRequests = isLoading
-		? skeletonPullRequests
-		: openPullRequests;
+	const displayPullRequests = isLoading ? skeletonPullRequests : openPullRequests;
 
 	const reviewStatsSource = reviewActivity ?? [];
 
@@ -66,10 +54,7 @@ export function ProfileContent({
 			acc.totalReviews += 1;
 			acc.totalScore += activity.score ?? 0;
 			acc.codeComments += activity.codeComments ?? 0;
-			if (
-				!acc.lastReviewAt ||
-				(activity.submittedAt && activity.submittedAt > acc.lastReviewAt)
-			) {
+			if (!acc.lastReviewAt || (activity.submittedAt && activity.submittedAt > acc.lastReviewAt)) {
 				acc.lastReviewAt = activity.submittedAt;
 			}
 			switch (activity.state) {
@@ -99,12 +84,9 @@ export function ProfileContent({
 		},
 	);
 
-	const reviewedPullRequestsForPopover: ReviewedPullRequest[] =
-		reviewStatsSource
-			.map((activity) => activity.pullRequest)
-			.filter((pullRequest): pullRequest is PullRequestBaseInfo =>
-				Boolean(pullRequest),
-			);
+	const reviewedPullRequestsForPopover: ReviewedPullRequest[] = reviewStatsSource
+		.map((activity) => activity.pullRequest)
+		.filter((pullRequest): pullRequest is PullRequestBaseInfo => Boolean(pullRequest));
 
 	return (
 		<div className="flex flex-col gap-4">
@@ -133,20 +115,18 @@ export function ProfileContent({
 					</div>
 					<div className="flex flex-col gap-2 m-1">
 						{filteredReviewActivity.length > 0 ? (
-							(filteredReviewActivity as PullRequestReviewInfo[]).map(
-								(activity) => (
-									<ReviewActivityCard
-										key={activity.id}
-										isLoading={isLoading}
-										state={activity.state}
-										submittedAt={activity.submittedAt}
-										htmlUrl={activity.htmlUrl}
-										pullRequest={activity.pullRequest}
-										repositoryName={activity.pullRequest?.repository?.name}
-										score={activity.score}
-									/>
-								),
-							)
+							(filteredReviewActivity as PullRequestReviewInfo[]).map((activity) => (
+								<ReviewActivityCard
+									key={activity.id}
+									isLoading={isLoading}
+									state={activity.state}
+									submittedAt={activity.submittedAt}
+									htmlUrl={activity.htmlUrl}
+									pullRequest={activity.pullRequest}
+									repositoryName={activity.pullRequest?.repository?.name}
+									score={activity.score}
+								/>
+							))
 						) : (
 							<EmptyState
 								icon={CodeReviewIcon}

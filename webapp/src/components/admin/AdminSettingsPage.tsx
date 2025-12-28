@@ -56,10 +56,7 @@ export function AdminSettingsPage({
 				/>
 
 				{/* Leagues Settings */}
-				<AdminLeagueSettings
-					isResetting={isResettingLeagues}
-					onResetLeagues={onResetLeagues}
-				/>
+				<AdminLeagueSettings isResetting={isResettingLeagues} onResetLeagues={onResetLeagues} />
 			</div>
 		</div>
 	);

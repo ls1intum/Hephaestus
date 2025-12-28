@@ -55,7 +55,13 @@ export const Output: Story = {
 			type: "tool-updateDocument",
 			state: "output-available",
 			toolCallId: "tc3",
-			output: { id: "doc-1", title: "Project Plan", kind: "TEXT" },
+			output: {
+				id: "doc-1",
+				title: "Project Plan",
+				kind: "text",
+				content: "Document content here",
+				description: "Updated document",
+			},
 		} as ToolPart<"updateDocument">,
 	},
 };

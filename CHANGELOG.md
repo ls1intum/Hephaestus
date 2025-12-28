@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.12.2](https://github.com/ls1intum/Hephaestus/compare/v0.12.1...v0.12.2) (2025-12-27)
+
+### 🐛 Bug Fixes
+
+* **webapp:** content-hashed runtime config with nginx best practices ([#622](https://github.com/ls1intum/Hephaestus/issues/622)) ([7f402e5](https://github.com/ls1intum/Hephaestus/commit/7f402e56e131c9305773e80943d41072cf407183))
+
+## [0.12.1](https://github.com/ls1intum/Hephaestus/compare/v0.12.0...v0.12.1) (2025-12-23)
+
+### 🐛 Bug Fixes
+
+* trigger patch release ([7d29081](https://github.com/ls1intum/Hephaestus/commit/7d2908120935bab94b11c03759609beba5fb8eed))
+
 ## [0.12.0](https://github.com/ls1intum/Hephaestus/compare/v0.11.1...v0.12.0) (2025-12-16)
 
 ### 🐛 Bug Fixes

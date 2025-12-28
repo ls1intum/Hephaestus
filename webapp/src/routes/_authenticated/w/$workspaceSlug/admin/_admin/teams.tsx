@@ -18,16 +18,13 @@ import { AdminTeamsTable } from "@/components/admin/AdminTeamsTable";
 import { NoWorkspace } from "@/components/workspace/NoWorkspace";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 
-export const Route = createFileRoute(
-	"/_authenticated/w/$workspaceSlug/admin/_admin/teams",
-)({
+export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/_admin/teams")({
 	component: AdminTeamsContainer,
 });
 
 function AdminTeamsContainer() {
 	const queryClient = useQueryClient();
-	const { workspaceSlug, isLoading: isWorkspaceLoading } =
-		useActiveWorkspaceSlug();
+	const { workspaceSlug, isLoading: isWorkspaceLoading } = useActiveWorkspaceSlug();
 	const slug = workspaceSlug ?? "";
 	const hasWorkspace = Boolean(workspaceSlug);
 
@@ -47,8 +44,7 @@ function AdminTeamsContainer() {
 			await queryClient.cancelQueries({ queryKey: teamsQueryKey });
 			const prev = queryClient.getQueryData<TeamInfo[]>(teamsQueryKey);
 			const teamId = vars.path?.id;
-			const hidden =
-				typeof vars.body === "boolean" ? vars.body : vars.query?.hidden;
+			const hidden = typeof vars.body === "boolean" ? vars.body : vars.query?.hidden;
 			if (prev && typeof teamId === "number" && typeof hidden === "boolean") {
 				const next = prev.map((t) => (t.id === teamId ? { ...t, hidden } : t));
 				queryClient.setQueryData(teamsQueryKey, next);
@@ -87,9 +83,7 @@ function AdminTeamsContainer() {
 			const teamId = vars.path?.teamId;
 			const repositoryId = vars.path?.repositoryId;
 			const hidden =
-				typeof vars.body === "boolean"
-					? vars.body
-					: vars.query?.hiddenFromContributions;
+				typeof vars.body === "boolean" ? vars.body : vars.query?.hiddenFromContributions;
 			if (
 				prev &&
 				typeof teamId === "number" &&
@@ -101,9 +95,7 @@ function AdminTeamsContainer() {
 					return {
 						...team,
 						repositories: (team.repositories ?? []).map((repo) =>
-							repo.id === repositoryId
-								? { ...repo, hiddenFromContributions: hidden }
-								: repo,
+							repo.id === repositoryId ? { ...repo, hiddenFromContributions: hidden } : repo,
 						),
 					};
 				});
@@ -133,11 +125,7 @@ function AdminTeamsContainer() {
 		});
 	};
 
-	const handleAddLabelToTeam = async (
-		teamId: number,
-		repositoryId: number,
-		label: string,
-	) => {
+	const handleAddLabelToTeam = async (teamId: number, repositoryId: number, label: string) => {
 		if (!hasWorkspace) {
 			return;
 		}

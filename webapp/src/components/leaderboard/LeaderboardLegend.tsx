@@ -8,13 +8,7 @@ import {
 } from "@primer/octicons-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import {
-	Card,
-	CardContent,
-	CardDescription,
-	CardHeader,
-	CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScoringExplanationDialog } from "./ScoringExplanationDialog";
 
 export function LeaderboardLegend() {
@@ -27,9 +21,7 @@ export function LeaderboardLegend() {
 					<CardTitle>
 						<InfoIcon className="inline mr-2 h-4 w-4" /> Activity Legend
 					</CardTitle>
-					<CardDescription>
-						Understanding the leaderboard activity indicators
-					</CardDescription>
+					<CardDescription>Understanding the leaderboard activity indicators</CardDescription>
 				</CardHeader>
 				<CardContent>
 					<div className="space-y-3">
@@ -58,9 +50,9 @@ export function LeaderboardLegend() {
 
 						<div className="pt-2 border-t">
 							<p className="text-sm text-github-muted-foreground mb-2">
-								Your score combines your review activity with the complexity of
-								the pull requests you've reviewed. Score calculation weighs
-								change requests highest, followed by approvals and comments.
+								Your score combines your review activity with the complexity of the pull requests
+								you've reviewed. Score calculation weighs change requests highest, followed by
+								approvals and comments.
 							</p>
 							<Button
 								variant="outline"
@@ -75,10 +67,7 @@ export function LeaderboardLegend() {
 				</CardContent>
 			</Card>
 
-			<ScoringExplanationDialog
-				open={showScoringModal}
-				onOpenChange={setShowScoringModal}
-			/>
+			<ScoringExplanationDialog open={showScoringModal} onOpenChange={setShowScoringModal} />
 		</>
 	);
 }

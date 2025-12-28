@@ -15,9 +15,7 @@ export function NoWorkspace() {
 					<Folders />
 				</EmptyMedia>
 				<EmptyTitle>No workspace</EmptyTitle>
-				<EmptyDescription>
-					You&apos;re not a member of any workspace yet.
-				</EmptyDescription>
+				<EmptyDescription>You&apos;re not a member of any workspace yet.</EmptyDescription>
 			</EmptyHeader>
 		</Empty>
 	);

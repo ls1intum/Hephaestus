@@ -27,12 +27,7 @@ import {
 	SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import {
-	Tooltip,
-	TooltipContent,
-	TooltipProvider,
-	TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { stateConfig } from "./utils";
 
 interface BadPracticeCardProps {
@@ -44,10 +39,7 @@ interface BadPracticeCardProps {
 	onResolveBadPracticeAsFixed?: (id: number) => void;
 	onResolveBadPracticeAsWontFix?: (id: number) => void;
 	onResolveBadPracticeAsWrong?: (id: number) => void;
-	onProvideFeedback?: (
-		id: number,
-		feedback: { type: string; explanation: string },
-	) => void;
+	onProvideFeedback?: (id: number, feedback: { type: string; explanation: string }) => void;
 }
 
 export function BadPracticeCard({
@@ -64,17 +56,9 @@ export function BadPracticeCard({
 	const [dialogOpen, setDialogOpen] = useState(false);
 	const stateInfo = stateConfig[state];
 	const Icon = stateInfo.icon;
-	const [feedbackType, setFeedbackType] = useState<string | undefined>(
-		undefined,
-	);
+	const [feedbackType, setFeedbackType] = useState<string | undefined>(undefined);
 	const [feedbackExplanation, setFeedbackExplanation] = useState<string>("");
-	const feedbackTypes = [
-		"Not a bad practice",
-		"Irrelevant",
-		"Incorrect",
-		"Imprecise",
-		"Other",
-	];
+	const feedbackTypes = ["Not a bad practice", "Irrelevant", "Incorrect", "Imprecise", "Other"];
 
 	const handleResolveAsFixed = () => {
 		onResolveBadPracticeAsFixed?.(id);
@@ -162,8 +146,8 @@ export function BadPracticeCard({
 							<DialogHeader>
 								<DialogTitle>Provide feedback</DialogTitle>
 								<DialogDescription>
-									Mark this bad practice with feedback that helps us improve the
-									bad practice detection.
+									Mark this bad practice with feedback that helps us improve the bad practice
+									detection.
 								</DialogDescription>
 							</DialogHeader>
 							<div className="py-4 grid gap-4">
@@ -172,10 +156,7 @@ export function BadPracticeCard({
 										Feedback
 									</Label>
 									<div className="col-span-3">
-										<Select
-											onValueChange={(value) => setFeedbackType(value)}
-											value={feedbackType}
-										>
+										<Select onValueChange={(value) => setFeedbackType(value)} value={feedbackType}>
 											<SelectTrigger id="feedback-type" className="w-full">
 												<SelectValue placeholder="Select the type of feedback" />
 											</SelectTrigger>

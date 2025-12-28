@@ -48,8 +48,7 @@ const meta = {
 			},
 		},
 		profileData: {
-			description:
-				"Complete profile data object containing user info and activity",
+			description: "Complete profile data object containing user info and activity",
 			control: "object",
 			table: {
 				type: { summary: "object" },

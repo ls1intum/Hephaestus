@@ -14,16 +14,9 @@ export interface TeamCardProps {
 	children?: ReactNode;
 }
 
-export function TeamCard({
-	team,
-	memberCount,
-	onToggleVisibility,
-	children,
-}: TeamCardProps) {
+export function TeamCard({ team, memberCount, onToggleVisibility, children }: TeamCardProps) {
 	return (
-		<Card
-			className={cn("flex flex-col gap-3", team.hidden ? "bg-muted/40" : "")}
-		>
+		<Card className={cn("flex flex-col gap-3", team.hidden ? "bg-muted/40" : "")}>
 			<CardHeader className="pb-4">
 				<div className="flex flex-wrap items-start justify-between gap-2">
 					<div className="min-w-0 flex-1">
@@ -62,11 +55,7 @@ export function TeamCard({
 							className="h-8 w-8"
 							title={team.hidden ? "Show team" : "Hide team"}
 						>
-							{team.hidden ? (
-								<EyeOff className="h-4 w-4" />
-							) : (
-								<Eye className="h-4 w-4" />
-							)}
+							{team.hidden ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
 						</Button>
 					</div>
 				</div>

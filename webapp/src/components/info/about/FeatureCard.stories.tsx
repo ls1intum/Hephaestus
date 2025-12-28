@@ -12,8 +12,7 @@ const meta = {
 	tags: ["autodocs"],
 	argTypes: {
 		feature: {
-			description:
-				"Feature data object containing icon, badge, title, description, and content",
+			description: "Feature data object containing icon, badge, title, description, and content",
 		},
 	},
 } satisfies Meta<typeof FeatureCard>;

@@ -14,11 +14,7 @@ export interface TeamsTableProps {
 		repositoryId: number,
 		hidden: boolean,
 	) => Promise<void>;
-	onAddLabelToTeam?: (
-		teamId: number,
-		repositoryId: number,
-		label: string,
-	) => Promise<void>;
+	onAddLabelToTeam?: (teamId: number, repositoryId: number, label: string) => Promise<void>;
 	onRemoveLabelFromTeam?: (teamId: number, labelId: number) => Promise<void>;
 }
 
@@ -62,9 +58,7 @@ export function AdminTeamsTable({
 	const rootsAll = useMemo(
 		() =>
 			[...teams]
-				.filter(
-					(t) => t.parentId === undefined || !allTeamsById.has(t.parentId),
-				)
+				.filter((t) => t.parentId === undefined || !allTeamsById.has(t.parentId))
 				.sort((a, b) => a.name.localeCompare(b.name)),
 		[teams, allTeamsById],
 	);
@@ -75,8 +69,7 @@ export function AdminTeamsTable({
 		if (!search) return new Set<number>(teams.map((t) => t.id));
 		const result = new Set<number>();
 		const memo = new Map<number, boolean>();
-		const matches = (t: TeamInfo): boolean =>
-			t.name.toLowerCase().includes(search);
+		const matches = (t: TeamInfo): boolean => t.name.toLowerCase().includes(search);
 		const hasMatchInSubtree = (t: TeamInfo): boolean => {
 			const cached = memo.get(t.id);
 			if (cached !== undefined) return cached;
@@ -178,9 +171,7 @@ export function AdminTeamsTable({
 								team={team}
 								childrenMap={childrenMap}
 								displaySet={displaySet}
-								onToggleVisibility={(teamId, hidden) =>
-									onHideTeam(teamId, hidden)
-								}
+								onToggleVisibility={(teamId, hidden) => onHideTeam(teamId, hidden)}
 								onToggleRepositoryVisibility={onToggleRepositoryVisibility}
 								onAddLabel={onAddLabelToTeam}
 								onRemoveLabel={onRemoveLabelFromTeam}

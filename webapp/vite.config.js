@@ -25,7 +25,7 @@ export default defineConfig(({ command }) => {
 				}),
 		].filter(Boolean), // Filter out falsy values
 		build: {
-			sourcemap: true,
+			sourcemap: false, // Disable sourcemaps for now to reduce build memory usage
 		},
 		optimizeDeps: {
 			exclude: ["storybook-static"],
@@ -37,6 +37,18 @@ export default defineConfig(({ command }) => {
 		resolve: {
 			alias: {
 				"@": resolve(__dirname, "./src"),
+				// Alias to share TS sources from the intelligence-service project
+				"@intelligence-service": resolve(__dirname, "../server/intelligence-service/src/mentor"),
+				"@intelligence-service-utils": resolve(
+					__dirname,
+					"../server/intelligence-service/src/shared",
+				),
+			},
+		},
+		server: {
+			fs: {
+				// Allow serving files from the monorepo root and sibling server directory
+				allow: [resolve(__dirname, ".."), resolve(__dirname, "../server/intelligence-service")],
 			},
 		},
 	};

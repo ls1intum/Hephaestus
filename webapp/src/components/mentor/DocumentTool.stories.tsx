@@ -16,8 +16,7 @@ const meta = {
 			options: ["create", "update", "request-suggestions"],
 		},
 		isLoading: {
-			description:
-				"Whether the operation is in progress (shows loading spinner)",
+			description: "Whether the operation is in progress (shows loading spinner)",
 			control: "boolean",
 		},
 	},

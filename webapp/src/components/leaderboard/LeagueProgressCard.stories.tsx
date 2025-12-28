@@ -37,8 +37,7 @@ const meta: Meta<typeof LeagueProgressCard> = {
 				},
 			];
 			const currentLeague = leagues.find(
-				(league) =>
-					leaguePoints >= league.minPoints && leaguePoints < league.maxPoints,
+				(league) => leaguePoints >= league.minPoints && leaguePoints < league.maxPoints,
 			);
 
 			const progressValue = currentLeague

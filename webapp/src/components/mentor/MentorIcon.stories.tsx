@@ -14,8 +14,7 @@ const meta: Meta<typeof MentorIcon> = {
 		},
 		animated: {
 			control: "boolean",
-			description:
-				"Whether to enable cute animations (floating, blinking, etc.)",
+			description: "Whether to enable cute animations (floating, blinking, etc.)",
 		},
 	},
 };
@@ -52,8 +51,7 @@ export const StaticIcon: Story = {
 	parameters: {
 		docs: {
 			description: {
-				story:
-					"Icon without animations for accessibility or performance reasons.",
+				story: "Icon without animations for accessibility or performance reasons.",
 			},
 		},
 	},
@@ -93,8 +91,7 @@ export const AccessibilityPreference: Story = {
 	parameters: {
 		docs: {
 			description: {
-				story:
-					"The icon respects user accessibility preferences for reduced motion.",
+				story: "The icon respects user accessibility preferences for reduced motion.",
 			},
 		},
 	},

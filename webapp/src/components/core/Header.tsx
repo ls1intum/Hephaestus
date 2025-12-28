@@ -15,11 +15,7 @@ import {
 	DropdownMenuSeparator,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-	Tooltip,
-	TooltipContent,
-	TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 export interface HeaderProps {
 	/** Sidebar trigger button component */
@@ -75,10 +71,7 @@ export default function Header({
 							<span className="text-xl font-semibold">Hephaestus</span>
 						</Link>
 					) : (
-						<Link
-							to="/landing"
-							className="flex gap-2 items-center hover:text-muted-foreground"
-						>
+						<Link to="/landing" className="flex gap-2 items-center hover:text-muted-foreground">
 							<Hammer className="text-2xl sm:text-3xl" />
 							<span className="text-xl font-semibold">Hephaestus</span>
 						</Link>
@@ -100,9 +93,7 @@ export default function Header({
 							<TooltipContent>View release notes</TooltipContent>
 						</Tooltip>
 					) : (
-						<span className="text-xs font-mono mt-1 text-muted-foreground">
-							{version}
-						</span>
+						<span className="text-xs font-mono mt-1 text-muted-foreground">{version}</span>
 					)}
 				</div>
 			</div>
@@ -124,9 +115,7 @@ export default function Header({
 												src={`https://github.com/${username}.png`}
 												alt={`${username}'s avatar`}
 											/>
-											<AvatarFallback>
-												{username?.slice(0, 2)?.toUpperCase() || "?"}
-											</AvatarFallback>
+											<AvatarFallback>{username?.slice(0, 2)?.toUpperCase() || "?"}</AvatarFallback>
 										</Avatar>
 									</Button>
 								</DropdownMenuTrigger>
@@ -152,10 +141,7 @@ export default function Header({
 												</Link>
 											</DropdownMenuItem>
 										) : (
-											<DropdownMenuItem
-												disabled
-												title="Join a workspace to view your profile"
-											>
+											<DropdownMenuItem disabled title="Join a workspace to view your profile">
 												<User />
 												<span>My Profile</span>
 											</DropdownMenuItem>

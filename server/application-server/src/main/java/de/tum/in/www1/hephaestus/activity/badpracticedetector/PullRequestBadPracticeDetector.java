@@ -2,14 +2,15 @@ package de.tum.in.www1.hephaestus.activity.badpracticedetector;
 
 import de.tum.in.www1.hephaestus.activity.BadPracticeDetectionRepository;
 import de.tum.in.www1.hephaestus.activity.model.*;
-import de.tum.in.www1.hephaestus.config.IntelligenceServiceConfig.BadPracticeDetectorService;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
+import de.tum.in.www1.hephaestus.intelligenceservice.api.DetectorApi;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.BadPractice;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.DetectorRequest;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.DetectorResponse;
 import jakarta.transaction.Transactional;
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import org.slf4j.Logger;
@@ -36,7 +37,7 @@ public class PullRequestBadPracticeDetector {
     private PullRequestTemplateGetter pullRequestTemplateGetter;
 
     @Autowired
-    private BadPracticeDetectorService detectorApi;
+    private DetectorApi detectorApi;
 
     /**
      * Detects bad practices for a given pull request ID and syncs the results with the
@@ -124,14 +125,14 @@ public class PullRequestBadPracticeDetector {
         detectorRequest.setTitle(pullRequest.getTitle());
         detectorRequest.setLifecycleState(lifecycleState.getState());
         detectorRequest.setRepositoryName(pullRequest.getRepository().getName());
-        detectorRequest.setPullRequestNumber(pullRequest.getNumber());
+        detectorRequest.setPullRequestNumber(BigDecimal.valueOf(pullRequest.getNumber()));
         detectorRequest.setBadPracticeSummary(summary);
         detectorRequest.setBadPractices(
             existingBadPractices.stream().map(this::convertToIntelligenceBadPractice).toList()
         );
         detectorRequest.setPullRequestTemplate(template);
 
-        DetectorResponse detectorResponse = detectorApi.detectDetectorPost(detectorRequest);
+        DetectorResponse detectorResponse = detectorApi.detectBadPractices(detectorRequest);
 
         // Note: Detection metadata (summary, timestamp) is stored in BadPracticeDetection,
         // not on the PullRequest entity itself, to keep gitprovider entities clean.

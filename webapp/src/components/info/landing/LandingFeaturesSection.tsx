@@ -1,13 +1,7 @@
 import { CheckCheck, Trophy } from "lucide-react";
 import { MentorIcon } from "@/components/mentor/MentorIcon";
 import { Badge } from "@/components/ui/badge";
-import {
-	Card,
-	CardContent,
-	CardDescription,
-	CardHeader,
-	CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 export function LandingFeaturesSection() {
 	return (
@@ -21,8 +15,7 @@ export function LandingFeaturesSection() {
 						Tools for Team Growth
 					</h2>
 					<p className="text-muted-foreground text-lg">
-						Features designed to elevate your engineering team's collaboration
-						and learning
+						Features designed to elevate your engineering team's collaboration and learning
 					</p>
 				</div>
 
@@ -33,9 +26,7 @@ export function LandingFeaturesSection() {
 								<Trophy className="h-5 w-5 text-yellow-500" />
 							</div>
 							<CardTitle>Code Review Gamification</CardTitle>
-							<CardDescription>
-								Transform code reviews into learning opportunities
-							</CardDescription>
+							<CardDescription>Transform code reviews into learning opportunities</CardDescription>
 						</CardHeader>
 						<CardContent>
 							<ul className="space-y-2">

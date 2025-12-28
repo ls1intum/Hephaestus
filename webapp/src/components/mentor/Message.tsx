@@ -9,11 +9,7 @@ import { MessageActions } from "./MessageActions";
 import { MessageEditor } from "./MessageEditor";
 import { MessageReasoning } from "./MessageReasoning";
 import { PreviewAttachment } from "./PreviewAttachment";
-import type {
-	PartRenderer,
-	PartRendererMap,
-	ToolPart,
-} from "./renderers/types";
+import type { PartRenderer, PartRendererMap, ToolPart } from "./renderers/types";
 
 export interface MessageProps {
 	/** The message to display */
@@ -53,13 +49,9 @@ export function PreviewMessage({
 	initialEditMode = false,
 	partRenderers,
 }: MessageProps) {
-	const [mode, setMode] = useState<"view" | "edit">(
-		initialEditMode ? "edit" : "view",
-	);
+	const [mode, setMode] = useState<"view" | "edit">(initialEditMode ? "edit" : "view");
 
-	const attachmentsFromMessage = message.parts.filter(
-		(part) => part.type === "file",
-	);
+	const attachmentsFromMessage = message.parts.filter((part) => part.type === "file");
 
 	const isArtifact = variant === "artifact";
 
@@ -88,17 +80,12 @@ export function PreviewMessage({
 					)}
 				>
 					{message.role === "assistant" && (
-						<MentorAvatar
-							streaming={isLoading && message.role === "assistant"}
-						/>
+						<MentorAvatar streaming={isLoading && message.role === "assistant"} />
 					)}
 
 					<div className="flex flex-col gap-4 w-full">
 						{attachmentsFromMessage.length > 0 && (
-							<div
-								data-testid="message-attachments"
-								className="flex flex-row justify-end gap-2"
-							>
+							<div data-testid="message-attachments" className="flex flex-row justify-end gap-2">
 								{attachmentsFromMessage.map((attachment) => (
 									<PreviewAttachment
 										key={attachment.url}
@@ -125,9 +112,7 @@ export function PreviewMessage({
 										typeof p.text === "string" &&
 										p.text.trim().length > 0,
 								);
-								const isReasoningLoading = Boolean(
-									isLoading && !hasAnswerTextStarted,
-								);
+								const isReasoningLoading = Boolean(isLoading && !hasAnswerTextStarted);
 
 								return (
 									<MessageReasoning
@@ -177,8 +162,7 @@ export function PreviewMessage({
 
 							if (type.startsWith("tool-")) {
 								if (!partRenderers) return null;
-								const toolKey =
-									(part as { toolCallId?: string }).toolCallId || key;
+								const toolKey = (part as { toolCallId?: string }).toolCallId || key;
 								const isAnyToolPart = (p: unknown): p is ToolPart =>
 									Boolean(
 										p &&
@@ -186,18 +170,10 @@ export function PreviewMessage({
 											(p as { type: string }).type.startsWith("tool-"),
 									);
 								if (!isAnyToolPart(part)) return null;
-								const renderers = partRenderers as unknown as Record<
-									string,
-									PartRenderer
-								>;
+								const renderers = partRenderers as unknown as Record<string, PartRenderer>;
 								const Renderer = renderers[type];
 								return Renderer ? (
-									<Renderer
-										key={toolKey}
-										message={message}
-										part={part}
-										variant={variant}
-									/>
+									<Renderer key={toolKey} message={message} part={part} variant={variant} />
 								) : null;
 							}
 
@@ -223,9 +199,7 @@ export function PreviewMessage({
 										? (isUpvote) => onVote?.(message.id, isUpvote)
 										: undefined
 								}
-								onEdit={
-									message.role === "user" ? () => setMode("edit") : undefined
-								}
+								onEdit={message.role === "user" ? () => setMode("edit") : undefined}
 							/>
 						)}
 					</div>
@@ -257,9 +231,7 @@ export const ThinkingMessage = () => {
 				<MentorAvatar streaming={true} />
 
 				<div className="flex flex-col gap-2 w-full">
-					<div className="flex flex-col gap-4 text-muted-foreground">
-						Hmm...
-					</div>
+					<div className="flex flex-col gap-4 text-muted-foreground">Hmm...</div>
 				</div>
 			</div>
 		</motion.div>

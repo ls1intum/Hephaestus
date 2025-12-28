@@ -17,15 +17,10 @@ const leagueVariants = cva("size-8", {
 });
 
 // Base props for all league icons
-type LeagueIconBaseProps = React.ComponentProps<"svg"> &
-	VariantProps<typeof leagueVariants>;
+type LeagueIconBaseProps = React.ComponentProps<"svg"> & VariantProps<typeof leagueVariants>;
 
 // Bronze League Icon
-export function LeagueBronzeIcon({
-	className,
-	size,
-	...props
-}: LeagueIconBaseProps) {
+export function LeagueBronzeIcon({ className, size, ...props }: LeagueIconBaseProps) {
 	return (
 		<svg
 			className={cn(leagueVariants({ size }), "text-league-bronze", className)}
@@ -54,11 +49,7 @@ export function LeagueBronzeIcon({
 }
 
 // Silver League Icon
-export function LeagueSilverIcon({
-	className,
-	size,
-	...props
-}: LeagueIconBaseProps) {
+export function LeagueSilverIcon({ className, size, ...props }: LeagueIconBaseProps) {
 	return (
 		<svg
 			className={cn(leagueVariants({ size }), "text-league-silver", className)}
@@ -91,11 +82,7 @@ export function LeagueSilverIcon({
 }
 
 // Gold League Icon
-export function LeagueGoldIcon({
-	className,
-	size,
-	...props
-}: LeagueIconBaseProps) {
+export function LeagueGoldIcon({ className, size, ...props }: LeagueIconBaseProps) {
 	return (
 		<svg
 			className={cn(leagueVariants({ size }), "text-league-gold", className)}
@@ -132,11 +119,7 @@ export function LeagueGoldIcon({
 }
 
 // Diamond League Icon
-export function LeagueDiamondIcon({
-	className,
-	size,
-	...props
-}: LeagueIconBaseProps) {
+export function LeagueDiamondIcon({ className, size, ...props }: LeagueIconBaseProps) {
 	return (
 		<svg
 			className={cn(leagueVariants({ size }), "text-league-diamond", className)}
@@ -185,11 +168,7 @@ export function LeagueDiamondIcon({
 }
 
 // Master League Icon
-export function LeagueMasterIcon({
-	className,
-	size,
-	...props
-}: LeagueIconBaseProps) {
+export function LeagueMasterIcon({ className, size, ...props }: LeagueIconBaseProps) {
 	return (
 		<svg
 			className={cn(leagueVariants({ size }), "text-league-master", className)}
@@ -209,10 +188,7 @@ export function LeagueMasterIcon({
 				d="M13 6.3094L6.33975 10.1547V17.8453L13 21.6906L19.6603 17.8453V10.1547L13 6.3094ZM21.6603 9L13 4L4.33975 9V19L13 24L21.6603 19V9Z"
 				fill="currentColor"
 			/>
-			<path
-				d="M18.19 17.0036L15.69 18.4469V9.55307L18.19 10.9965V17.0036Z"
-				fill="currentColor"
-			/>
+			<path d="M18.19 17.0036L15.69 18.4469V9.55307L18.19 10.9965V17.0036Z" fill="currentColor" />
 			<path
 				d="M7.81001 10.9964L10.31 9.55307V18.4469L7.81001 17.0036V10.9964Z"
 				fill="currentColor"
@@ -225,10 +201,7 @@ export function LeagueMasterIcon({
 				d="M19.1244 5.8453L23.1244 8.1547V12.7735L25.1244 11.6188V7L21.1244 4.6906L19.1244 5.8453Z"
 				fill="currentColor"
 			/>
-			<path
-				d="M9 2.3094L13 0L17 2.3094V4.6188L13 2.3094L9 4.6188V2.3094Z"
-				fill="currentColor"
-			/>
+			<path d="M9 2.3094L13 0L17 2.3094V4.6188L13 2.3094L9 4.6188V2.3094Z" fill="currentColor" />
 			<path
 				d="M0.875641 11.6188V7L4.87564 4.6906L6.87564 5.8453L2.87564 8.1547V12.7735L0.875641 11.6188Z"
 				fill="currentColor"
@@ -250,11 +223,7 @@ export function LeagueMasterIcon({
 }
 
 // None/Default League Icon
-export function LeagueNoneIcon({
-	className,
-	size,
-	...props
-}: LeagueIconBaseProps) {
+export function LeagueNoneIcon({ className, size, ...props }: LeagueIconBaseProps) {
 	return (
 		<svg
 			className={cn(leagueVariants({ size }), "text-league-none", className)}

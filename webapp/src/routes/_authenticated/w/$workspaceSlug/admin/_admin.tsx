@@ -3,9 +3,7 @@ import { useEffect } from "react";
 import { Spinner } from "@/components/ui/spinner";
 import { useWorkspaceAccess } from "@/hooks/use-workspace-access";
 
-export const Route = createFileRoute(
-	"/_authenticated/w/$workspaceSlug/admin/_admin",
-)({
+export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/_admin")({
 	component: AdminLayout,
 });
 

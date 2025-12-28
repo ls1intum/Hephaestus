@@ -4,11 +4,7 @@ import type { LabelInfo, RepositoryInfo, TeamInfo } from "@/api/types.gen";
 import { GithubBadge } from "@/components/shared/GithubBadge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import {
-	Popover,
-	PopoverContent,
-	PopoverTrigger,
-} from "@/components/ui/popover";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { RepositoryLabelsToggle } from "./RepositoryLabelsToggle";
 
@@ -16,11 +12,7 @@ export interface RepositoryCardProps {
 	repository: RepositoryInfo;
 	team: TeamInfo;
 	catalogLabels: LabelInfo[];
-	onAddLabel?: (
-		teamId: number,
-		repositoryId: number,
-		label: string,
-	) => Promise<void>;
+	onAddLabel?: (teamId: number, repositoryId: number, label: string) => Promise<void>;
 	onRemoveLabel?: (teamId: number, labelId: number) => Promise<void>;
 	onToggleVisibility?: (hidden: boolean) => void | Promise<void>;
 }
@@ -66,9 +58,7 @@ export function RepositoryCard({
 								rel="noopener noreferrer"
 								className={cn(
 									"text-sm font-medium hover:underline block truncate",
-									team.hidden || repository.hiddenFromContributions
-										? "text-muted-foreground"
-										: "",
+									team.hidden || repository.hiddenFromContributions ? "text-muted-foreground" : "",
 								)}
 								title={repository.nameWithOwner}
 							>
@@ -94,9 +84,7 @@ export function RepositoryCard({
 								variant="ghost"
 								size="sm"
 								className="h-7 w-7 p-0"
-								onClick={() =>
-									onToggleVisibility(!repository.hiddenFromContributions)
-								}
+								onClick={() => onToggleVisibility(!repository.hiddenFromContributions)}
 								title={
 									repository.hiddenFromContributions
 										? "Show repository contributions"
@@ -116,10 +104,7 @@ export function RepositoryCard({
 									<Settings className="h-3 w-3" />
 								</Button>
 							</PopoverTrigger>
-							<PopoverContent
-								className="w-[32rem] max-w-[calc(100vw-2rem)] p-3 sm:p-4"
-								align="end"
-							>
+							<PopoverContent className="w-[32rem] max-w-[calc(100vw-2rem)] p-3 sm:p-4" align="end">
 								<RepositoryLabelsToggle
 									team={team}
 									repository={repository}

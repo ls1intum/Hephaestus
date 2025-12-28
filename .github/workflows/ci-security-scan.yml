@@ -71,16 +71,12 @@ jobs:
           cd webapp
           npx tsc --noEmit
 
-          # Python dependencies
+          # Node.js (intelligence-service) - TypeScript build for CodeQL
           cd ../server/intelligence-service
-          if [ ! -d ".venv" ]; then
-            poetry install --no-interaction --no-root
-          fi
+          npx tsc --noEmit
 
-          cd ../webhook-ingest
-          if [ ! -d ".venv" ]; then
-            poetry install --no-interaction --no-root
-          fi
+          # Python (webhook-ingest) - CodeQL can analyze Python without building
+          # No build step required
 
           echo "✅ Build completed"
 

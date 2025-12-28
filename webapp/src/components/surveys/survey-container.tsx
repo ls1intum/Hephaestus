@@ -44,9 +44,7 @@ function SurveyHeader({
 	return (
 		<div className="flex items-start justify-between border-b p-4 pb-3">
 			<div className="flex-1 pr-6 sm:pr-8">
-				<h2 className="text-lg font-semibold sm:text-xl text-balance">
-					{title}
-				</h2>
+				<h2 className="text-lg font-semibold sm:text-xl text-balance">{title}</h2>
 				{description && (
 					<p className="mt-1 text-xs text-muted-foreground sm:text-sm text-balance">
 						{description}
@@ -73,9 +71,7 @@ export function SurveyContainer({
 	onProgress,
 }: SurveyContainerProps) {
 	const [history, setHistory] = useState<number[]>([0]);
-	const [responses, setResponses] = useState<Record<string, SurveyResponse>>(
-		{},
-	);
+	const [responses, setResponses] = useState<Record<string, SurveyResponse>>({});
 	const [errors, setErrors] = useState<ErrorMap>({});
 	const [completedResponses, setCompletedResponses] = useState<Record<
 		string,
@@ -179,8 +175,8 @@ export function SurveyContainer({
 					</EmptyMedia>
 					<EmptyTitle>Thank you for your participation.</EmptyTitle>
 					<EmptyDescription>
-						Your insights are critical for our research into making
-						collaborative software engineering more effective.
+						Your insights are critical for our research into making collaborative software
+						engineering more effective.
 					</EmptyDescription>
 					<EmptyContent>
 						<Button onClick={handleClose}>Close survey</Button>
@@ -216,9 +212,7 @@ export function SurveyContainer({
 				<SurveyQuestion
 					question={currentQuestion as SurveyQuestionType}
 					value={responses[currentQuestion.id]}
-					onChange={(nextValue) =>
-						handleResponse(currentQuestion.id, nextValue)
-					}
+					onChange={(nextValue) => handleResponse(currentQuestion.id, nextValue)}
 					error={errors[currentQuestion.id]}
 				/>
 			</div>
@@ -249,10 +243,7 @@ export function SurveyContainer({
 	);
 }
 
-const validateQuestion = (
-	question: SurveyQuestionType,
-	response: SurveyResponse,
-): boolean => {
+const validateQuestion = (question: SurveyQuestionType, response: SurveyResponse): boolean => {
 	if (!question.required) {
 		return true;
 	}

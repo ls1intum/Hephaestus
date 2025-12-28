@@ -62,7 +62,7 @@ services:
       DATABASE_URL: postgresql://postgres:5432/hephaestus
       DATABASE_USERNAME: root
       DATABASE_PASSWORD: root
-      INTELLIGENCE_SERVICE_URL: http://intelligence-service:5000
+      INTELLIGENCE_SERVICE_URL: http://intelligence-service:8000
       NATS_SERVER: nats://nats-server:4222
       KEYCLOAK_URL: https://${APP_HOSTNAME}/keycloak
       KEYCLOAK_REALM: hephaestus
@@ -98,7 +98,7 @@ services:
       RUN_AUTOMATIC_DETECTION_FOR_ALL: ${RUN_AUTOMATIC_DETECTION_FOR_ALL}
       LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY}
       LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY}
-      LANGFUSE_HOST: ${LANGFUSE_HOST}
+      LANGFUSE_BASE_URL: ${LANGFUSE_BASE_URL}
       POSTHOG_ENABLED: ${POSTHOG_ENABLED:-false}
       POSTHOG_API_HOST: ${POSTHOG_API_HOST:-https://app.posthog.com}
       POSTHOG_PROJECT_ID: ${POSTHOG_PROJECT_ID:-}
@@ -137,34 +137,31 @@ services:
   intelligence-service:
     image: "ghcr.io/ls1intum/hephaestus/intelligence-service:${IMAGE_TAG}"
     environment:
-      DATABASE_URL: postgresql://postgres:5432/hephaestus
-      DATABASE_USERNAME: root
-      DATABASE_PASSWORD: root
+      NODE_ENV: production
+      PORT: 8000
+      LOG_LEVEL: info
+      DATABASE_URL: postgresql://root:root@postgres:5432/hephaestus
       MODEL_NAME: ${MODEL_NAME}
-      OPENAI_API_KEY: ${OPENAI_API_KEY}
-      OPENAI_API_VERSION: ${OPENAI_API_VERSION}
-      AZURE_OPENAI_ENDPOINT: ${AZURE_OPENAI_ENDPOINT}
-      AZURE_OPENAI_API_KEY: ${AZURE_OPENAI_API_KEY}
-      OLLAMA_BASIC_AUTH_USERNAME: ${OLLAMA_BASIC_AUTH_USERNAME}
-      OLLAMA_BASIC_AUTH_PASSWORD: ${OLLAMA_BASIC_AUTH_PASSWORD}
-      OLLAMA_HOST: ${OLLAMA_HOST}
       DETECTION_MODEL_NAME: ${DETECTION_MODEL_NAME}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      AZURE_RESOURCE_NAME: ${AZURE_RESOURCE_NAME}
+      AZURE_API_KEY: ${AZURE_API_KEY}
       LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY}
       LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY}
-      LANGFUSE_HOST: ${LANGFUSE_HOST}
+      LANGFUSE_BASE_URL: ${LANGFUSE_BASE_URL}
     depends_on:
       - postgres
     restart: unless-stopped
     ports:
-      - '5000'
+      - '8000'
     networks:
       - shared-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      test: ["CMD", "wget", "-qO-", "http://localhost:8000/health"]
       interval: 5s
       timeout: 10s
       retries: 10
-      start_period: 5s
+      start_period: 10s
     logging:
       driver: "json-file"
       options:

@@ -1,19 +1,10 @@
-import {
-	CheckIcon,
-	CommentIcon,
-	FileDiffIcon,
-	GitPullRequestIcon,
-} from "@primer/octicons-react";
+import { CheckIcon, CommentIcon, FileDiffIcon, GitPullRequestIcon } from "@primer/octicons-react";
 import { formatDistanceToNow } from "date-fns";
 import { AwardIcon } from "lucide-react";
 import { FormattedTitle } from "@/components/shared/FormattedTitle";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-	Tooltip,
-	TooltipContent,
-	TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
 // Define the styling for different review states
@@ -94,12 +85,7 @@ export function ReviewActivityCard({
 
 	// Use CSS to style the card as a clickable link with hover effects
 	return (
-		<a
-			href={htmlUrl}
-			target="_blank"
-			rel="noopener noreferrer"
-			className="block w-full"
-		>
+		<a href={htmlUrl} target="_blank" rel="noopener noreferrer" className="block w-full">
 			<Card className="rounded-lg border border-border bg-card text-card-foreground shadow-sm hover:bg-accent/50 cursor-pointer">
 				<div className="flex flex-col gap-1 px-6">
 					{/* Repository, PR number and points */}
@@ -107,9 +93,7 @@ export function ReviewActivityCard({
 						<span className="font-medium flex justify-center items-center space-x-1">
 							{isLoading ? (
 								<>
-									<Skeleton
-										className={cn("size-5", stateStyle.skeletonColor)}
-									/>
+									<Skeleton className={cn("size-5", stateStyle.skeletonColor)} />
 									<Skeleton className="h-4 w-16 lg:w-36" />
 								</>
 							) : (
@@ -118,8 +102,7 @@ export function ReviewActivityCard({
 										<stateStyle.icon className="mr-1" size={18} />
 									</div>
 									<span className="whitespace-nowrap">
-										{pullRequest?.repository?.name} #{pullRequest?.number}{" "}
-										{relativeTime}
+										{pullRequest?.repository?.name} #{pullRequest?.number} {relativeTime}
 									</span>
 								</>
 							)}
@@ -132,9 +115,7 @@ export function ReviewActivityCard({
 										<AwardIcon size={16} />
 										<span>+{score}</span>
 									</TooltipTrigger>
-									<TooltipContent side="top">
-										Points awarded for this activity
-									</TooltipContent>
+									<TooltipContent side="top">Points awarded for this activity</TooltipContent>
 								</Tooltip>
 							</span>
 						)}

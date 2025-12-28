@@ -68,21 +68,13 @@ export const streamingGhostPlugin = new Plugin<GhostState>({
 						active = true;
 						pending = "";
 						className = meta.className ?? prev.className;
-						const nextAnchor =
-							typeof meta.pos === "number"
-								? meta.pos
-								: newState.doc.content.size;
-						const clamped = Math.max(
-							0,
-							Math.min(nextAnchor, newState.doc.content.size),
-						);
-						decos = DecorationSet.create(newState.doc, [
-							makeWidget(clamped, "", className),
-						]);
+						const nextAnchor = typeof meta.pos === "number" ? meta.pos : newState.doc.content.size;
+						const clamped = Math.max(0, Math.min(nextAnchor, newState.doc.content.size));
+						decos = DecorationSet.create(newState.doc, [makeWidget(clamped, "", className)]);
 						return { active, anchor: clamped, pending, className, decos };
 					}
 					case "push": {
-						pending = pending + meta.text;
+						pending += meta.text;
 						if (active) {
 							const w = makeWidget(mappedAnchor, pending, className);
 							decos = DecorationSet.create(newState.doc, [w]);
@@ -147,9 +139,7 @@ function scheduleFlush(view: EditorView) {
 export const streamingGhost: Controller = {
 	start(view, pos, className) {
 		buffers.set(view, { buf: "", scheduled: false });
-		view.dispatch(
-			withGhostMeta(view.state.tr, { type: "start", pos, className }),
-		);
+		view.dispatch(withGhostMeta(view.state.tr, { type: "start", pos, className }));
 	},
 
 	push(view, chunk) {
@@ -162,9 +152,7 @@ export const streamingGhost: Controller = {
 	finish(view, opts) {
 		const box = buffers.get(view);
 		if (box?.buf) {
-			view.dispatch(
-				withGhostMeta(view.state.tr, { type: "push", text: box.buf }),
-			);
+			view.dispatch(withGhostMeta(view.state.tr, { type: "push", text: box.buf }));
 			box.buf = "";
 			box.scheduled = false;
 		}

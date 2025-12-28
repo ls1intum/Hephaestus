@@ -49,20 +49,17 @@ const meta = {
 			control: false,
 		},
 		onVote: {
-			description:
-				"Callback when vote action is triggered (assistant messages only)",
+			description: "Callback when vote action is triggered (assistant messages only)",
 			control: false,
 		},
 		onEdit: {
-			description:
-				"Callback when edit action is triggered (user messages only)",
+			description: "Callback when edit action is triggered (user messages only)",
 			control: false,
 		},
 	},
 	args: {
 		className: undefined,
-		messageContentToCopy:
-			"This is a sample message that demonstrates the action buttons.",
+		messageContentToCopy: "This is a sample message that demonstrates the action buttons.",
 		messageRole: "assistant",
 		isLoading: false,
 		isInEditMode: false,
@@ -74,9 +71,7 @@ const meta = {
 	decorators: [
 		(Story) => (
 			<div className="max-w-md p-4 border rounded-lg group/message">
-				<div className="mb-2 text-sm text-muted-foreground">
-					Hover to see actions
-				</div>
+				<div className="mb-2 text-sm text-muted-foreground">Hover to see actions</div>
 				<Story />
 			</div>
 		),

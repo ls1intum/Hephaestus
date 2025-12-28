@@ -23,7 +23,6 @@ ensure_dev() {
   fi
 }
 
-ensure_dev server/intelligence-service black
 ensure_dev server/webhook-ingest black
 
 echo "✅ Python dev environments ready."

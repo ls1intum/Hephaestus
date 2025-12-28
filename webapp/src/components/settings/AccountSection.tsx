@@ -43,26 +43,19 @@ export function AccountSection({
 				<h2 id="account-heading" className="text-xl font-semibold">
 					Danger Zone
 				</h2>
-				<p className="text-sm text-muted-foreground">
-					Irreversible account actions
-				</p>
+				<p className="text-sm text-muted-foreground">Irreversible account actions</p>
 			</div>
 
 			<div className="flex items-start justify-between gap-6 py-4">
 				<div className="space-y-1 flex-1">
 					<h3 className="text-base font-medium">Delete account</h3>
 					<p className="text-sm text-muted-foreground leading-relaxed">
-						Permanently delete your account and remove your data from our
-						servers.
+						Permanently delete your account and remove your data from our servers.
 					</p>
 				</div>
 				<AlertDialog>
 					<AlertDialogTrigger asChild>
-						<Button
-							variant="destructive"
-							disabled={pending || processing}
-							className="mt-1"
-						>
+						<Button variant="destructive" disabled={pending || processing} className="mt-1">
 							{processing ? "Deleting…" : "Delete"}
 						</Button>
 					</AlertDialogTrigger>
@@ -70,8 +63,8 @@ export function AccountSection({
 						<AlertDialogHeader>
 							<AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
 							<AlertDialogDescription>
-								This action cannot be undone. This will permanently delete your
-								account and remove your data from our servers.
+								This action cannot be undone. This will permanently delete your account and remove
+								your data from our servers.
 							</AlertDialogDescription>
 						</AlertDialogHeader>
 						<AlertDialogFooter>

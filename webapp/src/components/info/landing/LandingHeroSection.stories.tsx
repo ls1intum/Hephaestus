@@ -21,13 +21,11 @@ const meta = {
 	tags: ["autodocs"],
 	argTypes: {
 		onSignIn: {
-			description:
-				"Callback function triggered when the sign-in button is clicked",
+			description: "Callback function triggered when the sign-in button is clicked",
 			action: "signed in",
 		},
 		onGoToDashboard: {
-			description:
-				"Callback function triggered when the 'Go to Dashboard' button is clicked",
+			description: "Callback function triggered when the 'Go to Dashboard' button is clicked",
 			action: "go to dashboard",
 		},
 		isSignedIn: {
@@ -35,8 +33,7 @@ const meta = {
 			control: "boolean",
 		},
 		onLearnMoreClick: {
-			description:
-				"Callback function triggered when the learn more button is clicked",
+			description: "Callback function triggered when the learn more button is clicked",
 			action: "learn more clicked",
 		},
 	},

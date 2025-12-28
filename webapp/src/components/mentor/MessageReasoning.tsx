@@ -27,14 +27,12 @@ export function MessageReasoning({
 	useEffect(() => {
 		if (isLoading) {
 			if (startRef.current == null) {
-				startRef.current =
-					typeof performance !== "undefined" ? performance.now() : Date.now();
+				startRef.current = typeof performance !== "undefined" ? performance.now() : Date.now();
 			}
 			// Reset end when resuming loading (rare)
 			endRef.current = null;
 		} else if (startRef.current != null && endRef.current == null) {
-			endRef.current =
-				typeof performance !== "undefined" ? performance.now() : Date.now();
+			endRef.current = typeof performance !== "undefined" ? performance.now() : Date.now();
 		}
 	}, [isLoading]);
 
@@ -60,8 +58,7 @@ export function MessageReasoning({
 	const elapsedMs = (() => {
 		if (startRef.current == null) return 0;
 		const end =
-			endRef.current ??
-			(typeof performance !== "undefined" ? performance.now() : Date.now());
+			endRef.current ?? (typeof performance !== "undefined" ? performance.now() : Date.now());
 		return end - startRef.current;
 	})();
 
@@ -114,8 +111,7 @@ export function MessageReasoning({
 		const sections: Section[] = [];
 		if (!text) return sections;
 		const heads = parseHeadings(text);
-		if (heads.length === 0)
-			return [{ title: "Thinking for a few seconds", body: text }];
+		if (heads.length === 0) return [{ title: "Thinking for a few seconds", body: text }];
 		// Preamble before first heading
 		if (heads[0].index > 0) {
 			sections.push({ body: text.slice(0, heads[0].index).trim() });
@@ -133,8 +129,7 @@ export function MessageReasoning({
 	};
 
 	const sections = hasContent ? parseSections(reasoning) : [];
-	const lastHeading =
-		sections.length > 0 ? (sections[sections.length - 1].title ?? null) : null;
+	const lastHeading = sections.length > 0 ? (sections[sections.length - 1].title ?? null) : null;
 	const hasTiming = startRef.current != null && endRef.current != null;
 	const headerText = isLoading
 		? lastHeading || "Thinking"
@@ -161,8 +156,7 @@ export function MessageReasoning({
 								background:
 									"linear-gradient(90deg, transparent 45%, rgba(255,255,255,0.6) 50%, transparent 55%)",
 								backgroundSize: "200% 100%",
-								animation:
-									"message-reasoning-shimmer 1.4s linear infinite reverse",
+								animation: "message-reasoning-shimmer 1.4s linear infinite reverse",
 							}}
 						/>
 					</div>
@@ -195,8 +189,7 @@ export function MessageReasoning({
 									background:
 										"linear-gradient(90deg, transparent 20%, rgba(255,255,255,0.6) 50%, transparent 55%)",
 									backgroundSize: "200% 100%",
-									animation:
-										"message-reasoning-shimmer 2s linear infinite reverse",
+									animation: "message-reasoning-shimmer 2s linear infinite reverse",
 								}}
 							/>
 						)}

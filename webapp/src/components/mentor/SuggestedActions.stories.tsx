@@ -15,8 +15,7 @@ const meta = {
 	tags: ["autodocs"],
 	argTypes: {
 		onAction: {
-			description:
-				"Callback function triggered when a suggested action is clicked",
+			description: "Callback function triggered when a suggested action is clicked",
 			control: false,
 		},
 	},

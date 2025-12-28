@@ -1,10 +1,5 @@
 import { Activity } from "lucide-react";
-import {
-	Card,
-	CardDescription,
-	CardHeader,
-	CardTitle,
-} from "@/components/ui/card";
+import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 interface ActivitySummaryCardProps {
 	username: string;
@@ -27,19 +22,12 @@ export function ActivitySummaryCard({
 }: ActivitySummaryCardProps) {
 	// Use displayName if available, otherwise fall back to username
 	const userDisplayName = displayName || username;
-	const userLabel = currUserIsDashboardUser
-		? "You have"
-		: `${userDisplayName} has`;
+	const userLabel = currUserIsDashboardUser ? "You have" : `${userDisplayName} has`;
 
 	// Handle pluralization
-	const prText =
-		numberOfPullRequests === 1 ? "active pull request" : "active pull requests";
-	const goodText =
-		numberOfGoodPractices === 1 ? "good practice" : "good practices";
-	const badText =
-		numberOfBadPractices === 1
-			? "area for improvement"
-			: "areas for improvement";
+	const prText = numberOfPullRequests === 1 ? "active pull request" : "active pull requests";
+	const goodText = numberOfGoodPractices === 1 ? "good practice" : "good practices";
+	const badText = numberOfBadPractices === 1 ? "area for improvement" : "areas for improvement";
 
 	return (
 		<Card className="mb-4">

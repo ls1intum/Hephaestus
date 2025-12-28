@@ -13,8 +13,7 @@ const meta = {
 	},
 	argTypes: {
 		title: {
-			description:
-				"Text content with optional code segments wrapped in backticks (`)",
+			description: "Text content with optional code segments wrapped in backticks (`)",
 			control: "text",
 		},
 		className: {
@@ -41,8 +40,7 @@ export const Basic: Story = {
  */
 export const WithCode: Story = {
 	args: {
-		title:
-			"Use `npm install` to install dependencies and `npm start` to run the application.",
+		title: "Use `npm install` to install dependencies and `npm start` to run the application.",
 	},
 };
 

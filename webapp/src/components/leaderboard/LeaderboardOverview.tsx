@@ -1,15 +1,5 @@
-import {
-	differenceInHours,
-	differenceInMinutes,
-	differenceInSeconds,
-	isPast,
-} from "date-fns";
-import {
-	CalendarClock,
-	MoveRight,
-	TrendingDown,
-	TrendingUp,
-} from "lucide-react";
+import { differenceInHours, differenceInMinutes, differenceInSeconds, isPast } from "date-fns";
+import { CalendarClock, MoveRight, TrendingDown, TrendingUp } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { LeaderboardEntry } from "@/api/types.gen";
 import { Button } from "@/components/ui/button";
@@ -104,12 +94,8 @@ export function LeaderboardOverview({
 						<div className="flex flex-col items-center gap-2">
 							<div className="flex items-end gap-2">
 								<span>
-									<span className="text-3xl font-light text-muted-foreground">
-										#
-									</span>
-									<span className="text-4xl text-primary font-light">
-										{leaderboardEntry.rank}
-									</span>
+									<span className="text-3xl font-light text-muted-foreground">#</span>
+									<span className="text-4xl text-primary font-light">{leaderboardEntry.rank}</span>
 								</span>
 								<div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center overflow-hidden">
 									{user.avatarUrl ? (
@@ -132,15 +118,11 @@ export function LeaderboardOverview({
 					<div className="flex flex-col items-center gap-1 text-center">
 						<div className="flex items-center gap-1">
 							<CalendarClock className="h-4 w-4 text-muted-foreground" />
-							<span className="text-sm text-muted-foreground">
-								Leaderboard ends in:
-							</span>
+							<span className="text-sm text-muted-foreground">Leaderboard ends in:</span>
 						</div>
 						<span className="text-xl font-medium">{countdown}</span>
 						<div className="flex flex-wrap items-center justify-center gap-1 mt-1 text-sm">
-							<span className="text-muted-foreground">
-								League points change:
-							</span>
+							<span className="text-muted-foreground">League points change:</span>
 							<div className="flex items-center gap-1">
 								<span className="font-medium">{leaguePointsChange}</span>
 								{leaguePointsChange > 0 ? (
@@ -163,10 +145,7 @@ export function LeaderboardOverview({
 				</div>
 			</CardContent>
 
-			<LeagueInfoDialog
-				open={leagueInfoOpen}
-				onOpenChange={setLeagueInfoOpen}
-			/>
+			<LeagueInfoDialog open={leagueInfoOpen} onOpenChange={setLeagueInfoOpen} />
 		</Card>
 	);
 }

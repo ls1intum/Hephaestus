@@ -5,11 +5,9 @@ import { TeamsPage } from "@/components/teams/TeamsPage";
 import { NoWorkspace } from "@/components/workspace/NoWorkspace";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 
-export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/teams/")(
-	{
-		component: TeamsContainer,
-	},
-);
+export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/teams/")({
+	component: TeamsContainer,
+});
 
 function TeamsContainer() {
 	const { workspaceSlug } = useActiveWorkspaceSlug();
@@ -23,9 +21,6 @@ function TeamsContainer() {
 	}
 
 	return (
-		<TeamsPage
-			teams={teamsQuery.data || []}
-			isLoading={teamsQuery.isLoading || !workspaceSlug}
-		/>
+		<TeamsPage teams={teamsQuery.data || []} isLoading={teamsQuery.isLoading || !workspaceSlug} />
 	);
 }

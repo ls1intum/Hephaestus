@@ -1,18 +1,13 @@
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { toast } from "sonner";
-import {
-	getAllTeamsOptions,
-	getUsersWithTeamsOptions,
-} from "@/api/@tanstack/react-query.gen";
+import { getAllTeamsOptions, getUsersWithTeamsOptions } from "@/api/@tanstack/react-query.gen";
 import { AdminMembersPage } from "@/components/admin/AdminMembersPage";
 import { adaptApiUserTeams } from "@/components/admin/types";
 import { NoWorkspace } from "@/components/workspace/NoWorkspace";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 
-export const Route = createFileRoute(
-	"/_authenticated/w/$workspaceSlug/admin/_admin/members",
-)({
+export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/_admin/members")({
 	component: AdminMembersContainer,
 });
 
@@ -53,14 +48,10 @@ function AdminMembersContainer() {
 	const users = (usersData?.map(adaptApiUserTeams) || [])
 		.map((user) => ({
 			...user,
-			teams: [...(user.teams || [])].sort((a, b) =>
-				a.name.localeCompare(b.name),
-			),
+			teams: [...(user.teams || [])].sort((a, b) => a.name.localeCompare(b.name)),
 		}))
 		.sort((a, b) => a.user.name.localeCompare(b.user.name));
-	const teams = [...(teamsData || [])].sort((a, b) =>
-		a.name.localeCompare(b.name),
-	);
+	const teams = [...(teamsData || [])].sort((a, b) => a.name.localeCompare(b.name));
 	const isLoading = isWorkspaceLoading || usersLoading || teamsLoading;
 
 	if (!workspaceSlug && !isWorkspaceLoading) {
@@ -76,11 +67,5 @@ function AdminMembersContainer() {
 		toast.error(`Failed to load data: ${errorMessage}`);
 	}
 
-	return (
-		<AdminMembersPage
-			users={users}
-			teams={teams}
-			isLoading={isLoading || !workspaceSlug}
-		/>
-	);
+	return <AdminMembersPage users={users} teams={teams} isLoading={isLoading || !workspaceSlug} />;
 }

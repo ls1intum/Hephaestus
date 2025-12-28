@@ -22,12 +22,7 @@ export function NavMentor({ workspaceSlug }: { workspaceSlug: string }) {
 							params={{ workspaceSlug }}
 							className="group/mentor items-center gap-2"
 						>
-							<MentorIcon
-								className="-mx-1.5"
-								size={30}
-								pad={5}
-								strokeWidth={1.5}
-							/>
+							<MentorIcon className="-mx-1.5" size={30} pad={5} strokeWidth={1.5} />
 							<span className="flex items-center gap-2">
 								Heph
 								<Badge variant="outline" className="text-muted-foreground">

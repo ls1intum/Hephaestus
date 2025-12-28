@@ -19,10 +19,7 @@ export interface SortFilterProps {
 	selectedSort?: LeaderboardSortType;
 }
 
-export function SortFilter({
-	onSortChange,
-	selectedSort = "SCORE",
-}: SortFilterProps) {
+export function SortFilter({ onSortChange, selectedSort = "SCORE" }: SortFilterProps) {
 	return (
 		<div className="space-y-1.5">
 			<Label htmlFor="sort">Sort by</Label>

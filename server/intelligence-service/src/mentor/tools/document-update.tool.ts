@@ -1,0 +1,275 @@
+/**
+ * Document update tool for the AI mentor.
+ *
+ * Updates existing documents based on user instructions and conversation context.
+ * Creates a new version in the database, preserving history.
+ */
+
+import {
+	type ModelMessage,
+	smoothStream,
+	streamText,
+	tool,
+	type UIMessage,
+	type UIMessageStreamWriter,
+} from "ai";
+import { desc, eq } from "drizzle-orm";
+import pino from "pino";
+import { z } from "zod";
+import env from "@/env";
+import { formatConversationForDocument } from "@/shared/ai/messages";
+import { getTelemetryOptions } from "@/shared/ai/telemetry";
+import db from "@/shared/db";
+import { document as docTable } from "@/shared/db/schema";
+import { defineToolMeta } from "./define-tool";
+
+// ═══════════════════════════════════════════════════════════════════════════
+// TOOL DEFINITION (Single Source of Truth)
+// ═══════════════════════════════════════════════════════════════════════════
+
+const inputSchema = z.object({
+	id: z.string().uuid().describe("The document ID to update."),
+	description: z.string().describe("What changes to make to the document."),
+});
+
+const { definition: updateDocumentDefinition, TOOL_DESCRIPTION } = defineToolMeta({
+	name: "updateDocument",
+	description: `Update an existing document with new content.
+
+**When to use:**
+- When adding to an existing reflection or summary
+- When the user wants to modify a previous document
+
+**When NOT to use:**
+- When creating a new document (use createDocument)
+- When deleting content (describe what to remove, don't delete)`,
+	inputSchema,
+});
+
+export { updateDocumentDefinition };
+
+// ═══════════════════════════════════════════════════════════════════════════
+// INPUT TYPE
+// ═══════════════════════════════════════════════════════════════════════════
+
+type Input = z.infer<typeof inputSchema>;
+type DocumentRow = typeof docTable.$inferSelect;
+
+// ═══════════════════════════════════════════════════════════════════════════
+// DATABASE OPERATIONS
+// ═══════════════════════════════════════════════════════════════════════════
+
+async function getLatestDocumentRow(id: string): Promise<DocumentRow | undefined> {
+	const rows = await db
+		.select()
+		.from(docTable)
+		.where(eq(docTable.id, id))
+		.orderBy(desc(docTable.versionNumber))
+		.limit(1);
+	return rows[0];
+}
+
+async function persistNextVersion(params: {
+	id: string;
+	base: DocumentRow | undefined;
+	content: string;
+}): Promise<DocumentRow | undefined> {
+	const { id, base, content } = params;
+	if (!base) {
+		// Document doesn't exist - this is an error condition, not silent failure
+		throw new Error(`Document with id "${id}" not found`);
+	}
+
+	const nextVersion = (base.versionNumber ?? 0) + 1;
+
+	const rows = await db
+		.insert(docTable)
+		.values({
+			id,
+			versionNumber: nextVersion,
+			createdAt: new Date().toISOString(),
+			title: base.title ?? "",
+			content,
+			kind: (base.kind as "text" | undefined) ?? "text",
+			userId: base.userId ?? 0,
+			workspaceId: base.workspaceId,
+		})
+		.returning();
+
+	return rows[0];
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// DOCUMENT UPDATE
+// ═══════════════════════════════════════════════════════════════════════════
+
+interface StreamParams {
+	id: string;
+	currentContent: string;
+	description: string;
+	conversationContext: string;
+	dataStream: UIMessageStreamWriter<UIMessage>;
+}
+
+/**
+ * Streams updated document content to the client.
+ *
+ * Uses predicted outputs for faster streaming when supported by the provider.
+ */
+async function streamUpdatedContent(params: StreamParams): Promise<string> {
+	const { id, currentContent, description, conversationContext, dataStream } = params;
+	let content = "";
+
+	// Build system prompt with current document
+	const systemPrompt = `You are updating an existing document based on the user's instructions.
+
+**Current Document:**
+${currentContent}
+
+**Rules:**
+- Apply the requested changes precisely
+- Preserve structure and formatting unless asked to change it
+- Keep existing content that isn't affected by the change
+- Use markdown formatting`;
+
+	// Build user prompt with context and instructions
+	let userPrompt = `**Requested Changes:** ${description}`;
+	if (conversationContext) {
+		userPrompt += `\n\n**Recent Conversation (for context):**\n${conversationContext}`;
+	}
+
+	// Enable telemetry for document updates
+	const telemetryOptions = getTelemetryOptions({
+		operation: "document:update",
+	});
+
+	const { fullStream } = streamText({
+		model: env.defaultModel,
+		system: systemPrompt,
+		prompt: userPrompt,
+		experimental_transform: smoothStream({ chunking: "word" }),
+		// Use predicted outputs for faster streaming (OpenAI feature)
+		providerOptions: {
+			openai: {
+				prediction: { type: "content", content: currentContent },
+			},
+		},
+		...telemetryOptions,
+	});
+
+	for await (const delta of fullStream) {
+		if (delta.type === "text-delta") {
+			const text = (delta as { type: "text-delta"; text: string }).text;
+			if (text) {
+				content += text;
+				dataStream.write({
+					type: "data-document-delta",
+					data: { id, kind: "text", delta: text },
+					transient: true,
+				});
+			}
+		}
+	}
+
+	return content;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// TOOL FACTORY
+// ═══════════════════════════════════════════════════════════════════════════
+
+interface ToolFactoryParams {
+	dataStream: UIMessageStreamWriter<UIMessage>;
+}
+
+const logger = pino({ name: "document-update-tool" });
+
+/**
+ * Factory to create the document update tool.
+ * Requires dataStream for streaming document content to the client.
+ */
+export const updateDocumentTool = ({ dataStream }: ToolFactoryParams) =>
+	tool({
+		description: TOOL_DESCRIPTION,
+
+		inputSchema,
+		strict: true, // Ensure model follows schema strictly
+
+		execute: async ({ id, description }: Input, context) => {
+			const messages: ModelMessage[] = context?.messages ?? [];
+
+			// Signal update start
+			dataStream.write({
+				type: "data-document-update",
+				data: { id, kind: "text" },
+				transient: true,
+			});
+
+			try {
+				const latestRow = await getLatestDocumentRow(id);
+
+				// Check if document exists BEFORE streaming
+				if (!latestRow) {
+					logger.error({ id }, "Document not found for update");
+					return {
+						id,
+						title: "",
+						content: "",
+						kind: "text" as const,
+						description,
+						error: `Document with id "${id}" not found`,
+					};
+				}
+
+				const currentContent = latestRow.content ?? "";
+
+				// Get conversation context for additional info
+				const conversationContext = formatConversationForDocument(messages);
+
+				let content = "";
+				try {
+					content = await streamUpdatedContent({
+						id,
+						currentContent,
+						description,
+						conversationContext,
+						dataStream,
+					});
+				} finally {
+					dataStream.write({
+						type: "data-document-finish",
+						data: { id, kind: "text" },
+						transient: true,
+					});
+				}
+
+				// Persist new version
+				const contentToPersist = content || currentContent;
+				const row = await persistNextVersion({ id, base: latestRow, content: contentToPersist });
+
+				return {
+					id,
+					title: row?.title ?? latestRow.title ?? "",
+					content: row?.content ?? contentToPersist,
+					kind: (row?.kind as "text" | undefined) ?? (latestRow.kind as "text") ?? "text",
+					description,
+				};
+			} catch (error) {
+				logger.error({ error, id, description }, "Document update failed");
+				// Always emit finish event even on error
+				dataStream.write({
+					type: "data-document-finish",
+					data: { id, kind: "text" },
+					transient: true,
+				});
+				return {
+					id,
+					title: "",
+					content: "",
+					kind: "text" as const,
+					description,
+					error: error instanceof Error ? error.message : "Unknown error updating document",
+				};
+			}
+		},
+	});

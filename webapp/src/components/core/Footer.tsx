@@ -1,15 +1,7 @@
-import {
-	ClockIcon,
-	GitBranchIcon,
-	GitCommitIcon,
-} from "@primer/octicons-react";
+import { ClockIcon, GitBranchIcon, GitCommitIcon } from "@primer/octicons-react";
 import { Link } from "@tanstack/react-router";
 
-import {
-	Tooltip,
-	TooltipContent,
-	TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
 export interface FooterProps {
@@ -26,16 +18,10 @@ export interface FooterProps {
  * Version is NOT shown here - it's displayed in the Header beside the logo.
  */
 export default function Footer({ className, buildInfo }: FooterProps) {
-	const showBuildInfo =
-		buildInfo?.branch || buildInfo?.commit || buildInfo?.deployedAt;
+	const showBuildInfo = buildInfo?.branch || buildInfo?.commit || buildInfo?.deployedAt;
 
 	return (
-		<footer
-			className={cn(
-				"border-t border-sidebar-border bg-sidebar py-2 md:px-8",
-				className,
-			)}
-		>
+		<footer className={cn("border-t border-sidebar-border bg-sidebar py-2 md:px-8", className)}>
 			<div className="flex flex-col items-center justify-between gap-2 px-4 md:flex-row md:px-0">
 				{/* Attribution */}
 				<p className="text-sm text-muted-foreground text-center md:text-left">
@@ -113,9 +99,7 @@ export default function Footer({ className, buildInfo }: FooterProps) {
 											className="flex items-center gap-1 hover:text-foreground transition-colors"
 										>
 											<GitBranchIcon size={12} />
-											<span className="max-w-20 truncate">
-												{buildInfo.branch}
-											</span>
+											<span className="max-w-20 truncate">{buildInfo.branch}</span>
 										</a>
 									</TooltipTrigger>
 									<TooltipContent>{buildInfo.branch}</TooltipContent>
@@ -145,8 +129,7 @@ export default function Footer({ className, buildInfo }: FooterProps) {
 										<ClockIcon size={12} />
 									</TooltipTrigger>
 									<TooltipContent>
-										Deployed:{" "}
-										{buildInfo.deployedAt.replace("T", " ").substring(0, 16)}
+										Deployed: {buildInfo.deployedAt.replace("T", " ").substring(0, 16)}
 									</TooltipContent>
 								</Tooltip>
 							)}

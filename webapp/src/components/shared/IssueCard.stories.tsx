@@ -74,8 +74,7 @@ const meta = {
 			control: "boolean",
 		},
 		rightContent: {
-			description:
-				"Additional content to display in the right side of the card header",
+			description: "Additional content to display in the right side of the card header",
 		},
 	},
 	tags: ["autodocs"],
