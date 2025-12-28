@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from "@storybook/react";
+import type { Meta, StoryObj } from "@storybook/react-vite";
 import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useState } from "react";
 import Header from "@/components/core/Header";

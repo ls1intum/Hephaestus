@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from "@storybook/react";
+import type { Meta, StoryObj } from "@storybook/react-vite";
 import { Code, Sparkles, Users, Zap } from "lucide-react";
 import { FeatureCard } from "./FeatureCard";
 

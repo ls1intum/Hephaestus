@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from "@storybook/react";
+import type { Meta, StoryObj } from "@storybook/react-vite";
 import { NoWorkspace } from "./NoWorkspace";
 
 const meta: Meta<typeof NoWorkspace> = {

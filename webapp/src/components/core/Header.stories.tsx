@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from "@storybook/react";
+import type { Meta, StoryObj } from "@storybook/react-vite";
 import { fn } from "storybook/test";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import Header from "./Header";
@@ -123,7 +123,10 @@ export const Mobile: Story = {
 		isAuthenticated: true,
 		isLoading: false,
 	},
-	parameters: {
-		viewport: { defaultViewport: "mobile1" },
+	globals: {
+		viewport: {
+			value: "mobile1",
+			isRotated: false,
+		},
 	},
 };

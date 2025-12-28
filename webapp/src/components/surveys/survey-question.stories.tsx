@@ -1,4 +1,4 @@
-import type { Decorator, Meta, StoryObj } from "@storybook/react";
+import type { Decorator, Meta, StoryObj } from "@storybook/react-vite";
 import { fn } from "storybook/test";
 import type { SurveyQuestion as SurveyQuestionType } from "@/types/survey";
 import { SurveyQuestion } from "./survey-question";

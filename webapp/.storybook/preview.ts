@@ -1,5 +1,5 @@
 import { withThemeByClassName, withThemeFromJSXProvider } from "@storybook/addon-themes";
-import type { Decorator, Preview } from "@storybook/react";
+import type { Decorator, Preview } from "@storybook/react-vite";
 import {
 	createRootRoute,
 	createRouter,
@@ -106,7 +106,7 @@ const preview: Preview = {
 		},
 		// Better viewport defaults
 		viewport: {
-			viewports: {
+			options: {
 				mobile: {
 					name: "Mobile",
 					styles: { width: "375px", height: "667px" },

@@ -1,7 +1,7 @@
 /**
  * Rating survey question capturing scaled feedback with number or emoji display.
  */
-import type { Meta, StoryObj } from "@storybook/react";
+import type { Meta, StoryObj } from "@storybook/react-vite";
 import { fn } from "storybook/test";
 import { QuestionRating } from "./question-rating";
 

@@ -1,7 +1,7 @@
 /**
  * Multiple choice survey question allowing several selections plus an optional open response.
  */
-import type { Meta, StoryObj } from "@storybook/react";
+import type { Meta, StoryObj } from "@storybook/react-vite";
 import { fn } from "storybook/test";
 import { QuestionMultipleChoice } from "./question-multiple-choice";
 

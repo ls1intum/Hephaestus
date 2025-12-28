@@ -6,7 +6,7 @@ import { detectorRequestSchema, detectorResponseSchema, tags } from "./detector.
 
 export const detectBadPractices = createRoute({
 	path: "/",
-	method: "post",
+	method: "post" as const,
 	operationId: "detectBadPractices",
 	tags: [...tags],
 	summary: "Detect bad practices for a pull request",

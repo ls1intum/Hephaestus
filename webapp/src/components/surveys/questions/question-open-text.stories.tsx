@@ -1,7 +1,7 @@
 /**
  * Open text survey question for collecting free-form feedback.
  */
-import type { Meta, StoryObj } from "@storybook/react";
+import type { Meta, StoryObj } from "@storybook/react-vite";
 import { fn } from "storybook/test";
 import { QuestionOpenText } from "./question-open-text";
 

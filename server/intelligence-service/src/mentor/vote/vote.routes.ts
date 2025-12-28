@@ -11,7 +11,7 @@ import {
 
 export const voteMessageRoute = createRoute({
 	path: "/{messageId}/vote",
-	method: "put",
+	method: "put" as const,
 	tags: ["vote", ...EXPORTED_TAG],
 	summary: "Vote on a chat message (upvote/downvote) - idempotent upsert",
 	operationId: "voteMessage",
