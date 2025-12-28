@@ -1,7 +1,9 @@
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
+import { createMiddleware } from "hono/factory";
 import { HTTPException } from "hono/http-exception";
 import { requestId as requestIdMiddleware } from "hono/request-id";
+import { timeout as timeoutMiddleware } from "hono/timeout";
 
 import env from "@/env";
 import logger from "@/logger";
@@ -19,6 +21,15 @@ const app = new Hono();
 // Request ID middleware for tracing
 app.use(requestIdMiddleware());
 
+// Request timeout to prevent slow loris attacks
+// GitHub/GitLab webhook timeout is ~10s, so 15s gives margin for processing
+const REQUEST_TIMEOUT_MS = 15_000;
+app.use(
+	timeoutMiddleware(REQUEST_TIMEOUT_MS, () => {
+		throw new HTTPException(408, { message: "Request timeout" });
+	}),
+);
+
 // Body limit middleware to prevent DoS attacks
 // CVE-2025-59139: Fixed in Hono 4.9.7+
 const maxPayloadBytes = env.MAX_PAYLOAD_SIZE_MB * 1024 * 1024;
@@ -30,6 +41,20 @@ app.use(
 		},
 	}),
 );
+
+// Content-Type validation for webhook endpoints (security best practice)
+// Only applied to POST requests on webhook routes
+const validateJsonContentType = createMiddleware(async (c, next) => {
+	if (c.req.method === "POST") {
+		const contentType = c.req.header("Content-Type");
+		if (!contentType?.includes("application/json")) {
+			return c.json({ error: "Content-Type must be application/json" }, 415);
+		}
+	}
+	return await next();
+});
+app.use("/github", validateJsonContentType);
+app.use("/gitlab", validateJsonContentType);
 
 // Simple request logging middleware
 app.use(async (c, next) => {

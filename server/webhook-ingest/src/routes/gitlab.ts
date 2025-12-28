@@ -24,16 +24,9 @@ gitlab.post("/", async (c) => {
 	const token = c.req.header("X-GitLab-Token");
 	const eventType = c.req.header("X-GitLab-Event");
 
-	// Verify webhook secret is configured
-	const secret = env.WEBHOOK_SECRET;
-	if (!secret) {
-		throw new HTTPException(401, {
-			message: "GitLab webhook secret not configured",
-		});
-	}
-
 	// Verify token using constant-time comparison
-	if (!verifyGitLabToken(token, secret)) {
+	// Note: env.WEBHOOK_SECRET is guaranteed to be a non-empty string by Zod validation
+	if (!verifyGitLabToken(token, env.WEBHOOK_SECRET)) {
 		logger.warn({ eventType }, "Invalid GitLab webhook token");
 		throw new HTTPException(401, { message: "Invalid token" });
 	}

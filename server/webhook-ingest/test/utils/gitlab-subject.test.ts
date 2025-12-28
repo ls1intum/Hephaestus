@@ -73,4 +73,59 @@ describe("buildGitLabSubject", () => {
 
 		expect(buildGitLabSubject(payload)).toBe("gitlab.org.repo.issue");
 	});
+
+	describe("special characters in paths", () => {
+		it("should preserve wildcards", () => {
+			const payload = {
+				object_kind: "push",
+				project: {
+					path_with_namespace: "org*/repo",
+				},
+			};
+			expect(buildGitLabSubject(payload)).toBe("gitlab.org*.repo.push");
+		});
+
+		it("should preserve unicode", () => {
+			const payload = {
+				object_kind: "push",
+				project: {
+					path_with_namespace: "org🚀/repo📦",
+				},
+			};
+			expect(buildGitLabSubject(payload)).toBe("gitlab.org🚀.repo📦.push");
+		});
+
+		it("should preserve special characters", () => {
+			const payload = {
+				object_kind: "push",
+				project: {
+					path_with_namespace: "café/naïve",
+				},
+			};
+			expect(buildGitLabSubject(payload)).toBe("gitlab.café.naïve.push");
+		});
+
+		it("should handle empty namespace with ? placeholder", () => {
+			const payload = {
+				object_kind: "push",
+				project: {
+					path_with_namespace: "",
+				},
+			};
+			expect(buildGitLabSubject(payload)).toBe("gitlab.?.?.push");
+		});
+
+		it("should handle very long namespace paths", () => {
+			const longName = "a".repeat(1000);
+			const payload = {
+				object_kind: "push",
+				project: {
+					path_with_namespace: `${longName}/${longName}`,
+				},
+			};
+			const subject = buildGitLabSubject(payload);
+			expect(subject).toContain("gitlab.");
+			expect(subject.endsWith(".push")).toBe(true);
+		});
+	});
 });

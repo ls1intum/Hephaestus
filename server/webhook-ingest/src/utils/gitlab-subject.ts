@@ -1,12 +1,20 @@
 /**
+ * Sanitize a single path part for NATS subject tokens.
+ * NATS uses dots as token separators, so we replace them with ~.
+ */
+function sanitizeToken(value: string): string {
+	if (!value) {
+		return "";
+	}
+	return String(value).replace(/\./g, "~");
+}
+
+/**
  * Sanitize path parts for NATS subject tokens.
- * Replaces dots with "~" to avoid extra NATS tokens.
+ * Splits on "/" and sanitizes each part.
  */
 function sanitizeParts(path: string): string[] {
-	return path
-		.split("/")
-		.filter(Boolean)
-		.map((part) => String(part).replace(/\./g, "~"));
+	return path.split("/").filter(Boolean).map(sanitizeToken);
 }
 
 /**
@@ -25,7 +33,7 @@ function extractFromProject(payload: Record<string, unknown>): {
 		if (parts.length >= 2) {
 			return {
 				namespace: parts.slice(0, -1).join("~"),
-				project: parts[parts.length - 1] ?? "?",
+				project: parts[parts.length - 1] ?? "_",
 			};
 		}
 	}
@@ -93,11 +101,14 @@ function extractFromObjectAttributes(payload: Record<string, unknown>): {
  * with proper sanitization for NATS subject tokens.
  */
 export function buildGitLabSubject(payload: Record<string, unknown>): string {
-	const eventName = (
+	const rawEventName = (
 		(payload.object_kind as string) ||
 		(payload.event_name as string) ||
 		"unknown"
 	).toLowerCase();
+
+	// Sanitize event name for NATS subject safety
+	const eventName = sanitizeToken(rawEventName) || "unknown";
 
 	// Try extraction strategies in order of priority
 	let result = extractFromProject(payload);

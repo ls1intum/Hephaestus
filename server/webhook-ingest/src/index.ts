@@ -65,8 +65,10 @@ async function main() {
 		shutdown("uncaughtException").catch(() => process.exit(1));
 	});
 
-	process.on("unhandledRejection", (reason) => {
-		logger.fatal({ reason }, "Unhandled rejection, shutting down");
+	process.on("unhandledRejection", (reason: unknown) => {
+		// Normalize reason to Error for consistent logging
+		const error = reason instanceof Error ? reason : new Error(String(reason));
+		logger.fatal({ error, reason }, "Unhandled rejection, shutting down");
 		shutdown("unhandledRejection").catch(() => process.exit(1));
 	});
 

@@ -8,8 +8,14 @@ import { buildDedupeId } from "@/utils/dedupe";
 
 const github = new Hono();
 
-/** Sanitize a string for use in NATS subject tokens (dots become ~). */
+/**
+ * Sanitize a string for use in NATS subject tokens.
+ * NATS uses dots as token separators, so we replace them with ~.
+ */
 function sanitize(value: string): string {
+	if (!value) {
+		return "?";
+	}
 	return value.replace(/\./g, "~");
 }
 
@@ -69,11 +75,7 @@ function verifyRequest(
 	deliveryId: string | undefined,
 	eventType: string | undefined,
 ): void {
-	if (!env.WEBHOOK_SECRET) {
-		throw new HTTPException(401, {
-			message: "GitHub webhook secret not configured",
-		});
-	}
+	// Note: env.WEBHOOK_SECRET is guaranteed to be a non-empty string by Zod validation
 	if (!verifyGitHubSignature(signature, env.WEBHOOK_SECRET, bodyBytes)) {
 		logger.warn({ deliveryId, eventType }, "Invalid GitHub webhook signature");
 		throw new HTTPException(401, { message: "Invalid signature" });

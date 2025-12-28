@@ -16,6 +16,18 @@ const MAX_RETRIES = env.NATS_PUBLISH_MAX_RETRIES;
 const RETRY_BASE_DELAY_MS = env.NATS_PUBLISH_RETRY_BASE_DELAY_MS;
 const PUBLISH_TIMEOUT_MS = env.NATS_PUBLISH_TIMEOUT_MS;
 
+/**
+ * Add jitter to retry delay to prevent thundering herd problem.
+ * Uses ±25% jitter around the calculated delay (2025 best practice).
+ * @see https://aws.amazon.com/blogs/architecture/exponential-backoff-and-jitter/
+ */
+function addJitter(baseDelay: number): number {
+	const jitterFactor = 0.25;
+	const minDelay = baseDelay * (1 - jitterFactor);
+	const maxDelay = baseDelay * (1 + jitterFactor);
+	return Math.floor(minDelay + Math.random() * (maxDelay - minDelay));
+}
+
 export interface StreamConfig {
 	name: string;
 	subjects: string[];
@@ -37,7 +49,18 @@ class NATSClient {
 	}
 
 	async connect(): Promise<void> {
-		logger.info({ url: env.NATS_URL }, "Connecting to NATS...");
+		// Log only the host, not the full URL (which might contain credentials)
+		const urlHosts = env.NATS_URL.split(",")
+			.map((u) => {
+				try {
+					const parsed = new URL(u.trim());
+					return parsed.host;
+				} catch {
+					return "[invalid]";
+				}
+			})
+			.join(",");
+		logger.info({ hosts: urlHosts }, "Connecting to NATS...");
 
 		const connectOptions = {
 			servers: env.NATS_URL,
@@ -53,11 +76,17 @@ class NATSClient {
 
 		logger.info("Connected to NATS");
 
-		// Set up event handlers
-		this.nc.closed().then(() => {
-			this.connectionHealthy = false;
-			logger.info("NATS connection closed");
-		});
+		// Set up event handlers for connection lifecycle
+		this.nc
+			.closed()
+			.then(() => {
+				this.connectionHealthy = false;
+				logger.info("NATS connection closed");
+			})
+			.catch((error: unknown) => {
+				this.connectionHealthy = false;
+				logger.error({ error }, "NATS connection closed with error");
+			});
 
 		// Track connection status in the background
 		this.trackStatus();
@@ -76,19 +105,31 @@ class NATSClient {
 				const stream = await this.jsm.streams.get(streamConfig.name);
 				await stream.info();
 				logger.info({ stream: streamConfig.name }, "Stream already exists");
-			} catch {
-				// Stream doesn't exist, create it
-				logger.info({ stream: streamConfig.name }, "Creating stream");
-				await this.jsm.streams.add({
-					name: streamConfig.name,
-					subjects: streamConfig.subjects,
-					retention: "limits", // RetentionPolicy.Limits
-					discard: "old", // DiscardPolicy.Old
-					storage: "file", // StorageType.File
-					max_age: streamMaxAgeNs,
-					max_msgs: STREAM_MAX_MSGS,
-				});
-				logger.info({ stream: streamConfig.name }, "Stream created");
+			} catch (error: unknown) {
+				// Check if error indicates stream doesn't exist (404) vs other errors
+				const isNotFound =
+					error instanceof Error &&
+					(error.message.includes("stream not found") ||
+						error.message.includes("404") ||
+						(error as Error & { code?: string }).code === "404");
+
+				if (isNotFound) {
+					logger.info({ stream: streamConfig.name }, "Creating stream");
+					await this.jsm.streams.add({
+						name: streamConfig.name,
+						subjects: streamConfig.subjects,
+						retention: "limits", // RetentionPolicy.Limits
+						discard: "old", // DiscardPolicy.Old
+						storage: "file", // StorageType.File
+						max_age: streamMaxAgeNs,
+						max_msgs: STREAM_MAX_MSGS,
+					});
+					logger.info({ stream: streamConfig.name }, "Stream created");
+				} else {
+					// Unexpected error - rethrow
+					logger.error({ stream: streamConfig.name, error }, "Failed to check stream status");
+					throw error;
+				}
 			}
 		}
 	}
@@ -192,8 +233,14 @@ class NATSClient {
 				await this.publishWithTimeout(subject, message, headerMap, remainingMs);
 				return;
 			} catch (error) {
-				const waitTime = Math.min(RETRY_BASE_DELAY_MS * 2 ** attempt, remainingMs);
-				logger.error(
+				const isLastAttempt = attempt >= MAX_RETRIES - 1;
+				const baseWait = RETRY_BASE_DELAY_MS * 2 ** attempt;
+				const waitTime = Math.min(addJitter(baseWait), remainingMs);
+
+				// Use WARN for retries, ERROR only on final failure
+				const logMethod = isLastAttempt ? logger.error : logger.warn;
+				logMethod.call(
+					logger,
 					{
 						error,
 						subject,
@@ -202,10 +249,12 @@ class NATSClient {
 						waitTimeMs: waitTime,
 						remainingMs,
 					},
-					"NATS publish failed, retrying...",
+					isLastAttempt
+						? "NATS publish failed, no retries remaining"
+						: "NATS publish failed, retrying...",
 				);
 
-				if (attempt < MAX_RETRIES - 1 && waitTime > 0) {
+				if (!isLastAttempt && waitTime > 0) {
 					await new Promise((resolve) => setTimeout(resolve, waitTime));
 				}
 			}

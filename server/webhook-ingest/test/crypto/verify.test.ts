@@ -40,6 +40,42 @@ describe("verifyGitHubSignature", () => {
 	it("should reject unknown algorithm prefix", () => {
 		expect(verifyGitHubSignature("md5=abc123", secret, payload)).toBe(false);
 	});
+
+	// Security: Truncated signature attacks
+	it("should reject truncated SHA-256 signature", () => {
+		const mac = createHmac("sha256", secret);
+		mac.update(payload);
+		const fullSignature = mac.digest("hex");
+		// Truncate to half length - common attack vector
+		const truncatedSignature = `sha256=${fullSignature.slice(0, 32)}`;
+		expect(verifyGitHubSignature(truncatedSignature, secret, payload)).toBe(false);
+	});
+
+	it("should reject signature with extra characters", () => {
+		const mac = createHmac("sha256", secret);
+		mac.update(payload);
+		const fullSignature = `sha256=${mac.digest("hex")}`;
+		// Add extra characters - should fail length check
+		const paddedSignature = `${fullSignature}extra`;
+		expect(verifyGitHubSignature(paddedSignature, secret, payload)).toBe(false);
+	});
+
+	it("should reject signature with only prefix", () => {
+		expect(verifyGitHubSignature("sha256=", secret, payload)).toBe(false);
+		expect(verifyGitHubSignature("sha1=", secret, payload)).toBe(false);
+	});
+
+	it("should reject signature with whitespace", () => {
+		const mac = createHmac("sha256", secret);
+		mac.update(payload);
+		const expectedSignature = `sha256=${mac.digest("hex")}`;
+		expect(verifyGitHubSignature(` ${expectedSignature}`, secret, payload)).toBe(false);
+		expect(verifyGitHubSignature(`${expectedSignature} `, secret, payload)).toBe(false);
+	});
+
+	it("should reject undefined signature", () => {
+		expect(verifyGitHubSignature(undefined, secret, payload)).toBe(false);
+	});
 });
 
 describe("verifyGitLabToken", () => {
@@ -64,5 +100,24 @@ describe("verifyGitLabToken", () => {
 
 	it("should reject different length tokens (timing-safe)", () => {
 		expect(verifyGitLabToken("short", "much-longer-secret")).toBe(false);
+	});
+
+	// Security: Token manipulation attacks
+	it("should reject token with prefix matching", () => {
+		expect(verifyGitLabToken("gitlab", secret)).toBe(false);
+	});
+
+	it("should reject token with suffix matching", () => {
+		expect(verifyGitLabToken("secret", secret)).toBe(false);
+	});
+
+	it("should reject undefined token", () => {
+		expect(verifyGitLabToken(undefined, secret)).toBe(false);
+	});
+
+	it("should reject token with whitespace", () => {
+		expect(verifyGitLabToken(` ${secret}`, secret)).toBe(false);
+		expect(verifyGitLabToken(`${secret} `, secret)).toBe(false);
+		expect(verifyGitLabToken(` ${secret} `, secret)).toBe(false);
 	});
 });
