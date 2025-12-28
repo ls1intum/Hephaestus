@@ -3,7 +3,15 @@ import { NodeSDK } from "@opentelemetry/sdk-node";
 import pino from "pino";
 import { isTelemetryEnabled } from "@/shared/ai/telemetry";
 
-const logger = pino({ name: "instrumentation" });
+// Inline logger for instrumentation - can't import shared logger due to module load order
+// (instrumentation must load before env is parsed)
+const logger = pino({
+	name: "instrumentation",
+	redact: {
+		paths: ["*.token", "*.secret", "*.password", "*.apiKey"],
+		censor: "[REDACTED]",
+	},
+});
 
 /**
  * OpenTelemetry instrumentation with Langfuse integration.

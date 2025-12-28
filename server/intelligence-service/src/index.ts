@@ -7,14 +7,13 @@
 import "./instrumentation";
 
 import { serve } from "@hono/node-server";
-import pino from "pino";
 
 import app from "./app";
 import env from "./env";
 import { shutdownTelemetry } from "./instrumentation";
+import logger from "./logger";
 import { pool } from "./shared/db";
 
-const logger = pino({ level: env.LOG_LEVEL });
 const port = env.PORT;
 
 // Fail-fast: Validate database configuration at startup

@@ -58,7 +58,7 @@ Three GitHub Actions guard against drift:
 
 1. **Database schema validation** – Applies migrations to a fresh DB and compares it with current entities. Failure produces a new `changelog_new.xml`.
 2. **Database documentation validation** – Generates an ERD from migrations and compares it with the committed diagram.
-3. **Intelligence service model validation** – Regenerates the Drizzle schema and compares it with `src/shared/db/schema.ts`.
+3. **Intelligence service model validation** – Regenerates the Drizzle schema and compares it with `server/intelligence-service/src/shared/db/schema.ts`.
 
 ## Entity change tips
 

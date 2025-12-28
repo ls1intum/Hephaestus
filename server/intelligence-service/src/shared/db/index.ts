@@ -1,12 +1,12 @@
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
-import pino from "pino";
 
 import env from "@/env";
+import { createLogger } from "@/logger";
 
 import * as schema from "./schema";
 
-const logger = pino({ name: "db" });
+const logger = createLogger("db");
 
 /**
  * Database connection pool with production-ready configuration.
