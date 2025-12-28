@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.gitprovider.team.github;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventAction;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
 import de.tum.in.www1.hephaestus.gitprovider.team.github.dto.GitHubTeamEventDTO;
@@ -50,11 +51,16 @@ public class GitHubTeamMessageHandler extends GitHubMessageHandler<GitHubTeamEve
             event.organization() != null ? event.organization().login() : "unknown"
         );
 
+        String orgLogin = event.organization() != null ? event.organization().login() : null;
+        // Create a minimal context for team events (no repository context available)
+        ProcessingContext context = ProcessingContext.forWebhook(null, null, event.action());
+
         switch (event.actionType()) {
-            case GitHubEventAction.Team.DELETED -> teamProcessor.delete(teamDto.id());
+            case GitHubEventAction.Team.DELETED -> teamProcessor.delete(teamDto.id(), context);
             case GitHubEventAction.Team.CREATED, GitHubEventAction.Team.EDITED -> teamProcessor.process(
                 teamDto,
-                event.organization() != null ? event.organization().login() : null
+                orgLogin,
+                context
             );
             default -> logger.debug("Unhandled team action: {}", event.action());
         }

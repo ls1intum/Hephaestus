@@ -2,7 +2,9 @@ package de.tum.in.www1.hephaestus.gitprovider.issuecomment.github;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.AuthorAssociation;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
-import de.tum.in.www1.hephaestus.gitprovider.common.events.EntityEvents;
+import de.tum.in.www1.hephaestus.gitprovider.common.events.DomainEvent;
+import de.tum.in.www1.hephaestus.gitprovider.common.events.EventContext;
+import de.tum.in.www1.hephaestus.gitprovider.common.events.EventPayload;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.issue.IssueRepository;
 import de.tum.in.www1.hephaestus.gitprovider.issuecomment.IssueComment;
@@ -127,12 +129,25 @@ public class GitHubIssueCommentProcessor {
 
         IssueComment saved = commentRepository.save(comment);
 
-        // Publish domain events
+        // Publish domain events with DTOs (safe for async handlers)
         if (isNew) {
-            eventPublisher.publishEvent(new EntityEvents.Created<>(saved, context));
+            eventPublisher.publishEvent(
+                new DomainEvent.CommentCreated(
+                    EventPayload.CommentData.from(saved),
+                    issueId,
+                    EventContext.from(context)
+                )
+            );
             logger.debug("Created comment {} for issue {}", saved.getId(), issueId);
         } else if (!changedFields.isEmpty()) {
-            eventPublisher.publishEvent(new EntityEvents.Updated<>(saved, changedFields, context));
+            eventPublisher.publishEvent(
+                new DomainEvent.CommentUpdated(
+                    EventPayload.CommentData.from(saved),
+                    issueId,
+                    changedFields,
+                    EventContext.from(context)
+                )
+            );
             logger.debug("Updated comment {} with changes: {}", saved.getId(), changedFields);
         }
 
@@ -152,10 +167,15 @@ public class GitHubIssueCommentProcessor {
             return;
         }
 
-        if (commentRepository.existsById(commentId)) {
-            commentRepository.deleteById(commentId);
-            eventPublisher.publishEvent(new EntityEvents.Deleted<>(commentId, IssueComment.class, context));
-            logger.info("Deleted comment {}", commentId);
-        }
+        commentRepository
+            .findById(commentId)
+            .ifPresent(comment -> {
+                Long issueId = comment.getIssue() != null ? comment.getIssue().getId() : null;
+                commentRepository.deleteById(commentId);
+                eventPublisher.publishEvent(
+                    new DomainEvent.CommentDeleted(commentId, issueId, EventContext.from(context))
+                );
+                logger.info("Deleted comment {}", commentId);
+            });
     }
 }

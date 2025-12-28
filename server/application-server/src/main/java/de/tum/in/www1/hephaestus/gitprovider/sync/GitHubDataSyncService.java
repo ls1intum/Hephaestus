@@ -1,15 +1,14 @@
 package de.tum.in.www1.hephaestus.gitprovider.sync;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider.SyncTarget;
+import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider.SyncType;
 import de.tum.in.www1.hephaestus.gitprovider.issue.github.GitHubIssueSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.label.github.GitHubLabelSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.milestone.github.GitHubMilestoneSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.github.GitHubPullRequestSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
-import de.tum.in.www1.hephaestus.workspace.RepositoryToMonitor;
-import de.tum.in.www1.hephaestus.workspace.RepositoryToMonitorRepository;
-import de.tum.in.www1.hephaestus.workspace.Workspace;
-import de.tum.in.www1.hephaestus.workspace.WorkspaceRepository;
 import java.time.Instant;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,6 +21,7 @@ import org.springframework.stereotype.Service;
  * GraphQL-based data synchronization service.
  * <p>
  * Orchestrates synchronization of all GitHub data using typed GraphQL models.
+ * Uses the {@link SyncTargetProvider} SPI to decouple from workspace entities.
  */
 @Service
 public class GitHubDataSyncService {
@@ -30,8 +30,7 @@ public class GitHubDataSyncService {
 
     private final int syncCooldownInMinutes;
 
-    private final WorkspaceRepository workspaceRepository;
-    private final RepositoryToMonitorRepository repositoryToMonitorRepository;
+    private final SyncTargetProvider syncTargetProvider;
     private final RepositoryRepository repositoryRepository;
 
     private final GitHubLabelSyncService labelSyncService;
@@ -43,8 +42,7 @@ public class GitHubDataSyncService {
 
     public GitHubDataSyncService(
         @Value("${monitoring.sync-cooldown-in-minutes}") int syncCooldownInMinutes,
-        WorkspaceRepository workspaceRepository,
-        RepositoryToMonitorRepository repositoryToMonitorRepository,
+        SyncTargetProvider syncTargetProvider,
         RepositoryRepository repositoryRepository,
         GitHubLabelSyncService labelSyncService,
         GitHubMilestoneSyncService milestoneSyncService,
@@ -53,8 +51,7 @@ public class GitHubDataSyncService {
         @Qualifier("monitoringExecutor") AsyncTaskExecutor monitoringExecutor
     ) {
         this.syncCooldownInMinutes = syncCooldownInMinutes;
-        this.workspaceRepository = workspaceRepository;
-        this.repositoryToMonitorRepository = repositoryToMonitorRepository;
+        this.syncTargetProvider = syncTargetProvider;
         this.repositoryRepository = repositoryRepository;
         this.labelSyncService = labelSyncService;
         this.milestoneSyncService = milestoneSyncService;
@@ -64,20 +61,22 @@ public class GitHubDataSyncService {
     }
 
     /**
-     * Syncs a repository asynchronously using GraphQL.
+     * Syncs a sync target asynchronously using GraphQL.
+     *
+     * @param syncTarget the sync target to sync
      */
-    public void syncRepositoryAsync(RepositoryToMonitor repositoryToMonitor) {
-        monitoringExecutor.submit(() -> syncRepository(repositoryToMonitor));
+    public void syncSyncTargetAsync(SyncTarget syncTarget) {
+        monitoringExecutor.submit(() -> syncSyncTarget(syncTarget));
     }
 
     /**
-     * Syncs a repository using GraphQL API.
+     * Syncs a sync target using GraphQL API.
      *
-     * @param repositoryToMonitor the repository to sync
+     * @param syncTarget the sync target to sync
      */
-    public void syncRepository(RepositoryToMonitor repositoryToMonitor) {
-        Long workspaceId = repositoryToMonitor.getWorkspace().getId();
-        String nameWithOwner = repositoryToMonitor.getNameWithOwner();
+    public void syncSyncTarget(SyncTarget syncTarget) {
+        Long workspaceId = syncTarget.workspaceId();
+        String nameWithOwner = syncTarget.repositoryNameWithOwner();
 
         Repository repository = repositoryRepository.findByNameWithOwner(nameWithOwner).orElse(null);
         if (repository == null) {
@@ -105,9 +104,13 @@ public class GitHubDataSyncService {
             int prsCount = pullRequestSyncService.syncForRepository(workspaceId, repositoryId);
             log.debug("Synced {} pull requests for {}", prsCount, nameWithOwner);
 
-            // Update sync timestamp
-            repositoryToMonitor.setIssuesAndPullRequestsSyncedAt(Instant.now());
-            repositoryToMonitorRepository.save(repositoryToMonitor);
+            // Update sync timestamp via SPI
+            syncTargetProvider.updateSyncTimestamp(
+                workspaceId,
+                nameWithOwner,
+                SyncType.ISSUES_AND_PULL_REQUESTS,
+                Instant.now()
+            );
 
             log.info(
                 "Completed GraphQL sync for {}: {} labels, {} milestones, {} issues, {} PRs",
@@ -124,34 +127,31 @@ public class GitHubDataSyncService {
 
     /**
      * Syncs all repositories in a workspace using GraphQL.
+     *
+     * @param workspaceId the workspace ID
      */
-    public void syncAllRepositories(Workspace workspace) {
-        workspace = workspaceRepository.findById(workspace.getId()).orElse(null);
-        if (workspace == null) {
-            log.warn("Workspace no longer exists; skipping sync.");
+    public void syncAllRepositories(Long workspaceId) {
+        var syncTargets = syncTargetProvider.getSyncTargetsForWorkspace(workspaceId);
+        if (syncTargets.isEmpty()) {
+            log.warn("No sync targets found for workspace {}; skipping sync.", workspaceId);
             return;
         }
 
-        var repositoriesToMonitor = repositoryToMonitorRepository.findByWorkspaceId(workspace.getId());
-        log.info(
-            "Syncing {} repositories for workspace {}",
-            repositoriesToMonitor.size(),
-            workspace.getWorkspaceSlug()
-        );
+        log.info("Syncing {} repositories for workspace {}", syncTargets.size(), workspaceId);
 
-        for (RepositoryToMonitor repo : repositoriesToMonitor) {
-            if (shouldSync(repo)) {
-                syncRepository(repo);
+        for (SyncTarget target : syncTargets) {
+            if (shouldSync(target)) {
+                syncSyncTarget(target);
             }
         }
     }
 
-    private boolean shouldSync(RepositoryToMonitor repo) {
-        if (repo.getIssuesAndPullRequestsSyncedAt() == null) {
+    private boolean shouldSync(SyncTarget target) {
+        if (target.lastIssuesAndPullRequestsSyncedAt() == null) {
             return true;
         }
-        return repo
-            .getIssuesAndPullRequestsSyncedAt()
+        return target
+            .lastIssuesAndPullRequestsSyncedAt()
             .isBefore(Instant.now().minusSeconds(syncCooldownInMinutes * 60L));
     }
 }

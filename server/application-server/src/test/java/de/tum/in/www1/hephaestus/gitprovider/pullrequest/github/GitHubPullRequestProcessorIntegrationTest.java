@@ -3,7 +3,7 @@ package de.tum.in.www1.hephaestus.gitprovider.pullrequest.github;
 import static org.assertj.core.api.Assertions.*;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
-import de.tum.in.www1.hephaestus.gitprovider.common.events.EntityEvents;
+import de.tum.in.www1.hephaestus.gitprovider.common.events.DomainEvent;
 import de.tum.in.www1.hephaestus.gitprovider.label.Label;
 import de.tum.in.www1.hephaestus.gitprovider.label.LabelRepository;
 import de.tum.in.www1.hephaestus.gitprovider.label.github.dto.GitHubLabelDTO;
@@ -975,104 +975,104 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
     @Component
     static class TestPullRequestEventListener {
 
-        private final List<EntityEvents.Created<?>> createdEvents = new ArrayList<>();
-        private final List<EntityEvents.Updated<?>> updatedEvents = new ArrayList<>();
-        private final List<EntityEvents.Closed<?>> closedEvents = new ArrayList<>();
-        private final List<EntityEvents.Labeled<?>> labeledEvents = new ArrayList<>();
-        private final List<EntityEvents.Unlabeled<?>> unlabeledEvents = new ArrayList<>();
-        private final List<EntityEvents.PullRequestMerged> mergedEvents = new ArrayList<>();
-        private final List<EntityEvents.PullRequestReady> readyEvents = new ArrayList<>();
-        private final List<EntityEvents.PullRequestDrafted> draftedEvents = new ArrayList<>();
-        private final List<EntityEvents.PullRequestSynchronized> synchronizedEvents = new ArrayList<>();
+        private final List<DomainEvent.PullRequestCreated> createdEvents = new ArrayList<>();
+        private final List<DomainEvent.PullRequestUpdated> updatedEvents = new ArrayList<>();
+        private final List<DomainEvent.PullRequestClosed> closedEvents = new ArrayList<>();
+        private final List<DomainEvent.PullRequestReopened> reopenedEvents = new ArrayList<>();
+        private final List<DomainEvent.PullRequestLabeled> labeledEvents = new ArrayList<>();
+        private final List<DomainEvent.PullRequestUnlabeled> unlabeledEvents = new ArrayList<>();
+        private final List<DomainEvent.PullRequestMerged> mergedEvents = new ArrayList<>();
+        private final List<DomainEvent.PullRequestReady> readyEvents = new ArrayList<>();
+        private final List<DomainEvent.PullRequestDrafted> draftedEvents = new ArrayList<>();
+        private final List<DomainEvent.PullRequestSynchronized> synchronizedEvents = new ArrayList<>();
 
         @EventListener
-        public void onCreated(EntityEvents.Created<?> event) {
-            if (event.entity() instanceof PullRequest) {
-                createdEvents.add(event);
-            }
+        public void onCreated(DomainEvent.PullRequestCreated event) {
+            createdEvents.add(event);
         }
 
         @EventListener
-        public void onUpdated(EntityEvents.Updated<?> event) {
-            if (event.entity() instanceof PullRequest) {
-                updatedEvents.add(event);
-            }
+        public void onUpdated(DomainEvent.PullRequestUpdated event) {
+            updatedEvents.add(event);
         }
 
         @EventListener
-        public void onClosed(EntityEvents.Closed<?> event) {
-            if (event.entity() instanceof PullRequest) {
-                closedEvents.add(event);
-            }
+        public void onClosed(DomainEvent.PullRequestClosed event) {
+            closedEvents.add(event);
         }
 
         @EventListener
-        public void onLabeled(EntityEvents.Labeled<?> event) {
-            if (event.entity() instanceof PullRequest) {
-                labeledEvents.add(event);
-            }
+        public void onReopened(DomainEvent.PullRequestReopened event) {
+            reopenedEvents.add(event);
         }
 
         @EventListener
-        public void onUnlabeled(EntityEvents.Unlabeled<?> event) {
-            if (event.entity() instanceof PullRequest) {
-                unlabeledEvents.add(event);
-            }
+        public void onLabeled(DomainEvent.PullRequestLabeled event) {
+            labeledEvents.add(event);
         }
 
         @EventListener
-        public void onMerged(EntityEvents.PullRequestMerged event) {
+        public void onUnlabeled(DomainEvent.PullRequestUnlabeled event) {
+            unlabeledEvents.add(event);
+        }
+
+        @EventListener
+        public void onMerged(DomainEvent.PullRequestMerged event) {
             mergedEvents.add(event);
         }
 
         @EventListener
-        public void onReady(EntityEvents.PullRequestReady event) {
+        public void onReady(DomainEvent.PullRequestReady event) {
             readyEvents.add(event);
         }
 
         @EventListener
-        public void onDrafted(EntityEvents.PullRequestDrafted event) {
+        public void onDrafted(DomainEvent.PullRequestDrafted event) {
             draftedEvents.add(event);
         }
 
         @EventListener
-        public void onSynchronized(EntityEvents.PullRequestSynchronized event) {
+        public void onSynchronized(DomainEvent.PullRequestSynchronized event) {
             synchronizedEvents.add(event);
         }
 
-        public List<EntityEvents.Created<?>> getCreatedEvents() {
+        public List<DomainEvent.PullRequestCreated> getCreatedEvents() {
             return new ArrayList<>(createdEvents);
         }
 
-        public List<EntityEvents.Updated<?>> getUpdatedEvents() {
+        public List<DomainEvent.PullRequestUpdated> getUpdatedEvents() {
             return new ArrayList<>(updatedEvents);
         }
 
-        public List<EntityEvents.Closed<?>> getClosedEvents() {
+        public List<DomainEvent.PullRequestClosed> getClosedEvents() {
             return new ArrayList<>(closedEvents);
         }
 
-        public List<EntityEvents.Labeled<?>> getLabeledEvents() {
+        public List<DomainEvent.PullRequestReopened> getReopenedEvents() {
+            return new ArrayList<>(reopenedEvents);
+        }
+
+        public List<DomainEvent.PullRequestLabeled> getLabeledEvents() {
             return new ArrayList<>(labeledEvents);
         }
 
-        public List<EntityEvents.Unlabeled<?>> getUnlabeledEvents() {
+        public List<DomainEvent.PullRequestUnlabeled> getUnlabeledEvents() {
             return new ArrayList<>(unlabeledEvents);
         }
 
-        public List<EntityEvents.PullRequestMerged> getMergedEvents() {
+        public List<DomainEvent.PullRequestMerged> getMergedEvents() {
             return new ArrayList<>(mergedEvents);
         }
 
-        public List<EntityEvents.PullRequestReady> getReadyEvents() {
+        public List<DomainEvent.PullRequestReady> getReadyEvents() {
             return new ArrayList<>(readyEvents);
         }
 
-        public List<EntityEvents.PullRequestDrafted> getDraftedEvents() {
+        public List<DomainEvent.PullRequestDrafted> getDraftedEvents() {
             return new ArrayList<>(draftedEvents);
         }
 
-        public List<EntityEvents.PullRequestSynchronized> getSynchronizedEvents() {
+        public List<DomainEvent.PullRequestSynchronized> getSynchronizedEvents() {
             return new ArrayList<>(synchronizedEvents);
         }
 
@@ -1080,6 +1080,7 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
             createdEvents.clear();
             updatedEvents.clear();
             closedEvents.clear();
+            reopenedEvents.clear();
             labeledEvents.clear();
             unlabeledEvents.clear();
             mergedEvents.clear();

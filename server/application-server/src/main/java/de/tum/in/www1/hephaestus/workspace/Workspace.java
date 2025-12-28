@@ -1,8 +1,10 @@
 package de.tum.in.www1.hephaestus.workspace;
 
+import de.tum.in.www1.hephaestus.core.security.EncryptedStringConverter;
 import de.tum.in.www1.hephaestus.gitprovider.organization.Organization;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
+import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -96,6 +98,8 @@ public class Workspace {
     @NotNull(message = "Account type is required")
     private AccountType accountType;
 
+    // Encrypted at rest using AES-256-GCM
+    @Convert(converter = EncryptedStringConverter.class)
     @Column(name = "personal_access_token", columnDefinition = "TEXT")
     @ToString.Exclude
     private String personalAccessToken;
@@ -131,12 +135,14 @@ public class Workspace {
     @Column(name = "leaderboard_notification_channel_id", length = 100)
     private String leaderboardNotificationChannelId;
 
-    // TODO: Encrypt at rest using JPA AttributeConverter with AES-256-GCM
+    // Encrypted at rest using AES-256-GCM
+    @Convert(converter = EncryptedStringConverter.class)
     @Column(name = "slack_token", columnDefinition = "TEXT")
     @ToString.Exclude
     private String slackToken;
 
-    // TODO: Encrypt at rest using JPA AttributeConverter with AES-256-GCM
+    // Encrypted at rest using AES-256-GCM
+    @Convert(converter = EncryptedStringConverter.class)
     @Column(name = "slack_signing_secret", columnDefinition = "TEXT")
     @ToString.Exclude
     private String slackSigningSecret;

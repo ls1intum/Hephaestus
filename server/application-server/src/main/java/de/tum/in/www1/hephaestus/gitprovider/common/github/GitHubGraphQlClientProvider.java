@@ -2,9 +2,8 @@ package de.tum.in.www1.hephaestus.gitprovider.common.github;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.github.app.GitHubAppTokenService;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.app.GitHubAppTokenService.InstallationToken;
-import de.tum.in.www1.hephaestus.workspace.Workspace;
-import de.tum.in.www1.hephaestus.workspace.Workspace.GitProviderMode;
-import de.tum.in.www1.hephaestus.workspace.WorkspaceRepository;
+import de.tum.in.www1.hephaestus.gitprovider.common.spi.InstallationTokenProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.spi.InstallationTokenProvider.AuthMode;
 import org.springframework.graphql.client.HttpGraphQlClient;
 import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Component;
@@ -25,7 +24,6 @@ import org.springframework.stereotype.Component;
  * @Service
  * public class PullRequestGraphQlService {
  *   private final GitHubGraphQlClientProvider clientProvider;
- *   private final WorkspaceRepository workspaceRepo;
  *
  *   public Mono<PullRequest> fetchPR(Long workspaceId, String owner, String repo, int number) {
  *     return clientProvider.forWorkspace(workspaceId)
@@ -47,16 +45,16 @@ import org.springframework.stereotype.Component;
 public class GitHubGraphQlClientProvider {
 
     private final HttpGraphQlClient baseClient;
-    private final WorkspaceRepository workspaceRepository;
+    private final InstallationTokenProvider tokenProvider;
     private final GitHubAppTokenService appTokens;
 
     public GitHubGraphQlClientProvider(
         HttpGraphQlClient gitHubGraphQlClient,
-        WorkspaceRepository workspaceRepository,
+        InstallationTokenProvider tokenProvider,
         GitHubAppTokenService appTokens
     ) {
         this.baseClient = gitHubGraphQlClient;
-        this.workspaceRepository = workspaceRepository;
+        this.tokenProvider = tokenProvider;
         this.appTokens = appTokens;
     }
 
@@ -77,12 +75,7 @@ public class GitHubGraphQlClientProvider {
      *                                  config
      */
     public HttpGraphQlClient forWorkspace(Long workspaceId) {
-        Workspace workspace = workspaceRepository
-            .findById(workspaceId)
-            .orElseThrow(() -> new IllegalArgumentException("Workspace not found: " + workspaceId));
-
-        String token = getToken(workspace);
-
+        String token = getToken(workspaceId);
         return baseClient.mutate().header(HttpHeaders.AUTHORIZATION, "Bearer " + token).build();
     }
 
@@ -100,22 +93,24 @@ public class GitHubGraphQlClientProvider {
         return baseClient.mutate().header(HttpHeaders.AUTHORIZATION, "Bearer " + token).build();
     }
 
-    private String getToken(Workspace workspace) {
-        if (workspace.getGitProviderMode() == GitProviderMode.GITHUB_APP_INSTALLATION) {
-            Long installationId = workspace.getInstallationId();
-            if (installationId == null) {
-                throw new IllegalStateException("Workspace " + workspace.getId() + " has no installation id.");
-            }
+    private String getToken(Long workspaceId) {
+        AuthMode authMode = tokenProvider.getAuthMode(workspaceId);
+
+        if (authMode == AuthMode.GITHUB_APP_INSTALLATION) {
+            Long installationId = tokenProvider
+                .getInstallationId(workspaceId)
+                .orElseThrow(() -> new IllegalStateException("Workspace " + workspaceId + " has no installation id."));
             InstallationToken token = appTokens.getInstallationTokenDetails(installationId);
             return token.token();
         }
 
-        String token = workspace.getPersonalAccessToken();
-        if (token == null || token.isBlank()) {
-            throw new IllegalStateException(
-                "Workspace " + workspace.getId() + " is configured for PAT access but no token is stored."
+        return tokenProvider
+            .getPersonalAccessToken(workspaceId)
+            .filter(t -> !t.isBlank())
+            .orElseThrow(() ->
+                new IllegalStateException(
+                    "Workspace " + workspaceId + " is configured for PAT access but no token is stored."
+                )
             );
-        }
-        return token;
     }
 }

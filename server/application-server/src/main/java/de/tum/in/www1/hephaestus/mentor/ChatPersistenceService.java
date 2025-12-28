@@ -520,7 +520,9 @@ public class ChatPersistenceService {
                     if (streamProviderMetadata != null) {
                         toolContent.set("callProviderMetadata", objectMapper.valueToTree(streamProviderMetadata));
                     }
-                } catch (Exception ignored) {}
+                } catch (Exception e) {
+                    logger.debug("Skipped optional provider metadata conversion: {}", e.getMessage());
+                }
 
                 toolPart.setContent(toolContent);
                 chatMessagePartRepository.save(toolPart);
@@ -708,7 +710,9 @@ public class ChatPersistenceService {
                     if (streamProviderMetadata != null) {
                         existingContent.set("callProviderMetadata", objectMapper.valueToTree(streamProviderMetadata));
                     }
-                } catch (Exception ignored) {}
+                } catch (Exception e) {
+                    logger.debug("Skipped optional provider metadata conversion: {}", e.getMessage());
+                }
                 if (inputError.getProviderExecuted() != null) {
                     existingContent.put("providerExecuted", inputError.getProviderExecuted());
                 }

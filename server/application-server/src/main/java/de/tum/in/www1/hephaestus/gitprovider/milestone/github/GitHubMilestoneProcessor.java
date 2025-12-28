@@ -1,7 +1,8 @@
 package de.tum.in.www1.hephaestus.gitprovider.milestone.github;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
-import de.tum.in.www1.hephaestus.gitprovider.common.events.EntityEvents;
+import de.tum.in.www1.hephaestus.gitprovider.common.events.DomainEvent;
+import de.tum.in.www1.hephaestus.gitprovider.common.events.EventPayload;
 import de.tum.in.www1.hephaestus.gitprovider.milestone.Milestone;
 import de.tum.in.www1.hephaestus.gitprovider.milestone.MilestoneRepository;
 import de.tum.in.www1.hephaestus.gitprovider.milestone.github.dto.GitHubMilestoneDTO;
@@ -126,10 +127,17 @@ public class GitHubMilestoneProcessor {
 
         Milestone saved = milestoneRepository.save(milestone);
 
-        // Publish domain event
-        eventPublisher.publishEvent(
-            new EntityEvents.MilestoneProcessed(saved, isNew, context.workspaceId(), repository.getId())
-        );
+        // Publish domain event with EventPayload DTO
+        EventPayload.MilestoneData milestoneData = EventPayload.MilestoneData.from(saved);
+        if (isNew) {
+            eventPublisher.publishEvent(
+                new DomainEvent.MilestoneCreated(milestoneData, context.workspaceId(), repository.getId())
+            );
+        } else {
+            eventPublisher.publishEvent(
+                new DomainEvent.MilestoneUpdated(milestoneData, context.workspaceId(), repository.getId())
+            );
+        }
 
         logger.debug("Processed milestone {} ({}): {}", saved.getTitle(), saved.getId(), isNew ? "created" : "updated");
         return saved;
@@ -171,7 +179,7 @@ public class GitHubMilestoneProcessor {
                 Long repoId = milestone.getRepository() != null ? milestone.getRepository().getId() : null;
                 milestoneRepository.delete(milestone);
                 eventPublisher.publishEvent(
-                    new EntityEvents.MilestoneDeleted(milestoneId, milestone.getTitle(), context.workspaceId(), repoId)
+                    new DomainEvent.MilestoneDeleted(milestoneId, milestone.getTitle(), context.workspaceId(), repoId)
                 );
                 logger.debug("Deleted milestone {} ({})", milestone.getTitle(), milestoneId);
             });

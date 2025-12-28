@@ -1,5 +1,9 @@
-package de.tum.in.www1.hephaestus.gitprovider.team;
+package de.tum.in.www1.hephaestus.workspace.team;
 
+import de.tum.in.www1.hephaestus.gitprovider.team.Team;
+import de.tum.in.www1.hephaestus.gitprovider.team.TeamInfoDTO;
+import de.tum.in.www1.hephaestus.gitprovider.team.TeamInfoDTOConverter;
+import de.tum.in.www1.hephaestus.gitprovider.team.TeamRepository;
 import de.tum.in.www1.hephaestus.gitprovider.team.permission.TeamRepositoryPermissionRepository;
 import de.tum.in.www1.hephaestus.workspace.Workspace;
 import de.tum.in.www1.hephaestus.workspace.authorization.RequireAtLeastWorkspaceAdmin;

@@ -69,8 +69,11 @@ public class GitHubPullRequestReviewThreadMessageHandler
 
         // Delegate thread state changes to processor
         switch (event.actionType()) {
-            case GitHubEventAction.PullRequestReviewThread.RESOLVED -> threadProcessor.resolve(threadDto.id());
-            case GitHubEventAction.PullRequestReviewThread.UNRESOLVED -> threadProcessor.unresolve(threadDto.id());
+            case GitHubEventAction.PullRequestReviewThread.RESOLVED -> threadProcessor.resolve(threadDto.id(), context);
+            case GitHubEventAction.PullRequestReviewThread.UNRESOLVED -> threadProcessor.unresolve(
+                threadDto.id(),
+                context
+            );
             default -> logger.debug("Unhandled thread action: {}", event.action());
         }
     }

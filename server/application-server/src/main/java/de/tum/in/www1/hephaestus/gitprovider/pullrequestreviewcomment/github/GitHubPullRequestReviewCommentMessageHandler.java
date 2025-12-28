@@ -67,14 +67,25 @@ public class GitHubPullRequestReviewCommentMessageHandler
         // Ensure PR exists
         prProcessor.process(prDto, context);
 
+        Long prId = prDto.getDatabaseId();
+
         // Delegate to processor based on action
         switch (event.actionType()) {
-            case GitHubEventAction.PullRequestReviewComment.DELETED -> commentProcessor.processDeleted(commentDto.id());
+            case GitHubEventAction.PullRequestReviewComment.DELETED -> commentProcessor.processDeleted(
+                commentDto.id(),
+                prId,
+                context
+            );
             case GitHubEventAction.PullRequestReviewComment.CREATED -> commentProcessor.processCreated(
                 commentDto,
-                prDto.getDatabaseId()
+                prId,
+                context
             );
-            case GitHubEventAction.PullRequestReviewComment.EDITED -> commentProcessor.processEdited(commentDto);
+            case GitHubEventAction.PullRequestReviewComment.EDITED -> commentProcessor.processEdited(
+                commentDto,
+                prId,
+                context
+            );
             default -> logger.debug("Unhandled comment action: {}", event.action());
         }
     }

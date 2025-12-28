@@ -158,8 +158,8 @@ public class ActivityController {
             pullRequest != null &&
             pullRequest.getRepository() != null &&
             pullRequest.getRepository().getOrganization() != null &&
-            pullRequest.getRepository().getOrganization().getWorkspace() != null &&
-            pullRequest.getRepository().getOrganization().getWorkspace().getId().equals(workspace.getId())
+            pullRequest.getRepository().getOrganization().getWorkspaceId() != null &&
+            pullRequest.getRepository().getOrganization().getWorkspaceId().equals(workspace.getId())
         );
     }
 }

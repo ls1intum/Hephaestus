@@ -2,6 +2,8 @@ package de.tum.in.www1.hephaestus.workspace;
 
 import de.tum.in.www1.hephaestus.core.LoggingUtils;
 import de.tum.in.www1.hephaestus.core.exception.EntityNotFoundException;
+import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider.SyncTarget;
 import de.tum.in.www1.hephaestus.gitprovider.installation.github.GitHubInstallationRepositoryEnumerationService;
 import de.tum.in.www1.hephaestus.gitprovider.issuetype.github.GitHubIssueTypeSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.label.Label;
@@ -20,7 +22,6 @@ import de.tum.in.www1.hephaestus.gitprovider.team.TeamRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserTeamsDTO;
-import de.tum.in.www1.hephaestus.monitoring.MonitoringScopeFilter;
 import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContextHolder;
 import de.tum.in.www1.hephaestus.workspace.exception.*;
@@ -89,14 +90,14 @@ public class WorkspaceService {
     // Services
     private final NatsConsumerService natsConsumerService;
     private final GitHubInstallationRepositoryEnumerationService installationRepositoryEnumerator;
-    private final MonitoringScopeFilter monitoringScopeFilter;
+    private final WorkspaceScopeFilter workspaceScopeFilter;
     private final TeamInfoDTOConverter teamInfoDTOConverter;
-    private final WorkspaceLeaguePointsRecalculationService workspaceLeaguePointsRecalculationService;
+    private final LeaguePointsRecalculator leaguePointsRecalculator;
     private final OrganizationService organizationService;
     private final WorkspaceMembershipService workspaceMembershipService;
 
     // Lazy-loaded dependencies (to break circular references)
-    private final ObjectProvider<GitHubDataSyncService> gitHubGraphQlDataSyncServiceProvider;
+    private final ObjectProvider<GitHubDataSyncService> gitHubDataSyncServiceProvider;
     private final ObjectProvider<GitHubIssueTypeSyncService> issueTypeSyncServiceProvider;
     private final ObjectProvider<GitHubSubIssueSyncService> subIssueSyncServiceProvider;
 
@@ -118,12 +119,12 @@ public class WorkspaceService {
         WorkspaceSlugHistoryRepository workspaceSlugHistoryRepository,
         NatsConsumerService natsConsumerService,
         GitHubInstallationRepositoryEnumerationService installationRepositoryEnumerator,
-        MonitoringScopeFilter monitoringScopeFilter,
+        WorkspaceScopeFilter workspaceScopeFilter,
         TeamInfoDTOConverter teamInfoDTOConverter,
-        WorkspaceLeaguePointsRecalculationService workspaceLeaguePointsRecalculationService,
+        LeaguePointsRecalculator leaguePointsRecalculator,
         OrganizationService organizationService,
         WorkspaceMembershipService workspaceMembershipService,
-        ObjectProvider<GitHubDataSyncService> gitHubGraphQlDataSyncServiceProvider,
+        ObjectProvider<GitHubDataSyncService> gitHubDataSyncServiceProvider,
         ObjectProvider<GitHubIssueTypeSyncService> issueTypeSyncServiceProvider,
         ObjectProvider<GitHubSubIssueSyncService> subIssueSyncServiceProvider,
         @Qualifier("monitoringExecutor") AsyncTaskExecutor monitoringExecutor,
@@ -141,12 +142,12 @@ public class WorkspaceService {
         this.workspaceSlugHistoryRepository = workspaceSlugHistoryRepository;
         this.natsConsumerService = natsConsumerService;
         this.installationRepositoryEnumerator = installationRepositoryEnumerator;
-        this.monitoringScopeFilter = monitoringScopeFilter;
+        this.workspaceScopeFilter = workspaceScopeFilter;
         this.teamInfoDTOConverter = teamInfoDTOConverter;
-        this.workspaceLeaguePointsRecalculationService = workspaceLeaguePointsRecalculationService;
+        this.leaguePointsRecalculator = leaguePointsRecalculator;
         this.organizationService = organizationService;
         this.workspaceMembershipService = workspaceMembershipService;
-        this.gitHubGraphQlDataSyncServiceProvider = gitHubGraphQlDataSyncServiceProvider;
+        this.gitHubDataSyncServiceProvider = gitHubDataSyncServiceProvider;
         this.issueTypeSyncServiceProvider = issueTypeSyncServiceProvider;
         this.subIssueSyncServiceProvider = subIssueSyncServiceProvider;
         this.monitoringExecutor = monitoringExecutor;
@@ -155,7 +156,7 @@ public class WorkspaceService {
 
     /** Lazy accessor for GitHubDataSyncService to break circular dependency. */
     private GitHubDataSyncService getGitHubDataSyncService() {
-        return gitHubGraphQlDataSyncServiceProvider.getObject();
+        return gitHubDataSyncServiceProvider.getObject();
     }
 
     /** Lazy accessor for GitHubIssueTypeSyncService. */
@@ -166,6 +167,33 @@ public class WorkspaceService {
     /** Lazy accessor for GitHubSubIssueSyncService. */
     private GitHubSubIssueSyncService getSubIssueSyncService() {
         return subIssueSyncServiceProvider.getObject();
+    }
+
+    /**
+     * Converts a RepositoryToMonitor to a SyncTarget for the sync service.
+     */
+    private SyncTarget toSyncTarget(Workspace workspace, RepositoryToMonitor rtm) {
+        SyncTargetProvider.AuthMode authMode = workspace.getGitProviderMode() ==
+            Workspace.GitProviderMode.GITHUB_APP_INSTALLATION
+            ? SyncTargetProvider.AuthMode.GITHUB_APP
+            : SyncTargetProvider.AuthMode.PAT;
+
+        return new SyncTarget(
+            rtm.getId(),
+            workspace.getId(),
+            workspace.getInstallationId(),
+            workspace.getPersonalAccessToken(),
+            authMode,
+            rtm.getNameWithOwner(),
+            rtm.getLabelsSyncedAt(),
+            rtm.getMilestonesSyncedAt(),
+            rtm.getIssuesAndPullRequestsSyncedAt(),
+            rtm.getCollaboratorsSyncedAt(),
+            rtm.getRepositorySyncedAt(),
+            rtm.getBackfillHighWaterMark(),
+            rtm.getBackfillCheckpoint(),
+            rtm.getBackfillLastRunAt()
+        );
     }
 
     /**
@@ -224,8 +252,8 @@ public class WorkspaceService {
     }
 
     private void activateWorkspace(Workspace workspace, Set<String> organizationConsumersStarted) {
-        if (!monitoringScopeFilter.isWorkspaceAllowed(workspace)) {
-            logger.info("Workspace id={} skipped: monitoring filters active.", workspace.getId());
+        if (!workspaceScopeFilter.isWorkspaceAllowed(workspace)) {
+            logger.info("Workspace id={} skipped: workspace scope filters active.", workspace.getId());
             return;
         }
 
@@ -238,7 +266,7 @@ public class WorkspaceService {
         );
         var eligibleRepositories = repositoriesToMonitor
             .stream()
-            .filter(monitoringScopeFilter::isRepositoryAllowed)
+            .filter(workspaceScopeFilter::isRepositoryAllowed)
             .toList();
 
         if (runMonitoringOnStartup) {
@@ -255,7 +283,7 @@ public class WorkspaceService {
                 // Workspaces themselves run in parallel using virtual threads.
                 for (var repo : eligibleRepositories) {
                     try {
-                        getGitHubDataSyncService().syncRepository(repo);
+                        getGitHubDataSyncService().syncSyncTarget(toSyncTarget(workspace, repo));
                     } catch (Exception ex) {
                         logger.error(
                             "Error syncing repository {}: {}",
@@ -300,7 +328,7 @@ public class WorkspaceService {
         // The startup sync ensures all entities exist before NATS starts processing
         // webhook events that might reference them.
         if (shouldUseNats(workspace)) {
-            natsConsumerService.startConsumingWorkspace(workspace);
+            natsConsumerService.startConsumingWorkspace(workspace.getId());
         }
     }
 
@@ -692,7 +720,7 @@ public class WorkspaceService {
             return;
         }
 
-        workspaceLeaguePointsRecalculationService.recalculate(workspace);
+        leaguePointsRecalculator.recalculate(workspace);
     }
 
     @Transactional
@@ -813,7 +841,7 @@ public class WorkspaceService {
             .findByInstallationId(installationId)
             .ifPresent(workspace -> {
                 if (shouldUseNats(workspace)) {
-                    natsConsumerService.stopConsumingWorkspace(workspace);
+                    natsConsumerService.stopConsumingWorkspace(workspace.getId());
                 }
             });
     }
@@ -909,7 +937,7 @@ public class WorkspaceService {
 
         // Update the workspace consumer with new subjects after all renames
         if (shouldUseNats(workspace)) {
-            natsConsumerService.updateWorkspaceConsumer(workspace);
+            natsConsumerService.updateWorkspaceConsumer(workspace.getId());
         }
     }
 
@@ -963,7 +991,7 @@ public class WorkspaceService {
 
         // Update the workspace consumer - it will pick up the new org login from
         // workspace
-        natsConsumerService.updateWorkspaceConsumer(workspace);
+        natsConsumerService.updateWorkspaceConsumer(workspace.getId());
     }
 
     /**
@@ -1037,17 +1065,17 @@ public class WorkspaceService {
         repositoryToMonitorRepository.save(monitor);
         workspace.getRepositoriesToMonitor().add(monitor);
         workspaceRepository.save(workspace);
-        boolean repositoryAllowed = monitoringScopeFilter.isRepositoryAllowed(monitor);
+        boolean repositoryAllowed = workspaceScopeFilter.isRepositoryAllowed(monitor);
         if (shouldUseNats(workspace) && repositoryAllowed) {
             // Update workspace consumer to include new repository subjects
-            natsConsumerService.updateWorkspaceConsumer(workspace);
+            natsConsumerService.updateWorkspaceConsumer(workspace.getId());
         }
         if (deferSync) {
             logger.debug("Repository {} persisted with deferred sync.", monitor.getNameWithOwner());
             return;
         }
         if (repositoryAllowed) {
-            getGitHubDataSyncService().syncRepositoryAsync(monitor);
+            getGitHubDataSyncService().syncSyncTargetAsync(toSyncTarget(workspace, monitor));
         } else {
             logger.debug("Repository {} persisted but monitoring disabled by filters.", monitor.getNameWithOwner());
         }
@@ -1059,7 +1087,7 @@ public class WorkspaceService {
         workspaceRepository.save(workspace);
         if (shouldUseNats(workspace)) {
             // Update workspace consumer to remove repository subjects
-            natsConsumerService.updateWorkspaceConsumer(workspace);
+            natsConsumerService.updateWorkspaceConsumer(workspace.getId());
         }
     }
 

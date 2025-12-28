@@ -4,7 +4,6 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.app.GitHubAppTokenService;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
-import de.tum.in.www1.hephaestus.monitoring.MonitoringScopeFilter;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceMembership.WorkspaceRole;
 import java.util.List;
 import java.util.Optional;
@@ -35,7 +34,7 @@ public class WorkspaceProvisioningService {
     private final UserRepository userRepository;
     private final WorkspaceMembershipRepository workspaceMembershipRepository;
     private final WorkspaceMembershipService workspaceMembershipService;
-    private final MonitoringScopeFilter monitoringScopeFilter;
+    private final WorkspaceScopeFilter workspaceScopeFilter;
     private final WebClient webClient;
 
     public WorkspaceProvisioningService(
@@ -47,7 +46,7 @@ public class WorkspaceProvisioningService {
         UserRepository userRepository,
         WorkspaceMembershipRepository workspaceMembershipRepository,
         WorkspaceMembershipService workspaceMembershipService,
-        MonitoringScopeFilter monitoringScopeFilter
+        WorkspaceScopeFilter workspaceScopeFilter
     ) {
         this.workspaceProperties = workspaceProperties;
         this.workspaceRepository = workspaceRepository;
@@ -57,7 +56,7 @@ public class WorkspaceProvisioningService {
         this.userRepository = userRepository;
         this.workspaceMembershipRepository = workspaceMembershipRepository;
         this.workspaceMembershipService = workspaceMembershipService;
-        this.monitoringScopeFilter = monitoringScopeFilter;
+        this.workspaceScopeFilter = workspaceScopeFilter;
         this.webClient = WebClient.builder()
             .baseUrl(GITHUB_API_BASE_URL)
             .defaultHeader(HttpHeaders.ACCEPT, "application/vnd.github+json")
@@ -268,7 +267,7 @@ public class WorkspaceProvisioningService {
 
         String login = installation.account().login();
 
-        if (monitoringScopeFilter.isActive() && !monitoringScopeFilter.isOrganizationAllowed(login)) {
+        if (workspaceScopeFilter.isActive() && !workspaceScopeFilter.isOrganizationAllowed(login)) {
             logger.info(
                 "Skipping installation {} for '{}' - not in allowed-organizations filter",
                 installation.id(),

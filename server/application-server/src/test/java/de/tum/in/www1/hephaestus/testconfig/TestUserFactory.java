@@ -25,7 +25,7 @@ public final class TestUserFactory {
         user.setEmail(login + "@example.com");
         user.setNotificationsEnabled(true);
         user.setParticipateInResearch(true);
-        user.setLeaguePoints(0);
+        // Note: leaguePoints is set on WorkspaceMembership, not User
         return user;
     }
 }

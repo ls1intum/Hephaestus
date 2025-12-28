@@ -2,8 +2,8 @@ package de.tum.in.www1.hephaestus.gitprovider.sync;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandlerRegistry;
-import de.tum.in.www1.hephaestus.workspace.RepositoryToMonitor;
-import de.tum.in.www1.hephaestus.workspace.Workspace;
+import de.tum.in.www1.hephaestus.gitprovider.common.spi.NatsSubscriptionProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.spi.NatsSubscriptionProvider.NatsSubscriptionInfo;
 import io.nats.client.Connection;
 import io.nats.client.ConsumerContext;
 import io.nats.client.ErrorListener;
@@ -103,9 +103,14 @@ public class NatsConsumerService {
     private final ExecutorService virtualThreadExecutor = Executors.newVirtualThreadPerTaskExecutor();
 
     private final GitHubMessageHandlerRegistry handlerRegistry;
+    private final NatsSubscriptionProvider subscriptionProvider;
 
-    public NatsConsumerService(GitHubMessageHandlerRegistry handlerRegistry) {
+    public NatsConsumerService(
+        @org.springframework.context.annotation.Lazy GitHubMessageHandlerRegistry handlerRegistry,
+        NatsSubscriptionProvider subscriptionProvider
+    ) {
         this.handlerRegistry = handlerRegistry;
+        this.subscriptionProvider = subscriptionProvider;
     }
 
     @EventListener(ApplicationReadyEvent.class)
@@ -168,14 +173,12 @@ public class NatsConsumerService {
      * Creates a single consumer that subscribes to ALL repositories in the workspace.
      * Messages are processed sequentially to avoid race conditions.
      *
-     * @param workspace The workspace to start consuming for
+     * @param workspaceId The workspace ID to start consuming for
      */
-    public void startConsumingWorkspace(Workspace workspace) {
-        if (!isNatsEnabled || shuttingDown.get()) {
+    public void startConsumingWorkspace(Long workspaceId) {
+        if (!isNatsEnabled || shuttingDown.get() || workspaceId == null) {
             return;
         }
-
-        Long workspaceId = workspace.getId();
 
         // Check if consumer already exists
         if (workspaceConsumers.containsKey(workspaceId)) {
@@ -192,7 +195,7 @@ public class NatsConsumerService {
         virtualThreadExecutor.submit(() -> {
             try {
                 ensureNatsConnectionEstablished();
-                setupWorkspaceConsumer(workspace);
+                setupWorkspaceConsumer(workspaceId);
             } catch (Exception e) {
                 logger.error("Failed to start consumer for workspace id={}: {}", workspaceId, e.getMessage(), e);
             } finally {
@@ -206,14 +209,13 @@ public class NatsConsumerService {
      * Call this when repositories are added/removed from a workspace.
      * NOTE: Does NOT start a consumer if one doesn't exist - use startConsumingWorkspace for that.
      *
-     * @param workspace The workspace with updated repositories
+     * @param workspaceId The workspace ID with updated repositories
      */
-    public void updateWorkspaceConsumer(Workspace workspace) {
-        if (!isNatsEnabled || shuttingDown.get()) {
+    public void updateWorkspaceConsumer(Long workspaceId) {
+        if (!isNatsEnabled || shuttingDown.get() || workspaceId == null) {
             return;
         }
 
-        Long workspaceId = workspace.getId();
         WorkspaceConsumer existing = workspaceConsumers.get(workspaceId);
 
         if (existing == null) {
@@ -228,7 +230,7 @@ public class NatsConsumerService {
 
         virtualThreadExecutor.submit(() -> {
             try {
-                String[] newSubjects = buildWorkspaceSubjects(workspace);
+                String[] newSubjects = buildWorkspaceSubjects(workspaceId);
                 existing.updateSubjects(newSubjects);
                 logger.info("Updated consumer subjects for workspace id={}", workspaceId);
             } catch (Exception e) {
@@ -240,10 +242,12 @@ public class NatsConsumerService {
     /**
      * Stops consuming events for a workspace.
      *
-     * @param workspace The workspace to stop consuming for
+     * @param workspaceId The workspace ID to stop consuming for
      */
-    public void stopConsumingWorkspace(Workspace workspace) {
-        Long workspaceId = workspace.getId();
+    public void stopConsumingWorkspace(Long workspaceId) {
+        if (workspaceId == null) {
+            return;
+        }
         WorkspaceConsumer consumer = workspaceConsumers.remove(workspaceId);
 
         if (consumer == null) {
@@ -266,9 +270,8 @@ public class NatsConsumerService {
     // Internal implementation
     // =========================================================================
 
-    private void setupWorkspaceConsumer(Workspace workspace) throws IOException {
-        Long workspaceId = workspace.getId();
-        String[] subjects = buildWorkspaceSubjects(workspace);
+    private void setupWorkspaceConsumer(Long workspaceId) throws IOException {
+        String[] subjects = buildWorkspaceSubjects(workspaceId);
 
         if (subjects.length == 0) {
             logger.info("No subjects to consume for workspace id={} - skipping consumer setup", workspaceId);
@@ -374,19 +377,24 @@ public class NatsConsumerService {
         return streamContext.createOrUpdateConsumer(configBuilder.build());
     }
 
-    private String[] buildWorkspaceSubjects(Workspace workspace) {
+    private String[] buildWorkspaceSubjects(Long workspaceId) {
+        var subscriptionInfoOpt = subscriptionProvider.getSubscriptionInfo(workspaceId);
+        if (subscriptionInfoOpt.isEmpty()) {
+            logger.warn("No subscription info found for workspace id={}", workspaceId);
+            return new String[0];
+        }
+
+        NatsSubscriptionInfo subscriptionInfo = subscriptionInfoOpt.get();
         Set<String> subjects = new HashSet<>();
 
         // Add subjects for all repositories in the workspace
-        Set<RepositoryToMonitor> repos = workspace.getRepositoriesToMonitor();
-        for (RepositoryToMonitor repo : repos) {
-            subjects.addAll(Arrays.asList(getRepositorySubjects(repo.getNameWithOwner())));
+        for (String repoNameWithOwner : subscriptionInfo.repositoryNamesWithOwner()) {
+            subjects.addAll(Arrays.asList(getRepositorySubjects(repoNameWithOwner)));
         }
 
         // Add organization-level subjects if workspace has an organization
-        String orgLogin = workspace.getAccountLogin();
-        if (orgLogin != null && !orgLogin.isBlank()) {
-            subjects.addAll(Arrays.asList(getOrganizationSubjects(orgLogin)));
+        if (subscriptionInfo.hasOrganization()) {
+            subjects.addAll(Arrays.asList(getOrganizationSubjects(subscriptionInfo.organizationLogin())));
         }
 
         return subjects.toArray(String[]::new);
@@ -649,12 +657,15 @@ public class NatsConsumerService {
                 processorThread = null;
             }
 
-            // Drain remaining messages (NAK them)
+            // Drain remaining messages (NAK them) - exceptions during shutdown are expected
             Message msg;
             while ((msg = messageQueue.poll()) != null) {
                 try {
                     msg.nak();
-                } catch (Exception ignored) {}
+                } catch (Exception e) {
+                    // Expected during shutdown when connection is already closed
+                    logger.trace("Ignored NAK error during shutdown: {}", e.getMessage());
+                }
             }
         }
 

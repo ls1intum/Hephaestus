@@ -1,13 +1,13 @@
 package de.tum.in.www1.hephaestus.gitprovider.issuedependency.github;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider.WorkspaceSyncMetadata;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.IssueConnection;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.issue.IssueRepository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
-import de.tum.in.www1.hephaestus.workspace.Workspace;
-import de.tum.in.www1.hephaestus.workspace.WorkspaceRepository;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -57,20 +57,20 @@ public class GitHubIssueDependencySyncService {
 
     private final IssueRepository issueRepository;
     private final RepositoryRepository repositoryRepository;
-    private final WorkspaceRepository workspaceRepository;
+    private final SyncTargetProvider syncTargetProvider;
     private final GitHubGraphQlClientProvider graphQlClientProvider;
     private final int syncCooldownInMinutes;
 
     public GitHubIssueDependencySyncService(
         IssueRepository issueRepository,
         RepositoryRepository repositoryRepository,
-        WorkspaceRepository workspaceRepository,
+        SyncTargetProvider syncTargetProvider,
         GitHubGraphQlClientProvider graphQlClientProvider,
         @Value("${monitoring.sync-cooldown-in-minutes}") int syncCooldownInMinutes
     ) {
         this.issueRepository = issueRepository;
         this.repositoryRepository = repositoryRepository;
-        this.workspaceRepository = workspaceRepository;
+        this.syncTargetProvider = syncTargetProvider;
         this.graphQlClientProvider = graphQlClientProvider;
         this.syncCooldownInMinutes = syncCooldownInMinutes;
     }
@@ -137,15 +137,17 @@ public class GitHubIssueDependencySyncService {
      * @return Total relationships synced, or -1 if skipped due to cooldown
      */
     public int syncDependenciesForWorkspace(Long workspaceId) {
-        Workspace workspace = workspaceRepository
-            .findById(workspaceId)
-            .orElseThrow(() -> new IllegalArgumentException("Workspace not found: " + workspaceId));
+        Optional<WorkspaceSyncMetadata> metadataOpt = syncTargetProvider.getWorkspaceSyncMetadata(workspaceId);
+        if (metadataOpt.isEmpty()) {
+            throw new IllegalArgumentException("Workspace not found: " + workspaceId);
+        }
 
-        if (!shouldSync(workspace)) {
+        WorkspaceSyncMetadata metadata = metadataOpt.get();
+        if (!metadata.needsIssueDependenciesSync(syncCooldownInMinutes)) {
             logger.debug(
                 "Skipping issue dependencies sync for workspace '{}' due to cooldown (last sync: {})",
-                workspace.getDisplayName(),
-                workspace.getIssueDependenciesSyncedAt()
+                metadata.displayName(),
+                metadata.issueDependenciesSyncedAt()
             );
             return -1;
         }
@@ -184,7 +186,7 @@ public class GitHubIssueDependencySyncService {
         logger.info(
             "Synced {} issue dependency relationships for workspace {} ({} repos failed)",
             totalSynced,
-            workspace.getDisplayName(),
+            metadata.displayName(),
             failedRepos
         );
         return totalSynced;
@@ -195,12 +197,11 @@ public class GitHubIssueDependencySyncService {
      */
     @Transactional
     public void updateSyncTimestamp(Long workspaceId) {
-        workspaceRepository
-            .findById(workspaceId)
-            .ifPresent(ws -> {
-                ws.setIssueDependenciesSyncedAt(Instant.now());
-                workspaceRepository.save(ws);
-            });
+        syncTargetProvider.updateWorkspaceSyncTimestamp(
+            workspaceId,
+            SyncTargetProvider.SyncType.ISSUE_DEPENDENCIES,
+            Instant.now()
+        );
     }
 
     /**
@@ -340,14 +341,6 @@ public class GitHubIssueDependencySyncService {
         }
 
         return changes;
-    }
-
-    private boolean shouldSync(Workspace workspace) {
-        if (workspace.getIssueDependenciesSyncedAt() == null) {
-            return true;
-        }
-        var cooldownTime = Instant.now().minusSeconds(syncCooldownInMinutes * 60L);
-        return workspace.getIssueDependenciesSyncedAt().isBefore(cooldownTime);
     }
 
     // ═══════════════════════════════════════════════════════════════════════════

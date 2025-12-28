@@ -1,12 +1,13 @@
-package de.tum.in.www1.hephaestus.workspace;
+package de.tum.in.www1.hephaestus.leaderboard;
 
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
-import de.tum.in.www1.hephaestus.leaderboard.LeaderboardEntryDTO;
-import de.tum.in.www1.hephaestus.leaderboard.LeaderboardMode;
-import de.tum.in.www1.hephaestus.leaderboard.LeaderboardService;
-import de.tum.in.www1.hephaestus.leaderboard.LeaderboardSortType;
-import de.tum.in.www1.hephaestus.leaderboard.LeaguePointsCalculationService;
+import de.tum.in.www1.hephaestus.workspace.LeaguePointsRecalculator;
+import de.tum.in.www1.hephaestus.workspace.Workspace;
+import de.tum.in.www1.hephaestus.workspace.WorkspaceContributionActivityService;
+import de.tum.in.www1.hephaestus.workspace.WorkspaceMembership;
+import de.tum.in.www1.hephaestus.workspace.WorkspaceMembershipRepository;
+import de.tum.in.www1.hephaestus.workspace.WorkspaceMembershipService;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.HashMap;
@@ -17,10 +18,18 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+/**
+ * Service responsible for recalculating league points for all members of a workspace.
+ * This service iterates through historical contribution windows and updates each member's
+ * league points based on their leaderboard performance in each window.
+ *
+ * <p>Implements {@link LeaguePointsRecalculator} to allow the workspace module to trigger
+ * recalculation without creating a cyclic dependency.
+ */
 @Service
-public class WorkspaceLeaguePointsRecalculationService {
+public class LeaguePointsRecalculationService implements LeaguePointsRecalculator {
 
-    private static final Logger logger = LoggerFactory.getLogger(WorkspaceLeaguePointsRecalculationService.class);
+    private static final Logger logger = LoggerFactory.getLogger(LeaguePointsRecalculationService.class);
 
     private final WorkspaceMembershipRepository workspaceMembershipRepository;
     private final WorkspaceMembershipService workspaceMembershipService;
@@ -29,7 +38,7 @@ public class WorkspaceLeaguePointsRecalculationService {
     private final LeaguePointsCalculationService leaguePointsCalculationService;
     private final UserRepository userRepository;
 
-    public WorkspaceLeaguePointsRecalculationService(
+    public LeaguePointsRecalculationService(
         WorkspaceMembershipRepository workspaceMembershipRepository,
         WorkspaceMembershipService workspaceMembershipService,
         WorkspaceContributionActivityService workspaceContributionActivityService,
@@ -45,6 +54,7 @@ public class WorkspaceLeaguePointsRecalculationService {
         this.userRepository = userRepository;
     }
 
+    @Override
     public void recalculate(Workspace workspace) {
         if (workspace == null || workspace.getId() == null) {
             logger.warn("Skipping league recalculation because workspace is missing or not persisted");

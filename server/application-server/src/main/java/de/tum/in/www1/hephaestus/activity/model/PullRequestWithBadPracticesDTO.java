@@ -8,6 +8,7 @@ import java.time.Instant;
 import java.util.Comparator;
 import java.util.List;
 import org.springframework.lang.NonNull;
+import org.springframework.lang.Nullable;
 
 public record PullRequestWithBadPracticesDTO(
     @NonNull Long id,
@@ -27,8 +28,17 @@ public record PullRequestWithBadPracticesDTO(
     @NonNull List<PullRequestBadPracticeDTO> badPractices,
     @NonNull List<PullRequestBadPracticeDTO> oldBadPractices
 ) {
+    /**
+     * Creates a DTO from a PullRequest and its associated bad practice data.
+     *
+     * @param pullRequest the pull request entity
+     * @param badPracticeSummary summary from the most recent BadPracticeDetection, or empty string if none
+     * @param badPractices current bad practices from the latest detection
+     * @param oldBadPractices historical bad practices that are no longer detected
+     */
     public static PullRequestWithBadPracticesDTO fromPullRequest(
         PullRequest pullRequest,
+        @Nullable String badPracticeSummary,
         List<PullRequestBadPracticeDTO> badPractices,
         List<PullRequestBadPracticeDTO> oldBadPractices
     ) {
@@ -51,7 +61,7 @@ public record PullRequestWithBadPracticesDTO(
             pullRequest.getHtmlUrl(),
             pullRequest.getCreatedAt(),
             pullRequest.getUpdatedAt(),
-            pullRequest.getBadPracticeSummary(),
+            badPracticeSummary != null ? badPracticeSummary : "",
             badPractices,
             oldBadPractices
         );

@@ -1,25 +1,21 @@
 package de.tum.in.www1.hephaestus.gitprovider.team.github;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
+import de.tum.in.www1.hephaestus.gitprovider.common.events.DomainEvent;
+import de.tum.in.www1.hephaestus.gitprovider.common.events.EventContext;
+import de.tum.in.www1.hephaestus.gitprovider.common.events.EventPayload;
 import de.tum.in.www1.hephaestus.gitprovider.team.Team;
 import de.tum.in.www1.hephaestus.gitprovider.team.TeamRepository;
 import de.tum.in.www1.hephaestus.gitprovider.team.github.dto.GitHubTeamEventDTO;
+import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Processor for GitHub teams.
- * <p>
- * This service handles the conversion of GitHubTeamDTO to Team entities,
- * persists them, and manages team lifecycle events.
- * <p>
- * <b>Design Principles:</b>
- * <ul>
- * <li>Single processing path for all data sources (sync and webhooks)</li>
- * <li>Idempotent operations via upsert pattern</li>
- * <li>Works exclusively with DTOs for complete field coverage</li>
- * </ul>
  */
 @Service
 public class GitHubTeamProcessor {
@@ -27,21 +23,23 @@ public class GitHubTeamProcessor {
     private static final Logger logger = LoggerFactory.getLogger(GitHubTeamProcessor.class);
 
     private final TeamRepository teamRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
-    public GitHubTeamProcessor(TeamRepository teamRepository) {
+    public GitHubTeamProcessor(TeamRepository teamRepository, ApplicationEventPublisher eventPublisher) {
         this.teamRepository = teamRepository;
+        this.eventPublisher = eventPublisher;
     }
 
     /**
-     * Process a GitHub team DTO and persist it as a Team entity.
-     * Uses upsert pattern to handle both create and update scenarios.
-     *
-     * @param dto the GitHub team DTO
-     * @param orgLogin the organization login (for new teams)
-     * @return the persisted Team entity, or null if dto is invalid
+     * Process a team without emitting events (for sync operations).
      */
     @Transactional
     public Team process(GitHubTeamEventDTO.GitHubTeamDTO dto, String orgLogin) {
+        return process(dto, orgLogin, null);
+    }
+
+    @Transactional
+    public Team process(GitHubTeamEventDTO.GitHubTeamDTO dto, String orgLogin, ProcessingContext context) {
         if (dto == null || dto.id() == null) {
             logger.warn("Team DTO is null or missing ID, skipping");
             return null;
@@ -75,17 +73,37 @@ public class GitHubTeamProcessor {
         }
 
         Team saved = teamRepository.save(team);
+
+        if (context != null) {
+            if (isNew) {
+                eventPublisher.publishEvent(
+                    new DomainEvent.TeamCreated(EventPayload.TeamData.from(saved), EventContext.from(context))
+                );
+            } else {
+                eventPublisher.publishEvent(
+                    new DomainEvent.TeamUpdated(
+                        EventPayload.TeamData.from(saved),
+                        Set.of("name", "description"),
+                        EventContext.from(context)
+                    )
+                );
+            }
+        }
+
         logger.debug("Processed team {} ({}): {}", saved.getName(), saved.getId(), isNew ? "created" : "updated");
         return saved;
     }
 
     /**
-     * Delete a team by its ID.
-     *
-     * @param teamId the team ID
+     * Delete a team without emitting events (for sync operations).
      */
     @Transactional
     public void delete(Long teamId) {
+        delete(teamId, null);
+    }
+
+    @Transactional
+    public void delete(Long teamId, ProcessingContext context) {
         if (teamId == null) {
             return;
         }
@@ -93,24 +111,21 @@ public class GitHubTeamProcessor {
         teamRepository
             .findById(teamId)
             .ifPresent(team -> {
+                String teamName = team.getName();
                 teamRepository.delete(team);
-                logger.info("Deleted team {} ({})", team.getName(), teamId);
+                if (context != null) {
+                    eventPublisher.publishEvent(
+                        new DomainEvent.TeamDeleted(teamId, teamName, EventContext.from(context))
+                    );
+                }
+                logger.info("Deleted team {} ({})", teamName, teamId);
             });
     }
 
-    /**
-     * Check if a team exists by ID.
-     *
-     * @param teamId the team ID
-     * @return true if the team exists
-     */
     public boolean exists(Long teamId) {
         return teamId != null && teamRepository.existsById(teamId);
     }
 
-    /**
-     * Map GitHub privacy string to Team.Privacy enum.
-     */
     private Team.Privacy mapPrivacy(String privacy) {
         if (privacy == null) {
             return Team.Privacy.CLOSED;

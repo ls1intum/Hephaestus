@@ -11,7 +11,6 @@ import static org.mockito.Mockito.when;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.app.GitHubAppTokenService;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
-import de.tum.in.www1.hephaestus.monitoring.MonitoringScopeFilter;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -44,7 +43,7 @@ class WorkspaceProvisioningServiceTest {
     private WorkspaceMembershipService workspaceMembershipService;
 
     @Mock
-    private MonitoringScopeFilter monitoringScopeFilter;
+    private WorkspaceScopeFilter workspaceScopeFilter;
 
     private WorkspaceProvisioningService provisioningService;
 
@@ -68,7 +67,7 @@ class WorkspaceProvisioningServiceTest {
             userRepository,
             workspaceMembershipRepository,
             workspaceMembershipService,
-            monitoringScopeFilter
+            workspaceScopeFilter
         );
     }
 

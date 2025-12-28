@@ -2,12 +2,11 @@ package de.tum.in.www1.hephaestus.gitprovider.installation.github;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventAction;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
+import de.tum.in.www1.hephaestus.gitprovider.common.spi.WorkspaceProvisioningListener;
 import de.tum.in.www1.hephaestus.gitprovider.installation.github.dto.GitHubInstallationTargetEventDTO;
 import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationService;
-import de.tum.in.www1.hephaestus.workspace.WorkspaceService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
 
 /**
@@ -18,15 +17,15 @@ public class GitHubInstallationTargetMessageHandler extends GitHubMessageHandler
 
     private static final Logger logger = LoggerFactory.getLogger(GitHubInstallationTargetMessageHandler.class);
 
-    private final WorkspaceService workspaceService;
+    private final WorkspaceProvisioningListener provisioningListener;
     private final OrganizationService organizationService;
 
     GitHubInstallationTargetMessageHandler(
-        @Lazy WorkspaceService workspaceService,
+        WorkspaceProvisioningListener provisioningListener,
         OrganizationService organizationService
     ) {
         super(GitHubInstallationTargetEventDTO.class);
-        this.workspaceService = workspaceService;
+        this.provisioningListener = provisioningListener;
         this.organizationService = organizationService;
     }
 
@@ -67,7 +66,7 @@ public class GitHubInstallationTargetMessageHandler extends GitHubMessageHandler
             previousLogin = event.changes().login().from();
         }
 
-        workspaceService.handleInstallationTargetRename(installationId, previousLogin, newLogin);
+        provisioningListener.onAccountRenamed(installationId, previousLogin, newLogin);
         upsertOrganization(event, installationId, newLogin);
 
         logger.info(

@@ -1,13 +1,14 @@
 package de.tum.in.www1.hephaestus.gitprovider.issuetype.github;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider.WorkspaceSyncMetadata;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.IssueTypeColor;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.IssueTypeConnection;
 import de.tum.in.www1.hephaestus.gitprovider.issuetype.IssueType;
 import de.tum.in.www1.hephaestus.gitprovider.issuetype.IssueTypeRepository;
 import de.tum.in.www1.hephaestus.gitprovider.organization.Organization;
-import de.tum.in.www1.hephaestus.workspace.Workspace;
-import de.tum.in.www1.hephaestus.workspace.WorkspaceRepository;
+import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationRepository;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.HashSet;
@@ -33,18 +34,21 @@ public class GitHubIssueTypeSyncService {
     private static final String GET_ISSUE_TYPES_DOCUMENT = "GetOrganizationIssueTypes";
 
     private final IssueTypeRepository issueTypeRepository;
-    private final WorkspaceRepository workspaceRepository;
+    private final OrganizationRepository organizationRepository;
+    private final SyncTargetProvider syncTargetProvider;
     private final GitHubGraphQlClientProvider graphQlClientProvider;
     private final int syncCooldownInMinutes;
 
     public GitHubIssueTypeSyncService(
         IssueTypeRepository issueTypeRepository,
-        WorkspaceRepository workspaceRepository,
+        OrganizationRepository organizationRepository,
+        SyncTargetProvider syncTargetProvider,
         GitHubGraphQlClientProvider graphQlClientProvider,
         @Value("${monitoring.sync-cooldown-in-minutes}") int syncCooldownInMinutes
     ) {
         this.issueTypeRepository = issueTypeRepository;
-        this.workspaceRepository = workspaceRepository;
+        this.organizationRepository = organizationRepository;
+        this.syncTargetProvider = syncTargetProvider;
         this.graphQlClientProvider = graphQlClientProvider;
         this.syncCooldownInMinutes = syncCooldownInMinutes;
     }
@@ -57,24 +61,31 @@ public class GitHubIssueTypeSyncService {
      */
     @Transactional
     public int syncIssueTypesForWorkspace(Long workspaceId) {
-        Workspace workspace = workspaceRepository.findById(workspaceId).orElse(null);
-        if (workspace == null) {
+        Optional<WorkspaceSyncMetadata> metadataOpt = syncTargetProvider.getWorkspaceSyncMetadata(workspaceId);
+        if (metadataOpt.isEmpty()) {
             logger.warn("Workspace {} not found, cannot sync issue types", workspaceId);
             return 0;
         }
 
-        Organization organization = workspace.getOrganization();
-        if (organization == null) {
+        WorkspaceSyncMetadata metadata = metadataOpt.get();
+        String orgLogin = metadata.organizationLogin();
+        if (orgLogin == null) {
             logger.debug("Workspace {} has no organization, skipping issue type sync", workspaceId);
             return 0;
         }
 
-        if (!shouldSync(workspace)) {
+        if (!metadata.needsIssueTypesSync(syncCooldownInMinutes)) {
             logger.debug("Skipping issue type sync for workspace {} - cooldown active", workspaceId);
             return -1;
         }
 
-        String orgLogin = organization.getLogin();
+        // Load organization from gitprovider's repository
+        Organization organization = organizationRepository.findById(metadata.organizationId()).orElse(null);
+        if (organization == null) {
+            logger.warn("Organization {} not found in database", orgLogin);
+            return 0;
+        }
+
         logger.info("Syncing issue types for organization {}", orgLogin);
 
         HttpGraphQlClient client = graphQlClientProvider.forWorkspace(workspaceId);
@@ -112,8 +123,11 @@ public class GitHubIssueTypeSyncService {
             }
 
             removeDeletedIssueTypes(organization.getId(), syncedIds);
-            workspace.setIssueTypesSyncedAt(Instant.now());
-            workspaceRepository.save(workspace);
+            syncTargetProvider.updateWorkspaceSyncTimestamp(
+                workspaceId,
+                SyncTargetProvider.SyncType.ISSUE_TYPES,
+                Instant.now()
+            );
 
             logger.info("Synced {} issue types for organization {}", totalSynced, orgLogin);
             return totalSynced;
@@ -121,14 +135,6 @@ public class GitHubIssueTypeSyncService {
             logger.error("Error syncing issue types for organization {}: {}", orgLogin, e.getMessage(), e);
             return 0;
         }
-    }
-
-    private boolean shouldSync(Workspace workspace) {
-        if (workspace.getIssueTypesSyncedAt() == null) {
-            return true;
-        }
-        var cooldownTime = Instant.now().minusSeconds(syncCooldownInMinutes * 60L);
-        return workspace.getIssueTypesSyncedAt().isBefore(cooldownTime);
     }
 
     private void removeDeletedIssueTypes(Long organizationId, Set<String> syncedIds) {

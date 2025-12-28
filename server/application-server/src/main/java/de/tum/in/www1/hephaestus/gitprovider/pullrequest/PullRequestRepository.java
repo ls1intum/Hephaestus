@@ -32,7 +32,7 @@ public interface PullRequestRepository extends JpaRepository<PullRequest, Long> 
         LEFT JOIN FETCH p.repository
         WHERE (p.author.login ILIKE :assigneeLogin OR LOWER(:assigneeLogin) IN (SELECT LOWER(u.login) FROM p.assignees u))
             AND p.state IN :states
-            AND p.repository.organization.workspace.id = :workspaceId
+            AND p.repository.organization.workspaceId = :workspaceId
         ORDER BY p.createdAt DESC
         """
     )
@@ -53,7 +53,7 @@ public interface PullRequestRepository extends JpaRepository<PullRequest, Long> 
         WHERE (p.author.login ILIKE :assigneeLogin OR LOWER(:assigneeLogin) IN (SELECT LOWER(u.login) FROM p.assignees u))
             AND p.state IN :states
             AND p.updatedAt >= :activitySince
-            AND p.repository.organization.workspace.id = :workspaceId
+            AND p.repository.organization.workspaceId = :workspaceId
         ORDER BY p.createdAt DESC
         """
     )

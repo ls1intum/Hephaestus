@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.notification;
 
+import de.tum.in.www1.hephaestus.activity.badpracticedetector.BadPracticesDetectedEvent;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserInfoDTO;
 import jakarta.mail.*;
@@ -21,6 +22,8 @@ public class MailBuilder {
 
     private final User primaryRecipient;
 
+    private final BadPracticesDetectedEvent.UserData userDataRecipient;
+
     private final String email;
 
     @Getter
@@ -36,6 +39,27 @@ public class MailBuilder {
         this.config = config;
 
         this.primaryRecipient = primaryRecipient;
+        this.userDataRecipient = null;
+        this.email = email;
+
+        this.subject = subject;
+        this.template = template;
+
+        this.variables = new HashMap<>();
+        this.variables.put("config", config);
+    }
+
+    public MailBuilder(
+        MailConfig config,
+        BadPracticesDetectedEvent.UserData userDataRecipient,
+        String email,
+        String subject,
+        String template
+    ) {
+        this.config = config;
+
+        this.primaryRecipient = null;
+        this.userDataRecipient = userDataRecipient;
         this.email = email;
 
         this.subject = subject;
@@ -51,12 +75,18 @@ public class MailBuilder {
     }
 
     public void send(JavaMailSender mailSender) {
-        if (primaryRecipient == null || email == null) {
+        // Check if we have a valid recipient (either entity or DTO)
+        boolean hasRecipient = primaryRecipient != null || userDataRecipient != null;
+        if (!hasRecipient || email == null) {
             log.warn("No primary recipient specified");
             return;
         }
 
-        if (!primaryRecipient.isNotificationsEnabled()) {
+        // Check notifications enabled
+        boolean notificationsEnabled = primaryRecipient != null
+            ? primaryRecipient.isNotificationsEnabled()
+            : userDataRecipient.notificationsEnabled();
+        if (!notificationsEnabled) {
             log.warn("Primary recipient has notifications disabled");
             return;
         }
@@ -70,7 +100,11 @@ public class MailBuilder {
 
             Context templateContext = new Context();
             templateContext.setVariables(this.variables);
-            templateContext.setVariable("recipient", UserInfoDTO.fromUser(primaryRecipient));
+            // Set recipient info - use DTO if available, otherwise convert from entity
+            if (primaryRecipient != null) {
+                templateContext.setVariable("recipient", UserInfoDTO.fromUser(primaryRecipient));
+            }
+            // Note: when using userDataRecipient, the caller should set the "user" variable with the DTO
 
             message.setSubject(subject);
 

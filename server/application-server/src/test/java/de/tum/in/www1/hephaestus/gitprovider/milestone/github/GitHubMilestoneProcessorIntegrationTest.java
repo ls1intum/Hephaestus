@@ -3,7 +3,7 @@ package de.tum.in.www1.hephaestus.gitprovider.milestone.github;
 import static org.assertj.core.api.Assertions.*;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
-import de.tum.in.www1.hephaestus.gitprovider.common.events.EntityEvents;
+import de.tum.in.www1.hephaestus.gitprovider.common.events.DomainEvent;
 import de.tum.in.www1.hephaestus.gitprovider.milestone.Milestone;
 import de.tum.in.www1.hephaestus.gitprovider.milestone.MilestoneRepository;
 import de.tum.in.www1.hephaestus.gitprovider.milestone.github.dto.GitHubMilestoneDTO;
@@ -143,7 +143,7 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
     class ProcessMethod {
 
         @Test
-        @DisplayName("Should create new milestone and publish MilestoneProcessed event with isNew=true")
+        @DisplayName("Should create new milestone and publish MilestoneCreated event")
         void shouldCreateNewMilestoneAndPublishEvent() {
             // Given
             Long milestoneId = 14028854L;
@@ -173,16 +173,16 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
             // Verify persisted
             assertThat(milestoneRepository.findById(milestoneId)).isPresent();
 
-            // Verify event published
-            assertThat(eventListener.getProcessedEvents())
+            // Verify MilestoneCreated event published
+            assertThat(eventListener.getCreatedEvents())
                 .hasSize(1)
                 .first()
                 .satisfies(event -> {
-                    assertThat(event.isNew()).isTrue();
-                    assertThat(event.milestone().getId()).isEqualTo(milestoneId);
+                    assertThat(event.milestone().id()).isEqualTo(milestoneId);
                     assertThat(event.workspaceId()).isEqualTo(testWorkspace.getId());
                     assertThat(event.repositoryId()).isEqualTo(FIXTURE_REPO_ID);
                 });
+            assertThat(eventListener.getUpdatedEvents()).isEmpty();
         }
 
         @Test
@@ -220,14 +220,14 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
             assertThat(result.getDescription()).isEqualTo("Updated description");
             assertThat(result.getState()).isEqualTo(Milestone.State.CLOSED);
 
-            // Verify event published with isNew=false
-            assertThat(eventListener.getProcessedEvents())
+            // Verify MilestoneUpdated event published
+            assertThat(eventListener.getUpdatedEvents())
                 .hasSize(1)
                 .first()
                 .satisfies(event -> {
-                    assertThat(event.isNew()).isFalse();
-                    assertThat(event.milestone().getTitle()).isEqualTo("Updated Title");
+                    assertThat(event.milestone().title()).isEqualTo("Updated Title");
                 });
+            assertThat(eventListener.getCreatedEvents()).isEmpty();
         }
 
         @Test
@@ -238,7 +238,8 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
 
             // Then
             assertThat(result).isNull();
-            assertThat(eventListener.getProcessedEvents()).isEmpty();
+            assertThat(eventListener.getCreatedEvents()).isEmpty();
+            assertThat(eventListener.getUpdatedEvents()).isEmpty();
         }
 
         @Test
@@ -264,7 +265,7 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
             assertThat(result.getId()).isNegative(); // Generated IDs are negative to avoid collision
             assertThat(result.getNumber()).isEqualTo(1);
             assertThat(result.getTitle()).isEqualTo("GraphQL Synced Milestone");
-            assertThat(eventListener.getProcessedEvents()).hasSize(1);
+            assertThat(eventListener.getCreatedEvents()).hasSize(1);
         }
 
         @Test
@@ -369,13 +370,10 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
             eventListener.clear();
             processor.process(dto, testRepository, null, createContext());
 
-            // Then - only one milestone exists, second event has isNew=false
+            // Then - only one milestone exists, second time emits MilestoneUpdated (not Created)
             assertThat(milestoneRepository.count()).isEqualTo(1);
-            assertThat(eventListener.getProcessedEvents())
-                .hasSize(1)
-                .first()
-                .extracting(EntityEvents.MilestoneProcessed::isNew)
-                .isEqualTo(false);
+            assertThat(eventListener.getUpdatedEvents()).hasSize(1);
+            assertThat(eventListener.getCreatedEvents()).isEmpty();
         }
 
         @Test
@@ -576,29 +574,40 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
     @Component
     static class TestMilestoneEventListener {
 
-        private final List<EntityEvents.MilestoneProcessed> processedEvents = new ArrayList<>();
-        private final List<EntityEvents.MilestoneDeleted> deletedEvents = new ArrayList<>();
+        private final List<DomainEvent.MilestoneCreated> createdEvents = new ArrayList<>();
+        private final List<DomainEvent.MilestoneUpdated> updatedEvents = new ArrayList<>();
+        private final List<DomainEvent.MilestoneDeleted> deletedEvents = new ArrayList<>();
 
         @EventListener
-        public void onMilestoneProcessed(EntityEvents.MilestoneProcessed event) {
-            processedEvents.add(event);
+        public void onMilestoneCreated(DomainEvent.MilestoneCreated event) {
+            createdEvents.add(event);
         }
 
         @EventListener
-        public void onMilestoneDeleted(EntityEvents.MilestoneDeleted event) {
+        public void onMilestoneUpdated(DomainEvent.MilestoneUpdated event) {
+            updatedEvents.add(event);
+        }
+
+        @EventListener
+        public void onMilestoneDeleted(DomainEvent.MilestoneDeleted event) {
             deletedEvents.add(event);
         }
 
-        public List<EntityEvents.MilestoneProcessed> getProcessedEvents() {
-            return new ArrayList<>(processedEvents);
+        public List<DomainEvent.MilestoneCreated> getCreatedEvents() {
+            return new ArrayList<>(createdEvents);
         }
 
-        public List<EntityEvents.MilestoneDeleted> getDeletedEvents() {
+        public List<DomainEvent.MilestoneUpdated> getUpdatedEvents() {
+            return new ArrayList<>(updatedEvents);
+        }
+
+        public List<DomainEvent.MilestoneDeleted> getDeletedEvents() {
             return new ArrayList<>(deletedEvents);
         }
 
         public void clear() {
-            processedEvents.clear();
+            createdEvents.clear();
+            updatedEvents.clear();
             deletedEvents.clear();
         }
     }

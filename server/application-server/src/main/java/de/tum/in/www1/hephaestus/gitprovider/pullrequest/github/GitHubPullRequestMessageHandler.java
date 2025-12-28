@@ -9,6 +9,7 @@ import de.tum.in.www1.hephaestus.gitprovider.pullrequest.github.dto.GitHubPullRe
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Handles all GitHub pull request webhook events.
@@ -36,6 +37,7 @@ public class GitHubPullRequestMessageHandler extends GitHubMessageHandler<GitHub
     }
 
     @Override
+    @Transactional
     protected void handleEvent(GitHubPullRequestEventDTO event) {
         GitHubPullRequestDTO prDto = event.pullRequest();
 
@@ -73,11 +75,11 @@ public class GitHubPullRequestMessageHandler extends GitHubMessageHandler<GitHub
                 GitHubEventAction.PullRequest.DEMILESTONED,
                 GitHubEventAction.PullRequest.AUTO_MERGE_ENABLED,
                 GitHubEventAction.PullRequest.AUTO_MERGE_DISABLED,
-                GitHubEventAction.PullRequest.REOPENED,
                 GitHubEventAction.PullRequest.REVIEW_REQUEST_REMOVED,
                 GitHubEventAction.PullRequest.ENQUEUED,
                 GitHubEventAction.PullRequest.DEQUEUED,
                 GitHubEventAction.PullRequest.REVIEW_REQUESTED -> prProcessor.process(prDto, context);
+            case GitHubEventAction.PullRequest.REOPENED -> prProcessor.processReopened(prDto, context);
             case GitHubEventAction.PullRequest.CLOSED -> prProcessor.processClosed(prDto, context);
             case GitHubEventAction.PullRequest.READY_FOR_REVIEW -> prProcessor.processReadyForReview(prDto, context);
             case GitHubEventAction.PullRequest.CONVERTED_TO_DRAFT -> prProcessor.processConvertedToDraft(

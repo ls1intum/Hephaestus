@@ -9,6 +9,7 @@ import de.tum.in.www1.hephaestus.gitprovider.issue.github.dto.GitHubIssueEventDT
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Handles all GitHub issue webhook events.
@@ -33,6 +34,7 @@ public class GitHubIssueMessageHandler extends GitHubMessageHandler<GitHubIssueE
     }
 
     @Override
+    @Transactional
     protected void handleEvent(GitHubIssueEventDTO event) {
         GitHubIssueDTO issueDto = event.issue();
 
@@ -71,7 +73,7 @@ public class GitHubIssueMessageHandler extends GitHubMessageHandler<GitHubIssueE
                 GitHubEventAction.Issue.TRANSFERRED -> issueProcessor.process(issueDto, context);
             case GitHubEventAction.Issue.CLOSED -> issueProcessor.processClosed(issueDto, context);
             case GitHubEventAction.Issue.REOPENED -> issueProcessor.processReopened(issueDto, context);
-            case GitHubEventAction.Issue.DELETED -> issueProcessor.processDeleted(issueDto);
+            case GitHubEventAction.Issue.DELETED -> issueProcessor.processDeleted(issueDto, context);
             case GitHubEventAction.Issue.LABELED -> {
                 if (event.label() != null) {
                     issueProcessor.processLabeled(issueDto, event.label(), context);

@@ -1,8 +1,6 @@
 package de.tum.in.www1.hephaestus.notification;
 
-import de.tum.in.www1.hephaestus.activity.model.PullRequestBadPractice;
-import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
-import de.tum.in.www1.hephaestus.gitprovider.user.User;
+import de.tum.in.www1.hephaestus.activity.badpracticedetector.BadPracticesDetectedEvent;
 import java.util.List;
 import org.keycloak.admin.client.Keycloak;
 import org.keycloak.representations.idm.UserRepresentation;
@@ -34,25 +32,30 @@ public class MailService {
         this.keycloak = keycloak;
     }
 
-    public void sendBadPracticesDetectedInPullRequestEmail(
-        User user,
-        PullRequest pullRequest,
-        List<PullRequestBadPractice> badPractices,
-        String workspaceSlug
-    ) {
-        logger.info("Sending bad practice detected email to user: {}", user.getLogin());
+    /**
+     * Sends an email notification when bad practices are detected in a pull request.
+     *
+     * @param event The event containing user, pull request, and bad practice data
+     */
+    public void sendBadPracticesDetectedEmail(BadPracticesDetectedEvent event) {
+        var user = event.user();
+        var pullRequest = event.pullRequest();
+        var badPractices = event.badPractices();
+        String workspaceSlug = event.workspaceSlug();
+
+        logger.info("Sending bad practice detected email to user: {}", user.login());
         String email;
 
         try {
             UserRepresentation keyCloakUser = keycloak
                 .realm(realm)
                 .users()
-                .searchByUsername(user.getLogin(), true)
+                .searchByUsername(user.login(), true)
                 .getFirst();
 
             email = keyCloakUser.getEmail();
         } catch (Exception e) {
-            logger.error("Failed to find user in Keycloak: {}", user.getLogin(), e);
+            logger.error("Failed to find user in Keycloak: {}", user.login(), e);
             return;
         }
 
@@ -60,10 +63,10 @@ public class MailService {
             "Hephaestus: " +
             getBadPracticeString(badPractices) +
             " detected in your pull request #" +
-            pullRequest.getNumber();
+            pullRequest.number();
 
         if (workspaceSlug == null || workspaceSlug.isBlank()) {
-            logger.warn("Skipping email send because workspace slug is missing for PR {}", pullRequest.getNumber());
+            logger.warn("Skipping email send because workspace slug is missing for PR {}", pullRequest.number());
             return;
         }
 
@@ -73,12 +76,12 @@ public class MailService {
             .fillPlaceholder(pullRequest, "pullRequest")
             .fillPlaceholder(badPractices, "badPractices")
             .fillPlaceholder(getBadPracticeString(badPractices), "badPracticeString")
-            .fillPlaceholder(pullRequest.getRepository().getName(), "repository")
+            .fillPlaceholder(pullRequest.repositoryName(), "repository")
             .fillPlaceholder(workspaceSlug, "workspaceSlug")
             .send(javaMailSender);
     }
 
-    private String getBadPracticeString(List<PullRequestBadPractice> badPractices) {
+    private String getBadPracticeString(List<BadPracticesDetectedEvent.BadPracticeData> badPractices) {
         int size = badPractices == null ? 0 : badPractices.size();
         if (size == 1) {
             return "1 bad practice";

@@ -1,14 +1,14 @@
 package de.tum.in.www1.hephaestus.gitprovider.subissue.github;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider.WorkspaceSyncMetadata;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.IssueConnection;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.SubIssuesSummary;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.issue.IssueRepository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
-import de.tum.in.www1.hephaestus.workspace.Workspace;
-import de.tum.in.www1.hephaestus.workspace.WorkspaceRepository;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -56,20 +56,20 @@ public class GitHubSubIssueSyncService {
 
     private final IssueRepository issueRepository;
     private final RepositoryRepository repositoryRepository;
-    private final WorkspaceRepository workspaceRepository;
+    private final SyncTargetProvider syncTargetProvider;
     private final GitHubGraphQlClientProvider graphQlClientProvider;
     private final int syncCooldownInMinutes;
 
     public GitHubSubIssueSyncService(
         IssueRepository issueRepository,
         RepositoryRepository repositoryRepository,
-        WorkspaceRepository workspaceRepository,
+        SyncTargetProvider syncTargetProvider,
         GitHubGraphQlClientProvider graphQlClientProvider,
         @Value("${monitoring.sync-cooldown-in-minutes}") int syncCooldownInMinutes
     ) {
         this.issueRepository = issueRepository;
         this.repositoryRepository = repositoryRepository;
-        this.workspaceRepository = workspaceRepository;
+        this.syncTargetProvider = syncTargetProvider;
         this.graphQlClientProvider = graphQlClientProvider;
         this.syncCooldownInMinutes = syncCooldownInMinutes;
     }
@@ -185,17 +185,20 @@ public class GitHubSubIssueSyncService {
      *         cooldown
      */
     public int syncSubIssuesForWorkspace(Long workspaceId) {
-        // Load workspace info outside transaction (read-only)
-        Workspace workspace = workspaceRepository
-            .findById(workspaceId)
-            .orElseThrow(() -> new IllegalArgumentException("Workspace not found: " + workspaceId));
+        // Load workspace metadata via SPI
+        Optional<WorkspaceSyncMetadata> metadataOpt = syncTargetProvider.getWorkspaceSyncMetadata(workspaceId);
+        if (metadataOpt.isEmpty()) {
+            throw new IllegalArgumentException("Workspace not found: " + workspaceId);
+        }
+
+        WorkspaceSyncMetadata metadata = metadataOpt.get();
 
         // Check cooldown
-        if (!shouldSync(workspace)) {
+        if (!metadata.needsSubIssuesSync(syncCooldownInMinutes)) {
             logger.debug(
                 "Skipping sub-issues sync for workspace '{}' due to cooldown (last sync: {})",
-                workspace.getDisplayName(),
-                workspace.getSubIssuesSyncedAt()
+                metadata.displayName(),
+                metadata.subIssuesSyncedAt()
             );
             return -1;
         }
@@ -212,7 +215,7 @@ public class GitHubSubIssueSyncService {
 
         logger.info(
             "Starting sub-issue sync for workspace '{}' with {} repositories",
-            workspace.getDisplayName(),
+            metadata.displayName(),
             repositories.size()
         );
 
@@ -235,7 +238,7 @@ public class GitHubSubIssueSyncService {
 
         logger.info(
             "Completed sub-issue sync for workspace '{}': {} relationships synced ({} repos failed)",
-            workspace.getDisplayName(),
+            metadata.displayName(),
             totalLinked,
             failedRepos
         );
@@ -243,22 +246,13 @@ public class GitHubSubIssueSyncService {
         return totalLinked;
     }
 
-    private boolean shouldSync(Workspace workspace) {
-        if (workspace.getSubIssuesSyncedAt() == null) {
-            return true; // Never synced before
-        }
-        var cooldownTime = Instant.now().minusSeconds(syncCooldownInMinutes * 60L);
-        return workspace.getSubIssuesSyncedAt().isBefore(cooldownTime);
-    }
-
     @Transactional
     public void updateSyncTimestamp(Long workspaceId) {
-        workspaceRepository
-            .findById(workspaceId)
-            .ifPresent(ws -> {
-                ws.setSubIssuesSyncedAt(Instant.now());
-                workspaceRepository.save(ws);
-            });
+        syncTargetProvider.updateWorkspaceSyncTimestamp(
+            workspaceId,
+            SyncTargetProvider.SyncType.SUB_ISSUES,
+            Instant.now()
+        );
     }
 
     private int syncSubIssuesForRepository(HttpGraphQlClient client, Repository repository) {

@@ -6,8 +6,6 @@ import de.tum.in.www1.hephaestus.gitprovider.organization.Organization;
 import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationRepository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
-import de.tum.in.www1.hephaestus.workspace.Workspace;
-import de.tum.in.www1.hephaestus.workspace.WorkspaceRepository;
 import java.time.Duration;
 import java.util.Optional;
 import org.slf4j.Logger;
@@ -75,18 +73,15 @@ public class GitHubRepositorySyncService {
     private final GitHubGraphQlClientProvider graphQlClientProvider;
     private final RepositoryRepository repositoryRepository;
     private final OrganizationRepository organizationRepository;
-    private final WorkspaceRepository workspaceRepository;
 
     public GitHubRepositorySyncService(
         GitHubGraphQlClientProvider graphQlClientProvider,
         RepositoryRepository repositoryRepository,
-        OrganizationRepository organizationRepository,
-        WorkspaceRepository workspaceRepository
+        OrganizationRepository organizationRepository
     ) {
         this.graphQlClientProvider = graphQlClientProvider;
         this.repositoryRepository = repositoryRepository;
         this.organizationRepository = organizationRepository;
-        this.workspaceRepository = workspaceRepository;
     }
 
     /**
@@ -98,12 +93,6 @@ public class GitHubRepositorySyncService {
      */
     @Transactional
     public Optional<Repository> syncRepository(Long workspaceId, String nameWithOwner) {
-        Workspace workspace = workspaceRepository.findById(workspaceId).orElse(null);
-        if (workspace == null) {
-            logger.warn("Workspace {} not found", workspaceId);
-            return Optional.empty();
-        }
-
         String[] parts = nameWithOwner.split("/");
         if (parts.length != 2) {
             logger.warn("Invalid repository name: {}", nameWithOwner);

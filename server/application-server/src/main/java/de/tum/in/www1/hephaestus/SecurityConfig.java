@@ -82,7 +82,12 @@ public class SecurityConfig {
             // Non-GET workspace operations still require authentication.
             requests.requestMatchers("/workspaces/**").authenticated();
             requests.requestMatchers("/mentor/**").hasAuthority("mentor_access");
-            requests.anyRequest().permitAll();
+            // Public endpoints
+            requests.requestMatchers(HttpMethod.GET, "/contributors").permitAll();
+            // User account management requires authentication
+            requests.requestMatchers("/user/**").authenticated();
+            // Default: require authentication for all other endpoints
+            requests.anyRequest().authenticated();
         });
 
         return http.build();

@@ -9,7 +9,8 @@ import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.PullReques
 import de.tum.in.www1.hephaestus.gitprovider.repository.collaborator.RepositoryCollaborator;
 import de.tum.in.www1.hephaestus.gitprovider.team.Team;
 import de.tum.in.www1.hephaestus.gitprovider.team.membership.TeamMembership;
-import de.tum.in.www1.hephaestus.workspace.WorkspaceMembership;
+// Note: WorkspaceMembership relationship is intentionally unidirectional from WorkspaceMembership → User
+// to keep gitprovider module decoupled from workspace module
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -102,18 +103,14 @@ public class User extends BaseGitServiceEntity {
     @ToString.Exclude
     private Set<PullRequestReviewComment> reviewComments = new HashSet<>();
 
-    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
-    @ToString.Exclude
-    private Set<WorkspaceMembership> workspaceMemberships = new HashSet<>();
+    // Note: WorkspaceMembership is accessed via WorkspaceMembershipRepository, not via User entity.
+    // The relationship is unidirectional from WorkspaceMembership → User to maintain module separation.
 
     @NonNull
     private boolean notificationsEnabled = true;
 
     @NonNull
     private boolean participateInResearch = true;
-
-    // Current ranking points for the leaderboard leagues
-    private int leaguePoints;
 
     public enum Type {
         USER,

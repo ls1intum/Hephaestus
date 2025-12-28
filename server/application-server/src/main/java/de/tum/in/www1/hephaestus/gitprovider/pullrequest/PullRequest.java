@@ -68,10 +68,9 @@ public class PullRequest extends Issue {
     @ToString.Exclude
     private Set<PullRequestReviewThread> reviewThreads = new HashSet<>();
 
-    @Column(columnDefinition = "TEXT")
-    private String badPracticeSummary;
-
-    protected Instant lastDetectionTime;
+    // Note: Bad practice detection metadata (summary, lastDetectionTime) is stored in
+    // the activity module's BadPracticeDetection entity, not here. This keeps the
+    // gitprovider module focused on GitHub data synchronization.
 
     @Override
     public boolean isPullRequest() {

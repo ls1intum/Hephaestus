@@ -1,7 +1,8 @@
 package de.tum.in.www1.hephaestus.gitprovider.label.github;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
-import de.tum.in.www1.hephaestus.gitprovider.common.events.EntityEvents;
+import de.tum.in.www1.hephaestus.gitprovider.common.events.DomainEvent;
+import de.tum.in.www1.hephaestus.gitprovider.common.events.EventPayload;
 import de.tum.in.www1.hephaestus.gitprovider.label.Label;
 import de.tum.in.www1.hephaestus.gitprovider.label.LabelRepository;
 import de.tum.in.www1.hephaestus.gitprovider.label.github.dto.GitHubLabelDTO;
@@ -93,10 +94,17 @@ public class GitHubLabelProcessor {
 
         Label saved = labelRepository.save(label);
 
-        // Publish domain event
-        eventPublisher.publishEvent(
-            new EntityEvents.LabelProcessed(saved, isNew, context.workspaceId(), repository.getId())
-        );
+        // Publish domain event with DTO payload (safe for async handling)
+        EventPayload.LabelData labelData = EventPayload.LabelData.from(saved);
+        if (isNew) {
+            eventPublisher.publishEvent(
+                new DomainEvent.LabelCreated(labelData, context.workspaceId(), repository.getId())
+            );
+        } else {
+            eventPublisher.publishEvent(
+                new DomainEvent.LabelUpdated(labelData, context.workspaceId(), repository.getId())
+            );
+        }
 
         logger.debug("Processed label {} ({}): {}", saved.getName(), saved.getId(), isNew ? "created" : "updated");
         return saved;
@@ -138,7 +146,7 @@ public class GitHubLabelProcessor {
                 Long repoId = label.getRepository() != null ? label.getRepository().getId() : null;
                 labelRepository.delete(label);
                 eventPublisher.publishEvent(
-                    new EntityEvents.LabelDeleted(labelId, label.getName(), context.workspaceId(), repoId)
+                    new DomainEvent.LabelDeleted(labelId, label.getName(), context.workspaceId(), repoId)
                 );
                 logger.debug("Deleted label {} ({})", label.getName(), labelId);
             });

@@ -3,7 +3,7 @@ package de.tum.in.www1.hephaestus.gitprovider.issue.github;
 import static org.assertj.core.api.Assertions.*;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
-import de.tum.in.www1.hephaestus.gitprovider.common.events.EntityEvents;
+import de.tum.in.www1.hephaestus.gitprovider.common.events.DomainEvent;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.issue.IssueRepository;
 import de.tum.in.www1.hephaestus.gitprovider.issue.github.dto.GitHubIssueDTO;
@@ -335,8 +335,7 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
                 .hasSize(1)
                 .first()
                 .satisfies(event -> {
-                    Issue issue = (Issue) event.entity();
-                    assertThat(issue.getId()).isEqualTo(issueId);
+                    assertThat(event.issue().id()).isEqualTo(issueId);
                     assertThat(event.context().workspaceId()).isEqualTo(testWorkspace.getId());
                 });
         }
@@ -999,7 +998,7 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
                 .hasSize(1)
                 .first()
                 .satisfies(event -> {
-                    assertThat(event.label().getName()).isEqualTo("enhancement");
+                    assertThat(event.label().name()).isEqualTo("enhancement");
                 });
         }
 
@@ -1043,7 +1042,7 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
                 .hasSize(1)
                 .first()
                 .satisfies(event -> {
-                    assertThat(event.label().getName()).isEqualTo("bug");
+                    assertThat(event.label().name()).isEqualTo("bug");
                 });
         }
     }
@@ -1081,8 +1080,8 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
                 .hasSize(1)
                 .first()
                 .satisfies(event -> {
-                    assertThat(event.issueType().getName()).isEqualTo("Task");
-                    assertThat(event.issue().getId()).isEqualTo(issueId);
+                    assertThat(event.issueType().name()).isEqualTo("Task");
+                    assertThat(event.issue().id()).isEqualTo(issueId);
                 });
         }
 
@@ -1125,8 +1124,8 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
                 .hasSize(1)
                 .first()
                 .satisfies(event -> {
-                    assertThat(event.previousType().getName()).isEqualTo("Bug");
-                    assertThat(event.issue().getId()).isEqualTo(issueId);
+                    assertThat(event.previousType().name()).isEqualTo("Bug");
+                    assertThat(event.issue().id()).isEqualTo(issueId);
                 });
         }
     }
@@ -1156,7 +1155,7 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
             GitHubIssueDTO dto = createBasicIssueDto(issueId, 20);
 
             // When
-            processor.processDeleted(dto);
+            processor.processDeleted(dto, createContext());
 
             // Then
             assertThat(issueRepository.findById(issueId)).isEmpty();
@@ -1172,7 +1171,7 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
             GitHubIssueDTO dto = createBasicIssueDto(nonExistentId, 99);
 
             // When/Then - should not throw
-            assertThatCode(() -> processor.processDeleted(dto)).doesNotThrowAnyException();
+            assertThatCode(() -> processor.processDeleted(dto, createContext())).doesNotThrowAnyException();
         }
 
         @Test
@@ -1202,7 +1201,7 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
             );
 
             // When/Then - should not throw
-            assertThatCode(() -> processor.processDeleted(dto)).doesNotThrowAnyException();
+            assertThatCode(() -> processor.processDeleted(dto, createContext())).doesNotThrowAnyException();
         }
     }
 
@@ -1420,84 +1419,84 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
     @Component
     static class TestIssueEventListener {
 
-        private final List<EntityEvents.Created<?>> createdEvents = new ArrayList<>();
-        private final List<EntityEvents.Updated<?>> updatedEvents = new ArrayList<>();
-        private final List<EntityEvents.Closed<?>> closedEvents = new ArrayList<>();
-        private final List<EntityEvents.Labeled<?>> labeledEvents = new ArrayList<>();
-        private final List<EntityEvents.Unlabeled<?>> unlabeledEvents = new ArrayList<>();
-        private final List<EntityEvents.Typed> typedEvents = new ArrayList<>();
-        private final List<EntityEvents.Untyped> untypedEvents = new ArrayList<>();
+        private final List<DomainEvent.IssueCreated> createdEvents = new ArrayList<>();
+        private final List<DomainEvent.IssueUpdated> updatedEvents = new ArrayList<>();
+        private final List<DomainEvent.IssueClosed> closedEvents = new ArrayList<>();
+        private final List<DomainEvent.IssueReopened> reopenedEvents = new ArrayList<>();
+        private final List<DomainEvent.IssueLabeled> labeledEvents = new ArrayList<>();
+        private final List<DomainEvent.IssueUnlabeled> unlabeledEvents = new ArrayList<>();
+        private final List<DomainEvent.IssueTyped> typedEvents = new ArrayList<>();
+        private final List<DomainEvent.IssueUntyped> untypedEvents = new ArrayList<>();
 
         @EventListener
-        public void onCreated(EntityEvents.Created<?> event) {
-            if (event.entity() instanceof Issue) {
-                createdEvents.add(event);
-            }
+        public void onCreated(DomainEvent.IssueCreated event) {
+            createdEvents.add(event);
         }
 
         @EventListener
-        public void onUpdated(EntityEvents.Updated<?> event) {
-            if (event.entity() instanceof Issue) {
-                updatedEvents.add(event);
-            }
+        public void onUpdated(DomainEvent.IssueUpdated event) {
+            updatedEvents.add(event);
         }
 
         @EventListener
-        public void onClosed(EntityEvents.Closed<?> event) {
-            if (event.entity() instanceof Issue) {
-                closedEvents.add(event);
-            }
+        public void onClosed(DomainEvent.IssueClosed event) {
+            closedEvents.add(event);
         }
 
         @EventListener
-        public void onLabeled(EntityEvents.Labeled<?> event) {
-            if (event.entity() instanceof Issue) {
-                labeledEvents.add(event);
-            }
+        public void onReopened(DomainEvent.IssueReopened event) {
+            reopenedEvents.add(event);
         }
 
         @EventListener
-        public void onUnlabeled(EntityEvents.Unlabeled<?> event) {
-            if (event.entity() instanceof Issue) {
-                unlabeledEvents.add(event);
-            }
+        public void onLabeled(DomainEvent.IssueLabeled event) {
+            labeledEvents.add(event);
         }
 
         @EventListener
-        public void onTyped(EntityEvents.Typed event) {
+        public void onUnlabeled(DomainEvent.IssueUnlabeled event) {
+            unlabeledEvents.add(event);
+        }
+
+        @EventListener
+        public void onTyped(DomainEvent.IssueTyped event) {
             typedEvents.add(event);
         }
 
         @EventListener
-        public void onUntyped(EntityEvents.Untyped event) {
+        public void onUntyped(DomainEvent.IssueUntyped event) {
             untypedEvents.add(event);
         }
 
-        public List<EntityEvents.Created<?>> getCreatedEvents() {
+        public List<DomainEvent.IssueCreated> getCreatedEvents() {
             return new ArrayList<>(createdEvents);
         }
 
-        public List<EntityEvents.Updated<?>> getUpdatedEvents() {
+        public List<DomainEvent.IssueUpdated> getUpdatedEvents() {
             return new ArrayList<>(updatedEvents);
         }
 
-        public List<EntityEvents.Closed<?>> getClosedEvents() {
+        public List<DomainEvent.IssueClosed> getClosedEvents() {
             return new ArrayList<>(closedEvents);
         }
 
-        public List<EntityEvents.Labeled<?>> getLabeledEvents() {
+        public List<DomainEvent.IssueReopened> getReopenedEvents() {
+            return new ArrayList<>(reopenedEvents);
+        }
+
+        public List<DomainEvent.IssueLabeled> getLabeledEvents() {
             return new ArrayList<>(labeledEvents);
         }
 
-        public List<EntityEvents.Unlabeled<?>> getUnlabeledEvents() {
+        public List<DomainEvent.IssueUnlabeled> getUnlabeledEvents() {
             return new ArrayList<>(unlabeledEvents);
         }
 
-        public List<EntityEvents.Typed> getTypedEvents() {
+        public List<DomainEvent.IssueTyped> getTypedEvents() {
             return new ArrayList<>(typedEvents);
         }
 
-        public List<EntityEvents.Untyped> getUntypedEvents() {
+        public List<DomainEvent.IssueUntyped> getUntypedEvents() {
             return new ArrayList<>(untypedEvents);
         }
 
@@ -1505,6 +1504,7 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
             createdEvents.clear();
             updatedEvents.clear();
             closedEvents.clear();
+            reopenedEvents.clear();
             labeledEvents.clear();
             unlabeledEvents.clear();
             typedEvents.clear();

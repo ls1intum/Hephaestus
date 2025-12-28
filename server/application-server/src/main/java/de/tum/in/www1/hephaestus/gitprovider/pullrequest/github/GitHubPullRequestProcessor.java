@@ -1,7 +1,9 @@
 package de.tum.in.www1.hephaestus.gitprovider.pullrequest.github;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
-import de.tum.in.www1.hephaestus.gitprovider.common.events.EntityEvents;
+import de.tum.in.www1.hephaestus.gitprovider.common.events.DomainEvent;
+import de.tum.in.www1.hephaestus.gitprovider.common.events.EventContext;
+import de.tum.in.www1.hephaestus.gitprovider.common.events.EventPayload;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.BaseGitHubProcessor;
 import de.tum.in.www1.hephaestus.gitprovider.label.Label;
 import de.tum.in.www1.hephaestus.gitprovider.label.LabelRepository;
@@ -82,7 +84,9 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
         if (isNew) {
             pr = createPullRequest(dto, context.repository());
             pr = pullRequestRepository.save(pr);
-            eventPublisher.publishEvent(new EntityEvents.Created<>(pr, context));
+            eventPublisher.publishEvent(
+                new DomainEvent.PullRequestCreated(EventPayload.PullRequestData.from(pr), EventContext.from(context))
+            );
             logger.debug("Created PR #{} in {}", dto.number(), context.repository().getNameWithOwner());
         } else {
             pr = existingOpt.get();
@@ -90,7 +94,13 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
             pr = pullRequestRepository.save(pr);
 
             if (!changedFields.isEmpty()) {
-                eventPublisher.publishEvent(new EntityEvents.Updated<>(pr, changedFields, context));
+                eventPublisher.publishEvent(
+                    new DomainEvent.PullRequestUpdated(
+                        EventPayload.PullRequestData.from(pr),
+                        changedFields,
+                        EventContext.from(context)
+                    )
+                );
                 logger.debug(
                     "Updated PR #{} in {} - changed: {}",
                     dto.number(),
@@ -110,11 +120,13 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
     public PullRequest processClosed(GitHubPullRequestDTO dto, ProcessingContext context) {
         PullRequest pr = process(dto, context);
         boolean wasMerged = dto.isMerged();
+        EventPayload.PullRequestData prData = EventPayload.PullRequestData.from(pr);
+        EventContext eventContext = EventContext.from(context);
 
-        eventPublisher.publishEvent(new EntityEvents.Closed<>(pr, wasMerged ? "merged" : "closed", context));
+        eventPublisher.publishEvent(new DomainEvent.PullRequestClosed(prData, wasMerged, eventContext));
 
         if (wasMerged) {
-            eventPublisher.publishEvent(new EntityEvents.PullRequestMerged(pr, context));
+            eventPublisher.publishEvent(new DomainEvent.PullRequestMerged(prData, eventContext));
             logger.info("PR #{} merged", pr.getNumber());
         } else {
             logger.debug("PR #{} closed without merging", pr.getNumber());
@@ -124,12 +136,27 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
     }
 
     /**
+     * Process a reopened event.
+     */
+    @Transactional
+    public PullRequest processReopened(GitHubPullRequestDTO dto, ProcessingContext context) {
+        PullRequest pr = process(dto, context);
+        eventPublisher.publishEvent(
+            new DomainEvent.PullRequestReopened(EventPayload.PullRequestData.from(pr), EventContext.from(context))
+        );
+        logger.info("PR #{} reopened", pr.getNumber());
+        return pr;
+    }
+
+    /**
      * Process a ready_for_review event.
      */
     @Transactional
     public PullRequest processReadyForReview(GitHubPullRequestDTO dto, ProcessingContext context) {
         PullRequest pr = process(dto, context);
-        eventPublisher.publishEvent(new EntityEvents.PullRequestReady(pr, context));
+        eventPublisher.publishEvent(
+            new DomainEvent.PullRequestReady(EventPayload.PullRequestData.from(pr), EventContext.from(context))
+        );
         logger.info("PR #{} is ready for review", pr.getNumber());
         return pr;
     }
@@ -140,7 +167,9 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
     @Transactional
     public PullRequest processConvertedToDraft(GitHubPullRequestDTO dto, ProcessingContext context) {
         PullRequest pr = process(dto, context);
-        eventPublisher.publishEvent(new EntityEvents.PullRequestDrafted(pr, context));
+        eventPublisher.publishEvent(
+            new DomainEvent.PullRequestDrafted(EventPayload.PullRequestData.from(pr), EventContext.from(context))
+        );
         logger.debug("PR #{} converted to draft", pr.getNumber());
         return pr;
     }
@@ -151,7 +180,9 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
     @Transactional
     public PullRequest processSynchronize(GitHubPullRequestDTO dto, ProcessingContext context) {
         PullRequest pr = process(dto, context);
-        eventPublisher.publishEvent(new EntityEvents.PullRequestSynchronized(pr, context));
+        eventPublisher.publishEvent(
+            new DomainEvent.PullRequestSynchronized(EventPayload.PullRequestData.from(pr), EventContext.from(context))
+        );
         logger.debug("PR #{} synchronized (new commits)", pr.getNumber());
         return pr;
     }
@@ -164,7 +195,13 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
         PullRequest pr = process(dto, context);
         Label label = findOrCreateLabel(labelDto, context.repository());
         if (label != null) {
-            eventPublisher.publishEvent(new EntityEvents.Labeled<>(pr, label, context));
+            eventPublisher.publishEvent(
+                new DomainEvent.PullRequestLabeled(
+                    EventPayload.PullRequestData.from(pr),
+                    EventPayload.LabelData.from(label),
+                    EventContext.from(context)
+                )
+            );
             logger.debug("PR #{} labeled: {}", pr.getNumber(), label.getName());
         }
         return pr;
@@ -178,7 +215,13 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
         PullRequest pr = process(dto, context);
         Label label = findOrCreateLabel(labelDto, context.repository());
         if (label != null) {
-            eventPublisher.publishEvent(new EntityEvents.Unlabeled<>(pr, label, context));
+            eventPublisher.publishEvent(
+                new DomainEvent.PullRequestUnlabeled(
+                    EventPayload.PullRequestData.from(pr),
+                    EventPayload.LabelData.from(label),
+                    EventContext.from(context)
+                )
+            );
             logger.debug("PR #{} unlabeled: {}", pr.getNumber(), label.getName());
         }
         return pr;

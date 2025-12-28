@@ -20,7 +20,7 @@ public interface PullRequestReviewRepository extends JpaRepository<PullRequestRe
         LEFT JOIN FETCH prr.comments
         WHERE prr.author.login ILIKE :authorLogin
             AND prr.submittedAt >= :activitySince
-            AND prr.pullRequest.repository.organization.workspace.id = :workspaceId
+            AND prr.pullRequest.repository.organization.workspaceId = :workspaceId
         ORDER BY prr.submittedAt DESC
         """
     )
@@ -40,7 +40,7 @@ public interface PullRequestReviewRepository extends JpaRepository<PullRequestRe
         LEFT JOIN FETCH prr.comments
         WHERE prr.author.login ILIKE :authorLogin
             AND prr.submittedAt BETWEEN :after AND :before
-            AND prr.pullRequest.repository.organization.workspace.id = :workspaceId
+            AND prr.pullRequest.repository.organization.workspaceId = :workspaceId
         ORDER BY prr.submittedAt DESC
         """
     )
@@ -62,7 +62,7 @@ public interface PullRequestReviewRepository extends JpaRepository<PullRequestRe
         WHERE
             prr.submittedAt BETWEEN :after AND :before
             AND prr.author.type = 'USER'
-            AND prr.pullRequest.repository.organization.workspace.id = :workspaceId
+            AND prr.pullRequest.repository.organization.workspaceId = :workspaceId
         ORDER BY prr.submittedAt DESC
         """
     )
@@ -83,7 +83,7 @@ public interface PullRequestReviewRepository extends JpaRepository<PullRequestRe
         WHERE
             prr.submittedAt BETWEEN :after AND :before
             AND prr.author.type = 'USER'
-            AND prr.pullRequest.repository.organization.workspace.id = :workspaceId
+            AND prr.pullRequest.repository.organization.workspaceId = :workspaceId
             AND EXISTS (
                 SELECT 1
                 FROM TeamRepositoryPermission trp
@@ -127,7 +127,7 @@ public interface PullRequestReviewRepository extends JpaRepository<PullRequestRe
         SELECT MIN(prr.submittedAt)
         FROM PullRequestReview prr
         WHERE prr.author.id = :userId
-            AND prr.pullRequest.repository.organization.workspace.id = :workspaceId
+            AND prr.pullRequest.repository.organization.workspaceId = :workspaceId
         """
     )
     Instant findEarliestSubmissionInstant(@Param("workspaceId") Long workspaceId, @Param("userId") Long userId);

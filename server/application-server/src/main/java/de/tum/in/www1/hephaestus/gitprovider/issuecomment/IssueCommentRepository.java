@@ -18,7 +18,7 @@ public interface IssueCommentRepository extends JpaRepository<IssueComment, Long
         WHERE
             ic.author.login ILIKE :authorLogin
             AND ic.createdAt >= :activitySince
-            AND ic.issue.repository.organization.workspace.id = :workspaceId
+            AND ic.issue.repository.organization.workspaceId = :workspaceId
             AND (:onlyFromPullRequests = false OR ic.issue.htmlUrl LIKE '%/pull/%')
         ORDER BY ic.createdAt DESC
         """
@@ -40,7 +40,7 @@ public interface IssueCommentRepository extends JpaRepository<IssueComment, Long
         WHERE
             ic.author.login ILIKE :authorLogin
             AND ic.createdAt BETWEEN :after AND :before
-            AND ic.issue.repository.organization.workspace.id = :workspaceId
+            AND ic.issue.repository.organization.workspaceId = :workspaceId
             AND (:onlyFromPullRequests = false OR ic.issue.htmlUrl LIKE '%/pull/%')
         ORDER BY ic.createdAt DESC
         """
@@ -63,7 +63,7 @@ public interface IssueCommentRepository extends JpaRepository<IssueComment, Long
         WHERE
             ic.createdAt BETWEEN :after AND :before
             AND ic.author.type = 'USER'
-            AND ic.issue.repository.organization.workspace.id = :workspaceId
+            AND ic.issue.repository.organization.workspaceId = :workspaceId
             AND (:onlyFromPullRequests = false OR ic.issue.htmlUrl LIKE '%/pull/%')
         ORDER BY ic.createdAt DESC
         """
@@ -85,7 +85,7 @@ public interface IssueCommentRepository extends JpaRepository<IssueComment, Long
         WHERE
             ic.createdAt BETWEEN :after AND :before
             AND ic.author.type = 'USER'
-            AND ic.issue.repository.organization.workspace.id = :workspaceId
+            AND ic.issue.repository.organization.workspaceId = :workspaceId
             AND EXISTS (
                 SELECT 1
                 FROM TeamRepositoryPermission trp
@@ -131,7 +131,7 @@ public interface IssueCommentRepository extends JpaRepository<IssueComment, Long
         SELECT MIN(ic.createdAt)
         FROM IssueComment ic
         WHERE ic.author.id = :userId
-            AND ic.issue.repository.organization.workspace.id = :workspaceId
+            AND ic.issue.repository.organization.workspaceId = :workspaceId
         """
     )
     Instant findEarliestCreatedAt(@Param("workspaceId") Long workspaceId, @Param("userId") Long userId);

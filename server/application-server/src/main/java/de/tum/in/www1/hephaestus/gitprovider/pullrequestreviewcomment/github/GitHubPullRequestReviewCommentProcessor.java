@@ -1,6 +1,10 @@
 package de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.github;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.AuthorAssociation;
+import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
+import de.tum.in.www1.hephaestus.gitprovider.common.events.DomainEvent;
+import de.tum.in.www1.hephaestus.gitprovider.common.events.EventContext;
+import de.tum.in.www1.hephaestus.gitprovider.common.events.EventPayload;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReviewRepository;
@@ -10,28 +14,15 @@ import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.github.dto
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewthread.PullRequestReviewThread;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewthread.PullRequestReviewThreadRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
+import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Processor for GitHub pull request review comments.
- * <p>
- * This service handles the conversion of GitHubReviewCommentDTO to PullRequestReviewComment entities,
- * persists them, and manages thread associations.
- * <p>
- * <b>Design Principles:</b>
- * <ul>
- * <li>Single processing path for all data sources (sync and webhooks)</li>
- * <li>Idempotent operations via upsert pattern</li>
- * <li>Handles synthetic thread creation for comments from webhooks</li>
- * <li>Works exclusively with DTOs for complete field coverage</li>
- * </ul>
- * <p>
- * <b>Thread handling:</b> GitHub does not send explicit thread IDs in webhook payloads.
- * Threads are created implicitly: root comments (no in_reply_to_id) create new threads,
- * and replies (with in_reply_to_id) join the thread of their parent comment.
  */
 @Service
 public class GitHubPullRequestReviewCommentProcessor {
@@ -43,32 +34,40 @@ public class GitHubPullRequestReviewCommentProcessor {
     private final PullRequestReviewRepository reviewRepository;
     private final PullRequestReviewThreadRepository threadRepository;
     private final UserRepository userRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     public GitHubPullRequestReviewCommentProcessor(
         PullRequestReviewCommentRepository commentRepository,
         PullRequestRepository prRepository,
         PullRequestReviewRepository reviewRepository,
         PullRequestReviewThreadRepository threadRepository,
-        UserRepository userRepository
+        UserRepository userRepository,
+        ApplicationEventPublisher eventPublisher
     ) {
         this.commentRepository = commentRepository;
         this.prRepository = prRepository;
         this.reviewRepository = reviewRepository;
         this.threadRepository = threadRepository;
         this.userRepository = userRepository;
+        this.eventPublisher = eventPublisher;
     }
 
     /**
-     * Process a created comment event.
-     *
-     * @param dto the comment DTO from the webhook
-     * @param prId the pull request database ID
-     * @return the created comment, or null if PR not found or comment already exists
+     * Process a created comment without emitting events (for sync operations).
      */
     @Transactional
     public PullRequestReviewComment processCreated(
         GitHubPullRequestReviewCommentEventDTO.GitHubReviewCommentDTO dto,
         Long prId
+    ) {
+        return processCreated(dto, prId, null);
+    }
+
+    @Transactional
+    public PullRequestReviewComment processCreated(
+        GitHubPullRequestReviewCommentEventDTO.GitHubReviewCommentDTO dto,
+        Long prId,
+        ProcessingContext context
     ) {
         if (commentRepository.existsById(dto.id())) {
             logger.debug("Comment {} already exists, skipping", dto.id());
@@ -85,24 +84,41 @@ public class GitHubPullRequestReviewCommentProcessor {
         PullRequestReviewComment comment = createComment(dto, pr, thread);
 
         PullRequestReviewComment saved = commentRepository.save(comment);
+        if (context != null) {
+            eventPublisher.publishEvent(
+                new DomainEvent.ReviewCommentCreated(
+                    EventPayload.ReviewCommentData.from(saved),
+                    prId,
+                    EventContext.from(context)
+                )
+            );
+        }
         logger.debug("Created comment {} in thread {}", dto.id(), thread.getId());
         return saved;
     }
 
-    /**
-     * Process an edited comment event.
-     *
-     * @param dto the updated comment DTO
-     * @return the updated comment, or null if not found
-     */
     @Transactional
-    public PullRequestReviewComment processEdited(GitHubPullRequestReviewCommentEventDTO.GitHubReviewCommentDTO dto) {
+    public PullRequestReviewComment processEdited(
+        GitHubPullRequestReviewCommentEventDTO.GitHubReviewCommentDTO dto,
+        Long prId,
+        ProcessingContext context
+    ) {
         return commentRepository
             .findById(dto.id())
             .map(comment -> {
                 comment.setBody(dto.body());
                 comment.setUpdatedAt(dto.updatedAt());
                 PullRequestReviewComment saved = commentRepository.save(comment);
+                if (context != null) {
+                    eventPublisher.publishEvent(
+                        new DomainEvent.ReviewCommentEdited(
+                            EventPayload.ReviewCommentData.from(saved),
+                            prId,
+                            Set.of("body"),
+                            EventContext.from(context)
+                        )
+                    );
+                }
                 logger.debug("Updated comment {}", dto.id());
                 return saved;
             })
@@ -112,14 +128,14 @@ public class GitHubPullRequestReviewCommentProcessor {
             });
     }
 
-    /**
-     * Process a deleted comment event.
-     *
-     * @param commentId the comment ID to delete
-     */
     @Transactional
-    public void processDeleted(Long commentId) {
+    public void processDeleted(Long commentId, Long prId, ProcessingContext context) {
         commentRepository.deleteById(commentId);
+        if (context != null) {
+            eventPublisher.publishEvent(
+                new DomainEvent.ReviewCommentDeleted(commentId, prId, EventContext.from(context))
+            );
+        }
         logger.debug("Deleted comment {}", commentId);
     }
 

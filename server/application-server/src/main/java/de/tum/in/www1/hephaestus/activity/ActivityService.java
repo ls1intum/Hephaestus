@@ -96,7 +96,13 @@ public class ActivityService {
                     .map(PullRequestBadPracticeDTO::fromPullRequestBadPractice)
                     .toList();
 
-                return PullRequestWithBadPracticesDTO.fromPullRequest(pullRequest, badPractices, oldBadPractices);
+                String summary = lastDetection != null ? lastDetection.getSummary() : "";
+                return PullRequestWithBadPracticesDTO.fromPullRequest(
+                    pullRequest,
+                    summary,
+                    badPractices,
+                    oldBadPractices
+                );
             })
             .collect(Collectors.toList());
 

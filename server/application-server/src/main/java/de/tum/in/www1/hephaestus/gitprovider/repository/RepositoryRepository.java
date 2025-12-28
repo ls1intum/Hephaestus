@@ -18,7 +18,7 @@ public interface RepositoryRepository extends JpaRepository<Repository, Long> {
         FROM Repository r
         JOIN PullRequest pr ON r.id = pr.repository.id
         WHERE pr.author.login ILIKE :contributorLogin
-            AND r.organization.workspace.id = :workspaceId
+            AND r.organization.workspaceId = :workspaceId
         ORDER BY r.name ASC
         """
     )
@@ -31,7 +31,7 @@ public interface RepositoryRepository extends JpaRepository<Repository, Long> {
         """
         SELECT r
         FROM Repository r
-        WHERE r.organization.workspace.id = :workspaceId
+        WHERE r.organization.workspaceId = :workspaceId
         ORDER BY r.name ASC
         """
     )

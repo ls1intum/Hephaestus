@@ -12,6 +12,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
+import lombok.extern.slf4j.Slf4j;
 import org.hibernate.annotations.Type;
 import org.springframework.lang.NonNull;
 
@@ -26,6 +27,7 @@ import org.springframework.lang.NonNull;
 @NoArgsConstructor
 @ToString
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
+@Slf4j
 public class ChatMessagePart {
 
     @EmbeddedId
@@ -410,11 +412,12 @@ public class ChatMessagePart {
 
             return uiPart;
         } catch (Exception e) {
-            // Log the conversion error for debugging
-            System.err.println("Failed to convert ChatMessagePart to UIMessagePart: " + e.getMessage());
-            System.err.println("Content: " + content);
-            System.err.println("Type: " + type + ", OriginalType: " + originalType);
-            e.printStackTrace();
+            log.warn(
+                "Failed to convert ChatMessagePart to UIMessagePart: type={}, originalType={}",
+                type,
+                originalType,
+                e
+            );
 
             // Create a fallback instance
             UIMessagePartsInner uiPart = new UIMessagePartsInner();

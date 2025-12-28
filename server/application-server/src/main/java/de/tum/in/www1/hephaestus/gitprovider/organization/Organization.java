@@ -1,10 +1,8 @@
 package de.tum.in.www1.hephaestus.gitprovider.organization;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.BaseGitServiceEntity;
-import de.tum.in.www1.hephaestus.workspace.Workspace;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import lombok.Getter;
@@ -43,7 +41,6 @@ public class Organization extends BaseGitServiceEntity {
     @Column(name = "installation_id")
     private Long installationId;
 
-    @OneToOne(mappedBy = "organization")
-    @ToString.Exclude
-    private Workspace workspace;
+    @Column(name = "workspace_id")
+    private Long workspaceId;
 }

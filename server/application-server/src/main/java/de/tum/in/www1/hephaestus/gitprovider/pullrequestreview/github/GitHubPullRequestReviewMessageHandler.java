@@ -68,9 +68,9 @@ public class GitHubPullRequestReviewMessageHandler extends GitHubMessageHandler<
 
         // Delegate to processor based on action
         if (event.actionType() == GitHubEventAction.PullRequestReview.DISMISSED) {
-            reviewProcessor.processDismissed(reviewDto.id());
+            reviewProcessor.processDismissed(reviewDto.id(), context);
         } else {
-            reviewProcessor.process(reviewDto, prDto.getDatabaseId());
+            reviewProcessor.process(reviewDto, prDto.getDatabaseId(), context);
         }
     }
 }

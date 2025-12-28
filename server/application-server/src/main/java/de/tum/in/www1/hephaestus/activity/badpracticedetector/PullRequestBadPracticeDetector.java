@@ -39,6 +39,25 @@ public class PullRequestBadPracticeDetector {
     private BadPracticeDetectorService detectorApi;
 
     /**
+     * Detects bad practices for a given pull request ID and syncs the results with the
+     * database. This method fetches the pull request entity from the database.
+     *
+     * @param pullRequestId The ID of the pull request to detect bad practices for.
+     * @return The detection result, or ERROR_NO_UPDATE_ON_PULLREQUEST if the PR is not found.
+     */
+    @Transactional
+    public DetectionResult detectAndSyncBadPractices(Long pullRequestId) {
+        logger.debug("Looking up pull request by ID: {}", pullRequestId);
+        return pullRequestRepository
+            .findById(pullRequestId)
+            .map(this::detectAndSyncBadPractices)
+            .orElseGet(() -> {
+                logger.warn("Pull request with ID {} not found", pullRequestId);
+                return DetectionResult.ERROR_NO_UPDATE_ON_PULLREQUEST;
+            });
+    }
+
+    /**
      * Detects bad practices for a given pull request and syncs the results with the
      * database.
      *
@@ -49,10 +68,15 @@ public class PullRequestBadPracticeDetector {
     public DetectionResult detectAndSyncBadPractices(PullRequest pullRequest) {
         logger.info("Detecting bad practices for pull request: {}", pullRequest.getId());
 
+        // Check if PR was updated since last detection by querying BadPracticeDetection
+        BadPracticeDetection lastDetection = badPracticeDetectionRepository.findMostRecentByPullRequestId(
+            pullRequest.getId()
+        );
         if (
             pullRequest.getUpdatedAt() != null &&
-            pullRequest.getLastDetectionTime() != null &&
-            pullRequest.getUpdatedAt().isBefore(pullRequest.getLastDetectionTime())
+            lastDetection != null &&
+            lastDetection.getDetectionTime() != null &&
+            pullRequest.getUpdatedAt().isBefore(lastDetection.getDetectionTime())
         ) {
             logger.info("Pull request has not been updated since last detection. Skipping detection.");
             return DetectionResult.ERROR_NO_UPDATE_ON_PULLREQUEST;
@@ -109,9 +133,8 @@ public class PullRequestBadPracticeDetector {
 
         DetectorResponse detectorResponse = detectorApi.detectDetectorPost(detectorRequest);
 
-        pullRequest.setLastDetectionTime(Instant.now());
-        pullRequest.setBadPracticeSummary(detectorResponse.getBadPracticeSummary());
-        pullRequestRepository.save(pullRequest);
+        // Note: Detection metadata (summary, timestamp) is stored in BadPracticeDetection,
+        // not on the PullRequest entity itself, to keep gitprovider entities clean.
 
         List<PullRequestBadPractice> detectedBadPractices = detectorResponse
             .getBadPractices()

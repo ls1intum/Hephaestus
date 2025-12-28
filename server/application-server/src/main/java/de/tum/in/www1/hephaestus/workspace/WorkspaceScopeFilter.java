@@ -1,7 +1,6 @@
-package de.tum.in.www1.hephaestus.monitoring;
+package de.tum.in.www1.hephaestus.workspace;
 
-import de.tum.in.www1.hephaestus.workspace.RepositoryToMonitor;
-import de.tum.in.www1.hephaestus.workspace.Workspace;
+import de.tum.in.www1.hephaestus.monitoring.MonitoringFilterProperties;
 import jakarta.annotation.PostConstruct;
 import java.util.Collections;
 import java.util.Locale;
@@ -12,7 +11,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 /**
- * Filters which workspaces and repositories are actively monitored.
+ * Filters which workspaces and repositories are actively monitored/synced.
  * <p>
  * <strong>Purpose:</strong> In development, you don't want to sync hundreds of repositories
  * from every GitHub App installation. This filter lets you focus on specific orgs/repos
@@ -28,14 +27,14 @@ import org.springframework.stereotype.Component;
  * @see MonitoringFilterProperties
  */
 @Component
-public class MonitoringScopeFilter {
+public class WorkspaceScopeFilter {
 
-    private static final Logger logger = LoggerFactory.getLogger(MonitoringScopeFilter.class);
+    private static final Logger logger = LoggerFactory.getLogger(WorkspaceScopeFilter.class);
 
     private final Set<String> allowedOrganizations;
     private final Set<String> allowedRepositories;
 
-    public MonitoringScopeFilter(MonitoringFilterProperties properties) {
+    public WorkspaceScopeFilter(MonitoringFilterProperties properties) {
         this.allowedOrganizations = normalizeSet(properties.getAllowedOrganizations());
         this.allowedRepositories = normalizeSet(properties.getAllowedRepositories());
     }
@@ -44,12 +43,12 @@ public class MonitoringScopeFilter {
     void logConfiguration() {
         if (isActive()) {
             logger.info(
-                "Monitoring scope filter ACTIVE: allowed-organizations={}, allowed-repositories={}",
+                "Workspace scope filter ACTIVE: allowed-organizations={}, allowed-repositories={}",
                 allowedOrganizations,
                 allowedRepositories
             );
         } else {
-            logger.info("Monitoring scope filter INACTIVE: all workspaces and repositories will be synced.");
+            logger.info("Workspace scope filter INACTIVE: all workspaces and repositories will be synced.");
         }
     }
 
@@ -61,6 +60,25 @@ public class MonitoringScopeFilter {
             return false;
         }
         return allowedOrganizations.isEmpty() || allowedOrganizations.contains(normalize(workspace.getAccountLogin()));
+    }
+
+    /**
+     * Check if a workspace is allowed by its ID.
+     * When only workspace ID is available and no org filter is active, returns true.
+     * This is used by gitprovider services that don't have direct access to Workspace entities.
+     *
+     * @param workspaceId the workspace ID
+     * @return true if allowed (or if org filter is not active)
+     */
+    public boolean isWorkspaceAllowed(Long workspaceId) {
+        // If no org filter is configured, all workspaces are allowed
+        if (allowedOrganizations.isEmpty()) {
+            return true;
+        }
+        // With only workspaceId, we can't check org - caller must ensure appropriate filtering
+        // This is a fallback for when workspace entity is not available
+        // In practice, the scheduler (which has workspace access) does org-level filtering
+        return workspaceId != null;
     }
 
     public boolean isRepositoryAllowed(RepositoryToMonitor repository) {

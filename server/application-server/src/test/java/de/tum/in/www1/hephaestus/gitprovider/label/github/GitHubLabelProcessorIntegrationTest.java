@@ -3,7 +3,7 @@ package de.tum.in.www1.hephaestus.gitprovider.label.github;
 import static org.assertj.core.api.Assertions.*;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
-import de.tum.in.www1.hephaestus.gitprovider.common.events.EntityEvents;
+import de.tum.in.www1.hephaestus.gitprovider.common.events.DomainEvent;
 import de.tum.in.www1.hephaestus.gitprovider.label.Label;
 import de.tum.in.www1.hephaestus.gitprovider.label.LabelRepository;
 import de.tum.in.www1.hephaestus.gitprovider.label.github.dto.GitHubLabelDTO;
@@ -123,7 +123,7 @@ class GitHubLabelProcessorIntegrationTest extends BaseIntegrationTest {
     class ProcessMethod {
 
         @Test
-        @DisplayName("Should create new label and publish LabelProcessed event with isNew=true")
+        @DisplayName("Should create new label and publish LabelCreated event")
         void shouldCreateNewLabelAndPublishEvent() {
             // Given
             Long labelId = 111222333L;
@@ -149,20 +149,20 @@ class GitHubLabelProcessorIntegrationTest extends BaseIntegrationTest {
             // Verify persisted
             assertThat(labelRepository.findById(labelId)).isPresent();
 
-            // Verify event published
-            assertThat(eventListener.getProcessedEvents())
+            // Verify LabelCreated event published
+            assertThat(eventListener.getCreatedEvents())
                 .hasSize(1)
                 .first()
                 .satisfies(event -> {
-                    assertThat(event.isNew()).isTrue();
-                    assertThat(event.label().getId()).isEqualTo(labelId);
+                    assertThat(event.label().id()).isEqualTo(labelId);
                     assertThat(event.workspaceId()).isEqualTo(testWorkspace.getId());
                     assertThat(event.repositoryId()).isEqualTo(TEST_REPO_ID);
                 });
+            assertThat(eventListener.getUpdatedEvents()).isEmpty();
         }
 
         @Test
-        @DisplayName("Should update existing label and publish LabelProcessed event with isNew=false")
+        @DisplayName("Should update existing label and publish LabelUpdated event")
         void shouldUpdateExistingLabelAndPublishEvent() {
             // Given - create existing label
             Long labelId = 444555666L;
@@ -192,14 +192,14 @@ class GitHubLabelProcessorIntegrationTest extends BaseIntegrationTest {
             assertThat(result.getColor()).isEqualTo("ff0000");
             assertThat(result.getDescription()).isEqualTo("Updated description");
 
-            // Verify event published with isNew=false
-            assertThat(eventListener.getProcessedEvents())
+            // Verify LabelUpdated event published
+            assertThat(eventListener.getUpdatedEvents())
                 .hasSize(1)
                 .first()
                 .satisfies(event -> {
-                    assertThat(event.isNew()).isFalse();
-                    assertThat(event.label().getName()).isEqualTo("updated-name");
+                    assertThat(event.label().name()).isEqualTo("updated-name");
                 });
+            assertThat(eventListener.getCreatedEvents()).isEmpty();
         }
 
         @Test
@@ -210,7 +210,8 @@ class GitHubLabelProcessorIntegrationTest extends BaseIntegrationTest {
 
             // Then
             assertThat(result).isNull();
-            assertThat(eventListener.getProcessedEvents()).isEmpty();
+            assertThat(eventListener.getCreatedEvents()).isEmpty();
+            assertThat(eventListener.getUpdatedEvents()).isEmpty();
         }
 
         @Test
@@ -233,7 +234,7 @@ class GitHubLabelProcessorIntegrationTest extends BaseIntegrationTest {
             assertThat(result.getId()).isNotNull();
             assertThat(result.getId()).isNegative(); // Generated IDs are negative to avoid collision
             assertThat(result.getName()).isEqualTo("graphql-synced-label");
-            assertThat(eventListener.getProcessedEvents()).hasSize(1);
+            assertThat(eventListener.getCreatedEvents()).hasSize(1);
         }
 
         @Test
@@ -308,13 +309,10 @@ class GitHubLabelProcessorIntegrationTest extends BaseIntegrationTest {
             eventListener.clear();
             processor.process(dto, testRepository, createContext());
 
-            // Then - only one label exists, second event has isNew=false
+            // Then - only one label exists, second time emits LabelUpdated (not Created)
             assertThat(labelRepository.count()).isEqualTo(1);
-            assertThat(eventListener.getProcessedEvents())
-                .hasSize(1)
-                .first()
-                .extracting(EntityEvents.LabelProcessed::isNew)
-                .isEqualTo(false);
+            assertThat(eventListener.getUpdatedEvents()).hasSize(1);
+            assertThat(eventListener.getCreatedEvents()).isEmpty();
         }
     }
 
@@ -386,29 +384,40 @@ class GitHubLabelProcessorIntegrationTest extends BaseIntegrationTest {
     @Component
     static class TestLabelEventListener {
 
-        private final List<EntityEvents.LabelProcessed> processedEvents = new ArrayList<>();
-        private final List<EntityEvents.LabelDeleted> deletedEvents = new ArrayList<>();
+        private final List<DomainEvent.LabelCreated> createdEvents = new ArrayList<>();
+        private final List<DomainEvent.LabelUpdated> updatedEvents = new ArrayList<>();
+        private final List<DomainEvent.LabelDeleted> deletedEvents = new ArrayList<>();
 
         @EventListener
-        public void onLabelProcessed(EntityEvents.LabelProcessed event) {
-            processedEvents.add(event);
+        public void onLabelCreated(DomainEvent.LabelCreated event) {
+            createdEvents.add(event);
         }
 
         @EventListener
-        public void onLabelDeleted(EntityEvents.LabelDeleted event) {
+        public void onLabelUpdated(DomainEvent.LabelUpdated event) {
+            updatedEvents.add(event);
+        }
+
+        @EventListener
+        public void onLabelDeleted(DomainEvent.LabelDeleted event) {
             deletedEvents.add(event);
         }
 
-        public List<EntityEvents.LabelProcessed> getProcessedEvents() {
-            return new ArrayList<>(processedEvents);
+        public List<DomainEvent.LabelCreated> getCreatedEvents() {
+            return new ArrayList<>(createdEvents);
         }
 
-        public List<EntityEvents.LabelDeleted> getDeletedEvents() {
+        public List<DomainEvent.LabelUpdated> getUpdatedEvents() {
+            return new ArrayList<>(updatedEvents);
+        }
+
+        public List<DomainEvent.LabelDeleted> getDeletedEvents() {
             return new ArrayList<>(deletedEvents);
         }
 
         public void clear() {
-            processedEvents.clear();
+            createdEvents.clear();
+            updatedEvents.clear();
             deletedEvents.clear();
         }
     }

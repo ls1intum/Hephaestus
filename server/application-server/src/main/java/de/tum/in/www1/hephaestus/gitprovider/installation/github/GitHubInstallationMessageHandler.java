@@ -2,15 +2,16 @@ package de.tum.in.www1.hephaestus.gitprovider.installation.github;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventAction;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
+import de.tum.in.www1.hephaestus.gitprovider.common.spi.WorkspaceProvisioningListener;
+import de.tum.in.www1.hephaestus.gitprovider.common.spi.WorkspaceProvisioningListener.AccountType;
+import de.tum.in.www1.hephaestus.gitprovider.common.spi.WorkspaceProvisioningListener.InstallationData;
 import de.tum.in.www1.hephaestus.gitprovider.installation.github.dto.GitHubInstallationEventDTO;
 import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationService;
-import de.tum.in.www1.hephaestus.workspace.RepositorySelection;
-import de.tum.in.www1.hephaestus.workspace.Workspace;
-import de.tum.in.www1.hephaestus.workspace.WorkspaceService;
+import java.util.Collections;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Handles GitHub installation webhook events and provisions workspaces.
@@ -20,12 +21,15 @@ public class GitHubInstallationMessageHandler extends GitHubMessageHandler<GitHu
 
     private static final Logger logger = LoggerFactory.getLogger(GitHubInstallationMessageHandler.class);
 
-    private final WorkspaceService workspaceService;
+    private final WorkspaceProvisioningListener provisioningListener;
     private final OrganizationService organizationService;
 
-    GitHubInstallationMessageHandler(@Lazy WorkspaceService workspaceService, OrganizationService organizationService) {
+    GitHubInstallationMessageHandler(
+        WorkspaceProvisioningListener provisioningListener,
+        OrganizationService organizationService
+    ) {
         super(GitHubInstallationEventDTO.class);
-        this.workspaceService = workspaceService;
+        this.provisioningListener = provisioningListener;
         this.organizationService = organizationService;
     }
 
@@ -40,6 +44,7 @@ public class GitHubInstallationMessageHandler extends GitHubMessageHandler<GitHu
     }
 
     @Override
+    @Transactional
     protected void handleEvent(GitHubInstallationEventDTO event) {
         var installation = event.installation();
 
@@ -64,20 +69,25 @@ public class GitHubInstallationMessageHandler extends GitHubMessageHandler<GitHu
         // Handle deletion early - no workspace provisioning needed
         if (action == GitHubEventAction.Installation.DELETED) {
             logger.info("App uninstalled from account: {}", accountLogin);
-            // Future: Handle workspace cleanup
+            provisioningListener.onInstallationDeleted(installationId);
             return;
         }
 
-        // Provision or update workspace
-        RepositorySelection selection = parseRepositorySelection(installation.repositorySelection());
-        Workspace workspace = workspaceService.ensureForInstallation(installationId, accountLogin, selection);
+        // Build installation data for workspace provisioning
+        String repositorySelection = installation.repositorySelection();
+        String avatarUrl = account != null ? account.avatarUrl() : null;
+        AccountType accountType = account != null ? AccountType.fromGitHubType(account.type()) : AccountType.USER;
 
-        if (workspace == null) {
-            logger.info("Skipping installation event for {}: workspace could not be ensured", installationId);
-            return;
-        }
+        InstallationData installationData = new InstallationData(
+            installationId,
+            accountLogin,
+            accountType,
+            avatarUrl,
+            Collections.emptyList() // Repository names are handled separately via repository events
+        );
 
-        workspaceService.updateRepositorySelection(installationId, selection);
+        provisioningListener.onInstallationCreated(installationData);
+        provisioningListener.onRepositorySelectionChanged(installationId, repositorySelection);
 
         // Link organization to installation if applicable
         if (account != null && "Organization".equalsIgnoreCase(account.type())) {
@@ -86,22 +96,9 @@ public class GitHubInstallationMessageHandler extends GitHubMessageHandler<GitHu
 
         // Handle status changes
         switch (action) {
-            case SUSPEND -> workspaceService.updateStatusForInstallation(
-                installationId,
-                Workspace.WorkspaceStatus.SUSPENDED
-            );
-            case UNSUSPEND, CREATED -> workspaceService.updateStatusForInstallation(
-                installationId,
-                Workspace.WorkspaceStatus.ACTIVE
-            );
+            case SUSPEND -> provisioningListener.onInstallationSuspended(installationId);
+            case UNSUSPEND, CREATED -> provisioningListener.onInstallationActivated(installationId);
             default -> logger.debug("Unhandled installation action: {}", event.action());
         }
-    }
-
-    private RepositorySelection parseRepositorySelection(String selection) {
-        if ("all".equalsIgnoreCase(selection)) {
-            return RepositorySelection.ALL;
-        }
-        return RepositorySelection.SELECTED;
     }
 }

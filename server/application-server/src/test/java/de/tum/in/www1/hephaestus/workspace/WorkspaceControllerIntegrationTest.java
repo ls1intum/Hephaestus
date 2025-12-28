@@ -269,8 +269,7 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
     @WithAdminUser
     void resetLeagueEndpointRequiresExistingWorkspaceAndResetsPoints() {
         User user = persistUser("league-user");
-        user.setLeaguePoints(1_500);
-        userRepository.save(user);
+        // Note: leaguePoints is on WorkspaceMembership, not User
 
         Workspace workspace = createWorkspace("league-space", "League", "league", AccountType.ORG, user);
         ensureAdminMembership(workspace);
