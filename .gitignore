@@ -191,12 +191,5 @@ tmp
 .beads/bd.pipe
 .beads/.exclusive-lock
 
-# OpenCode agent worktrees (isolated development environments)
-.worktrees/
-
-# OpenCode local config
-.opencode/node_modules/
-.opencode/bun.lock
-
 # Research directory (local only)
 .research/

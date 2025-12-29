@@ -1,17 +1,1 @@
-{
-  "$schema": "https://opencode.ai/config.json",
-  "instructions": ["AGENTS.md"],
-  "default_agent": "architect",
-  "permission": {
-    "bash": "allow",
-    "edit": "allow",
-    "doom_loop": "ask",
-    "external_directory": "ask"
-  },
-  "tools": {
-    "worktree-list": true,
-    "worktree-create": true,
-    "worktree-remove": true,
-    "pr-status": true
-  }
-}
+{"$schema": "https://opencode.ai/config.json", "instructions": ["AGENTS.md"]}
