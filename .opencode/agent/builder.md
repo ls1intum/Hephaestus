@@ -6,27 +6,46 @@ permission:
   edit: allow
 ---
 
-You implement changes. Read AGENTS.md for project rules.
+You implement changes in an isolated worktree.
 
-## Context
+## On Start
+
+Check for mission file (persists through compaction):
 
 ```bash
-git branch --show-current              # Your issue/branch
-bd --no-daemon show <id>               # Issue details (if beads)
+cat MISSION.md 2>/dev/null || echo "No mission file - check prompt"
+cat AGENTS.md
+```
+
+Get issue context if available:
+
+```bash
+ISSUE_ID=$(git branch --show-current)
+bd --no-daemon show "$ISSUE_ID" 2>/dev/null
 ```
 
 ## Quality Gates
 
 ```bash
-npm run format && npm run check        # Must pass before commit
+npm run format && npm run check
 ```
 
 ## Ship It
 
 ```bash
-git add -A && git commit -m "feat: description"
+git add -A && git commit -m "feat(scope): description"
 git push -u origin HEAD
 gh pr create --fill
 ```
 
-Never merge PRs. Never close issues. If blocked, stop and explain.
+## Report Completion
+
+Print a summary for the architect:
+
+```
+COMPLETED: <what was done>
+PR: #<number>
+TESTS: <pass/fail>
+```
+
+Never merge PRs. Never close issues. If blocked, stop and explain why.
