@@ -1,8 +1,10 @@
 package de.tum.in.www1.hephaestus.workspace;
 
 import de.tum.in.www1.hephaestus.core.LoggingUtils;
+import de.tum.in.www1.hephaestus.gitprovider.common.spi.WorkspaceProvisioningListener;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.gitprovider.sync.NatsConsumerService;
+import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import java.time.Instant;
 import java.util.Locale;
@@ -76,6 +78,45 @@ public class WorkspaceInstallationService {
         String accountLogin,
         RepositorySelection repositorySelection
     ) {
+        // Delegate to full method with null account info (backward compat)
+        return createOrUpdateFromInstallation(
+            installationId,
+            null, // accountId
+            accountLogin,
+            WorkspaceProvisioningListener.AccountType.ORGANIZATION, // default
+            null, // avatarUrl
+            repositorySelection
+        );
+    }
+
+    /**
+     * Creates or updates a workspace from a GitHub App installation with full account info.
+     * <p>
+     * This method handles several scenarios:
+     * <ul>
+     *   <li>If a workspace already exists for the installation ID, it updates the workspace</li>
+     *   <li>If a PAT workspace exists for the account without a token, it promotes it to GitHub App mode</li>
+     *   <li>If a PAT workspace exists with a stored token, it skips linking to preserve the PAT configuration</li>
+     *   <li>If no workspace exists, it creates a new one</li>
+     * </ul>
+     *
+     * @param installationId      the GitHub App installation ID
+     * @param accountId           the GitHub account database ID
+     * @param accountLogin        the GitHub account login (organization or user)
+     * @param accountType         the account type (USER or ORGANIZATION)
+     * @param avatarUrl           the account's avatar URL
+     * @param repositorySelection the repository selection mode (ALL or SELECTED)
+     * @return the created or updated workspace, or null if workspace creation was skipped
+     */
+    @Transactional
+    public Workspace createOrUpdateFromInstallation(
+        long installationId,
+        Long accountId,
+        String accountLogin,
+        WorkspaceProvisioningListener.AccountType accountType,
+        String avatarUrl,
+        RepositorySelection repositorySelection
+    ) {
         // First check if an installation-backed workspace already exists for this
         // installation ID
         Workspace workspace = workspaceRepository.findByInstallationId(installationId).orElse(null);
@@ -127,7 +168,13 @@ public class WorkspaceInstallationService {
                 );
             }
 
-            Long ownerUserId = syncGitHubUserForOwnership(installationId, accountLogin);
+            Long ownerUserId = syncGitHubUserForOwnership(
+                installationId,
+                accountId,
+                accountLogin,
+                accountType,
+                avatarUrl
+            );
 
             if (ownerUserId == null) {
                 // Cannot sync the owner user - likely an old/deleted installation
@@ -139,6 +186,10 @@ public class WorkspaceInstallationService {
                 );
                 return null;
             }
+
+            AccountType wsAccountType = accountType == WorkspaceProvisioningListener.AccountType.ORGANIZATION
+                ? AccountType.ORG
+                : AccountType.USER;
 
             String desiredSlug = workspaceSlugService.normalize(accountLogin);
             String availableSlug = workspaceSlugService.allocate(
@@ -152,7 +203,7 @@ public class WorkspaceInstallationService {
             // would leak or
             // hijack that workspace. Instead, callers must surface the allocated slug to
             // the user.
-            workspace = createWorkspace(availableSlug, accountLogin, accountLogin, AccountType.ORG, ownerUserId);
+            workspace = createWorkspace(availableSlug, accountLogin, accountLogin, wsAccountType, ownerUserId);
             logger.info(
                 "Created new workspace '{}' for installation {} with owner userId={} (requested slug='{}').",
                 LoggingUtils.sanitizeForLog(workspace.getWorkspaceSlug()),
@@ -393,13 +444,25 @@ public class WorkspaceInstallationService {
 
     /**
      * Looks up or creates a user for workspace ownership assignment.
-     * TODO: Implement user sync via GraphQL API when available.
-     * Currently falls back to checking existing users in the database.
-     * Returns null if the user doesn't exist locally.
+     * <p>
+     * If the user doesn't exist in the database but we have account info from the
+     * installation webhook, we create the user entity directly.
+     *
+     * @param installationId the GitHub App installation ID
+     * @param accountId      the GitHub account database ID
+     * @param accountLogin   the GitHub account login
+     * @param accountType    the account type (USER or ORGANIZATION)
+     * @param avatarUrl      the account's avatar URL
+     * @return the user ID, or null if user could not be created
      */
-    private Long syncGitHubUserForOwnership(long installationId, String accountLogin) {
-        // TODO: User sync via GraphQL not yet implemented
-        // For now, just look up existing users in the database
+    private Long syncGitHubUserForOwnership(
+        long installationId,
+        Long accountId,
+        String accountLogin,
+        WorkspaceProvisioningListener.AccountType accountType,
+        String avatarUrl
+    ) {
+        // First check if user already exists
         var existingUser = userRepository.findByLogin(accountLogin);
         if (existingUser.isPresent()) {
             logger.info(
@@ -410,8 +473,33 @@ public class WorkspaceInstallationService {
             return existingUser.get().getId();
         }
 
+        // If we have the account ID, we can create the user directly from webhook data
+        if (accountId != null) {
+            User user = new User();
+            user.setId(accountId);
+            user.setLogin(accountLogin);
+            user.setName(accountLogin); // Use login as fallback name
+            user.setAvatarUrl(avatarUrl != null ? avatarUrl : "");
+            user.setHtmlUrl("https://github.com/" + accountLogin);
+            user.setType(
+                accountType == WorkspaceProvisioningListener.AccountType.ORGANIZATION
+                    ? User.Type.ORGANIZATION
+                    : User.Type.USER
+            );
+
+            User saved = userRepository.save(user);
+            logger.info(
+                "Created user '{}' (id={}, type={}) for workspace ownership from installation {}.",
+                LoggingUtils.sanitizeForLog(accountLogin),
+                saved.getId(),
+                saved.getType(),
+                installationId
+            );
+            return saved.getId();
+        }
+
         logger.warn(
-            "User '{}' not found in database for installation {}. User sync via GraphQL pending implementation.",
+            "Cannot create user '{}' for installation {}: missing account ID from webhook.",
             LoggingUtils.sanitizeForLog(accountLogin),
             installationId
         );

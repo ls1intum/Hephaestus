@@ -8,6 +8,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Service;
+import org.springframework.web.reactive.function.client.ExchangeStrategies;
 import org.springframework.web.reactive.function.client.WebClient;
 
 /**
@@ -19,16 +20,23 @@ public class GitHubInstallationRepositoryEnumerationService {
 
     private static final Logger logger = LoggerFactory.getLogger(GitHubInstallationRepositoryEnumerationService.class);
     private static final String GITHUB_API_BASE_URL = "https://api.github.com";
+    private static final int MAX_BUFFER_SIZE = 16 * 1024 * 1024; // 16MB for large repo lists
 
     private final GitHubAppTokenService gitHubAppTokenService;
     private final WebClient webClient;
 
     public GitHubInstallationRepositoryEnumerationService(GitHubAppTokenService gitHubAppTokenService) {
         this.gitHubAppTokenService = gitHubAppTokenService;
+
+        ExchangeStrategies strategies = ExchangeStrategies.builder()
+            .codecs(config -> config.defaultCodecs().maxInMemorySize(MAX_BUFFER_SIZE))
+            .build();
+
         this.webClient = WebClient.builder()
             .baseUrl(GITHUB_API_BASE_URL)
             .defaultHeader(HttpHeaders.ACCEPT, "application/vnd.github+json")
             .defaultHeader("X-GitHub-Api-Version", "2022-11-28")
+            .exchangeStrategies(strategies)
             .build();
     }
 

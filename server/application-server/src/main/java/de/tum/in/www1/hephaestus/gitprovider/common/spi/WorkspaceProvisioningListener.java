@@ -24,6 +24,7 @@ public interface WorkspaceProvisioningListener {
 
     record InstallationData(
         Long installationId,
+        Long accountId,
         String accountLogin,
         AccountType accountType,
         String avatarUrl,

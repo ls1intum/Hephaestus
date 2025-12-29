@@ -78,10 +78,12 @@ public class GitHubInstallationMessageHandler extends GitHubMessageHandler<GitHu
         // Build installation data for workspace provisioning
         String repositorySelection = installation.repositorySelection();
         String avatarUrl = account != null ? account.avatarUrl() : null;
+        Long accountId = account != null ? account.id() : null;
         AccountType accountType = account != null ? AccountType.fromGitHubType(account.type()) : AccountType.USER;
 
         InstallationData installationData = new InstallationData(
             installationId,
+            accountId,
             accountLogin,
             accountType,
             avatarUrl,

@@ -297,4 +297,12 @@
         </createIndex>
     </changeSet>
 
+    <!-- Fix repository.description column type to TEXT for long descriptions -->
+    <changeSet id="1766231004215_fix_repository_description_type" author="FelixTJDietrich">
+        <comment>Change repository.description from VARCHAR(255) to TEXT to support long descriptions</comment>
+        <sql>
+            ALTER TABLE repository ALTER COLUMN description TYPE TEXT;
+        </sql>
+    </changeSet>
+
 </databaseChangeLog>

@@ -2,6 +2,7 @@ package de.tum.in.www1.hephaestus.workspace;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.app.GitHubAppTokenService;
+import de.tum.in.www1.hephaestus.gitprovider.common.spi.WorkspaceProvisioningListener;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceMembership.WorkspaceRole;
@@ -296,9 +297,17 @@ public class WorkspaceProvisioningService {
 
         logger.info("Ensuring installation={} for org={} (selection={}).", installationId, login, selection);
 
+        var account = installation.account();
+        WorkspaceProvisioningListener.AccountType wsAccountType = "Organization".equalsIgnoreCase(accountType)
+            ? WorkspaceProvisioningListener.AccountType.ORGANIZATION
+            : WorkspaceProvisioningListener.AccountType.USER;
+
         Workspace workspace = workspaceInstallationService.createOrUpdateFromInstallation(
             installationId,
+            account.id(),
             login,
+            wsAccountType,
+            account.avatarUrl(),
             selection
         );
 
@@ -359,5 +368,5 @@ public class WorkspaceProvisioningService {
         @JsonProperty("repository_selection") String repositorySelection
     ) {}
 
-    private record AccountDto(String login, String type) {}
+    private record AccountDto(Long id, String login, String type, @JsonProperty("avatar_url") String avatarUrl) {}
 }

@@ -30,7 +30,10 @@ public class WorkspaceProvisioningAdapter implements WorkspaceProvisioningListen
         RepositorySelection selection = RepositorySelection.SELECTED; // Default selection
         Workspace workspace = workspaceInstallationService.createOrUpdateFromInstallation(
             installation.installationId(),
+            installation.accountId(),
             installation.accountLogin(),
+            installation.accountType(),
+            installation.avatarUrl(),
             selection
         );
 
