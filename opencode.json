@@ -9,9 +9,9 @@
     "external_directory": "ask"
   },
   "tools": {
-    "worktree_list": true,
-    "worktree_create": true,
-    "worktree_remove": true,
-    "pr_status": true
+    "worktree-list": true,
+    "worktree-create": true,
+    "worktree-remove": true,
+    "pr-status": true
   }
 }

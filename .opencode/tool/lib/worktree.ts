@@ -82,7 +82,7 @@ export function removeWorktree(path: string): string {
   }
 }
 
-// CLI runner
+// CLI runner for standalone testing
 if (
   import.meta.url === `file://${process.argv[1]}` ||
   process.argv[1]?.endsWith("worktree.ts")
@@ -116,55 +116,3 @@ if (
       console.log("  remove <path>     - Remove worktree");
   }
 }
-
-// OpenCode plugin exports (only if @opencode-ai/plugin is available)
-type ToolFn = typeof import("@opencode-ai/plugin").tool;
-let tool: ToolFn | undefined;
-
-try {
-  const plugin = await import("@opencode-ai/plugin");
-  tool = plugin.tool;
-} catch {
-  // Plugin not available, skip tool registration
-}
-
-/** Tool to list all active git worktrees in .worktrees/ directory */
-export const worktree_list = tool
-  ? tool({
-      description: "List all active git worktrees in .worktrees/ directory",
-      args: {},
-      async execute() {
-        return listWorktrees();
-      },
-    })
-  : undefined;
-
-/** Tool to create a new git worktree for isolated development */
-export const worktree_create = tool
-  ? tool({
-      description: "Create a new git worktree for isolated development",
-      args: {
-        branch: tool.schema.string().describe("Branch name to create"),
-        base: tool.schema
-          .string()
-          .optional()
-          .describe("Base branch (default: main)"),
-      },
-      async execute({ branch, base }: { branch: string; base?: string }) {
-        return createWorktree(branch, base);
-      },
-    })
-  : undefined;
-
-/** Tool to remove a git worktree */
-export const worktree_remove = tool
-  ? tool({
-      description: "Remove a git worktree",
-      args: {
-        path: tool.schema.string().describe("Path to the worktree"),
-      },
-      async execute({ path }: { path: string }) {
-        return removeWorktree(path);
-      },
-    })
-  : undefined;
