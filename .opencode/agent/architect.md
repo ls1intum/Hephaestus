@@ -57,15 +57,16 @@ Before creating builders:
 ## Create Builder
 
 ```bash
-ID=<branch-name>
+BRANCH=<branch-name>  # e.g., feat/my-feature or heph-123
+SAFE_ID=$(echo "$BRANCH" | tr '/' '-')  # feat/my-feature → feat-my-feature
 git fetch origin main && git checkout main && git pull
-git worktree add "../Hephaestus_$ID" -b "$ID"
+git worktree add "../Hephaestus_$SAFE_ID" -b "$BRANCH"
 ```
 
 ## Write MISSION.md
 
 ```bash
-cat > "../Hephaestus_$ID/MISSION.md" << 'EOF'
+cat > "../Hephaestus_$SAFE_ID/MISSION.md" << 'EOF'
 # Mission: <title>
 
 ## Objective
@@ -89,7 +90,7 @@ EOF
 ## Dispatch (New Session)
 
 ```bash
-cd "../Hephaestus_$ID"
+cd "../Hephaestus_$SAFE_ID"
 opencode run --agent builder "Execute mission. A+ quality." 2>&1 | tee /tmp/builder.log &
 # Extract session ID when available
 sleep 5 && grep -o 'session_[a-zA-Z0-9]*' /tmp/builder.log | head -1 > .builder-session
@@ -98,7 +99,7 @@ sleep 5 && grep -o 'session_[a-zA-Z0-9]*' /tmp/builder.log | head -1 > .builder-
 ## Continue Existing Session
 
 ```bash
-cd "../Hephaestus_$ID"
+cd "../Hephaestus_$SAFE_ID"
 opencode run --session "$(cat .builder-session)" "Your message"
 ```
 
