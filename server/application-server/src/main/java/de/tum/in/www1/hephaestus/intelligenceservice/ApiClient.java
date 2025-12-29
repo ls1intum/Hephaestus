@@ -58,7 +58,6 @@ import java.time.OffsetDateTime;
 
 import de.tum.in.www1.hephaestus.intelligenceservice.auth.Authentication;
 
-@SuppressWarnings("all")
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
 public class ApiClient extends JavaTimeFormatter {
     public enum CollectionFormat {
