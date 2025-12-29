@@ -57,7 +57,10 @@ class GitHubInstallationRepositoriesMessageHandlerIntegrationTest extends BaseIn
         );
 
         var added = payload.getRepositoriesAdded();
-        var names = added.stream().map(r -> r.getFullName()).toList();
+        var names = added
+            .stream()
+            .map(r -> r.getFullName())
+            .toList();
         names.forEach(n -> assertThat(repositoryRepository.findByNameWithOwner(n)).isEmpty());
         assertThat(repositoryToMonitorRepository.findByWorkspaceId(workspace.getId())).isEmpty();
 

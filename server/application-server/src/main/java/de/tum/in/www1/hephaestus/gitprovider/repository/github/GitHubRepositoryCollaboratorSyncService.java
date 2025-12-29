@@ -59,7 +59,8 @@ public class GitHubRepositoryCollaboratorSyncService {
 
         List<RepositoryCollaborator> existingCollaborators = collaboratorRepository.findByRepository_Id(repositoryId);
         Map<Long, RepositoryCollaborator> existingByUserId = new HashMap<>(existingCollaborators.size());
-        existingCollaborators.forEach(collaborator -> existingByUserId.put(collaborator.getUser().getId(), collaborator)
+        existingCollaborators.forEach(collaborator ->
+            existingByUserId.put(collaborator.getUser().getId(), collaborator)
         );
 
         Set<Long> seenUserIds = new HashSet<>();

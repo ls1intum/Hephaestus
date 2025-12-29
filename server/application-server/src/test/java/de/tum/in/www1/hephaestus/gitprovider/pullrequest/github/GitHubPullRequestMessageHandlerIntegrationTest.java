@@ -55,9 +55,8 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
     }
 
     @Test
-    void shouldPersistPullRequestOnOpenedEvent(
-        @GitHubPayload("pull_request.opened") GHEventPayload.PullRequest payload
-    ) throws Exception {
+    void shouldPersistPullRequestOnOpenedEvent(@GitHubPayload("pull_request.opened") GHEventPayload.PullRequest payload)
+        throws Exception {
         handler.handleEvent(payload);
 
         PullRequest pullRequest = getPullRequest(payload);
@@ -103,7 +102,12 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
         handler.handleEvent(assigned);
         PullRequest withAssignee = getPullRequest(assigned);
         assertThat(userLogins(withAssignee.getAssignees())).containsExactlyInAnyOrder(
-            assigned.getPullRequest().getAssignees().stream().map(user -> user.getLogin()).toArray(String[]::new)
+            assigned
+                .getPullRequest()
+                .getAssignees()
+                .stream()
+                .map(user -> user.getLogin())
+                .toArray(String[]::new)
         );
 
         handler.handleEvent(unassigned);

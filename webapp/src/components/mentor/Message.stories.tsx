@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { fn } from "@storybook/test";
+import { fn } from "storybook/test";
 import type { Document } from "@/api/types.gen";
 import type { ChatMessage } from "@/lib/types";
 import { PreviewMessage, ThinkingMessage } from "./Message";

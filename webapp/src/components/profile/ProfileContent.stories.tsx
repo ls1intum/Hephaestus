@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { fn } from "@storybook/test";
 import { endOfISOWeek, formatISO, startOfISOWeek, subDays } from "date-fns";
+import { fn } from "storybook/test";
 import { ProfileContent } from "./ProfileContent";
 
 const now = new Date();

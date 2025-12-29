@@ -113,7 +113,7 @@ class ArchitectureTest {
             .haveSimpleName("WorkspaceRepository")
             .because(
                 "Use WorkspaceContextHolder.getContext() instead of direct workspace repository access. " +
-                "Only workspace context resolver and workspace service packages may access WorkspaceRepository directly."
+                    "Only workspace context resolver and workspace service packages may access WorkspaceRepository directly."
             )
             .allowEmptyShould(true)
             .check(applicationClasses);

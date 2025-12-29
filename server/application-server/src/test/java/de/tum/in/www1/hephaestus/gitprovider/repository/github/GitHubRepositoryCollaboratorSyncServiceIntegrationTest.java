@@ -120,8 +120,10 @@ class GitHubRepositoryCollaboratorSyncServiceIntegrationTest extends BaseIntegra
                 ? Collections.emptyList()
                 : Collections.singletonList(snapshot.toArray(GHUser[]::new));
             try {
-                Constructor<?> constructor =
-                    PagedIterator.class.getDeclaredConstructor(Iterator.class, java.util.function.Consumer.class);
+                Constructor<?> constructor = PagedIterator.class.getDeclaredConstructor(
+                    Iterator.class,
+                    java.util.function.Consumer.class
+                );
                 constructor.setAccessible(true);
                 @SuppressWarnings("unchecked")
                 PagedIterator<GHUser> iterator = (PagedIterator<GHUser>) constructor.newInstance(

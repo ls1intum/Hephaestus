@@ -1,6 +1,6 @@
 // Cleaned up duplicate content; single coherent story below
 import type { Meta, StoryObj } from "@storybook/react";
-import { fn } from "@storybook/test";
+import { fn } from "storybook/test";
 import type { TeamInfo } from "@/api/types.gen";
 import { AdminTeamsTable } from "./AdminTeamsTable";
 

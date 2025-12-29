@@ -181,7 +181,9 @@ public class GitHubTeamSyncService {
             boolean push = ghRepo.hasPushAccess();
             TeamRepositoryPermission.PermissionLevel level = admin
                 ? TeamRepositoryPermission.PermissionLevel.ADMIN
-                : push ? TeamRepositoryPermission.PermissionLevel.WRITE : TeamRepositoryPermission.PermissionLevel.READ;
+                : push
+                    ? TeamRepositoryPermission.PermissionLevel.WRITE
+                    : TeamRepositoryPermission.PermissionLevel.READ;
 
             TeamRepositoryPermission permission = team
                 .getRepoPermissions()

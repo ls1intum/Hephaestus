@@ -53,7 +53,7 @@
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 
         <!-- Maven wrapper version -->
-        <maven.wrapper.version>3.9.9</maven.wrapper.version>
+        <maven.wrapper.version>3.9.12</maven.wrapper.version>
     </properties>
     <dependencies>
         <dependency>
@@ -354,7 +354,7 @@
             <dependency>
                 <groupId>org.springframework.modulith</groupId>
                 <artifactId>spring-modulith-bom</artifactId>
-                <version>1.2.2</version>
+                <version>1.4.6</version>
                 <scope>import</scope>
                 <type>pom</type>
             </dependency>
@@ -561,7 +561,7 @@
                     <dependency>
                         <groupId>org.springframework.boot</groupId>
                         <artifactId>spring-boot-starter-data-jpa</artifactId>
-                        <version>3.5.0</version>
+                        <version>3.5.9</version>
                     </dependency>
                     <dependency>
                         <groupId>jakarta.validation</groupId>

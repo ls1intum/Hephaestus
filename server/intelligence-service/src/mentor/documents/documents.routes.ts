@@ -16,7 +16,7 @@ import {
 
 export const createDocumentRoute = createRoute({
 	path: "/",
-	method: "post",
+	method: "post" as const,
 	tags: ["documents", ...EXPORTED_TAG],
 	summary: "Create a new document",
 	operationId: "createDocument",
@@ -32,7 +32,7 @@ export const createDocumentRoute = createRoute({
 
 export const getDocumentRoute = createRoute({
 	path: "/{id}",
-	method: "get",
+	method: "get" as const,
 	tags: ["documents", ...EXPORTED_TAG],
 	summary: "Get latest version of a document",
 	operationId: "getDocument",
@@ -47,7 +47,7 @@ export const getDocumentRoute = createRoute({
 
 export const updateDocumentRoute = createRoute({
 	path: "/{id}",
-	method: "put",
+	method: "put" as const,
 	tags: ["documents", ...EXPORTED_TAG],
 	summary: "Update a document (creates new version)",
 	operationId: "updateDocument",
@@ -65,7 +65,7 @@ export const updateDocumentRoute = createRoute({
 
 export const deleteDocumentRoute = createRoute({
 	path: "/{id}",
-	method: "delete",
+	method: "delete" as const,
 	tags: ["documents", ...EXPORTED_TAG],
 	summary: "Delete a document and all versions",
 	operationId: "deleteDocument",
@@ -80,7 +80,7 @@ export const deleteDocumentRoute = createRoute({
 
 export const listDocumentsRoute = createRoute({
 	path: "/",
-	method: "get",
+	method: "get" as const,
 	tags: ["documents", ...EXPORTED_TAG],
 	summary: "List documents owned by the authenticated user",
 	operationId: "listDocuments",
@@ -94,7 +94,7 @@ export const listDocumentsRoute = createRoute({
 
 export const listVersionsRoute = createRoute({
 	path: "/{id}/versions",
-	method: "get",
+	method: "get" as const,
 	tags: ["documents", ...EXPORTED_TAG],
 	summary: "List versions of a document",
 	operationId: "listVersions",
@@ -109,7 +109,7 @@ export const listVersionsRoute = createRoute({
 
 export const getVersionRoute = createRoute({
 	path: "/{id}/versions/{versionNumber}",
-	method: "get",
+	method: "get" as const,
 	tags: ["documents", ...EXPORTED_TAG],
 	summary: "Get specific version",
 	operationId: "getVersion",
@@ -124,7 +124,7 @@ export const getVersionRoute = createRoute({
 
 export const deleteAfterRoute = createRoute({
 	path: "/{id}/versions",
-	method: "delete",
+	method: "delete" as const,
 	tags: ["documents", ...EXPORTED_TAG],
 	summary: "Delete versions after timestamp",
 	operationId: "deleteDocumentVersionsAfter",

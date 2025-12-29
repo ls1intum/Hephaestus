@@ -375,7 +375,12 @@ public class WorkspaceService {
         );
 
         // Removed unused workspaceContext-based block
-        if (workspace.getRepositoriesToMonitor().stream().anyMatch(r -> r.getNameWithOwner().equals(nameWithOwner))) {
+        if (
+            workspace
+                .getRepositoriesToMonitor()
+                .stream()
+                .anyMatch(r -> r.getNameWithOwner().equals(nameWithOwner))
+        ) {
             logger.info("Repository is already being monitored");
             throw new RepositoryAlreadyMonitoredException(nameWithOwner);
         }
@@ -689,8 +694,8 @@ public class WorkspaceService {
                 if (isPatWorkspace && hasPatToken) {
                     logger.info(
                         "Workspace id={} for {} is a PAT workspace with a stored token; skipping GitHub App installation {} linking. " +
-                        "If you want to use the GitHub App instead, delete the PAT workspace first or set " +
-                        "hephaestus.workspace.init-default=false.",
+                            "If you want to use the GitHub App instead, delete the PAT workspace first or set " +
+                            "hephaestus.workspace.init-default=false.",
                         existingByLogin.getId(),
                         LoggingUtils.sanitizeForLog(accountLogin),
                         installationId
@@ -1309,7 +1314,7 @@ public class WorkspaceService {
             if (!SLACK_CHANNEL_ID_PATTERN.matcher(trimmedChannelId).matches()) {
                 throw new IllegalArgumentException(
                     "Slack channel ID must start with 'C' (public), 'G' (private), or 'D' (DM) followed by at least 8 alphanumerics, got: " +
-                    trimmedChannelId
+                        trimmedChannelId
                 );
             }
             workspace.setLeaderboardNotificationChannelId(trimmedChannelId);

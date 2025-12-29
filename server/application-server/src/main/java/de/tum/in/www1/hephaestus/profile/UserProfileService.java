@@ -100,19 +100,19 @@ public class UserProfileService {
         List<PullRequestInfoDTO> openPullRequests = workspaceId == null
             ? List.of()
             : pullRequestRepository
-                .findAssignedByLoginAndStates(login, Set.of(Issue.State.OPEN), workspaceId)
-                .stream()
-                .map(PullRequestInfoDTO::fromPullRequest)
-                .toList();
+                  .findAssignedByLoginAndStates(login, Set.of(Issue.State.OPEN), workspaceId)
+                  .stream()
+                  .map(PullRequestInfoDTO::fromPullRequest)
+                  .toList();
 
         List<RepositoryInfoDTO> contributedRepositories = workspaceId == null
             ? List.of()
             : repositoryRepository
-                .findContributedByLogin(login, workspaceId)
-                .stream()
-                .map(RepositoryInfoDTO::fromRepository)
-                .sorted(Comparator.comparing(RepositoryInfoDTO::name))
-                .toList();
+                  .findContributedByLogin(login, workspaceId)
+                  .stream()
+                  .map(RepositoryInfoDTO::fromRepository)
+                  .sorted(Comparator.comparing(RepositoryInfoDTO::name))
+                  .toList();
 
         // Review activity includes both pull request reviews and issue comments
         List<PullRequestReviewInfoDTO> reviewActivity = buildReviewActivity(login, workspaceId, timeRange);

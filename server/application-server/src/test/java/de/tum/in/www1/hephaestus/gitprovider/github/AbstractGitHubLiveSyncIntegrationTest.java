@@ -279,7 +279,11 @@ abstract class AbstractGitHubLiveSyncIntegrationTest extends BaseGitHubLiveInteg
         List<GHPullRequestReviewComment> reviewComments = pullRequest.listReviewComments().toList();
         GHPullRequestReviewComment reviewComment = reviewComments.get(0);
         awaitCondition("pull request review present", () ->
-            pullRequest.listReviews().toList().stream().anyMatch(r -> r.getId() == commentReview.getId())
+            pullRequest
+                .listReviews()
+                .toList()
+                .stream()
+                .anyMatch(r -> r.getId() == commentReview.getId())
         );
 
         return new PullRequestArtifacts(

@@ -89,7 +89,11 @@ public class MonitoringScopeFilter {
         if (values == null || values.isEmpty()) {
             return Collections.emptySet();
         }
-        return values.stream().map(this::normalize).filter(s -> s != null && !s.isEmpty()).collect(Collectors.toSet());
+        return values
+            .stream()
+            .map(this::normalize)
+            .filter(s -> s != null && !s.isEmpty())
+            .collect(Collectors.toSet());
     }
 
     private String normalize(String value) {

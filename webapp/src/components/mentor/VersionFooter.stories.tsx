@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { fn } from "@storybook/test";
 import { useState } from "react";
+import { fn } from "storybook/test";
 import { VersionFooter } from "./VersionFooter";
 
 /**
@@ -154,11 +154,6 @@ export const CustomStyled: Story = {
  */
 export const Mobile: Story = {
 	args: {},
-	parameters: {
-		viewport: {
-			defaultViewport: "mobile1",
-		},
-	},
 	decorators: [
 		(Story) => (
 			<div className="relative h-[500px] bg-background border border-border rounded-lg overflow-hidden">
@@ -172,6 +167,12 @@ export const Mobile: Story = {
 			</div>
 		),
 	],
+	globals: {
+		viewport: {
+			value: "mobile1",
+			isRotated: false,
+		},
+	},
 };
 
 /**

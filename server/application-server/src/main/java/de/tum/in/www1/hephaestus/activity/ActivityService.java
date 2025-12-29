@@ -82,10 +82,10 @@ public class ActivityService {
                 List<PullRequestBadPracticeDTO> badPractices = lastDetection == null
                     ? List.of()
                     : lastDetection
-                        .getBadPractices()
-                        .stream()
-                        .map(PullRequestBadPracticeDTO::fromPullRequestBadPractice)
-                        .toList();
+                          .getBadPractices()
+                          .stream()
+                          .map(PullRequestBadPracticeDTO::fromPullRequestBadPractice)
+                          .toList();
 
                 List<String> badPracticeTitles = badPractices.stream().map(PullRequestBadPracticeDTO::title).toList();
 

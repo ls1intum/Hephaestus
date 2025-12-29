@@ -41,7 +41,8 @@ class WorkspaceContextExecutorTest {
         AtomicReference<WorkspaceContext> capturedContext = new AtomicReference<>();
 
         // Act
-        Runnable wrapped = WorkspaceContextExecutor.wrap(() -> capturedContext.set(WorkspaceContextHolder.getContext())
+        Runnable wrapped = WorkspaceContextExecutor.wrap(() ->
+            capturedContext.set(WorkspaceContextHolder.getContext())
         );
 
         // Clear context in main thread to simulate async boundary
