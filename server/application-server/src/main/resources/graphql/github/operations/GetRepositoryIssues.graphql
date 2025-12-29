@@ -2,91 +2,91 @@
 # Used by GitHubIssueSyncService for GraphQL-based sync
 
 query GetRepositoryIssues($owner: String!, $name: String!, $first: Int!, $after: String, $states: [IssueState!]) {
-	rateLimit {
-		cost
-		remaining
-		resetAt
-	}
-	repository(owner: $owner, name: $name) {
-		issues(first: $first, after: $after, states: $states, orderBy: { field: UPDATED_AT, direction: DESC }) {
-			pageInfo {
-				hasNextPage
-				endCursor
-			}
-			totalCount
-			nodes {
-				id
-				fullDatabaseId
-				number
-				title
-				body
-				state
-				stateReason
-				url
-				createdAt
-				updatedAt
-				closedAt
-				
-				# Issue type (organization-level categorization)
-				issueType {
-					id
-					name
-					description
-					color
-					isEnabled
-				}
-				
-				# Author
-				author {
-					__typename
-					... on User {
-						id
-						databaseId
-						login
-						avatarUrl
-						name
-						email
-					}
-					... on Bot {
-						id
-						databaseId
-						login
-						avatarUrl
-					}
-				}
-				
-				# Assignees
-				assignees(first: 20) {
-					nodes {
-						id
-						databaseId
-						login
-						avatarUrl
-						name
-					}
-				}
-				
-				# Labels
-				labels(first: 50) {
-					nodes {
-						id
-						name
-						description
-						color
-					}
-				}
-				
-				# Milestone
-				milestone {
-					id
-					number
-					title
-					description
-					state
-					dueOn
-					url
-				}
-			}
-		}
-	}
+    rateLimit {
+        cost
+        remaining
+        resetAt
+    }
+    repository(owner: $owner, name: $name) {
+        issues(first: $first, after: $after, states: $states, orderBy: { field: UPDATED_AT, direction: DESC }) {
+            pageInfo {
+                hasNextPage
+                endCursor
+            }
+            totalCount
+            nodes {
+                id
+                fullDatabaseId
+                number
+                title
+                body
+                state
+                stateReason
+                url
+                createdAt
+                updatedAt
+                closedAt
+
+                # Issue type (organization-level categorization)
+                issueType {
+                    id
+                    name
+                    description
+                    color
+                    isEnabled
+                }
+
+                # Author
+                author {
+                    __typename
+                    ... on User {
+                        id
+                        databaseId
+                        login
+                        avatarUrl
+                        name
+                        email
+                    }
+                    ... on Bot {
+                        id
+                        databaseId
+                        login
+                        avatarUrl
+                    }
+                }
+
+                # Assignees
+                assignees(first: 20) {
+                    nodes {
+                        id
+                        databaseId
+                        login
+                        avatarUrl
+                        name
+                    }
+                }
+
+                # Labels
+                labels(first: 50) {
+                    nodes {
+                        id
+                        name
+                        description
+                        color
+                    }
+                }
+
+                # Milestone
+                milestone {
+                    id
+                    number
+                    title
+                    description
+                    state
+                    dueOn
+                    url
+                }
+            }
+        }
+    }
 }

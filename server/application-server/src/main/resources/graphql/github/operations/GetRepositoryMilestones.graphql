@@ -1,53 +1,59 @@
 # GraphQL query for fetching repository milestones
 # Used by GraphQL-based sync services
 
-query GetRepositoryMilestones($owner: String!, $name: String!, $first: Int!, $after: String, $states: [MilestoneState!]) {
-	rateLimit {
-		cost
-		remaining
-		resetAt
-	}
-	repository(owner: $owner, name: $name) {
-		milestones(first: $first, after: $after, states: $states, orderBy: { field: UPDATED_AT, direction: DESC }) {
-			pageInfo {
-				hasNextPage
-				endCursor
-			}
-			totalCount
-			nodes {
-				id
-				number
-				title
-				description
-				state
-				dueOn
-				closedAt
-				createdAt
-				updatedAt
-				url
-				
-				# Progress and issue counts
-				progressPercentage
-				openIssueCount
-				closedIssueCount
-				
-				# Creator
-				creator {
-					__typename
-					... on User {
-						id
-						databaseId
-						login
-						avatarUrl
-					}
-					... on Bot {
-						id
-						databaseId
-						login
-						avatarUrl
-					}
-				}
-			}
-		}
-	}
+query GetRepositoryMilestones(
+    $owner: String!
+    $name: String!
+    $first: Int!
+    $after: String
+    $states: [MilestoneState!]
+) {
+    rateLimit {
+        cost
+        remaining
+        resetAt
+    }
+    repository(owner: $owner, name: $name) {
+        milestones(first: $first, after: $after, states: $states, orderBy: { field: UPDATED_AT, direction: DESC }) {
+            pageInfo {
+                hasNextPage
+                endCursor
+            }
+            totalCount
+            nodes {
+                id
+                number
+                title
+                description
+                state
+                dueOn
+                closedAt
+                createdAt
+                updatedAt
+                url
+
+                # Progress and issue counts
+                progressPercentage
+                openIssueCount
+                closedIssueCount
+
+                # Creator
+                creator {
+                    __typename
+                    ... on User {
+                        id
+                        databaseId
+                        login
+                        avatarUrl
+                    }
+                    ... on Bot {
+                        id
+                        databaseId
+                        login
+                        avatarUrl
+                    }
+                }
+            }
+        }
+    }
 }

@@ -3,47 +3,47 @@
 # User/Bot still use databaseId as fullDatabaseId is not available on Actor types.
 
 query GetIssueComments($owner: String!, $name: String!, $number: Int!, $first: Int!, $after: String) {
-	rateLimit {
-		cost
-		remaining
-		resetAt
-	}
-	repository(owner: $owner, name: $name) {
-		issue(number: $number) {
-			comments(first: $first, after: $after) {
-				pageInfo {
-					hasNextPage
-					endCursor
-				}
-				totalCount
-				nodes {
-					id
-					fullDatabaseId
-					body
-					url
-					createdAt
-					updatedAt
-					
-					# Author
-					author {
-						__typename
-						... on User {
-							id
-							databaseId
-							login
-							avatarUrl
-						}
-						... on Bot {
-							id
-							databaseId
-							login
-							avatarUrl
-						}
-					}
-					
-					authorAssociation
-				}
-			}
-		}
-	}
+    rateLimit {
+        cost
+        remaining
+        resetAt
+    }
+    repository(owner: $owner, name: $name) {
+        issue(number: $number) {
+            comments(first: $first, after: $after) {
+                pageInfo {
+                    hasNextPage
+                    endCursor
+                }
+                totalCount
+                nodes {
+                    id
+                    fullDatabaseId
+                    body
+                    url
+                    createdAt
+                    updatedAt
+
+                    # Author
+                    author {
+                        __typename
+                        ... on User {
+                            id
+                            databaseId
+                            login
+                            avatarUrl
+                        }
+                        ... on Bot {
+                            id
+                            databaseId
+                            login
+                            avatarUrl
+                        }
+                    }
+
+                    authorAssociation
+                }
+            }
+        }
+    }
 }

@@ -2,69 +2,69 @@
 # Used by GraphQL-based sync services
 
 query GetOrganizationTeams($login: String!, $first: Int!, $after: String) {
-	rateLimit {
-		cost
-		remaining
-		resetAt
-	}
-	organization(login: $login) {
-		teams(first: $first, after: $after) {
-			pageInfo {
-				hasNextPage
-				endCursor
-			}
-			totalCount
-			nodes {
-				id
-				databaseId
-				slug
-				name
-				description
-				privacy
-				url
-				createdAt
-				updatedAt
-				
-				# Team members
-				members(first: 100) {
-					totalCount
-					pageInfo {
-						hasNextPage
-					}
-					nodes {
-						id
-						databaseId
-						login
-						avatarUrl
-						name
-					}
-				}
-				
-				# Parent team
-				parentTeam {
-					id
-					databaseId
-					slug
-					name
-				}
-				
-				# Repositories with permissions
-				repositories(first: 100) {
-					totalCount
-					pageInfo {
-						hasNextPage
-					}
-					edges {
-						permission
-						node {
-							id
-							databaseId
-							name
-							nameWithOwner
-						}
-					}
-				}
-			}
-		}
-	}
+    rateLimit {
+        cost
+        remaining
+        resetAt
+    }
+    organization(login: $login) {
+        teams(first: $first, after: $after) {
+            pageInfo {
+                hasNextPage
+                endCursor
+            }
+            totalCount
+            nodes {
+                id
+                databaseId
+                slug
+                name
+                description
+                privacy
+                url
+                createdAt
+                updatedAt
+
+                # Team members
+                members(first: 100) {
+                    totalCount
+                    pageInfo {
+                        hasNextPage
+                    }
+                    nodes {
+                        id
+                        databaseId
+                        login
+                        avatarUrl
+                        name
+                    }
+                }
+
+                # Parent team
+                parentTeam {
+                    id
+                    databaseId
+                    slug
+                    name
+                }
+
+                # Repositories with permissions
+                repositories(first: 100) {
+                    totalCount
+                    pageInfo {
+                        hasNextPage
+                    }
+                    edges {
+                        permission
+                        node {
+                            id
+                            databaseId
+                            name
+                            nameWithOwner
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
