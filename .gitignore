@@ -196,3 +196,5 @@ tmp
 
 # OpenCode builder mission files (per-worktree, ephemeral)
 MISSION.md
+# Builder session tracking (per-worktree)
+.builder-session
