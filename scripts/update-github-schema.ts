@@ -1,14 +1,10 @@
 /**
  * Update GitHub GraphQL schema from official docs
  *
- * This script downloads the latest schema and optionally triggers code generation.
- *
- * Usage:
- *   npx tsx scripts/update-github-schema.ts [--generate]
+ * Usage: npm run github:update-schema
  */
 
-import { execSync } from "node:child_process";
-import { existsSync, statSync, unlinkSync, writeFileSync } from "node:fs";
+import { statSync, unlinkSync, writeFileSync, renameSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -21,76 +17,32 @@ const SCHEMA_DIR = resolve(
 );
 const SCHEMA_FILE = join(SCHEMA_DIR, "schema.github.graphql");
 const SCHEMA_URL = "https://docs.github.com/public/fpt/schema.docs.graphql";
-const MIN_SIZE_BYTES = 1_000_000; // Schema should be ~1.4MB
+const MIN_SIZE_BYTES = 1_000_000;
 
-async function downloadSchema(): Promise<void> {
+async function main(): Promise<void> {
 	console.log("📥 Downloading GitHub GraphQL schema...");
 
 	const response = await fetch(SCHEMA_URL);
 	if (!response.ok) {
-		throw new Error(`Failed to download schema: ${response.status} ${response.statusText}`);
+		console.error(`❌ Failed: ${response.status} ${response.statusText}`);
+		process.exit(1);
 	}
 
 	const content = await response.text();
 	const tempFile = `${SCHEMA_FILE}.tmp`;
-
 	writeFileSync(tempFile, content, "utf-8");
 
-	// Verify download was successful (file should be > 1MB)
 	const stats = statSync(tempFile);
 	if (stats.size < MIN_SIZE_BYTES) {
 		unlinkSync(tempFile);
-		throw new Error(
-			`Downloaded file is too small (${stats.size} bytes). Schema should be ~1.4MB`,
-		);
-	}
-
-	// Atomic rename
-	const { renameSync } = await import("node:fs");
-	renameSync(tempFile, SCHEMA_FILE);
-
-	const sizeStr =
-		stats.size > 1_048_576
-			? `${Math.round(stats.size / 1_048_576)}MB`
-			: `${Math.round(stats.size / 1024)}KB`;
-
-	console.log(`✅ Schema downloaded successfully (${sizeStr})`);
-}
-
-function generateCode(): void {
-	console.log("");
-	console.log("🔨 Generating GraphQL client code...");
-
-	const serverDir = resolve(__dirname, "../server/application-server");
-	execSync("./mvnw graphql-codegen:generate -q", {
-		cwd: serverDir,
-		stdio: "inherit",
-	});
-
-	console.log("✅ Code generation complete");
-	console.log("   Output: target/generated-sources/graphql");
-}
-
-async function main(): Promise<void> {
-	const args = process.argv.slice(2);
-	const shouldGenerate = args.includes("--generate");
-
-	try {
-		await downloadSchema();
-
-		if (shouldGenerate) {
-			generateCode();
-		}
-
-		console.log("");
-		console.log(`📁 Schema location: ${SCHEMA_FILE}`);
-		console.log("");
-		console.log("To regenerate client code, run:");
-		console.log("  cd server/application-server && ./mvnw graphql-codegen:generate");
-	} catch (error) {
-		console.error(`❌ ${error instanceof Error ? error.message : String(error)}`);
+		console.error(`❌ File too small (${stats.size} bytes)`);
 		process.exit(1);
 	}
+
+	renameSync(tempFile, SCHEMA_FILE);
+	console.log(`✅ Schema updated (${Math.round(stats.size / 1_048_576)}MB)`);
+	console.log(`   ${SCHEMA_FILE}`);
+	console.log(`\nTo regenerate: cd server/application-server && ./mvnw compile -DskipTests`);
 }
 
 main();
