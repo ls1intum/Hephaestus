@@ -15,7 +15,7 @@
     -->
 
     <!-- Create issue_type table for GitHub organization-level issue types -->
-    <changeSet id="1766231004215_create_issue_type_table" author="hephaestus">
+    <changeSet id="1766231004215_create_issue_type_table" author="FelixTJDietrich">
         <comment>Add issue_type table for GitHub organization-level issue type categorization</comment>
 
         <createTable tableName="issue_type">
@@ -55,7 +55,7 @@
     </changeSet>
 
     <!-- Add sub-issue hierarchy support to issue table -->
-    <changeSet id="1766231004215_add_sub_issue_hierarchy" author="hephaestus">
+    <changeSet id="1766231004215_add_sub_issue_hierarchy" author="FelixTJDietrich">
         <comment>Add parent_issue_id column to issue table for GitHub sub-issue hierarchy</comment>
         
         <addColumn tableName="issue">
@@ -79,7 +79,7 @@
     </changeSet>
 
     <!-- Add sub-issue summary fields for denormalized counts -->
-    <changeSet id="1766231004215_add_sub_issue_summary" author="hephaestus">
+    <changeSet id="1766231004215_add_sub_issue_summary" author="FelixTJDietrich">
         <comment>Add sub_issues_summary denormalized fields from GitHub webhooks</comment>
 
         <addColumn tableName="issue">
@@ -102,7 +102,7 @@
     </changeSet>
 
     <!-- Add issue_type_id to issue table -->
-    <changeSet id="1766231004215_add_issue_type_to_issue" author="hephaestus">
+    <changeSet id="1766231004215_add_issue_type_to_issue" author="FelixTJDietrich">
         <comment>Add issue_type_id foreign key to issue table</comment>
 
         <addColumn tableName="issue">
@@ -125,7 +125,7 @@
     </changeSet>
 
     <!-- Add sync timestamp columns to workspace for cooldown tracking -->
-    <changeSet id="1766231004215_add_workspace_sync_timestamps" author="hephaestus">
+    <changeSet id="1766231004215_add_workspace_sync_timestamps" author="FelixTJDietrich">
         <comment>Add sync timestamp columns for sub-issues and issue types to workspace</comment>
 
         <addColumn tableName="workspace">
@@ -148,7 +148,7 @@
     </changeSet>
 
     <!-- Fix undersized node_id column: 64 chars was too short for GitHub commit IDs (observed 69+) -->
-    <changeSet id="1766231004215_fix_nodeid_column_length" author="hephaestus">
+    <changeSet id="1766231004215_fix_nodeid_column_length" author="FelixTJDietrich">
         <comment>Increase pull_request_review_thread.node_id from VARCHAR(64) to VARCHAR(128) for longer GitHub IDs</comment>
 
         <modifyDataType tableName="pull_request_review_thread"
@@ -157,7 +157,7 @@
     </changeSet>
 
     <!-- Create issue_blocking join table for blocked_by/blocking relationships -->
-    <changeSet id="1766231004215_create_issue_blocking_table" author="hephaestus">
+    <changeSet id="1766231004215_create_issue_blocking_table" author="FelixTJDietrich">
         <comment>Add issue_blocking join table for tracking issue dependency relationships</comment>
 
         <createTable tableName="issue_blocking">
@@ -197,6 +197,103 @@
 
         <createIndex tableName="issue_blocking" indexName="idx_issue_blocking_blocking_id">
             <column name="blocking_issue_id"/>
+        </createIndex>
+    </changeSet>
+
+    <!-- 
+        Remove entity contamination from gitprovider module.
+        
+        These columns stored data that properly belongs in other modules:
+        - badPracticeSummary, lastDetectionTime -> activity module (BadPracticeDetection entity)
+        - leaguePoints -> workspace module (WorkspaceMembership entity, already exists there)
+        
+        See: DOMAIN_EVENT_ARCHITECTURE.md for full rationale.
+    -->
+
+    <changeSet id="1766231004215-drop-bad-practice-summary" author="FelixTJDietrich">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="pullrequest" columnName="bad_practice_summary"/>
+        </preConditions>
+        <comment>Drop bad_practice_summary column - data exists in bad_practice_detection.summary</comment>
+        <dropColumn tableName="pullrequest" columnName="bad_practice_summary"/>
+    </changeSet>
+
+    <changeSet id="1766231004215-drop-last-detection-time" author="FelixTJDietrich">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="pullrequest" columnName="last_detection_time"/>
+        </preConditions>
+        <comment>Drop last_detection_time column - data exists in bad_practice_detection.detection_time</comment>
+        <dropColumn tableName="pullrequest" columnName="last_detection_time"/>
+    </changeSet>
+
+    <changeSet id="1766231004215-drop-league-points" author="FelixTJDietrich">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="hephaestus_user" columnName="league_points"/>
+        </preConditions>
+        <comment>Drop league_points column from user table - migrated to workspace_membership</comment>
+        <dropColumn tableName="hephaestus_user" columnName="league_points"/>
+    </changeSet>
+
+    <!-- 
+        Drop deprecated position columns from pull_request_review_comment table.
+        These fields were deprecated by GitHub in favor of line/originalLine fields.
+        See: https://docs.github.com/en/graphql/reference/objects#pullrequestreviewcomment
+    -->
+    <changeSet id="1766231004215-drop-deprecated-positions" author="FelixTJDietrich">
+        <dropColumn tableName="pull_request_review_comment" columnName="position"/>
+        <dropColumn tableName="pull_request_review_comment" columnName="original_position"/>
+    </changeSet>
+
+    <!-- Add missing indexes on foreign key columns for query performance -->
+    <changeSet id="1766231004215-add-missing-indexes" author="FelixTJDietrich">
+        <comment>Add missing indexes on foreign key columns for query performance</comment>
+        
+        <!-- Issue table indexes -->
+        <createIndex tableName="issue" indexName="idx_issue_repository_id">
+            <column name="repository_id"/>
+        </createIndex>
+        <createIndex tableName="issue" indexName="idx_issue_author_id">
+            <column name="author_id"/>
+        </createIndex>
+        <createIndex tableName="issue" indexName="idx_issue_state">
+            <column name="state"/>
+        </createIndex>
+        
+        <!-- Pull request review indexes -->
+        <createIndex tableName="pull_request_review" indexName="idx_pr_review_author_id">
+            <column name="author_id"/>
+        </createIndex>
+        <createIndex tableName="pull_request_review" indexName="idx_pr_review_submitted_at">
+            <column name="submitted_at"/>
+        </createIndex>
+        <createIndex tableName="pull_request_review" indexName="idx_pr_review_pull_request_id">
+            <column name="pull_request_id"/>
+        </createIndex>
+        
+        <!-- Issue comment indexes -->
+        <createIndex tableName="issue_comment" indexName="idx_issue_comment_author_id">
+            <column name="author_id"/>
+        </createIndex>
+        <createIndex tableName="issue_comment" indexName="idx_issue_comment_created_at">
+            <column name="created_at"/>
+        </createIndex>
+        
+        <!-- Repository indexes -->
+        <createIndex tableName="repository" indexName="idx_repository_name_with_owner">
+            <column name="name_with_owner"/>
+        </createIndex>
+        <createIndex tableName="repository" indexName="idx_repository_organization_id">
+            <column name="organization_id"/>
+        </createIndex>
+        
+        <!-- Workspace membership index -->
+        <createIndex tableName="workspace_membership" indexName="idx_workspace_membership_user_id">
+            <column name="user_id"/>
+        </createIndex>
+        
+        <!-- Chat message index -->
+        <createIndex tableName="chat_message" indexName="idx_chat_message_thread_id">
+            <column name="thread_id"/>
         </createIndex>
     </changeSet>
 

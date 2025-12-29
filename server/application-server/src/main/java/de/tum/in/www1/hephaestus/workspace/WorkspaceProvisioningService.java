@@ -301,6 +301,16 @@ public class WorkspaceProvisioningService {
             login,
             selection
         );
+
+        if (workspace == null) {
+            logger.warn(
+                "Workspace creation skipped for installation={} and org={}. User may not exist in database.",
+                installationId,
+                login
+            );
+            return;
+        }
+
         workspace = workspaceService.updateAccountLogin(workspace.getId(), login);
 
         logger.info("Organization sync for workspace {} will be handled via webhooks", workspace.getWorkspaceSlug());
