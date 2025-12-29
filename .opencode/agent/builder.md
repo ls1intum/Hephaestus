@@ -58,16 +58,34 @@ git add -A
 git commit -m "feat(scope): description"
 git push -u origin HEAD
 
-# Create PR if doesn't exist, otherwise just pushed
+# Create PR if doesn't exist
 if ! gh pr view --json number &>/dev/null; then
-  gh pr create --fill --body "## Summary
-<what this does>
+  # Use heredoc to match PR template format
+  gh pr create --title "feat(scope): description" --body "$(cat <<'EOF'
+## Description
 
-## Testing
-- [ ] Local verification passed
-- [ ] Self-audit completed"
+<1-2 sentences explaining what this PR does and why>
+
+Fixes #<issue-number-if-applicable>
+
+## How to test
+
+<manual steps to verify, or "CI covers this" for config changes>
+
+## Screenshots
+
+<!-- Delete if not applicable -->
+EOF
+)"
 fi
 ```
+
+**Important**: Fill in the template properly:
+
+- Title: `<type>(<scope>): <description>` (conventional commits)
+- Description: Explain what AND why
+- Link issue if applicable
+- Test instructions: Be specific or state "CI covers this"
 
 ---
 
