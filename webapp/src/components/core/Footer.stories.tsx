@@ -69,7 +69,10 @@ export const Mobile: Story = {
 			deployedAt: "2024-12-14T10:00:00Z",
 		},
 	},
-	parameters: {
-		viewport: { defaultViewport: "mobile1" },
+	globals: {
+		viewport: {
+			value: "mobile1",
+			isRotated: false,
+		},
 	},
 };

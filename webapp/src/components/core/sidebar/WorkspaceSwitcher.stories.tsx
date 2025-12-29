@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { fn } from "@storybook/test";
+import { fn } from "storybook/test";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
 

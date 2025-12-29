@@ -11,7 +11,7 @@ import { ChatThreadGroupSchema, ThreadIdParamsSchema, threadDetailSchema } from 
 
 export const getGroupedThreadsRoute = createRoute({
 	path: "/grouped",
-	method: "get",
+	method: "get" as const,
 	tags: ["mentor", ...EXPORTED_TAG],
 	summary: "List chat threads grouped by time buckets",
 	operationId: "getGroupedThreads",
@@ -31,7 +31,7 @@ export type HandleGetGroupedThreadsRoute = typeof getGroupedThreadsRoute;
 
 export const getThreadRoute = createRoute({
 	path: "/{threadId}",
-	method: "get",
+	method: "get" as const,
 	tags: ["mentor", ...EXPORTED_TAG],
 	summary: "Get mentor chat thread detail",
 	operationId: "getThread",
