@@ -1,15 +1,19 @@
 package de.tum.in.www1.hephaestus.gitprovider.organization.github;
 
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.*;
+
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.OrganizationMemberConnection;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.OrganizationMemberEdge;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.OrganizationMemberRole;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.PageInfo;
 import de.tum.in.www1.hephaestus.gitprovider.organization.Organization;
 import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationMembershipRepository;
 import de.tum.in.www1.hephaestus.gitprovider.organization.github.dto.GitHubOrganizationEventDTO;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserProcessor;
 import de.tum.in.www1.hephaestus.gitprovider.user.github.dto.GitHubUserDTO;
-import java.time.Duration;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -33,8 +37,8 @@ import org.springframework.transaction.annotation.Transactional;
 public class GitHubOrganizationSyncService {
 
     private static final Logger logger = LoggerFactory.getLogger(GitHubOrganizationSyncService.class);
-    private static final Duration GRAPHQL_TIMEOUT = Duration.ofSeconds(30);
     private static final String GET_ORGANIZATION_DOCUMENT = "GetOrganization";
+    private static final String GET_ORGANIZATION_MEMBERS_DOCUMENT = "GetOrganizationMembers";
 
     private final GitHubGraphQlClientProvider graphQlClientProvider;
     private final GitHubOrganizationProcessor organizationProcessor;
@@ -91,8 +95,8 @@ public class GitHubOrganizationSyncService {
             Organization organization = organizationProcessor.process(dto);
 
             if (organization != null) {
-                // Sync organization memberships
-                int membersSynced = syncOrganizationMemberships(organization, graphQlOrg);
+                // Sync organization memberships with full pagination
+                int membersSynced = syncOrganizationMemberships(client, organization, graphQlOrg);
                 logger.info(
                     "Synced organization {} ({}) with {} members",
                     organization.getLogin(),
@@ -109,16 +113,19 @@ public class GitHubOrganizationSyncService {
     }
 
     /**
-     * Synchronizes organization memberships from the GraphQL response.
+     * Synchronizes organization memberships from the GraphQL response with full pagination.
      * <p>
      * For each member in the organization's membersWithRole connection, this method
      * ensures the user exists and upserts an OrganizationMembership record.
+     * If there are more than 100 members, it paginates through all pages.
      *
+     * @param client       the GraphQL client for pagination requests
      * @param organization the Organization entity
-     * @param graphQlOrg   the GraphQL organization object containing members
+     * @param graphQlOrg   the GraphQL organization object containing initial members
      * @return the number of members synced
      */
     private int syncOrganizationMemberships(
+        HttpGraphQlClient client,
         Organization organization,
         de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.Organization graphQlOrg
     ) {
@@ -128,10 +135,42 @@ public class GitHubOrganizationSyncService {
             return 0;
         }
 
+        // Collect all members with pagination
+        List<OrganizationMemberEdge> allMembers = new ArrayList<>(membersConnection.getEdges());
+        PageInfo pageInfo = membersConnection.getPageInfo();
+        String cursor = pageInfo != null ? pageInfo.getEndCursor() : null;
+
+        // Paginate through all remaining members if there are more pages
+        while (pageInfo != null && Boolean.TRUE.equals(pageInfo.getHasNextPage())) {
+            OrganizationMemberConnection nextPage = client
+                .documentName(GET_ORGANIZATION_MEMBERS_DOCUMENT)
+                .variable("login", organization.getLogin())
+                .variable("first", LARGE_PAGE_SIZE)
+                .variable("after", cursor)
+                .retrieve("organization.membersWithRole")
+                .toEntity(OrganizationMemberConnection.class)
+                .block(GRAPHQL_TIMEOUT);
+
+            if (nextPage == null || nextPage.getEdges() == null) {
+                break;
+            }
+
+            allMembers.addAll(nextPage.getEdges());
+            pageInfo = nextPage.getPageInfo();
+            cursor = pageInfo != null ? pageInfo.getEndCursor() : null;
+        }
+
+        logger.debug(
+            "Fetched {} total members for organization {} (totalCount={})",
+            allMembers.size(),
+            organization.getLogin(),
+            membersConnection.getTotalCount()
+        );
+
         Set<Long> syncedUserIds = new HashSet<>();
         int memberCount = 0;
 
-        for (OrganizationMemberEdge edge : membersConnection.getEdges()) {
+        for (OrganizationMemberEdge edge : allMembers) {
             if (edge == null || edge.getNode() == null) {
                 continue;
             }

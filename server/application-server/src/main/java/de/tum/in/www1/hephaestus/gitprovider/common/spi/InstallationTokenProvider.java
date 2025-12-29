@@ -14,9 +14,4 @@ public interface InstallationTokenProvider {
 
     /** Get authentication mode for a workspace. */
     AuthMode getAuthMode(Long workspaceId);
-
-    enum AuthMode {
-        GITHUB_APP_INSTALLATION,
-        PERSONAL_ACCESS_TOKEN,
-    }
 }

@@ -546,7 +546,9 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
                 "Milestone description",
                 "open",
                 Instant.parse("2025-12-31T08:00:00Z"),
-                "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/milestone/2"
+                "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/milestone/2",
+                0,
+                0
             );
             GitHubIssueDTO dto = new GitHubIssueDTO(
                 issueId,
@@ -739,7 +741,9 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
                 "Desc",
                 "open",
                 null,
-                "https://example.com/milestone/2"
+                "https://example.com/milestone/2",
+                0,
+                0
             );
             GitHubIssueDTO dto = new GitHubIssueDTO(
                 issueId,

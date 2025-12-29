@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.workspace.adapter;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.spi.AuthMode;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.InstallationTokenProvider;
 import de.tum.in.www1.hephaestus.workspace.Workspace;
 import de.tum.in.www1.hephaestus.workspace.Workspace.GitProviderMode;
@@ -36,7 +37,7 @@ public class WorkspaceInstallationTokenProvider implements InstallationTokenProv
             .orElseThrow(() -> new IllegalArgumentException("Workspace not found: " + workspaceId));
 
         return workspace.getGitProviderMode() == GitProviderMode.GITHUB_APP_INSTALLATION
-            ? AuthMode.GITHUB_APP_INSTALLATION
+            ? AuthMode.GITHUB_APP
             : AuthMode.PERSONAL_ACCESS_TOKEN;
     }
 }

@@ -2,51 +2,80 @@ package de.tum.in.www1.hephaestus.gitprovider.common.spi;
 
 import java.time.Instant;
 import java.util.List;
-import java.util.Optional;
 
 /**
  * Provides sync targets (repositories) for the gitprovider ETL engine.
+ * <p>
+ * This is the main SPI (Service Provider Interface) for the sync engine to discover
+ * and manage synchronization targets. It extends focused sub-interfaces to comply
+ * with the Interface Segregation Principle (ISP):
+ * <ul>
+ *   <li>{@link WorkspaceSyncMetadataProvider} - Workspace-level sync state</li>
+ *   <li>{@link BackfillStateProvider} - Backfill tracking for incremental sync</li>
+ * </ul>
+ * <p>
+ * <b>Dependency Guidance:</b>
+ * <ul>
+ *   <li>For repository-level sync: depend on {@code SyncTargetProvider}</li>
+ *   <li>For workspace metadata only: depend on {@link WorkspaceSyncMetadataProvider}</li>
+ *   <li>For backfill management only: depend on {@link BackfillStateProvider}</li>
+ * </ul>
+ *
+ * @see WorkspaceSyncMetadataProvider
+ * @see BackfillStateProvider
  */
-public interface SyncTargetProvider {
+public interface SyncTargetProvider extends WorkspaceSyncMetadataProvider, BackfillStateProvider {
+    // ═══════════════════════════════════════════════════════════════════════════
+    // CORE SYNC TARGET OPERATIONS
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /**
+     * Gets all active sync targets (repositories) across all workspaces.
+     *
+     * @return list of active sync targets
+     */
     List<SyncTarget> getActiveSyncTargets();
 
+    /**
+     * Gets sync targets for a specific workspace.
+     *
+     * @param workspaceId the workspace ID
+     * @return list of sync targets for the workspace
+     */
+    List<SyncTarget> getSyncTargetsForWorkspace(Long workspaceId);
+
+    /**
+     * Updates the sync timestamp for a repository-level sync operation.
+     *
+     * @param workspaceId             the workspace ID
+     * @param repositoryNameWithOwner the repository name with owner (e.g., "owner/repo")
+     * @param syncType                the type of sync
+     * @param syncedAt                the timestamp of the sync
+     */
+    void updateSyncTimestamp(Long workspaceId, String repositoryNameWithOwner, SyncType syncType, Instant syncedAt);
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // WORKSPACE SYNC SESSIONS
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /**
+     * Gets workspace sync sessions for batch synchronization.
+     * Each session contains all sync targets for a workspace with its sync context.
+     *
+     * @return list of workspace sync sessions
+     */
     default List<WorkspaceSyncSession> getWorkspaceSyncSessions() {
         return List.of();
     }
 
+    /**
+     * Gets statistics about sync target filtering.
+     *
+     * @return sync statistics
+     */
     default SyncStatistics getSyncStatistics() {
         return new SyncStatistics(0, 0, 0, 0, false);
     }
-
-    List<SyncTarget> getSyncTargetsForWorkspace(Long workspaceId);
-
-    void updateSyncTimestamp(Long workspaceId, String repositoryNameWithOwner, SyncType syncType, Instant syncedAt);
-
-    default Optional<WorkspaceSyncMetadata> getWorkspaceSyncMetadata(Long workspaceId) {
-        return Optional.empty();
-    }
-
-    default void updateWorkspaceSyncTimestamp(Long workspaceId, SyncType syncType, Instant syncedAt) {}
-
-    default Optional<WorkspaceUserSyncMetadata> getWorkspaceUserSyncMetadata(Long workspaceId) {
-        return Optional.empty();
-    }
-
-    default void updateUsersSyncTimestamp(Long workspaceId, Instant syncedAt) {}
-
-    default Optional<WorkspaceTeamSyncMetadata> getWorkspaceTeamSyncMetadata(Long workspaceId) {
-        return Optional.empty();
-    }
-
-    default void updateTeamsSyncTimestamp(Long workspaceId, Instant syncedAt) {}
-
-    default Optional<SyncTarget> findSyncTargetById(Long syncTargetId) {
-        return Optional.empty();
-    }
-
-    default void updateBackfillState(Long syncTargetId, Integer highWaterMark, Integer checkpoint, Instant lastRunAt) {}
-
-    default void removeSyncTarget(Long syncTargetId) {}
 
     // ═══════════════════════════════════════════════════════════════════════════
     // Records
@@ -164,10 +193,5 @@ public interface SyncTargetProvider {
         ISSUE_TYPES,
         ISSUE_DEPENDENCIES,
         SUB_ISSUES,
-    }
-
-    enum AuthMode {
-        GITHUB_APP,
-        PAT,
     }
 }

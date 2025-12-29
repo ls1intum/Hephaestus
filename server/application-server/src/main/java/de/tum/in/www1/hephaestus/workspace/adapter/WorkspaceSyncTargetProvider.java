@@ -4,8 +4,8 @@ import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncContextProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider;
 import de.tum.in.www1.hephaestus.workspace.RepositoryToMonitor;
 import de.tum.in.www1.hephaestus.workspace.RepositoryToMonitorRepository;
+import de.tum.in.www1.hephaestus.workspace.SyncTargetFactory;
 import de.tum.in.www1.hephaestus.workspace.Workspace;
-import de.tum.in.www1.hephaestus.workspace.Workspace.GitProviderMode;
 import de.tum.in.www1.hephaestus.workspace.Workspace.WorkspaceStatus;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceRepository;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceScopeFilter;
@@ -15,6 +15,16 @@ import java.util.Optional;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * Adapter that bridges workspace entities to the sync engine SPI.
+ * <p>
+ * Implements the full sync provider interface hierarchy:
+ * <ul>
+ *   <li>{@link SyncTargetProvider} - Core sync target operations (extends the sub-interfaces below)</li>
+ *   <li>{@link de.tum.in.www1.hephaestus.gitprovider.common.spi.WorkspaceSyncMetadataProvider WorkspaceSyncMetadataProvider} - Workspace-level sync metadata</li>
+ *   <li>{@link de.tum.in.www1.hephaestus.gitprovider.common.spi.BackfillStateProvider BackfillStateProvider} - Backfill state management</li>
+ * </ul>
+ */
 @Component
 public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
 
@@ -38,7 +48,7 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
             .findAll()
             .stream()
             .filter(ws -> ws.getStatus() == Workspace.WorkspaceStatus.ACTIVE)
-            .flatMap(ws -> ws.getRepositoriesToMonitor().stream().map(rtm -> toSyncTarget(ws, rtm)))
+            .flatMap(ws -> ws.getRepositoriesToMonitor().stream().map(rtm -> SyncTargetFactory.create(ws, rtm)))
             .toList();
     }
 
@@ -46,7 +56,7 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
     public List<SyncTarget> getSyncTargetsForWorkspace(Long workspaceId) {
         return workspaceRepository
             .findById(workspaceId)
-            .map(ws -> ws.getRepositoriesToMonitor().stream().map(rtm -> toSyncTarget(ws, rtm)).toList())
+            .map(ws -> ws.getRepositoriesToMonitor().stream().map(rtm -> SyncTargetFactory.create(ws, rtm)).toList())
             .orElse(List.of());
     }
 
@@ -99,29 +109,6 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
                 }
                 workspaceRepository.save(ws);
             });
-    }
-
-    private SyncTarget toSyncTarget(Workspace workspace, RepositoryToMonitor rtm) {
-        AuthMode authMode = workspace.getGitProviderMode() == GitProviderMode.GITHUB_APP_INSTALLATION
-            ? AuthMode.GITHUB_APP
-            : AuthMode.PAT;
-
-        return new SyncTarget(
-            rtm.getId(),
-            workspace.getId(),
-            workspace.getInstallationId(),
-            workspace.getPersonalAccessToken(),
-            authMode,
-            rtm.getNameWithOwner(),
-            rtm.getLabelsSyncedAt(),
-            rtm.getMilestonesSyncedAt(),
-            rtm.getIssuesAndPullRequestsSyncedAt(),
-            rtm.getCollaboratorsSyncedAt(),
-            rtm.getRepositorySyncedAt(),
-            rtm.getBackfillHighWaterMark(),
-            rtm.getBackfillCheckpoint(),
-            rtm.getBackfillLastRunAt()
-        );
     }
 
     private WorkspaceSyncMetadata toWorkspaceSyncMetadata(Workspace workspace) {
@@ -195,7 +182,7 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
             .findById(syncTargetId)
             .map(rtm -> {
                 var workspace = rtm.getWorkspace();
-                return toSyncTarget(workspace, rtm);
+                return SyncTargetFactory.create(workspace, rtm);
             });
     }
 
@@ -277,7 +264,7 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
             .getRepositoriesToMonitor()
             .stream()
             .filter(workspaceScopeFilter::isRepositoryAllowed)
-            .map(rtm -> toSyncTarget(workspace, rtm))
+            .map(rtm -> SyncTargetFactory.create(workspace, rtm))
             .toList();
 
         SyncContextProvider.SyncContext syncContext = new SyncContextProvider.SyncContext(

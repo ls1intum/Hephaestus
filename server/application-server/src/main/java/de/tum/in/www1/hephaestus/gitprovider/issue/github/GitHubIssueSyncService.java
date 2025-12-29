@@ -1,14 +1,19 @@
 package de.tum.in.www1.hephaestus.gitprovider.issue.github;
 
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.DEFAULT_PAGE_SIZE;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.GRAPHQL_TIMEOUT;
+
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser.RepositoryOwnerAndName;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.IssueConnection;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.PageInfo;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.issue.github.dto.GitHubIssueDTO;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
-import java.time.Duration;
+import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.graphql.client.ClientGraphQlResponse;
@@ -27,8 +32,6 @@ public class GitHubIssueSyncService {
 
     private static final Logger log = LoggerFactory.getLogger(GitHubIssueSyncService.class);
     private static final String QUERY_DOCUMENT = "GetRepositoryIssues";
-    private static final int PAGE_SIZE = 50;
-    private static final Duration TIMEOUT = Duration.ofSeconds(30);
 
     private final RepositoryRepository repositoryRepository;
     private final GitHubGraphQlClientProvider graphQlClientProvider;
@@ -59,11 +62,12 @@ public class GitHubIssueSyncService {
             return 0;
         }
 
-        String[] ownerAndName = parseOwnerAndName(repository.getNameWithOwner());
-        if (ownerAndName == null) {
+        Optional<RepositoryOwnerAndName> parsedName = GitHubRepositoryNameParser.parse(repository.getNameWithOwner());
+        if (parsedName.isEmpty()) {
             log.warn("Invalid repository name format: {}", repository.getNameWithOwner());
             return 0;
         }
+        RepositoryOwnerAndName ownerAndName = parsedName.get();
 
         HttpGraphQlClient client = graphQlClientProvider.forWorkspace(workspaceId);
         ProcessingContext context = ProcessingContext.forSync(workspaceId, repository);
@@ -76,12 +80,12 @@ public class GitHubIssueSyncService {
             try {
                 ClientGraphQlResponse response = client
                     .documentName(QUERY_DOCUMENT)
-                    .variable("owner", ownerAndName[0])
-                    .variable("name", ownerAndName[1])
-                    .variable("first", PAGE_SIZE)
+                    .variable("owner", ownerAndName.owner())
+                    .variable("name", ownerAndName.name())
+                    .variable("first", DEFAULT_PAGE_SIZE)
                     .variable("after", cursor)
                     .execute()
-                    .block(TIMEOUT);
+                    .block(GRAPHQL_TIMEOUT);
 
                 if (response == null || !response.isValid()) {
                     log.warn("Invalid GraphQL response: {}", response != null ? response.getErrors() : "null");
@@ -115,16 +119,5 @@ public class GitHubIssueSyncService {
 
         log.info("Synced {} issues for {}", totalSynced, repository.getNameWithOwner());
         return totalSynced;
-    }
-
-    private String[] parseOwnerAndName(String nameWithOwner) {
-        if (nameWithOwner == null || !nameWithOwner.contains("/")) {
-            return null;
-        }
-        String[] parts = nameWithOwner.split("/", 2);
-        if (parts.length != 2 || parts[0].isEmpty() || parts[1].isEmpty()) {
-            return null;
-        }
-        return parts;
     }
 }

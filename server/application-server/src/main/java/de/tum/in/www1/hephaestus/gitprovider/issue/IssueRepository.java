@@ -1,9 +1,12 @@
 package de.tum.in.www1.hephaestus.gitprovider.issue;
 
+import jakarta.persistence.QueryHint;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Stream;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.jpa.repository.QueryHints;
 import org.springframework.data.repository.query.Param;
 
 public interface IssueRepository extends JpaRepository<Issue, Long> {
@@ -14,6 +17,19 @@ public interface IssueRepository extends JpaRepository<Issue, Long> {
      * @return list of issues for the repository
      */
     List<Issue> findAllByRepository_Id(Long repositoryId);
+
+    /**
+     * Streams all issues belonging to a repository.
+     * <p>
+     * Must be used within a try-with-resources block to ensure the stream is closed
+     * and the database connection is released. The calling method must be annotated
+     * with @Transactional(readOnly = true) for streaming to work properly.
+     *
+     * @param repositoryId the repository ID
+     * @return stream of issues for the repository
+     */
+    @QueryHints(@QueryHint(name = org.hibernate.jpa.HibernateHints.HINT_FETCH_SIZE, value = "50"))
+    Stream<Issue> streamAllByRepository_Id(Long repositoryId);
 
     @Query(
         """

@@ -1,14 +1,25 @@
 package de.tum.in.www1.hephaestus.gitprovider.pullrequest.github;
 
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.DEFAULT_PAGE_SIZE;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.GRAPHQL_TIMEOUT;
+
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser.RepositoryOwnerAndName;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.PageInfo;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.PullRequestConnection;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
-import de.tum.in.www1.hephaestus.gitprovider.pullrequest.github.dto.GitHubPullRequestDTO;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequest.github.dto.EmbeddedReviewsDTO;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequest.github.dto.PullRequestWithReviews;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.github.GitHubPullRequestReviewProcessor;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.github.GitHubPullRequestReviewSyncService;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.github.dto.GitHubPullRequestReviewEventDTO.GitHubReviewDTO;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
-import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.graphql.client.ClientGraphQlResponse;
@@ -20,32 +31,46 @@ import org.springframework.transaction.annotation.Transactional;
  * Service for synchronizing GitHub pull requests via GraphQL API.
  * <p>
  * This service fetches PRs using typed GraphQL models and delegates persistence
- * to GitHubPullRequestProcessor.
+ * to GitHubPullRequestProcessor. Reviews are fetched inline with PRs to avoid
+ * N+1 query patterns - only PRs with more than 10 reviews require additional
+ * API calls for pagination.
  */
 @Service
 public class GitHubPullRequestSyncService {
 
     private static final Logger log = LoggerFactory.getLogger(GitHubPullRequestSyncService.class);
     private static final String QUERY_DOCUMENT = "GetRepositoryPullRequests";
-    private static final int PAGE_SIZE = 50;
-    private static final Duration TIMEOUT = Duration.ofSeconds(30);
 
     private final RepositoryRepository repositoryRepository;
     private final GitHubGraphQlClientProvider graphQlClientProvider;
     private final GitHubPullRequestProcessor pullRequestProcessor;
+    private final GitHubPullRequestReviewProcessor reviewProcessor;
+    private final GitHubPullRequestReviewSyncService reviewSyncService;
+
+    /**
+     * Container for PRs that need additional review pagination.
+     */
+    private record PullRequestWithReviewCursor(PullRequest pullRequest, String reviewCursor) {}
 
     public GitHubPullRequestSyncService(
         RepositoryRepository repositoryRepository,
         GitHubGraphQlClientProvider graphQlClientProvider,
-        GitHubPullRequestProcessor pullRequestProcessor
+        GitHubPullRequestProcessor pullRequestProcessor,
+        GitHubPullRequestReviewProcessor reviewProcessor,
+        GitHubPullRequestReviewSyncService reviewSyncService
     ) {
         this.repositoryRepository = repositoryRepository;
         this.graphQlClientProvider = graphQlClientProvider;
         this.pullRequestProcessor = pullRequestProcessor;
+        this.reviewProcessor = reviewProcessor;
+        this.reviewSyncService = reviewSyncService;
     }
 
     /**
      * Synchronizes all pull requests for a repository.
+     * <p>
+     * Reviews are fetched inline with PRs (first 10 per PR) to eliminate N+1 queries.
+     * Only PRs with more than 10 reviews require additional API calls for pagination.
      *
      * @param workspaceId  the workspace ID for authentication
      * @param repositoryId the repository ID to sync pull requests for
@@ -59,16 +84,19 @@ public class GitHubPullRequestSyncService {
             return 0;
         }
 
-        String[] ownerAndName = parseOwnerAndName(repository.getNameWithOwner());
-        if (ownerAndName == null) {
+        Optional<RepositoryOwnerAndName> parsedName = GitHubRepositoryNameParser.parse(repository.getNameWithOwner());
+        if (parsedName.isEmpty()) {
             log.warn("Invalid repository name format: {}", repository.getNameWithOwner());
             return 0;
         }
+        RepositoryOwnerAndName ownerAndName = parsedName.get();
 
         HttpGraphQlClient client = graphQlClientProvider.forWorkspace(workspaceId);
         ProcessingContext context = ProcessingContext.forSync(workspaceId, repository);
 
-        int totalSynced = 0;
+        int totalPRsSynced = 0;
+        int totalReviewsSynced = 0;
+        List<PullRequestWithReviewCursor> prsNeedingReviewPagination = new ArrayList<>();
         String cursor = null;
         boolean hasMore = true;
 
@@ -76,12 +104,12 @@ public class GitHubPullRequestSyncService {
             try {
                 ClientGraphQlResponse response = client
                     .documentName(QUERY_DOCUMENT)
-                    .variable("owner", ownerAndName[0])
-                    .variable("name", ownerAndName[1])
-                    .variable("first", PAGE_SIZE)
+                    .variable("owner", ownerAndName.owner())
+                    .variable("name", ownerAndName.name())
+                    .variable("first", DEFAULT_PAGE_SIZE)
                     .variable("after", cursor)
                     .execute()
-                    .block(TIMEOUT);
+                    .block(GRAPHQL_TIMEOUT);
 
                 if (response == null || !response.isValid()) {
                     log.warn("Invalid GraphQL response: {}", response != null ? response.getErrors() : "null");
@@ -97,12 +125,31 @@ public class GitHubPullRequestSyncService {
                 }
 
                 for (var graphQlPullRequest : connection.getNodes()) {
-                    GitHubPullRequestDTO dto = GitHubPullRequestDTO.fromPullRequest(graphQlPullRequest);
-                    if (dto != null) {
-                        PullRequest entity = pullRequestProcessor.process(dto, context);
-                        if (entity != null) {
-                            totalSynced++;
+                    PullRequestWithReviews prWithReviews = PullRequestWithReviews.fromPullRequest(graphQlPullRequest);
+                    if (prWithReviews == null || prWithReviews.pullRequest() == null) {
+                        continue;
+                    }
+
+                    // Process the PR
+                    PullRequest entity = pullRequestProcessor.process(prWithReviews.pullRequest(), context);
+                    if (entity == null) {
+                        continue;
+                    }
+                    totalPRsSynced++;
+
+                    // Process embedded reviews
+                    EmbeddedReviewsDTO embeddedReviews = prWithReviews.embeddedReviews();
+                    for (GitHubReviewDTO reviewDTO : embeddedReviews.reviews()) {
+                        if (reviewProcessor.process(reviewDTO, entity.getId()) != null) {
+                            totalReviewsSynced++;
                         }
+                    }
+
+                    // Track PRs that need additional review pagination (with cursor for efficient continuation)
+                    if (embeddedReviews.needsPagination()) {
+                        prsNeedingReviewPagination.add(
+                            new PullRequestWithReviewCursor(entity, embeddedReviews.endCursor())
+                        );
                     }
                 }
 
@@ -115,18 +162,30 @@ public class GitHubPullRequestSyncService {
             }
         }
 
-        log.info("Synced {} pull requests for {}", totalSynced, repository.getNameWithOwner());
-        return totalSynced;
-    }
+        // Fetch remaining reviews for PRs with >10 reviews (using cursor for efficient continuation)
+        if (!prsNeedingReviewPagination.isEmpty()) {
+            log.debug(
+                "Fetching additional reviews for {} PRs with >10 reviews in {}",
+                prsNeedingReviewPagination.size(),
+                repository.getNameWithOwner()
+            );
+            for (PullRequestWithReviewCursor prWithCursor : prsNeedingReviewPagination) {
+                int additionalReviews = reviewSyncService.syncRemainingReviews(
+                    workspaceId,
+                    prWithCursor.pullRequest(),
+                    prWithCursor.reviewCursor()
+                );
+                totalReviewsSynced += additionalReviews;
+            }
+        }
 
-    private String[] parseOwnerAndName(String nameWithOwner) {
-        if (nameWithOwner == null || !nameWithOwner.contains("/")) {
-            return null;
-        }
-        String[] parts = nameWithOwner.split("/", 2);
-        if (parts.length != 2 || parts[0].isEmpty() || parts[1].isEmpty()) {
-            return null;
-        }
-        return parts;
+        log.info(
+            "Synced {} pull requests and {} reviews for {} ({} PRs needed review pagination)",
+            totalPRsSynced,
+            totalReviewsSynced,
+            repository.getNameWithOwner(),
+            prsNeedingReviewPagination.size()
+        );
+        return totalPRsSynced;
     }
 }

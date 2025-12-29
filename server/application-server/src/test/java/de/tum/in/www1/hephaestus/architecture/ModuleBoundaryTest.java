@@ -445,4 +445,111 @@ class ModuleBoundaryTest {
             rule.check(classes);
         }
     }
+
+    // ========================================================================
+    // FEATURE MODULE BOUNDARIES
+    // ========================================================================
+
+    @Nested
+    @DisplayName("Feature Module Boundaries")
+    class FeatureModuleBoundaryTests {
+
+        /**
+         * Leaderboard should not depend on workspace internal implementation.
+         *
+         * <p>Feature modules should depend on public APIs, not internal details.
+         */
+        @Test
+        @DisplayName("Leaderboard does not depend on workspace internals")
+        void leaderboardDoesNotDependOnWorkspaceInternals() {
+            ArchRule rule = noClasses()
+                .that()
+                .resideInAPackage("..leaderboard..")
+                .should()
+                .dependOnClassesThat()
+                .resideInAnyPackage("..workspace..internal..", "..workspace..adapter..")
+                .allowEmptyShould(true)
+                .because("Leaderboard should depend on workspace public API, not internals");
+            rule.check(classes);
+        }
+
+        /**
+         * Activity module should not depend on leaderboard internals.
+         *
+         * <p>Activity and leaderboard are peer modules - they should not
+         * have direct dependencies on each other's internal implementation.
+         */
+        @Test
+        @DisplayName("Activity does not depend on leaderboard internals")
+        void activityDoesNotDependOnLeaderboardInternals() {
+            ArchRule rule = noClasses()
+                .that()
+                .resideInAPackage("..activity..")
+                .should()
+                .dependOnClassesThat()
+                .resideInAnyPackage("..leaderboard..internal..", "..leaderboard..repository..")
+                .allowEmptyShould(true)
+                .because("Activity should not depend on leaderboard internal classes");
+            rule.check(classes);
+        }
+
+        /**
+         * Mentor module should only depend on gitprovider and shared modules.
+         *
+         * <p>Mentor is a standalone feature that consumes pull request data.
+         */
+        @Test
+        @DisplayName("Mentor has limited dependencies on feature modules")
+        void mentorHasLimitedDependencies() {
+            ArchRule rule = noClasses()
+                .that()
+                .resideInAPackage("..mentor..")
+                .should()
+                .dependOnClassesThat()
+                .resideInAnyPackage("..leaderboard..", "..activity..", "..notification..")
+                .allowEmptyShould(true)
+                .because("Mentor should be isolated from other feature modules");
+            rule.check(classes);
+        }
+
+        /**
+         * Profile module should not depend on core sync logic.
+         *
+         * <p>Profile is a read-only view module that should not modify
+         * or depend on the sync engine internals.
+         */
+        @Test
+        @DisplayName("Profile does not depend on gitprovider sync internals")
+        void profileDoesNotDependOnSyncInternals() {
+            ArchRule rule = noClasses()
+                .that()
+                .resideInAPackage("..profile..")
+                .should()
+                .dependOnClassesThat()
+                .resideInAnyPackage("..gitprovider..sync..", "..gitprovider..github..service..")
+                .allowEmptyShould(true)
+                .because("Profile should only read data, not depend on sync internals");
+            rule.check(classes);
+        }
+
+        /**
+         * Notification module should not directly depend on feature module internals.
+         *
+         * <p>Notification should receive events through the event system,
+         * not by depending on feature module implementations.
+         */
+        @Test
+        @DisplayName("Notification uses events, not direct dependencies")
+        void notificationUsesEventsNotDirectDependencies() {
+            ArchRule rule = noClasses()
+                .that()
+                .resideInAPackage("..notification..")
+                .should()
+                .dependOnClassesThat()
+                .resideInAnyPackage("..leaderboard..service..", "..activity..service..", "..mentor..service..")
+                .allowEmptyShould(true)
+                .because("Notification should use domain events for cross-module communication");
+            rule.check(classes);
+        }
+    }
 }

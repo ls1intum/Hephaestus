@@ -117,6 +117,13 @@ public class GitHubMilestoneProcessor {
             // Default to OPEN for new milestones without state
             milestone.setState(Milestone.State.OPEN);
         }
+        // Set issue counts if provided
+        if (dto.openIssuesCount() != null) {
+            milestone.setOpenIssuesCount(dto.openIssuesCount());
+        }
+        if (dto.closedIssuesCount() != null) {
+            milestone.setClosedIssuesCount(dto.closedIssuesCount());
+        }
         milestone.setRepository(repository);
 
         // Set creator if provided

@@ -1,18 +1,22 @@
 package de.tum.in.www1.hephaestus.gitprovider.team.github;
 
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.*;
+
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.TeamConnection;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.TeamMemberConnection;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.TeamPrivacy;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.TeamRepositoryConnection;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.User;
 import de.tum.in.www1.hephaestus.gitprovider.team.Team;
 import de.tum.in.www1.hephaestus.gitprovider.team.TeamRepository;
 import de.tum.in.www1.hephaestus.gitprovider.team.github.dto.GitHubTeamEventDTO;
 import de.tum.in.www1.hephaestus.gitprovider.team.membership.TeamMembership;
 import de.tum.in.www1.hephaestus.gitprovider.team.membership.TeamMembershipRepository;
-import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserProcessor;
 import de.tum.in.www1.hephaestus.gitprovider.user.github.dto.GitHubUserDTO;
-import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -36,9 +40,9 @@ import org.springframework.transaction.annotation.Transactional;
 public class GitHubTeamSyncService {
 
     private static final Logger logger = LoggerFactory.getLogger(GitHubTeamSyncService.class);
-    private static final int GRAPHQL_PAGE_SIZE = 100;
-    private static final Duration GRAPHQL_TIMEOUT = Duration.ofSeconds(30);
     private static final String GET_ORGANIZATION_TEAMS_DOCUMENT = "GetOrganizationTeams";
+    private static final String GET_TEAM_MEMBERS_DOCUMENT = "GetTeamMembers";
+    private static final String GET_TEAM_REPOSITORIES_DOCUMENT = "GetTeamRepositories";
 
     private final TeamRepository teamRepository;
     private final TeamMembershipRepository teamMembershipRepository;
@@ -89,7 +93,7 @@ public class GitHubTeamSyncService {
                 TeamConnection response = client
                     .documentName(GET_ORGANIZATION_TEAMS_DOCUMENT)
                     .variable("login", organizationLogin)
-                    .variable("first", GRAPHQL_PAGE_SIZE)
+                    .variable("first", LARGE_PAGE_SIZE)
                     .variable("after", cursor)
                     .retrieve("organization.teams")
                     .toEntity(TeamConnection.class)
@@ -103,7 +107,7 @@ public class GitHubTeamSyncService {
                     Team team = processTeam(graphQlTeam, organizationLogin);
                     if (team != null) {
                         syncedTeamIds.add(team.getId());
-                        syncTeamMemberships(team, graphQlTeam);
+                        syncTeamMemberships(client, team, graphQlTeam, organizationLogin);
                         totalSynced++;
                     }
                 }
@@ -156,29 +160,54 @@ public class GitHubTeamSyncService {
      * <p>
      * For each member in the team's members connection, this method ensures the
      * user exists and creates a TeamMembership record if one doesn't already exist.
+     * If the team has more than 100 members, this method paginates through all members
+     * using the GetTeamMembers query.
      *
-     * @param team      the Team entity
-     * @param graphQlTeam the GraphQL team object containing members
+     * @param client          the GraphQL client for additional queries
+     * @param team            the Team entity
+     * @param graphQlTeam     the GraphQL team object containing members
+     * @param organizationLogin the organization login for pagination queries
      */
     private void syncTeamMemberships(
+        HttpGraphQlClient client,
         Team team,
-        de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.Team graphQlTeam
+        de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.Team graphQlTeam,
+        String organizationLogin
     ) {
         var membersConnection = graphQlTeam.getMembers();
         if (membersConnection == null || membersConnection.getNodes() == null) {
             return;
         }
 
+        // Collect all members - paginate if needed
+        List<User> allMembers = new ArrayList<>(membersConnection.getNodes());
+        var membersPageInfo = membersConnection.getPageInfo();
+
+        if (membersPageInfo != null && Boolean.TRUE.equals(membersPageInfo.getHasNextPage())) {
+            logger.debug(
+                "Team {} has more than 100 members (totalCount={}), fetching additional pages",
+                team.getName(),
+                membersConnection.getTotalCount()
+            );
+            List<User> additionalMembers = fetchAllTeamMembers(
+                client,
+                organizationLogin,
+                graphQlTeam.getSlug(),
+                membersPageInfo.getEndCursor()
+            );
+            allMembers.addAll(additionalMembers);
+        }
+
         Set<Long> syncedMemberIds = new HashSet<>();
 
-        for (var graphQlUser : membersConnection.getNodes()) {
+        for (var graphQlUser : allMembers) {
             if (graphQlUser == null || graphQlUser.getDatabaseId() == null) {
                 continue;
             }
 
             // Convert GraphQL User to GitHubUserDTO and ensure user exists
             GitHubUserDTO userDTO = convertUserToDTO(graphQlUser);
-            User user = userProcessor.ensureExists(userDTO);
+            de.tum.in.www1.hephaestus.gitprovider.user.User user = userProcessor.ensureExists(userDTO);
 
             if (user != null) {
                 syncedMemberIds.add(user.getId());
@@ -194,6 +223,103 @@ public class GitHubTeamSyncService {
 
         // Remove memberships for users no longer in the team
         removeStaleTeamMemberships(team, syncedMemberIds);
+    }
+
+    /**
+     * Fetches all remaining team members using pagination.
+     *
+     * @param client            the GraphQL client
+     * @param organizationLogin the organization login
+     * @param teamSlug          the team slug
+     * @param startCursor       the cursor to start from
+     * @return list of all remaining members
+     */
+    private List<User> fetchAllTeamMembers(
+        HttpGraphQlClient client,
+        String organizationLogin,
+        String teamSlug,
+        String startCursor
+    ) {
+        List<User> allMembers = new ArrayList<>();
+        String cursor = startCursor;
+        boolean hasNextPage = true;
+
+        while (hasNextPage) {
+            TeamMemberConnection response = client
+                .documentName(GET_TEAM_MEMBERS_DOCUMENT)
+                .variable("orgLogin", organizationLogin)
+                .variable("teamSlug", teamSlug)
+                .variable("first", LARGE_PAGE_SIZE)
+                .variable("after", cursor)
+                .retrieve("organization.team.members")
+                .toEntity(TeamMemberConnection.class)
+                .block(GRAPHQL_TIMEOUT);
+
+            if (response == null || response.getNodes() == null) {
+                break;
+            }
+
+            allMembers.addAll(response.getNodes());
+
+            var pageInfo = response.getPageInfo();
+            hasNextPage = pageInfo != null && Boolean.TRUE.equals(pageInfo.getHasNextPage());
+            cursor = pageInfo != null ? pageInfo.getEndCursor() : null;
+        }
+
+        return allMembers;
+    }
+
+    /**
+     * Fetches all remaining team repositories using pagination.
+     *
+     * @param client            the GraphQL client
+     * @param organizationLogin the organization login
+     * @param teamSlug          the team slug
+     * @param startCursor       the cursor to start from
+     * @return the repository connection with all remaining repositories
+     */
+    private TeamRepositoryConnection fetchAllTeamRepositories(
+        HttpGraphQlClient client,
+        String organizationLogin,
+        String teamSlug,
+        String startCursor
+    ) {
+        List<de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.TeamRepositoryEdge> allEdges =
+            new ArrayList<>();
+        String cursor = startCursor;
+        boolean hasNextPage = true;
+        Integer totalCount = null;
+
+        while (hasNextPage) {
+            TeamRepositoryConnection response = client
+                .documentName(GET_TEAM_REPOSITORIES_DOCUMENT)
+                .variable("orgLogin", organizationLogin)
+                .variable("teamSlug", teamSlug)
+                .variable("first", LARGE_PAGE_SIZE)
+                .variable("after", cursor)
+                .retrieve("organization.team.repositories")
+                .toEntity(TeamRepositoryConnection.class)
+                .block(GRAPHQL_TIMEOUT);
+
+            if (response == null || response.getEdges() == null) {
+                break;
+            }
+
+            allEdges.addAll(response.getEdges());
+            if (totalCount == null) {
+                totalCount = response.getTotalCount();
+            }
+
+            var pageInfo = response.getPageInfo();
+            hasNextPage = pageInfo != null && Boolean.TRUE.equals(pageInfo.getHasNextPage());
+            cursor = pageInfo != null ? pageInfo.getEndCursor() : null;
+        }
+
+        // Create a new connection with all edges
+        TeamRepositoryConnection result = new TeamRepositoryConnection();
+        result.setEdges(allEdges);
+        result.setTotalCount(totalCount);
+        return result;
     }
 
     /**

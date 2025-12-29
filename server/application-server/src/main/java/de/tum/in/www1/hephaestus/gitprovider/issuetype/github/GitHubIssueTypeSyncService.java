@@ -1,5 +1,7 @@
 package de.tum.in.www1.hephaestus.gitprovider.issuetype.github;
 
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.*;
+
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider.WorkspaceSyncMetadata;
@@ -9,7 +11,6 @@ import de.tum.in.www1.hephaestus.gitprovider.issuetype.IssueType;
 import de.tum.in.www1.hephaestus.gitprovider.issuetype.IssueTypeRepository;
 import de.tum.in.www1.hephaestus.gitprovider.organization.Organization;
 import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationRepository;
-import java.time.Duration;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.List;
@@ -29,8 +30,6 @@ import org.springframework.transaction.annotation.Transactional;
 public class GitHubIssueTypeSyncService {
 
     private static final Logger logger = LoggerFactory.getLogger(GitHubIssueTypeSyncService.class);
-    private static final int GRAPHQL_PAGE_SIZE = 100;
-    private static final Duration GRAPHQL_TIMEOUT = Duration.ofSeconds(30);
     private static final String GET_ISSUE_TYPES_DOCUMENT = "GetOrganizationIssueTypes";
 
     private final IssueTypeRepository issueTypeRepository;
@@ -100,7 +99,7 @@ public class GitHubIssueTypeSyncService {
                 IssueTypeConnection response = client
                     .documentName(GET_ISSUE_TYPES_DOCUMENT)
                     .variable("login", orgLogin)
-                    .variable("first", GRAPHQL_PAGE_SIZE)
+                    .variable("first", LARGE_PAGE_SIZE)
                     .variable("after", cursor)
                     .retrieve("organization.issueTypes")
                     .toEntity(IssueTypeConnection.class)

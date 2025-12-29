@@ -154,7 +154,9 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
                 "A new milestone for testing",
                 "open",
                 Instant.parse("2025-11-30T08:00:00Z"),
-                "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/milestone/3"
+                "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/milestone/3",
+                0,
+                0
             );
 
             // When
@@ -209,7 +211,9 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
                 "Updated description",
                 "closed",
                 Instant.parse("2026-01-14T08:00:00Z"),
-                "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/milestone/3"
+                "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/milestone/3",
+                0,
+                0
             );
 
             // When
@@ -253,7 +257,9 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
                 "desc",
                 "open",
                 null,
-                "https://example.com"
+                "https://example.com",
+                0,
+                0
             );
 
             // When
@@ -290,7 +296,9 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
                 "new description",
                 "open",
                 null,
-                "https://example.com"
+                "https://example.com",
+                0,
+                0
             );
 
             // When
@@ -316,7 +324,9 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
                 null, // null description
                 "open",
                 null,
-                "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/milestone/5"
+                "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/milestone/5",
+                0,
+                0
             );
 
             // When
@@ -339,7 +349,9 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
                 "Has description but no due date",
                 "open",
                 null, // null dueOn
-                "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/milestone/6"
+                "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/milestone/6",
+                0,
+                0
             );
 
             // When
@@ -362,7 +374,9 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
                 "Same every time",
                 "open",
                 null,
-                "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/milestone/7"
+                "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/milestone/7",
+                0,
+                0
             );
 
             // When - process twice
@@ -388,7 +402,9 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
                 "Description",
                 "open",
                 null,
-                "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/milestone/8"
+                "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/milestone/8",
+                0,
+                0
             );
 
             // When
@@ -413,7 +429,9 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
                 "Description",
                 "open",
                 null,
-                "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/milestone/9"
+                "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/milestone/9",
+                0,
+                0
             );
             GitHubUserDTO newCreator = new GitHubUserDTO(
                 newUserId,
@@ -448,7 +466,9 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
                 "Description",
                 "open",
                 null,
-                "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/milestone/10"
+                "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/milestone/10",
+                0,
+                0
             );
 
             // When
@@ -471,7 +491,9 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
                 "Description",
                 "closed",
                 null,
-                "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/milestone/11"
+                "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/milestone/11",
+                0,
+                0
             );
 
             // When
@@ -493,7 +515,9 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
                 "Description",
                 null, // null state
                 null,
-                "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/milestone/12"
+                "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/milestone/12",
+                0,
+                0
             );
 
             // When

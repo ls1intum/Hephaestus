@@ -183,6 +183,129 @@ class CodeQualityTest {
     }
 
     // ========================================================================
+    // METHOD COMPLEXITY LIMITS
+    // ========================================================================
+
+    @Nested
+    @DisplayName("Method Complexity")
+    class MethodComplexityTests {
+
+        /** Maximum parameters per method - indicates complex method. */
+        private static final int MAX_METHOD_PARAMETERS = 6;
+
+        /**
+         * Methods should not have too many parameters.
+         *
+         * <p>Too many parameters indicates complex methods that are hard
+         * to test and maintain. Consider using parameter objects.
+         */
+        @Test
+        @DisplayName("Methods have limited parameters (max 6)")
+        void methodsHaveLimitedParameters() {
+            ArchCondition<JavaClass> haveMethodsWithLimitedParams = new ArchCondition<>(
+                "have methods with at most " + MAX_METHOD_PARAMETERS + " parameters"
+            ) {
+                @Override
+                public void check(JavaClass javaClass, ConditionEvents events) {
+                    javaClass
+                        .getMethods()
+                        .stream()
+                        .filter(m -> m.getOwner().equals(javaClass)) // Only declared methods
+                        .filter(m -> !m.getName().startsWith("$")) // Exclude synthetic
+                        .filter(m -> !m.getName().equals("<init>")) // Exclude constructors
+                        .filter(m -> !m.getName().startsWith("lambda$")) // Exclude lambdas
+                        .forEach(method -> {
+                            int paramCount = method.getRawParameterTypes().size();
+                            if (paramCount > MAX_METHOD_PARAMETERS) {
+                                events.add(
+                                    SimpleConditionEvent.violated(
+                                        javaClass,
+                                        String.format(
+                                            "COMPLEXITY: %s.%s has %d parameters (max %d) - consider parameter object",
+                                            javaClass.getSimpleName(),
+                                            method.getName(),
+                                            paramCount,
+                                            MAX_METHOD_PARAMETERS
+                                        )
+                                    )
+                                );
+                            }
+                        });
+                }
+            };
+
+            ArchRule rule = classes()
+                .that()
+                .resideInAPackage(BASE_PACKAGE + "..")
+                .and()
+                .resideOutsideOfPackage("..intelligenceservice..")
+                .and()
+                .resideOutsideOfPackage(GENERATED_GRAPHQL_PACKAGE)
+                .and()
+                .areNotAnonymousClasses()
+                .and()
+                .areNotMemberClasses()
+                .should(haveMethodsWithLimitedParams)
+                .because("Too many parameters indicates complex methods needing refactoring");
+
+            rule.check(classes);
+        }
+
+        /**
+         * Public methods in services should not have excessive nesting indicators.
+         *
+         * <p>Methods with many boolean parameters often indicate high cyclomatic complexity.
+         * This is a proxy check since ArchUnit cannot directly measure cyclomatic complexity.
+         */
+        @Test
+        @DisplayName("Service methods avoid excessive boolean parameters")
+        void serviceMethodsAvoidExcessiveBooleanParams() {
+            ArchCondition<JavaClass> avoidManyBooleans = new ArchCondition<>(
+                "avoid methods with more than 2 boolean parameters"
+            ) {
+                @Override
+                public void check(JavaClass javaClass, ConditionEvents events) {
+                    javaClass
+                        .getMethods()
+                        .stream()
+                        .filter(m -> m.getOwner().equals(javaClass))
+                        .filter(m -> !m.getName().startsWith("$"))
+                        .forEach(method -> {
+                            long booleanCount = method
+                                .getRawParameterTypes()
+                                .stream()
+                                .filter(p -> p.getName().equals("boolean") || p.getName().equals("java.lang.Boolean"))
+                                .count();
+                            if (booleanCount > 2) {
+                                events.add(
+                                    SimpleConditionEvent.violated(
+                                        javaClass,
+                                        String.format(
+                                            "COMPLEXITY: %s.%s has %d boolean params - consider using enum or builder",
+                                            javaClass.getSimpleName(),
+                                            method.getName(),
+                                            booleanCount
+                                        )
+                                    )
+                                );
+                            }
+                        });
+                }
+            };
+
+            ArchRule rule = classes()
+                .that()
+                .haveSimpleNameEndingWith("Service")
+                .and()
+                .resideOutsideOfPackage("..intelligenceservice..")
+                .should(avoidManyBooleans)
+                .because("Multiple boolean parameters indicate complexity and poor API design");
+
+            rule.check(classes);
+        }
+    }
+
+    // ========================================================================
     // SECURITY PATTERNS
     // ========================================================================
 

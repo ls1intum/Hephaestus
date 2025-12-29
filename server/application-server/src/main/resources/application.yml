@@ -30,6 +30,10 @@ spring:
             hibernate:
                 integrator_provider: de.tum.in.www1.hephaestus.ClassImportIntegratorIntegratorProvider
                 format_sql: "true"
+                jdbc:
+                    batch_size: 50
+                order_inserts: true
+                order_updates: true
 
     liquibase:
         change-log: classpath:db/master.xml
@@ -268,3 +272,25 @@ slack:
 
 sentry:
     dsn: ""
+
+# ═══════════════════════════════════════════════════════════════════════════
+# RESILIENCE4J CIRCUIT BREAKER
+# ═══════════════════════════════════════════════════════════════════════════
+# Protects against cascading failures when GitHub API is unavailable
+# See ResilienceConfig.java for default values; these can be overridden here
+resilience4j:
+    circuitbreaker:
+        configs:
+            default:
+                slidingWindowSize: 10
+                failureRateThreshold: 50
+                waitDurationInOpenState: 30s
+                permittedNumberOfCallsInHalfOpenState: 3
+                minimumNumberOfCalls: 5
+                slowCallDurationThreshold: 10s
+                slowCallRateThreshold: 80
+        instances:
+            githubGraphQl:
+                baseConfig: default
+            githubRest:
+                baseConfig: default

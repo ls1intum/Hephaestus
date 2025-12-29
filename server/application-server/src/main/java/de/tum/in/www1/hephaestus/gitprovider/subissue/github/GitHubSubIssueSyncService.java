@@ -1,6 +1,10 @@
 package de.tum.in.www1.hephaestus.gitprovider.subissue.github;
 
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.*;
+
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser.RepositoryOwnerAndName;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider.WorkspaceSyncMetadata;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.IssueConnection;
@@ -9,7 +13,6 @@ import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.issue.IssueRepository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
-import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -48,8 +51,6 @@ import org.springframework.transaction.annotation.Transactional;
 public class GitHubSubIssueSyncService {
 
     private static final Logger logger = LoggerFactory.getLogger(GitHubSubIssueSyncService.class);
-    private static final int GRAPHQL_PAGE_SIZE = 100;
-    private static final Duration GRAPHQL_TIMEOUT = Duration.ofSeconds(30);
 
     /** Document name for graphql-documents/GetSubIssuesForRepository.graphql */
     private static final String GET_SUB_ISSUES_DOCUMENT = "GetSubIssuesForRepository";
@@ -256,14 +257,13 @@ public class GitHubSubIssueSyncService {
     }
 
     private int syncSubIssuesForRepository(HttpGraphQlClient client, Repository repository) {
-        String[] parts = repository.getNameWithOwner().split("/");
-        if (parts.length != 2) {
+        Optional<RepositoryOwnerAndName> parsedName = GitHubRepositoryNameParser.parse(repository.getNameWithOwner());
+        if (parsedName.isEmpty()) {
             logger.warn("Invalid repository name format: {}", repository.getNameWithOwner());
             return 0;
         }
-
-        String owner = parts[0];
-        String name = parts[1];
+        String owner = parsedName.get().owner();
+        String name = parsedName.get().name();
         String cursor = null;
         boolean hasNextPage = true;
         int linkedCount = 0;
@@ -275,7 +275,7 @@ public class GitHubSubIssueSyncService {
                     .documentName(GET_SUB_ISSUES_DOCUMENT)
                     .variable("owner", owner)
                     .variable("name", name)
-                    .variable("first", GRAPHQL_PAGE_SIZE)
+                    .variable("first", LARGE_PAGE_SIZE)
                     .variable("after", cursor)
                     .retrieve("repository.issues")
                     .toEntity(IssueConnection.class)

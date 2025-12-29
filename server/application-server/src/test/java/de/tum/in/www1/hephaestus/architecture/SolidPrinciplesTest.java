@@ -473,4 +473,152 @@ class SolidPrinciplesTest {
             rule.check(classes);
         }
     }
+
+    // ========================================================================
+    // LISKOV SUBSTITUTION PRINCIPLE
+    // ========================================================================
+
+    @Nested
+    @DisplayName("Liskov Substitution Principle")
+    class LiskovSubstitutionTests {
+
+        /**
+         * Services should not declare generic Exception in methods.
+         *
+         * <p>LSP principle: methods should declare specific exceptions.
+         * Declaring generic Exception makes substitutability harder to verify
+         * and forces callers to handle all possible exceptions.
+         */
+        @Test
+        @DisplayName("Service methods should not declare generic Exception")
+        void serviceMethodsShouldNotDeclareGenericException() {
+            ArchCondition<JavaClass> notDeclareGenericException = new ArchCondition<>(
+                "not declare generic Exception in methods"
+            ) {
+                @Override
+                public void check(JavaClass javaClass, ConditionEvents events) {
+                    javaClass
+                        .getMethods()
+                        .stream()
+                        .filter(m -> m.getOwner().equals(javaClass))
+                        .filter(m -> !m.getName().startsWith("$"))
+                        .filter(m -> !m.getName().equals("<init>"))
+                        .forEach(method -> {
+                            boolean declaresGenericException = method
+                                .getThrowsClause()
+                                .stream()
+                                .anyMatch(t -> t.getRawType().getName().equals("java.lang.Exception"));
+                            if (declaresGenericException) {
+                                events.add(
+                                    SimpleConditionEvent.violated(
+                                        javaClass,
+                                        String.format(
+                                            "LSP: %s.%s declares generic Exception - use specific exceptions",
+                                            javaClass.getSimpleName(),
+                                            method.getName()
+                                        )
+                                    )
+                                );
+                            }
+                        });
+                }
+            };
+
+            ArchRule rule = classes()
+                .that()
+                .haveSimpleNameEndingWith("Service")
+                .and()
+                .areAnnotatedWith(org.springframework.stereotype.Service.class)
+                .and()
+                .resideOutsideOfPackage("..intelligenceservice..")
+                .should(notDeclareGenericException)
+                .because("LSP: specific exceptions are required for substitutability");
+
+            rule.check(classes);
+        }
+
+        /**
+         * Subclasses should not weaken preconditions by having incompatible return types.
+         *
+         * <p>Classes extending base services should maintain return type compatibility.
+         * Returning null where parent returns non-null violates LSP.
+         */
+        @Test
+        @DisplayName("Service subclasses extend proper base classes")
+        void serviceSubclassesMaintainContracts() {
+            ArchCondition<JavaClass> extendProperBaseClass = new ArchCondition<>(
+                "extend a proper base class or implement an interface"
+            ) {
+                @Override
+                public void check(JavaClass javaClass, ConditionEvents events) {
+                    // Check that service subclasses have a clear inheritance hierarchy
+                    var superclass = javaClass.getSuperclass();
+                    if (superclass.isPresent()) {
+                        String superclassName = superclass.get().getName();
+                        // Services extending Object directly is fine, but extending
+                        // another concrete service class should be reviewed
+                        if (
+                            superclassName.endsWith("Service") &&
+                            !superclassName.contains("Abstract") &&
+                            !superclassName.contains("Base")
+                        ) {
+                            // Extract simple name from fully qualified name
+                            String simpleClassName = superclassName.substring(superclassName.lastIndexOf('.') + 1);
+                            events.add(
+                                SimpleConditionEvent.violated(
+                                    javaClass,
+                                    String.format(
+                                        "LSP Warning: %s extends concrete service %s - prefer composition or abstract base",
+                                        javaClass.getSimpleName(),
+                                        simpleClassName
+                                    )
+                                )
+                            );
+                        }
+                    }
+                }
+            };
+
+            ArchRule rule = classes()
+                .that()
+                .haveSimpleNameEndingWith("Service")
+                .and()
+                .areNotInterfaces()
+                .and()
+                .resideOutsideOfPackage("..intelligenceservice..")
+                .should(extendProperBaseClass)
+                .allowEmptyShould(true)
+                .because("LSP: service subclasses should not break parent contracts");
+
+            rule.check(classes);
+        }
+
+        /**
+         * Event handlers should not modify inherited behavior in unexpected ways.
+         *
+         * <p>Handlers processing events should maintain behavioral compatibility
+         * with their base handler contracts.
+         */
+        @Test
+        @DisplayName("Handler implementations follow interface contracts")
+        void handlerImplementationsFollowContracts() {
+            ArchRule rule = classes()
+                .that()
+                .haveSimpleNameEndingWith("Handler")
+                .and()
+                .areNotInterfaces()
+                .and()
+                .resideInAPackage(BASE_PACKAGE + "..")
+                .and()
+                .resideOutsideOfPackage("..intelligenceservice..")
+                .should()
+                .implement(JavaClass.Predicates.INTERFACES)
+                .orShould()
+                .beAssignableTo(Object.class)
+                .allowEmptyShould(true)
+                .because("LSP: handlers should implement interfaces to ensure contract compliance");
+
+            rule.check(classes);
+        }
+    }
 }

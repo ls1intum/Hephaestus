@@ -457,7 +457,9 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
                 "First release",
                 "open",
                 Instant.now().plusSeconds(86400 * 30), // dueOn
-                "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/milestone/2"
+                "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/milestone/2",
+                0,
+                0
             );
 
             GitHubPullRequestDTO dto = new GitHubPullRequestDTO(

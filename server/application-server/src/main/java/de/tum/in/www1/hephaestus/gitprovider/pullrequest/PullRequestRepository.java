@@ -1,11 +1,14 @@
 package de.tum.in.www1.hephaestus.gitprovider.pullrequest;
 
+import jakarta.persistence.QueryHint;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Stream;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.jpa.repository.QueryHints;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
@@ -98,4 +101,17 @@ public interface PullRequestRepository extends JpaRepository<PullRequest, Long> 
      * @return list of pull requests for the repository
      */
     List<PullRequest> findAllByRepository_Id(Long repositoryId);
+
+    /**
+     * Streams all pull requests belonging to a repository.
+     * <p>
+     * Must be used within a try-with-resources block to ensure the stream is closed
+     * and the database connection is released. The calling method must be annotated
+     * with @Transactional(readOnly = true) for streaming to work properly.
+     *
+     * @param repositoryId the repository ID
+     * @return stream of pull requests for the repository
+     */
+    @QueryHints(@QueryHint(name = org.hibernate.jpa.HibernateHints.HINT_FETCH_SIZE, value = "50"))
+    Stream<PullRequest> streamAllByRepository_Id(Long repositoryId);
 }

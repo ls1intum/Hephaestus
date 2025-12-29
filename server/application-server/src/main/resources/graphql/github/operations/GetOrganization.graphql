@@ -2,6 +2,11 @@
 # Used by GraphQL-based sync services
 
 query GetOrganization($login: String!) {
+	rateLimit {
+		cost
+		remaining
+		resetAt
+	}
 	organization(login: $login) {
 		__typename
 		id
@@ -19,6 +24,9 @@ query GetOrganization($login: String!) {
 		# Organization members
 		membersWithRole(first: 100) {
 			totalCount
+			pageInfo {
+				hasNextPage
+			}
 			edges {
 				role
 				node {

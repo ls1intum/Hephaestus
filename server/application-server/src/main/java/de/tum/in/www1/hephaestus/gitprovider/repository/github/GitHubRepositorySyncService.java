@@ -1,12 +1,15 @@
 package de.tum.in.www1.hephaestus.gitprovider.repository.github;
 
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.*;
+
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser.RepositoryOwnerAndName;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.RepositoryOwner;
 import de.tum.in.www1.hephaestus.gitprovider.organization.Organization;
 import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationRepository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
-import java.time.Duration;
 import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -93,14 +96,13 @@ public class GitHubRepositorySyncService {
      */
     @Transactional
     public Optional<Repository> syncRepository(Long workspaceId, String nameWithOwner) {
-        String[] parts = nameWithOwner.split("/");
-        if (parts.length != 2) {
-            logger.warn("Invalid repository name: {}", nameWithOwner);
+        Optional<RepositoryOwnerAndName> parsedName = GitHubRepositoryNameParser.parse(nameWithOwner);
+        if (parsedName.isEmpty()) {
+            logger.warn("Invalid repository name format: {}", nameWithOwner);
             return Optional.empty();
         }
-
-        String repoOwner = parts[0];
-        String repoName = parts[1];
+        String repoOwner = parsedName.get().owner();
+        String repoName = parsedName.get().name();
 
         try {
             HttpGraphQlClient client = graphQlClientProvider.forWorkspace(workspaceId);
@@ -109,7 +111,7 @@ public class GitHubRepositorySyncService {
                 .variable("owner", repoOwner)
                 .variable("name", repoName)
                 .execute()
-                .block(Duration.ofSeconds(30));
+                .block(GRAPHQL_TIMEOUT);
 
             if (response == null || !response.isValid()) {
                 logger.warn(

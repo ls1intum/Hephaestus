@@ -1,6 +1,10 @@
 package de.tum.in.www1.hephaestus.gitprovider.issuedependency.github;
 
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.*;
+
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser.RepositoryOwnerAndName;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider.WorkspaceSyncMetadata;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.IssueConnection;
@@ -8,7 +12,6 @@ import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.issue.IssueRepository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
-import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -49,8 +52,6 @@ import org.springframework.transaction.annotation.Transactional;
 public class GitHubIssueDependencySyncService {
 
     private static final Logger logger = LoggerFactory.getLogger(GitHubIssueDependencySyncService.class);
-    private static final int GRAPHQL_PAGE_SIZE = 100;
-    private static final Duration GRAPHQL_TIMEOUT = Duration.ofSeconds(30);
 
     /** Document name for graphql-documents/GetIssueDependencies.graphql */
     private static final String GET_DEPENDENCIES_DOCUMENT = "GetIssueDependencies";
@@ -209,14 +210,13 @@ public class GitHubIssueDependencySyncService {
      * Uses type-safe generated DTOs for GraphQL response handling.
      */
     private int syncRepositoryDependencies(HttpGraphQlClient client, Repository repo) {
-        String[] parts = repo.getNameWithOwner().split("/");
-        if (parts.length != 2) {
+        Optional<RepositoryOwnerAndName> parsedName = GitHubRepositoryNameParser.parse(repo.getNameWithOwner());
+        if (parsedName.isEmpty()) {
             logger.warn("Invalid repository name format: {}", repo.getNameWithOwner());
             return 0;
         }
-
-        String owner = parts[0];
-        String name = parts[1];
+        String owner = parsedName.get().owner();
+        String name = parsedName.get().name();
         String after = null;
         boolean hasNextPage = true;
         int totalSynced = 0;
@@ -227,7 +227,7 @@ public class GitHubIssueDependencySyncService {
                 .documentName(GET_DEPENDENCIES_DOCUMENT)
                 .variable("owner", owner)
                 .variable("name", name)
-                .variable("first", GRAPHQL_PAGE_SIZE)
+                .variable("first", LARGE_PAGE_SIZE)
                 .variable("after", after)
                 .retrieve("repository.issues")
                 .toEntity(IssueConnection.class)

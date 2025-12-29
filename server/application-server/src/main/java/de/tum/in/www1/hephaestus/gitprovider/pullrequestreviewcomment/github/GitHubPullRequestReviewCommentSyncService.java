@@ -1,9 +1,14 @@
 package de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.github;
 
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.*;
+
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser.RepositoryOwnerAndName;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.Actor;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.CommentAuthorAssociation;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.DiffSide;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.PageInfo;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.PullRequestReviewCommentConnection;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.PullRequestReviewThreadConnection;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.User;
@@ -17,10 +22,14 @@ import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.github.dto.GitHubUserDTO;
 import java.math.BigInteger;
-import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Stream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.graphql.client.ClientGraphQlResponse;
 import org.springframework.graphql.client.HttpGraphQlClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -41,15 +50,16 @@ import org.springframework.transaction.annotation.Transactional;
 public class GitHubPullRequestReviewCommentSyncService {
 
     private static final Logger logger = LoggerFactory.getLogger(GitHubPullRequestReviewCommentSyncService.class);
-    private static final int GRAPHQL_PAGE_SIZE = 50;
-    private static final Duration GRAPHQL_TIMEOUT = Duration.ofSeconds(60);
     private static final String GET_PR_REVIEW_COMMENTS_DOCUMENT = "GetPullRequestReviewComments";
+    private static final String GET_THREAD_COMMENTS_DOCUMENT = "GetThreadComments";
 
     private final RepositoryRepository repositoryRepository;
     private final PullRequestRepository pullRequestRepository;
     private final PullRequestReviewThreadRepository threadRepository;
     private final GitHubGraphQlClientProvider graphQlClientProvider;
     private final GitHubPullRequestReviewCommentProcessor commentProcessor;
+    // Store client reference for nested pagination
+    private HttpGraphQlClient currentClient;
 
     public GitHubPullRequestReviewCommentSyncService(
         RepositoryRepository repositoryRepository,
@@ -67,12 +77,14 @@ public class GitHubPullRequestReviewCommentSyncService {
 
     /**
      * Synchronizes all review comments for all pull requests in a repository using GraphQL.
+     * <p>
+     * Uses streaming to avoid loading all pull requests into memory at once.
      *
      * @param workspaceId  the workspace ID for authentication
      * @param repositoryId the repository ID to sync comments for
      * @return number of comments synced
      */
-    @Transactional
+    @Transactional(readOnly = true)
     public int syncCommentsForRepository(Long workspaceId, Long repositoryId) {
         Repository repository = repositoryRepository.findById(repositoryId).orElse(null);
         if (repository == null) {
@@ -80,8 +92,18 @@ public class GitHubPullRequestReviewCommentSyncService {
             return 0;
         }
 
-        List<PullRequest> pullRequests = pullRequestRepository.findAllByRepository_Id(repositoryId);
-        if (pullRequests.isEmpty()) {
+        AtomicInteger totalSynced = new AtomicInteger(0);
+        AtomicInteger prCount = new AtomicInteger(0);
+
+        try (Stream<PullRequest> prStream = pullRequestRepository.streamAllByRepository_Id(repositoryId)) {
+            prStream.forEach(pullRequest -> {
+                int synced = syncCommentsForPullRequest(workspaceId, pullRequest);
+                totalSynced.addAndGet(synced);
+                prCount.incrementAndGet();
+            });
+        }
+
+        if (prCount.get() == 0) {
             logger.info(
                 "No pull requests found for repository {}, skipping review comment sync",
                 repository.getNameWithOwner()
@@ -89,19 +111,13 @@ public class GitHubPullRequestReviewCommentSyncService {
             return 0;
         }
 
-        int totalSynced = 0;
-        for (PullRequest pullRequest : pullRequests) {
-            int synced = syncCommentsForPullRequest(workspaceId, pullRequest);
-            totalSynced += synced;
-        }
-
         logger.info(
             "Synced {} review comments for {} pull requests in repository {}",
-            totalSynced,
-            pullRequests.size(),
+            totalSynced.get(),
+            prCount.get(),
             repository.getNameWithOwner()
         );
-        return totalSynced;
+        return totalSynced.get();
     }
 
     /**
@@ -124,15 +140,16 @@ public class GitHubPullRequestReviewCommentSyncService {
             return 0;
         }
 
-        String[] parts = repository.getNameWithOwner().split("/");
-        if (parts.length != 2) {
-            logger.warn("Invalid repository nameWithOwner: {}", repository.getNameWithOwner());
+        Optional<RepositoryOwnerAndName> parsedName = GitHubRepositoryNameParser.parse(repository.getNameWithOwner());
+        if (parsedName.isEmpty()) {
+            logger.warn("Invalid repository name format: {}", repository.getNameWithOwner());
             return 0;
         }
-        String owner = parts[0];
-        String name = parts[1];
+        String owner = parsedName.get().owner();
+        String name = parsedName.get().name();
 
         HttpGraphQlClient client = graphQlClientProvider.forWorkspace(workspaceId);
+        this.currentClient = client; // Store for nested pagination
 
         try {
             int totalSynced = 0;
@@ -145,11 +162,11 @@ public class GitHubPullRequestReviewCommentSyncService {
                     .variable("owner", owner)
                     .variable("name", name)
                     .variable("number", pullRequest.getNumber())
-                    .variable("first", GRAPHQL_PAGE_SIZE)
+                    .variable("first", DEFAULT_PAGE_SIZE)
                     .variable("after", cursor)
                     .retrieve("repository.pullRequest.reviewThreads")
                     .toEntity(PullRequestReviewThreadConnection.class)
-                    .block(GRAPHQL_TIMEOUT);
+                    .block(EXTENDED_GRAPHQL_TIMEOUT);
 
                 if (response == null || response.getNodes() == null) {
                     break;
@@ -204,6 +221,13 @@ public class GitHubPullRequestReviewCommentSyncService {
             return 0;
         }
 
+        // Handle nested pagination for thread comments
+        var commentsPageInfo = commentsConnection.getPageInfo();
+        if (commentsPageInfo != null && Boolean.TRUE.equals(commentsPageInfo.getHasNextPage())) {
+            // Fetch all remaining comments using pagination
+            fetchAllRemainingThreadComments(graphQlThread, commentsPageInfo.getEndCursor());
+        }
+
         var graphQlComments = commentsConnection.getNodes();
         if (graphQlComments.isEmpty()) {
             return 0;
@@ -232,6 +256,91 @@ public class GitHubPullRequestReviewCommentSyncService {
         }
 
         return synced;
+    }
+
+    /**
+     * Fetches all remaining comments for a thread when the initial query hit the pagination limit.
+     * This method modifies the graphQlThread's comments list in place by adding all fetched comments.
+     *
+     * @param graphQlThread the thread to fetch remaining comments for
+     * @param startCursor   the cursor to start fetching from
+     */
+    private void fetchAllRemainingThreadComments(
+        de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.PullRequestReviewThread graphQlThread,
+        String startCursor
+    ) {
+        if (currentClient == null) {
+            logger.warn(
+                "No client available for nested pagination, skipping remaining comments for thread {}",
+                graphQlThread.getId()
+            );
+            return;
+        }
+
+        String threadId = graphQlThread.getId();
+        PullRequestReviewCommentConnection existingComments = graphQlThread.getComments();
+        if (existingComments == null || existingComments.getNodes() == null) {
+            return;
+        }
+
+        // Create a mutable list to collect all comments
+        List<de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.PullRequestReviewComment> allComments =
+            new ArrayList<>(existingComments.getNodes());
+
+        String cursor = startCursor;
+        boolean hasMore = true;
+        int fetchedPages = 0;
+
+        while (hasMore) {
+            try {
+                ClientGraphQlResponse response = currentClient
+                    .documentName(GET_THREAD_COMMENTS_DOCUMENT)
+                    .variable("threadId", threadId)
+                    .variable("first", LARGE_PAGE_SIZE)
+                    .variable("after", cursor)
+                    .execute()
+                    .block(GRAPHQL_TIMEOUT);
+
+                if (response == null || !response.isValid()) {
+                    logger.warn(
+                        "Invalid GraphQL response fetching comments for thread {}: {}",
+                        threadId,
+                        response != null ? response.getErrors() : "null"
+                    );
+                    break;
+                }
+
+                PullRequestReviewCommentConnection commentsConnection = response
+                    .field("node.comments")
+                    .toEntity(PullRequestReviewCommentConnection.class);
+
+                if (commentsConnection == null || commentsConnection.getNodes() == null) {
+                    break;
+                }
+
+                allComments.addAll(commentsConnection.getNodes());
+                fetchedPages++;
+
+                PageInfo pageInfo = commentsConnection.getPageInfo();
+                hasMore = pageInfo != null && Boolean.TRUE.equals(pageInfo.getHasNextPage());
+                cursor = pageInfo != null ? pageInfo.getEndCursor() : null;
+            } catch (Exception e) {
+                logger.error("Error fetching additional comments for thread {}: {}", threadId, e.getMessage(), e);
+                break;
+            }
+        }
+
+        // Update the thread's comments with the complete list
+        existingComments.setNodes(allComments);
+
+        if (fetchedPages > 0) {
+            logger.debug(
+                "Fetched {} additional pages of comments for thread {} (total: {} comments)",
+                fetchedPages,
+                threadId,
+                allComments.size()
+            );
+        }
     }
 
     /**
@@ -332,21 +441,31 @@ public class GitHubPullRequestReviewCommentSyncService {
         // Convert author association
         String authorAssociation = convertAuthorAssociation(graphQlComment.getAuthorAssociation());
 
-        // Get review ID if present
+        // Get review ID if present - prefer fullDatabaseId over deprecated databaseId
         Long reviewId = null;
         if (graphQlComment.getPullRequestReview() != null) {
-            Integer reviewDbId = graphQlComment.getPullRequestReview().getDatabaseId();
-            if (reviewDbId != null) {
-                reviewId = reviewDbId.longValue();
+            BigInteger reviewFullDbId = graphQlComment.getPullRequestReview().getFullDatabaseId();
+            if (reviewFullDbId != null) {
+                reviewId = reviewFullDbId.longValue();
+            } else {
+                Integer reviewDbId = graphQlComment.getPullRequestReview().getDatabaseId();
+                if (reviewDbId != null) {
+                    reviewId = reviewDbId.longValue();
+                }
             }
         }
 
-        // Get reply-to ID if present
+        // Get reply-to ID if present - prefer fullDatabaseId over deprecated databaseId
         Long inReplyToId = null;
         if (graphQlComment.getReplyTo() != null) {
-            Integer replyToDbId = graphQlComment.getReplyTo().getDatabaseId();
-            if (replyToDbId != null) {
-                inReplyToId = replyToDbId.longValue();
+            BigInteger replyToFullDbId = graphQlComment.getReplyTo().getFullDatabaseId();
+            if (replyToFullDbId != null) {
+                inReplyToId = replyToFullDbId.longValue();
+            } else {
+                Integer replyToDbId = graphQlComment.getReplyTo().getDatabaseId();
+                if (replyToDbId != null) {
+                    inReplyToId = replyToDbId.longValue();
+                }
             }
         }
 

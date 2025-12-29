@@ -2,8 +2,13 @@ package de.tum.in.www1.hephaestus.gitprovider.common.github;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.github.app.GitHubAppTokenService;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.app.GitHubAppTokenService.InstallationToken;
+import de.tum.in.www1.hephaestus.gitprovider.common.spi.AuthMode;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.InstallationTokenProvider;
-import de.tum.in.www1.hephaestus.gitprovider.common.spi.InstallationTokenProvider.AuthMode;
+import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
+import io.github.resilience4j.circuitbreaker.CircuitBreaker;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.graphql.client.HttpGraphQlClient;
 import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Component;
@@ -17,6 +22,11 @@ import org.springframework.stereotype.Component;
  * client
  * ({@link GitHubClientProvider}), GraphQL clients are lightweight and don't
  * need caching.
+ * <p>
+ * <b>Circuit Breaker Protection:</b>
+ * All clients returned by this provider are protected by a circuit breaker
+ * that prevents cascading failures when GitHub API is unavailable. When the
+ * circuit is open, calls fail fast with {@link CircuitBreakerOpenException}.
  * <p>
  * Usage:
  *
@@ -44,18 +54,79 @@ import org.springframework.stereotype.Component;
 @Component
 public class GitHubGraphQlClientProvider {
 
+    private static final Logger logger = LoggerFactory.getLogger(GitHubGraphQlClientProvider.class);
+
     private final HttpGraphQlClient baseClient;
     private final InstallationTokenProvider tokenProvider;
     private final GitHubAppTokenService appTokens;
+    private final CircuitBreaker circuitBreaker;
 
     public GitHubGraphQlClientProvider(
         HttpGraphQlClient gitHubGraphQlClient,
         InstallationTokenProvider tokenProvider,
-        GitHubAppTokenService appTokens
+        GitHubAppTokenService appTokens,
+        @Qualifier("githubGraphQlCircuitBreaker") CircuitBreaker circuitBreaker
     ) {
         this.baseClient = gitHubGraphQlClient;
         this.tokenProvider = tokenProvider;
         this.appTokens = appTokens;
+        this.circuitBreaker = circuitBreaker;
+    }
+
+    /**
+     * Checks if the circuit breaker allows calls to GitHub.
+     * <p>
+     * Use this to preemptively check if sync operations should be attempted.
+     *
+     * @return true if circuit is closed or half-open, false if open
+     */
+    public boolean isCircuitClosed() {
+        return circuitBreaker.getState() != CircuitBreaker.State.OPEN;
+    }
+
+    /**
+     * Gets the current circuit breaker state for monitoring.
+     *
+     * @return current state (CLOSED, OPEN, HALF_OPEN, DISABLED, FORCED_OPEN)
+     */
+    public CircuitBreaker.State getCircuitState() {
+        return circuitBreaker.getState();
+    }
+
+    /**
+     * Records a successful API call for the circuit breaker.
+     * <p>
+     * Call this after a successful GraphQL operation completes.
+     */
+    public void recordSuccess() {
+        circuitBreaker.onSuccess(0, java.util.concurrent.TimeUnit.MILLISECONDS);
+    }
+
+    /**
+     * Records a failed API call for the circuit breaker.
+     * <p>
+     * Call this when a GraphQL operation fails with a retryable error.
+     *
+     * @param throwable the exception that occurred
+     */
+    public void recordFailure(Throwable throwable) {
+        circuitBreaker.onError(0, java.util.concurrent.TimeUnit.MILLISECONDS, throwable);
+    }
+
+    /**
+     * Checks if the circuit breaker permits a call, throwing if not.
+     * <p>
+     * Call this before making a GraphQL request to fail fast when circuit is open.
+     *
+     * @throws CircuitBreakerOpenException if the circuit is open
+     */
+    public void acquirePermission() {
+        try {
+            circuitBreaker.acquirePermission();
+        } catch (CallNotPermittedException e) {
+            logger.warn("GitHub GraphQL circuit breaker is OPEN - rejecting call");
+            throw new CircuitBreakerOpenException("GitHub GraphQL API circuit breaker is open", e);
+        }
     }
 
     /**
@@ -96,7 +167,7 @@ public class GitHubGraphQlClientProvider {
     private String getToken(Long workspaceId) {
         AuthMode authMode = tokenProvider.getAuthMode(workspaceId);
 
-        if (authMode == AuthMode.GITHUB_APP_INSTALLATION) {
+        if (authMode == AuthMode.GITHUB_APP) {
             Long installationId = tokenProvider
                 .getInstallationId(workspaceId)
                 .orElseThrow(() -> new IllegalStateException("Workspace " + workspaceId + " has no installation id."));

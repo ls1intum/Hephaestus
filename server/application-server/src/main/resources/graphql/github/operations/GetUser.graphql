@@ -2,6 +2,11 @@
 # Used by GraphQL-based sync services
 
 query GetUser($login: String!) {
+	rateLimit {
+		cost
+		remaining
+		resetAt
+	}
 	user(login: $login) {
 		id
 		databaseId

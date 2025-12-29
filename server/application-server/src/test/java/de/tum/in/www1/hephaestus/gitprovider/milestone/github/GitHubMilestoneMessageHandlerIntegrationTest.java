@@ -288,7 +288,9 @@ class GitHubMilestoneMessageHandlerIntegrationTest extends BaseIntegrationTest {
                 "Test description",
                 "open",
                 null,
-                "https://example.com"
+                "https://example.com",
+                0,
+                0
             );
             GitHubMilestoneEventDTO event = new GitHubMilestoneEventDTO("created", milestoneDto, null, null);
 
@@ -308,7 +310,9 @@ class GitHubMilestoneMessageHandlerIntegrationTest extends BaseIntegrationTest {
                 null, // null description
                 "open",
                 null,
-                "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/milestone/1"
+                "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/milestone/1",
+                0,
+                0
             );
             GitHubMilestoneEventDTO event = new GitHubMilestoneEventDTO(
                 "created",
@@ -342,7 +346,9 @@ class GitHubMilestoneMessageHandlerIntegrationTest extends BaseIntegrationTest {
                 "Description",
                 "open",
                 null, // null dueOn
-                "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/milestone/2"
+                "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/milestone/2",
+                0,
+                0
             );
             GitHubMilestoneEventDTO event = new GitHubMilestoneEventDTO(
                 "created",
@@ -386,7 +392,9 @@ class GitHubMilestoneMessageHandlerIntegrationTest extends BaseIntegrationTest {
                 null, // setting to null
                 "open",
                 null,
-                "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/milestone/10"
+                "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/milestone/10",
+                0,
+                0
             );
             GitHubMilestoneEventDTO event = new GitHubMilestoneEventDTO(
                 "edited",
@@ -441,7 +449,9 @@ class GitHubMilestoneMessageHandlerIntegrationTest extends BaseIntegrationTest {
                 "desc",
                 "open",
                 null,
-                "https://example.com"
+                "https://example.com",
+                0,
+                0
             );
             GitHubMilestoneEventDTO event = new GitHubMilestoneEventDTO(
                 "unknown_action", // not created/edited/closed/opened/deleted
@@ -539,7 +549,9 @@ class GitHubMilestoneMessageHandlerIntegrationTest extends BaseIntegrationTest {
                 "Updated description",
                 "open",
                 Instant.parse("2026-01-14T08:00:00Z"),
-                "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/milestone/3"
+                "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/milestone/3",
+                0,
+                0
             );
             GitHubMilestoneEventDTO editEvent = new GitHubMilestoneEventDTO(
                 "edited",

@@ -375,33 +375,6 @@ public class WorkspaceRepositoryMonitorService {
     // ========================================================================
 
     /**
-     * Converts a RepositoryToMonitor to a SyncTarget for the sync service.
-     */
-    SyncTarget toSyncTarget(Workspace workspace, RepositoryToMonitor rtm) {
-        SyncTargetProvider.AuthMode authMode = workspace.getGitProviderMode() ==
-            Workspace.GitProviderMode.GITHUB_APP_INSTALLATION
-            ? SyncTargetProvider.AuthMode.GITHUB_APP
-            : SyncTargetProvider.AuthMode.PAT;
-
-        return new SyncTarget(
-            rtm.getId(),
-            workspace.getId(),
-            workspace.getInstallationId(),
-            workspace.getPersonalAccessToken(),
-            authMode,
-            rtm.getNameWithOwner(),
-            rtm.getLabelsSyncedAt(),
-            rtm.getMilestonesSyncedAt(),
-            rtm.getIssuesAndPullRequestsSyncedAt(),
-            rtm.getCollaboratorsSyncedAt(),
-            rtm.getRepositorySyncedAt(),
-            rtm.getBackfillHighWaterMark(),
-            rtm.getBackfillCheckpoint(),
-            rtm.getBackfillLastRunAt()
-        );
-    }
-
-    /**
      * Checks if a repository exists (placeholder until GraphQL repository sync is available).
      * TODO: Implement proper repository validation via GraphQL API.
      */
@@ -441,7 +414,7 @@ public class WorkspaceRepositoryMonitorService {
             return;
         }
         if (repositoryAllowed) {
-            getGitHubDataSyncService().syncSyncTargetAsync(toSyncTarget(workspace, monitor));
+            getGitHubDataSyncService().syncSyncTargetAsync(SyncTargetFactory.create(workspace, monitor));
         } else {
             logger.debug("Repository {} persisted but monitoring disabled by filters.", monitor.getNameWithOwner());
         }

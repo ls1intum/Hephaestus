@@ -2,6 +2,11 @@
 # Used by GraphQL-based sync services
 
 query GetRepositoryPullRequests($owner: String!, $name: String!, $first: Int!, $after: String, $states: [PullRequestState!]) {
+	rateLimit {
+		cost
+		remaining
+		resetAt
+	}
 	repository(owner: $owner, name: $name) {
 		pullRequests(first: $first, after: $after, states: $states, orderBy: { field: UPDATED_AT, direction: DESC }) {
 			pageInfo {
@@ -119,6 +124,46 @@ query GetRepositoryPullRequests($owner: String!, $name: String!, $first: Int!, $
 					state
 					dueOn
 					url
+				}
+				
+				# Reviews (embedded to avoid N+1 queries)
+				# Most PRs have <10 reviews; we'll paginate for PRs with more
+				reviews(first: 10) {
+					totalCount
+					pageInfo {
+						hasNextPage
+						endCursor
+					}
+					nodes {
+						id
+						fullDatabaseId
+						body
+						state
+						url
+						submittedAt
+						
+						# Commit
+						commit {
+							oid
+						}
+						
+						# Author
+						author {
+							__typename
+							... on User {
+								id
+								databaseId
+								login
+								avatarUrl
+							}
+							... on Bot {
+								id
+								databaseId
+								login
+								avatarUrl
+							}
+						}
+					}
 				}
 			}
 		}

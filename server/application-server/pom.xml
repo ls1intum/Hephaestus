@@ -286,7 +286,7 @@
         <dependency>
             <groupId>com.squareup.okhttp3</groupId>
             <artifactId>logging-interceptor</artifactId>
-            <version>5.0.0-alpha.14</version>
+            <version>4.12.0</version>
         </dependency>
         <dependency>
             <groupId>com.google.code.gson</groupId>
@@ -326,7 +326,7 @@
         <dependency>
             <groupId>io.sentry</groupId>
             <artifactId>sentry-spring-boot-starter-jakarta</artifactId>
-            <version>8.2.0</version>
+            <version>8.29.0</version>
         </dependency>
         <dependency>
             <groupId>com.langfuse</groupId>
@@ -343,6 +343,16 @@
             <groupId>io.github.kobylynskyi</groupId>
             <artifactId>graphql-java-codegen</artifactId>
             <version>5.10.0</version>
+        </dependency>
+        <!-- Resilience4j for Circuit Breaker pattern on external API calls -->
+        <dependency>
+            <groupId>io.github.resilience4j</groupId>
+            <artifactId>resilience4j-spring-boot3</artifactId>
+            <version>2.2.0</version>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-aop</artifactId>
         </dependency>
     </dependencies>
     <dependencyManagement>

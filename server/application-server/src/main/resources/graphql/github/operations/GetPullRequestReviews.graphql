@@ -3,6 +3,11 @@
 # User/Bot still use databaseId as fullDatabaseId is not available on Actor types.
 
 query GetPullRequestReviews($owner: String!, $name: String!, $number: Int!, $first: Int!, $after: String) {
+    rateLimit {
+        cost
+        remaining
+        resetAt
+    }
     repository(owner: $owner, name: $name) {
         pullRequest(number: $number) {
             reviews(first: $first, after: $after) {
@@ -44,8 +49,11 @@ query GetPullRequestReviews($owner: String!, $name: String!, $number: Int!, $fir
                     }
 
                     # Comments in review
-                    comments(first: 100) {
+                    comments(first: 10) {
                         totalCount
+                        pageInfo {
+                            hasNextPage
+                        }
                         nodes {
                             id
                             fullDatabaseId

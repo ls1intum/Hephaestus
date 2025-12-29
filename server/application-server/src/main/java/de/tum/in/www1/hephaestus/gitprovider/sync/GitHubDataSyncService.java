@@ -3,13 +3,22 @@ package de.tum.in.www1.hephaestus.gitprovider.sync;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider.SyncTarget;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider.SyncType;
+import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider.WorkspaceSyncMetadata;
 import de.tum.in.www1.hephaestus.gitprovider.issue.github.GitHubIssueSyncService;
+import de.tum.in.www1.hephaestus.gitprovider.issuecomment.github.GitHubIssueCommentSyncService;
+import de.tum.in.www1.hephaestus.gitprovider.issuedependency.github.GitHubIssueDependencySyncService;
 import de.tum.in.www1.hephaestus.gitprovider.label.github.GitHubLabelSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.milestone.github.GitHubMilestoneSyncService;
+import de.tum.in.www1.hephaestus.gitprovider.organization.github.GitHubOrganizationSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.github.GitHubPullRequestSyncService;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.github.GitHubPullRequestReviewCommentSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
+import de.tum.in.www1.hephaestus.gitprovider.repository.github.GitHubRepositorySyncService;
+import de.tum.in.www1.hephaestus.gitprovider.subissue.github.GitHubSubIssueSyncService;
+import de.tum.in.www1.hephaestus.gitprovider.team.github.GitHubTeamSyncService;
 import java.time.Instant;
+import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -36,7 +45,14 @@ public class GitHubDataSyncService {
     private final GitHubLabelSyncService labelSyncService;
     private final GitHubMilestoneSyncService milestoneSyncService;
     private final GitHubIssueSyncService issueSyncService;
+    private final GitHubIssueCommentSyncService issueCommentSyncService;
+    private final GitHubIssueDependencySyncService issueDependencySyncService;
+    private final GitHubSubIssueSyncService subIssueSyncService;
     private final GitHubPullRequestSyncService pullRequestSyncService;
+    private final GitHubPullRequestReviewCommentSyncService pullRequestReviewCommentSyncService;
+    private final GitHubTeamSyncService teamSyncService;
+    private final GitHubOrganizationSyncService organizationSyncService;
+    private final GitHubRepositorySyncService repositorySyncService;
 
     private final AsyncTaskExecutor monitoringExecutor;
 
@@ -47,7 +63,14 @@ public class GitHubDataSyncService {
         GitHubLabelSyncService labelSyncService,
         GitHubMilestoneSyncService milestoneSyncService,
         GitHubIssueSyncService issueSyncService,
+        GitHubIssueCommentSyncService issueCommentSyncService,
+        GitHubIssueDependencySyncService issueDependencySyncService,
+        GitHubSubIssueSyncService subIssueSyncService,
         GitHubPullRequestSyncService pullRequestSyncService,
+        GitHubPullRequestReviewCommentSyncService pullRequestReviewCommentSyncService,
+        GitHubTeamSyncService teamSyncService,
+        GitHubOrganizationSyncService organizationSyncService,
+        GitHubRepositorySyncService repositorySyncService,
         @Qualifier("monitoringExecutor") AsyncTaskExecutor monitoringExecutor
     ) {
         this.syncCooldownInMinutes = syncCooldownInMinutes;
@@ -56,7 +79,14 @@ public class GitHubDataSyncService {
         this.labelSyncService = labelSyncService;
         this.milestoneSyncService = milestoneSyncService;
         this.issueSyncService = issueSyncService;
+        this.issueCommentSyncService = issueCommentSyncService;
+        this.issueDependencySyncService = issueDependencySyncService;
+        this.subIssueSyncService = subIssueSyncService;
         this.pullRequestSyncService = pullRequestSyncService;
+        this.pullRequestReviewCommentSyncService = pullRequestReviewCommentSyncService;
+        this.teamSyncService = teamSyncService;
+        this.organizationSyncService = organizationSyncService;
+        this.repositorySyncService = repositorySyncService;
         this.monitoringExecutor = monitoringExecutor;
     }
 
@@ -88,6 +118,17 @@ public class GitHubDataSyncService {
         log.info("Starting GraphQL sync for repository {}", nameWithOwner);
 
         try {
+            // Sync repository metadata first (ensures entity is up-to-date before syncing related data)
+            var syncedRepository = repositorySyncService.syncRepository(workspaceId, nameWithOwner);
+            if (syncedRepository.isPresent()) {
+                log.debug("Synced repository metadata for {}", nameWithOwner);
+            } else {
+                log.warn(
+                    "Failed to sync repository metadata for {}, continuing with other sync operations",
+                    nameWithOwner
+                );
+            }
+
             // Sync labels
             int labelsCount = labelSyncService.syncLabelsForRepository(workspaceId, repositoryId);
             log.debug("Synced {} labels for {}", labelsCount, nameWithOwner);
@@ -100,9 +141,20 @@ public class GitHubDataSyncService {
             int issuesCount = issueSyncService.syncForRepository(workspaceId, repositoryId);
             log.debug("Synced {} issues for {}", issuesCount, nameWithOwner);
 
+            // Sync issue comments (requires issues to exist)
+            int issueCommentsCount = issueCommentSyncService.syncForRepository(workspaceId, repositoryId);
+            log.debug("Synced {} issue comments for {}", issueCommentsCount, nameWithOwner);
+
             // Sync pull requests
             int prsCount = pullRequestSyncService.syncForRepository(workspaceId, repositoryId);
             log.debug("Synced {} pull requests for {}", prsCount, nameWithOwner);
+
+            // Sync PR review comments/threads (requires PRs to exist)
+            int prReviewCommentsCount = pullRequestReviewCommentSyncService.syncCommentsForRepository(
+                workspaceId,
+                repositoryId
+            );
+            log.debug("Synced {} PR review comments for {}", prReviewCommentsCount, nameWithOwner);
 
             // Update sync timestamp via SPI
             syncTargetProvider.updateSyncTimestamp(
@@ -113,12 +165,15 @@ public class GitHubDataSyncService {
             );
 
             log.info(
-                "Completed GraphQL sync for {}: {} labels, {} milestones, {} issues, {} PRs",
+                "Completed GraphQL sync for {}: repo metadata {}, {} labels, {} milestones, {} issues, {} issue comments, {} PRs, {} PR review comments",
                 nameWithOwner,
+                syncedRepository.isPresent() ? "synced" : "failed",
                 labelsCount,
                 milestonesCount,
                 issuesCount,
-                prsCount
+                issueCommentsCount,
+                prsCount,
+                prReviewCommentsCount
             );
         } catch (Exception e) {
             log.error("Error syncing repository {} via GraphQL: {}", nameWithOwner, e.getMessage(), e);
@@ -127,6 +182,15 @@ public class GitHubDataSyncService {
 
     /**
      * Syncs all repositories in a workspace using GraphQL.
+     * <p>
+     * This method orchestrates:
+     * <ol>
+     *   <li>Organization sync (if organization exists)</li>
+     *   <li>Team sync (if organization exists)</li>
+     *   <li>Per-repository syncs (labels, milestones, issues, PRs, comments)</li>
+     *   <li>Workspace-level issue dependencies sync</li>
+     *   <li>Workspace-level sub-issues sync</li>
+     * </ol>
      *
      * @param workspaceId the workspace ID
      */
@@ -139,10 +203,99 @@ public class GitHubDataSyncService {
 
         log.info("Syncing {} repositories for workspace {}", syncTargets.size(), workspaceId);
 
+        // Sync organization and teams first (if applicable)
+        syncOrganizationAndTeams(workspaceId);
+
+        // Sync each repository
         for (SyncTarget target : syncTargets) {
             if (shouldSync(target)) {
                 syncSyncTarget(target);
             }
+        }
+
+        // Sync workspace-level relationships (after all issues/PRs are synced)
+        syncWorkspaceLevelRelationships(workspaceId);
+    }
+
+    /**
+     * Syncs organization and teams for a workspace.
+     * <p>
+     * Organization sync includes memberships.
+     * Team sync includes team memberships.
+     *
+     * @param workspaceId the workspace ID
+     */
+    private void syncOrganizationAndTeams(Long workspaceId) {
+        Optional<WorkspaceSyncMetadata> metadataOpt = syncTargetProvider.getWorkspaceSyncMetadata(workspaceId);
+        if (metadataOpt.isEmpty()) {
+            log.debug("No workspace metadata found for workspace {}, skipping org/team sync", workspaceId);
+            return;
+        }
+
+        WorkspaceSyncMetadata metadata = metadataOpt.get();
+        String organizationLogin = metadata.organizationLogin();
+
+        if (organizationLogin == null || organizationLogin.isBlank()) {
+            log.debug("No organization login for workspace {}, skipping org/team sync", workspaceId);
+            return;
+        }
+
+        try {
+            // Sync organization and memberships
+            var organization = organizationSyncService.syncOrganization(workspaceId, organizationLogin);
+            if (organization != null) {
+                log.debug("Synced organization {} for workspace {}", organizationLogin, workspaceId);
+            }
+
+            // Sync teams and team memberships
+            int teamsCount = teamSyncService.syncTeamsForOrganization(workspaceId, organizationLogin);
+            log.debug(
+                "Synced {} teams for organization {} in workspace {}",
+                teamsCount,
+                organizationLogin,
+                workspaceId
+            );
+        } catch (Exception e) {
+            log.error("Error syncing organization/teams for workspace {}: {}", workspaceId, e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Syncs workspace-level relationships that require issues and PRs to exist first.
+     * <p>
+     * This includes:
+     * <ul>
+     *   <li>Issue dependencies (blocked_by relationships)</li>
+     *   <li>Sub-issues (parent-child relationships)</li>
+     * </ul>
+     * <p>
+     * These sync operations have their own cooldown mechanisms.
+     *
+     * @param workspaceId the workspace ID
+     */
+    private void syncWorkspaceLevelRelationships(Long workspaceId) {
+        try {
+            // Sync issue dependencies (has internal cooldown check)
+            int dependenciesCount = issueDependencySyncService.syncDependenciesForWorkspace(workspaceId);
+            if (dependenciesCount >= 0) {
+                log.debug("Synced {} issue dependencies for workspace {}", dependenciesCount, workspaceId);
+            } else {
+                log.debug("Issue dependencies sync skipped due to cooldown for workspace {}", workspaceId);
+            }
+        } catch (Exception e) {
+            log.error("Error syncing issue dependencies for workspace {}: {}", workspaceId, e.getMessage(), e);
+        }
+
+        try {
+            // Sync sub-issues (has internal cooldown check)
+            int subIssuesCount = subIssueSyncService.syncSubIssuesForWorkspace(workspaceId);
+            if (subIssuesCount >= 0) {
+                log.debug("Synced {} sub-issue relationships for workspace {}", subIssuesCount, workspaceId);
+            } else {
+                log.debug("Sub-issues sync skipped due to cooldown for workspace {}", workspaceId);
+            }
+        } catch (Exception e) {
+            log.error("Error syncing sub-issues for workspace {}: {}", workspaceId, e.getMessage(), e);
         }
     }
 

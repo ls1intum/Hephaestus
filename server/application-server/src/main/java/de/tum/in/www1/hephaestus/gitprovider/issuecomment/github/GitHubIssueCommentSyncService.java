@@ -1,7 +1,12 @@
 package de.tum.in.www1.hephaestus.gitprovider.issuecomment.github;
 
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.DEFAULT_PAGE_SIZE;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.GRAPHQL_TIMEOUT;
+
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser.RepositoryOwnerAndName;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.IssueCommentConnection;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.PageInfo;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
@@ -10,8 +15,9 @@ import de.tum.in.www1.hephaestus.gitprovider.issuecomment.IssueComment;
 import de.tum.in.www1.hephaestus.gitprovider.issuecomment.github.dto.GitHubIssueCommentEventDTO.GitHubCommentDTO;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
-import java.time.Duration;
-import java.util.List;
+import java.util.Optional;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Stream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.graphql.client.ClientGraphQlResponse;
@@ -30,8 +36,6 @@ public class GitHubIssueCommentSyncService {
 
     private static final Logger log = LoggerFactory.getLogger(GitHubIssueCommentSyncService.class);
     private static final String QUERY_DOCUMENT = "GetIssueComments";
-    private static final int PAGE_SIZE = 50;
-    private static final Duration TIMEOUT = Duration.ofSeconds(30);
 
     private final RepositoryRepository repositoryRepository;
     private final IssueRepository issueRepository;
@@ -52,12 +56,14 @@ public class GitHubIssueCommentSyncService {
 
     /**
      * Synchronizes all comments for all issues in a repository.
+     * <p>
+     * Uses streaming to avoid loading all issues into memory at once.
      *
      * @param workspaceId  the workspace ID for authentication
      * @param repositoryId the repository ID to sync comments for
      * @return number of comments synced
      */
-    @Transactional
+    @Transactional(readOnly = true)
     public int syncForRepository(Long workspaceId, Long repositoryId) {
         Repository repository = repositoryRepository.findById(repositoryId).orElse(null);
         if (repository == null) {
@@ -65,19 +71,28 @@ public class GitHubIssueCommentSyncService {
             return 0;
         }
 
-        List<Issue> issues = issueRepository.findAllByRepository_Id(repositoryId);
-        if (issues.isEmpty()) {
+        AtomicInteger totalSynced = new AtomicInteger(0);
+        AtomicInteger issueCount = new AtomicInteger(0);
+
+        try (Stream<Issue> issueStream = issueRepository.streamAllByRepository_Id(repositoryId)) {
+            issueStream.forEach(issue -> {
+                totalSynced.addAndGet(syncForIssue(workspaceId, issue));
+                issueCount.incrementAndGet();
+            });
+        }
+
+        if (issueCount.get() == 0) {
             log.info("No issues found for {}, skipping comment sync", repository.getNameWithOwner());
             return 0;
         }
 
-        int totalSynced = 0;
-        for (Issue issue : issues) {
-            totalSynced += syncForIssue(workspaceId, issue);
-        }
-
-        log.info("Synced {} comments for {} issues in {}", totalSynced, issues.size(), repository.getNameWithOwner());
-        return totalSynced;
+        log.info(
+            "Synced {} comments for {} issues in {}",
+            totalSynced.get(),
+            issueCount.get(),
+            repository.getNameWithOwner()
+        );
+        return totalSynced.get();
     }
 
     /**
@@ -91,11 +106,12 @@ public class GitHubIssueCommentSyncService {
         }
 
         Repository repository = issue.getRepository();
-        String[] ownerAndName = parseOwnerAndName(repository.getNameWithOwner());
-        if (ownerAndName == null) {
+        Optional<RepositoryOwnerAndName> parsedName = GitHubRepositoryNameParser.parse(repository.getNameWithOwner());
+        if (parsedName.isEmpty()) {
             log.warn("Invalid repository name format: {}", repository.getNameWithOwner());
             return 0;
         }
+        RepositoryOwnerAndName ownerAndName = parsedName.get();
 
         HttpGraphQlClient client = graphQlClientProvider.forWorkspace(workspaceId);
         ProcessingContext context = ProcessingContext.forSync(workspaceId, repository);
@@ -108,13 +124,13 @@ public class GitHubIssueCommentSyncService {
             try {
                 ClientGraphQlResponse response = client
                     .documentName(QUERY_DOCUMENT)
-                    .variable("owner", ownerAndName[0])
-                    .variable("name", ownerAndName[1])
+                    .variable("owner", ownerAndName.owner())
+                    .variable("name", ownerAndName.name())
                     .variable("number", issue.getNumber())
-                    .variable("first", PAGE_SIZE)
+                    .variable("first", DEFAULT_PAGE_SIZE)
                     .variable("after", cursor)
                     .execute()
-                    .block(TIMEOUT);
+                    .block(GRAPHQL_TIMEOUT);
 
                 if (response == null || !response.isValid()) {
                     log.warn("Invalid GraphQL response: {}", response != null ? response.getErrors() : "null");
@@ -161,16 +177,5 @@ public class GitHubIssueCommentSyncService {
             repository.getNameWithOwner()
         );
         return totalSynced;
-    }
-
-    private String[] parseOwnerAndName(String nameWithOwner) {
-        if (nameWithOwner == null || !nameWithOwner.contains("/")) {
-            return null;
-        }
-        String[] parts = nameWithOwner.split("/", 2);
-        if (parts.length != 2 || parts[0].isEmpty() || parts[1].isEmpty()) {
-            return null;
-        }
-        return parts;
     }
 }

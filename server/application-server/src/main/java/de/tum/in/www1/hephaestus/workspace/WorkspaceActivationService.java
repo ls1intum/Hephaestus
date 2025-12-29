@@ -99,33 +99,6 @@ public class WorkspaceActivationService {
     }
 
     /**
-     * Converts a RepositoryToMonitor to a SyncTarget for the sync service.
-     */
-    private SyncTarget toSyncTarget(Workspace workspace, RepositoryToMonitor rtm) {
-        SyncTargetProvider.AuthMode authMode = workspace.getGitProviderMode() ==
-            Workspace.GitProviderMode.GITHUB_APP_INSTALLATION
-            ? SyncTargetProvider.AuthMode.GITHUB_APP
-            : SyncTargetProvider.AuthMode.PAT;
-
-        return new SyncTarget(
-            rtm.getId(),
-            workspace.getId(),
-            workspace.getInstallationId(),
-            workspace.getPersonalAccessToken(),
-            authMode,
-            rtm.getNameWithOwner(),
-            rtm.getLabelsSyncedAt(),
-            rtm.getMilestonesSyncedAt(),
-            rtm.getIssuesAndPullRequestsSyncedAt(),
-            rtm.getCollaboratorsSyncedAt(),
-            rtm.getRepositorySyncedAt(),
-            rtm.getBackfillHighWaterMark(),
-            rtm.getBackfillCheckpoint(),
-            rtm.getBackfillLastRunAt()
-        );
-    }
-
-    /**
      * Prepare every workspace and start monitoring/sync routines for those that are
      * ready.
      * Intended to run after provisioning so the workspace catalog is populated.
@@ -221,7 +194,7 @@ public class WorkspaceActivationService {
                 // Workspaces themselves run in parallel using virtual threads.
                 for (var repo : eligibleRepositories) {
                     try {
-                        getGitHubDataSyncService().syncSyncTarget(toSyncTarget(workspace, repo));
+                        getGitHubDataSyncService().syncSyncTarget(SyncTargetFactory.create(workspace, repo));
                     } catch (Exception ex) {
                         logger.error(
                             "Error syncing repository {}: {}",

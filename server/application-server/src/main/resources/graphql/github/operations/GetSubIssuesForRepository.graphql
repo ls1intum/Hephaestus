@@ -10,6 +10,11 @@ query GetSubIssuesForRepository(
 	$first: Int!
 	$after: String
 ) {
+	rateLimit {
+		cost
+		remaining
+		resetAt
+	}
 	repository(owner: $owner, name: $name) {
 		issues(first: $first, after: $after, filterBy: { states: [OPEN, CLOSED] }) {
 			pageInfo {

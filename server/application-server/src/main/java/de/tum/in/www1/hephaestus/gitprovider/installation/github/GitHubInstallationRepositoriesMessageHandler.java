@@ -4,6 +4,7 @@ import de.tum.in.www1.hephaestus.gitprovider.common.NatsMessageDeserializer;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
 import de.tum.in.www1.hephaestus.gitprovider.installation.github.dto.GitHubInstallationRepositoriesEventDTO;
 import de.tum.in.www1.hephaestus.gitprovider.repository.github.dto.GitHubRepositoryRefDTO;
+import de.tum.in.www1.hephaestus.workspace.WorkspaceRepositoryMonitorService;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -13,7 +14,8 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Handles GitHub installation_repositories webhook events.
  * <p>
- * Uses DTOs directly for complete field coverage.
+ * When repositories are added or removed from a GitHub App installation,
+ * this handler updates the workspace's monitored repositories accordingly.
  */
 @Component
 public class GitHubInstallationRepositoriesMessageHandler
@@ -21,8 +23,14 @@ public class GitHubInstallationRepositoriesMessageHandler
 
     private static final Logger logger = LoggerFactory.getLogger(GitHubInstallationRepositoriesMessageHandler.class);
 
-    GitHubInstallationRepositoriesMessageHandler(NatsMessageDeserializer deserializer) {
+    private final WorkspaceRepositoryMonitorService workspaceRepositoryMonitorService;
+
+    GitHubInstallationRepositoriesMessageHandler(
+        NatsMessageDeserializer deserializer,
+        WorkspaceRepositoryMonitorService workspaceRepositoryMonitorService
+    ) {
         super(GitHubInstallationRepositoriesEventDTO.class, deserializer);
+        this.workspaceRepositoryMonitorService = workspaceRepositoryMonitorService;
     }
 
     @Override
@@ -58,12 +66,18 @@ public class GitHubInstallationRepositoriesMessageHandler
             removed.size()
         );
 
-        // Future: Repository add/remove will be implemented here
+        long installationId = installation.id();
+
+        // Handle added repositories
         for (GitHubRepositoryRefDTO repo : added) {
-            logger.info("Repository added to installation: {}", repo.fullName());
+            logger.info("Adding repository to monitor for installation {}: {}", installationId, repo.fullName());
+            workspaceRepositoryMonitorService.ensureRepositoryMonitorForInstallation(installationId, repo.fullName());
         }
+
+        // Handle removed repositories
         for (GitHubRepositoryRefDTO repo : removed) {
-            logger.info("Repository removed from installation: {}", repo.fullName());
+            logger.info("Removing repository from monitor for installation {}: {}", installationId, repo.fullName());
+            workspaceRepositoryMonitorService.removeRepositoryMonitorForInstallation(installationId, repo.fullName());
         }
     }
 }

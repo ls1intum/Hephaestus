@@ -9,6 +9,7 @@ import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Handles GitHub installation_target webhook events.
@@ -42,6 +43,7 @@ public class GitHubInstallationTargetMessageHandler extends GitHubMessageHandler
     }
 
     @Override
+    @Transactional
     protected void handleEvent(GitHubInstallationTargetEventDTO event) {
         if (event.actionType() != GitHubEventAction.InstallationTarget.RENAMED) {
             return;

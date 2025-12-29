@@ -1,16 +1,21 @@
 package de.tum.in.www1.hephaestus.gitprovider.label.github;
 
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.GRAPHQL_TIMEOUT;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.LARGE_PAGE_SIZE;
+
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser.RepositoryOwnerAndName;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.LabelConnection;
 import de.tum.in.www1.hephaestus.gitprovider.label.Label;
 import de.tum.in.www1.hephaestus.gitprovider.label.LabelRepository;
 import de.tum.in.www1.hephaestus.gitprovider.label.github.dto.GitHubLabelDTO;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
-import java.time.Duration;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -28,8 +33,6 @@ import org.springframework.transaction.annotation.Transactional;
 public class GitHubLabelSyncService {
 
     private static final Logger logger = LoggerFactory.getLogger(GitHubLabelSyncService.class);
-    private static final int GRAPHQL_PAGE_SIZE = 100;
-    private static final Duration GRAPHQL_TIMEOUT = Duration.ofSeconds(30);
     private static final String GET_LABELS_DOCUMENT = "GetRepositoryLabels";
 
     private final RepositoryRepository repositoryRepository;
@@ -64,13 +67,13 @@ public class GitHubLabelSyncService {
             return 0;
         }
 
-        String[] parts = repository.getNameWithOwner().split("/");
-        if (parts.length != 2) {
-            logger.warn("Invalid repository nameWithOwner: {}", repository.getNameWithOwner());
+        Optional<RepositoryOwnerAndName> parsedName = GitHubRepositoryNameParser.parse(repository.getNameWithOwner());
+        if (parsedName.isEmpty()) {
+            logger.warn("Invalid repository name format: {}", repository.getNameWithOwner());
             return 0;
         }
-        String owner = parts[0];
-        String name = parts[1];
+        String owner = parsedName.get().owner();
+        String name = parsedName.get().name();
 
         HttpGraphQlClient client = graphQlClientProvider.forWorkspace(workspaceId);
         ProcessingContext context = ProcessingContext.forSync(workspaceId, repository);
@@ -86,7 +89,7 @@ public class GitHubLabelSyncService {
                     .documentName(GET_LABELS_DOCUMENT)
                     .variable("owner", owner)
                     .variable("name", name)
-                    .variable("first", GRAPHQL_PAGE_SIZE)
+                    .variable("first", LARGE_PAGE_SIZE)
                     .variable("after", cursor)
                     .retrieve("repository.labels")
                     .toEntity(LabelConnection.class)
