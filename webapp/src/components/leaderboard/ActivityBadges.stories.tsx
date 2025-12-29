@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from "@storybook/react-vite";
+import type { Meta, StoryObj } from "@storybook/react";
 import { ActivityBadges } from "./ActivityBadges";
 import type { ReviewedPullRequest } from "./ReviewsPopover";
 

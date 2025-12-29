@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from "@storybook/react-vite";
+import type { Meta, StoryObj } from "@storybook/react";
 import { endOfISOWeek, formatISO, startOfISOWeek, subDays } from "date-fns";
 import { fn } from "storybook/test";
 import { ProfileContent } from "./ProfileContent";

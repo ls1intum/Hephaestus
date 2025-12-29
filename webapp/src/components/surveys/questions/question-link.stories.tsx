@@ -1,7 +1,7 @@
 /**
  * Link survey question for routing respondents to external resources or follow-up flows.
  */
-import type { Meta, StoryObj } from "@storybook/react-vite";
+import type { Meta, StoryObj } from "@storybook/react";
 import { fn } from "storybook/test";
 import { QuestionLink } from "./question-link";
 

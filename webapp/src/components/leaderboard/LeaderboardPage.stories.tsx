@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from "@storybook/react-vite";
+import type { Meta, StoryObj } from "@storybook/react";
 import type { LeaderboardEntry } from "@/api/types.gen";
 import { LeaderboardPage } from "./LeaderboardPage";
 

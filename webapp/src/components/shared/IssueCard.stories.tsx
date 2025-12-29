@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from "@storybook/react-vite";
+import type { Meta, StoryObj } from "@storybook/react";
 import { RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { IssueCard } from "./IssueCard";

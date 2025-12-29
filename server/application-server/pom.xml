@@ -561,7 +561,7 @@
                     <dependency>
                         <groupId>org.springframework.boot</groupId>
                         <artifactId>spring-boot-starter-data-jpa</artifactId>
-        <version>3.5.9</version>
+                        <version>3.5.9</version>
                     </dependency>
                     <dependency>
                         <groupId>jakarta.validation</groupId>

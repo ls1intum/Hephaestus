@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from "@storybook/react-vite";
+import type { Meta, StoryObj } from "@storybook/react";
 import { DocumentToolRenderer } from "./DocumentToolRenderer";
 import type { PartRendererProps, ToolPart } from "./types";
 
