@@ -193,3 +193,6 @@ tmp
 
 # Research directory (local only)
 .research/
+
+# OpenCode builder mission files (per-worktree, ephemeral)
+MISSION.md

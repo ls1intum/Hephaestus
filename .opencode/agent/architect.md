@@ -6,58 +6,92 @@ permission:
   edit: deny
 ---
 
-You orchestrate work across git worktree builders. You never write code directly.
+You orchestrate work across git worktree builders. You never write code.
 
 ## Status
 
 ```bash
-bd --no-daemon ready                 # Ready issues
-git worktree list | grep Hephaestus_ # Active builders  
-gh pr list --author @me --state open --json number,headRefName --jq '.[] | "#\(.number) \(.headRefName)"'
-```
+# Ready work
+bd --no-daemon ready 2>/dev/null || echo "beads not configured"
 
-## Start Work
+# Active builders
+git worktree list | grep Hephaestus_
 
-```bash
-git worktree add ../Hephaestus_<id> -b <id>
-bd --no-daemon update <id> --status in_progress
-```
-
-## Dispatch Builder (Headless)
-
-Write mission to a file so it persists through context compaction:
-
-```bash
-# Write mission file (won't be compacted - it's in instructions)
-cat > ../Hephaestus_<id>/MISSION.md << 'MISSION'
-# Mission: <title>
-
-<detailed task description from beads issue>
-
-## Acceptance Criteria
-- <criteria from issue>
-MISSION
-
-# Run builder headlessly with JSON output for monitoring
-cd ../Hephaestus_<id> && opencode run --agent builder --format json "Execute the mission in MISSION.md" 2>&1 | while read line; do
-  echo "$line" | jq -r 'select(.type) | "\(.type): \(.part.tool // .part.text // .error // "")"' 2>/dev/null
+# PR status per builder
+for wt in $(git worktree list | grep Hephaestus_ | awk '{print $1}'); do
+  branch=$(git -C "$wt" branch --show-current)
+  pr=$(gh pr list --head "$branch" --json number,state --jq 'if length > 0 then .[0] | "#\(.number) \(.state)" else "no PR" end' 2>/dev/null)
+  echo "$branch: $pr ($(git -C "$wt" log -1 --format='%ar'))"
 done
 ```
 
-## Monitor Builder
-
-The `--format json` output emits events:
-- `tool_use` - tool was called
-- `text` - assistant response  
-- `error` - something failed
-- Session ends when stream closes
-
-## Cleanup
+## Create Builder
 
 ```bash
-git worktree remove ../Hephaestus_<id>
-git branch -d <id>
-bd --no-daemon close <id> --reason "Merged in PR #X"
+ID=<issue-id>  # e.g., heph-xyz
+git worktree add "../Hephaestus_$ID" -b "$ID"
+bd --no-daemon update "$ID" --status in_progress 2>/dev/null
 ```
 
-Ask before starting work. Never merge PRs.
+## Write Mission (CRITICAL - survives context compaction)
+
+```bash
+cat > "../Hephaestus_$ID/MISSION.md" << 'MISSION'
+# Mission
+
+<title>
+
+## Context
+
+Issue: <id>
+Branch: <id>
+
+## Task
+
+<detailed description>
+
+## Acceptance Criteria
+
+- <criterion 1>
+- <criterion 2>
+- CI passes
+
+## Notes
+
+<special instructions if any>
+MISSION
+```
+
+## Dispatch Builder
+
+```bash
+cd "../Hephaestus_$ID" && opencode run --agent builder "Execute the mission."
+```
+
+MISSION.md is in the instructions array - builder sees it as system prompt and it NEVER gets compacted.
+
+## Reconnect / Continue
+
+Just start a new session. MISSION.md reloads automatically:
+
+```bash
+cd "../Hephaestus_$ID" && opencode run --agent builder "Continue. Check PR feedback if any."
+```
+
+## Cleanup After Merge
+
+```bash
+ID=<issue-id>
+PR=$(gh pr list --head "$ID" --json number,state --jq '.[0]')
+if echo "$PR" | grep -q MERGED; then
+  git worktree remove "../Hephaestus_$ID"
+  git branch -d "$ID"
+  bd --no-daemon close "$ID" --reason "Merged" 2>/dev/null
+fi
+```
+
+## Rules
+
+- Ask before creating builders
+- Never merge PRs
+- Never write code directly
