@@ -12,6 +12,6 @@
     "worktree_list": true,
     "worktree_create": true,
     "worktree_remove": true,
-    "pr-status": true
+    "pr_status": true
   }
 }
