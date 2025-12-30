@@ -43,6 +43,38 @@ export const stateConfig: {
 	},
 };
 
+/**
+ * Resolved states for bad practices - these have been addressed by the user
+ */
+const RESOLVED_STATES: ReadonlySet<PullRequestBadPractice["state"]> = new Set([
+	"FIXED",
+	"WONT_FIX",
+	"WRONG",
+]);
+
+/**
+ * Unresolved issue states - these require user action
+ */
+const UNRESOLVED_ISSUE_STATES: ReadonlySet<PullRequestBadPractice["state"]> = new Set([
+	"CRITICAL_ISSUE",
+	"NORMAL_ISSUE",
+	"MINOR_ISSUE",
+]);
+
+/**
+ * Check if a bad practice state represents an unresolved issue that can be resolved
+ */
+export function isUnresolvedIssue(state: PullRequestBadPractice["state"]): boolean {
+	return UNRESOLVED_ISSUE_STATES.has(state);
+}
+
+/**
+ * Check if a bad practice state represents a resolved issue
+ */
+export function isResolvedState(state: PullRequestBadPractice["state"]): boolean {
+	return RESOLVED_STATES.has(state);
+}
+
 // Filter practices by category
 export function filterGoodAndBadPractices(allBadPractices: PullRequestBadPractice[]): {
 	goodPractices: PullRequestBadPractice[];
