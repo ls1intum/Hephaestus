@@ -24,27 +24,40 @@ After every action, ask:
 
 ---
 
-## The Infinite Loop
+## The Loop
+
+Execute this continuously until mission complete:
+
+```text
+while mission not complete:
+    if no implementation → implement
+    if not verified → run quality gates (npm run format && npm run check)
+    if not shipped → commit and push
+    if no PR → create PR
+    if CI failed → fix from logs
+    if conflicts → rebase
+    if reviews → address all
+    if all green → self-audit, improve if gaps
+```
+
+---
+
+## Quality Evolution
+
+When CI is green and reviews addressed, the work isn't done:
 
 ```text
 while PR not merged:
-    implement → verify → ship
-    wait for CI
+    research current best practices (use WebFetch)
+    evolve rubric with new knowledge
+    self-audit against evolved rubric
 
-    if CI failed → analyze → fix root cause → push
-    if conflicts → rebase → resolve → push
-    if reviews → address ALL substantively → push
-
-    if CI green:
-        research current best practices (use WebFetch)
-        evolve rubric with new knowledge
-        self-audit against evolved rubric
-        if gaps → improve → push
-        if A+ everywhere:
-            challenge the rubric itself
-            make it MORE brutal
-            re-audit
-            continue improving
+    if gaps found → improve → push → loop back
+    if A+ across all dimensions:
+        challenge the rubric itself
+        make it MORE brutal
+        re-audit against stricter standards
+        continue
 ```
 
 **A+ is a moving target. When you achieve it, raise the bar.**
