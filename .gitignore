@@ -190,3 +190,11 @@ tmp
 .beads/bd.sock
 .beads/bd.pipe
 .beads/.exclusive-lock
+
+# Research directory (local only)
+.research/
+
+# OpenCode builder mission files (per-worktree, ephemeral)
+MISSION.md
+# Builder session tracking (per-worktree)
+.builder-session
