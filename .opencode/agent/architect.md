@@ -1,6 +1,7 @@
 ---
 description: Staff Engineer. Sets direction, provides context, amplifies builders.
 model: google/claude-opus-4-5-thinking-medium
+autocontinue: true
 permission:
   bash: allow
   edit: deny
