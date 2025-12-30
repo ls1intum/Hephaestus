@@ -27,6 +27,7 @@ import { type AuthContextType, useAuth } from "@/integrations/auth/AuthContext";
 import { isPosthogEnabled } from "@/integrations/posthog/config";
 import { useTheme } from "@/integrations/theme";
 import type { ChatMessage } from "@/lib/types";
+import { isMentorPath, replaceWorkspaceSlug } from "@/lib/workspace-paths";
 
 interface MyRouterContext {
 	queryClient: QueryClient;
@@ -45,7 +46,8 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 		});
 		const allowSurveys =
 			isPosthogEnabled && !userSettingsError && (userSettings?.participateInResearch ?? true);
-		const isMentorRoute = pathname === "/mentor" || /^\/w\/[^/]+\/mentor/.test(pathname);
+		// Only workspace-scoped mentor routes are valid (legacy /mentor was removed)
+		const isMentorRoute = isMentorPath(pathname);
 
 		// Exclude routes where Copilot should not appear
 		const isExcludedRoute =
@@ -224,8 +226,7 @@ function AppSidebarContainer() {
 	const workspaceList = Array.isArray(workspaces) ? workspaces : [];
 	const activeWorkspace = workspaceList.find((ws) => ws.workspaceSlug === workspaceSlug);
 
-	const sidebarContext: SidebarContext =
-		pathname === "/mentor" || /^\/w\/[^/]+\/mentor/.test(pathname) ? "mentor" : "main";
+	const sidebarContext: SidebarContext = isMentorPath(pathname) ? "mentor" : "main";
 
 	// Always call useQuery but only enable when in mentor context and authenticated
 	const {
@@ -246,8 +247,7 @@ function AppSidebarContainer() {
 	const handleWorkspaceChange = (ws: typeof activeWorkspace) => {
 		if (!ws) return;
 		selectWorkspace(ws.workspaceSlug);
-		const remainder = pathname.replace(/^\/w\/[^/]+/, "");
-		const target = `/w/${ws.workspaceSlug}${remainder || "/"}`;
+		const target = replaceWorkspaceSlug(pathname, ws.workspaceSlug);
 		navigate({ to: target as never, replace: true });
 	};
 

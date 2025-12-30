@@ -3,6 +3,7 @@ import { useLocation } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { listWorkspacesOptions } from "@/api/@tanstack/react-query.gen";
 import { useAuth } from "@/integrations/auth/AuthContext";
+import { extractWorkspaceSlug } from "@/lib/workspace-paths";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 
 /**
@@ -20,9 +21,8 @@ export function useActiveWorkspaceSlug() {
 	const location = useLocation();
 
 	// Extract slug from the current path if present (/w/<slug>/...)
-	// React Compiler handles memoization automatically
-	const pathMatch = location.pathname.match(/^\/w\/([^/]+)/);
-	const slugFromPath = pathMatch?.[1];
+	// Uses the centralized workspace path helper
+	const slugFromPath = extractWorkspaceSlug(location.pathname);
 
 	const isValidSlug = (slug?: string) =>
 		slug != null && workspaces.some((ws) => ws.workspaceSlug === slug);

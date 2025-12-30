@@ -8,6 +8,7 @@ import {
 	SidebarMenuButton,
 	SidebarMenuItem,
 } from "@/components/ui/sidebar";
+import { toWorkspacePath } from "@/lib/workspace-paths";
 
 export interface NavMentorThreadsProps {
 	threadGroups: ChatThreadGroup[];
@@ -94,7 +95,7 @@ function ThreadGroup({
 			<SidebarGroupContent>
 				<SidebarMenu>
 					{threads.map((thread) => {
-						const threadPath = `/w/${workspaceSlug}/mentor/${thread.id}`;
+						const threadPath = toWorkspacePath(workspaceSlug, `mentor/${thread.id}`);
 						const isActive = location.pathname === threadPath;
 
 						return (
