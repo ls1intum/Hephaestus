@@ -53,20 +53,33 @@ export interface WorkspaceProviderProps {
 }
 
 /**
+ * Type guard to check if a value is an Error instance.
+ */
+function isError(value: unknown): value is Error {
+	return value instanceof Error;
+}
+
+/**
+ * Type guard to check if a value is an object with a status property.
+ */
+function hasStatusCode(value: unknown): value is { status: number } {
+	return typeof value === "object" && value !== null && "status" in value;
+}
+
+/**
  * Determines the error type from an HTTP error response.
  */
 function getErrorType(error: unknown): WorkspaceErrorType {
 	if (!error) return null;
 
 	// Check for fetch/HTTP errors with status codes
-	if (typeof error === "object" && error !== null && "status" in error) {
-		const status = (error as { status: number }).status;
-		if (status === 404) return "not-found";
-		if (status === 403) return "forbidden";
+	if (hasStatusCode(error)) {
+		if (error.status === 404) return "not-found";
+		if (error.status === 403) return "forbidden";
 	}
 
 	// Check for Error objects with message containing status hints
-	if (error instanceof Error) {
+	if (isError(error)) {
 		const message = error.message.toLowerCase();
 		if (message.includes("404") || message.includes("not found")) return "not-found";
 		if (message.includes("403") || message.includes("forbidden")) return "forbidden";
@@ -179,8 +192,11 @@ export function WorkspaceProvider({ slug, children }: WorkspaceProviderProps) {
 	const isOwner = role === "OWNER";
 
 	// Normalize error for consumer convenience - extract Error if available, otherwise wrap
-	const normalizedError: Error | null =
-		error instanceof Error ? error : error ? new Error(String(error)) : null;
+	const normalizedError: Error | null = isError(error)
+		? error
+		: error
+			? new Error(String(error))
+			: null;
 
 	const value: WorkspaceContextType = {
 		workspace: workspaceQuery.data ?? null,
