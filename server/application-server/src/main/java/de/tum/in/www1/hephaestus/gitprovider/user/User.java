@@ -37,19 +37,9 @@ public class User extends BaseGitServiceEntity {
     @NonNull
     private String avatarUrl;
 
-    // AKA bio
-    private String description;
-
     @NonNull
     // Equals login if not fetched / existing
     private String name;
-
-    private String company;
-
-    // Url
-    private String blog;
-
-    private String location;
 
     private String email;
 
@@ -59,10 +49,6 @@ public class User extends BaseGitServiceEntity {
     @NonNull
     @Enumerated(EnumType.STRING)
     private User.Type type;
-
-    private int followers;
-
-    private int following;
 
     @OneToMany(mappedBy = "user")
     @ToString.Exclude

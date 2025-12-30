@@ -93,19 +93,6 @@ public class GitHubIssueMessageHandler extends GitHubMessageHandler<GitHubIssueE
                     issueProcessor.process(issueDto, context);
                 }
             }
-            case GitHubEventAction.Issue.TYPED -> {
-                String orgLogin = event.repository().fullName().split("/")[0];
-                issueProcessor.processTyped(issueDto, event.issueType(), orgLogin, context);
-            }
-            case GitHubEventAction.Issue.UNKNOWN -> {
-                // Handle "untyped" action which isn't in the enum
-                if ("untyped".equals(event.action())) {
-                    issueProcessor.processUntyped(issueDto, context);
-                } else {
-                    logger.debug("Unhandled issue action: {}", event.action());
-                    issueProcessor.process(issueDto, context);
-                }
-            }
             default -> {
                 logger.debug("Unhandled issue action: {}", event.action());
                 issueProcessor.process(issueDto, context);

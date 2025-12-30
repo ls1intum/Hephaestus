@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!-- 
+    Remove unused columns from repository table.
+    These fields were never synced and have no feature use.
+    -->
+
+    <changeSet id="1735570001000-drop-repository-has-issues" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="repository" columnName="has_issues"/>
+        </preConditions>
+        <dropColumn tableName="repository" columnName="has_issues"/>
+    </changeSet>
+
+    <changeSet id="1735570001000-drop-repository-has-projects" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="repository" columnName="has_projects"/>
+        </preConditions>
+        <dropColumn tableName="repository" columnName="has_projects"/>
+    </changeSet>
+
+    <changeSet id="1735570001000-drop-repository-has-wiki" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="repository" columnName="has_wiki"/>
+        </preConditions>
+        <dropColumn tableName="repository" columnName="has_wiki"/>
+    </changeSet>
+
+    <changeSet id="1735570001000-drop-repository-homepage" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="repository" columnName="homepage"/>
+        </preConditions>
+        <dropColumn tableName="repository" columnName="homepage"/>
+    </changeSet>
+
+    <changeSet id="1735570001000-drop-repository-stargazers-count" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="repository" columnName="stargazers_count"/>
+        </preConditions>
+        <dropColumn tableName="repository" columnName="stargazers_count"/>
+    </changeSet>
+
+    <changeSet id="1735570001000-drop-repository-watchers-count" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="repository" columnName="watchers_count"/>
+        </preConditions>
+        <dropColumn tableName="repository" columnName="watchers_count"/>
+    </changeSet>
+
+</databaseChangeLog>

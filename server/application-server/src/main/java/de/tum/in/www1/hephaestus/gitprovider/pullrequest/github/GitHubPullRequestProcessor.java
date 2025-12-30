@@ -243,8 +243,6 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
         pr.setMergedAt(dto.mergedAt());
         pr.setDraft(dto.isDraft());
         pr.setMerged(dto.isMerged());
-        pr.setMergeCommitSha(dto.mergeCommitSha());
-        pr.setLocked(dto.locked());
         pr.setAdditions(dto.additions());
         pr.setDeletions(dto.deletions());
         pr.setChangedFiles(dto.changedFiles());
@@ -347,16 +345,6 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
         if (!Objects.equals(pr.getMergedAt(), dto.mergedAt())) {
             pr.setMergedAt(dto.mergedAt());
             changedFields.add("mergedAt");
-        }
-
-        if (!Objects.equals(pr.getMergeCommitSha(), dto.mergeCommitSha())) {
-            pr.setMergeCommitSha(dto.mergeCommitSha());
-            changedFields.add("mergeCommitSha");
-        }
-
-        if (pr.isLocked() != dto.locked()) {
-            pr.setLocked(dto.locked());
-            changedFields.add("locked");
         }
 
         // Update mergedBy

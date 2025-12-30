@@ -21,18 +21,9 @@ public class PullRequest extends Issue {
 
     private Instant mergedAt;
 
-    private String mergeCommitSha;
-
     private boolean isDraft;
 
     private boolean isMerged;
-
-    private Boolean isMergeable;
-
-    private String mergeableState;
-
-    // Indicates whether maintainers can modify the pull request.
-    private boolean maintainerCanModify;
 
     private int commits;
 

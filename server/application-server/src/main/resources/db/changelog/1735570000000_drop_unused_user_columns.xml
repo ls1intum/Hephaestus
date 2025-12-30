@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!-- 
+    Remove unused columns from user table.
+    These fields were never synced and have no feature use.
+    -->
+
+    <!-- User table cleanups -->
+    <changeSet id="1735570000000-drop-user-followers" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="user" columnName="followers"/>
+        </preConditions>
+        <dropColumn tableName="user" columnName="followers"/>
+    </changeSet>
+
+    <changeSet id="1735570000000-drop-user-following" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="user" columnName="following"/>
+        </preConditions>
+        <dropColumn tableName="user" columnName="following"/>
+    </changeSet>
+
+</databaseChangeLog>

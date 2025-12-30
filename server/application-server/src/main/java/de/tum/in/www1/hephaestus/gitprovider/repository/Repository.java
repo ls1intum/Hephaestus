@@ -54,10 +54,6 @@ public class Repository extends BaseGitServiceEntity {
     @Column(columnDefinition = "TEXT")
     private String description;
 
-    // External URL, can vary widely
-    @Column(length = 1024)
-    private String homepage;
-
     @NonNull
     private Instant pushedAt;
 
@@ -70,18 +66,8 @@ public class Repository extends BaseGitServiceEntity {
     @Enumerated(EnumType.STRING)
     private Repository.Visibility visibility;
 
-    private int stargazersCount;
-
-    private int watchersCount;
-
     @NonNull
     private String defaultBranch;
-
-    private boolean hasIssues;
-
-    private boolean hasProjects;
-
-    private boolean hasWiki;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "organization_id", foreignKey = @ForeignKey(name = "fk_repository_organization"))
