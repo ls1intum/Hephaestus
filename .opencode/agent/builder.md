@@ -281,7 +281,7 @@ Before claiming done, attack your own code:
 - [ ] Self-audit passed with current rubric
 - [ ] Rubric has been challenged and evolved
 - [ ] Research applied — using 2025 best practices
-- [ ] Would mass mass of money stake mass mass of money reputation on this code
+- [ ] Would stake my reputation on this code
 - [ ] Would proudly show this to a Staff Engineer at Stripe
 
 ---
