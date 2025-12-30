@@ -85,18 +85,12 @@ export function filterGoodAndBadPractices(allBadPractices: PullRequestBadPractic
 		(badPractice) => badPractice.state === "GOOD_PRACTICE",
 	);
 
-	const badPractices = allBadPractices.filter(
-		(badPractice) =>
-			badPractice.state === "CRITICAL_ISSUE" ||
-			badPractice.state === "NORMAL_ISSUE" ||
-			badPractice.state === "MINOR_ISSUE",
+	const badPractices = allBadPractices.filter((badPractice) =>
+		isUnresolvedIssue(badPractice.state),
 	);
 
-	const resolvedPractices = allBadPractices.filter(
-		(badPractice) =>
-			badPractice.state === "FIXED" ||
-			badPractice.state === "WONT_FIX" ||
-			badPractice.state === "WRONG",
+	const resolvedPractices = allBadPractices.filter((badPractice) =>
+		isResolvedState(badPractice.state),
 	);
 
 	return { goodPractices, badPractices, resolvedPractices };
