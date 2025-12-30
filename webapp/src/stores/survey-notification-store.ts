@@ -39,7 +39,7 @@ export const useSurveyNotificationStore = create<SurveyNotificationState>()(
 				if (get().pendingSurvey) set({ shouldShowSurvey: true });
 			},
 
-			// Only clears the signal - keeps pendingSurvey for potential re-display
+			// Only clears the show signal - pendingSurvey remains so user can reopen from notification badge
 			clearShowSignal: () => set({ shouldShowSurvey: false }),
 		}),
 		{
