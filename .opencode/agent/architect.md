@@ -1,6 +1,6 @@
 ---
 description: Staff Engineer. Sets direction, provides context, amplifies builders.
-model: google/gemini-2.5-pro
+model: google/claude-opus-4-5-thinking-medium
 permission:
   bash: allow
   edit: deny
