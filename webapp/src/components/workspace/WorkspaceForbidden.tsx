@@ -1,4 +1,3 @@
-import { useNavigate } from "@tanstack/react-router";
 import { ShieldX } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -8,6 +7,7 @@ import {
 	EmptyMedia,
 	EmptyTitle,
 } from "@/components/ui/empty";
+import { useGoHome } from "@/hooks/use-go-home";
 
 export interface WorkspaceForbiddenProps {
 	/** The slug that the user cannot access (optional, for display purposes) */
@@ -19,11 +19,7 @@ export interface WorkspaceForbiddenProps {
  * Shows a friendly message explaining the user lacks permission.
  */
 export function WorkspaceForbidden({ slug }: WorkspaceForbiddenProps) {
-	const navigate = useNavigate();
-
-	const handleGoHome = () => {
-		navigate({ to: "/" });
-	};
+	const handleGoHome = useGoHome();
 
 	return (
 		<Empty>

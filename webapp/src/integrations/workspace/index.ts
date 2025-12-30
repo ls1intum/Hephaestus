@@ -10,13 +10,13 @@ export {
 	type MockWorkspaceProviderProps,
 	mockMembership,
 	mockWorkspace,
-	useMockWorkspace,
 } from "./mock-workspace-provider";
 export {
 	clearLastWorkspaceSlug,
 	getLastWorkspaceSlug,
 	useWorkspace,
 	useWorkspaceOptional,
+	WorkspaceContext,
 	type WorkspaceContextType,
 	type WorkspaceErrorType,
 	WorkspaceProvider,

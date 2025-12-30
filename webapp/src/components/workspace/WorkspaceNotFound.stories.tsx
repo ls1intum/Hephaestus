@@ -2,8 +2,9 @@ import type { Meta, StoryObj } from "@storybook/react";
 import { WorkspaceNotFound } from "./WorkspaceNotFound";
 
 /**
- * WorkspaceNotFound displays a friendly 404 error state when a workspace
- * cannot be found. Provides navigation back to the home page.
+ * Error state component for workspace 404 scenarios.
+ * Use when a workspace slug cannot be resolved,
+ * typically in route loaders or workspace-dependent layouts.
  */
 const meta = {
 	component: WorkspaceNotFound,
@@ -29,11 +30,13 @@ type Story = StoryObj<typeof meta>;
 
 /**
  * Default presentation without a specific slug.
+ * Use when the workspace slug is unknown or not relevant.
  */
 export const Default: Story = {};
 
 /**
  * Shows the specific slug that wasn't found.
+ * Use when you want to display which workspace the user tried to access.
  */
 export const WithSlug: Story = {
 	args: {

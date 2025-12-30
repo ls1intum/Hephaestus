@@ -39,6 +39,12 @@ export interface WorkspaceContextType {
 
 const WorkspaceContext = createContext<WorkspaceContextType | undefined>(undefined);
 
+/**
+ * Exported for use by MockWorkspaceProvider in tests.
+ * @internal
+ */
+export { WorkspaceContext };
+
 export interface WorkspaceProviderProps {
 	/** Workspace slug to fetch */
 	slug: string;
@@ -53,7 +59,7 @@ function getErrorType(error: unknown): WorkspaceErrorType {
 	if (!error) return null;
 
 	// Check for fetch/HTTP errors with status codes
-	if (error && typeof error === "object" && "status" in error) {
+	if (typeof error === "object" && error !== null && "status" in error) {
 		const status = (error as { status: number }).status;
 		if (status === 404) return "not-found";
 		if (status === 403) return "forbidden";
@@ -172,13 +178,17 @@ export function WorkspaceProvider({ slug, children }: WorkspaceProviderProps) {
 	const isAdmin = role === "ADMIN" || role === "OWNER";
 	const isOwner = role === "OWNER";
 
+	// Normalize error for consumer convenience - extract Error if available, otherwise wrap
+	const normalizedError: Error | null =
+		error instanceof Error ? error : error ? new Error(String(error)) : null;
+
 	const value: WorkspaceContextType = {
 		workspace: workspaceQuery.data ?? null,
 		membership: membershipQuery.data ?? null,
 		slug,
 		isLoading,
 		errorType,
-		error: error as Error | null,
+		error: normalizedError,
 		isReady: Boolean(workspaceQuery.data) && !isLoading && !errorType,
 		role,
 		isAdmin,

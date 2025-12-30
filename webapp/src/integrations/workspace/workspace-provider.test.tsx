@@ -5,7 +5,9 @@
  * - Initialization and loading states
  * - Successful data loading (mocked)
  * - Error states (404, 403)
- * - LocalStorage persistence
+ * - Retry behavior for different error types
+ * - LocalStorage persistence when workspace loads
+ * - LocalStorage clearing on logout
  * - Role derivation (isMember, isAdmin, isOwner)
  * - Hook error when used outside provider
  */
@@ -262,6 +264,148 @@ describe("WorkspaceProvider", () => {
 		});
 	});
 
+	describe("retry behavior", () => {
+		it("should not retry on 404 errors", async () => {
+			let callCount = 0;
+			mockGetWorkspaceOptions.mockImplementation(({ path }) => ({
+				queryKey: ["getWorkspace", path.workspaceSlug],
+				queryFn: () => {
+					callCount++;
+					return Promise.reject({ status: 404, message: "Not found" });
+				},
+			}));
+
+			// Create a query client that respects the retry option from the provider
+			const retryQueryClient = new QueryClient({
+				defaultOptions: {
+					queries: {
+						staleTime: Number.POSITIVE_INFINITY,
+						// Don't disable retry at the client level - let the provider control it
+					},
+				},
+			});
+
+			renderHook(() => useWorkspace(), {
+				wrapper: createWrapper(retryQueryClient, "unknown-workspace"),
+			});
+
+			// Wait for query to complete and settle
+			await waitFor(
+				() => {
+					// After initial call, 404 should not trigger retries
+					expect(callCount).toBeGreaterThan(0);
+				},
+				{ timeout: 500 },
+			);
+
+			// Give some time for any potential retries
+			await new Promise((resolve) => setTimeout(resolve, 100));
+
+			// Should only have been called once (no retries for 404)
+			expect(callCount).toBe(1);
+		});
+
+		it("should not retry on 403 errors", async () => {
+			let callCount = 0;
+			mockGetWorkspaceOptions.mockImplementation(({ path }) => ({
+				queryKey: ["getWorkspace", path.workspaceSlug],
+				queryFn: () => {
+					callCount++;
+					return Promise.reject({ status: 403, message: "Forbidden" });
+				},
+			}));
+
+			const retryQueryClient = new QueryClient({
+				defaultOptions: {
+					queries: {
+						staleTime: Number.POSITIVE_INFINITY,
+					},
+				},
+			});
+
+			renderHook(() => useWorkspace(), {
+				wrapper: createWrapper(retryQueryClient, "private-workspace"),
+			});
+
+			await waitFor(
+				() => {
+					expect(callCount).toBeGreaterThan(0);
+				},
+				{ timeout: 500 },
+			);
+
+			await new Promise((resolve) => setTimeout(resolve, 100));
+
+			// Should only have been called once (no retries for 403)
+			expect(callCount).toBe(1);
+		});
+	});
+
+	describe("localStorage persistence", () => {
+		it("should persist slug to localStorage when workspace loads successfully", async () => {
+			expect(getLastWorkspaceSlug()).toBeNull();
+
+			const { result } = renderHook(() => useWorkspace(), {
+				wrapper: createWrapper(queryClient, "test-workspace"),
+			});
+
+			await waitFor(() => {
+				expect(result.current.isReady).toBe(true);
+			});
+
+			// Slug should now be persisted
+			expect(getLastWorkspaceSlug()).toBe("test-workspace");
+		});
+
+		it("should not persist slug if workspace fetch fails", async () => {
+			mockGetWorkspaceOptions.mockImplementation(({ path }) => ({
+				queryKey: ["getWorkspace", path.workspaceSlug],
+				queryFn: () => Promise.reject({ status: 404, message: "Not found" }),
+			}));
+
+			const { result } = renderHook(() => useWorkspace(), {
+				wrapper: createWrapper(queryClient, "unknown-workspace"),
+			});
+
+			await waitFor(() => {
+				expect(result.current.errorType).toBe("not-found");
+			});
+
+			// Slug should NOT be persisted on error
+			expect(getLastWorkspaceSlug()).toBeNull();
+		});
+
+		it("should clear localStorage when user logs out", async () => {
+			// Set up initial authenticated state
+			localStorage.setItem("hephaestus.lastWorkspaceSlug", "test-workspace");
+			expect(getLastWorkspaceSlug()).toBe("test-workspace");
+
+			// Start with authenticated user
+			mockUseAuth.mockReturnValue({
+				isAuthenticated: true,
+				isLoading: false,
+			});
+
+			const { rerender } = renderHook(() => useWorkspace(), {
+				wrapper: createWrapper(queryClient, "test-workspace"),
+			});
+
+			// Simulate logout
+			mockUseAuth.mockReturnValue({
+				isAuthenticated: false,
+				isLoading: false,
+			});
+
+			// Re-render to trigger the logout effect
+			rerender();
+
+			// Wait for effect to run
+			await waitFor(() => {
+				expect(getLastWorkspaceSlug()).toBeNull();
+			});
+		});
+	});
+
 	describe("useWorkspace hook", () => {
 		it("should throw when used outside WorkspaceProvider", () => {
 			expect(() => {
@@ -299,7 +443,7 @@ describe("WorkspaceProvider", () => {
 	});
 });
 
-describe("localStorage persistence", () => {
+describe("localStorage utility functions", () => {
 	beforeEach(() => {
 		localStorage.clear();
 	});

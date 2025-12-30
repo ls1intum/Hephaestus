@@ -1,7 +1,13 @@
 import type { ReactNode } from "react";
-import { createContext, useContext } from "react";
 import type { Workspace, WorkspaceMembership } from "@/api/types.gen";
-import type { WorkspaceContextType, WorkspaceErrorType } from "./workspace-provider";
+import {
+	WorkspaceContext,
+	type WorkspaceContextType,
+	type WorkspaceErrorType,
+} from "./workspace-provider";
+
+/** Fixed date constant for deterministic test data */
+const MOCK_DATE = new Date("2024-01-01T00:00:00Z");
 
 /**
  * Default mock workspace data for testing.
@@ -15,8 +21,8 @@ export const mockWorkspace: Workspace = {
 	isPubliclyViewable: false,
 	hasSlackToken: false,
 	hasSlackSigningSecret: false,
-	createdAt: new Date("2024-01-01T00:00:00Z"),
-	updatedAt: new Date("2024-01-01T00:00:00Z"),
+	createdAt: MOCK_DATE,
+	updatedAt: MOCK_DATE,
 };
 
 /**
@@ -27,7 +33,7 @@ export const mockMembership: WorkspaceMembership = {
 	userLogin: "testuser",
 	userName: "Test User",
 	role: "MEMBER",
-	createdAt: new Date("2024-01-01T00:00:00Z"),
+	createdAt: MOCK_DATE,
 };
 
 /**
@@ -47,8 +53,6 @@ export const defaultMockContext: WorkspaceContextType = {
 	isMember: true,
 };
 
-const MockWorkspaceContext = createContext<WorkspaceContextType | undefined>(undefined);
-
 export interface MockWorkspaceProviderProps {
 	/** Override specific context values */
 	value?: Partial<WorkspaceContextType>;
@@ -58,11 +62,12 @@ export interface MockWorkspaceProviderProps {
 
 /**
  * Mock provider for testing components that depend on WorkspaceProvider.
- * Uses a separate context to avoid interference with the real provider.
+ * Uses the same context as the real provider, allowing tested components
+ * to use the real useWorkspace hook.
  *
  * @example
  * ```tsx
- * // Default values
+ * // Default values - components can use the real useWorkspace hook
  * <MockWorkspaceProvider>
  *   <ComponentUnderTest />
  * </MockWorkspaceProvider>
@@ -89,21 +94,7 @@ export function MockWorkspaceProvider({ value, children }: MockWorkspaceProvider
 		...value,
 	};
 
-	return (
-		<MockWorkspaceContext.Provider value={contextValue}>{children}</MockWorkspaceContext.Provider>
-	);
-}
-
-/**
- * Hook for accessing the mock workspace context in tests.
- * Falls back to the real useWorkspace if not within MockWorkspaceProvider.
- */
-export function useMockWorkspace(): WorkspaceContextType {
-	const context = useContext(MockWorkspaceContext);
-	if (!context) {
-		throw new Error("useMockWorkspace must be used within a MockWorkspaceProvider");
-	}
-	return context;
+	return <WorkspaceContext.Provider value={contextValue}>{children}</WorkspaceContext.Provider>;
 }
 
 /**
