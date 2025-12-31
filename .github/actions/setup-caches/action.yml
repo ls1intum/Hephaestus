@@ -14,7 +14,7 @@ runs:
   steps:
     # Node.js caching
     - name: Setup Node.js
-      if: contains(fromJSON('["application-server-quality", "webapp-quality", "webapp-visual", "openapi-validation", "docs-quality", "intelligence-service-quality", "intelligence-service-unit", "intelligence-service-integration", "webhook-ingest-quality", "webhook-ingest-unit"]'), inputs.cache-type)
+      if: contains(fromJSON('["application-server-quality", "webapp-quality", "webapp-visual", "webapp-unit", "webapp-storybook", "openapi-validation", "intelligence-service-quality", "intelligence-service-unit", "intelligence-service-integration", "webhook-ingest-quality", "webhook-ingest-unit"]'), inputs.cache-type)
       uses: actions/setup-node@v4
       with:
         node-version-file: ".node-version"
