@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.github;
 
+import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.DEFAULT_PAGE_SIZE;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.GRAPHQL_TIMEOUT;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.LARGE_PAGE_SIZE;
@@ -85,12 +86,13 @@ public class GitHubPullRequestReviewSyncService {
             });
         }
 
+        String safeNameWithOwner = sanitizeForLog(repository.getNameWithOwner());
         if (prCount.get() == 0) {
-            log.info("No pull requests found for {}, skipping review sync", repository.getNameWithOwner());
+            log.info("No pull requests found for {}, skipping review sync", safeNameWithOwner);
             return 0;
         }
 
-        log.info("Synced {} reviews for {} PRs in {}", totalSynced.get(), prCount.get(), repository.getNameWithOwner());
+        log.info("Synced {} reviews for {} PRs in {}", totalSynced.get(), prCount.get(), safeNameWithOwner);
         return totalSynced.get();
     }
 
@@ -128,9 +130,11 @@ public class GitHubPullRequestReviewSyncService {
         }
 
         Repository repository = pullRequest.getRepository();
-        Optional<RepositoryOwnerAndName> parsedName = GitHubRepositoryNameParser.parse(repository.getNameWithOwner());
+        String nameWithOwner = repository.getNameWithOwner();
+        String safeNameWithOwner = sanitizeForLog(nameWithOwner);
+        Optional<RepositoryOwnerAndName> parsedName = GitHubRepositoryNameParser.parse(nameWithOwner);
         if (parsedName.isEmpty()) {
-            log.warn("Invalid repository name format: {}", repository.getNameWithOwner());
+            log.warn("Invalid repository name format: {}", safeNameWithOwner);
             return 0;
         }
         RepositoryOwnerAndName ownerAndName = parsedName.get();
@@ -193,7 +197,7 @@ public class GitHubPullRequestReviewSyncService {
                 log.error(
                     "Error syncing reviews for PR #{} in {}: {}",
                     pullRequest.getNumber(),
-                    repository.getNameWithOwner(),
+                    safeNameWithOwner,
                     e.getMessage(),
                     e
                 );
@@ -201,12 +205,7 @@ public class GitHubPullRequestReviewSyncService {
             }
         }
 
-        log.debug(
-            "Synced {} reviews for PR #{} in {}",
-            totalSynced,
-            pullRequest.getNumber(),
-            repository.getNameWithOwner()
-        );
+        log.debug("Synced {} reviews for PR #{} in {}", totalSynced, pullRequest.getNumber(), safeNameWithOwner);
         return totalSynced;
     }
 

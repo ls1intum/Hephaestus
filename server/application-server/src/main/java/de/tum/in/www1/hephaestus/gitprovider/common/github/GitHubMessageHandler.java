@@ -1,5 +1,7 @@
 package de.tum.in.www1.hephaestus.gitprovider.common.github;
 
+import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
+
 import de.tum.in.www1.hephaestus.gitprovider.common.NatsMessageDeserializer;
 import io.nats.client.Message;
 import io.nats.client.MessageHandler;
@@ -37,8 +39,9 @@ public abstract class GitHubMessageHandler<T> implements MessageHandler {
     public void onMessage(Message msg) {
         String eventType = getEventKey();
         String subject = msg.getSubject();
+        String safeSubject = sanitizeForLog(subject);
         if (!subject.endsWith(eventType)) {
-            logger.error("Received message on unexpected subject: {}, expected to end with {}", subject, eventType);
+            logger.error("Received message on unexpected subject: {}, expected to end with {}", safeSubject, eventType);
             return;
         }
 
@@ -46,9 +49,9 @@ public abstract class GitHubMessageHandler<T> implements MessageHandler {
             T eventPayload = deserializer.deserialize(msg, payloadType);
             handleEvent(eventPayload);
         } catch (IOException e) {
-            logger.error("Failed to parse payload for subject {}: {}", subject, e.getMessage(), e);
+            logger.error("Failed to parse payload for subject {}: {}", safeSubject, e.getMessage(), e);
         } catch (Exception e) {
-            logger.error("Unexpected error while handling message for subject {}: {}", subject, e.getMessage(), e);
+            logger.error("Unexpected error while handling message for subject {}: {}", safeSubject, e.getMessage(), e);
         }
     }
 

@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.gitprovider.issuecomment.github;
 
+import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.DEFAULT_PAGE_SIZE;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.GRAPHQL_TIMEOUT;
 
@@ -81,17 +82,13 @@ public class GitHubIssueCommentSyncService {
             });
         }
 
+        String safeNameWithOwner = sanitizeForLog(repository.getNameWithOwner());
         if (issueCount.get() == 0) {
-            log.info("No issues found for {}, skipping comment sync", repository.getNameWithOwner());
+            log.info("No issues found for {}, skipping comment sync", safeNameWithOwner);
             return 0;
         }
 
-        log.info(
-            "Synced {} comments for {} issues in {}",
-            totalSynced.get(),
-            issueCount.get(),
-            repository.getNameWithOwner()
-        );
+        log.info("Synced {} comments for {} issues in {}", totalSynced.get(), issueCount.get(), safeNameWithOwner);
         return totalSynced.get();
     }
 
@@ -106,9 +103,11 @@ public class GitHubIssueCommentSyncService {
         }
 
         Repository repository = issue.getRepository();
-        Optional<RepositoryOwnerAndName> parsedName = GitHubRepositoryNameParser.parse(repository.getNameWithOwner());
+        String nameWithOwner = repository.getNameWithOwner();
+        String safeNameWithOwner = sanitizeForLog(nameWithOwner);
+        Optional<RepositoryOwnerAndName> parsedName = GitHubRepositoryNameParser.parse(nameWithOwner);
         if (parsedName.isEmpty()) {
-            log.warn("Invalid repository name format: {}", repository.getNameWithOwner());
+            log.warn("Invalid repository name format: {}", safeNameWithOwner);
             return 0;
         }
         RepositoryOwnerAndName ownerAndName = parsedName.get();
@@ -162,7 +161,7 @@ public class GitHubIssueCommentSyncService {
                 log.error(
                     "Error syncing comments for issue #{} in {}: {}",
                     issue.getNumber(),
-                    repository.getNameWithOwner(),
+                    safeNameWithOwner,
                     e.getMessage(),
                     e
                 );
@@ -170,12 +169,7 @@ public class GitHubIssueCommentSyncService {
             }
         }
 
-        log.debug(
-            "Synced {} comments for issue #{} in {}",
-            totalSynced,
-            issue.getNumber(),
-            repository.getNameWithOwner()
-        );
+        log.debug("Synced {} comments for issue #{} in {}", totalSynced, issue.getNumber(), safeNameWithOwner);
         return totalSynced;
     }
 }

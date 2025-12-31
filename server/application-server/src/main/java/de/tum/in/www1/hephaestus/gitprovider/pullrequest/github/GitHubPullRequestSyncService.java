@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.gitprovider.pullrequest.github;
 
+import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.DEFAULT_PAGE_SIZE;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.GRAPHQL_TIMEOUT;
 
@@ -84,9 +85,11 @@ public class GitHubPullRequestSyncService {
             return 0;
         }
 
-        Optional<RepositoryOwnerAndName> parsedName = GitHubRepositoryNameParser.parse(repository.getNameWithOwner());
+        String nameWithOwner = repository.getNameWithOwner();
+        String safeNameWithOwner = sanitizeForLog(nameWithOwner);
+        Optional<RepositoryOwnerAndName> parsedName = GitHubRepositoryNameParser.parse(nameWithOwner);
         if (parsedName.isEmpty()) {
-            log.warn("Invalid repository name format: {}", repository.getNameWithOwner());
+            log.warn("Invalid repository name format: {}", safeNameWithOwner);
             return 0;
         }
         RepositoryOwnerAndName ownerAndName = parsedName.get();
@@ -157,7 +160,7 @@ public class GitHubPullRequestSyncService {
                 hasMore = pageInfo != null && Boolean.TRUE.equals(pageInfo.getHasNextPage());
                 cursor = pageInfo != null ? pageInfo.getEndCursor() : null;
             } catch (Exception e) {
-                log.error("Error syncing pull requests for {}: {}", repository.getNameWithOwner(), e.getMessage(), e);
+                log.error("Error syncing pull requests for {}: {}", safeNameWithOwner, e.getMessage(), e);
                 break;
             }
         }
@@ -167,7 +170,7 @@ public class GitHubPullRequestSyncService {
             log.debug(
                 "Fetching additional reviews for {} PRs with >10 reviews in {}",
                 prsNeedingReviewPagination.size(),
-                repository.getNameWithOwner()
+                safeNameWithOwner
             );
             for (PullRequestWithReviewCursor prWithCursor : prsNeedingReviewPagination) {
                 int additionalReviews = reviewSyncService.syncRemainingReviews(
@@ -183,7 +186,7 @@ public class GitHubPullRequestSyncService {
             "Synced {} pull requests and {} reviews for {} ({} PRs needed review pagination)",
             totalPRsSynced,
             totalReviewsSynced,
-            repository.getNameWithOwner(),
+            safeNameWithOwner,
             prsNeedingReviewPagination.size()
         );
         return totalPRsSynced;

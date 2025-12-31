@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.gitprovider.issue.github;
 
+import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.DEFAULT_PAGE_SIZE;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.GRAPHQL_TIMEOUT;
 
@@ -62,9 +63,11 @@ public class GitHubIssueSyncService {
             return 0;
         }
 
-        Optional<RepositoryOwnerAndName> parsedName = GitHubRepositoryNameParser.parse(repository.getNameWithOwner());
+        String nameWithOwner = repository.getNameWithOwner();
+        String safeNameWithOwner = sanitizeForLog(nameWithOwner);
+        Optional<RepositoryOwnerAndName> parsedName = GitHubRepositoryNameParser.parse(nameWithOwner);
         if (parsedName.isEmpty()) {
-            log.warn("Invalid repository name format: {}", repository.getNameWithOwner());
+            log.warn("Invalid repository name format: {}", safeNameWithOwner);
             return 0;
         }
         RepositoryOwnerAndName ownerAndName = parsedName.get();
@@ -112,12 +115,12 @@ public class GitHubIssueSyncService {
                 hasMore = pageInfo != null && Boolean.TRUE.equals(pageInfo.getHasNextPage());
                 cursor = pageInfo != null ? pageInfo.getEndCursor() : null;
             } catch (Exception e) {
-                log.error("Error syncing issues for {}: {}", repository.getNameWithOwner(), e.getMessage(), e);
+                log.error("Error syncing issues for {}: {}", safeNameWithOwner, e.getMessage(), e);
                 break;
             }
         }
 
-        log.info("Synced {} issues for {}", totalSynced, repository.getNameWithOwner());
+        log.info("Synced {} issues for {}", totalSynced, safeNameWithOwner);
         return totalSynced;
     }
 }
