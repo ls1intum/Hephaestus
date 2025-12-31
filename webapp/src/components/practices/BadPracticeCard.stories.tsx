@@ -146,3 +146,18 @@ export const WithResolutionControls: Story = {
 		currUserIsDashboardUser: true,
 	},
 };
+
+/**
+ * Demonstrates that resolved items (FIXED state) do NOT show the Resolve button,
+ * even when the user is a dashboard user. This is the key behavior that prevents
+ * showing resolution options for already-resolved practices.
+ */
+export const ResolvedWithDashboardUser: Story = {
+	args: {
+		id: 9,
+		title: "Previously flagged issue",
+		description: "This issue was already resolved as fixed.",
+		state: "FIXED",
+		currUserIsDashboardUser: true,
+	},
+};
