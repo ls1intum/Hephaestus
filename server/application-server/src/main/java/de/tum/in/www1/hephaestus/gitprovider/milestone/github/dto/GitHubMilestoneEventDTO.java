@@ -16,8 +16,7 @@ public record GitHubMilestoneEventDTO(
     @JsonProperty("milestone") GitHubMilestoneDTO milestone,
     @JsonProperty("repository") GitHubRepositoryRefDTO repository,
     @JsonProperty("sender") GitHubUserDTO sender
-)
-    implements GitHubWebhookEvent {
+) implements GitHubWebhookEvent {
     public GitHubEventAction.Milestone actionType() {
         return GitHubEventAction.Milestone.fromString(action);
     }

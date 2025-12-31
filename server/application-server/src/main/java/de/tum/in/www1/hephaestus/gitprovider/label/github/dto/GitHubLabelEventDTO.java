@@ -16,8 +16,7 @@ public record GitHubLabelEventDTO(
     @JsonProperty("label") GitHubLabelDTO label,
     @JsonProperty("repository") GitHubRepositoryRefDTO repository,
     @JsonProperty("sender") GitHubUserDTO sender
-)
-    implements GitHubWebhookEvent {
+) implements GitHubWebhookEvent {
     public GitHubEventAction.Label actionType() {
         return GitHubEventAction.Label.fromString(action);
     }

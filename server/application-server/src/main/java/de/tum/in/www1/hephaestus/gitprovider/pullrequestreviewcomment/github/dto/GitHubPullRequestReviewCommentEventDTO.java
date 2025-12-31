@@ -19,8 +19,7 @@ public record GitHubPullRequestReviewCommentEventDTO(
     @JsonProperty("pull_request") GitHubPullRequestDTO pullRequest,
     @JsonProperty("repository") GitHubRepositoryRefDTO repository,
     @JsonProperty("sender") GitHubUserDTO sender
-)
-    implements GitHubWebhookEvent {
+) implements GitHubWebhookEvent {
     public GitHubEventAction.PullRequestReviewComment actionType() {
         return GitHubEventAction.PullRequestReviewComment.fromString(action);
     }

@@ -17,8 +17,7 @@ public record GitHubInstallationRepositoriesEventDTO(
     @JsonProperty("repositories_added") List<GitHubRepositoryRefDTO> repositoriesAdded,
     @JsonProperty("repositories_removed") List<GitHubRepositoryRefDTO> repositoriesRemoved,
     @JsonProperty("sender") GitHubUserDTO sender
-)
-    implements GitHubWebhookEvent {
+) implements GitHubWebhookEvent {
     @Override
     public GitHubRepositoryRefDTO repository() {
         return null; // This event covers multiple repositories

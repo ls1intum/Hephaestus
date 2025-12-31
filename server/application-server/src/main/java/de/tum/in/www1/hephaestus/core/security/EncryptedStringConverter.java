@@ -61,7 +61,7 @@ public class EncryptedStringConverter implements AttributeConverter<String, Stri
             }
             logger.warn(
                 "Encryption key not configured - sensitive data will NOT be encrypted at rest. " +
-                "Set hephaestus.security.encryption-key in production!"
+                    "Set hephaestus.security.encryption-key in production!"
             );
             this.secretKey = null;
             this.enabled = false;

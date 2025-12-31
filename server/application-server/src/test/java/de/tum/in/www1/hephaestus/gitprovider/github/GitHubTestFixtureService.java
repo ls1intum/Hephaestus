@@ -59,8 +59,7 @@ public class GitHubTestFixtureService {
         // First, get organization node ID via GraphQL query
         String orgNodeId = getOrganizationNodeId(orgLogin);
 
-        String mutation =
-            """
+        String mutation = """
             mutation CreateRepository($input: CreateRepositoryInput!) {
                 createRepository(input: $input) {
                     repository {
@@ -141,8 +140,7 @@ public class GitHubTestFixtureService {
      * Creates a label in a repository via GraphQL mutation.
      */
     public CreatedLabel createLabel(String repositoryNodeId, String name, String color, String description) {
-        String mutation =
-            """
+        String mutation = """
             mutation CreateLabel($input: CreateLabelInput!) {
                 createLabel(input: $input) {
                     label {
@@ -186,8 +184,7 @@ public class GitHubTestFixtureService {
      * Updates a label via GraphQL mutation.
      */
     public void updateLabel(String labelNodeId, String newColor, String newDescription) {
-        String mutation =
-            """
+        String mutation = """
             mutation UpdateLabel($input: UpdateLabelInput!) {
                 updateLabel(input: $input) {
                     label {
@@ -210,8 +207,7 @@ public class GitHubTestFixtureService {
      * Deletes a label via GraphQL mutation.
      */
     public void deleteLabel(String labelNodeId) {
-        String mutation =
-            """
+        String mutation = """
             mutation DeleteLabel($input: DeleteLabelInput!) {
                 deleteLabel(input: $input) {
                     clientMutationId
@@ -308,8 +304,7 @@ public class GitHubTestFixtureService {
      * Creates an issue via GraphQL mutation.
      */
     public CreatedIssue createIssue(String repositoryNodeId, String title, String body) {
-        String mutation =
-            """
+        String mutation = """
             mutation CreateIssue($input: CreateIssueInput!) {
                 createIssue(input: $input) {
                     issue {
@@ -353,8 +348,7 @@ public class GitHubTestFixtureService {
      * Adds a comment to an issue via GraphQL.
      */
     public CreatedIssueComment addIssueComment(String issueNodeId, String body) {
-        String mutation =
-            """
+        String mutation = """
             mutation AddComment($input: AddCommentInput!) {
                 addComment(input: $input) {
                     commentEdge {
@@ -403,8 +397,7 @@ public class GitHubTestFixtureService {
         String headBranch,
         String baseBranch
     ) {
-        String mutation =
-            """
+        String mutation = """
             mutation CreatePullRequest($input: CreatePullRequestInput!) {
                 createPullRequest(input: $input) {
                     pullRequest {
@@ -464,8 +457,7 @@ public class GitHubTestFixtureService {
         String commitOid,
         List<ReviewComment> comments
     ) {
-        String mutation =
-            """
+        String mutation = """
             mutation AddPullRequestReview($input: AddPullRequestReviewInput!) {
                 addPullRequestReview(input: $input) {
                     pullRequestReview {
@@ -523,8 +515,7 @@ public class GitHubTestFixtureService {
         if (commitSha == null) {
             throw new IllegalArgumentException("Cannot create branch: commitSha is null. Repository may be empty.");
         }
-        String mutation =
-            """
+        String mutation = """
             mutation CreateRef($input: CreateRefInput!) {
                 createRef(input: $input) {
                     ref {
@@ -572,8 +563,7 @@ public class GitHubTestFixtureService {
         String repo = parts[1];
 
         // First get branch info including head commit
-        String query =
-            """
+        String query = """
             query GetBranchInfo($owner: String!, $name: String!, $qualifiedName: String!) {
                 repository(owner: $owner, name: $name) {
                     id
@@ -602,8 +592,7 @@ public class GitHubTestFixtureService {
 
         String expectedHeadOid = infoResponse.field("repository.ref.target.oid").toEntity(String.class);
 
-        String mutation =
-            """
+        String mutation = """
             mutation CreateCommitOnBranch($input: CreateCommitOnBranchInput!) {
                 createCommitOnBranch(input: $input) {
                     commit {
@@ -738,8 +727,7 @@ public class GitHubTestFixtureService {
      * Gets the node ID of an organization.
      */
     public String getOrganizationNodeId(String login) {
-        String query =
-            """
+        String query = """
             query GetOrganization($login: String!) {
                 organization(login: $login) {
                     id
@@ -766,8 +754,7 @@ public class GitHubTestFixtureService {
      * Gets organization members.
      */
     public List<String> getOrganizationMemberLogins(String login) {
-        String query =
-            """
+        String query = """
             query GetOrgMembers($login: String!) {
                 organization(login: $login) {
                     membersWithRole(first: 100) {
@@ -792,7 +779,10 @@ public class GitHubTestFixtureService {
         }
 
         List<Map<String, Object>> nodes = response.field("organization.membersWithRole.nodes").toEntity(List.class);
-        return nodes.stream().map(n -> (String) n.get("login")).toList();
+        return nodes
+            .stream()
+            .map(n -> (String) n.get("login"))
+            .toList();
     }
 
     // ========== REPOSITORY QUERIES ==========
@@ -802,8 +792,7 @@ public class GitHubTestFixtureService {
      */
     public RepositoryInfo getRepositoryInfo(String fullName) {
         String[] parts = fullName.split("/");
-        String query =
-            """
+        String query = """
             query GetRepository($owner: String!, $name: String!) {
                 repository(owner: $owner, name: $name) {
                     id
@@ -852,8 +841,7 @@ public class GitHubTestFixtureService {
      */
     public List<LabelInfo> listLabels(String fullName) {
         String[] parts = fullName.split("/");
-        String query =
-            """
+        String query = """
             query ListLabels($owner: String!, $name: String!) {
                 repository(owner: $owner, name: $name) {
                     labels(first: 100) {

@@ -646,7 +646,11 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
     }
 
     private Set<String> labelNames(Issue issue) {
-        return issue.getLabels().stream().map(l -> l.getName()).collect(Collectors.toSet());
+        return issue
+            .getLabels()
+            .stream()
+            .map(l -> l.getName())
+            .collect(Collectors.toSet());
     }
 
     // ==================== Test Event Listener ====================

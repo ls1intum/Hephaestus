@@ -288,7 +288,8 @@ class ModuleBoundaryTest {
                     boolean hasOnlyPrivateConstructors = javaClass
                         .getConstructors()
                         .stream()
-                        .allMatch(c -> c.getModifiers().contains(com.tngtech.archunit.core.domain.JavaModifier.PRIVATE)
+                        .allMatch(c ->
+                            c.getModifiers().contains(com.tngtech.archunit.core.domain.JavaModifier.PRIVATE)
                         );
 
                     if (!isFinal && !hasOnlyPrivateConstructors) {

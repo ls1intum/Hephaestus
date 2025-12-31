@@ -19,8 +19,7 @@ public record GitHubInstallationTargetEventDTO(
     @JsonProperty("target_type") String targetType,
     @JsonProperty("changes") @Nullable Changes changes,
     @JsonProperty("sender") GitHubUserDTO sender
-)
-    implements GitHubWebhookEvent {
+) implements GitHubWebhookEvent {
     public GitHubEventAction.InstallationTarget actionType() {
         return GitHubEventAction.InstallationTarget.fromString(action);
     }

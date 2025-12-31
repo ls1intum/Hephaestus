@@ -82,36 +82,47 @@ public final class DomainEvent {
         EventPayload.IssueData issue();
     }
 
-    public record IssueCreated(EventPayload.IssueData issue, EventContext context)
-        implements IssueEvent, ContextualEvent {}
+    public record IssueCreated(EventPayload.IssueData issue, EventContext context) implements
+        IssueEvent, ContextualEvent {}
 
-    public record IssueUpdated(EventPayload.IssueData issue, Set<String> changedFields, EventContext context)
-        implements IssueEvent, ContextualEvent {}
+    public record IssueUpdated(EventPayload.IssueData issue, Set<String> changedFields, EventContext context) implements
+        IssueEvent, ContextualEvent {}
 
-    public record IssueClosed(EventPayload.IssueData issue, @Nullable String stateReason, EventContext context)
-        implements IssueEvent, ContextualEvent {}
+    public record IssueClosed(
+        EventPayload.IssueData issue,
+        @Nullable String stateReason,
+        EventContext context
+    ) implements IssueEvent, ContextualEvent {}
 
-    public record IssueReopened(EventPayload.IssueData issue, EventContext context)
-        implements IssueEvent, ContextualEvent {}
+    public record IssueReopened(EventPayload.IssueData issue, EventContext context) implements
+        IssueEvent, ContextualEvent {}
 
     /** Deleted event is separate - entity no longer exists, only ID available. */
     public record IssueDeleted(Long issueId, EventContext context) implements ContextualEvent {}
 
-    public record IssueLabeled(EventPayload.IssueData issue, EventPayload.LabelData label, EventContext context)
-        implements IssueEvent, ContextualEvent {}
+    public record IssueLabeled(
+        EventPayload.IssueData issue,
+        EventPayload.LabelData label,
+        EventContext context
+    ) implements IssueEvent, ContextualEvent {}
 
-    public record IssueUnlabeled(EventPayload.IssueData issue, EventPayload.LabelData label, EventContext context)
-        implements IssueEvent, ContextualEvent {}
+    public record IssueUnlabeled(
+        EventPayload.IssueData issue,
+        EventPayload.LabelData label,
+        EventContext context
+    ) implements IssueEvent, ContextualEvent {}
 
-    public record IssueTyped(EventPayload.IssueData issue, EventPayload.IssueTypeData issueType, EventContext context)
-        implements IssueEvent, ContextualEvent {}
+    public record IssueTyped(
+        EventPayload.IssueData issue,
+        EventPayload.IssueTypeData issueType,
+        EventContext context
+    ) implements IssueEvent, ContextualEvent {}
 
     public record IssueUntyped(
         EventPayload.IssueData issue,
         @Nullable EventPayload.IssueTypeData previousType,
         EventContext context
-    )
-        implements IssueEvent, ContextualEvent {}
+    ) implements IssueEvent, ContextualEvent {}
 
     // ========================================================================
     // Pull Request Events
@@ -134,47 +145,47 @@ public final class DomainEvent {
         EventPayload.PullRequestData pullRequest();
     }
 
-    public record PullRequestCreated(EventPayload.PullRequestData pullRequest, EventContext context)
-        implements PullRequestEvent, ContextualEvent {}
+    public record PullRequestCreated(EventPayload.PullRequestData pullRequest, EventContext context) implements
+        PullRequestEvent, ContextualEvent {}
 
     public record PullRequestUpdated(
         EventPayload.PullRequestData pullRequest,
         Set<String> changedFields,
         EventContext context
-    )
-        implements PullRequestEvent, ContextualEvent {}
+    ) implements PullRequestEvent, ContextualEvent {}
 
-    public record PullRequestClosed(EventPayload.PullRequestData pullRequest, boolean wasMerged, EventContext context)
-        implements PullRequestEvent, ContextualEvent {}
+    public record PullRequestClosed(
+        EventPayload.PullRequestData pullRequest,
+        boolean wasMerged,
+        EventContext context
+    ) implements PullRequestEvent, ContextualEvent {}
 
-    public record PullRequestMerged(EventPayload.PullRequestData pullRequest, EventContext context)
-        implements PullRequestEvent, ContextualEvent {}
+    public record PullRequestMerged(EventPayload.PullRequestData pullRequest, EventContext context) implements
+        PullRequestEvent, ContextualEvent {}
 
-    public record PullRequestReopened(EventPayload.PullRequestData pullRequest, EventContext context)
-        implements PullRequestEvent, ContextualEvent {}
+    public record PullRequestReopened(EventPayload.PullRequestData pullRequest, EventContext context) implements
+        PullRequestEvent, ContextualEvent {}
 
     public record PullRequestLabeled(
         EventPayload.PullRequestData pullRequest,
         EventPayload.LabelData label,
         EventContext context
-    )
-        implements PullRequestEvent, ContextualEvent {}
+    ) implements PullRequestEvent, ContextualEvent {}
 
     public record PullRequestUnlabeled(
         EventPayload.PullRequestData pullRequest,
         EventPayload.LabelData label,
         EventContext context
-    )
-        implements PullRequestEvent, ContextualEvent {}
+    ) implements PullRequestEvent, ContextualEvent {}
 
-    public record PullRequestReady(EventPayload.PullRequestData pullRequest, EventContext context)
-        implements PullRequestEvent, ContextualEvent {}
+    public record PullRequestReady(EventPayload.PullRequestData pullRequest, EventContext context) implements
+        PullRequestEvent, ContextualEvent {}
 
-    public record PullRequestDrafted(EventPayload.PullRequestData pullRequest, EventContext context)
-        implements PullRequestEvent, ContextualEvent {}
+    public record PullRequestDrafted(EventPayload.PullRequestData pullRequest, EventContext context) implements
+        PullRequestEvent, ContextualEvent {}
 
-    public record PullRequestSynchronized(EventPayload.PullRequestData pullRequest, EventContext context)
-        implements PullRequestEvent, ContextualEvent {}
+    public record PullRequestSynchronized(EventPayload.PullRequestData pullRequest, EventContext context) implements
+        PullRequestEvent, ContextualEvent {}
 
     // ========================================================================
     // Label Events
@@ -186,14 +197,14 @@ public final class DomainEvent {
         Long workspaceId();
     }
 
-    public record LabelCreated(EventPayload.LabelData label, Long workspaceId, Long repositoryId)
-        implements LabelEvent {}
+    public record LabelCreated(EventPayload.LabelData label, Long workspaceId, Long repositoryId) implements
+        LabelEvent {}
 
-    public record LabelUpdated(EventPayload.LabelData label, Long workspaceId, Long repositoryId)
-        implements LabelEvent {}
+    public record LabelUpdated(EventPayload.LabelData label, Long workspaceId, Long repositoryId) implements
+        LabelEvent {}
 
-    public record LabelDeleted(Long labelId, String labelName, Long workspaceId, Long repositoryId)
-        implements LabelEvent {}
+    public record LabelDeleted(Long labelId, String labelName, Long workspaceId, Long repositoryId) implements
+        LabelEvent {}
 
     // ========================================================================
     // Milestone Events
@@ -205,14 +216,14 @@ public final class DomainEvent {
         Long workspaceId();
     }
 
-    public record MilestoneCreated(EventPayload.MilestoneData milestone, Long workspaceId, Long repositoryId)
-        implements MilestoneEvent {}
+    public record MilestoneCreated(EventPayload.MilestoneData milestone, Long workspaceId, Long repositoryId) implements
+        MilestoneEvent {}
 
-    public record MilestoneUpdated(EventPayload.MilestoneData milestone, Long workspaceId, Long repositoryId)
-        implements MilestoneEvent {}
+    public record MilestoneUpdated(EventPayload.MilestoneData milestone, Long workspaceId, Long repositoryId) implements
+        MilestoneEvent {}
 
-    public record MilestoneDeleted(Long milestoneId, String title, Long workspaceId, Long repositoryId)
-        implements MilestoneEvent {}
+    public record MilestoneDeleted(Long milestoneId, String title, Long workspaceId, Long repositoryId) implements
+        MilestoneEvent {}
 
     // ========================================================================
     // Comment Events
@@ -223,19 +234,18 @@ public final class DomainEvent {
         Long issueId();
     }
 
-    public record CommentCreated(EventPayload.CommentData comment, Long issueId, EventContext context)
-        implements CommentEvent, ContextualEvent {}
+    public record CommentCreated(EventPayload.CommentData comment, Long issueId, EventContext context) implements
+        CommentEvent, ContextualEvent {}
 
     public record CommentUpdated(
         EventPayload.CommentData comment,
         Long issueId,
         Set<String> changedFields,
         EventContext context
-    )
-        implements CommentEvent, ContextualEvent {}
+    ) implements CommentEvent, ContextualEvent {}
 
-    public record CommentDeleted(Long commentId, Long issueId, EventContext context)
-        implements CommentEvent, ContextualEvent {}
+    public record CommentDeleted(Long commentId, Long issueId, EventContext context) implements
+        CommentEvent, ContextualEvent {}
 
     // ========================================================================
     // Pull Request Review Events
@@ -245,14 +255,17 @@ public final class DomainEvent {
         EventPayload.ReviewData review();
     }
 
-    public record ReviewSubmitted(EventPayload.ReviewData review, EventContext context)
-        implements ReviewEvent, ContextualEvent {}
+    public record ReviewSubmitted(EventPayload.ReviewData review, EventContext context) implements
+        ReviewEvent, ContextualEvent {}
 
-    public record ReviewEdited(EventPayload.ReviewData review, Set<String> changedFields, EventContext context)
-        implements ReviewEvent, ContextualEvent {}
+    public record ReviewEdited(
+        EventPayload.ReviewData review,
+        Set<String> changedFields,
+        EventContext context
+    ) implements ReviewEvent, ContextualEvent {}
 
-    public record ReviewDismissed(EventPayload.ReviewData review, EventContext context)
-        implements ReviewEvent, ContextualEvent {}
+    public record ReviewDismissed(EventPayload.ReviewData review, EventContext context) implements
+        ReviewEvent, ContextualEvent {}
 
     // ========================================================================
     // Pull Request Review Comment Events
@@ -264,19 +277,21 @@ public final class DomainEvent {
         Long pullRequestId();
     }
 
-    public record ReviewCommentCreated(EventPayload.ReviewCommentData comment, Long pullRequestId, EventContext context)
-        implements ReviewCommentEvent, ContextualEvent {}
+    public record ReviewCommentCreated(
+        EventPayload.ReviewCommentData comment,
+        Long pullRequestId,
+        EventContext context
+    ) implements ReviewCommentEvent, ContextualEvent {}
 
     public record ReviewCommentEdited(
         EventPayload.ReviewCommentData comment,
         Long pullRequestId,
         Set<String> changedFields,
         EventContext context
-    )
-        implements ReviewCommentEvent, ContextualEvent {}
+    ) implements ReviewCommentEvent, ContextualEvent {}
 
-    public record ReviewCommentDeleted(Long commentId, Long pullRequestId, EventContext context)
-        implements ReviewCommentEvent, ContextualEvent {}
+    public record ReviewCommentDeleted(Long commentId, Long pullRequestId, EventContext context) implements
+        ReviewCommentEvent, ContextualEvent {}
 
     // ========================================================================
     // Pull Request Review Thread Events
@@ -286,11 +301,11 @@ public final class DomainEvent {
         EventPayload.ReviewThreadData thread();
     }
 
-    public record ReviewThreadResolved(EventPayload.ReviewThreadData thread, EventContext context)
-        implements ReviewThreadEvent, ContextualEvent {}
+    public record ReviewThreadResolved(EventPayload.ReviewThreadData thread, EventContext context) implements
+        ReviewThreadEvent, ContextualEvent {}
 
-    public record ReviewThreadUnresolved(EventPayload.ReviewThreadData thread, EventContext context)
-        implements ReviewThreadEvent, ContextualEvent {}
+    public record ReviewThreadUnresolved(EventPayload.ReviewThreadData thread, EventContext context) implements
+        ReviewThreadEvent, ContextualEvent {}
 
     // ========================================================================
     // Team Events
@@ -307,16 +322,16 @@ public final class DomainEvent {
         }
     }
 
-    public record TeamUpdated(EventPayload.TeamData team, Set<String> changedFields, EventContext context)
-        implements TeamEvent, ContextualEvent {
+    public record TeamUpdated(EventPayload.TeamData team, Set<String> changedFields, EventContext context) implements
+        TeamEvent, ContextualEvent {
         @Override
         public Long teamId() {
             return team.id();
         }
     }
 
-    public record TeamDeleted(Long teamId, String teamName, EventContext context)
-        implements TeamEvent, ContextualEvent {
+    public record TeamDeleted(Long teamId, String teamName, EventContext context) implements
+        TeamEvent, ContextualEvent {
         @Override
         public Long teamId() {
             return teamId;

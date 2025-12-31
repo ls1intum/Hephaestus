@@ -22,8 +22,7 @@ public record GitHubPullRequestEventDTO(
     @JsonProperty("label") GitHubLabelDTO label,
     @JsonProperty("requested_reviewer") GitHubUserDTO requestedReviewer,
     @JsonProperty("changes") Map<String, Object> changes
-)
-    implements GitHubWebhookEvent {
+) implements GitHubWebhookEvent {
     public GitHubEventAction.PullRequest actionType() {
         return GitHubEventAction.PullRequest.fromString(action);
     }

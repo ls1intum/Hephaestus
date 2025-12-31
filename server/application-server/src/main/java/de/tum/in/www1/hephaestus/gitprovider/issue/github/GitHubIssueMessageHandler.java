@@ -65,7 +65,8 @@ public class GitHubIssueMessageHandler extends GitHubMessageHandler<GitHubIssueE
 
     private void routeToProcessor(GitHubIssueEventDTO event, GitHubIssueDTO issueDto, ProcessingContext context) {
         switch (event.actionType()) {
-            case GitHubEventAction.Issue.OPENED,
+            case
+                GitHubEventAction.Issue.OPENED,
                 GitHubEventAction.Issue.EDITED,
                 GitHubEventAction.Issue.ASSIGNED,
                 GitHubEventAction.Issue.UNASSIGNED,

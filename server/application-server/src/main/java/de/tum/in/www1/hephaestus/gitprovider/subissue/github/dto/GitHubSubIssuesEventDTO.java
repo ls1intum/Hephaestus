@@ -18,8 +18,7 @@ public record GitHubSubIssuesEventDTO(
     @JsonProperty("parent_issue") GitHubIssueDTO parentIssue,
     @JsonProperty("repository") GitHubRepositoryRefDTO repository,
     @JsonProperty("sender") GitHubUserDTO sender
-)
-    implements GitHubWebhookEvent {
+) implements GitHubWebhookEvent {
     public GitHubEventAction.SubIssue actionType() {
         return GitHubEventAction.SubIssue.fromString(action);
     }

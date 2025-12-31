@@ -23,8 +23,7 @@ public record GitHubIssueCommentEventDTO(
     @JsonProperty("issue") GitHubIssueDTO issue,
     @JsonProperty("repository") GitHubRepositoryRefDTO repository,
     @JsonProperty("sender") GitHubUserDTO sender
-)
-    implements GitHubWebhookEvent {
+) implements GitHubWebhookEvent {
     public GitHubEventAction.IssueComment actionType() {
         return GitHubEventAction.IssueComment.fromString(action);
     }

@@ -37,7 +37,10 @@ public class SlackMessageService {
      */
     public List<User> getAllMembers() {
         try {
-            return slackApp.client().usersList(r -> r).getMembers();
+            return slackApp
+                .client()
+                .usersList(r -> r)
+                .getMembers();
         } catch (IOException | SlackApiException e) {
             logger.error("Failed to get all members from Slack: " + e.getMessage());
             return new ArrayList<>();

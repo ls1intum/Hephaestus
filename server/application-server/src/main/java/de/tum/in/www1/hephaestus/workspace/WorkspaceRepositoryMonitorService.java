@@ -117,7 +117,12 @@ public class WorkspaceRepositoryMonitorService {
             workspace.getId()
         );
 
-        if (workspace.getRepositoriesToMonitor().stream().anyMatch(r -> r.getNameWithOwner().equals(nameWithOwner))) {
+        if (
+            workspace
+                .getRepositoriesToMonitor()
+                .stream()
+                .anyMatch(r -> r.getNameWithOwner().equals(nameWithOwner))
+        ) {
             logger.info("Repository is already being monitored");
             throw new RepositoryAlreadyMonitoredException(nameWithOwner);
         }

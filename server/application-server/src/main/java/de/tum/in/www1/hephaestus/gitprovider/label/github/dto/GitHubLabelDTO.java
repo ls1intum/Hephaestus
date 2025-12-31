@@ -41,6 +41,11 @@ public record GitHubLabelDTO(
         if (connection == null || connection.getNodes() == null) {
             return Collections.emptyList();
         }
-        return connection.getNodes().stream().map(GitHubLabelDTO::fromLabel).filter(dto -> dto != null).toList();
+        return connection
+            .getNodes()
+            .stream()
+            .map(GitHubLabelDTO::fromLabel)
+            .filter(dto -> dto != null)
+            .toList();
     }
 }

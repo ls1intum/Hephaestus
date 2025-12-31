@@ -21,5 +21,4 @@ import org.springframework.security.access.prepost.PreAuthorize;
 @Retention(RetentionPolicy.RUNTIME)
 @Documented
 @PreAuthorize("@workspaceSecure.isAdmin()")
-public @interface RequireAtLeastWorkspaceAdmin {
-}
+public @interface RequireAtLeastWorkspaceAdmin {}

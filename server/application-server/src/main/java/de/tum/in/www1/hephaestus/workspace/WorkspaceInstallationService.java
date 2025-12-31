@@ -132,8 +132,8 @@ public class WorkspaceInstallationService {
                 if (isPatWorkspace && hasPatToken) {
                     logger.info(
                         "Workspace id={} for {} is a PAT workspace with a stored token; skipping GitHub App installation {} linking. " +
-                        "If you want to use the GitHub App instead, delete the PAT workspace first or set " +
-                        "hephaestus.workspace.init-default=false.",
+                            "If you want to use the GitHub App instead, delete the PAT workspace first or set " +
+                            "hephaestus.workspace.init-default=false.",
                         existingByLogin.getId(),
                         LoggingUtils.sanitizeForLog(accountLogin),
                         installationId

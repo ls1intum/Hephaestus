@@ -69,7 +69,8 @@ public class GitHubPullRequestMessageHandler extends GitHubMessageHandler<GitHub
         ProcessingContext context
     ) {
         switch (event.actionType()) {
-            case GitHubEventAction.PullRequest.OPENED,
+            case
+                GitHubEventAction.PullRequest.OPENED,
                 GitHubEventAction.PullRequest.EDITED,
                 GitHubEventAction.PullRequest.ASSIGNED,
                 GitHubEventAction.PullRequest.UNASSIGNED,

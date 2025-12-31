@@ -18,8 +18,7 @@ public record GitHubMembershipEventDTO(
     @JsonProperty("team") GitHubTeamEventDTO.GitHubTeamDTO team,
     @JsonProperty("organization") GitHubTeamEventDTO.GitHubOrgRefDTO organization,
     @JsonProperty("sender") GitHubUserDTO sender
-)
-    implements GitHubWebhookEvent {
+) implements GitHubWebhookEvent {
     public GitHubEventAction.Membership actionType() {
         return GitHubEventAction.Membership.fromString(action);
     }

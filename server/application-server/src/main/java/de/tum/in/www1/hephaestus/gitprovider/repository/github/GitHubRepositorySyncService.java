@@ -30,8 +30,7 @@ public class GitHubRepositorySyncService {
 
     private static final Logger logger = LoggerFactory.getLogger(GitHubRepositorySyncService.class);
 
-    private static final String REPOSITORY_QUERY =
-        """
+    private static final String REPOSITORY_QUERY = """
         query GetRepository($owner: String!, $name: String!) {
             repository(owner: $owner, name: $name) {
                 id

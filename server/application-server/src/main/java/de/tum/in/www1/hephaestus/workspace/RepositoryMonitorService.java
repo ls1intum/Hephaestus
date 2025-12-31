@@ -51,7 +51,10 @@ public class RepositoryMonitorService {
      * @return true if monitored
      */
     public boolean isMonitored(Workspace workspace, String nameWithOwner) {
-        return workspace.getRepositoriesToMonitor().stream().anyMatch(r -> r.getNameWithOwner().equals(nameWithOwner));
+        return workspace
+            .getRepositoriesToMonitor()
+            .stream()
+            .anyMatch(r -> r.getNameWithOwner().equals(nameWithOwner));
     }
 
     /**

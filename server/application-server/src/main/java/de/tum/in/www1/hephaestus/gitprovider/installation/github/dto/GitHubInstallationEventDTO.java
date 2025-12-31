@@ -17,8 +17,7 @@ public record GitHubInstallationEventDTO(
     @JsonProperty("installation") GitHubInstallationDTO installation,
     @JsonProperty("repositories") List<GitHubRepositoryRefDTO> repositories,
     @JsonProperty("sender") GitHubUserDTO sender
-)
-    implements GitHubWebhookEvent {
+) implements GitHubWebhookEvent {
     public GitHubEventAction.Installation actionType() {
         return GitHubEventAction.Installation.fromString(action);
     }

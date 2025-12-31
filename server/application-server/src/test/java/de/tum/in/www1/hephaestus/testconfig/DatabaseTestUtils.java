@@ -67,8 +67,8 @@ public class DatabaseTestUtils {
         List<Object> tables = entityManager
             .createNativeQuery(
                 "SELECT table_name FROM information_schema.tables " +
-                "WHERE table_schema = 'public' AND table_type = 'BASE TABLE' " +
-                "AND table_name NOT LIKE 'pg_%' AND table_name NOT LIKE 'sql_%'"
+                    "WHERE table_schema = 'public' AND table_type = 'BASE TABLE' " +
+                    "AND table_name NOT LIKE 'pg_%' AND table_name NOT LIKE 'sql_%'"
             )
             .getResultList();
 

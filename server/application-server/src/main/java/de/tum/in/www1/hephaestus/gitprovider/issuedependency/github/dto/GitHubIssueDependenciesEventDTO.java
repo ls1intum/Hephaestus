@@ -18,8 +18,7 @@ public record GitHubIssueDependenciesEventDTO(
     @JsonProperty("blocking_issue") GitHubIssueDTO blockingIssue,
     @JsonProperty("repository") GitHubRepositoryRefDTO repository,
     @JsonProperty("sender") GitHubUserDTO sender
-)
-    implements GitHubWebhookEvent {
+) implements GitHubWebhookEvent {
     public GitHubEventAction.IssueDependency actionType() {
         return GitHubEventAction.IssueDependency.fromString(action);
     }

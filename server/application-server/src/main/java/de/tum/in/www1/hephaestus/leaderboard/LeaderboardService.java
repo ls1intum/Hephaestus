@@ -359,7 +359,10 @@ public class LeaderboardService {
         );
 
         int score = entries.stream().mapToInt(LeaderboardEntryDTO::score).sum();
-        int leaguePoints = entries.stream().mapToInt(e -> e.user() == null ? 0 : e.user().leaguePoints()).sum();
+        int leaguePoints = entries
+            .stream()
+            .mapToInt(e -> e.user() == null ? 0 : e.user().leaguePoints())
+            .sum();
         int numberOfReviewedPRs = entries.stream().mapToInt(LeaderboardEntryDTO::numberOfReviewedPRs).sum();
         int numberOfApprovals = entries.stream().mapToInt(LeaderboardEntryDTO::numberOfApprovals).sum();
         int numberOfChangeRequests = entries.stream().mapToInt(LeaderboardEntryDTO::numberOfChangeRequests).sum();

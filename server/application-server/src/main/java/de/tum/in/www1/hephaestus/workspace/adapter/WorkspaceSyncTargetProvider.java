@@ -48,7 +48,12 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
             .findAll()
             .stream()
             .filter(ws -> ws.getStatus() == Workspace.WorkspaceStatus.ACTIVE)
-            .flatMap(ws -> ws.getRepositoriesToMonitor().stream().map(rtm -> SyncTargetFactory.create(ws, rtm)))
+            .flatMap(ws ->
+                ws
+                    .getRepositoriesToMonitor()
+                    .stream()
+                    .map(rtm -> SyncTargetFactory.create(ws, rtm))
+            )
             .toList();
     }
 
@@ -56,7 +61,13 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
     public List<SyncTarget> getSyncTargetsForWorkspace(Long workspaceId) {
         return workspaceRepository
             .findById(workspaceId)
-            .map(ws -> ws.getRepositoriesToMonitor().stream().map(rtm -> SyncTargetFactory.create(ws, rtm)).toList())
+            .map(ws ->
+                ws
+                    .getRepositoriesToMonitor()
+                    .stream()
+                    .map(rtm -> SyncTargetFactory.create(ws, rtm))
+                    .toList()
+            )
             .orElse(List.of());
     }
 

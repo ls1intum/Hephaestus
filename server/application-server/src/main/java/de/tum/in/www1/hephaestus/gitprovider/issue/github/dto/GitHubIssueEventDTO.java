@@ -21,8 +21,7 @@ public record GitHubIssueEventDTO(
     @JsonProperty("label") GitHubLabelDTO label,
     @JsonProperty("type") GitHubIssueTypeDTO issueType,
     @JsonProperty("changes") Map<String, Object> changes
-)
-    implements GitHubWebhookEvent {
+) implements GitHubWebhookEvent {
     public GitHubEventAction.Issue actionType() {
         return GitHubEventAction.Issue.fromString(action);
     }

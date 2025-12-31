@@ -243,7 +243,10 @@ class AdvancedArchitectureTest {
                         method.isAnnotatedWith(PreAuthorize.class) ||
                         method.getOwner().isAnnotatedWith(PreAuthorize.class) ||
                         // Check for custom security annotations on method
-                        method.getAnnotations().stream().anyMatch(a -> a.getRawType().getName().contains("Require")) ||
+                        method
+                            .getAnnotations()
+                            .stream()
+                            .anyMatch(a -> a.getRawType().getName().contains("Require")) ||
                         // Check for custom security annotations on class
                         method
                             .getOwner()

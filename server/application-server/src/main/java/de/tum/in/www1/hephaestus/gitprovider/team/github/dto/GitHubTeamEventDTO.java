@@ -17,8 +17,7 @@ public record GitHubTeamEventDTO(
     @JsonProperty("organization") GitHubOrgRefDTO organization,
     @JsonProperty("repository") GitHubRepositoryRefDTO repository,
     @JsonProperty("sender") GitHubUserDTO sender
-)
-    implements GitHubWebhookEvent {
+) implements GitHubWebhookEvent {
     public GitHubEventAction.Team actionType() {
         return GitHubEventAction.Team.fromString(action);
     }

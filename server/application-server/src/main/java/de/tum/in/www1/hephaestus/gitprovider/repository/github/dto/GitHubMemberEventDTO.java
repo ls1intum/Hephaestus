@@ -17,8 +17,7 @@ public record GitHubMemberEventDTO(
     @JsonProperty("repository") GitHubRepositoryRefDTO repository,
     @JsonProperty("sender") GitHubUserDTO sender,
     @JsonProperty("changes") Map<String, Object> changes
-)
-    implements GitHubWebhookEvent {
+) implements GitHubWebhookEvent {
     public GitHubEventAction.Member actionType() {
         return GitHubEventAction.Member.fromString(action);
     }

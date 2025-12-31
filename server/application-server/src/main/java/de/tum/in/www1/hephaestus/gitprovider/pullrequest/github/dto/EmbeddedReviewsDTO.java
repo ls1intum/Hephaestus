@@ -32,11 +32,11 @@ public record EmbeddedReviewsDTO(
 
         List<GitHubReviewDTO> reviews = connection.getNodes() != null
             ? connection
-                .getNodes()
-                .stream()
-                .map(GitHubReviewDTO::fromPullRequestReview)
-                .filter(Objects::nonNull)
-                .toList()
+                  .getNodes()
+                  .stream()
+                  .map(GitHubReviewDTO::fromPullRequestReview)
+                  .filter(Objects::nonNull)
+                  .toList()
             : Collections.emptyList();
 
         boolean hasNextPage =
