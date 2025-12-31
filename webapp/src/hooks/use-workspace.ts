@@ -19,3 +19,12 @@ export function useWorkspace(): Workspace {
 	}
 	return workspace;
 }
+
+/**
+ * Returns the current workspace or null if not within a workspace route.
+ * Use this variant when you need to conditionally access workspace data
+ * without throwing an error.
+ */
+export function useWorkspaceOptional(): Workspace | null {
+	return use(WorkspaceContext);
+}

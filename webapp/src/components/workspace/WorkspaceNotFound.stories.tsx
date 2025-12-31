@@ -72,3 +72,24 @@ export const SpecialCharacters: Story = {
 		slug: "test-workspace-<script>alert('xss')</script>",
 	},
 };
+
+/** Empty string slug shows generic message. */
+export const EmptySlug: Story = {
+	args: {
+		slug: "",
+	},
+};
+
+/** Unicode/emoji in slug - tests character handling. */
+export const UnicodeSlug: Story = {
+	args: {
+		slug: "workspace-🚀-日本語-عربي",
+	},
+};
+
+/** Slug with only special characters. */
+export const OnlySpecialChars: Story = {
+	args: {
+		slug: "!@#$%^&*()",
+	},
+};

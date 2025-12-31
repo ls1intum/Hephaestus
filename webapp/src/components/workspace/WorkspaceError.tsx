@@ -28,10 +28,14 @@ function isNetworkError(error: Error): boolean {
 	}
 
 	// Fallback: check common fetch/network error patterns in message
-	// Using case-insensitive matching for robustness across browsers
-	const networkPatterns = /\b(fetch|network|timeout|abort|connection|offline)\b/i;
-	return networkPatterns.test(error.message);
+	// Guard against undefined/null message (defensive)
+	const message = error.message ?? "";
+	const networkPatterns = /\b(fetch|network|timeout|abort|connection|offline|cors)\b/i;
+	return networkPatterns.test(message);
 }
+
+/** Maximum length for error details display to prevent layout issues */
+const MAX_ERROR_DETAILS_LENGTH = 5000;
 
 /**
  * Generic error state component for unexpected workspace errors.
@@ -116,9 +120,17 @@ export function WorkspaceError({ error, reset }: WorkspaceErrorProps) {
 			{process.env.NODE_ENV === "development" && (
 				<details className="mt-4 max-w-md text-left text-xs text-muted-foreground">
 					<summary className="cursor-pointer hover:text-foreground">Error details</summary>
-					<pre className="mt-2 overflow-auto rounded bg-muted p-2">
-						{error.name}: {error.message}
-						{error.stack && `\n\n${error.stack}`}
+					<pre className="mt-2 max-h-64 overflow-auto rounded bg-muted p-2">
+						{(() => {
+							const name = error.name || "Error";
+							const message = error.message || "(no message)";
+							const stack = error.stack || "";
+							const full = `${name}: ${message}${stack ? `\n\n${stack}` : ""}`;
+							// Truncate extremely long error details to prevent memory/layout issues
+							return full.length > MAX_ERROR_DETAILS_LENGTH
+								? `${full.slice(0, MAX_ERROR_DETAILS_LENGTH)}...\n\n[Truncated - ${full.length} chars total]`
+								: full;
+						})()}
 					</pre>
 				</details>
 			)}

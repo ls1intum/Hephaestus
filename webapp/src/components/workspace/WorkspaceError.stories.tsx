@@ -106,3 +106,40 @@ export const ServerError: Story = {
 		error: new Error("Internal Server Error"),
 	},
 };
+
+/** CORS error detected via message pattern. */
+export const CorsError: Story = {
+	args: {
+		error: new Error("CORS policy: No 'Access-Control-Allow-Origin' header"),
+	},
+};
+
+/** Error with empty message - defensive handling. */
+export const EmptyMessage: Story = {
+	args: {
+		error: (() => {
+			const err = new Error();
+			err.message = "";
+			return err;
+		})(),
+	},
+};
+
+/** Error with undefined message - defensive handling. */
+export const UndefinedMessage: Story = {
+	args: {
+		error: (() => {
+			const err = new Error();
+			// @ts-expect-error - Testing edge case where message is undefined
+			err.message = undefined;
+			return err;
+		})(),
+	},
+};
+
+/** Extremely long error message - tests truncation in dev details. */
+export const LongErrorMessage: Story = {
+	args: {
+		error: new Error("A".repeat(10000)),
+	},
+};
