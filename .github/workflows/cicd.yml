@@ -13,27 +13,42 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  # Detect which components changed for selective job execution
-  # This significantly reduces CI time when only specific components are modified
-  changes:
+  # ┌──────────────────────────────────────────────────────────────────────────┐
+  # │ CHANGE DETECTION                                                          │
+  # │ Detects which components changed for selective job execution.             │
+  # │ This significantly reduces CI time when only specific components change.  │
+  # │                                                                            │
+  # │ Why fetch-depth: 0?                                                       │
+  # │ - For PRs: paths-filter uses GitHub API (no git history needed)           │
+  # │ - For pushes/merge_group: needs git history to find merge-base            │
+  # │ We use fetch-depth: 0 to handle all event types consistently.             │
+  # │ See: https://github.com/dorny/paths-filter#supported-workflows            │
+  # └──────────────────────────────────────────────────────────────────────────┘
+  detect-changes:
+    name: "Detect changes"
     runs-on: ubuntu-latest
+    # Required for dorny/paths-filter to access PR files via GitHub API
+    permissions:
+      pull-requests: read
+      contents: read
     outputs:
-      # Component-level changes
+      # Component-level changes (string 'true'/'false')
       webapp: ${{ steps.filter.outputs.webapp }}
       application-server: ${{ steps.filter.outputs.application-server }}
       intelligence-service: ${{ steps.filter.outputs.intelligence-service }}
       webhook-ingest: ${{ steps.filter.outputs.webhook-ingest }}
       docs: ${{ steps.filter.outputs.docs }}
-      # Aggregate flags
-      any-server: ${{ steps.filter.outputs.application-server == 'true' || steps.filter.outputs.intelligence-service == 'true' || steps.filter.outputs.webhook-ingest == 'true' }}
-      any-code: ${{ steps.filter.outputs.webapp == 'true' || steps.filter.outputs.application-server == 'true' || steps.filter.outputs.intelligence-service == 'true' || steps.filter.outputs.webhook-ingest == 'true' }}
       ci-config: ${{ steps.filter.outputs.ci-config }}
+      # Aggregate: any code changed (not just docs/ci-config)
+      any-code: ${{ steps.filter.outputs.webapp == 'true' || steps.filter.outputs.application-server == 'true' || steps.filter.outputs.intelligence-service == 'true' || steps.filter.outputs.webhook-ingest == 'true' }}
       # Skip duplicate check
       should_skip: ${{ steps.skip_check.outputs.should_skip }}
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
         with:
+          # Full history for merge-base detection on push/merge_group events
+          # For PRs, paths-filter uses GitHub API and doesn't need history
           fetch-depth: 0
 
       - id: skip_check
@@ -52,14 +67,19 @@ jobs:
               - '.node-version'
             application-server:
               - 'server/application-server/**'
+              # db-utils.sh contains database migration tooling
               - 'scripts/db-utils.sh'
             intelligence-service:
               - 'server/intelligence-service/**'
-              - 'scripts/**'
+              # Scripts that affect intelligence-service builds/tooling
+              - 'scripts/install-platform-binaries.mjs'
+              - 'scripts/generate-mermaid-erd.ts'
+              - 'scripts/postprocess-openapi-java.ts'
               - 'package.json'
               - 'package-lock.json'
             webhook-ingest:
               - 'server/webhook-ingest/**'
+              # Root package files affect workspace dependencies
               - 'package.json'
               - 'package-lock.json'
             docs:
@@ -68,108 +88,148 @@ jobs:
               - '.github/workflows/**'
               - '.github/actions/**'
 
-  # Code quality and style checks - runs selectively based on changes
+  # ┌──────────────────────────────────────────────────────────────────────────┐
+  # │ QUALITY GATES                                                             │
+  # │ Code quality and style checks - runs selectively based on changes.        │
+  # └──────────────────────────────────────────────────────────────────────────┘
   quality-gates:
     uses: ./.github/workflows/ci-quality-gates.yml
-    needs: [changes]
+    needs: [detect-changes]
     # Run if: any code changed, CI config changed, or not a PR (push to main/merge_group/dispatch)
     if: |
-      needs.changes.outputs.should_skip != 'true' && (
-        needs.changes.outputs.any-code == 'true' ||
-        needs.changes.outputs.ci-config == 'true' ||
+      needs.detect-changes.outputs.should_skip != 'true' && (
+        needs.detect-changes.outputs.any-code == 'true' ||
+        needs.detect-changes.outputs.ci-config == 'true' ||
         github.event_name != 'pull_request'
       )
     secrets: inherit
     with:
-      should_skip: ${{ needs.changes.outputs.should_skip }}
+      should_skip: ${{ needs.detect-changes.outputs.should_skip }}
       # Force run all checks when CI config changes or on non-PR events (push to main, merge queue)
       # This ensures workflow changes are fully validated
-      force_run: ${{ needs.changes.outputs.ci-config == 'true' || github.event_name != 'pull_request' }}
+      # Note: Using ternary pattern to ensure string output for workflow_call string inputs
+      # See: https://github.com/actions/runner/issues/1483
+      force_run: ${{ (needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
       # Pass change detection to sub-workflow for further optimization
-      webapp_changed: ${{ needs.changes.outputs.webapp == 'true' || needs.changes.outputs.ci-config == 'true' || github.event_name != 'pull_request' }}
-      application_server_changed: ${{ needs.changes.outputs.application-server == 'true' || needs.changes.outputs.ci-config == 'true' || github.event_name != 'pull_request' }}
-      intelligence_service_changed: ${{ needs.changes.outputs.intelligence-service == 'true' || needs.changes.outputs.ci-config == 'true' || github.event_name != 'pull_request' }}
-      webhook_ingest_changed: ${{ needs.changes.outputs.webhook-ingest == 'true' || needs.changes.outputs.ci-config == 'true' || github.event_name != 'pull_request' }}
+      webapp_changed: ${{ (needs.detect-changes.outputs.webapp == 'true' || needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
+      application_server_changed: ${{ (needs.detect-changes.outputs.application-server == 'true' || needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
+      intelligence_service_changed: ${{ (needs.detect-changes.outputs.intelligence-service == 'true' || needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
+      webhook_ingest_changed: ${{ (needs.detect-changes.outputs.webhook-ingest == 'true' || needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
 
-  # Security vulnerability scanning - always run for safety
+  # ┌──────────────────────────────────────────────────────────────────────────┐
+  # │ SECURITY SCANNING                                                         │
+  # │ Vulnerability scanning - runs on code changes for safety.                 │
+  # └──────────────────────────────────────────────────────────────────────────┘
   security-scan:
     uses: ./.github/workflows/ci-security-scan.yml
-    needs: [changes]
+    needs: [detect-changes]
     if: |
-      needs.changes.outputs.should_skip != 'true' && (
-        needs.changes.outputs.any-code == 'true' ||
-        needs.changes.outputs.ci-config == 'true' ||
+      needs.detect-changes.outputs.should_skip != 'true' && (
+        needs.detect-changes.outputs.any-code == 'true' ||
+        needs.detect-changes.outputs.ci-config == 'true' ||
         github.event_name != 'pull_request'
       )
     secrets: inherit
     with:
-      should_skip: ${{ needs.changes.outputs.should_skip }}
+      should_skip: ${{ needs.detect-changes.outputs.should_skip }}
 
-  # Comprehensive test execution - runs selectively
+  # ┌──────────────────────────────────────────────────────────────────────────┐
+  # │ TEST SUITE                                                                │
+  # │ Comprehensive test execution - runs selectively based on changes.        │
+  # └──────────────────────────────────────────────────────────────────────────┘
   test-suite:
     uses: ./.github/workflows/ci-tests.yml
-    needs: [changes]
+    needs: [detect-changes]
     if: |
-      needs.changes.outputs.should_skip != 'true' && (
-        needs.changes.outputs.any-code == 'true' ||
-        needs.changes.outputs.ci-config == 'true' ||
+      needs.detect-changes.outputs.should_skip != 'true' && (
+        needs.detect-changes.outputs.any-code == 'true' ||
+        needs.detect-changes.outputs.ci-config == 'true' ||
         github.event_name != 'pull_request'
       )
     secrets: inherit
     with:
-      should_skip: ${{ needs.changes.outputs.should_skip }}
-      # Force run all tests when CI config changes or on non-PR events
-      webapp_changed: ${{ needs.changes.outputs.webapp == 'true' || needs.changes.outputs.ci-config == 'true' || github.event_name != 'pull_request' }}
-      application_server_changed: ${{ needs.changes.outputs.application-server == 'true' || needs.changes.outputs.ci-config == 'true' || github.event_name != 'pull_request' }}
+      should_skip: ${{ needs.detect-changes.outputs.should_skip }}
+      # Note: Using ternary pattern to ensure string output for workflow_call string inputs
+      webapp_changed: ${{ (needs.detect-changes.outputs.webapp == 'true' || needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
+      application_server_changed: ${{ (needs.detect-changes.outputs.application-server == 'true' || needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
 
-  # Build Docker images - runs selectively based on component changes
+  # ┌──────────────────────────────────────────────────────────────────────────┐
+  # │ DOCKER BUILDS                                                             │
+  # │ Builds Docker images - runs selectively based on component changes.       │
+  # └──────────────────────────────────────────────────────────────────────────┘
   docker-build:
     uses: ./.github/workflows/ci-docker-build.yml
-    needs: [changes]
+    needs: [detect-changes]
     if: |
-      needs.changes.outputs.should_skip != 'true' && (
-        needs.changes.outputs.any-code == 'true' ||
-        needs.changes.outputs.ci-config == 'true' ||
+      needs.detect-changes.outputs.should_skip != 'true' && (
+        needs.detect-changes.outputs.any-code == 'true' ||
+        needs.detect-changes.outputs.ci-config == 'true' ||
         github.event_name != 'pull_request'
       )
     secrets: inherit
     with:
-      should_skip: ${{ needs.changes.outputs.should_skip }}
+      should_skip: ${{ needs.detect-changes.outputs.should_skip }}
       # Docker builds should run when component OR CI config changes (Dockerfiles may have changed)
       # Also always run on non-PR events (push to main, merge queue)
-      webapp_changed: ${{ needs.changes.outputs.webapp == 'true' || needs.changes.outputs.ci-config == 'true' || github.event_name != 'pull_request' }}
-      application_server_changed: ${{ needs.changes.outputs.application-server == 'true' || needs.changes.outputs.ci-config == 'true' || github.event_name != 'pull_request' }}
-      intelligence_service_changed: ${{ needs.changes.outputs.intelligence-service == 'true' || needs.changes.outputs.ci-config == 'true' || github.event_name != 'pull_request' }}
-      webhook_ingest_changed: ${{ needs.changes.outputs.webhook-ingest == 'true' || needs.changes.outputs.ci-config == 'true' || github.event_name != 'pull_request' }}
+      # Note: Using ternary pattern to ensure string output for workflow_call string inputs
+      webapp_changed: ${{ (needs.detect-changes.outputs.webapp == 'true' || needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
+      application_server_changed: ${{ (needs.detect-changes.outputs.application-server == 'true' || needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
+      intelligence_service_changed: ${{ (needs.detect-changes.outputs.intelligence-service == 'true' || needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
+      webhook_ingest_changed: ${{ (needs.detect-changes.outputs.webhook-ingest == 'true' || needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
 
-  # Final: Aggregated success gate for branch protection
-  # Must handle skipped jobs gracefully for branch protection rules
+  # ┌──────────────────────────────────────────────────────────────────────────┐
+  # │ CI STATUS GATE                                                            │
+  # │ Aggregated success gate for branch protection rules.                      │
+  # │                                                                            │
+  # │ Why this job exists:                                                       │
+  # │ - Branch protection requires a single check for merge eligibility         │
+  # │ - With path-based filtering, individual jobs may be skipped               │
+  # │ - Skipped jobs count as "success" for branch protection, but we need      │
+  # │   explicit verification that no jobs failed or were cancelled             │
+  # │                                                                            │
+  # │ Status interpretation:                                                     │
+  # │ - 'success': Job ran and passed                                           │
+  # │ - 'skipped': Job was skipped (path filtering or condition not met)        │
+  # │ - 'failure': Job ran and failed - BLOCKS MERGE                            │
+  # │ - 'cancelled': Job was cancelled - BLOCKS MERGE                           │
+  # └──────────────────────────────────────────────────────────────────────────┘
   all-ci-passed:
+    name: "CI Status Gate"
     runs-on: ubuntu-latest
-    needs: [changes, quality-gates, security-scan, test-suite, docker-build]
+    needs:
+      [detect-changes, quality-gates, security-scan, test-suite, docker-build]
     if: always()
     steps:
-      - name: Check all jobs passed
+      - name: Evaluate CI results
         run: |
-          echo "📊 Job Results Summary:"
-          echo "  changes: ${{ needs.changes.result }}"
-          echo "  quality-gates: ${{ needs.quality-gates.result }}"
-          echo "  security-scan: ${{ needs.security-scan.result }}"
-          echo "  test-suite: ${{ needs.test-suite.result }}"
-          echo "  docker-build: ${{ needs.docker-build.result }}"
+          echo "╔══════════════════════════════════════════════════════════════════╗"
+          echo "║                     CI RESULTS SUMMARY                           ║"
+          echo "╠══════════════════════════════════════════════════════════════════╣"
+          echo "║ detect-changes: ${{ needs.detect-changes.result }}"
+          echo "║ quality-gates:  ${{ needs.quality-gates.result }}"
+          echo "║ security-scan:  ${{ needs.security-scan.result }}"
+          echo "║ test-suite:     ${{ needs.test-suite.result }}"
+          echo "║ docker-build:   ${{ needs.docker-build.result }}"
+          echo "╚══════════════════════════════════════════════════════════════════╝"
           echo ""
 
           # Failure check - any job that ran and failed
           if [[ "${{ contains(needs.*.result, 'failure') }}" == "true" ]]; then
-            echo "❌ One or more CI jobs failed"
+            echo "❌ BLOCKED: One or more CI jobs failed"
             exit 1
           fi
 
           # Cancellation check - any job cancelled (not skipped)
           if [[ "${{ contains(needs.*.result, 'cancelled') }}" == "true" ]]; then
-            echo "⚠️ One or more CI jobs were cancelled"
+            echo "⚠️ BLOCKED: One or more CI jobs were cancelled"
             exit 1
           fi
 
-          # Success: jobs either passed or were skipped (due to path filtering)
-          echo "✅ All required CI jobs passed (some may have been skipped due to no relevant changes)"
+          # Success: all jobs either passed or were skipped
+          # Skipped jobs are treated as success for branch protection because:
+          # 1. Path-based filtering determined the component wasn't affected
+          # 2. The job's preconditions weren't met (e.g., docs-only change)
+          echo "✅ PASSED: All required CI jobs succeeded"
+          echo ""
+          echo "Note: 'skipped' status means path filtering determined no relevant"
+          echo "      changes for that component. This is expected and safe."

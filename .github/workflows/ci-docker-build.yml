@@ -9,51 +9,45 @@ on:
         type: string
         default: "false"
       # Path-based change detection for selective Docker builds
+      # These are pre-computed by the caller (cicd.yml) to include CI config fallback
       webapp_changed:
-        description: "Whether webapp files changed"
+        description: "Whether webapp files changed (or should build for other reasons)"
         required: false
         type: string
         default: "true"
       application_server_changed:
-        description: "Whether application-server files changed"
+        description: "Whether application-server files changed (or should build for other reasons)"
         required: false
         type: string
         default: "true"
       intelligence_service_changed:
-        description: "Whether intelligence-service files changed"
+        description: "Whether intelligence-service files changed (or should build for other reasons)"
         required: false
         type: string
         default: "true"
       webhook_ingest_changed:
-        description: "Whether webhook-ingest files changed"
+        description: "Whether webhook-ingest files changed (or should build for other reasons)"
         required: false
         type: string
         default: "true"
 
-jobs:
-  # Pre-check to determine which components need building
-  # This avoids spinning up the external workflow for unchanged components
-  check-changes:
-    runs-on: ubuntu-latest
-    if: inputs.should_skip != 'true'
-    outputs:
-      webapp: ${{ steps.check.outputs.webapp }}
-      application-server: ${{ steps.check.outputs.application-server }}
-      intelligence-service: ${{ steps.check.outputs.intelligence-service }}
-      webhook-ingest: ${{ steps.check.outputs.webhook-ingest }}
-    steps:
-      - id: check
-        run: |
-          echo "webapp=${{ inputs.webapp_changed }}" >> $GITHUB_OUTPUT
-          echo "application-server=${{ inputs.application_server_changed }}" >> $GITHUB_OUTPUT
-          echo "intelligence-service=${{ inputs.intelligence_service_changed }}" >> $GITHUB_OUTPUT
-          echo "webhook-ingest=${{ inputs.webhook_ingest_changed }}" >> $GITHUB_OUTPUT
+# ┌──────────────────────────────────────────────────────────────────────────────┐
+# │ DOCKER IMAGE BUILDS                                                          │
+# │ Each component is built independently based on change detection.             │
+# │                                                                               │
+# │ Design decisions:                                                             │
+# │ - No intermediate job: Inputs are passed directly to build jobs to avoid     │
+# │   5-10s overhead of an intermediate "check-changes" job.                      │
+# │ - Individual jobs: Each component builds independently, allowing parallel     │
+# │   execution and selective skipping.                                           │
+# │ - External workflow: Uses shared org workflow for consistent Docker builds.   │
+# └──────────────────────────────────────────────────────────────────────────────┘
 
+jobs:
   # Build webapp Docker image
   webapp-build:
-    name: "webapp-build"
-    needs: check-changes
-    if: needs.check-changes.outputs.webapp == 'true'
+    name: "Docker: webapp"
+    if: inputs.should_skip != 'true' && inputs.webapp_changed == 'true'
     uses: ls1intum/.github/.github/workflows/build-and-push-docker-image.yml@main
     with:
       image-name: "ls1intum/hephaestus/webapp"
@@ -75,9 +69,8 @@ jobs:
 
   # Build application-server Docker image
   application-server-build:
-    name: "application-server-build"
-    needs: check-changes
-    if: needs.check-changes.outputs.application-server == 'true'
+    name: "Docker: application-server"
+    if: inputs.should_skip != 'true' && inputs.application_server_changed == 'true'
     uses: ls1intum/.github/.github/workflows/build-and-push-docker-image.yml@main
     with:
       image-name: "ls1intum/hephaestus/application-server"
@@ -99,9 +92,8 @@ jobs:
 
   # Build intelligence-service Docker image
   intelligence-service-build:
-    name: "intelligence-service-build"
-    needs: check-changes
-    if: needs.check-changes.outputs.intelligence-service == 'true'
+    name: "Docker: intelligence-service"
+    if: inputs.should_skip != 'true' && inputs.intelligence_service_changed == 'true'
     uses: ls1intum/.github/.github/workflows/build-and-push-docker-image.yml@main
     with:
       image-name: "ls1intum/hephaestus/intelligence-service"
@@ -123,9 +115,8 @@ jobs:
 
   # Build webhook-ingest Docker image
   webhook-ingest-build:
-    name: "webhook-ingest-build"
-    needs: check-changes
-    if: needs.check-changes.outputs.webhook-ingest == 'true'
+    name: "Docker: webhook-ingest"
+    if: inputs.should_skip != 'true' && inputs.webhook_ingest_changed == 'true'
     uses: ls1intum/.github/.github/workflows/build-and-push-docker-image.yml@main
     with:
       image-name: "ls1intum/hephaestus/webhook-ingest"

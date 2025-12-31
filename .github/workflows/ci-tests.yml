@@ -20,8 +20,16 @@ on:
         type: string
         default: "true"
 
+# ┌──────────────────────────────────────────────────────────────────────────────┐
+# │ TEST SUITE                                                                   │
+# │ Matrix-based test execution with path-based filtering.                       │
+# │                                                                               │
+# │ Test types:                                                                   │
+# │ - application-server-*: JUnit tests (unit, integration, architecture)        │
+# │ - webapp-visual: Chromatic visual regression tests via Storybook             │
+# └──────────────────────────────────────────────────────────────────────────────┘
+
 jobs:
-  # Intelligent test execution matrix with path-based filtering
   tests:
     permissions:
       contents: read
@@ -43,19 +51,28 @@ jobs:
           ]
 
     steps:
-      # Determine if this test type should run based on changed files
-      - name: Check if job should run
+      # ────────────────────────────────────────────────────────────────────────
+      # Path-based skip logic
+      # IMPORTANT: If adding a new test type to the matrix above, add a case here!
+      # ────────────────────────────────────────────────────────────────────────
+      - name: Determine if test should run
         id: should_run
         run: |
           case "${{ matrix.test-type }}" in
             "webapp-visual")
               echo "run=${{ inputs.webapp_changed }}" >> $GITHUB_OUTPUT
+              echo "reason=webapp files changed: ${{ inputs.webapp_changed }}"
               ;;
             "application-server-unit"|"application-server-integration"|"application-server-architecture")
               echo "run=${{ inputs.application_server_changed }}" >> $GITHUB_OUTPUT
+              echo "reason=application-server files changed: ${{ inputs.application_server_changed }}"
               ;;
             *)
-              echo "run=true" >> $GITHUB_OUTPUT
+              # Unknown test type - fail explicitly to catch missing case statements
+              echo "::error::Unknown test type '${{ matrix.test-type }}' in ci-tests.yml matrix."
+              echo "::error::Please add a case for this test type in the 'Determine if test should run' step."
+              echo "run=false" >> $GITHUB_OUTPUT
+              exit 1
               ;;
           esac
 
@@ -63,13 +80,17 @@ jobs:
         if: steps.should_run.outputs.run != 'true'
         run: |
           echo "⏭️ Skipping ${{ matrix.test-type }} - no relevant files changed"
+          echo "   This is expected behavior from path-based filtering."
 
       - uses: actions/checkout@v4
         if: steps.should_run.outputs.run == 'true'
         with:
-          # TurboSnap needs full git history for webapp-visual (fetch-depth: 0)
-          # Use shallow clone for application-server tests (fetch-depth: 1)
-          # Note: Can't use && 0 || 1 since 0 is falsy - use conditional job or explicit check
+          # Why fetch-depth: 0 (full history)?
+          # - webapp-visual: Chromatic's TurboSnap feature needs git history to detect
+          #   which stories changed and only test those, saving build minutes
+          # - application-server: Could use fetch-depth: 1, but keeping 0 for simplicity
+          #   since git clone overhead is minimal (~2-3s) and full history enables
+          #   future features like blame-based test selection
           fetch-depth: 0
 
       # Ensure stable Node/npm and proper caching for webapp visual tests

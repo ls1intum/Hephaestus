@@ -37,9 +37,15 @@ on:
         type: string
         default: "true"
 
+# ┌──────────────────────────────────────────────────────────────────────────────┐
+# │ QUALITY GATES                                                                │
+# │ Matrix-based quality checks with path-based filtering.                       │
+# │                                                                               │
+# │ Each check runs only if relevant files changed, saving CI resources.         │
+# │ The matrix is intentionally NOT dynamic to preserve GitHub's job visibility. │
+# └──────────────────────────────────────────────────────────────────────────────┘
+
 jobs:
-  # Quality gates with intelligent caching and error handling
-  # Jobs are skipped if no relevant files changed (path-based filtering)
   quality-gates:
     name: ${{ matrix.check }}
     runs-on: ubuntu-latest
@@ -60,31 +66,43 @@ jobs:
             database-models-validation,
           ]
     steps:
-      # Skip check based on path filtering
-      # This happens at step level to avoid matrix complexity while still saving resources
-      - name: Check if job should run
+      # ────────────────────────────────────────────────────────────────────────
+      # Path-based skip logic
+      # This happens at step level to avoid matrix complexity while saving resources
+      # IMPORTANT: If adding a new check to the matrix above, add a case here too!
+      # ────────────────────────────────────────────────────────────────────────
+      - name: Determine if check should run
         id: should_run
         run: |
           case "${{ matrix.check }}" in
             "webapp-quality")
               echo "run=${{ inputs.webapp_changed }}" >> $GITHUB_OUTPUT
+              echo "reason=webapp files changed: ${{ inputs.webapp_changed }}"
               ;;
             "application-server-quality"|"database-schema-validation"|"database-documentation-validation"|"openapi-validation")
               echo "run=${{ inputs.application_server_changed }}" >> $GITHUB_OUTPUT
+              echo "reason=application-server files changed: ${{ inputs.application_server_changed }}"
               ;;
             "intelligence-service-quality"|"database-models-validation")
-              # intelligence-service depends on application-server schema
+              # intelligence-service depends on application-server schema for DB models
               if [[ "${{ inputs.intelligence_service_changed }}" == "true" || "${{ inputs.application_server_changed }}" == "true" ]]; then
                 echo "run=true" >> $GITHUB_OUTPUT
+                echo "reason=intelligence-service or application-server changed"
               else
                 echo "run=false" >> $GITHUB_OUTPUT
+                echo "reason=neither intelligence-service nor application-server changed"
               fi
               ;;
             "webhook-ingest-quality")
               echo "run=${{ inputs.webhook_ingest_changed }}" >> $GITHUB_OUTPUT
+              echo "reason=webhook-ingest files changed: ${{ inputs.webhook_ingest_changed }}"
               ;;
             *)
-              echo "run=true" >> $GITHUB_OUTPUT
+              # Unknown check type - fail explicitly to catch missing case statements
+              echo "::error::Unknown check type '${{ matrix.check }}' in ci-quality-gates.yml matrix."
+              echo "::error::Please add a case for this check in the 'Determine if check should run' step."
+              echo "run=false" >> $GITHUB_OUTPUT
+              exit 1
               ;;
           esac
 
@@ -92,13 +110,16 @@ jobs:
         if: steps.should_run.outputs.run != 'true'
         run: |
           echo "⏭️ Skipping ${{ matrix.check }} - no relevant files changed"
+          echo "   This is expected behavior from path-based filtering."
 
       - name: Checkout repository
         if: steps.should_run.outputs.run == 'true'
         uses: actions/checkout@v4
         with:
-          # Use shallow clone where possible for speed
-          # Only need full history for database validation (git diff)
+          # Shallow clone for most checks (fetch-depth: 1) - only need HEAD
+          # Database checks need full history (fetch-depth: 0) for:
+          # - git diff operations on schema/migrations
+          # - Accurate changelog generation
           fetch-depth: ${{ contains(matrix.check, 'database') && 0 || 1 }}
 
       # Ensure a stable Node/npm toolchain and proper npm caching

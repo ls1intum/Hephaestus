@@ -9,10 +9,19 @@ on:
         type: string
         default: "false"
 
+# ┌──────────────────────────────────────────────────────────────────────────────┐
+# │ SECURITY SCANNING                                                            │
+# │ Comprehensive security analysis with multiple scan types.                    │
+# │                                                                               │
+# │ Scan types:                                                                   │
+# │ - sast: Static Application Security Testing (CodeQL)                         │
+# │ - dependencies: Dependency vulnerability scanning (Trivy)                    │
+# │ - secrets: Secret detection in code and git history (TruffleHog)             │
+# └──────────────────────────────────────────────────────────────────────────────┘
+
 jobs:
-  # Comprehensive security scanning
   security-scan:
-    name: ${{ matrix.scan-type }}
+    name: "Security: ${{ matrix.scan-type }}"
     runs-on: ubuntu-latest
     if: inputs.should_skip != 'true'
     timeout-minutes: 15
@@ -26,10 +35,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          # Shallow clone for most scans; secrets scan uses git history for PR diffs
+          # fetch-depth varies by scan type:
+          # - sast/dependencies: Shallow clone (1) - only need current code
+          # - secrets: Full history (0) - TruffleHog scans git history for PR diffs
+          #   to detect secrets that may have been committed and then removed
           fetch-depth: ${{ matrix.scan-type == 'secrets' && 0 || 1 }}
 
-      # Ensure stable Node/npm and caching for Node steps used in SAST
+      # Node.js setup for SAST only
+      # Other scan types (dependencies, secrets) don't require Node.js
       - name: Setup Node.js (LTS) and npm cache
         if: matrix.scan-type == 'sast'
         uses: actions/setup-node@v4
