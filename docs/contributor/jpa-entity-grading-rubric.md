@@ -143,7 +143,7 @@ Does the entity capture all essential fields from the source system (GitHub/GitL
 | **60**   | 60-69%   | Missing multiple critical fields                  |
 | **50**   | 50-59%   | Half of essential fields missing                  |
 | **40**   | 40-49%   | Majority missing                                  |
-| **0-39** | <40%     | Fundamental rework needed                         |
+| **0-39** | &lt;40%  | Fundamental rework needed                         |
 
 ### Red Flags (Automatic Deductions)
 
