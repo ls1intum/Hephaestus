@@ -11,6 +11,14 @@ import org.springframework.lang.Nullable;
  * This context carries all the information needed to process data consistently,
  * regardless of whether it came from a scheduled GraphQL sync or a webhook
  * event.
+ *
+ * @param workspaceId    The workspace this data belongs to
+ * @param repository     The repository being processed
+ * @param startedAt      When processing started
+ * @param correlationId  Unique ID for distributed tracing - correlates all log
+ *                       entries and events from a single webhook or sync operation
+ * @param webhookAction  The webhook action (e.g. "opened", "closed") if from webhook
+ * @param source         Whether data came from sync or webhook
  */
 public record ProcessingContext(
     Long workspaceId,
