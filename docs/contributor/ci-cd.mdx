@@ -187,3 +187,35 @@ cd server/webhook-ingest && npm run test
 | Test failures         | Check the specific test output for details    |
 | OpenAPI out of sync   | Run `npm run generate:api`                    |
 | Database schema drift | Run `npm run db:draft-changelog`              |
+
+## 📊 CI Features
+
+### Test Results
+
+All test suites generate JUnit XML reports that are displayed in the **Test Results** tab of each workflow run:
+
+- **Application Server**: Unit, integration, and architecture tests
+- **Webapp**: Unit tests and Storybook interaction tests
+- **Intelligence Service**: Unit and integration tests (with Testcontainers)
+- **Webhook Ingest**: Unit tests
+
+### Job Summary
+
+Each CI run generates a rich **Job Summary** in the Actions UI with:
+
+- Overall status with emoji indicators
+- Results table for each workflow (quality gates, tests, security, Docker)
+- Components changed table (from path filtering)
+- Failure-specific troubleshooting guides with fix commands
+- Performance metrics showing skipped workflows
+
+### Workflow Timeline
+
+The CI Status Gate job generates a visual **Mermaid timeline** showing:
+
+- Job execution order and duration
+- Parallel job execution
+- Runner wait times
+- Critical path identification
+
+This helps identify bottlenecks and optimization opportunities.

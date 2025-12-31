@@ -198,10 +198,18 @@ jobs:
   all-ci-passed:
     name: "CI Status Gate"
     runs-on: ubuntu-latest
+    permissions:
+      actions: read
     needs:
       [detect-changes, quality-gates, security-scan, test-suite, docker-build]
     if: always()
     steps:
+      # Generate visual timeline of the workflow for performance analysis
+      - name: Generate workflow timeline
+        uses: Kesin11/actions-timeline@v2
+        with:
+          show-waiting-runner: true
+
       - name: Evaluate CI results
         id: evaluate
         run: |
