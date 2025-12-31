@@ -8,24 +8,31 @@ on:
         required: false
         type: string
         default: "false"
+      # Force run all checks (e.g., when CI config changes)
+      force_run:
+        description: "Force run all checks regardless of path changes"
+        required: false
+        type: string
+        default: "false"
       # Path-based change detection inputs for selective execution
+      # These should already include ci-config fallback logic from caller
       webapp_changed:
-        description: "Whether webapp files changed"
+        description: "Whether webapp files changed (or should run for other reasons)"
         required: false
         type: string
         default: "true"
       application_server_changed:
-        description: "Whether application-server files changed"
+        description: "Whether application-server files changed (or should run for other reasons)"
         required: false
         type: string
         default: "true"
       intelligence_service_changed:
-        description: "Whether intelligence-service files changed"
+        description: "Whether intelligence-service files changed (or should run for other reasons)"
         required: false
         type: string
         default: "true"
       webhook_ingest_changed:
-        description: "Whether webhook-ingest files changed"
+        description: "Whether webhook-ingest files changed (or should run for other reasons)"
         required: false
         type: string
         default: "true"

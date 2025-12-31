@@ -82,11 +82,14 @@ jobs:
     secrets: inherit
     with:
       should_skip: ${{ needs.changes.outputs.should_skip }}
+      # Force run all checks when CI config changes or on non-PR events (push to main, merge queue)
+      # This ensures workflow changes are fully validated
+      force_run: ${{ needs.changes.outputs.ci-config == 'true' || github.event_name != 'pull_request' }}
       # Pass change detection to sub-workflow for further optimization
-      webapp_changed: ${{ needs.changes.outputs.webapp }}
-      application_server_changed: ${{ needs.changes.outputs.application-server }}
-      intelligence_service_changed: ${{ needs.changes.outputs.intelligence-service }}
-      webhook_ingest_changed: ${{ needs.changes.outputs.webhook-ingest }}
+      webapp_changed: ${{ needs.changes.outputs.webapp == 'true' || needs.changes.outputs.ci-config == 'true' || github.event_name != 'pull_request' }}
+      application_server_changed: ${{ needs.changes.outputs.application-server == 'true' || needs.changes.outputs.ci-config == 'true' || github.event_name != 'pull_request' }}
+      intelligence_service_changed: ${{ needs.changes.outputs.intelligence-service == 'true' || needs.changes.outputs.ci-config == 'true' || github.event_name != 'pull_request' }}
+      webhook_ingest_changed: ${{ needs.changes.outputs.webhook-ingest == 'true' || needs.changes.outputs.ci-config == 'true' || github.event_name != 'pull_request' }}
 
   # Security vulnerability scanning - always run for safety
   security-scan:
@@ -115,8 +118,9 @@ jobs:
     secrets: inherit
     with:
       should_skip: ${{ needs.changes.outputs.should_skip }}
-      webapp_changed: ${{ needs.changes.outputs.webapp }}
-      application_server_changed: ${{ needs.changes.outputs.application-server }}
+      # Force run all tests when CI config changes or on non-PR events
+      webapp_changed: ${{ needs.changes.outputs.webapp == 'true' || needs.changes.outputs.ci-config == 'true' || github.event_name != 'pull_request' }}
+      application_server_changed: ${{ needs.changes.outputs.application-server == 'true' || needs.changes.outputs.ci-config == 'true' || github.event_name != 'pull_request' }}
 
   # Build Docker images - runs selectively based on component changes
   docker-build:
@@ -131,10 +135,12 @@ jobs:
     secrets: inherit
     with:
       should_skip: ${{ needs.changes.outputs.should_skip }}
-      webapp_changed: ${{ needs.changes.outputs.webapp }}
-      application_server_changed: ${{ needs.changes.outputs.application-server }}
-      intelligence_service_changed: ${{ needs.changes.outputs.intelligence-service }}
-      webhook_ingest_changed: ${{ needs.changes.outputs.webhook-ingest }}
+      # Docker builds should run when component OR CI config changes (Dockerfiles may have changed)
+      # Also always run on non-PR events (push to main, merge queue)
+      webapp_changed: ${{ needs.changes.outputs.webapp == 'true' || needs.changes.outputs.ci-config == 'true' || github.event_name != 'pull_request' }}
+      application_server_changed: ${{ needs.changes.outputs.application-server == 'true' || needs.changes.outputs.ci-config == 'true' || github.event_name != 'pull_request' }}
+      intelligence_service_changed: ${{ needs.changes.outputs.intelligence-service == 'true' || needs.changes.outputs.ci-config == 'true' || github.event_name != 'pull_request' }}
+      webhook_ingest_changed: ${{ needs.changes.outputs.webhook-ingest == 'true' || needs.changes.outputs.ci-config == 'true' || github.event_name != 'pull_request' }}
 
   # Final: Aggregated success gate for branch protection
   # Must handle skipped jobs gracefully for branch protection rules
