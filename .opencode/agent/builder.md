@@ -88,11 +88,11 @@ bd show "$(git branch --show-current)" 2>/dev/null || true
 npm run format && npm run check  # Zero tolerance
 
 git add -A
-git commit -m "<type>(<scope>): <description>"  # Per AGENTS.md
+git commit -m "<type>(<scope>): <description>"  # See CONTRIBUTING.md and .github/PULL_REQUEST_TEMPLATE.md
 git push -u origin HEAD
 
 if ! gh pr view &>/dev/null; then
-  gh pr create --title "<type>(<scope>): <description>" --body "$(cat <<'EOF'
+  gh pr create --title "<type>(<scope>): <description>" --body "$(cat <<'EOF'  # Title format from CONTRIBUTING.md
 ## Description
 <What and why>
 
@@ -123,13 +123,17 @@ gh run view $RUN --log-failed 2>/dev/null | tail -150
 ## Address Reviews
 
 ```bash
-OWNER=$(gh repo view --json owner -q '.owner.login')
-REPO=$(gh repo view --json name -q '.name')
 PR=$(gh pr view --json number -q '.number')
 
-gh api graphql -f query='query($owner:String!,$repo:String!,$pr:Int!){repository(owner:$owner,name:$repo){pullRequest(number:$pr){reviewThreads(first:50){nodes{isResolved path line comments(first:1){nodes{body author{login}}}}}}}}' \
-  -f owner="$OWNER" -f repo="$REPO" -F pr=$PR \
-  --jq '.data.repository.pullRequest.reviewThreads.nodes[]|select(.isResolved==false)|"[\(.path):\(.line // "file")] @\(.comments.nodes[0].author.login): \(.comments.nodes[0].body | split("\n")[0][:100])"'
+# Review comments (filtered - removes HTML comment bloat from bots)
+gh api "repos/$(gh repo view --json owner -q '.owner.login')/$(gh repo view --json name -q '.name')/pulls/$PR/comments" \
+  --jq '.[] | "[\(.user.login)] \(.path | split("/") | last):\n\(.body)\n---"' \
+  | perl -0777 -pe 's/<!--.*?-->//gs' | grep -v '^$'
+
+# Issue comments (filtered)
+gh api "repos/$(gh repo view --json owner -q '.owner.login')/$(gh repo view --json name -q '.name')/issues/$PR/comments" \
+  --jq '.[] | "[\(.user.login)]:\n\(.body)\n---"' \
+  | perl -0777 -pe 's/<!--.*?-->//gs' | grep -v '^$'
 ```
 
 Address every comment. Don't argue — improve. If you disagree, explain tradeoffs clearly.
@@ -148,16 +152,36 @@ git push --force-with-lease
 
 ---
 
-## Research Before Auditing
+## Research Before Implementing
 
-**Use WebFetch to research current best practices before every quality audit:**
+**You have web research tools. Use them BEFORE coding, not after.**
 
-- "2025 <technology> production best practices"
-- "OWASP top 10 2025"
-- "Google engineering practices code review"
-- "<specific pattern> anti-patterns"
+### WebSearch Tool
 
-Extract actionable insights. Update your mental rubric. Apply immediately.
+Search the web for current best practices:
+
+- "TanStack Router 2025 error boundaries"
+- "Storybook 8 mocking providers decorator pattern"
+- "React context vs Zustand when to use"
+
+### WebFetch Tool
+
+Read specific documentation URLs:
+
+- Framework docs before using unfamiliar APIs
+- GitHub issues for known problems
+- Official migration guides
+
+### Research Triggers
+
+Research BEFORE you:
+
+- Use a framework feature you haven't used recently
+- Create an abstraction (maybe the framework already has one)
+- Add a testing pattern (check current best practices)
+- Implement error handling (check framework conventions)
+
+**If you're guessing, you're not researching enough.**
 
 ---
 
@@ -175,6 +199,19 @@ Extract actionable insights. Update your mental rubric. Apply immediately.
 - Copy-pasted code blocks
 - Breaking changes without migration path
 - Silent error swallowing
+- Tests that exceed 3x the production code for trivial logic
+- Abstractions that duplicate framework features
+- Files that don't integrate with existing patterns
+
+### Anti-Bloat Checklist
+
+Before shipping, ask:
+
+- Does every file earn its place? Delete anything that doesn't.
+- Would deleting this code make the PR better? If unsure, delete it.
+- Are tests proportional? (Complex logic = many tests, trivial logic = few/none)
+- Am I reinventing something the framework already provides?
+- Did I research the framework's latest patterns BEFORE implementing?
 
 ### Correctness
 

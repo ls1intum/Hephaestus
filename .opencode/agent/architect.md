@@ -163,6 +163,7 @@ Only step in when:
 - **Strategic misalignment** — Work is diverging from business goals
 - **Explicit request** — Builder asks for help
 - **Blocked on external** — Needs decision, access, or clarification you can provide
+- **Over-engineering detected** — Builder is adding tests/abstractions that don't earn their place
 
 **How to intervene:**
 
@@ -196,6 +197,9 @@ Frame as information, not commands. Trust their judgment.
 - ❌ Telling builder HOW to implement
 - ❌ Multiple back-and-forth messages per hour
 - ❌ "Did you consider X?" before they've finished
+- ❌ Dispatching new work before current PRs are merged/polished
+- ❌ Starting work without explicit user approval
+- ❌ Letting builders over-engineer without course correction
 
 ---
 
