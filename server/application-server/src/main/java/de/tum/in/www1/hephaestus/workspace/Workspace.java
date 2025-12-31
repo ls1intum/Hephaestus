@@ -144,7 +144,10 @@ public class Workspace {
         this.updatedAt = Instant.now();
     }
 
-    //TODO: Only temporary to differentiate between ls1intum <-> orgs installed via GHApp. To be deleted in the future
+    /**
+     * Distinguishes authentication mechanisms for GitHub API access.
+     * PAT_ORG uses a personal access token; GITHUB_APP_INSTALLATION uses GitHub App installation tokens.
+     */
     public enum GitProviderMode {
         PAT_ORG,
         GITHUB_APP_INSTALLATION,
