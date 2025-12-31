@@ -69,6 +69,16 @@ public abstract class GitHubMessageHandler<T> implements MessageHandler {
     protected abstract String getEventKey();
 
     /**
+     * Returns the event type for this handler.
+     * This is a type-safe alternative to {@link #getEventKey()}.
+     *
+     * @return The GitHub event type enum value, or null if not recognized.
+     */
+    public GitHubEventType getEventType() {
+        return GitHubEventType.fromString(getEventKey());
+    }
+
+    /**
      * Domain classification for handler routing. Defaults to REPOSITORY.
      */
     public GitHubMessageDomain getDomain() {
