@@ -1,6 +1,5 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { resolve } from "node:path";
 
 import { storybookTest } from "@storybook/addon-vitest/vitest-plugin";
 import tailwindcss from "@tailwindcss/vite";
@@ -33,12 +32,12 @@ export default defineConfig({
   ],
   resolve: {
     alias: {
-      "@": resolve(dirname, "./src"),
-      "@intelligence-service": resolve(
+      "@": path.resolve(dirname, "./src"),
+      "@intelligence-service": path.resolve(
         dirname,
         "../server/intelligence-service/src/mentor",
       ),
-      "@intelligence-service-utils": resolve(
+      "@intelligence-service-utils": path.resolve(
         dirname,
         "../server/intelligence-service/src/shared",
       ),

@@ -77,25 +77,20 @@ jobs:
           case "${{ matrix.check }}" in
             "webapp-quality")
               echo "run=${{ inputs.webapp_changed }}" >> $GITHUB_OUTPUT
-              echo "reason=webapp files changed: ${{ inputs.webapp_changed }}"
               ;;
             "application-server-quality"|"database-schema-validation"|"database-documentation-validation"|"openapi-validation")
               echo "run=${{ inputs.application_server_changed }}" >> $GITHUB_OUTPUT
-              echo "reason=application-server files changed: ${{ inputs.application_server_changed }}"
               ;;
             "intelligence-service-quality"|"database-models-validation")
               # intelligence-service depends on application-server schema for DB models
               if [[ "${{ inputs.intelligence_service_changed }}" == "true" || "${{ inputs.application_server_changed }}" == "true" ]]; then
                 echo "run=true" >> $GITHUB_OUTPUT
-                echo "reason=intelligence-service or application-server changed"
               else
                 echo "run=false" >> $GITHUB_OUTPUT
-                echo "reason=neither intelligence-service nor application-server changed"
               fi
               ;;
             "webhook-ingest-quality")
               echo "run=${{ inputs.webhook_ingest_changed }}" >> $GITHUB_OUTPUT
-              echo "reason=webhook-ingest files changed: ${{ inputs.webhook_ingest_changed }}"
               ;;
             *)
               # Unknown check type - fail explicitly to catch missing case statements
@@ -288,9 +283,10 @@ jobs:
         if: steps.should_run.outputs.run == 'true' && matrix.check == 'intelligence-service-quality'
         run: |
           echo "🔍 Running intelligence-service quality checks..."
-          # Clean install and explicitly install linux biome binary
+          # Clean local node_modules but PRESERVE ~/.npm cache (restored by setup-node)
+          # The npm cache is used by npm ci to avoid re-downloading packages
           # The package-lock.json from macOS may not include linux platform binaries
-          rm -rf node_modules server/intelligence-service/node_modules ~/.npm
+          rm -rf node_modules server/intelligence-service/node_modules
           npm install --no-audit --progress=false
           # Install platform binaries from package.json versions (no hardcoding)
           node scripts/install-platform-binaries.mjs
@@ -337,8 +333,9 @@ jobs:
         if: steps.should_run.outputs.run == 'true' && matrix.check == 'webhook-ingest-quality'
         run: |
           echo "🔍 Running webhook-ingest quality checks..."
-          # Clean install and explicitly install linux biome binary
-          rm -rf node_modules server/webhook-ingest/node_modules ~/.npm
+          # Clean local node_modules but PRESERVE ~/.npm cache (restored by setup-node)
+          # The npm cache is used by npm ci to avoid re-downloading packages
+          rm -rf node_modules server/webhook-ingest/node_modules
           npm install --no-audit --progress=false
           # Install platform binaries from package.json versions (no hardcoding)
           node scripts/install-platform-binaries.mjs
