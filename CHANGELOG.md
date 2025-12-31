@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.12.4](https://github.com/ls1intum/Hephaestus/compare/v0.12.3...v0.12.4) (2025-12-31)
+
+### 🐛 Bug Fixes
+
+* **webapp:** hide resolve button for already-resolved bad practices ([#628](https://github.com/ls1intum/Hephaestus/issues/628)) ([e044486](https://github.com/ls1intum/Hephaestus/commit/e044486f5152eddd84093fce6957ffb98d87cf5d))
+* **webapp:** preserve survey on navigation and fix clear show signal ([#607](https://github.com/ls1intum/Hephaestus/issues/607)) ([1a1c7b8](https://github.com/ls1intum/Hephaestus/commit/1a1c7b8bf20c4f446932c54b8e8f4fa68b9888f8))
+
 ## [0.12.3](https://github.com/ls1intum/Hephaestus/compare/v0.12.2...v0.12.3) (2025-12-28)
 
 ### 🐛 Bug Fixes
