@@ -8,9 +8,31 @@ on:
         required: false
         type: string
         default: "false"
+      # Path-based change detection inputs for selective execution
+      webapp_changed:
+        description: "Whether webapp files changed"
+        required: false
+        type: string
+        default: "true"
+      application_server_changed:
+        description: "Whether application-server files changed"
+        required: false
+        type: string
+        default: "true"
+      intelligence_service_changed:
+        description: "Whether intelligence-service files changed"
+        required: false
+        type: string
+        default: "true"
+      webhook_ingest_changed:
+        description: "Whether webhook-ingest files changed"
+        required: false
+        type: string
+        default: "true"
 
 jobs:
   # Quality gates with intelligent caching and error handling
+  # Jobs are skipped if no relevant files changed (path-based filtering)
   quality-gates:
     name: ${{ matrix.check }}
     runs-on: ubuntu-latest
@@ -31,25 +53,62 @@ jobs:
             database-models-validation,
           ]
     steps:
+      # Skip check based on path filtering
+      # This happens at step level to avoid matrix complexity while still saving resources
+      - name: Check if job should run
+        id: should_run
+        run: |
+          case "${{ matrix.check }}" in
+            "webapp-quality")
+              echo "run=${{ inputs.webapp_changed }}" >> $GITHUB_OUTPUT
+              ;;
+            "application-server-quality"|"database-schema-validation"|"database-documentation-validation"|"openapi-validation")
+              echo "run=${{ inputs.application_server_changed }}" >> $GITHUB_OUTPUT
+              ;;
+            "intelligence-service-quality"|"database-models-validation")
+              # intelligence-service depends on application-server schema
+              if [[ "${{ inputs.intelligence_service_changed }}" == "true" || "${{ inputs.application_server_changed }}" == "true" ]]; then
+                echo "run=true" >> $GITHUB_OUTPUT
+              else
+                echo "run=false" >> $GITHUB_OUTPUT
+              fi
+              ;;
+            "webhook-ingest-quality")
+              echo "run=${{ inputs.webhook_ingest_changed }}" >> $GITHUB_OUTPUT
+              ;;
+            *)
+              echo "run=true" >> $GITHUB_OUTPUT
+              ;;
+          esac
+
+      - name: Skip notification
+        if: steps.should_run.outputs.run != 'true'
+        run: |
+          echo "⏭️ Skipping ${{ matrix.check }} - no relevant files changed"
+
       - name: Checkout repository
+        if: steps.should_run.outputs.run == 'true'
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          # Use shallow clone where possible for speed
+          # Only need full history for database validation (git diff)
+          fetch-depth: ${{ contains(matrix.check, 'database') && 0 || 1 }}
 
       # Ensure a stable Node/npm toolchain and proper npm caching
       - name: Setup Node.js (LTS) and npm cache
+        if: steps.should_run.outputs.run == 'true'
         uses: actions/setup-node@v4
         with:
-          node-version-file: '.node-version'
-          cache: 'npm'
+          node-version-file: ".node-version"
+          cache: "npm"
           cache-dependency-path: |
             package-lock.json
             webapp/package-lock.json
             server/intelligence-service/package-lock.json
 
-
       # Advanced cache setup with fallback
       - name: Setup shared caches
+        if: steps.should_run.outputs.run == 'true'
         uses: ./.github/actions/setup-caches
         with:
           cache-type: ${{ matrix.check }}
@@ -57,7 +116,7 @@ jobs:
 
       # Additional cache for webapp build artifacts
       - name: Cache webapp build artifacts
-        if: matrix.check == 'webapp-quality'
+        if: steps.should_run.outputs.run == 'true' && matrix.check == 'webapp-quality'
         uses: actions/cache@v4
         with:
           path: |
@@ -72,7 +131,7 @@ jobs:
 
       # application-server code quality and formatting
       - name: application-server formatting & static analysis
-        if: matrix.check == 'application-server-quality'
+        if: steps.should_run.outputs.run == 'true' && matrix.check == 'application-server-quality'
         run: |
           echo "🔍 Checking application-server code formatting..."
 
@@ -88,7 +147,7 @@ jobs:
 
       # Webapp quality checks with comprehensive validation
       - name: Webapp quality & type checking
-        if: matrix.check == 'webapp-quality'
+        if: steps.should_run.outputs.run == 'true' && matrix.check == 'webapp-quality'
         working-directory: ./webapp
         run: |
           echo "🔍 Running webapp quality checks..."
@@ -155,7 +214,7 @@ jobs:
           echo "✅ All webapp quality checks passed"
 
       - name: Docs quality gate
-        if: matrix.check == 'docs-quality'
+        if: steps.should_run.outputs.run == 'true' && matrix.check == 'docs-quality'
         working-directory: ./docs
         run: |
           echo "📚 Running docs quality checks..."
@@ -198,7 +257,7 @@ jobs:
 
       # intelligence-service quality checks with comprehensive validation
       - name: intelligence-service quality & type checking
-        if: matrix.check == 'intelligence-service-quality'
+        if: steps.should_run.outputs.run == 'true' && matrix.check == 'intelligence-service-quality'
         run: |
           echo "🔍 Running intelligence-service quality checks..."
           # Clean install and explicitly install linux biome binary
@@ -247,7 +306,7 @@ jobs:
 
       # webhook-ingest quality checks with comprehensive validation
       - name: webhook-ingest quality & type checking
-        if: matrix.check == 'webhook-ingest-quality'
+        if: steps.should_run.outputs.run == 'true' && matrix.check == 'webhook-ingest-quality'
         run: |
           echo "🔍 Running webhook-ingest quality checks..."
           # Clean install and explicitly install linux biome binary
@@ -303,7 +362,7 @@ jobs:
 
       # OpenAPI validation with intelligent auto-commit
       - name: OpenAPI validation & synchronization
-        if: matrix.check == 'openapi-validation'
+        if: steps.should_run.outputs.run == 'true' && matrix.check == 'openapi-validation'
         env:
           # Required for intelligence-service OpenAPI export (uses fake provider, no actual API calls)
           DATABASE_URL: postgresql://fake:fake@localhost:5432/fake
@@ -339,7 +398,7 @@ jobs:
 
       # Database schema validation - JPA entities vs committed migrations
       - name: Database schema validation
-        if: matrix.check == 'database-schema-validation'
+        if: steps.should_run.outputs.run == 'true' && matrix.check == 'database-schema-validation'
         run: |
           echo "🔍 Validating JPA entities match committed migrations..."
 
@@ -404,7 +463,7 @@ jobs:
 
       # Database documentation validation - ERD matches migration-based schema
       - name: Database documentation validation
-        if: matrix.check == 'database-documentation-validation'
+        if: steps.should_run.outputs.run == 'true' && matrix.check == 'database-documentation-validation'
         run: |
           echo "📊 Validating ERD documentation matches migration-based schema..."
 
@@ -470,7 +529,7 @@ jobs:
 
       # Database models validation - Drizzle ORM models match committed migrations
       - name: Database models validation
-        if: matrix.check == 'database-models-validation'
+        if: steps.should_run.outputs.run == 'true' && matrix.check == 'database-models-validation'
         run: |
           echo "🔍 Validating intelligence-service DB models match committed migrations..."
 

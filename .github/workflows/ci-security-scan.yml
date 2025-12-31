@@ -26,14 +26,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          # Shallow clone for most scans; secrets scan uses git history for PR diffs
+          fetch-depth: ${{ matrix.scan-type == 'secrets' && 0 || 1 }}
 
       # Ensure stable Node/npm and caching for Node steps used in SAST
       - name: Setup Node.js (LTS) and npm cache
+        if: matrix.scan-type == 'sast'
         uses: actions/setup-node@v4
         with:
-          node-version-file: '.node-version'
-          cache: 'npm'
+          node-version-file: ".node-version"
+          cache: "npm"
           cache-dependency-path: |
             package-lock.json
             webapp/package-lock.json
@@ -59,11 +61,11 @@ jobs:
         if: matrix.scan-type == 'sast'
         run: |
           echo "🔨 Building for CodeQL analysis..."
-          
+
           # Java build
           cd server/application-server
           mvn compile -DskipTests --quiet
-          
+
           # Node.js (webapp) - Type-only build for CodeQL; avoid bundle to reduce native deps
           cd ../..
           rm -rf node_modules
