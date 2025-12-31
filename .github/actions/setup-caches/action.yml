@@ -1,27 +1,27 @@
-name: 'Setup Advanced Caches'
-description: 'Sets up intelligent caching for CI/CD pipeline optimization'
+name: "Setup Advanced Caches"
+description: "Sets up intelligent caching for CI/CD pipeline optimization"
 inputs:
   cache-type:
-    description: 'Type of cache to setup'
+    description: "Type of cache to setup"
     required: true
   os:
-    description: 'Operating system for cache key'
+    description: "Operating system for cache key"
     required: false
-    default: 'ubuntu-latest'
+    default: "ubuntu-latest"
 
 runs:
   using: "composite"
   steps:
     # Node.js caching
     - name: Setup Node.js
-      if: contains(fromJSON('["application-server-quality", "webapp-quality", "webapp-visual", "openapi-validation", "docs-quality", "intelligence-service-quality", "webhook-ingest-quality"]'), inputs.cache-type)
+      if: contains(fromJSON('["application-server-quality", "webapp-quality", "webapp-visual", "openapi-validation", "docs-quality", "intelligence-service-quality", "intelligence-service-unit", "intelligence-service-integration", "webhook-ingest-quality", "webhook-ingest-unit"]'), inputs.cache-type)
       uses: actions/setup-node@v4
       with:
-        node-version-file: '.node-version'
+        node-version-file: ".node-version"
         cache: "npm"
 
     - name: Cache Node.js dependencies
-      if: contains(fromJSON('["application-server-quality", "webapp-quality", "webapp-visual", "openapi-validation", "webhook-ingest-quality", "intelligence-service-quality"]'), inputs.cache-type)
+      if: contains(fromJSON('["application-server-quality", "webapp-quality", "webapp-visual", "openapi-validation", "webhook-ingest-quality", "webhook-ingest-unit", "intelligence-service-quality", "intelligence-service-unit", "intelligence-service-integration"]'), inputs.cache-type)
       uses: actions/cache@v4
       with:
         path: |
@@ -41,8 +41,8 @@ runs:
       if: contains(fromJSON('["application-server-unit", "application-server-integration", "application-server-architecture", "application-server-quality", "openapi-validation", "database-schema-validation", "database-documentation-validation", "database-models-validation"]'), inputs.cache-type)
       uses: actions/setup-java@v4
       with:
-        distribution: 'temurin'
-        java-version: '21'
+        distribution: "temurin"
+        java-version: "21"
         cache: maven
 
     - name: Cache Maven dependencies
