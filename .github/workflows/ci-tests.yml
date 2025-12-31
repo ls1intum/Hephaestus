@@ -34,9 +34,11 @@ on:
 # │ TEST SUITE                                                                   │
 # │ Matrix-based test execution with path-based filtering.                       │
 # │                                                                               │
-# │ Test types:                                                               │
+# │ Test types:                                                                  │
 # │ - application-server-*: JUnit tests (unit, integration, architecture)        │
-# │ - webapp-*: Vitest unit tests and Chromatic visual regression tests          │
+# │ - webapp-unit: Vitest unit tests                                             │
+# │ - webapp-storybook: Storybook interaction tests with Playwright/Vitest       │
+# │ - webapp-visual: Chromatic visual regression tests                           │
 # │ - intelligence-service-*: Vitest unit and integration tests (Testcontainers) │
 # │ - webhook-ingest-*: Vitest unit tests                                        │
 # └──────────────────────────────────────────────────────────────────────────────┘
@@ -60,6 +62,7 @@ jobs:
             application-server-integration,
             application-server-architecture,
             webapp-unit,
+            webapp-storybook,
             webapp-visual,
             intelligence-service-unit,
             intelligence-service-integration,
@@ -75,7 +78,7 @@ jobs:
         id: should_run
         run: |
           case "${{ matrix.test-type }}" in
-            "webapp-unit"|"webapp-visual")
+            "webapp-unit"|"webapp-storybook"|"webapp-visual")
               echo "run=${{ inputs.webapp_changed }}" >> $GITHUB_OUTPUT
               echo "reason=webapp files changed: ${{ inputs.webapp_changed }}"
               ;;
@@ -180,6 +183,12 @@ jobs:
             "webapp-unit")
               echo "🧪 Running webapp unit tests..."
               npm run test
+              ;;
+            "webapp-storybook")
+              echo "🧪 Running Storybook interaction tests with Playwright..."
+              # Install Playwright chromium browser for Vitest browser mode
+              npx playwright install chromium --with-deps
+              npm run test:storybook
               ;;
             "webapp-visual")
               if ! npm run build-storybook; then

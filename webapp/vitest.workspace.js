@@ -1,32 +1,14 @@
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+// DEPRECATED: This file is kept for backward compatibility.
+// Use vitest.config.storybook.ts instead for Storybook tests.
+// Run: npx vitest --config vitest.config.storybook.ts
+//
+// This workspace file was originally created for Storybook 8.x with Vitest 2.x.
+// Vitest 4.x deprecated `defineWorkspace` in favor of `test.projects`.
+// See: https://vitest.dev/guide/migration
 
-import { defineWorkspace } from 'vitest/config';
+console.warn(
+  "vitest.workspace.js is deprecated. Use vitest.config.storybook.ts for Storybook tests.",
+);
 
-import { storybookTest } from '@storybook/addon-vitest/vitest-plugin';
-
-const dirname =
-  typeof __dirname !== 'undefined' ? __dirname : path.dirname(fileURLToPath(import.meta.url));
-
-// More info at: https://storybook.js.org/docs/writing-tests/test-addon
-export default defineWorkspace([
-  'vite.config.js',
-  {
-    extends: 'vite.config.js',
-    plugins: [
-      // The plugin will run tests for the stories defined in your Storybook config
-      // See options at: https://storybook.js.org/docs/writing-tests/test-addon#storybooktest
-      storybookTest({ configDir: path.join(dirname, '.storybook') }),
-    ],
-    test: {
-      name: 'storybook',
-      browser: {
-        enabled: true,
-        headless: true,
-        provider: 'playwright',
-        instances: [{ browser: 'chromium' }]
-      },
-      setupFiles: ['.storybook/vitest.setup.ts'],
-    },
-  },
-]);
+// Re-export vite.config.js for basic Vitest usage
+export { default } from "./vite.config.js";
