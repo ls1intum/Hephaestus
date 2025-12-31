@@ -49,6 +49,16 @@ public class EncryptedStringConverter implements AttributeConverter<String, Stri
     private final SecretKey secretKey;
     private final boolean enabled;
 
+    /**
+     * No-arg constructor required by JPA/Hibernate when running outside Spring context
+     * (e.g., Liquibase schema diff). Encryption is disabled in this mode.
+     */
+    public EncryptedStringConverter() {
+        this.secretKey = null;
+        this.enabled = false;
+        logger.debug("EncryptedStringConverter instantiated without Spring context - encryption disabled");
+    }
+
     public EncryptedStringConverter(
         @Value("${hephaestus.security.encryption-key:}") String encryptionKey,
         @Value("${spring.profiles.active:}") String activeProfiles
