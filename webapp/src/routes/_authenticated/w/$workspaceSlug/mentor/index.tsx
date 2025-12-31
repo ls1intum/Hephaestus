@@ -6,7 +6,7 @@ import { v4 as uuidv4 } from "uuid";
 import { getGroupedThreadsQueryKey, getThreadQueryKey } from "@/api/@tanstack/react-query.gen";
 import type { ChatThreadGroup, ChatThreadSummary } from "@/api/types.gen";
 import { Greeting } from "@/components/mentor/Greeting";
-import { useWorkspace } from "@/integrations/workspace/context";
+import { useWorkspace } from "@/hooks/use-workspace";
 
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/mentor/")({
 	component: MentorContainer,

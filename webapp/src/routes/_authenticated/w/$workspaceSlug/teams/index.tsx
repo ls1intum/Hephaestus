@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { getAllTeamsOptions } from "@/api/@tanstack/react-query.gen";
 import { TeamsPage } from "@/components/teams/TeamsPage";
-import { useWorkspace } from "@/integrations/workspace/context";
+import { useWorkspace } from "@/hooks/use-workspace";
 
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/teams/")({
 	component: TeamsContainer,

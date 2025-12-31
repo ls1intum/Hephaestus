@@ -3,7 +3,7 @@ import { getWorkspace } from "@/api/sdk.gen";
 import type { Workspace } from "@/api/types.gen";
 import { WorkspaceForbidden } from "@/components/workspace/WorkspaceForbidden";
 import { WorkspaceNotFound } from "@/components/workspace/WorkspaceNotFound";
-import { WorkspaceContext } from "@/integrations/workspace/context";
+import { WorkspaceContext } from "@/hooks/use-workspace";
 
 /**
  * Error class for 403 Forbidden responses from the workspace API.

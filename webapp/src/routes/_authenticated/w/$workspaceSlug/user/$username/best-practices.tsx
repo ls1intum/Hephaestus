@@ -12,8 +12,8 @@ import {
 } from "@/api/@tanstack/react-query.gen";
 import type { BadPracticeFeedback } from "@/api/types.gen";
 import { PracticesPage } from "@/components/practices/PracticesPage";
+import { useWorkspace } from "@/hooks/use-workspace";
 import { useAuth } from "@/integrations/auth/AuthContext";
-import { useWorkspace } from "@/integrations/workspace/context";
 
 export const Route = createFileRoute(
 	"/_authenticated/w/$workspaceSlug/user/$username/best-practices",

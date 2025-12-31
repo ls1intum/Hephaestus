@@ -4,8 +4,8 @@ import { zodValidator } from "@tanstack/zod-adapter";
 import { z } from "zod";
 import { getUserProfileOptions } from "@/api/@tanstack/react-query.gen";
 import { ProfilePage } from "@/components/profile/ProfilePage";
+import { useWorkspace } from "@/hooks/use-workspace";
 import { useAuth } from "@/integrations/auth/AuthContext";
-import { useWorkspace } from "@/integrations/workspace/context";
 import {
 	formatDateRangeForApi,
 	getDateRangeForPreset,
