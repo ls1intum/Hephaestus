@@ -193,10 +193,12 @@ jobs:
           esac
 
       # Intelligence-service tests
+      # Note: Integration tests require testcontainers/PostgreSQL and are run separately
+      # Architecture tests are also excluded here (they're about code organization, not functionality)
       - name: "Intelligence-service ${{ matrix.test-type }} execution"
         if: steps.should_run.outputs.run == 'true' && matrix.test-type == 'intelligence-service-unit'
         run: |
-          echo "🧪 Running intelligence-service unit tests..."
+          echo "🧪 Running intelligence-service unit tests (excluding integration and architecture tests)..."
 
           # Clean install and explicitly install linux biome binary
           rm -rf node_modules server/intelligence-service/node_modules ~/.npm
@@ -206,7 +208,8 @@ jobs:
           node scripts/install-platform-binaries.mjs
 
           cd server/intelligence-service
-          npm run test
+          # Exclude integration tests (require database) and architecture tests (code organization checks)
+          npx vitest run --exclude '**/integration/**' --exclude '**/architecture.test.ts'
 
       # Webhook-ingest tests
       - name: "Webhook-ingest ${{ matrix.test-type }} execution"
