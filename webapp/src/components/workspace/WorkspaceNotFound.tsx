@@ -1,3 +1,4 @@
+import { useNavigate } from "@tanstack/react-router";
 import { SearchX } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -7,7 +8,6 @@ import {
 	EmptyMedia,
 	EmptyTitle,
 } from "@/components/ui/empty";
-import { useGoHome } from "@/hooks/use-go-home";
 
 export interface WorkspaceNotFoundProps {
 	/** The slug that was not found (optional, for display purposes) */
@@ -19,7 +19,7 @@ export interface WorkspaceNotFoundProps {
  * Shows a friendly message and provides navigation options.
  */
 export function WorkspaceNotFound({ slug }: WorkspaceNotFoundProps) {
-	const handleGoHome = useGoHome();
+	const navigate = useNavigate();
 
 	return (
 		<Empty>
@@ -39,7 +39,7 @@ export function WorkspaceNotFound({ slug }: WorkspaceNotFoundProps) {
 					)}
 				</EmptyDescription>
 			</EmptyHeader>
-			<Button onClick={handleGoHome}>Go to home</Button>
+			<Button onClick={() => navigate({ to: "/" })}>Go to home</Button>
 		</Empty>
 	);
 }
