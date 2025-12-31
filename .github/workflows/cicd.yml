@@ -231,6 +231,8 @@ jobs:
           fi
 
           # Success: all jobs either passed or were skipped
+          # Note: 'skipped' status means path filtering determined no relevant changes
+          # for that component. This is expected and safe for branch protection.
           echo "✅ PASSED: All required CI jobs succeeded"
           echo "status=success" >> $GITHUB_OUTPUT
 
@@ -286,7 +288,7 @@ jobs:
           echo "| Webapp | ${{ needs.detect-changes.outputs.webapp == 'true' && '✅ Yes' || '➖ No' }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Application Server | ${{ needs.detect-changes.outputs.application-server == 'true' && '✅ Yes' || '➖ No' }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Intelligence Service | ${{ needs.detect-changes.outputs.intelligence-service == 'true' && '✅ Yes' || '➖ No' }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Webhook Ingest | ${{ needs.detect-changes.outputs.webhook-ingest == 'true' && '➖ Yes' || '➖ No' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Webhook Ingest | ${{ needs.detect-changes.outputs.webhook-ingest == 'true' && '✅ Yes' || '➖ No' }} |" >> $GITHUB_STEP_SUMMARY
           echo "| CI Config | ${{ needs.detect-changes.outputs.ci-config == 'true' && '⚙️ Yes' || '➖ No' }} |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
