@@ -17,6 +17,7 @@ import java.security.spec.PKCS8EncodedKeySpec;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
+import java.util.Date;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
@@ -71,8 +72,8 @@ public class GitHubAppTokenService {
         Algorithm algorithm = Algorithm.RSA256(null, (RSAPrivateKey) privateKey);
         return JWT.create()
             .withIssuer(String.valueOf(appId))
-            .withIssuedAt(java.util.Date.from(now.minusSeconds(60)))
-            .withExpiresAt(java.util.Date.from(now.plusSeconds(9 * 60)))
+            .withIssuedAt(Date.from(now.minusSeconds(60)))
+            .withExpiresAt(Date.from(now.plusSeconds(9 * 60)))
             .sign(algorithm);
     }
 

@@ -6,6 +6,7 @@ import de.tum.in.www1.hephaestus.gitprovider.common.spi.AuthMode;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.InstallationTokenProvider;
 import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
+import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -99,7 +100,7 @@ public class GitHubGraphQlClientProvider {
      * Call this after a successful GraphQL operation completes.
      */
     public void recordSuccess() {
-        circuitBreaker.onSuccess(0, java.util.concurrent.TimeUnit.MILLISECONDS);
+        circuitBreaker.onSuccess(0, TimeUnit.MILLISECONDS);
     }
 
     /**
@@ -110,7 +111,7 @@ public class GitHubGraphQlClientProvider {
      * @param throwable the exception that occurred
      */
     public void recordFailure(Throwable throwable) {
-        circuitBreaker.onError(0, java.util.concurrent.TimeUnit.MILLISECONDS, throwable);
+        circuitBreaker.onError(0, TimeUnit.MILLISECONDS, throwable);
     }
 
     /**
