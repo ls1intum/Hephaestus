@@ -43,6 +43,24 @@ export const stateConfig: {
 	},
 };
 
+/**
+ * States that can be resolved (issues that require user action).
+ * Used to determine whether to show resolution UI controls.
+ */
+const RESOLVABLE_STATES: ReadonlySet<PullRequestBadPractice["state"]> = new Set([
+	"CRITICAL_ISSUE",
+	"NORMAL_ISSUE",
+	"MINOR_ISSUE",
+]);
+
+/**
+ * Check if a bad practice can be resolved (shows "Resolve" button).
+ * Returns true for issues, false for already-resolved or good practices.
+ */
+export function canBeResolved(state: PullRequestBadPractice["state"]): boolean {
+	return RESOLVABLE_STATES.has(state);
+}
+
 // Filter practices by category
 export function filterGoodAndBadPractices(allBadPractices: PullRequestBadPractice[]): {
 	goodPractices: PullRequestBadPractice[];
@@ -53,12 +71,7 @@ export function filterGoodAndBadPractices(allBadPractices: PullRequestBadPractic
 		(badPractice) => badPractice.state === "GOOD_PRACTICE",
 	);
 
-	const badPractices = allBadPractices.filter(
-		(badPractice) =>
-			badPractice.state === "CRITICAL_ISSUE" ||
-			badPractice.state === "NORMAL_ISSUE" ||
-			badPractice.state === "MINOR_ISSUE",
-	);
+	const badPractices = allBadPractices.filter((badPractice) => canBeResolved(badPractice.state));
 
 	const resolvedPractices = allBadPractices.filter(
 		(badPractice) =>

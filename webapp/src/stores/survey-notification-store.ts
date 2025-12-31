@@ -39,7 +39,8 @@ export const useSurveyNotificationStore = create<SurveyNotificationState>()(
 				if (get().pendingSurvey) set({ shouldShowSurvey: true });
 			},
 
-			clearShowSignal: () => set({ shouldShowSurvey: false, pendingSurvey: null }),
+			// Only clears the show signal - pendingSurvey remains so user can reopen from notification badge
+			clearShowSignal: () => set({ shouldShowSurvey: false }),
 		}),
 		{
 			name: "hephaestus-survey-notification",
