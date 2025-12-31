@@ -9,6 +9,11 @@ import { WorkspaceError } from "./WorkspaceError";
  * - Uses `role="alert"` with `aria-live="assertive"` to announce to screen readers
  * - Auto-focuses the container when mounted for keyboard navigation
  * - Icons use `aria-hidden` to avoid redundant screen reader announcements
+ * - aria-atomic ensures the entire message is read as a unit
+ *
+ * ## Error Detection
+ * The component uses `error.name` (TypeError, NetworkError) and message pattern matching
+ * to detect network-related errors and show appropriate retry messaging.
  *
  * ## Usage
  * ```tsx
@@ -42,14 +47,43 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** Network-related error with retry messaging. */
-export const NetworkError: Story = {
+/** TypeError (fetch failures) shows network-friendly messaging. */
+export const FetchTypeError: Story = {
 	args: {
-		error: new Error("Failed to load workspace: network error"),
+		error: (() => {
+			const err = new Error("Failed to fetch");
+			err.name = "TypeError";
+			return err;
+		})(),
 	},
 };
 
-/** Generic unexpected error. */
+/** Network error detected via error.name shows retry-friendly message. */
+export const NetworkError: Story = {
+	args: {
+		error: (() => {
+			const err = new Error("Network request failed");
+			err.name = "NetworkError";
+			return err;
+		})(),
+	},
+};
+
+/** Timeout error detected via message pattern. */
+export const TimeoutError: Story = {
+	args: {
+		error: new Error("Request timeout after 30000ms"),
+	},
+};
+
+/** Connection error detected via message pattern. */
+export const ConnectionError: Story = {
+	args: {
+		error: new Error("Connection refused: ECONNREFUSED"),
+	},
+};
+
+/** Generic unexpected error shows standard message. */
 export const UnexpectedError: Story = {
 	args: {
 		error: new Error("Something unexpected happened"),
@@ -63,5 +97,12 @@ export const WithReset: Story = {
 		reset: () => {
 			console.log("Reset triggered");
 		},
+	},
+};
+
+/** Server error (500) without network indicators. */
+export const ServerError: Story = {
+	args: {
+		error: new Error("Internal Server Error"),
 	},
 };

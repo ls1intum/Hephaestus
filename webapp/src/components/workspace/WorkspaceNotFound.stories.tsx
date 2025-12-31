@@ -9,6 +9,7 @@ import { WorkspaceNotFound } from "./WorkspaceNotFound";
  * - Uses `role="alert"` with `aria-live="assertive"` to announce to screen readers
  * - Auto-focuses the container when mounted for keyboard navigation
  * - Icons use `aria-hidden` to avoid redundant screen reader announcements
+ * - Long slugs are truncated with ellipsis to prevent layout breakage
  *
  * ## Usage
  * ```tsx
@@ -55,5 +56,19 @@ export const WithRetry: Story = {
 	args: {
 		slug: "my-team-workspace",
 		showRetry: true,
+	},
+};
+
+/** Extremely long slug is truncated to prevent layout issues. Title attribute shows full slug on hover. */
+export const LongSlug: Story = {
+	args: {
+		slug: "this-is-an-extremely-long-workspace-slug-that-would-normally-break-the-layout-if-not-properly-handled",
+	},
+};
+
+/** Special characters in slug are handled safely. */
+export const SpecialCharacters: Story = {
+	args: {
+		slug: "test-workspace-<script>alert('xss')</script>",
 	},
 };

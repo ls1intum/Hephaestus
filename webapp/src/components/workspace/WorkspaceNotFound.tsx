@@ -21,24 +21,32 @@ export interface WorkspaceNotFoundProps {
  * Empty state component displayed when a workspace is not found (404).
  * Shows a friendly message and provides navigation options.
  *
- * Accessibility:
- * - Uses role="alert" to announce to screen readers
- * - Auto-focuses the container for keyboard navigation
- * - Provides clear action buttons with descriptive labels
+ * Accessibility (WCAG 2.2):
+ * - Uses role="alert" with aria-live="assertive" for immediate screen reader announcement
+ * - Auto-focuses container after render for keyboard navigation (via requestAnimationFrame)
+ * - Icons marked aria-hidden to prevent redundant announcements
+ * - Long slugs are truncated to prevent layout breakage
  */
 export function WorkspaceNotFound({ slug, showRetry = false }: WorkspaceNotFoundProps) {
 	const navigate = useNavigate();
 	const router = useRouter();
 	const containerRef = useRef<HTMLDivElement>(null);
 
-	// Focus the container when mounted for screen reader announcement
+	// Focus the container after render for screen reader announcement
+	// Using requestAnimationFrame ensures the DOM is fully painted before focus
 	useEffect(() => {
-		containerRef.current?.focus();
+		const frameId = requestAnimationFrame(() => {
+			containerRef.current?.focus();
+		});
+		return () => cancelAnimationFrame(frameId);
 	}, []);
 
 	const handleRetry = () => {
 		router.invalidate();
 	};
+
+	// Truncate extremely long slugs to prevent layout issues
+	const displaySlug = slug && slug.length > 50 ? `${slug.slice(0, 47)}...` : slug;
 
 	return (
 		<Empty>
@@ -57,10 +65,13 @@ export function WorkspaceNotFound({ slug, showRetry = false }: WorkspaceNotFound
 					</EmptyMedia>
 					<EmptyTitle>Workspace not found</EmptyTitle>
 					<EmptyDescription>
-						{slug ? (
+						{displaySlug ? (
 							<>
-								The workspace <strong>&quot;{slug}&quot;</strong> doesn&apos;t exist or may have
-								been deleted.
+								The workspace{" "}
+								<strong className="break-all" title={slug}>
+									&quot;{displaySlug}&quot;
+								</strong>{" "}
+								doesn&apos;t exist or may have been deleted.
 							</>
 						) : (
 							<>

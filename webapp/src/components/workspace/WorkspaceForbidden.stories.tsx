@@ -9,6 +9,7 @@ import { WorkspaceForbidden } from "./WorkspaceForbidden";
  * - Uses `role="alert"` with `aria-live="assertive"` to announce to screen readers
  * - Auto-focuses the container when mounted for keyboard navigation
  * - Icons use `aria-hidden` to avoid redundant screen reader announcements
+ * - Long slugs are truncated with ellipsis to prevent layout breakage
  *
  * ## Usage
  * ```tsx
@@ -45,5 +46,12 @@ export const Default: Story = {};
 export const WithSlug: Story = {
 	args: {
 		slug: "private-workspace",
+	},
+};
+
+/** Extremely long slug is truncated to prevent layout issues. Title attribute shows full slug on hover. */
+export const LongSlug: Story = {
+	args: {
+		slug: "this-is-an-extremely-long-workspace-slug-that-would-normally-break-the-layout-if-not-properly-handled",
 	},
 };

@@ -18,22 +18,43 @@ export interface WorkspaceErrorProps {
 }
 
 /**
+ * Determines if an error is likely network-related and thus potentially transient.
+ * Uses error.name (more reliable) with message fallback for fetch-based errors.
+ */
+function isNetworkError(error: Error): boolean {
+	// Check error.name first - more reliable than message parsing
+	if (error.name === "TypeError" || error.name === "NetworkError") {
+		return true;
+	}
+
+	// Fallback: check common fetch/network error patterns in message
+	// Using case-insensitive matching for robustness across browsers
+	const networkPatterns = /\b(fetch|network|timeout|abort|connection|offline)\b/i;
+	return networkPatterns.test(error.message);
+}
+
+/**
  * Generic error state component for unexpected workspace errors.
  * Provides retry functionality and clear messaging for recoverable errors.
  *
- * Accessibility:
- * - Uses role="alert" with aria-live="assertive" to announce to screen readers
- * - Auto-focuses the container for keyboard navigation
- * - Icons use aria-hidden to avoid redundant screen reader announcements
+ * Accessibility (WCAG 2.2):
+ * - Uses role="alert" with aria-live="assertive" for immediate screen reader announcement
+ * - Auto-focuses container after render for keyboard navigation (via requestAnimationFrame)
+ * - Icons marked aria-hidden to prevent redundant announcements
+ * - aria-atomic ensures the entire message is read as a unit
  */
 export function WorkspaceError({ error, reset }: WorkspaceErrorProps) {
 	const navigate = useNavigate();
 	const router = useRouter();
 	const containerRef = useRef<HTMLDivElement>(null);
 
-	// Focus the container when mounted for screen reader announcement
+	// Focus the container after render for screen reader announcement
+	// Using requestAnimationFrame ensures the DOM is fully painted before focus
 	useEffect(() => {
-		containerRef.current?.focus();
+		const frameId = requestAnimationFrame(() => {
+			containerRef.current?.focus();
+		});
+		return () => cancelAnimationFrame(frameId);
 	}, []);
 
 	const handleRetry = () => {
@@ -48,11 +69,7 @@ export function WorkspaceError({ error, reset }: WorkspaceErrorProps) {
 		navigate({ to: "/" });
 	};
 
-	// Determine if this is a network error (potentially transient)
-	const isNetworkError =
-		error.message.includes("fetch") ||
-		error.message.includes("network") ||
-		error.message.includes("Failed to load");
+	const showNetworkMessage = isNetworkError(error);
 
 	return (
 		<Empty>
@@ -71,7 +88,7 @@ export function WorkspaceError({ error, reset }: WorkspaceErrorProps) {
 					</EmptyMedia>
 					<EmptyTitle>Something went wrong</EmptyTitle>
 					<EmptyDescription>
-						{isNetworkError ? (
+						{showNetworkMessage ? (
 							<>
 								We couldn&apos;t load this workspace. This might be a temporary issue — please try
 								again.

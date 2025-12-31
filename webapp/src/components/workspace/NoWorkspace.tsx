@@ -12,16 +12,21 @@ import {
  * Empty state component displayed when a user has no workspace memberships.
  * Shown after authentication when the user hasn't been added to any workspace.
  *
- * Accessibility:
- * - Uses role="status" for non-critical information
- * - Auto-focuses the container for keyboard navigation
+ * Accessibility (WCAG 2.2):
+ * - Uses role="status" with aria-live="polite" for non-disruptive screen reader announcement
+ * - Auto-focuses container after render for keyboard navigation (via requestAnimationFrame)
+ * - Icons marked aria-hidden to prevent redundant announcements
  */
 export function NoWorkspace() {
 	const containerRef = useRef<HTMLDivElement>(null);
 
-	// Focus the container when mounted for screen reader announcement
+	// Focus the container after render for screen reader announcement
+	// Using requestAnimationFrame ensures the DOM is fully painted before focus
 	useEffect(() => {
-		containerRef.current?.focus();
+		const frameId = requestAnimationFrame(() => {
+			containerRef.current?.focus();
+		});
+		return () => cancelAnimationFrame(frameId);
 	}, []);
 
 	return (

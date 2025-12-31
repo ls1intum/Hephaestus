@@ -19,19 +19,27 @@ export interface WorkspaceForbiddenProps {
  * Empty state component displayed when access to a workspace is forbidden (403).
  * Shows a friendly message explaining the user lacks permission and provides recovery options.
  *
- * Accessibility:
- * - Uses role="alert" to announce to screen readers
- * - Auto-focuses the container for keyboard navigation
- * - Provides clear action buttons with descriptive labels
+ * Accessibility (WCAG 2.2):
+ * - Uses role="alert" with aria-live="assertive" for immediate screen reader announcement
+ * - Auto-focuses container after render for keyboard navigation (via requestAnimationFrame)
+ * - Icons marked aria-hidden to prevent redundant announcements
+ * - Long slugs are truncated to prevent layout breakage
  */
 export function WorkspaceForbidden({ slug }: WorkspaceForbiddenProps) {
 	const navigate = useNavigate();
 	const containerRef = useRef<HTMLDivElement>(null);
 
-	// Focus the container when mounted for screen reader announcement
+	// Focus the container after render for screen reader announcement
+	// Using requestAnimationFrame ensures the DOM is fully painted before focus
 	useEffect(() => {
-		containerRef.current?.focus();
+		const frameId = requestAnimationFrame(() => {
+			containerRef.current?.focus();
+		});
+		return () => cancelAnimationFrame(frameId);
 	}, []);
+
+	// Truncate extremely long slugs to prevent layout issues
+	const displaySlug = slug && slug.length > 50 ? `${slug.slice(0, 47)}...` : slug;
 
 	return (
 		<Empty>
@@ -50,11 +58,13 @@ export function WorkspaceForbidden({ slug }: WorkspaceForbiddenProps) {
 					</EmptyMedia>
 					<EmptyTitle>Access denied</EmptyTitle>
 					<EmptyDescription>
-						{slug ? (
+						{displaySlug ? (
 							<>
 								You don&apos;t have permission to access the workspace{" "}
-								<strong>&quot;{slug}&quot;</strong>. Contact a workspace administrator if you
-								believe this is a mistake.
+								<strong className="break-all" title={slug}>
+									&quot;{displaySlug}&quot;
+								</strong>
+								. Contact a workspace administrator if you believe this is a mistake.
 							</>
 						) : (
 							<>
