@@ -21,7 +21,7 @@ runs:
         cache: "npm"
 
     - name: Cache Node.js dependencies
-      if: contains(fromJSON('["application-server-quality", "webapp-quality", "webapp-visual", "openapi-validation", "webhook-ingest-quality", "webhook-ingest-unit", "intelligence-service-quality", "intelligence-service-unit", "intelligence-service-integration"]'), inputs.cache-type)
+      if: contains(fromJSON('["application-server-quality", "webapp-quality", "webapp-visual", "webapp-unit", "webapp-storybook", "openapi-validation", "webhook-ingest-quality", "webhook-ingest-unit", "intelligence-service-quality", "intelligence-service-unit", "intelligence-service-integration"]'), inputs.cache-type)
       uses: actions/cache@v4
       with:
         path: |
