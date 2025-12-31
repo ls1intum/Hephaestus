@@ -72,20 +72,25 @@ function hasStatusCode(value: unknown): value is { status: number } {
 function getErrorType(error: unknown): WorkspaceErrorType {
 	if (!error) return null;
 
-	// Check for fetch/HTTP errors with status codes
+	// Check for fetch/HTTP errors with status codes (most reliable)
 	if (hasStatusCode(error)) {
 		if (error.status === 404) return "not-found";
 		if (error.status === 403) return "forbidden";
-	}
-
-	// Check for Error objects with message containing status hints
-	if (isError(error)) {
-		const message = error.message.toLowerCase();
-		if (message.includes("404") || message.includes("not found")) return "not-found";
-		if (message.includes("403") || message.includes("forbidden")) return "forbidden";
+		// 401 treated as forbidden - user needs to authenticate
+		if (error.status === 401) return "forbidden";
 	}
 
 	return "error";
+}
+
+/**
+ * Custom retry function that skips retries for expected error states (403/404/401).
+ * These are not transient errors and retrying won't help.
+ */
+function shouldRetry(failureCount: number, error: unknown): boolean {
+	const errorType = getErrorType(error);
+	if (errorType === "not-found" || errorType === "forbidden") return false;
+	return failureCount < 2;
 }
 
 /**
@@ -142,12 +147,7 @@ export function WorkspaceProvider({ slug, children }: WorkspaceProviderProps) {
 			path: { workspaceSlug: slug },
 		}),
 		enabled: isEnabled,
-		retry: (failureCount: number, error: unknown) => {
-			// Don't retry on 403/404 - these are expected error states
-			const errorType = getErrorType(error);
-			if (errorType === "not-found" || errorType === "forbidden") return false;
-			return failureCount < 2;
-		},
+		retry: shouldRetry,
 	});
 
 	// Fetch membership data
@@ -156,11 +156,7 @@ export function WorkspaceProvider({ slug, children }: WorkspaceProviderProps) {
 			path: { workspaceSlug: slug },
 		}),
 		enabled: isEnabled,
-		retry: (failureCount: number, error: unknown) => {
-			const errorType = getErrorType(error);
-			if (errorType === "not-found" || errorType === "forbidden") return false;
-			return failureCount < 2;
-		},
+		retry: shouldRetry,
 	});
 
 	// Persist slug to localStorage when workspace loads successfully

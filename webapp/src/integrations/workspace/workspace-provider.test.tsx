@@ -252,6 +252,23 @@ describe("WorkspaceProvider", () => {
 			expect(result.current.isReady).toBe(false);
 		});
 
+		it("should handle 401 error as forbidden", async () => {
+			mockGetWorkspaceOptions.mockImplementation(({ path }) => ({
+				queryKey: ["getWorkspace", path.workspaceSlug],
+				queryFn: () => Promise.reject({ status: 401, message: "Unauthorized" }),
+			}));
+
+			const { result } = renderHook(() => useWorkspace(), {
+				wrapper: createWrapper(queryClient, "protected-workspace"),
+			});
+
+			await waitFor(() => {
+				expect(result.current.errorType).toBe("forbidden");
+			});
+
+			expect(result.current.isReady).toBe(false);
+		});
+
 		it("should handle generic errors gracefully", () => {
 			// Generic error handling is covered by the error type detection logic
 			// The component will show error state when queries fail
@@ -337,6 +354,41 @@ describe("WorkspaceProvider", () => {
 			await new Promise((resolve) => setTimeout(resolve, 100));
 
 			// Should only have been called once (no retries for 403)
+			expect(callCount).toBe(1);
+		});
+
+		it("should not retry on 401 errors", async () => {
+			let callCount = 0;
+			mockGetWorkspaceOptions.mockImplementation(({ path }) => ({
+				queryKey: ["getWorkspace", path.workspaceSlug],
+				queryFn: () => {
+					callCount++;
+					return Promise.reject({ status: 401, message: "Unauthorized" });
+				},
+			}));
+
+			const retryQueryClient = new QueryClient({
+				defaultOptions: {
+					queries: {
+						staleTime: Number.POSITIVE_INFINITY,
+					},
+				},
+			});
+
+			renderHook(() => useWorkspace(), {
+				wrapper: createWrapper(retryQueryClient, "protected-workspace"),
+			});
+
+			await waitFor(
+				() => {
+					expect(callCount).toBeGreaterThan(0);
+				},
+				{ timeout: 500 },
+			);
+
+			await new Promise((resolve) => setTimeout(resolve, 100));
+
+			// Should only have been called once (no retries for 401)
 			expect(callCount).toBe(1);
 		});
 	});
