@@ -300,3 +300,12 @@ jobs:
           path: "webapp/chromatic-build-*.xml"
           reporter: java-junit
           fail-on-error: false
+
+      - name: Upload intelligence-service test results
+        if: steps.should_run.outputs.run == 'true' && always() && startsWith(matrix.test-type, 'intelligence-service-')
+        uses: dorny/test-reporter@v2
+        with:
+          name: "Test Results - ${{ matrix.test-type }}"
+          path: "server/intelligence-service/test-results/junit-*.xml"
+          reporter: java-junit
+          fail-on-error: false

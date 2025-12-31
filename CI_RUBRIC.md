@@ -338,9 +338,10 @@ This rubric is informed by extensive research into CI/CD best practices from lea
 
 ## Revision History
 
-| Version | Date       | Changes                                                |
-| ------- | ---------- | ------------------------------------------------------ |
-| 1.0     | 2025-12-31 | Initial rubric, baseline analysis                      |
-| 1.1     | 2025-12-31 | Implemented path-based filtering                       |
-| 1.2     | 2025-12-31 | Fixed ci-config fallback, Chromatic git history        |
-| 2.0     | 2025-12-31 | Addressed all review comments, added industry research |
+| Version | Date       | Changes                                                            |
+| ------- | ---------- | ------------------------------------------------------------------ |
+| 1.0     | 2025-12-31 | Initial rubric, baseline analysis                                  |
+| 1.1     | 2025-12-31 | Implemented path-based filtering                                   |
+| 1.2     | 2025-12-31 | Fixed ci-config fallback, Chromatic git history                    |
+| 2.0     | 2025-12-31 | Addressed all review comments, added industry research             |
+| 2.1     | 2025-12-31 | Added JUnit reporters to Vitest configs for test result visibility |

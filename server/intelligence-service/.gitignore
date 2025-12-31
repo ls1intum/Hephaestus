@@ -30,3 +30,4 @@ lerna-debug.log*
 
 # test
 test/.test-config.json
+test-results/

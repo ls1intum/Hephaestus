@@ -49,12 +49,17 @@ export default defineConfig({
     testTimeout: 30000,
     hookTimeout: 60000,
     watch: false,
-    reporters: ["verbose"],
+    reporters: ["verbose", "junit"],
 
     // Strict mode
     allowOnly: false,
     bail: 0,
     retry: 0,
+
+    // CI integration - JUnit reporter for GitHub Actions test summaries
+    outputFile: {
+      junit: "./test-results/junit-unit.xml",
+    },
   },
   resolve: {
     alias: {
