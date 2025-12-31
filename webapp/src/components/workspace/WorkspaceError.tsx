@@ -1,4 +1,4 @@
-import { useRouter } from "@tanstack/react-router";
+import { useNavigate, useRouter } from "@tanstack/react-router";
 import { AlertTriangle, Home, RefreshCw } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
@@ -27,6 +27,7 @@ export interface WorkspaceErrorProps {
  * - Icons use aria-hidden to avoid redundant screen reader announcements
  */
 export function WorkspaceError({ error, reset }: WorkspaceErrorProps) {
+	const navigate = useNavigate();
 	const router = useRouter();
 	const containerRef = useRef<HTMLDivElement>(null);
 
@@ -44,7 +45,7 @@ export function WorkspaceError({ error, reset }: WorkspaceErrorProps) {
 	};
 
 	const handleGoHome = () => {
-		window.location.href = "/";
+		navigate({ to: "/" });
 	};
 
 	// Determine if this is a network error (potentially transient)
