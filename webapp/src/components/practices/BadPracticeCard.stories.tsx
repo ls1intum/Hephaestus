@@ -149,8 +149,8 @@ export const WithResolutionControls: Story = {
 
 /**
  * Demonstrates that resolved items (FIXED state) do NOT show the Resolve button,
- * even when the user is a dashboard user. This prevents confusion from showing
- * resolution options for already-resolved practices.
+ * even when the user is a dashboard user. This is the key behavior that prevents
+ * showing resolution options for already-resolved practices.
  */
 export const ResolvedWithDashboardUser: Story = {
 	args: {
@@ -158,34 +158,6 @@ export const ResolvedWithDashboardUser: Story = {
 		title: "Previously flagged issue",
 		description: "This issue was already resolved as fixed.",
 		state: "FIXED",
-		currUserIsDashboardUser: true,
-	},
-};
-
-/**
- * Demonstrates that WONT_FIX items do NOT show the Resolve button,
- * even for dashboard users.
- */
-export const WontFixWithDashboardUser: Story = {
-	args: {
-		id: 10,
-		title: "Issue marked as won't fix",
-		description: "This issue was intentionally left unaddressed.",
-		state: "WONT_FIX",
-		currUserIsDashboardUser: true,
-	},
-};
-
-/**
- * Demonstrates that good practices do NOT show the Resolve button,
- * as they don't require resolution.
- */
-export const GoodPracticeWithDashboardUser: Story = {
-	args: {
-		id: 11,
-		title: "Excellent code organization",
-		description: "The code follows best practices for structure and naming.",
-		state: "GOOD_PRACTICE",
 		currUserIsDashboardUser: true,
 	},
 };

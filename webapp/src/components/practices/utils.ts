@@ -44,35 +44,21 @@ export const stateConfig: {
 };
 
 /**
- * Resolved states for bad practices - these have been addressed by the user
+ * States that can be resolved (issues that require user action).
+ * Used to determine whether to show resolution UI controls.
  */
-const RESOLVED_STATES: ReadonlySet<PullRequestBadPractice["state"]> = new Set([
-	"FIXED",
-	"WONT_FIX",
-	"WRONG",
-]);
-
-/**
- * Unresolved issue states - these require user action
- */
-const UNRESOLVED_ISSUE_STATES: ReadonlySet<PullRequestBadPractice["state"]> = new Set([
+const RESOLVABLE_STATES: ReadonlySet<PullRequestBadPractice["state"]> = new Set([
 	"CRITICAL_ISSUE",
 	"NORMAL_ISSUE",
 	"MINOR_ISSUE",
 ]);
 
 /**
- * Check if a bad practice state represents an unresolved issue that can be resolved
+ * Check if a bad practice can be resolved (shows "Resolve" button).
+ * Returns true for issues, false for already-resolved or good practices.
  */
-export function isUnresolvedIssue(state: PullRequestBadPractice["state"]): boolean {
-	return UNRESOLVED_ISSUE_STATES.has(state);
-}
-
-/**
- * Check if a bad practice state represents a resolved issue
- */
-export function isResolvedState(state: PullRequestBadPractice["state"]): boolean {
-	return RESOLVED_STATES.has(state);
+export function canBeResolved(state: PullRequestBadPractice["state"]): boolean {
+	return RESOLVABLE_STATES.has(state);
 }
 
 // Filter practices by category
@@ -85,12 +71,13 @@ export function filterGoodAndBadPractices(allBadPractices: PullRequestBadPractic
 		(badPractice) => badPractice.state === "GOOD_PRACTICE",
 	);
 
-	const badPractices = allBadPractices.filter((badPractice) =>
-		isUnresolvedIssue(badPractice.state),
-	);
+	const badPractices = allBadPractices.filter((badPractice) => canBeResolved(badPractice.state));
 
-	const resolvedPractices = allBadPractices.filter((badPractice) =>
-		isResolvedState(badPractice.state),
+	const resolvedPractices = allBadPractices.filter(
+		(badPractice) =>
+			badPractice.state === "FIXED" ||
+			badPractice.state === "WONT_FIX" ||
+			badPractice.state === "WRONG",
 	);
 
 	return { goodPractices, badPractices, resolvedPractices };

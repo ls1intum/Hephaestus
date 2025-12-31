@@ -28,7 +28,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { isUnresolvedIssue, stateConfig } from "./utils";
+import { canBeResolved, stateConfig } from "./utils";
 
 interface BadPracticeCardProps {
 	id: number;
@@ -104,7 +104,7 @@ export function BadPracticeCard({
 					<p className="text-sm text-pretty">{description}</p>
 				</div>
 			</div>
-			{currUserIsDashboardUser && isUnresolvedIssue(state) && (
+			{currUserIsDashboardUser && canBeResolved(state) && (
 				<div className="justify-self-end">
 					<Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
 						<DropdownMenu>
