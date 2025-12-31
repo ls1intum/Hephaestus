@@ -248,7 +248,7 @@ jobs:
       - name: "Chromatic Visual Testing"
         if: steps.should_run.outputs.run == 'true' && matrix.test-type == 'webapp-visual'
         id: chromatic
-        uses: chromaui/action@latest
+        uses: chromaui/action@v11
         with:
           projectToken: ${{ secrets.CHROMATIC_PROJECT_TOKEN }}
           workingDir: webapp
