@@ -2,9 +2,9 @@ package de.tum.in.www1.hephaestus.gitprovider.installation.github;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.NatsMessageDeserializer;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
+import de.tum.in.www1.hephaestus.gitprovider.common.spi.WorkspaceProvisioningListener;
 import de.tum.in.www1.hephaestus.gitprovider.installation.github.dto.GitHubInstallationRepositoriesEventDTO;
 import de.tum.in.www1.hephaestus.gitprovider.repository.github.dto.GitHubRepositoryRefDTO;
-import de.tum.in.www1.hephaestus.workspace.WorkspaceRepositoryMonitorService;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -15,7 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
  * Handles GitHub installation_repositories webhook events.
  * <p>
  * When repositories are added or removed from a GitHub App installation,
- * this handler updates the workspace's monitored repositories accordingly.
+ * this handler notifies the workspace module via SPI to update monitored repositories.
  */
 @Component
 public class GitHubInstallationRepositoriesMessageHandler
@@ -23,14 +23,14 @@ public class GitHubInstallationRepositoriesMessageHandler
 
     private static final Logger logger = LoggerFactory.getLogger(GitHubInstallationRepositoriesMessageHandler.class);
 
-    private final WorkspaceRepositoryMonitorService workspaceRepositoryMonitorService;
+    private final WorkspaceProvisioningListener provisioningListener;
 
     GitHubInstallationRepositoriesMessageHandler(
         NatsMessageDeserializer deserializer,
-        WorkspaceRepositoryMonitorService workspaceRepositoryMonitorService
+        WorkspaceProvisioningListener provisioningListener
     ) {
         super(GitHubInstallationRepositoriesEventDTO.class, deserializer);
-        this.workspaceRepositoryMonitorService = workspaceRepositoryMonitorService;
+        this.provisioningListener = provisioningListener;
     }
 
     @Override
@@ -68,16 +68,22 @@ public class GitHubInstallationRepositoriesMessageHandler
 
         long installationId = installation.id();
 
-        // Handle added repositories
-        for (GitHubRepositoryRefDTO repo : added) {
-            logger.info("Adding repository to monitor for installation {}: {}", installationId, repo.fullName());
-            workspaceRepositoryMonitorService.ensureRepositoryMonitorForInstallation(installationId, repo.fullName());
+        // Notify workspace module via SPI for added repositories
+        if (!added.isEmpty()) {
+            List<String> addedNames = added.stream().map(GitHubRepositoryRefDTO::fullName).toList();
+            logger.info("Adding {} repositories to monitor for installation {}", addedNames.size(), installationId);
+            provisioningListener.onRepositoriesAdded(installationId, addedNames);
         }
 
-        // Handle removed repositories
-        for (GitHubRepositoryRefDTO repo : removed) {
-            logger.info("Removing repository from monitor for installation {}: {}", installationId, repo.fullName());
-            workspaceRepositoryMonitorService.removeRepositoryMonitorForInstallation(installationId, repo.fullName());
+        // Notify workspace module via SPI for removed repositories
+        if (!removed.isEmpty()) {
+            List<String> removedNames = removed.stream().map(GitHubRepositoryRefDTO::fullName).toList();
+            logger.info(
+                "Removing {} repositories from monitor for installation {}",
+                removedNames.size(),
+                installationId
+            );
+            provisioningListener.onRepositoriesRemoved(installationId, removedNames);
         }
     }
 }
