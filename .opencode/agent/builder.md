@@ -1,6 +1,6 @@
 ---
 description: Principal Engineer. Autonomous. Obsessive quality. Standards evolve.
-model: google/claude-opus-4-5-thinking-medium
+model: anthropic/claude-opus-4-5
 permission:
   bash: allow
   edit: allow
