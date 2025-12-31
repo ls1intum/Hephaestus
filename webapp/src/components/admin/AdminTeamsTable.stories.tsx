@@ -35,6 +35,17 @@ const labels = [
 	{ id: 104, name: "good first issue", color: "7057ff", repository: repos[2] },
 ];
 
+/**
+ * Teams with hierarchy structure for testing rollup counts.
+ * - Frontend (root): 2 members (Sarah, Alex)
+ *   - Backend (child): 1 member (Jamie)
+ *   - QA (child, hidden): 0 members
+ *
+ * Rollup counts:
+ * - Frontend: 3 (2 direct + 1 from Backend)
+ * - Backend: 1 (leaf)
+ * - QA: 0 (leaf, hidden)
+ */
 const teams: TeamInfo[] = [
 	{
 		id: 1,
@@ -105,6 +116,14 @@ const teams: TeamInfo[] = [
 	},
 ];
 
+/**
+ * AdminTeamsTable displays teams in a hierarchical tree structure with
+ * search, visibility toggles, and member count modes.
+ *
+ * Use the "Member Count" toggle to switch between:
+ * - **Direct**: Count only the team's own members
+ * - **Include Subteams**: Count unique members from team + all descendants
+ */
 const meta = {
 	component: AdminTeamsTable,
 	parameters: { layout: "centered" },
@@ -129,5 +148,52 @@ const meta = {
 export default meta;
 export type Story = StoryObj<typeof meta>;
 
+/**
+ * Default state with direct member counting.
+ * Toggle the "Include Subteams" button to see rollup counts.
+ */
 export const Default: Story = {};
+
+/**
+ * Loading state with skeleton placeholders.
+ */
 export const Loading: Story = { args: { isLoading: true, teams: [] } };
+
+/**
+ * Deep hierarchy with 3+ levels of nesting.
+ * Shows how member counts roll up through multiple levels.
+ */
+export const DeepHierarchy: Story = {
+	args: {
+		teams: [
+			...teams,
+			{
+				id: 4,
+				name: "API Team",
+				description: "",
+				htmlUrl: "https://github.com/orgs/org/teams/api",
+				organization: "org",
+				privacy: "CLOSED",
+				membershipCount: 2,
+				repoPermissionCount: 1,
+				hidden: false,
+				parentId: 2, // Child of Backend
+				repositories: [],
+				labels: [],
+				members: [
+					{ id: 4, login: "pat", name: "Pat", avatarUrl: "", htmlUrl: "" },
+					{ id: 5, login: "quinn", name: "Quinn", avatarUrl: "", htmlUrl: "" },
+				],
+			},
+		],
+	},
+};
+
+/**
+ * Flat structure with no hierarchy (all root teams).
+ */
+export const FlatStructure: Story = {
+	args: {
+		teams: teams.map((t) => ({ ...t, parentId: undefined })),
+	},
+};

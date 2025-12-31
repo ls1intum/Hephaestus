@@ -3,6 +3,8 @@ import { useMemo, useState } from "react";
 import type { LabelInfo, TeamInfo } from "@/api/types.gen";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { computeMemberCounts, type MemberCountMode } from "@/lib/team-hierarchy";
+import { MemberCountModeToggle } from "./teams/MemberCountModeToggle";
 import { TeamTree } from "./teams/TeamTree";
 
 export interface TeamsTableProps {
@@ -27,6 +29,7 @@ export function AdminTeamsTable({
 	onRemoveLabelFromTeam,
 }: TeamsTableProps) {
 	const [teamSearch, setTeamSearch] = useState("");
+	const [countMode, setCountMode] = useState<MemberCountMode>("direct");
 
 	// Build full team map (do NOT exclude hidden in admin view)
 	const allTeamsById = useMemo(() => {
@@ -123,6 +126,17 @@ export function AdminTeamsTable({
 		return [...byName.values()].sort((a, b) => a.name.localeCompare(b.name));
 	};
 
+	// Compute member counts for both direct and rollup modes
+	const memberCounts = useMemo(() => {
+		// Convert TeamInfo[] to HierarchyTeam[] by mapping members
+		const hierarchyTeams = teams.map((t) => ({
+			id: t.id,
+			parentId: t.parentId,
+			members: (t.members ?? []).map((m) => ({ id: m.id })),
+		}));
+		return computeMemberCounts(hierarchyTeams);
+	}, [teams]);
+
 	if (isLoading) {
 		return (
 			<div className="space-y-4">
@@ -141,7 +155,7 @@ export function AdminTeamsTable({
 
 	return (
 		<div className="space-y-6">
-			<div className="flex flex-col sm:flex-row gap-4 sm:items-center sm:justify-between">
+			<div className="flex flex-col sm:flex-row gap-4 sm:items-end sm:justify-between">
 				<div className="relative w-full sm:max-w-md">
 					<Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground h-4 w-4" />
 					<Input
@@ -151,6 +165,7 @@ export function AdminTeamsTable({
 						className="pl-10"
 					/>
 				</div>
+				<MemberCountModeToggle mode={countMode} onModeChange={setCountMode} />
 			</div>
 
 			{rootsAll.filter((t) => displaySet.has(t.id)).length === 0 ? (
@@ -171,6 +186,8 @@ export function AdminTeamsTable({
 								team={team}
 								childrenMap={childrenMap}
 								displaySet={displaySet}
+								memberCounts={memberCounts}
+								countMode={countMode}
 								onToggleVisibility={(teamId, hidden) => onHideTeam(teamId, hidden)}
 								onToggleRepositoryVisibility={onToggleRepositoryVisibility}
 								onAddLabel={onAddLabelToTeam}

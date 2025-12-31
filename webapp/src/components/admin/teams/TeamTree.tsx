@@ -1,4 +1,5 @@
 import type { LabelInfo, TeamInfo } from "@/api/types.gen";
+import type { MemberCountMode } from "@/lib/team-hierarchy";
 import { RepositoryCard } from "./RepositoryCard";
 import { TeamCard } from "./TeamCard";
 
@@ -6,6 +7,10 @@ export interface TeamTreeProps {
 	team: TeamInfo;
 	childrenMap: Map<number, TeamInfo[]>;
 	displaySet: Set<number>;
+	/** Precomputed member counts per team: { direct, rollup } */
+	memberCounts?: Map<number, { direct: number; rollup: number }>;
+	/** Current member count mode */
+	countMode?: MemberCountMode;
 	onToggleVisibility: (teamId: number, hidden: boolean) => void | Promise<void>;
 	onToggleRepositoryVisibility: (
 		teamId: number,
@@ -21,6 +26,8 @@ export function TeamTree({
 	team,
 	childrenMap,
 	displaySet,
+	memberCounts,
+	countMode = "direct",
 	onToggleVisibility,
 	onToggleRepositoryVisibility,
 	onAddLabel,
@@ -28,10 +35,15 @@ export function TeamTree({
 	getCatalogLabels,
 }: TeamTreeProps) {
 	const children = (childrenMap.get(team.id) ?? []).filter((c) => displaySet.has(c.id));
+	const counts = memberCounts?.get(team.id);
+	const directCount = counts?.direct ?? (team.members ?? []).length;
+	const rollupCount = counts?.rollup;
 	return (
 		<TeamCard
 			team={team}
-			memberCount={(team.members ?? []).length}
+			memberCount={directCount}
+			rollupMemberCount={rollupCount}
+			countMode={countMode}
 			onToggleVisibility={(hidden) => onToggleVisibility(team.id, hidden)}
 			getCatalogLabels={getCatalogLabels}
 		>
@@ -67,6 +79,8 @@ export function TeamTree({
 							team={child}
 							childrenMap={childrenMap}
 							displaySet={displaySet}
+							memberCounts={memberCounts}
+							countMode={countMode}
 							onToggleVisibility={onToggleVisibility}
 							onToggleRepositoryVisibility={onToggleRepositoryVisibility}
 							onAddLabel={onAddLabel}

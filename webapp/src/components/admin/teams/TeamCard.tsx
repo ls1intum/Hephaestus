@@ -1,20 +1,38 @@
-import { Eye, EyeOff, Users } from "lucide-react";
+import { Eye, EyeOff, Users, UsersRound } from "lucide-react";
 import type { ReactNode } from "react";
 import type { LabelInfo, TeamInfo } from "@/api/types.gen";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import type { MemberCountMode } from "@/lib/team-hierarchy";
 import { cn } from "@/lib/utils";
 
 export interface TeamCardProps {
 	team: TeamInfo;
+	/** Direct member count (team's own members) */
 	memberCount: number;
+	/** Rollup member count (unique members from team + subteams) */
+	rollupMemberCount?: number;
+	/** Which count mode is currently active */
+	countMode?: MemberCountMode;
 	labelFilter?: string;
 	onToggleVisibility: (hidden: boolean) => void;
 	getCatalogLabels: (repoId: number) => LabelInfo[];
 	children?: ReactNode;
 }
 
-export function TeamCard({ team, memberCount, onToggleVisibility, children }: TeamCardProps) {
+export function TeamCard({
+	team,
+	memberCount,
+	rollupMemberCount,
+	countMode = "direct",
+	onToggleVisibility,
+	children,
+}: TeamCardProps) {
+	const displayCount =
+		countMode === "rollup" && rollupMemberCount !== undefined ? rollupMemberCount : memberCount;
+	const isRollupMode = countMode === "rollup";
+	const hasSubteamMembers = rollupMemberCount !== undefined && rollupMemberCount > memberCount;
 	return (
 		<Card className={cn("flex flex-col gap-3", team.hidden ? "bg-muted/40" : "")}>
 			<CardHeader className="pb-4">
@@ -37,10 +55,33 @@ export function TeamCard({ team, memberCount, onToggleVisibility, children }: Te
 							)}
 						</div>
 						<div className="flex flex-wrap items-center gap-2 sm:gap-4 text-sm text-muted-foreground">
-							<span className="flex items-center gap-1">
-								<Users className="h-3 w-3" /> {memberCount}{" "}
-								{memberCount === 1 ? "member" : "members"}
-							</span>
+							<Tooltip>
+								<TooltipTrigger asChild>
+									<span className="flex items-center gap-1 cursor-help">
+										{isRollupMode ? (
+											<UsersRound className="h-3 w-3" />
+										) : (
+											<Users className="h-3 w-3" />
+										)}{" "}
+										{displayCount} {displayCount === 1 ? "member" : "members"}
+										{isRollupMode && hasSubteamMembers && (
+											<span className="text-xs text-muted-foreground/70">
+												({memberCount} direct)
+											</span>
+										)}
+									</span>
+								</TooltipTrigger>
+								<TooltipContent>
+									{isRollupMode ? (
+										<p>
+											Unique members from team + subteams
+											{hasSubteamMembers && ` (${memberCount} direct)`}
+										</p>
+									) : (
+										<p>Direct team members only</p>
+									)}
+								</TooltipContent>
+							</Tooltip>
 							<span>
 								{(team.repositories ?? []).length}{" "}
 								{(team.repositories ?? []).length === 1 ? "repo" : "repos"}
