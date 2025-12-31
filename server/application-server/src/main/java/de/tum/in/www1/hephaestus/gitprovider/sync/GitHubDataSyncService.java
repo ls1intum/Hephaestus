@@ -1,5 +1,7 @@
 package de.tum.in.www1.hephaestus.gitprovider.sync;
 
+import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
+
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider.SyncTarget;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider.SyncType;
@@ -107,54 +109,55 @@ public class GitHubDataSyncService {
     public void syncSyncTarget(SyncTarget syncTarget) {
         Long workspaceId = syncTarget.workspaceId();
         String nameWithOwner = syncTarget.repositoryNameWithOwner();
+        String safeNameWithOwner = sanitizeForLog(nameWithOwner);
 
         Repository repository = repositoryRepository.findByNameWithOwner(nameWithOwner).orElse(null);
         if (repository == null) {
-            log.warn("Repository {} not found in database, skipping sync", nameWithOwner);
+            log.warn("Repository {} not found in database, skipping sync", safeNameWithOwner);
             return;
         }
 
         Long repositoryId = repository.getId();
-        log.info("Starting GraphQL sync for repository {}", nameWithOwner);
+        log.info("Starting GraphQL sync for repository {}", safeNameWithOwner);
 
         try {
             // Sync repository metadata first (ensures entity is up-to-date before syncing related data)
             var syncedRepository = repositorySyncService.syncRepository(workspaceId, nameWithOwner);
             if (syncedRepository.isPresent()) {
-                log.debug("Synced repository metadata for {}", nameWithOwner);
+                log.debug("Synced repository metadata for {}", safeNameWithOwner);
             } else {
                 log.warn(
                     "Failed to sync repository metadata for {}, continuing with other sync operations",
-                    nameWithOwner
+                    safeNameWithOwner
                 );
             }
 
             // Sync labels
             int labelsCount = labelSyncService.syncLabelsForRepository(workspaceId, repositoryId);
-            log.debug("Synced {} labels for {}", labelsCount, nameWithOwner);
+            log.debug("Synced {} labels for {}", labelsCount, safeNameWithOwner);
 
             // Sync milestones
             int milestonesCount = milestoneSyncService.syncMilestonesForRepository(workspaceId, repositoryId);
-            log.debug("Synced {} milestones for {}", milestonesCount, nameWithOwner);
+            log.debug("Synced {} milestones for {}", milestonesCount, safeNameWithOwner);
 
             // Sync issues
             int issuesCount = issueSyncService.syncForRepository(workspaceId, repositoryId);
-            log.debug("Synced {} issues for {}", issuesCount, nameWithOwner);
+            log.debug("Synced {} issues for {}", issuesCount, safeNameWithOwner);
 
             // Sync issue comments (requires issues to exist)
             int issueCommentsCount = issueCommentSyncService.syncForRepository(workspaceId, repositoryId);
-            log.debug("Synced {} issue comments for {}", issueCommentsCount, nameWithOwner);
+            log.debug("Synced {} issue comments for {}", issueCommentsCount, safeNameWithOwner);
 
             // Sync pull requests
             int prsCount = pullRequestSyncService.syncForRepository(workspaceId, repositoryId);
-            log.debug("Synced {} pull requests for {}", prsCount, nameWithOwner);
+            log.debug("Synced {} pull requests for {}", prsCount, safeNameWithOwner);
 
             // Sync PR review comments/threads (requires PRs to exist)
             int prReviewCommentsCount = pullRequestReviewCommentSyncService.syncCommentsForRepository(
                 workspaceId,
                 repositoryId
             );
-            log.debug("Synced {} PR review comments for {}", prReviewCommentsCount, nameWithOwner);
+            log.debug("Synced {} PR review comments for {}", prReviewCommentsCount, safeNameWithOwner);
 
             // Update sync timestamp via SPI
             syncTargetProvider.updateSyncTimestamp(
@@ -166,7 +169,7 @@ public class GitHubDataSyncService {
 
             log.info(
                 "Completed GraphQL sync for {}: repo metadata {}, {} labels, {} milestones, {} issues, {} issue comments, {} PRs, {} PR review comments",
-                nameWithOwner,
+                safeNameWithOwner,
                 syncedRepository.isPresent() ? "synced" : "failed",
                 labelsCount,
                 milestonesCount,
@@ -176,7 +179,7 @@ public class GitHubDataSyncService {
                 prReviewCommentsCount
             );
         } catch (Exception e) {
-            log.error("Error syncing repository {} via GraphQL: {}", nameWithOwner, e.getMessage(), e);
+            log.error("Error syncing repository {} via GraphQL: {}", safeNameWithOwner, e.getMessage(), e);
         }
     }
 

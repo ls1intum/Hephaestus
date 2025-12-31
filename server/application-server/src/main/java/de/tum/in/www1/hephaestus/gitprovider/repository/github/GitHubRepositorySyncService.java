@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.gitprovider.repository.github;
 
+import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.*;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
@@ -95,9 +96,10 @@ public class GitHubRepositorySyncService {
      */
     @Transactional
     public Optional<Repository> syncRepository(Long workspaceId, String nameWithOwner) {
+        String safeNameWithOwner = sanitizeForLog(nameWithOwner);
         Optional<RepositoryOwnerAndName> parsedName = GitHubRepositoryNameParser.parse(nameWithOwner);
         if (parsedName.isEmpty()) {
-            logger.warn("Invalid repository name format: {}", nameWithOwner);
+            logger.warn("Invalid repository name format: {}", safeNameWithOwner);
             return Optional.empty();
         }
         String repoOwner = parsedName.get().owner();
@@ -115,7 +117,7 @@ public class GitHubRepositorySyncService {
             if (response == null || !response.isValid()) {
                 logger.warn(
                     "Failed to fetch repository {}: {}",
-                    nameWithOwner,
+                    safeNameWithOwner,
                     response != null ? response.getErrors() : "null response"
                 );
                 return Optional.empty();
@@ -126,7 +128,7 @@ public class GitHubRepositorySyncService {
                 .field("repository")
                 .toEntity(de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.Repository.class);
             if (repoData == null) {
-                logger.warn("Repository {} not found on GitHub", nameWithOwner);
+                logger.warn("Repository {} not found on GitHub", safeNameWithOwner);
                 return Optional.empty();
             }
 
@@ -137,7 +139,7 @@ public class GitHubRepositorySyncService {
             // Create or update repository using typed accessors
             Long githubDatabaseId = repoData.getDatabaseId() != null ? repoData.getDatabaseId().longValue() : null;
             if (githubDatabaseId == null) {
-                logger.warn("Repository {} missing databaseId", nameWithOwner);
+                logger.warn("Repository {} missing databaseId", safeNameWithOwner);
                 return Optional.empty();
             }
 
@@ -179,11 +181,11 @@ public class GitHubRepositorySyncService {
             }
 
             repository = repositoryRepository.save(repository);
-            logger.debug("Synced repository: {}", nameWithOwner);
+            logger.debug("Synced repository: {}", safeNameWithOwner);
 
             return Optional.of(repository);
         } catch (Exception e) {
-            logger.error("Error syncing repository {}: {}", nameWithOwner, e.getMessage(), e);
+            logger.error("Error syncing repository {}: {}", safeNameWithOwner, e.getMessage(), e);
             return Optional.empty();
         }
     }
