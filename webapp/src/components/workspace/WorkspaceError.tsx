@@ -38,6 +38,28 @@ function isNetworkError(error: Error): boolean {
 const MAX_ERROR_DETAILS_LENGTH = 5000;
 
 /**
+ * Debug component for error details - only rendered in development.
+ * Extracted to prevent IIFE re-creation on every render.
+ */
+function ErrorDetails({ error }: { error: Error }) {
+	const name = error.name || "Error";
+	const message = error.message || "(no message)";
+	const stack = error.stack || "";
+	const full = `${name}: ${message}${stack ? `\n\n${stack}` : ""}`;
+	const display =
+		full.length > MAX_ERROR_DETAILS_LENGTH
+			? `${full.slice(0, MAX_ERROR_DETAILS_LENGTH)}...\n\n[Truncated - ${full.length} chars total]`
+			: full;
+
+	return (
+		<details className="mt-4 max-w-md text-left text-xs text-muted-foreground">
+			<summary className="cursor-pointer hover:text-foreground">Error details</summary>
+			<pre className="mt-2 max-h-64 overflow-auto rounded bg-muted p-2">{display}</pre>
+		</details>
+	);
+}
+
+/**
  * Generic error state component for unexpected workspace errors.
  * Provides retry functionality and clear messaging for recoverable errors.
  *
@@ -116,24 +138,8 @@ export function WorkspaceError({ error, reset }: WorkspaceErrorProps) {
 					Go to home
 				</Button>
 			</div>
-			{/* Debug information in development */}
-			{process.env.NODE_ENV === "development" && (
-				<details className="mt-4 max-w-md text-left text-xs text-muted-foreground">
-					<summary className="cursor-pointer hover:text-foreground">Error details</summary>
-					<pre className="mt-2 max-h-64 overflow-auto rounded bg-muted p-2">
-						{(() => {
-							const name = error.name || "Error";
-							const message = error.message || "(no message)";
-							const stack = error.stack || "";
-							const full = `${name}: ${message}${stack ? `\n\n${stack}` : ""}`;
-							// Truncate extremely long error details to prevent memory/layout issues
-							return full.length > MAX_ERROR_DETAILS_LENGTH
-								? `${full.slice(0, MAX_ERROR_DETAILS_LENGTH)}...\n\n[Truncated - ${full.length} chars total]`
-								: full;
-						})()}
-					</pre>
-				</details>
-			)}
+			{/* Debug information in development - rendered lazily inside details */}
+			{process.env.NODE_ENV === "development" && <ErrorDetails error={error} />}
 		</Empty>
 	);
 }
