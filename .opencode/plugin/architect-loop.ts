@@ -45,8 +45,6 @@ export const ArchitectLoop: Plugin = async (input) => {
         }
       }
 
-      console.log("[architect-loop] Architect finished, sending continue prompt")
-
       // Send a more directive prompt than just "Continue"
       setTimeout(async () => {
         try {
@@ -57,7 +55,7 @@ export const ArchitectLoop: Plugin = async (input) => {
               parts: [
                 {
                   type: "text",
-                  text: `Continue executing your system prompt. Check builder status, review PRs, dispatch work if needed. Run your startup script if you haven't recently.`,
+                  text: `Continue executing your system prompt. Check builder status, review PRs, dispatch work if needed. Run your startup script if you haven't recently. Let builders have autonomy. Don't wait for review, continue polishing existing tasks (existing worktrees), increase brutality!`,
                 },
               ],
             },
