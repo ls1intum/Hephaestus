@@ -33,6 +33,10 @@ export default defineConfig(({ command }) => {
 		test: {
 			globals: true,
 			environment: "jsdom",
+			reporters: ["default", "junit"],
+			outputFile: {
+				junit: "./test-results/junit-webapp.xml",
+			},
 		},
 		resolve: {
 			alias: {

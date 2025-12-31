@@ -292,17 +292,90 @@ jobs:
           echo "| CI Config | ${{ needs.detect-changes.outputs.ci-config == 'true' && '⚙️ Yes' || '➖ No' }} |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
-          # Tips section for failures
+          # Tips section for failures - specific to what failed
           if [[ "${{ steps.evaluate.outputs.status }}" == "failure" ]]; then
-            echo "### 💡 Troubleshooting Tips" >> $GITHUB_STEP_SUMMARY
+            echo "### 💡 Troubleshooting Guide" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
-            echo "1. **Check the failed job logs** for specific error messages" >> $GITHUB_STEP_SUMMARY
-            echo "2. **Run locally** before pushing:" >> $GITHUB_STEP_SUMMARY
-            echo '   ```bash' >> $GITHUB_STEP_SUMMARY
-            echo '   npm run format && npm run check' >> $GITHUB_STEP_SUMMARY
-            echo '   ```' >> $GITHUB_STEP_SUMMARY
-            echo "3. **For test failures**, run the specific test suite locally" >> $GITHUB_STEP_SUMMARY
-            echo "4. **See the [CI documentation](docs/contributor/ci-cd.mdx)** for more help" >> $GITHUB_STEP_SUMMARY
+
+            # Quality gates failures
+            if [[ "${{ needs.quality-gates.result }}" == "failure" ]]; then
+              echo "<details><summary><b>❌ Quality Gates Failed</b></summary>" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "| Issue | Fix Command |" >> $GITHUB_STEP_SUMMARY
+              echo "|-------|-------------|" >> $GITHUB_STEP_SUMMARY
+              echo "| Formatting errors | \`npm run format\` |" >> $GITHUB_STEP_SUMMARY
+              echo "| TypeScript errors | \`npm run typecheck:webapp\` |" >> $GITHUB_STEP_SUMMARY
+              echo "| Biome lint errors | \`npm run lint:fix\` |" >> $GITHUB_STEP_SUMMARY
+              echo "| Java formatting | \`npm run format:java\` |" >> $GITHUB_STEP_SUMMARY
+              echo "| OpenAPI out of sync | \`npm run generate:api\` |" >> $GITHUB_STEP_SUMMARY
+              echo "| Database schema drift | \`npm run db:draft-changelog\` |" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "</details>" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+            fi
+
+            # Test failures
+            if [[ "${{ needs.test-suite.result }}" == "failure" ]]; then
+              echo "<details><summary><b>❌ Tests Failed</b></summary>" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "| Test Suite | Run Locally |" >> $GITHUB_STEP_SUMMARY
+              echo "|------------|-------------|" >> $GITHUB_STEP_SUMMARY
+              echo "| Webapp unit | \`npm run test:webapp\` |" >> $GITHUB_STEP_SUMMARY
+              echo "| Webapp Storybook | \`npm -w webapp run test:storybook\` |" >> $GITHUB_STEP_SUMMARY
+              echo "| Application server | \`cd server/application-server && ./mvnw test\` |" >> $GITHUB_STEP_SUMMARY
+              echo "| Intelligence service | \`npm -w server/intelligence-service run test\` |" >> $GITHUB_STEP_SUMMARY
+              echo "| Webhook ingest | \`npm -w server/webhook-ingest run test\` |" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "**Tip:** Check the **Test Results** tab above for specific failures." >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "</details>" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+            fi
+
+            # Docker build failures
+            if [[ "${{ needs.docker-build.result }}" == "failure" ]]; then
+              echo "<details><summary><b>❌ Docker Build Failed</b></summary>" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "Common causes:" >> $GITHUB_STEP_SUMMARY
+              echo "- Build errors in the application code" >> $GITHUB_STEP_SUMMARY
+              echo "- Missing dependencies" >> $GITHUB_STEP_SUMMARY
+              echo "- Dockerfile syntax errors" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "Test locally: \`docker build -f <component>/Dockerfile .\`" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "</details>" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+            fi
+
+            # Security scan failures
+            if [[ "${{ needs.security-scan.result }}" == "failure" ]]; then
+              echo "<details><summary><b>❌ Security Scan Failed</b></summary>" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "Check the **Security** tab for details on vulnerabilities." >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "</details>" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+            fi
+
+            echo "---" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Quick fix:** Run \`npm run format && npm run check\` before pushing." >> $GITHUB_STEP_SUMMARY
+          fi
+
+          # Performance note for successful runs
+          if [[ "${{ steps.evaluate.outputs.status }}" == "success" ]]; then
+            echo "### ⚡ Performance" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            SKIPPED_COUNT=0
+            [[ "${{ needs.quality-gates.result }}" == "skipped" ]] && ((SKIPPED_COUNT++))
+            [[ "${{ needs.test-suite.result }}" == "skipped" ]] && ((SKIPPED_COUNT++))
+            [[ "${{ needs.security-scan.result }}" == "skipped" ]] && ((SKIPPED_COUNT++))
+            [[ "${{ needs.docker-build.result }}" == "skipped" ]] && ((SKIPPED_COUNT++))
+            if [[ $SKIPPED_COUNT -gt 0 ]]; then
+              echo "🚀 **Path-based filtering saved time!** $SKIPPED_COUNT workflow(s) skipped because no relevant files changed." >> $GITHUB_STEP_SUMMARY
+            else
+              echo "All workflows ran (CI config or main branch push)." >> $GITHUB_STEP_SUMMARY
+            fi
           fi
 
           echo "" >> $GITHUB_STEP_SUMMARY

@@ -37,7 +37,12 @@ export default defineConfig({
 		testTimeout: 30000,
 		hookTimeout: 60000,
 		watch: false,
-		reporters: ["verbose"],
+		reporters: ["verbose", "junit"],
+
+		// JUnit reporter output for CI integration
+		outputFile: {
+			junit: "./test-results/junit-webhook-ingest.xml",
+		},
 
 		// Strict mode
 		allowOnly: false,

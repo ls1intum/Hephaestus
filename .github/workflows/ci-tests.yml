@@ -296,6 +296,15 @@ jobs:
           reporter: java-junit
           fail-on-error: false
 
+      - name: Upload webapp test results
+        if: steps.should_run.outputs.run == 'true' && always() && matrix.test-type == 'webapp-unit'
+        uses: dorny/test-reporter@v2
+        with:
+          name: "Test Results - ${{ matrix.test-type }}"
+          path: "webapp/test-results/junit-*.xml"
+          reporter: java-junit
+          fail-on-error: false
+
       - name: Upload Chromatic test results
         if: steps.should_run.outputs.run == 'true' && always() && matrix.test-type == 'webapp-visual' && startsWith(steps.chromatic.outputs.storybookUrl, 'http')
         uses: dorny/test-reporter@v2
@@ -313,3 +322,45 @@ jobs:
           path: "server/intelligence-service/test-results/junit-*.xml"
           reporter: java-junit
           fail-on-error: false
+
+      - name: Upload webhook-ingest test results
+        if: steps.should_run.outputs.run == 'true' && always() && matrix.test-type == 'webhook-ingest-unit'
+        uses: dorny/test-reporter@v2
+        with:
+          name: "Test Results - ${{ matrix.test-type }}"
+          path: "server/webhook-ingest/test-results/junit-*.xml"
+          reporter: java-junit
+          fail-on-error: false
+
+      # ────────────────────────────────────────────────────────────────────────
+      # Test Summary for Job Summary
+      # Creates a human-readable test summary visible in the Actions UI
+      # ────────────────────────────────────────────────────────────────────────
+      - name: Generate test summary
+        if: steps.should_run.outputs.run == 'true' && always()
+        run: |
+          echo "### 🧪 ${{ matrix.test-type }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Find and summarize JUnit XML results
+          case "${{ matrix.test-type }}" in
+            application-server-*)
+              if [ -d "server/application-server/target/surefire-reports" ]; then
+                TESTS=$(find server/application-server/target/surefire-reports -name "TEST-*.xml" -exec grep -h 'testsuite' {} \; 2>/dev/null | head -1 || echo "")
+                if [ -n "$TESTS" ]; then
+                  echo "✅ Tests completed. See **Test Results** tab for details." >> $GITHUB_STEP_SUMMARY
+                fi
+              fi
+              ;;
+            webapp-*)
+              echo "✅ Webapp tests completed." >> $GITHUB_STEP_SUMMARY
+              ;;
+            intelligence-service-*)
+              if [ -d "server/intelligence-service/test-results" ]; then
+                echo "✅ Intelligence service tests completed." >> $GITHUB_STEP_SUMMARY
+              fi
+              ;;
+            webhook-ingest-*)
+              echo "✅ Webhook ingest tests completed." >> $GITHUB_STEP_SUMMARY
+              ;;
+          esac
