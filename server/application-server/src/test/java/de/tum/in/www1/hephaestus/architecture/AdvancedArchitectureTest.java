@@ -342,8 +342,6 @@ class AdvancedArchitectureTest {
                 .orShould()
                 .resideInAPackage("..activity..")
                 .orShould()
-                .resideInAPackage("..contribution..")
-                .orShould()
                 .resideInAPackage("..workspace..")
                 .because("Event handlers should be discoverable or colocated with domain");
             rule.check(classes);

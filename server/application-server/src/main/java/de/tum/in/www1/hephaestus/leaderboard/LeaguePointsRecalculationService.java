@@ -37,7 +37,7 @@ public class LeaguePointsRecalculationService implements LeaguePointsRecalculato
     private final WorkspaceMembershipService workspaceMembershipService;
     private final WorkspaceContributionActivityService workspaceContributionActivityService;
     private final LeaderboardService leaderboardService;
-    private final LeaguePointsCalculationService leaguePointsCalculationService;
+    private final LeaguePointsService leaguePointsService;
     private final UserRepository userRepository;
 
     public LeaguePointsRecalculationService(
@@ -45,14 +45,14 @@ public class LeaguePointsRecalculationService implements LeaguePointsRecalculato
         WorkspaceMembershipService workspaceMembershipService,
         WorkspaceContributionActivityService workspaceContributionActivityService,
         LeaderboardService leaderboardService,
-        LeaguePointsCalculationService leaguePointsCalculationService,
+        LeaguePointsService leaguePointsService,
         UserRepository userRepository
     ) {
         this.workspaceMembershipRepository = workspaceMembershipRepository;
         this.workspaceMembershipService = workspaceMembershipService;
         this.workspaceContributionActivityService = workspaceContributionActivityService;
         this.leaderboardService = leaderboardService;
-        this.leaguePointsCalculationService = leaguePointsCalculationService;
+        this.leaguePointsService = leaguePointsService;
         this.userRepository = userRepository;
     }
 
@@ -177,7 +177,7 @@ public class LeaguePointsRecalculationService implements LeaguePointsRecalculato
         }
 
         int currentPoints = currentPointsByUserId.getOrDefault(userId, POINTS_DEFAULT);
-        int newPoints = leaguePointsCalculationService.calculateNewPoints(memberUser, currentPoints, entry);
+        int newPoints = leaguePointsService.calculateNewPoints(memberUser, currentPoints, entry);
         currentPointsByUserId.put(userId, newPoints);
         workspaceMembershipService.updateLeaguePoints(workspaceId, memberUser, newPoints);
     }

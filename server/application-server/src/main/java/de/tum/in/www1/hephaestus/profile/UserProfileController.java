@@ -1,7 +1,6 @@
 package de.tum.in.www1.hephaestus.profile;
 
 import de.tum.in.www1.hephaestus.core.exception.EntityNotFoundException;
-import de.tum.in.www1.hephaestus.gitprovider.user.UserProfileDTO;
 import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.in.www1.hephaestus.workspace.context.WorkspaceScopedController;
 import io.swagger.v3.oas.annotations.Operation;
@@ -40,7 +39,7 @@ public class UserProfileController {
         summary = "Get user profile",
         description = "Returns user profile with workspace-scoped activity data including open PRs, review activity, and league points"
     )
-    public ResponseEntity<UserProfileDTO> getUserProfile(
+    public ResponseEntity<ProfileDTO> getUserProfile(
         WorkspaceContext workspaceContext,
         @PathVariable String login,
         @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant after,

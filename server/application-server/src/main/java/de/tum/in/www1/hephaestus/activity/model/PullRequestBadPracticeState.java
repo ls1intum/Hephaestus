@@ -1,22 +1,38 @@
 package de.tum.in.www1.hephaestus.activity.model;
 
 import de.tum.in.www1.hephaestus.intelligenceservice.model.BadPractice;
-import lombok.Getter;
 
-@Getter
+/**
+ * State of a detected bad practice in a pull request.
+ *
+ * <p>Tracks both the severity detected by the intelligence service
+ * and user-applied resolutions.
+ */
 public enum PullRequestBadPracticeState {
+    /** No issue detected - PR follows best practices */
     GOOD_PRACTICE("Good Practice"),
+    /** Issue was detected but author has addressed it */
     FIXED("Fixed"),
+    /** Severe issue that blocks merge */
     CRITICAL_ISSUE("Critical Issue"),
+    /** Standard issue that should be addressed */
     NORMAL_ISSUE("Normal Issue"),
+    /** Minor issue that can be deferred */
     MINOR_ISSUE("Minor Issue"),
+    /** Author acknowledges issue but chooses not to fix */
     WONT_FIX("Won't Fix"),
+    /** Detection was incorrect - false positive */
     WRONG("Wrong");
 
     private final String value;
 
     PullRequestBadPracticeState(String value) {
         this.value = value;
+    }
+
+    /** Returns the display value of this state. */
+    public String getValue() {
+        return value;
     }
 
     public static PullRequestBadPracticeState fromBadPracticeStatus(BadPractice.StatusEnum status) {

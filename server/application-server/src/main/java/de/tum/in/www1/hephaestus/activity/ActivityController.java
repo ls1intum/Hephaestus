@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.activity;
 
+import de.tum.in.www1.hephaestus.activity.badpractice.PullRequestBadPracticeRepository;
 import de.tum.in.www1.hephaestus.activity.model.*;
 import de.tum.in.www1.hephaestus.core.exception.AccessForbiddenException;
 import de.tum.in.www1.hephaestus.core.exception.EntityNotFoundException;

@@ -28,7 +28,7 @@ public class LeaguePointsUpdateTask implements Runnable {
     private final String scheduledTime;
     private final UserRepository userRepository;
     private final LeaderboardService leaderboardService;
-    private final LeaguePointsCalculationService leaguePointsCalculationService;
+    private final LeaguePointsService leaguePointsService;
     private final WorkspaceMembershipService workspaceMembershipService;
     private final WorkspaceRepository workspaceRepository;
 
@@ -37,7 +37,7 @@ public class LeaguePointsUpdateTask implements Runnable {
         @Value("${hephaestus.leaderboard.schedule.time}") String scheduledTime,
         UserRepository userRepository,
         LeaderboardService leaderboardService,
-        LeaguePointsCalculationService leaguePointsCalculationService,
+        LeaguePointsService leaguePointsService,
         WorkspaceMembershipService workspaceMembershipService,
         WorkspaceRepository workspaceRepository
     ) {
@@ -45,7 +45,7 @@ public class LeaguePointsUpdateTask implements Runnable {
         this.scheduledTime = scheduledTime;
         this.userRepository = userRepository;
         this.leaderboardService = leaderboardService;
-        this.leaguePointsCalculationService = leaguePointsCalculationService;
+        this.leaguePointsService = leaguePointsService;
         this.workspaceMembershipService = workspaceMembershipService;
         this.workspaceRepository = workspaceRepository;
     }
@@ -112,7 +112,7 @@ public class LeaguePointsUpdateTask implements Runnable {
             }
             var user = userRepository.findByLoginWithEagerMergedPullRequests(leaderboardUser.login()).orElseThrow();
             int currentPoints = workspaceMembershipService.getCurrentLeaguePoints(workspaceId, user);
-            int newPoints = leaguePointsCalculationService.calculateNewPoints(user, currentPoints, entry);
+            int newPoints = leaguePointsService.calculateNewPoints(user, currentPoints, entry);
             workspaceMembershipService.updateLeaguePoints(workspaceId, user, newPoints);
         };
     }

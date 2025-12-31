@@ -1,16 +1,24 @@
-package de.tum.in.www1.hephaestus.activity;
+package de.tum.in.www1.hephaestus.activity.badpractice;
 
 import de.tum.in.www1.hephaestus.activity.model.PullRequestBadPractice;
-import jakarta.transaction.Transactional;
 import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+/**
+ * Repository for pull request bad practice records.
+ */
 @Repository
 public interface PullRequestBadPracticeRepository extends JpaRepository<PullRequestBadPractice, Long> {
-    @Transactional
+    /**
+     * Finds the most recent version of each bad practice for a given pull request.
+     * Groups by title and returns only the latest detection for each.
+     *
+     * @param pullRequestId the pull request ID
+     * @return list of bad practices with their most recent state
+     */
     @Query(
         """
         SELECT prbp

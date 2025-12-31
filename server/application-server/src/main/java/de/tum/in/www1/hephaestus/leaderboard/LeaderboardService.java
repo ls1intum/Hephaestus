@@ -3,8 +3,6 @@ package de.tum.in.www1.hephaestus.leaderboard;
 import static de.tum.in.www1.hephaestus.shared.LeaguePointsConstants.POINTS_DEFAULT;
 import static java.util.function.Function.identity;
 
-import de.tum.in.www1.hephaestus.gitprovider.issuecomment.IssueComment;
-import de.tum.in.www1.hephaestus.gitprovider.issuecomment.IssueCommentRepository;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestInfoDTO;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReview;
@@ -17,7 +15,6 @@ import de.tum.in.www1.hephaestus.gitprovider.user.UserInfoDTO;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.workspace.Workspace;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceMembershipService;
-import jakarta.annotation.Nonnull;
 import jakarta.transaction.Transactional;
 import java.time.Instant;
 import java.util.*;
@@ -26,6 +23,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+/**
+ * Service for building leaderboard data.
+ *
+ * <p>XP scores are read from the activity event ledger, NOT recalculated on-the-fly.
+ * This ensures consistency with the persisted XP values.
+ */
 @Service
 public class LeaderboardService {
 
@@ -33,27 +36,27 @@ public class LeaderboardService {
 
     private final UserRepository userRepository;
     private final PullRequestReviewRepository pullRequestReviewRepository;
-    private final IssueCommentRepository issueCommentRepository;
-    private final ScoringService scoringService;
+    private final LeaderboardXpQueryService leaderboardXpQueryService;
     private final TeamRepository teamRepository;
-    private final LeaguePointsCalculationService leaguePointsCalculationService;
+    private final TeamPathResolver teamPathResolver;
+    private final LeaguePointsService leaguePointsService;
     private final WorkspaceMembershipService workspaceMembershipService;
 
     public LeaderboardService(
         UserRepository userRepository,
         PullRequestReviewRepository pullRequestReviewRepository,
-        IssueCommentRepository issueCommentRepository,
-        ScoringService scoringService,
+        LeaderboardXpQueryService leaderboardXpQueryService,
         TeamRepository teamRepository,
-        LeaguePointsCalculationService leaguePointsCalculationService,
+        TeamPathResolver teamPathResolver,
+        LeaguePointsService leaguePointsService,
         WorkspaceMembershipService workspaceMembershipService
     ) {
         this.userRepository = userRepository;
         this.pullRequestReviewRepository = pullRequestReviewRepository;
-        this.issueCommentRepository = issueCommentRepository;
-        this.scoringService = scoringService;
+        this.leaderboardXpQueryService = leaderboardXpQueryService;
         this.teamRepository = teamRepository;
-        this.leaguePointsCalculationService = leaguePointsCalculationService;
+        this.teamPathResolver = teamPathResolver;
+        this.leaguePointsService = leaguePointsService;
         this.workspaceMembershipService = workspaceMembershipService;
     }
 
@@ -67,7 +70,9 @@ public class LeaderboardService {
         LeaderboardMode mode
     ) {
         if (mode == LeaderboardMode.INDIVIDUAL) {
-            Optional<Team> resolvedTeam = "all".equals(team) ? Optional.empty() : resolveTeamByPath(workspace, team);
+            Optional<Team> resolvedTeam = "all".equals(team)
+                ? Optional.empty()
+                : teamPathResolver.resolveByPath(workspace, team);
             return createIndividualLeaderboard(workspace, after, before, resolvedTeam, sort);
         }
 
@@ -108,104 +113,88 @@ public class LeaderboardService {
 
         Long workspaceId = workspace.getId();
 
-        Set<Long> teamIds;
-        teamIds = team
-            .map(teamName ->
-                collectTeamAndDescendantIds(
-                    teamName,
-                    Objects.requireNonNullElseGet(teamHierarchy, () -> buildTeamHierarchy(workspace))
+        // Collect team IDs for filtering (if team specified)
+        Set<Long> teamIds = team
+            .map(t ->
+                teamPathResolver.collectDescendantIds(
+                    t,
+                    Objects.requireNonNullElseGet(teamHierarchy, () -> teamPathResolver.buildHierarchy(workspace))
                 )
             )
             .orElse(Collections.emptySet());
 
-        List<PullRequestReview> reviews;
-        List<IssueComment> issueComments;
+        // ========================================================================
+        // XP and breakdown from activity events (source of truth)
+        // ========================================================================
+        Map<Long, LeaderboardUserXp> activityData = leaderboardXpQueryService.getLeaderboardData(
+            workspaceId,
+            after,
+            before,
+            teamIds
+        );
 
-        if (team.isPresent()) {
+        if (activityData.isEmpty()) {
+            logger.info("No activity events found for leaderboard");
+            return Collections.emptyList();
+        }
+
+        // ========================================================================
+        // Fetch PR data for display (not for scoring)
+        // ========================================================================
+        Set<Long> actorIds = activityData.keySet();
+
+        List<PullRequestReview> reviews;
+        if (team.isPresent() && !teamIds.isEmpty()) {
             reviews = pullRequestReviewRepository.findAllInTimeframeOfTeams(after, before, teamIds, workspaceId);
-            issueComments = issueCommentRepository.findAllInTimeframeOfTeams(after, before, teamIds, true, workspaceId);
         } else {
             reviews = pullRequestReviewRepository.findAllInTimeframe(after, before, workspaceId);
-            issueComments = issueCommentRepository.findAllInTimeframe(after, before, true, workspaceId);
         }
-
-        Map<Long, User> usersById = reviews
-            .stream()
-            .map(PullRequestReview::getAuthor)
-            .filter(u -> u != null && u.getId() != null)
-            .collect(Collectors.toMap(User::getId, identity(), (a, b) -> a, HashMap::new));
-
-        issueComments
-            .stream()
-            .map(IssueComment::getAuthor)
-            .filter(u -> u != null && u.getId() != null)
-            .forEach(u -> usersById.putIfAbsent(u.getId(), u));
-
-        if (team.isPresent() && !teamIds.isEmpty()) {
-            userRepository
-                .findAllByTeamIds(teamIds)
-                .forEach(u -> {
-                    if (u.getId() != null) {
-                        usersById.putIfAbsent(u.getId(), u);
-                    }
-                });
-        } else if (workspace.getAccountLogin() != null) {
-            userRepository
-                .findAllHumanInTeamsOfOrganization(workspace.getAccountLogin())
-                .forEach(u -> {
-                    if (u.getId() != null) {
-                        usersById.putIfAbsent(u.getId(), u);
-                    }
-                });
-        }
-
-        Map<Long, Integer> leaguePointsByUserId = workspaceMembershipService.getLeaguePointsSnapshot(
-            usersById.values(),
-            workspaceId
-        );
 
         Map<Long, List<PullRequestReview>> reviewsByUserId = reviews
             .stream()
             .filter(r -> r.getAuthor() != null && r.getAuthor().getId() != null)
+            .filter(r -> actorIds.contains(r.getAuthor().getId()))
             .collect(Collectors.groupingBy(r -> r.getAuthor().getId()));
 
-        Map<Long, List<IssueComment>> issueCommentsByUserId = issueComments
-            .stream()
-            .filter(c -> c.getAuthor() != null && c.getAuthor().getId() != null)
-            .collect(Collectors.groupingBy(c -> c.getAuthor().getId()));
+        // ========================================================================
+        // Get league points for ranking
+        // ========================================================================
+        Collection<User> users = activityData.values().stream().map(LeaderboardUserXp::user).toList();
 
-        Map<Long, Integer> scoresByUserId = reviewsByUserId
-            .entrySet()
-            .stream()
-            .collect(
-                Collectors.toMap(Map.Entry::getKey, e ->
-                    calculateTotalScore(
-                        e.getValue(),
-                        issueCommentsByUserId.getOrDefault(e.getKey(), Collections.emptyList())
-                    )
-                )
-            );
+        Map<Long, Integer> leaguePointsByUserId = workspaceMembershipService.getLeaguePointsSnapshot(
+            users,
+            workspaceId
+        );
 
-        // ensure all discovered users are present with at least score 0
-        usersById.keySet().forEach(id -> scoresByUserId.putIfAbsent(id, 0));
+        // ========================================================================
+        // Sort by specified criteria
+        // ========================================================================
+        Comparator<Map.Entry<Long, LeaderboardUserXp>> comparator = comparatorForActivityData(
+            sort,
+            leaguePointsByUserId
+        );
 
-        List<Long> ranking = scoresByUserId
-            .entrySet()
-            .stream()
-            .sorted(comparatorFor(sort, usersById, reviewsByUserId, issueCommentsByUserId, leaguePointsByUserId))
-            .map(Map.Entry::getKey)
-            .toList();
+        List<Long> ranking = activityData.entrySet().stream().sorted(comparator).map(Map.Entry::getKey).toList();
 
+        // ========================================================================
+        // Build DTOs
+        // ========================================================================
         List<LeaderboardEntryDTO> result = new ArrayList<>();
         for (int index = 0; index < ranking.size(); index++) {
             Long userId = ranking.get(index);
-            int score = scoresByUserId.getOrDefault(userId, 0);
-            UserInfoDTO userDto = Optional.ofNullable(usersById.get(userId))
-                .map(user -> UserInfoDTO.fromUser(user, leaguePointsByUserId.getOrDefault(userId, POINTS_DEFAULT)))
-                .orElse(null);
-            List<PullRequestReview> userReviews = reviewsByUserId.getOrDefault(userId, Collections.emptyList());
-            List<IssueComment> userIssueComments = issueCommentsByUserId.getOrDefault(userId, Collections.emptyList());
+            LeaderboardUserXp data = activityData.get(userId);
+            if (data == null) {
+                continue;
+            }
 
+            User user = data.user();
+            int score = data.totalScore();
+
+            UserInfoDTO userDto = UserInfoDTO.fromUser(user, leaguePointsByUserId.getOrDefault(userId, POINTS_DEFAULT));
+
+            List<PullRequestReview> userReviews = reviewsByUserId.getOrDefault(userId, Collections.emptyList());
+
+            // Extract reviewed PRs for display popover
             List<PullRequestInfoDTO> reviewedPullRequests = userReviews
                 .stream()
                 .map(PullRequestReview::getPullRequest)
@@ -217,59 +206,51 @@ public class LeaderboardService {
                 .map(PullRequestInfoDTO::fromPullRequest)
                 .collect(Collectors.toList());
 
-            int numberOfReviewedPRs = (int) userReviews
-                .stream()
-                .map(PullRequestReview::getPullRequest)
-                .filter(Objects::nonNull)
-                .map(PullRequest::getId)
-                .filter(Objects::nonNull)
-                .distinct()
-                .count();
-
-            int numberOfApprovals = (int) userReviews
-                .stream()
-                .filter(prr -> prr.getState() == PullRequestReview.State.APPROVED)
-                .count();
-
-            int numberOfChangeRequests = (int) userReviews
-                .stream()
-                .filter(prr -> prr.getState() == PullRequestReview.State.CHANGES_REQUESTED)
-                .count();
-
-            int numberOfComments =
-                (int) userReviews
-                    .stream()
-                    .filter(prr -> prr.getState() == PullRequestReview.State.COMMENTED && prr.getBody() != null)
-                    .count() +
-                userIssueComments.size();
-
-            int numberOfUnknowns = (int) userReviews
-                .stream()
-                .filter(prr -> prr.getState() == PullRequestReview.State.UNKNOWN && prr.getBody() != null)
-                .count();
-
-            int numberOfCodeComments = userReviews
-                .stream()
-                .mapToInt(prr -> prr.getComments() == null ? 0 : prr.getComments().size())
-                .sum();
-
+            // Stats come from activity events (pre-computed, not recalculated)
             LeaderboardEntryDTO entry = new LeaderboardEntryDTO(
                 index + 1,
                 score,
                 userDto,
                 null,
                 reviewedPullRequests,
-                numberOfReviewedPRs,
-                numberOfApprovals,
-                numberOfChangeRequests,
-                numberOfComments,
-                numberOfUnknowns,
-                numberOfCodeComments
+                data.reviewedPullRequestCount(),
+                data.approvals(),
+                data.changeRequests(),
+                data.comments() + data.issueComments(),
+                0, // numberOfUnknowns - not tracked in activity events
+                data.codeComments()
             );
             result.add(entry);
         }
 
         return result;
+    }
+
+    /**
+     * Comparator for activity-based leaderboard data.
+     */
+    private Comparator<Map.Entry<Long, LeaderboardUserXp>> comparatorForActivityData(
+        LeaderboardSortType sort,
+        Map<Long, Integer> leaguePointsByUserId
+    ) {
+        return (a, b) -> {
+            LeaderboardUserXp dataA = a.getValue();
+            LeaderboardUserXp dataB = b.getValue();
+
+            return switch (sort) {
+                case SCORE -> Integer.compare(dataB.totalScore(), dataA.totalScore());
+                case LEAGUE_POINTS -> {
+                    int lpA = leaguePointsByUserId.getOrDefault(a.getKey(), POINTS_DEFAULT);
+                    int lpB = leaguePointsByUserId.getOrDefault(b.getKey(), POINTS_DEFAULT);
+                    // Tie-breaker: use score if league points are equal
+                    int cmp = Integer.compare(lpB, lpA);
+                    if (cmp != 0) {
+                        yield cmp;
+                    }
+                    yield Integer.compare(dataB.totalScore(), dataA.totalScore());
+                }
+            };
+        };
     }
 
     private List<LeaderboardEntryDTO> createTeamLeaderboard(
@@ -285,13 +266,13 @@ public class LeaderboardService {
             workspace.getWorkspaceSlug()
         );
 
-        HashMap<Long, List<Team>> teamHierarchy = buildTeamHierarchy(workspace);
+        Map<Long, List<Team>> teamHierarchy = teamPathResolver.buildHierarchy(workspace);
         List<Team> targetTeams = workspace.getAccountLogin() == null
             ? List.of()
             : teamRepository.findAllByOrganizationIgnoreCaseAndHiddenFalse(workspace.getAccountLogin());
 
         if (targetTeams.isEmpty()) {
-            logger.info("❌ No teams found for team leaderboard");
+            logger.info("No teams found for team leaderboard in workspace {}", workspace.getWorkspaceSlug());
             return Collections.emptyList();
         }
 
@@ -351,92 +332,6 @@ public class LeaderboardService {
         return result;
     }
 
-    private Comparator<Map.Entry<Long, Integer>> comparatorFor(
-        LeaderboardSortType sortType,
-        Map<Long, User> usersById,
-        Map<Long, List<PullRequestReview>> reviewsByUserId,
-        Map<Long, List<IssueComment>> issueCommentsByUserId,
-        Map<Long, Integer> leaguePointsByUserId
-    ) {
-        if (sortType == LeaderboardSortType.LEAGUE_POINTS) {
-            return compareByLeaguePoints(usersById, reviewsByUserId, issueCommentsByUserId, leaguePointsByUserId);
-        } else {
-            return compareByScore(reviewsByUserId, issueCommentsByUserId);
-        }
-    }
-
-    private Comparator<Map.Entry<Long, Integer>> compareByLeaguePoints(
-        Map<Long, User> usersById,
-        Map<Long, List<PullRequestReview>> reviewsByUserId,
-        Map<Long, List<IssueComment>> issueCommentsByUserId,
-        Map<Long, Integer> leaguePointsByUserId
-    ) {
-        return (e1, e2) -> {
-            int e1LeaguePoints = leaguePointsByUserId.getOrDefault(e1.getKey(), POINTS_DEFAULT);
-            int e2LeaguePoints = leaguePointsByUserId.getOrDefault(e2.getKey(), POINTS_DEFAULT);
-            int leagueCompare = Integer.compare(e2LeaguePoints, e1LeaguePoints);
-            if (leagueCompare != 0) {
-                return leagueCompare;
-            }
-            return compareByScore(reviewsByUserId, issueCommentsByUserId).compare(e1, e2);
-        };
-    }
-
-    private Comparator<Map.Entry<Long, Integer>> compareByScore(
-        Map<Long, List<PullRequestReview>> reviewsByUserId,
-        Map<Long, List<IssueComment>> issueCommentsByUserId
-    ) {
-        return (e1, e2) -> {
-            int scoreCompare = Integer.compare(e2.getValue(), e1.getValue());
-            if (scoreCompare != 0) {
-                return scoreCompare;
-            }
-            int e1ReviewComments = reviewsByUserId
-                .getOrDefault(e1.getKey(), Collections.emptyList())
-                .stream()
-                .mapToInt(r -> r.getComments() == null ? 0 : r.getComments().size())
-                .sum();
-            int e2ReviewComments = reviewsByUserId
-                .getOrDefault(e2.getKey(), Collections.emptyList())
-                .stream()
-                .mapToInt(r -> r.getComments() == null ? 0 : r.getComments().size())
-                .sum();
-            int e1IssueComments = issueCommentsByUserId.getOrDefault(e1.getKey(), Collections.emptyList()).size();
-            int e2IssueComments = issueCommentsByUserId.getOrDefault(e2.getKey(), Collections.emptyList()).size();
-            int e1TotalComments = e1ReviewComments + e1IssueComments;
-            int e2TotalComments = e2ReviewComments + e2IssueComments;
-            return Integer.compare(e2TotalComments, e1TotalComments);
-        };
-    }
-
-    private int calculateTotalScore(List<PullRequestReview> reviews, List<IssueComment> issueComments) {
-        long numberOfIssueComments = issueComments
-            .stream()
-            .filter(issueComment -> {
-                Long issueAuthorId = issueComment.getIssue() == null
-                    ? null
-                    : issueComment.getIssue().getAuthor() == null ? null : issueComment.getIssue().getAuthor().getId();
-                Long commentAuthorId = issueComment.getAuthor() == null ? null : issueComment.getAuthor().getId();
-                return issueAuthorId != null && commentAuthorId != null && !issueAuthorId.equals(commentAuthorId);
-            })
-            .count();
-
-        Map<Long, List<PullRequestReview>> reviewsByPullRequest = reviews
-            .stream()
-            .filter(r -> r.getPullRequest() != null && r.getPullRequest().getId() != null)
-            .collect(Collectors.groupingBy(r -> r.getPullRequest().getId()));
-
-        double totalScore = reviewsByPullRequest
-            .values()
-            .stream()
-            .mapToDouble(pullRequestReviews ->
-                scoringService.calculateReviewScore(pullRequestReviews, (int) numberOfIssueComments)
-            )
-            .sum();
-
-        return (int) Math.ceil(totalScore);
-    }
-
     @Transactional
     public LeagueChangeDTO getUserLeagueStats(Workspace workspace, String login, LeaderboardEntryDTO entry) {
         User user = userRepository
@@ -450,205 +345,8 @@ public class LeaderboardService {
         Long workspaceId = workspace.getId();
 
         int currentLeaguePoints = workspaceMembershipService.getCurrentLeaguePoints(workspaceId, user);
-        int projectedNewPoints = leaguePointsCalculationService.calculateNewPoints(user, currentLeaguePoints, entry);
+        int projectedNewPoints = leaguePointsService.calculateNewPoints(user, currentLeaguePoints, entry);
         return new LeagueChangeDTO(user.getLogin(), projectedNewPoints - currentLeaguePoints);
-    }
-
-    private Optional<Team> resolveTeamByPath(Workspace workspace, @Nonnull String path) {
-        if (workspace == null || workspace.getAccountLogin() == null || path.isBlank()) {
-            return Optional.empty();
-        }
-
-        String[] parts = path.split(" / ");
-        String leaf = parts[parts.length - 1];
-        List<Team> candidates = teamRepository
-            .findAllByName(leaf)
-            .stream()
-            .filter(team -> belongsToWorkspace(team, workspace))
-            .toList();
-        if (candidates.isEmpty()) {
-            return Optional.empty();
-        }
-
-        Map<Long, Team> cache = new HashMap<>();
-        Map<Long, Team> currentByCandidate = new HashMap<>();
-
-        for (Team candidate : candidates) {
-            Long candidateId = candidate.getId();
-            if (candidateId == null) {
-                continue;
-            }
-            cache.put(candidateId, candidate);
-            currentByCandidate.put(candidateId, candidate);
-        }
-
-        if (currentByCandidate.isEmpty()) {
-            return Optional.empty();
-        }
-
-        if (parts.length == 1) {
-            Long sole = currentByCandidate.keySet().stream().findFirst().get();
-            return Optional.ofNullable(cache.get(sole));
-        }
-
-        for (int index = parts.length - 2; index >= 0; index--) {
-            if (currentByCandidate.size() == 1) {
-                break;
-            }
-
-            String expected = parts[index];
-            Map<Long, Team> nextVisibleByCandidate = new HashMap<>();
-            boolean pendingResolution = true;
-
-            while (pendingResolution) {
-                pendingResolution = false;
-                Set<Long> missingIds = new HashSet<>();
-
-                for (Map.Entry<Long, Team> entry : currentByCandidate.entrySet()) {
-                    Long candidateId = entry.getKey();
-                    Team cursor = entry.getValue();
-                    if (nextVisibleByCandidate.containsKey(candidateId)) {
-                        continue;
-                    }
-
-                    Long parentId = cursor.getParentId();
-                    while (parentId != null) {
-                        Team parent = cache.get(parentId);
-                        if (parent == null) {
-                            missingIds.add(parentId);
-                            break;
-                        }
-                        if (!parent.isHidden()) {
-                            nextVisibleByCandidate.put(candidateId, parent);
-                            break;
-                        }
-                        parentId = parent.getParentId();
-                    }
-
-                    if (parentId == null && !nextVisibleByCandidate.containsKey(candidateId)) {
-                        nextVisibleByCandidate.put(candidateId, null);
-                    }
-                }
-
-                if (!missingIds.isEmpty()) {
-                    teamRepository
-                        .findAllById(missingIds)
-                        .forEach(parent -> {
-                            Long parentId = parent.getId();
-                            if (parentId != null && belongsToWorkspace(parent, workspace)) {
-                                cache.putIfAbsent(parentId, parent);
-                            }
-                        });
-                    pendingResolution = true;
-                }
-            }
-
-            Map<Long, Team> filtered = new HashMap<>();
-            for (Map.Entry<Long, Team> e : currentByCandidate.entrySet()) {
-                Long candidateId = e.getKey();
-                Team nextVisible = nextVisibleByCandidate.get(candidateId);
-                if (
-                    nextVisible != null &&
-                    expected.equals(nextVisible.getName()) &&
-                    belongsToWorkspace(nextVisible, workspace)
-                ) {
-                    filtered.put(candidateId, nextVisible);
-                    if (nextVisible.getId() != null) {
-                        cache.putIfAbsent(nextVisible.getId(), nextVisible);
-                    }
-                }
-            }
-
-            currentByCandidate = filtered;
-
-            if (currentByCandidate.isEmpty()) {
-                return Optional.empty();
-            }
-
-            if (currentByCandidate.size() == 1) {
-                Long onlyId = currentByCandidate.keySet().iterator().next();
-                return Optional.ofNullable(cache.get(onlyId));
-            }
-        }
-
-        if (currentByCandidate.size() > 1) {
-            preloadAncestors(currentByCandidate.values(), cache);
-            for (Long candidateId : currentByCandidate.keySet()) {
-                Team candidate = cache.get(candidateId);
-                if (
-                    candidate != null &&
-                    belongsToWorkspace(candidate, workspace) &&
-                    equalsVisiblePath(candidate, parts, cache)
-                ) {
-                    return Optional.of(candidate);
-                }
-            }
-            logger.warn(
-                "Ambiguous team path '{}' resolved to multiple workspace candidates; picking first.",
-                sanitizeForLog(path)
-            );
-        }
-
-        Long anyId = currentByCandidate.keySet().stream().findFirst().orElse(null);
-        return Optional.ofNullable(cache.get(anyId));
-    }
-
-    private boolean equalsVisiblePath(Team team, String[] parts, Map<Long, Team> cache) {
-        int index = parts.length - 1;
-        Team current = team;
-        while (current != null) {
-            if (!current.isHidden()) {
-                if (index < 0 || !parts[index].equals(current.getName())) {
-                    return false;
-                }
-                index--;
-            }
-            Long parentId = current.getParentId();
-            current = parentId == null ? null : cache.get(parentId);
-        }
-        return index < 0;
-    }
-
-    private void preloadAncestors(Collection<Team> teams, Map<Long, Team> cache) {
-        Set<Long> pending = teams
-            .stream()
-            .map(Team::getParentId)
-            .filter(Objects::nonNull)
-            .filter(id -> !cache.containsKey(id))
-            .collect(Collectors.toSet());
-
-        while (!pending.isEmpty()) {
-            Set<Long> nextRound = new HashSet<>();
-            teamRepository
-                .findAllById(pending)
-                .forEach(parent -> {
-                    Long parentId = parent.getId();
-                    if (parentId == null) {
-                        return;
-                    }
-                    if (!cache.containsKey(parentId)) {
-                        cache.put(parentId, parent);
-                    }
-                    Long ancestorId = parent.getParentId();
-                    if (ancestorId != null && !cache.containsKey(ancestorId)) {
-                        nextRound.add(ancestorId);
-                    }
-                });
-            pending = nextRound;
-        }
-    }
-
-    private boolean belongsToWorkspace(Team team, Workspace workspace) {
-        if (team == null || workspace == null) {
-            return false;
-        }
-        String org = team.getOrganization();
-        String workspaceLogin = workspace.getAccountLogin();
-        return org != null && workspaceLogin != null && org.equalsIgnoreCase(workspaceLogin);
-    }
-
-    private String sanitizeForLog(String input) {
-        return input == null ? null : input.replaceAll("[\\r\\n]", "");
     }
 
     private TeamStats aggregateTeamStats(List<LeaderboardEntryDTO> entries) {
@@ -680,41 +378,6 @@ public class LeaderboardService {
             numberOfUnknowns,
             numberOfCodeComments
         );
-    }
-
-    private HashMap<Long, List<Team>> buildTeamHierarchy(Workspace workspace) {
-        if (workspace == null || workspace.getAccountLogin() == null) {
-            return new HashMap<>();
-        }
-        List<Team> all = teamRepository.findAllByOrganizationIgnoreCase(workspace.getAccountLogin());
-        return all
-            .stream()
-            .collect(
-                Collectors.groupingBy(
-                    t -> Optional.ofNullable(t.getParentId()).orElse(0L),
-                    HashMap::new,
-                    Collectors.toList()
-                )
-            );
-    }
-
-    private Set<Long> collectTeamAndDescendantIds(Team team, Map<Long, List<Team>> hierarchy) {
-        Set<Long> result = new HashSet<>();
-        ArrayDeque<Team> queue = new ArrayDeque<>();
-        queue.add(team);
-
-        while (!queue.isEmpty()) {
-            Team current = queue.removeFirst();
-            Long currentId = current.getId();
-            if (currentId == null) {
-                continue;
-            }
-            if (result.add(currentId)) {
-                List<Team> children = hierarchy.getOrDefault(currentId, Collections.emptyList());
-                queue.addAll(children);
-            }
-        }
-        return result;
     }
 
     private record TeamStats(

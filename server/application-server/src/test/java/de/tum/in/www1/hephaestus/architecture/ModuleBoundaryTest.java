@@ -233,14 +233,15 @@ class ModuleBoundaryTest {
     class DomainEventPatternTests {
 
         /**
-         * Application domain events should be in events or contribution packages.
+         * Application domain events should be in events packages.
          *
          * <p>Events enable loose coupling between modules. Our domain events
-         * are in gitprovider.common.events and gitprovider.contribution.
+         * are in gitprovider.common.events. Activity events are in the activity
+         * module and use the activity_event ledger for persistence.
          * Generated GraphQL model classes ending in 'Event' are excluded.
          */
         @Test
-        @DisplayName("Domain events are in events or contribution packages")
+        @DisplayName("Domain events are in events packages")
         void domainEventsAreInEventsPackages() {
             ArchRule rule = classes()
                 .that()
@@ -253,10 +254,8 @@ class ModuleBoundaryTest {
                 .areNotInterfaces()
                 .should()
                 .resideInAPackage("..events..")
-                .orShould()
-                .resideInAPackage("..contribution..") // ContributionEvent is in contribution/
                 .allowEmptyShould(true)
-                .because("Domain events should be in events or contribution packages");
+                .because("Domain events should be in events packages");
             rule.check(classes);
         }
     }

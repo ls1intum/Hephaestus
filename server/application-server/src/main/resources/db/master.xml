@@ -39,4 +39,5 @@
     <include file="./changelog/1766231004215_changelog.xml" relativeToChangelogFile="true"/>
     <include file="./changelog/1735570000000_drop_unused_user_columns.xml" relativeToChangelogFile="true"/>
     <include file="./changelog/1735570001000_drop_unused_repo_columns.xml" relativeToChangelogFile="true"/>
+    <include file="./changelog/1735580000000_activity_event_ledger.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog>

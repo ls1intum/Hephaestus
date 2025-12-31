@@ -394,5 +394,30 @@ class ArchitectureTest {
                 .because("Consistent naming improves code discoverability");
             rule.check(classes);
         }
+
+        /**
+         * Adapter classes should use @Component, not @Service.
+         *
+         * <p>Adapters are technical integration code that bridges infrastructure
+         * and domain layers. They should use @Component because they don't contain
+         * business logic - they delegate to services.
+         *
+         * <p><b>Why package-based, not name-based:</b> Spring's @Service annotation
+         * indicates the class is in the service LAYER, not that it has a particular
+         * name. A class named "PaymentProcessor" containing business logic SHOULD
+         * use @Service. We test by package location (which implies architectural layer)
+         * rather than by name suffix.
+         */
+        @Test
+        @DisplayName("Adapter classes use @Component, not @Service")
+        void adaptersAreNotServices() {
+            ArchRule rule = noClasses()
+                .that()
+                .resideInAPackage("..adapter..")
+                .should()
+                .beAnnotatedWith(org.springframework.stereotype.Service.class)
+                .because("Adapters are infrastructure glue, not business services - use @Component");
+            rule.check(classes);
+        }
     }
 }

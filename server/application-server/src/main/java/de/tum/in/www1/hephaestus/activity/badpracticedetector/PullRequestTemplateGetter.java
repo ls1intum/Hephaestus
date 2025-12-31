@@ -8,6 +8,12 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 
+/**
+ * Service for fetching pull request templates from GitHub repositories.
+ *
+ * <p>Templates are cached and periodically refreshed to minimize API calls
+ * while ensuring reasonable freshness.
+ */
 @Component
 public class PullRequestTemplateGetter {
 

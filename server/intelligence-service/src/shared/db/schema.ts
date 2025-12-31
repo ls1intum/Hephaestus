@@ -3,6 +3,7 @@
 import {
 	bigint,
 	boolean,
+	doublePrecision,
 	foreignKey,
 	index,
 	integer,
@@ -60,11 +61,7 @@ export const repository = pgTable(
 		createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }),
 		updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" }),
 		defaultBranch: varchar("default_branch", { length: 255 }),
-		description: varchar({ length: 255 }),
-		hasIssues: boolean("has_issues").notNull(),
-		hasProjects: boolean("has_projects").notNull(),
-		hasWiki: boolean("has_wiki").notNull(),
-		homepage: varchar({ length: 1024 }),
+		description: text(),
 		htmlUrl: varchar("html_url", { length: 512 }),
 		isArchived: boolean("is_archived").notNull(),
 		isDisabled: boolean("is_disabled").notNull(),
@@ -72,9 +69,7 @@ export const repository = pgTable(
 		name: varchar({ length: 255 }),
 		nameWithOwner: varchar("name_with_owner", { length: 150 }),
 		pushedAt: timestamp("pushed_at", { withTimezone: true, mode: "string" }),
-		stargazersCount: integer("stargazers_count").notNull(),
 		visibility: varchar({ length: 255 }),
-		watchersCount: integer("watchers_count").notNull(),
 		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
 		organizationId: bigint("organization_id", { mode: "number" }),
 	},
@@ -99,8 +94,6 @@ export const user = pgTable("user", {
 	company: varchar({ length: 255 }),
 	description: varchar({ length: 255 }),
 	email: varchar({ length: 255 }),
-	followers: integer().notNull(),
-	following: integer().notNull(),
 	htmlUrl: varchar("html_url", { length: 255 }),
 	location: varchar({ length: 255 }),
 	login: varchar({ length: 255 }),
@@ -676,6 +669,8 @@ export const organization = pgTable(
 		installationId: bigint("installation_id", { mode: "number" }),
 		login: varchar({ length: 255 }).notNull(),
 		name: varchar({ length: 255 }),
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		workspaceId: bigint("workspace_id", { mode: "number" }),
 	},
 	(table) => [
 		unique("uq_organization_github_id").on(table.githubId),
@@ -784,38 +779,6 @@ export const workspaceSlugHistory = pgTable(
 	],
 );
 
-export const contributionEvent = pgTable(
-	"contribution_event",
-	{
-		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
-		id: bigint({ mode: "number" }).primaryKey().generatedByDefaultAsIdentity({
-			name: "contribution_event_id_seq",
-			startWith: 1,
-			increment: 1,
-			cache: 1,
-		}),
-		occurredAt: timestamp("occurred_at", {
-			precision: 6,
-			withTimezone: true,
-			mode: "string",
-		}).notNull(),
-		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
-		sourceId: bigint("source_id", { mode: "number" }).notNull(),
-		sourceType: varchar("source_type", { length: 32 }).notNull(),
-		xpAwarded: integer("xp_awarded").notNull(),
-		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
-		actorId: bigint("actor_id", { mode: "number" }).notNull(),
-	},
-	(table) => [
-		foreignKey({
-			columns: [table.actorId],
-			foreignColumns: [user.id],
-			name: "FK_contribution_event_actor",
-		}),
-		unique("uk_contribution_event_source").on(table.sourceId, table.sourceType),
-	],
-);
-
 export const issueType = pgTable(
 	"issue_type",
 	{
@@ -834,6 +797,72 @@ export const issueType = pgTable(
 			foreignColumns: [organization.id],
 			name: "fk_issue_type_organization",
 		}).onDelete("cascade"),
+	],
+);
+
+export const activityEvent = pgTable(
+	"activity_event",
+	{
+		id: uuid().primaryKey().notNull(),
+		eventKey: varchar("event_key", { length: 255 }).notNull(),
+		eventType: varchar("event_type", { length: 64 }).notNull(),
+		occurredAt: timestamp("occurred_at", { withTimezone: true, mode: "string" }).notNull(),
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		actorId: bigint("actor_id", { mode: "number" }),
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		workspaceId: bigint("workspace_id", { mode: "number" }).notNull(),
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		repositoryId: bigint("repository_id", { mode: "number" }),
+		targetType: varchar("target_type", { length: 32 }),
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		targetId: bigint("target_id", { mode: "number" }),
+		sourceSystem: varchar("source_system", { length: 32 }).notNull(),
+		correlationId: uuid("correlation_id"),
+		xp: doublePrecision().default(0).notNull(),
+		payload: jsonb(),
+		ingestedAt: timestamp("ingested_at", { withTimezone: true, mode: "string" })
+			.defaultNow()
+			.notNull(),
+	},
+	(table) => [
+		index("idx_activity_event_actor_time").using(
+			"btree",
+			table.actorId.asc().nullsLast(),
+			table.occurredAt.asc().nullsLast(),
+		),
+		index("idx_activity_event_correlation").using("btree", table.correlationId.asc().nullsLast()),
+		index("idx_activity_event_leaderboard").using(
+			"btree",
+			table.workspaceId.asc().nullsLast(),
+			table.actorId.asc().nullsLast(),
+			table.occurredAt.asc().nullsLast(),
+		),
+		index("idx_activity_event_type_time").using(
+			"btree",
+			table.eventType.asc().nullsLast(),
+			table.occurredAt.asc().nullsLast(),
+		),
+		index("idx_activity_event_workspace_time").using(
+			"btree",
+			table.workspaceId.asc().nullsLast(),
+			table.occurredAt.asc().nullsLast(),
+		),
+		foreignKey({
+			columns: [table.workspaceId],
+			foreignColumns: [workspace.id],
+			name: "fk_activity_event_workspace",
+		}),
+		foreignKey({
+			columns: [table.actorId],
+			foreignColumns: [user.id],
+			name: "fk_activity_event_actor",
+		}),
+		foreignKey({
+			columns: [table.repositoryId],
+			foreignColumns: [repository.id],
+			name: "fk_activity_event_repository",
+		}),
+		unique("uk_activity_event_workspace_key").on(table.eventKey, table.workspaceId),
 	],
 );
 

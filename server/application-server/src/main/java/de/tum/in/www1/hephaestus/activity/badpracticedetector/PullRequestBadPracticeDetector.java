@@ -1,6 +1,6 @@
 package de.tum.in.www1.hephaestus.activity.badpracticedetector;
 
-import de.tum.in.www1.hephaestus.activity.BadPracticeDetectionRepository;
+import de.tum.in.www1.hephaestus.activity.badpractice.BadPracticeDetectionRepository;
 import de.tum.in.www1.hephaestus.activity.model.*;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
@@ -17,6 +17,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
+/**
+ * Service for detecting bad practices in pull requests.
+ *
+ * <p>Analyzes PR metadata (title, description, labels) against the PR template
+ * and uses the intelligence service to identify potential issues.
+ */
 @Component
 public class PullRequestBadPracticeDetector {
 

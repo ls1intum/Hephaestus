@@ -43,4 +43,20 @@ public final class LeaguePointsConstants {
 
     /** K-factor for high-points players (more stable rating) */
     public static final double K_FACTOR_HIGH_POINTS = 1.1;
+
+    // ========================================================================
+    // Performance & Placement Bonus Constants
+    // ========================================================================
+
+    /** Seconds in 30 days for new player threshold */
+    public static final long NEW_PLAYER_THRESHOLD_SECONDS = 30L * 24 * 60 * 60;
+
+    /** Multiplier for performance score calculation: sqrt(score) * this */
+    public static final int PERFORMANCE_SCORE_MULTIPLIER = 10;
+
+    /** Top N placements eligible for placement bonus */
+    public static final int PLACEMENT_BONUS_THRESHOLD = 3;
+
+    /** Points awarded per placement position (e.g., 1st = 60, 2nd = 40, 3rd = 20) */
+    public static final int PLACEMENT_BONUS_PER_POSITION = 20;
 }

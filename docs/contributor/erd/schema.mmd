@@ -9,6 +9,22 @@ erDiagram
 
     direction LR
 
+    ActivityEvent {
+        UUID id PK
+        VARCHAR(255) event_key UK "NOT NULL"
+        VARCHAR(64) event_type "NOT NULL"
+        TIMESTAMPTZ occurred_at "NOT NULL"
+        BIGINT actor_id FK
+        BIGINT workspace_id FK,UK "NOT NULL"
+        BIGINT repository_id FK
+        VARCHAR(32) target_type
+        BIGINT target_id
+        VARCHAR(32) source_system "NOT NULL"
+        UUID correlation_id
+        JSONB payload
+        TIMESTAMPTZ ingested_at "NOT NULL"
+    }
+
     BadPracticeDetection {
         BIGINT id PK
         TIMESTAMPTZ detection_time
@@ -56,15 +72,6 @@ erDiagram
         UUID selected_leaf_message_id FK,UK
         BIGINT user_id FK
         BIGINT workspace_id FK "NOT NULL"
-    }
-
-    ContributionEvent {
-        BIGINT id PK
-        TIMESTAMPTZ occurred_at "NOT NULL"
-        BIGINT source_id UK "NOT NULL"
-        VARCHAR(32) source_type UK "NOT NULL"
-        INTEGER xp_awarded "NOT NULL"
-        BIGINT actor_id FK "NOT NULL"
     }
 
     Document {
@@ -188,6 +195,7 @@ erDiagram
         BIGINT installation_id
         VARCHAR(255) login UK "NOT NULL"
         VARCHAR(255) name
+        BIGINT workspace_id
     }
 
     OrganizationMembership {
@@ -277,11 +285,7 @@ erDiagram
         TIMESTAMPTZ created_at
         TIMESTAMPTZ updated_at
         VARCHAR(255) default_branch
-        VARCHAR(255) description
-        BOOLEAN has_issues "NOT NULL"
-        BOOLEAN has_projects "NOT NULL"
-        BOOLEAN has_wiki "NOT NULL"
-        VARCHAR(1024) homepage
+        TEXT description
         VARCHAR(512) html_url
         BOOLEAN is_archived "NOT NULL"
         BOOLEAN is_disabled "NOT NULL"
@@ -289,9 +293,7 @@ erDiagram
         VARCHAR(255) name
         VARCHAR(150) name_with_owner
         TIMESTAMPTZ pushed_at
-        INTEGER stargazers_count "NOT NULL"
         VARCHAR(255) visibility
-        INTEGER watchers_count "NOT NULL"
         BIGINT organization_id FK
     }
 
@@ -356,8 +358,6 @@ erDiagram
         VARCHAR(255) company
         VARCHAR(255) description
         VARCHAR(255) email
-        INTEGER followers "NOT NULL"
-        INTEGER following "NOT NULL"
         VARCHAR(255) html_url
         VARCHAR(255) location
         VARCHAR(255) login
@@ -418,6 +418,7 @@ erDiagram
 
     %% Relationships
     %% One-to-One relationships
+    Workspace ||--|| ActivityEvent : has
     ChatMessage ||--|| ChatMessagePart : has
     ChatMessage ||--|| ChatThread : references
     PullRequestReviewComment ||--|| PullRequestReviewThread : reviewed
@@ -426,13 +427,14 @@ erDiagram
     Workspace ||--|| WorkspaceMembership : belongs_to
 
     %% One-to-Many relationships
+    User ||--o{ ActivityEvent : references
+    Repository ||--o{ ActivityEvent : has
     Issue ||--o{ BadPracticeDetection : references
     PullRequestBadPractice ||--o{ BadPracticeFeedback : references
     ChatMessage ||--o{ ChatMessage : references
     ChatThread ||--o{ ChatMessage : has
     User ||--o{ ChatThread : has
     Workspace ||--o{ ChatThread : has
-    User ||--o{ ContributionEvent : references
     User ||--o{ Document : has
     Workspace ||--o{ Document : has
     User ||--o{ Issue : authored_by

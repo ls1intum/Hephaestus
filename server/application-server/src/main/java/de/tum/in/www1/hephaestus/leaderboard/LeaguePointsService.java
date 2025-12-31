@@ -8,22 +8,39 @@ import java.time.Instant;
 import java.util.Objects;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Service;
 
+/**
+ * Service for calculating league point updates based on leaderboard performance.
+ *
+ * <p>Uses an ELO-like algorithm with:
+ * <ul>
+ *   <li>K-factor adjustments for new vs established players</li>
+ *   <li>Decay to prevent point hoarding</li>
+ *   <li>Performance bonuses based on XP score</li>
+ *   <li>Placement bonuses for top ranks</li>
+ * </ul>
+ *
+ * <p>All constants are defined in {@link de.tum.in.www1.hephaestus.shared.LeaguePointsConstants}.
+ */
 @Service
-@Primary
-public class DefaultLeaguePointsCalculationService implements LeaguePointsCalculationService {
+public class LeaguePointsService {
 
-    private static final Logger logger = LoggerFactory.getLogger(DefaultLeaguePointsCalculationService.class);
+    private static final Logger logger = LoggerFactory.getLogger(LeaguePointsService.class);
 
-    @Override
+    /**
+     * Calculates updated league points for a user based on their leaderboard entry.
+     *
+     * @param user the user to calculate points for (must have merged PRs loaded)
+     * @param currentLeaguePoints current league point total
+     * @param entry the leaderboard entry with rank and score
+     * @return new league point total (minimum 1)
+     */
     public int calculateNewPoints(User user, int currentLeaguePoints, LeaderboardEntryDTO entry) {
         Objects.requireNonNull(user, "user must not be null");
         Objects.requireNonNull(entry, "entry must not be null");
 
-        int storedPoints = currentLeaguePoints;
-        int effectivePoints = storedPoints == 0 ? POINTS_DEFAULT : storedPoints;
+        int effectivePoints = currentLeaguePoints == 0 ? POINTS_DEFAULT : currentLeaguePoints;
         double kFactor = getKFactor(user, effectivePoints);
         int decay = calculateDecay(effectivePoints);
         int performanceBonus = calculatePerformanceBonus(entry.score());
@@ -31,8 +48,9 @@ public class DefaultLeaguePointsCalculationService implements LeaguePointsCalcul
         int pointChange = (int) (kFactor * (performanceBonus + placementBonus - decay));
         int newPoints = Math.max(1, effectivePoints + pointChange);
 
-        logger.info(
-            "Points calculation: old={}, k={}, decay={}, performanceBonus={}, placement={}, pointchange={}, new={}",
+        logger.debug(
+            "Points calculation for user {}: old={}, k={}, decay={}, performance={}, placement={}, change={}, new={}",
+            user.getLogin(),
             effectivePoints,
             kFactor,
             decay,
@@ -59,7 +77,7 @@ public class DefaultLeaguePointsCalculationService implements LeaguePointsCalcul
     }
 
     private boolean isNewPlayer(User user) {
-        Instant thirtyDaysAgo = Instant.now().minusSeconds(30L * 24 * 60 * 60);
+        Instant thresholdTime = Instant.now().minusSeconds(NEW_PLAYER_THRESHOLD_SECONDS);
         return user
             .getMergedPullRequests()
             .stream()
@@ -67,7 +85,7 @@ public class DefaultLeaguePointsCalculationService implements LeaguePointsCalcul
             .filter(PullRequest::isMerged)
             .map(PullRequest::getMergedAt)
             .filter(Objects::nonNull)
-            .noneMatch(mergedAt -> mergedAt.isBefore(thirtyDaysAgo));
+            .noneMatch(mergedAt -> mergedAt.isBefore(thresholdTime));
     }
 
     private int calculateDecay(int currentPoints) {
@@ -78,12 +96,12 @@ public class DefaultLeaguePointsCalculationService implements LeaguePointsCalcul
     }
 
     private int calculatePerformanceBonus(int score) {
-        return (int) (Math.sqrt((double) score) * 10);
+        return (int) (Math.sqrt((double) score) * PERFORMANCE_SCORE_MULTIPLIER);
     }
 
     private int calculatePlacementBonus(int placement) {
-        if (placement <= 3) {
-            return 20 * (4 - placement);
+        if (placement <= PLACEMENT_BONUS_THRESHOLD) {
+            return PLACEMENT_BONUS_PER_POSITION * (PLACEMENT_BONUS_THRESHOLD + 1 - placement);
         }
         return 0;
     }

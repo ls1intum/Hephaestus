@@ -10,7 +10,10 @@ import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
 /**
- * Listens for PR events and triggers real-time bad practice detection.
+ * Event listener that triggers bad practice detection on PR events.
+ *
+ * <p>Listens for PR created/updated events and asynchronously triggers
+ * the bad practice detector to analyze the pull request.
  */
 @Component
 public class BadPracticeEventListener {
