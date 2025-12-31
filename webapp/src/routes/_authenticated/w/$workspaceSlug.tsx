@@ -1,12 +1,14 @@
 import { createFileRoute, notFound, Outlet } from "@tanstack/react-router";
 import { getWorkspace } from "@/api/sdk.gen";
 import type { Workspace } from "@/api/types.gen";
+import { WorkspaceError } from "@/components/workspace/WorkspaceError";
 import { WorkspaceForbidden } from "@/components/workspace/WorkspaceForbidden";
 import { WorkspaceNotFound } from "@/components/workspace/WorkspaceNotFound";
 import { WorkspaceContext } from "@/hooks/use-workspace";
 
 /**
  * Error class for 403 Forbidden responses from the workspace API.
+ * Thrown when the user lacks permission to access a workspace.
  */
 class WorkspaceForbiddenError extends Error {
 	constructor(public slug: string) {
@@ -24,7 +26,7 @@ export const Route = createFileRoute("/_authenticated/w/$workspaceSlug")({
 			throwOnError: false,
 		});
 
-		// Handle error responses
+		// Handle error responses with specific error types for different HTTP statuses
 		if (result.error || !result.response.ok) {
 			const status = result.response.status;
 			if (status === 404) {
@@ -33,7 +35,8 @@ export const Route = createFileRoute("/_authenticated/w/$workspaceSlug")({
 			if (status === 403) {
 				throw new WorkspaceForbiddenError(workspaceSlug);
 			}
-			throw new Error(`Failed to load workspace: ${status}`);
+			// Throw a descriptive error for other status codes
+			throw new Error(`Failed to load workspace: HTTP ${status}`);
 		}
 
 		// At this point we know result.data exists because response.ok is true
@@ -47,12 +50,13 @@ export const Route = createFileRoute("/_authenticated/w/$workspaceSlug")({
 		const { workspaceSlug } = Route.useParams();
 		return <WorkspaceNotFound slug={workspaceSlug} />;
 	},
-	errorComponent: ({ error }) => {
+	errorComponent: ({ error, reset }) => {
+		// Handle specific error types with dedicated components
 		if (error instanceof WorkspaceForbiddenError) {
 			return <WorkspaceForbidden slug={error.slug} />;
 		}
-		// Re-throw other errors to bubble up to parent error boundaries
-		throw error;
+		// Handle generic errors with retry capability
+		return <WorkspaceError error={error} reset={reset} />;
 	},
 	component: WorkspaceLayout,
 });
