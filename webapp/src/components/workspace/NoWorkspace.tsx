@@ -16,6 +16,7 @@ import {
  * - Uses role="status" with aria-live="polite" for non-disruptive screen reader announcement
  * - Auto-focuses container after render for keyboard navigation (via requestAnimationFrame)
  * - Icons marked aria-hidden to prevent redundant announcements
+ * - aria-atomic ensures the entire message is read as a unit
  */
 export function NoWorkspace() {
 	const containerRef = useRef<HTMLDivElement>(null);
@@ -36,6 +37,7 @@ export function NoWorkspace() {
 				ref={containerRef}
 				role="status"
 				aria-live="polite"
+				aria-atomic="true"
 				tabIndex={-1}
 				className="outline-none"
 			>
