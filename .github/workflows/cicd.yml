@@ -18,6 +18,13 @@ jobs:
   # │ Detects which components changed for selective job execution.             │
   # │ This significantly reduces CI time when only specific components change.  │
   # │                                                                            │
+  # │ Adding a new service? Update these files:                                 │
+  # │ 1. cicd.yml: Add path filter below and output                             │
+  # │ 2. ci-quality-gates.yml: Add to matrix and case statement                 │
+  # │ 3. ci-tests.yml: Add to matrix and case statement                         │
+  # │ 4. ci-docker-build.yml: Add new build job                                 │
+  # │ 5. setup-caches/action.yml: Add to cache-type conditions                  │
+  # │                                                                            │
   # │ Why fetch-depth: 0?                                                       │
   # │ - For PRs: paths-filter uses GitHub API (no git history needed)           │
   # │ - For pushes/merge_group: needs git history to find merge-base            │
