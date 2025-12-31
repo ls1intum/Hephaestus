@@ -9,15 +9,12 @@ import {
 	getLeaderboardOptions,
 	getUserLeagueStatsOptions,
 	getUserProfileOptions,
-	getWorkspaceOptions,
 } from "@/api/@tanstack/react-query.gen";
 import { LeaderboardPage } from "@/components/leaderboard/LeaderboardPage";
 import type { LeaderboardSortType } from "@/components/leaderboard/SortFilter";
-import { NoWorkspace } from "@/components/workspace/NoWorkspace";
-import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 import { useAuth } from "@/integrations/auth/AuthContext";
+import { useWorkspace } from "@/integrations/workspace/context";
 import {
-	DEFAULT_SCHEDULE,
 	formatDateRangeForApi,
 	getLeaderboardWeekEnd,
 	getLeaderboardWeekStart,
@@ -49,29 +46,18 @@ export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/")({
 function LeaderboardContainer() {
 	// Get the current user from auth context
 	const { username } = useAuth();
-	const { workspaceSlug, isLoading: isWorkspaceLoading } = useActiveWorkspaceSlug();
-	const slug = workspaceSlug ?? "";
-	const hasWorkspace = Boolean(workspaceSlug);
-	const showNoWorkspace = !isWorkspaceLoading && !hasWorkspace;
+	// Workspace is loaded by the parent layout route and provided via context
+	const workspace = useWorkspace();
+	const workspaceSlug = workspace.workspaceSlug;
 
 	// Access properly validated search params with correct types
 	const { team, sort, after, before, mode } = Route.useSearch();
 	const navigate = useNavigate({ from: Route.fullPath });
 
-	// Query for workspace details (includes schedule info)
-	const workspaceQuery = useQuery({
-		...getWorkspaceOptions({
-			path: { workspaceSlug: slug },
-		}),
-		enabled: hasWorkspace,
-	});
-
 	// Extract leaderboard schedule from workspace config
 	const getSchedule = (): LeaderboardSchedule => {
-		if (!workspaceQuery.data) return DEFAULT_SCHEDULE;
-
-		const scheduledTime = workspaceQuery.data.leaderboardScheduleTime || "9:00";
-		const scheduledDay = workspaceQuery.data.leaderboardScheduleDay ?? 2;
+		const scheduledTime = workspace.leaderboardScheduleTime || "9:00";
+		const scheduledDay = workspace.leaderboardScheduleDay ?? 2;
 		const [hours, minutes] = scheduledTime
 			.split(":")
 			.map((part: string) => Number.parseInt(part, 10));
@@ -110,15 +96,14 @@ function LeaderboardContainer() {
 	// Query for teams in the workspace
 	const teamsQuery = useQuery({
 		...getAllTeamsOptions({
-			path: { workspaceSlug: slug },
+			path: { workspaceSlug },
 		}),
-		enabled: hasWorkspace,
 	});
 
 	// Query for leaderboard data based on filters
 	const leaderboardQuery = useQuery({
 		...getLeaderboardOptions({
-			path: { workspaceSlug: slug },
+			path: { workspaceSlug },
 			query: {
 				after: parsedAfter ?? new Date(),
 				before: parsedBefore ?? new Date(),
@@ -128,12 +113,12 @@ function LeaderboardContainer() {
 			},
 		}),
 		placeholderData: (previousData) => previousData,
-		enabled: hasWorkspace && Boolean(parsedAfter && teamsQuery.data),
+		enabled: Boolean(parsedAfter && teamsQuery.data),
 	});
 
 	// Query for user profile data (mirror leaderboard filters if provided)
 	const userProfileOptions = getUserProfileOptions({
-		path: { workspaceSlug: workspaceSlug ?? "", login: username || "" },
+		path: { workspaceSlug, login: username || "" },
 		query: {
 			after: parsedAfter,
 			before: parsedBefore,
@@ -143,7 +128,7 @@ function LeaderboardContainer() {
 	const userProfileQuery = useQuery({
 		...userProfileOptions,
 		placeholderData: (previousData) => previousData,
-		enabled: hasWorkspace && Boolean(username),
+		enabled: Boolean(username),
 	});
 	// Find the current user's entry in the leaderboard
 	const currentUserEntry = username
@@ -239,7 +224,7 @@ function LeaderboardContainer() {
 	// Query for league points change data if we have a current user entry
 	const leagueStatsQuery = useQuery({
 		...getUserLeagueStatsOptions({
-			path: { workspaceSlug: slug },
+			path: { workspaceSlug },
 			query: {
 				login: username || "",
 			},
@@ -262,12 +247,8 @@ function LeaderboardContainer() {
 				numberOfCodeComments: 0,
 			},
 		}),
-		enabled: hasWorkspace && Boolean(username && currentUserEntry),
+		enabled: Boolean(username && currentUserEntry),
 	});
-
-	if (showNoWorkspace) {
-		return <NoWorkspace />;
-	}
 
 	// Handle team filter changes
 	const handleTeamChange = (team: string) => {
@@ -302,10 +283,9 @@ function LeaderboardContainer() {
 
 	// Handle user profile navigation
 	const handleUserClick = (username: string) => {
-		if (!hasWorkspace) return;
 		navigate({
 			to: "/w/$workspaceSlug/user/$username",
-			params: { workspaceSlug: slug, username },
+			params: { workspaceSlug, username },
 		});
 	};
 
@@ -337,11 +317,7 @@ function LeaderboardContainer() {
 	return (
 		<LeaderboardPage
 			leaderboard={leaderboardQuery.data || []}
-			isLoading={
-				isWorkspaceLoading ||
-				teamsQuery.isPending ||
-				(leaderboardQuery.isPending && !leaderboardQuery.data)
-			}
+			isLoading={teamsQuery.isPending || (leaderboardQuery.isPending && !leaderboardQuery.data)}
 			currentUser={userProfileQuery.data?.userInfo}
 			currentUserEntry={currentUserEntry}
 			leaguePoints={userProfileQuery.data?.userInfo?.leaguePoints}

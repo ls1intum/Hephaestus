@@ -2,11 +2,11 @@ import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, retainSearchParams, useNavigate } from "@tanstack/react-router";
 import { zodValidator } from "@tanstack/zod-adapter";
 import { z } from "zod";
-import { getUserProfileOptions, getWorkspaceOptions } from "@/api/@tanstack/react-query.gen";
+import { getUserProfileOptions } from "@/api/@tanstack/react-query.gen";
 import { ProfilePage } from "@/components/profile/ProfilePage";
 import { useAuth } from "@/integrations/auth/AuthContext";
+import { useWorkspace } from "@/integrations/workspace/context";
 import {
-	DEFAULT_SCHEDULE,
 	formatDateRangeForApi,
 	getDateRangeForPreset,
 	type LeaderboardSchedule,
@@ -30,26 +30,18 @@ export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/user/$use
 });
 
 function UserProfile() {
-	const { username, workspaceSlug } = Route.useParams();
+	const { username } = Route.useParams();
 	const { isCurrentUser } = useAuth();
 	const { after, before } = Route.useSearch();
 	const navigate = useNavigate({ from: Route.fullPath });
-
-	// Query for workspace to get leaderboard schedule
-	const workspaceQuery = useQuery({
-		...getWorkspaceOptions({
-			path: { workspaceSlug },
-		}),
-		enabled: Boolean(workspaceSlug),
-	});
+	// Workspace is loaded by the parent layout route and provided via context
+	const workspace = useWorkspace();
+	const workspaceSlug = workspace.workspaceSlug;
 
 	// Extract leaderboard schedule from workspace config
-	// React Compiler handles memoization automatically
 	const getSchedule = (): LeaderboardSchedule => {
-		if (!workspaceQuery.data) return DEFAULT_SCHEDULE;
-
-		const scheduledTime = workspaceQuery.data.leaderboardScheduleTime || "9:00";
-		const scheduledDay = workspaceQuery.data.leaderboardScheduleDay ?? 2;
+		const scheduledTime = workspace.leaderboardScheduleTime || "9:00";
+		const scheduledDay = workspace.leaderboardScheduleDay ?? 2;
 		const [hours, minutes] = scheduledTime
 			.split(":")
 			.map((part: string) => Number.parseInt(part, 10));
@@ -92,7 +84,7 @@ function UserProfile() {
 			},
 		}),
 		placeholderData: (previousData) => previousData,
-		enabled: Boolean(username) && Boolean(workspaceSlug),
+		enabled: Boolean(username),
 	});
 
 	const handleTimeframeChange = (nextAfter: string, nextBefore?: string) => {
@@ -108,10 +100,7 @@ function UserProfile() {
 	return (
 		<ProfilePage
 			profileData={profileQuery.data}
-			isLoading={
-				(profileQuery.isPending && !profileQuery.data) ||
-				(workspaceQuery.isPending && !workspaceQuery.data)
-			}
+			isLoading={profileQuery.isPending && !profileQuery.data}
 			error={profileQuery.isError}
 			username={username}
 			currUserIsDashboardUser={currUserIsDashboardUser}

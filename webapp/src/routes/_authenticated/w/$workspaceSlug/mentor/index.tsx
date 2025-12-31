@@ -6,8 +6,7 @@ import { v4 as uuidv4 } from "uuid";
 import { getGroupedThreadsQueryKey, getThreadQueryKey } from "@/api/@tanstack/react-query.gen";
 import type { ChatThreadGroup, ChatThreadSummary } from "@/api/types.gen";
 import { Greeting } from "@/components/mentor/Greeting";
-import { NoWorkspace } from "@/components/workspace/NoWorkspace";
-import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
+import { useWorkspace } from "@/integrations/workspace/context";
 
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/mentor/")({
 	component: MentorContainer,
@@ -16,25 +15,25 @@ export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/mentor/")
 function MentorContainer() {
 	const queryClient = useQueryClient();
 	const navigate = useNavigate({ from: Route.fullPath });
-	const { workspaceSlug } = useActiveWorkspaceSlug();
-	const slug = workspaceSlug ?? "";
+	// Workspace is loaded by the parent layout route and provided via context
+	const { workspaceSlug } = useWorkspace();
 	const hasStartedRef = useRef(false);
 
 	// Auto-start a new conversation when the page loads
 	useEffect(() => {
-		if (!workspaceSlug || hasStartedRef.current) return;
+		if (hasStartedRef.current) return;
 		hasStartedRef.current = true;
 
 		const threadId = uuidv4();
 
 		// Pre-populate thread cache
-		queryClient.setQueryData(getThreadQueryKey({ path: { workspaceSlug: slug, threadId } }), {
+		queryClient.setQueryData(getThreadQueryKey({ path: { workspaceSlug, threadId } }), {
 			messages: [],
 		});
 
 		// Add to thread list
 		queryClient.setQueryData<Array<ChatThreadGroup>>(
-			getGroupedThreadsQueryKey({ path: { workspaceSlug: slug } }),
+			getGroupedThreadsQueryKey({ path: { workspaceSlug } }),
 			(prev) => {
 				const threadGroups = prev ?? [];
 				const newSummary: ChatThreadSummary = {
@@ -60,15 +59,11 @@ function MentorContainer() {
 		// Navigate to thread page - it will trigger the greeting via autoGreeting
 		navigate({
 			to: "/w/$workspaceSlug/mentor/$threadId",
-			params: { workspaceSlug: slug, threadId },
+			params: { workspaceSlug, threadId },
 			state: { autoGreeting: true },
 			replace: true,
 		});
-	}, [workspaceSlug, slug, queryClient, navigate]);
-
-	if (!workspaceSlug) {
-		return <NoWorkspace />;
-	}
+	}, [workspaceSlug, queryClient, navigate]);
 
 	// Show greeting animation while redirecting
 	return (
