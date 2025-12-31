@@ -67,9 +67,10 @@ jobs:
       - uses: actions/checkout@v4
         if: steps.should_run.outputs.run == 'true'
         with:
-          # TurboSnap needs full git history for webapp-visual
-          # Use shallow clone for application-server tests
-          fetch-depth: ${{ matrix.test-type == 'webapp-visual' && 0 || 1 }}
+          # TurboSnap needs full git history for webapp-visual (fetch-depth: 0)
+          # Use shallow clone for application-server tests (fetch-depth: 1)
+          # Note: Can't use && 0 || 1 since 0 is falsy - use conditional job or explicit check
+          fetch-depth: 0
 
       # Ensure stable Node/npm and proper caching for webapp visual tests
       - name: Setup Node.js (LTS) and npm cache
