@@ -81,9 +81,23 @@ logging:
 hephaestus:
     host-url: https://hephaestus.ase.cit.tum.de/
 
+    # ═══════════════════════════════════════════════════════════════════════════
+    # ENCRYPTION CONFIGURATION
+    # ═══════════════════════════════════════════════════════════════════════════
+    # Field-level encryption for sensitive data (tokens, secrets) stored in the database.
+    # Uses AES-256-GCM authenticated encryption with unique IV per encryption.
+    #
+    # To generate a new key: openssl rand -base64 32
+    #
+    # If not set, encryption is disabled and secrets are stored in plaintext.
+    # For production, this MUST be set via environment variable.
+    # ═══════════════════════════════════════════════════════════════════════════
+    encryption:
+        secret-key: ${HEPHAESTUS_ENCRYPTION_SECRET_KEY:}
+
     webapp:
         url: ${CLIENT_HOST:http://localhost:4200}
-    
+
     leaderboard:
         schedule:
             day: 2
@@ -95,7 +109,7 @@ hephaestus:
         # PR authors whose assignee-reviewers don't earn points (e.g., AI bots)
         self-review-author-logins:
             - Copilot
-    
+
     # ═══════════════════════════════════════════════════════════════════════════
     # WORKSPACE CONFIGURATION
     # ═══════════════════════════════════════════════════════════════════════════
@@ -133,7 +147,7 @@ hephaestus:
             repositories-to-monitor:
                 - ls1intum/Hephaestus
                 - ls1intum/Artemis
-    
+
     intelligence-service:
         url: http://localhost:8000
 
@@ -161,8 +175,6 @@ hephaestus:
         api-host: ${POSTHOG_API_HOST:https://app.posthog.com}
         project-id: ${POSTHOG_PROJECT_ID:}
         personal-api-key: ${POSTHOG_PERSONAL_API_KEY:}
-
-
 
 keycloak:
     url: http://localhost:8081
