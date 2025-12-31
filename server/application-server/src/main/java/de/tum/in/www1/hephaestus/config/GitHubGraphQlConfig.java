@@ -1,11 +1,20 @@
 package de.tum.in.www1.hephaestus.config;
 
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import de.tum.in.www1.hephaestus.config.jackson.GitHubActorMixin;
+import de.tum.in.www1.hephaestus.config.jackson.GitHubRepositoryOwnerMixin;
+import de.tum.in.www1.hephaestus.config.jackson.GitHubRequestedReviewerMixin;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.Actor;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.RepositoryOwner;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.RequestedReviewer;
 import java.time.Duration;
+import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.graphql.client.HttpGraphQlClient;
 import org.springframework.graphql.support.ResourceDocumentSource;
 import org.springframework.http.HttpHeaders;
@@ -63,19 +72,10 @@ public class GitHubGraphQlConfig {
         // 2. Registers mixins for polymorphic interface deserialization (Actor, RequestedReviewer, RepositoryOwner)
         ObjectMapper graphQlObjectMapper = baseObjectMapper
             .copy()
-            .configure(com.fasterxml.jackson.databind.DeserializationFeature.USE_LONG_FOR_INTS, true)
-            .addMixIn(
-                de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.Actor.class,
-                de.tum.in.www1.hephaestus.config.jackson.GitHubActorMixin.class
-            )
-            .addMixIn(
-                de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.RequestedReviewer.class,
-                de.tum.in.www1.hephaestus.config.jackson.GitHubRequestedReviewerMixin.class
-            )
-            .addMixIn(
-                de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.RepositoryOwner.class,
-                de.tum.in.www1.hephaestus.config.jackson.GitHubRepositoryOwnerMixin.class
-            );
+            .configure(DeserializationFeature.USE_LONG_FOR_INTS, true)
+            .addMixIn(Actor.class, GitHubActorMixin.class)
+            .addMixIn(RequestedReviewer.class, GitHubRequestedReviewerMixin.class)
+            .addMixIn(RepositoryOwner.class, GitHubRepositoryOwnerMixin.class);
 
         ExchangeStrategies strategies = ExchangeStrategies.builder()
             .codecs(config -> {
@@ -101,8 +101,8 @@ public class GitHubGraphQlConfig {
         // Configure document source to load operations from the correct location
         // Operations are colocated with the GitHub schema at graphql/github/operations/
         ResourceDocumentSource documentSource = new ResourceDocumentSource(
-            java.util.List.of(new org.springframework.core.io.ClassPathResource("graphql/github/operations/")),
-            java.util.List.of(".graphql", ".gql")
+            List.of(new ClassPathResource("graphql/github/operations/")),
+            List.of(".graphql", ".gql")
         );
         return HttpGraphQlClient.builder(gitHubGraphQlWebClient).documentSource(documentSource).build();
     }
