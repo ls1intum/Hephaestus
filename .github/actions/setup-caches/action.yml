@@ -56,3 +56,25 @@ runs:
         restore-keys: |
           ${{ inputs.os }}-maven-${{ hashFiles('server/application-server/pom.xml') || 'no-pom' }}-
           ${{ inputs.os }}-maven-
+
+    # Playwright browser caching for Storybook tests
+    - name: Cache Playwright browsers
+      if: inputs.cache-type == 'webapp-storybook'
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/ms-playwright
+        key: ${{ inputs.os }}-playwright-${{ hashFiles('webapp/package-lock.json') }}
+        restore-keys: |
+          ${{ inputs.os }}-playwright-
+
+    # Storybook build cache for visual tests
+    - name: Cache Storybook build
+      if: contains(fromJSON('["webapp-visual", "webapp-storybook"]'), inputs.cache-type)
+      uses: actions/cache@v4
+      with:
+        path: |
+          webapp/storybook-static
+          webapp/.storybook/.cache
+        key: ${{ inputs.os }}-storybook-${{ hashFiles('webapp/**/*.stories.tsx', 'webapp/.storybook/**', 'webapp/package-lock.json') }}
+        restore-keys: |
+          ${{ inputs.os }}-storybook-

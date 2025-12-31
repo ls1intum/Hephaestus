@@ -16,20 +16,20 @@ graph TD
     PR[Pull Request] --> Review{Code Review}
     Review -->|Approved| Merge[Merge to main]
     Merge --> CI[CI/CD Pipeline]
-    
+
     subgraph CI/CD
     CI --> Q[Quality Gates]
     CI --> T[Tests]
     CI --> D[Docker Build]
     end
-    
+
     Q --> Pass{All Pass?}
     T --> Pass
     D --> Pass
-    
+
     Pass -->|Yes| SR[semantic-release]
     SR --> Tag[Create Tag v1.2.3]
-    
+
     Tag --> Staging[Deploy Staging]
     Staging --> Verify{Verify OK?}
     Verify -->|Approve| Prod[Deploy Production]
@@ -37,16 +37,16 @@ graph TD
 
 ## ⚡ Pipeline Timeline
 
-| Stage | Duration | Notes |
-| --- | --- | --- |
-| Quality gates | ~3 min | Parallel with tests |
-| Tests | ~3 min | Parallel with gates |
-| Docker builds | ~7 min | Uses layer caching |
-| semantic-release | ~1 min | Creates tag + changelog |
-| Staging deploy | ~2 min | Automatic |
-| **Your verification** | You decide | Check staging |
-| Production deploy | ~2 min | After approval |
-| **Total** | **~15 min + verification** | |
+| Stage                 | Duration                   | Notes                   |
+| --------------------- | -------------------------- | ----------------------- |
+| Quality gates         | ~3 min                     | Parallel with tests     |
+| Tests                 | ~3 min                     | Parallel with gates     |
+| Docker builds         | ~7 min                     | Uses layer caching      |
+| semantic-release      | ~1 min                     | Creates tag + changelog |
+| Staging deploy        | ~2 min                     | Automatic               |
+| **Your verification** | You decide                 | Check staging           |
+| Production deploy     | ~2 min                     | After approval          |
+| **Total**             | **~15 min + verification** |                         |
 
 ## 🚀 Release Flow
 
@@ -65,12 +65,12 @@ Every merge to `main` with releasable changes (`feat:`, `fix:`, `perf:`, `revert
 
 Before any release, code must pass:
 
-| Gate | Tool | Purpose |
-| --- | --- | --- |
-| Database drift | Liquibase | JPA ↔ Schema sync |
-| OpenAPI sync | Diff check | Client ↔ Server sync |
-| Java formatting | Spotless | Code style |
-| TypeScript | Biome + tsc | Lint + typecheck |
+| Gate            | Tool        | Purpose               |
+| --------------- | ----------- | --------------------- |
+| Database drift  | Liquibase   | JPA ↔ Schema sync    |
+| OpenAPI sync    | Diff check  | Client ↔ Server sync |
+| Java formatting | Spotless    | Code style            |
+| TypeScript      | Biome + tsc | Lint + typecheck      |
 
 ## 🔒 Security
 
@@ -80,11 +80,11 @@ Before any release, code must pass:
 
 ## 📦 Environments
 
-| Environment | Protection | Deploys On |
-| --- | --- | --- |
-| Preview (Coolify) | None | Every PR |
-| Staging | None | Every tag |
-| Production | Approval required | Tag + approval |
+| Environment       | Protection        | Deploys On     |
+| ----------------- | ----------------- | -------------- |
+| Preview (Coolify) | None              | Every PR       |
+| Staging           | None              | Every tag      |
+| Production        | Approval required | Tag + approval |
 
 ### GitHub Environment Setup
 
@@ -102,14 +102,32 @@ Coolify handles PR previews:
 
 ## ⚙️ Key Workflows
 
-| Workflow | Trigger | Purpose |
-| --- | --- | --- |
-| `cicd.yml` | Push to main, PRs | Tests, builds, quality gates |
-| `release.yml` | On CI/CD Success | Creates tag, deploys staging, gates production |
-| `deploy-staging.yml` | Called by release.yml | Deploys to staging |
-| `deploy-prod.yml` | workflow_dispatch | Deploys to production (manual trigger) |
+| Workflow             | Trigger               | Purpose                                        |
+| -------------------- | --------------------- | ---------------------------------------------- |
+| `cicd.yml`           | Push to main, PRs     | Tests, builds, quality gates                   |
+| `release.yml`        | On CI/CD Success      | Creates tag, deploys staging, gates production |
+| `deploy-staging.yml` | Called by release.yml | Deploys to staging                             |
+| `deploy-prod.yml`    | workflow_dispatch     | Deploys to production (manual trigger)         |
 
 ## 🎯 Performance Optimizations
+
+### Path-Based Filtering
+
+CI only runs jobs for components that actually changed:
+
+| Component            | Triggers On                                                   |
+| -------------------- | ------------------------------------------------------------- |
+| Webapp               | `webapp/**`, `package.json`, `package-lock.json`              |
+| Application Server   | `server/application-server/**`, `scripts/db-utils.sh`         |
+| Intelligence Service | `server/intelligence-service/**`, scripts, root package files |
+| Webhook Ingest       | `server/webhook-ingest/**`, root package files                |
+| CI Config            | `.github/workflows/**`, `.github/actions/**` → runs all jobs  |
+
+**Benefits:**
+
+- Webapp-only changes skip Java tests (~3 min saved)
+- Docs-only changes skip all CI jobs (~7 min saved)
+- CI config changes run everything (safety net)
 
 ### Docker Layer Caching
 
@@ -119,11 +137,53 @@ Coolify handles PR previews:
 
 ### Parallel Execution
 
-- Quality gates run parallel to tests
-- Docker builds use matrix strategy
-- Fail-fast terminates on first failure
+- 9 test types run in parallel
+- 8 quality gate checks run in parallel
+- 4 Docker builds × 2 architectures (amd64 + arm64)
+- `fail-fast: false` ensures all jobs complete for full feedback
 
 ### Concurrency Control
 
 - Outdated PR runs cancelled automatically
 - Release runs never cancelled
+
+## 🛠️ Running CI Locally
+
+Before pushing, run the same checks that CI runs:
+
+### Quick Check (Recommended)
+
+```bash
+# Format and check all services
+npm run format && npm run check
+```
+
+### Per-Service Commands
+
+```bash
+# Webapp
+npm run check:webapp          # Full check (format + lint + typecheck)
+npm run test:webapp           # Unit tests
+
+# Application Server (Java)
+npm run format:java:check     # Check formatting
+cd server/application-server && ./mvnw test -Dgroups="unit"  # Unit tests
+
+# Intelligence Service
+npm run check:intelligence-service
+cd server/intelligence-service && npm run test:unit
+
+# Webhook Ingest
+npm run check:webhook-ingest
+cd server/webhook-ingest && npm run test
+```
+
+### Common Issues
+
+| Issue                 | Solution                                      |
+| --------------------- | --------------------------------------------- |
+| Formatting errors     | Run `npm run format`                          |
+| TypeScript errors     | Run `npm run typecheck:webapp` to see details |
+| Test failures         | Check the specific test output for details    |
+| OpenAPI out of sync   | Run `npm run generate:api`                    |
+| Database schema drift | Run `npm run db:draft-changelog`              |

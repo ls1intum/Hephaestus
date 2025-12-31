@@ -203,6 +203,7 @@ jobs:
     if: always()
     steps:
       - name: Evaluate CI results
+        id: evaluate
         run: |
           echo "╔══════════════════════════════════════════════════════════════════╗"
           echo "║                     CI RESULTS SUMMARY                           ║"
@@ -218,20 +219,90 @@ jobs:
           # Failure check - any job that ran and failed
           if [[ "${{ contains(needs.*.result, 'failure') }}" == "true" ]]; then
             echo "❌ BLOCKED: One or more CI jobs failed"
+            echo "status=failure" >> $GITHUB_OUTPUT
             exit 1
           fi
 
           # Cancellation check - any job cancelled (not skipped)
           if [[ "${{ contains(needs.*.result, 'cancelled') }}" == "true" ]]; then
             echo "⚠️ BLOCKED: One or more CI jobs were cancelled"
+            echo "status=cancelled" >> $GITHUB_OUTPUT
             exit 1
           fi
 
           # Success: all jobs either passed or were skipped
-          # Skipped jobs are treated as success for branch protection because:
-          # 1. Path-based filtering determined the component wasn't affected
-          # 2. The job's preconditions weren't met (e.g., docs-only change)
           echo "✅ PASSED: All required CI jobs succeeded"
-          echo ""
-          echo "Note: 'skipped' status means path filtering determined no relevant"
-          echo "      changes for that component. This is expected and safe."
+          echo "status=success" >> $GITHUB_OUTPUT
+
+      # ────────────────────────────────────────────────────────────────────────
+      # GitHub Actions Job Summary
+      # Provides a rich markdown summary visible in the Actions UI
+      # ────────────────────────────────────────────────────────────────────────
+      - name: Generate CI Summary
+        if: always()
+        run: |
+          # Header
+          echo "## 🔍 CI Pipeline Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Overall status
+          if [[ "${{ steps.evaluate.outputs.status }}" == "success" ]]; then
+            echo "✅ **All checks passed!**" >> $GITHUB_STEP_SUMMARY
+          elif [[ "${{ steps.evaluate.outputs.status }}" == "failure" ]]; then
+            echo "❌ **Some checks failed.** See details below." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⚠️ **CI was cancelled or encountered an issue.**" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Workflow results table
+          echo "### Workflow Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Workflow | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|--------|" >> $GITHUB_STEP_SUMMARY
+
+          # Map result to emoji
+          result_to_emoji() {
+            case "$1" in
+              success) echo "✅ Passed" ;;
+              failure) echo "❌ Failed" ;;
+              skipped) echo "⏭️ Skipped" ;;
+              cancelled) echo "🚫 Cancelled" ;;
+              *) echo "❓ Unknown" ;;
+            esac
+          }
+
+          echo "| Quality Gates | $(result_to_emoji '${{ needs.quality-gates.result }}') |" >> $GITHUB_STEP_SUMMARY
+          echo "| Test Suite | $(result_to_emoji '${{ needs.test-suite.result }}') |" >> $GITHUB_STEP_SUMMARY
+          echo "| Security Scan | $(result_to_emoji '${{ needs.security-scan.result }}') |" >> $GITHUB_STEP_SUMMARY
+          echo "| Docker Build | $(result_to_emoji '${{ needs.docker-build.result }}') |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Path filtering info
+          echo "### 📁 Components Changed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Component | Changed |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----------|---------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Webapp | ${{ needs.detect-changes.outputs.webapp == 'true' && '✅ Yes' || '➖ No' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Application Server | ${{ needs.detect-changes.outputs.application-server == 'true' && '✅ Yes' || '➖ No' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Intelligence Service | ${{ needs.detect-changes.outputs.intelligence-service == 'true' && '✅ Yes' || '➖ No' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Webhook Ingest | ${{ needs.detect-changes.outputs.webhook-ingest == 'true' && '➖ Yes' || '➖ No' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| CI Config | ${{ needs.detect-changes.outputs.ci-config == 'true' && '⚙️ Yes' || '➖ No' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Tips section for failures
+          if [[ "${{ steps.evaluate.outputs.status }}" == "failure" ]]; then
+            echo "### 💡 Troubleshooting Tips" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "1. **Check the failed job logs** for specific error messages" >> $GITHUB_STEP_SUMMARY
+            echo "2. **Run locally** before pushing:" >> $GITHUB_STEP_SUMMARY
+            echo '   ```bash' >> $GITHUB_STEP_SUMMARY
+            echo '   npm run format && npm run check' >> $GITHUB_STEP_SUMMARY
+            echo '   ```' >> $GITHUB_STEP_SUMMARY
+            echo "3. **For test failures**, run the specific test suite locally" >> $GITHUB_STEP_SUMMARY
+            echo "4. **See the [CI documentation](docs/contributor/ci-cd.mdx)** for more help" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "---" >> $GITHUB_STEP_SUMMARY
+          echo "*Generated by CI Status Gate • [View workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})*" >> $GITHUB_STEP_SUMMARY

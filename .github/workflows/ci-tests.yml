@@ -183,6 +183,10 @@ jobs:
             "webapp-storybook")
               echo "🧪 Running Storybook interaction tests with Playwright..."
               # Install Playwright chromium browser for Vitest browser mode
+              # Note: setup-caches action caches ~/.cache/ms-playwright for faster installs
+              if [ -d ~/.cache/ms-playwright ]; then
+                echo "📦 Playwright cache found, checking if install needed..."
+              fi
               npx playwright install chromium --with-deps
               npm run test:storybook
               ;;
