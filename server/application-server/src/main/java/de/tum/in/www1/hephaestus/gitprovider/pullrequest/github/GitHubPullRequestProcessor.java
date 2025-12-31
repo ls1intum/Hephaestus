@@ -5,6 +5,7 @@ import de.tum.in.www1.hephaestus.gitprovider.common.events.DomainEvent;
 import de.tum.in.www1.hephaestus.gitprovider.common.events.EventContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.events.EventPayload;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.BaseGitHubProcessor;
+import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.label.Label;
 import de.tum.in.www1.hephaestus.gitprovider.label.LabelRepository;
 import de.tum.in.www1.hephaestus.gitprovider.label.github.dto.GitHubLabelDTO;
@@ -406,14 +407,14 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
         return changedFields;
     }
 
-    private de.tum.in.www1.hephaestus.gitprovider.issue.Issue.State convertState(String state) {
+    private Issue.State convertState(String state) {
         if (state == null) {
-            return de.tum.in.www1.hephaestus.gitprovider.issue.Issue.State.OPEN;
+            return Issue.State.OPEN;
         }
         return switch (state.toUpperCase()) {
-            case "OPEN" -> de.tum.in.www1.hephaestus.gitprovider.issue.Issue.State.OPEN;
-            case "CLOSED" -> de.tum.in.www1.hephaestus.gitprovider.issue.Issue.State.CLOSED;
-            default -> de.tum.in.www1.hephaestus.gitprovider.issue.Issue.State.OPEN;
+            case "OPEN" -> Issue.State.OPEN;
+            case "CLOSED" -> Issue.State.CLOSED;
+            default -> Issue.State.OPEN;
         };
     }
 }

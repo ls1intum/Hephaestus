@@ -1,5 +1,7 @@
 package de.tum.in.www1.hephaestus.gitprovider.common.github.app;
 
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.GITHUB_API_BASE_URL;
+
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.algorithms.Algorithm;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -30,8 +32,6 @@ import org.springframework.web.reactive.function.client.WebClient;
  */
 @Service
 public class GitHubAppTokenService {
-
-    private static final String GITHUB_API_BASE_URL = "https://api.github.com";
 
     private final long appId;
     private final PrivateKey privateKey;

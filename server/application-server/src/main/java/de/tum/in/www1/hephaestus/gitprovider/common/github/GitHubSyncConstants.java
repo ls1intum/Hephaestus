@@ -14,6 +14,24 @@ public final class GitHubSyncConstants {
         // Utility class - prevent instantiation
     }
 
+    // ========================================================================
+    // API Configuration
+    // ========================================================================
+
+    /**
+     * GitHub REST API base URL.
+     */
+    public static final String GITHUB_API_BASE_URL = "https://api.github.com";
+
+    /**
+     * GitHub GraphQL API URL.
+     */
+    public static final String GITHUB_GRAPHQL_URL = "https://api.github.com/graphql";
+
+    // ========================================================================
+    // Pagination
+    // ========================================================================
+
     /**
      * Default page size for GraphQL queries (100 items per page).
      * <p>

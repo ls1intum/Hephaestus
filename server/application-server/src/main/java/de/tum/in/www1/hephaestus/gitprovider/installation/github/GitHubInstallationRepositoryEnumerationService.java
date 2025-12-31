@@ -1,5 +1,7 @@
 package de.tum.in.www1.hephaestus.gitprovider.installation.github;
 
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.GITHUB_API_BASE_URL;
+
 import com.fasterxml.jackson.annotation.JsonProperty;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.app.GitHubAppTokenService;
 import java.util.List;
@@ -19,7 +21,6 @@ import org.springframework.web.reactive.function.client.WebClient;
 public class GitHubInstallationRepositoryEnumerationService {
 
     private static final Logger logger = LoggerFactory.getLogger(GitHubInstallationRepositoryEnumerationService.class);
-    private static final String GITHUB_API_BASE_URL = "https://api.github.com";
     private static final int MAX_BUFFER_SIZE = 16 * 1024 * 1024; // 16MB for large repo lists
 
     private final GitHubAppTokenService gitHubAppTokenService;

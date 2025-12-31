@@ -1,5 +1,7 @@
 package de.tum.in.www1.hephaestus.workspace;
 
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.GITHUB_API_BASE_URL;
+
 import com.fasterxml.jackson.annotation.JsonProperty;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.app.GitHubAppTokenService;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.WorkspaceProvisioningListener;
@@ -24,7 +26,6 @@ import org.springframework.web.reactive.function.client.WebClient;
 public class WorkspaceProvisioningService {
 
     private static final Logger logger = LoggerFactory.getLogger(WorkspaceProvisioningService.class);
-    private static final String GITHUB_API_BASE_URL = "https://api.github.com";
 
     private final WorkspaceProperties workspaceProperties;
     private final WorkspaceRepository workspaceRepository;
