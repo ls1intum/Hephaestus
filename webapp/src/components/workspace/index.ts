@@ -1,11 +1,12 @@
 /**
  * Workspace error state components.
  *
- * All components follow accessibility best practices:
+ * All components follow WCAG 2.2 accessibility best practices:
  * - Use appropriate ARIA roles (alert, status) for screen reader announcements
- * - Auto-focus for keyboard navigation
- * - Icons marked aria-hidden to avoid redundant announcements
- * - Clear action buttons with descriptive labels
+ * - aria-live for dynamic content announcement (assertive/polite)
+ * - aria-atomic ensures entire message is read as a unit
+ * - Auto-focus via requestAnimationFrame for keyboard navigation
+ * - Icons marked aria-hidden to prevent redundant announcements
  */
 
 export { NoWorkspace } from "./NoWorkspace";
