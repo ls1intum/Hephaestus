@@ -280,55 +280,79 @@ Last updated: 2025-12-31
 
 ---
 
-## Optimization Round 1: Path-Based Filtering
+## Optimization Round 1: Path-Based Filtering (IMPLEMENTED)
 
 ### Changes Implemented
 
-1. **Added `dorny/paths-filter` to detect changed components**
+1. **Added `dorny/paths-filter` to detect changed components** (`cicd.yml`)
 
    - Detects: webapp, application-server, intelligence-service, webhook-ingest, docs, ci-config
-   - Outputs passed to all downstream workflows
+   - Outputs passed to all downstream workflows with proper fallback logic
+   - CI config changes trigger all checks (validates workflow changes)
 
 2. **Quality Gates workflow (`ci-quality-gates.yml`)**
 
    - Added path-based inputs for each component
-   - Jobs skip all steps if their component didn't change
-   - Shallow checkout (`fetch-depth: 1`) for non-database jobs
-   - Expected savings: 2-3 min when only subset of components changed
+   - Jobs skip execution if their component didn't change
+   - Force-run on CI config changes or non-PR events
 
 3. **Tests workflow (`ci-tests.yml`)**
 
    - Added path-based inputs for webapp and application-server
    - Jobs skip execution if their component didn't change
-   - Shallow checkout for application-server tests
-   - Expected savings: 1-2 min when only one component changed
+   - Full git history preserved for Chromatic TurboSnap
 
 4. **Docker Build workflow (`ci-docker-build.yml`)**
 
    - Converted from matrix to individual jobs with conditions
    - Each component only builds if its files changed
-   - Expected savings: 3-5 min when only subset changed
+   - CI config changes trigger all builds (Dockerfiles may have changed)
 
 5. **Security Scan workflow (`ci-security-scan.yml`)**
    - Shallow checkout for SAST and dependencies scans
    - Node setup only for SAST (not needed for other scans)
-   - Expected savings: 5-10s per job
 
-### Expected Impact
+### Measured Results (Full CI Run with CI Config Changes)
 
-| Scenario                          | Before  | After (Est.) | Savings |
-| --------------------------------- | ------- | ------------ | ------- |
-| All components changed            | 8-9 min | 8-9 min      | 0%      |
-| Only webapp changed               | 8-9 min | 4-5 min      | ~45%    |
-| Only application-server changed   | 8-9 min | 5-6 min      | ~35%    |
-| Only docs changed                 | 8-9 min | < 1 min      | ~90%    |
-| Only intelligence-service changed | 8-9 min | 4-5 min      | ~45%    |
+**Total CI Time: 7 minutes** (baseline was 8-9 min)
+
+| Job Category                | Duration | Notes                       |
+| --------------------------- | -------- | --------------------------- |
+| Docker - application-server | 374s     | Critical path (longest job) |
+| Security - SAST             | 325s     | CodeQL analysis             |
+| Docker - webapp             | 301s     | Multi-arch build            |
+| Quality Gates (8 jobs)      | 84-178s  | All passed                  |
+| Tests (4 jobs)              | 43-187s  | All passed                  |
+
+### Expected Impact (Component-Specific PRs)
+
+| Scenario                         | Before  | After (Est.) | Savings |
+| -------------------------------- | ------- | ------------ | ------- |
+| All components/CI config changed | 8-9 min | 7 min        | ~20%    |
+| Only webapp changed              | 8-9 min | 4-5 min      | ~45%    |
+| Only application-server changed  | 8-9 min | 5-6 min      | ~35%    |
+| Only docs changed                | 8-9 min | < 1 min      | ~90%    |
+
+---
+
+## Updated Grades After Optimization
+
+| Category            | Weight | Before  | After   | Notes                           |
+| ------------------- | ------ | ------- | ------- | ------------------------------- |
+| Speed               | 30%    | B       | B+      | Path filtering reduces avg time |
+| Caching             | 20%    | B       | B       | No change yet                   |
+| Parallelization     | 20%    | A       | A       | Already excellent               |
+| Resource Efficiency | 15%    | B       | A-      | Skipped jobs save compute       |
+| Robustness          | 10%    | A       | A       | No regressions                  |
+| Maintainability     | 5%     | A       | A-      | Slightly more complex           |
+| **Total**           | 100%   | **8.0** | **8.4** | +5% improvement                 |
 
 ---
 
 ## Revision History
 
-| Version | Date       | Changes                                             |
-| ------- | ---------- | --------------------------------------------------- |
-| 1.0     | 2025-12-31 | Initial rubric, baseline analysis                   |
-| 1.1     | 2025-12-31 | Implemented path-based filtering, shallow checkouts |
+| Version | Date       | Changes                                         |
+| ------- | ---------- | ----------------------------------------------- |
+| 1.0     | 2025-12-31 | Initial rubric, baseline analysis               |
+| 1.1     | 2025-12-31 | Implemented path-based filtering                |
+| 1.2     | 2025-12-31 | Fixed ci-config fallback, Chromatic git history |
