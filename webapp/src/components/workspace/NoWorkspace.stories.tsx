@@ -2,19 +2,13 @@ import type { Meta, StoryObj } from "@storybook/react";
 import { NoWorkspace } from "./NoWorkspace";
 
 /**
- * Empty state component for users without workspace membership.
- * Use when a user is authenticated but has no workspaces,
- * typically shown after login or when all memberships have been revoked.
+ * Empty state for users without workspace membership.
+ * Use when redirecting authenticated users who have no associated workspaces.
  */
 const meta = {
 	component: NoWorkspace,
 	parameters: {
 		layout: "centered",
-		docs: {
-			description: {
-				component: "Empty-state screen shown when a user has no workspace membership.",
-			},
-		},
 	},
 	tags: ["autodocs"],
 } satisfies Meta<typeof NoWorkspace>;
@@ -22,8 +16,5 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/**
- * Default presentation for users without any workspace membership.
- * Use when redirecting authenticated users who have no associated workspaces.
- */
+/** Standard presentation for users with no workspace memberships. */
 export const Default: Story = {};

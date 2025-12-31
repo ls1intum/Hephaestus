@@ -2,16 +2,14 @@ import { createContext, use } from "react";
 import type { Workspace } from "@/api/types.gen";
 
 /**
- * Context for accessing the current workspace data.
- * This is populated by the workspace layout route loader.
+ * Context for the current workspace, populated by the layout route loader.
+ * @see webapp/src/routes/_authenticated/w/$workspaceSlug.tsx
  */
 export const WorkspaceContext = createContext<Workspace | null>(null);
 
 /**
- * Hook to access the current workspace.
- * Must be used within a workspace route (under /w/$workspaceSlug).
- *
- * @throws Error if used outside of a workspace route
+ * Returns the current workspace from the layout route context.
+ * @throws Error when called outside a workspace route (/w/$workspaceSlug/*)
  */
 export function useWorkspace(): Workspace {
 	const workspace = use(WorkspaceContext);
