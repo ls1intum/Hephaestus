@@ -21,6 +21,7 @@ erDiagram
         BIGINT target_id
         VARCHAR(32) source_system "NOT NULL"
         UUID correlation_id
+        DOUBLE xp "NOT NULL"
         JSONB payload
         TIMESTAMPTZ ingested_at "NOT NULL"
     }
@@ -102,11 +103,7 @@ erDiagram
         INTEGER commits
         INTEGER deletions
         BOOLEAN is_draft
-        BOOLEAN is_mergeable
         BOOLEAN is_merged
-        BOOLEAN maintainer_can_modify
-        VARCHAR(255) merge_commit_sha
-        VARCHAR(255) mergeable_state
         TIMESTAMPTZ merged_at
         BIGINT author_id FK
         BIGINT milestone_id FK
@@ -354,16 +351,11 @@ erDiagram
         TIMESTAMPTZ created_at
         TIMESTAMPTZ updated_at
         VARCHAR(255) avatar_url
-        VARCHAR(255) blog
-        VARCHAR(255) company
-        VARCHAR(255) description
         VARCHAR(255) email
         VARCHAR(255) html_url
-        VARCHAR(255) location
         VARCHAR(255) login
         VARCHAR(255) name
         VARCHAR(255) type
-        INTEGER league_points "NOT NULL"
         BOOLEAN notifications_enabled "NOT NULL"
         BOOLEAN participate_in_research "NOT NULL"
     }
