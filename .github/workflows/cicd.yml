@@ -152,6 +152,8 @@ jobs:
       # Note: Using ternary pattern to ensure string output for workflow_call string inputs
       webapp_changed: ${{ (needs.detect-changes.outputs.webapp == 'true' || needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
       application_server_changed: ${{ (needs.detect-changes.outputs.application-server == 'true' || needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
+      intelligence_service_changed: ${{ (needs.detect-changes.outputs.intelligence-service == 'true' || needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
+      webhook_ingest_changed: ${{ (needs.detect-changes.outputs.webhook-ingest == 'true' || needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
 
   # ┌──────────────────────────────────────────────────────────────────────────┐
   # │ DOCKER BUILDS                                                             │
