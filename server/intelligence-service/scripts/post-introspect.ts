@@ -163,7 +163,7 @@ removePgTableBlock("databasechangeloglock");
 		tableBlocks.sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
 
 		// Append sorted blocks at the end
-		content = content.trimEnd() + "\n" + tableBlocks.map((t) => t.block).join("\n") + "\n";
+		content = `${content.trimEnd()}\n${tableBlocks.map((t) => t.block).join("\n")}\n`;
 	}
 }
 
