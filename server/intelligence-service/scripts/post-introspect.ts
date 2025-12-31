@@ -8,6 +8,7 @@
  * - Drops identity minValue/maxValue metadata to avoid precision-loss noise.
  * - Removes unused `sql` import from drizzle-orm if not referenced.
  * - Removes Liquibase changelog tables from the schema.
+ * - Sorts table exports alphabetically to ensure deterministic output.
  * - Deletes relations.ts (we don't use Drizzle relational queries).
  * - Moves schema.ts from ./drizzle/ to ./src/shared/db/
  *
@@ -130,6 +131,41 @@ const removePgTableBlock = (name: string) => {
 
 removePgTableBlock("databasechangelog");
 removePgTableBlock("databasechangeloglock");
+
+// Sort table exports alphabetically to ensure deterministic output across introspection runs.
+// Drizzle-kit introspect produces tables in non-deterministic order, which causes CI failures
+// when comparing generated schema against committed version.
+// Strategy: extract all `export const <name> = pgTable(...)` blocks and sort by table name.
+{
+	// Match table exports: `export const tableName = pgTable("tableName", { ... }, (table) => [...]);`
+	// This regex captures the full block including optional builder callback
+	const tableBlockRegex =
+		/\nexport\s+const\s+(\w+)\s*=\s*pgTable\(\s*["'][\w]+["']\s*,\s*\{[\s\S]*?\}\s*(?:,\s*\([^)]*\)\s*=>\s*\[[\s\S]*?\]\s*)?\)\s*;/g;
+
+	// Find all table blocks with their names
+	const tableBlocks: Array<{ name: string; block: string }> = [];
+	let tableMatch: RegExpExecArray | null = tableBlockRegex.exec(content);
+	while (tableMatch !== null) {
+		const tableName = tableMatch[1];
+		if (tableName) {
+			tableBlocks.push({ name: tableName, block: tableMatch[0] });
+		}
+		tableMatch = tableBlockRegex.exec(content);
+	}
+
+	if (tableBlocks.length > 0) {
+		// Remove all table blocks from content
+		for (const { block } of tableBlocks) {
+			content = content.replace(block, "");
+		}
+
+		// Sort blocks alphabetically by table name (case-insensitive)
+		tableBlocks.sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
+
+		// Append sorted blocks at the end
+		content = content.trimEnd() + "\n" + tableBlocks.map((t) => t.block).join("\n") + "\n";
+	}
+}
 
 fs.writeFileSync(schemaPath, content, "utf8");
 
