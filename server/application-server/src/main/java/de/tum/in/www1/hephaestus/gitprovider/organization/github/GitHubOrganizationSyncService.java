@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.gitprovider.organization.github;
 
+import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.*;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
@@ -131,7 +132,7 @@ public class GitHubOrganizationSyncService {
     ) {
         var membersConnection = graphQlOrg.getMembersWithRole();
         if (membersConnection == null || membersConnection.getEdges() == null) {
-            logger.debug("No members found for organization {}", organization.getLogin());
+            logger.debug("No members found for organization {}", sanitizeForLog(organization.getLogin()));
             return 0;
         }
 

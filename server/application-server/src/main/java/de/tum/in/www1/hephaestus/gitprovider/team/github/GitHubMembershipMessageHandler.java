@@ -1,5 +1,7 @@
 package de.tum.in.www1.hephaestus.gitprovider.team.github;
 
+import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
+
 import de.tum.in.www1.hephaestus.gitprovider.common.NatsMessageDeserializer;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventAction;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
@@ -94,24 +96,40 @@ public class GitHubMembershipMessageHandler extends GitHubMessageHandler<GitHubM
     private void handleMemberAdded(Team team, User user) {
         // Check if membership already exists
         if (teamMembershipRepository.existsByTeam_IdAndUser_Id(team.getId(), user.getId())) {
-            logger.debug("Membership already exists for user {} in team {}", user.getLogin(), team.getName());
+            logger.debug(
+                "Membership already exists for user {} in team {}",
+                sanitizeForLog(user.getLogin()),
+                sanitizeForLog(team.getName())
+            );
             return;
         }
 
         // Create and persist the membership
         TeamMembership membership = new TeamMembership(team, user, TeamMembership.Role.MEMBER);
         teamMembershipRepository.save(membership);
-        logger.info("Created membership for user {} in team {}", user.getLogin(), team.getName());
+        logger.info(
+            "Created membership for user {} in team {}",
+            sanitizeForLog(user.getLogin()),
+            sanitizeForLog(team.getName())
+        );
     }
 
     private void handleMemberRemoved(Team team, User user) {
         // Delete the membership if it exists
         if (!teamMembershipRepository.existsByTeam_IdAndUser_Id(team.getId(), user.getId())) {
-            logger.debug("No membership found to remove for user {} in team {}", user.getLogin(), team.getName());
+            logger.debug(
+                "No membership found to remove for user {} in team {}",
+                sanitizeForLog(user.getLogin()),
+                sanitizeForLog(team.getName())
+            );
             return;
         }
 
         teamMembershipRepository.deleteByTeam_IdAndUser_Id(team.getId(), user.getId());
-        logger.info("Removed membership for user {} from team {}", user.getLogin(), team.getName());
+        logger.info(
+            "Removed membership for user {} from team {}",
+            sanitizeForLog(user.getLogin()),
+            sanitizeForLog(team.getName())
+        );
     }
 }

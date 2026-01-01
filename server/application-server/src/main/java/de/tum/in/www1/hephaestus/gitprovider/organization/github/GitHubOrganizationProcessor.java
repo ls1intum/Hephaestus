@@ -1,5 +1,7 @@
 package de.tum.in.www1.hephaestus.gitprovider.organization.github;
 
+import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
+
 import de.tum.in.www1.hephaestus.gitprovider.organization.Organization;
 import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationRepository;
 import de.tum.in.www1.hephaestus.gitprovider.organization.github.dto.GitHubOrganizationEventDTO;
@@ -118,7 +120,7 @@ public class GitHubOrganizationProcessor {
             .findByGithubId(githubId)
             .ifPresent(org -> {
                 organizationRepository.delete(org);
-                logger.info("Deleted organization {} ({})", org.getLogin(), githubId);
+                logger.info("Deleted organization {} ({})", sanitizeForLog(org.getLogin()), githubId);
             });
     }
 }

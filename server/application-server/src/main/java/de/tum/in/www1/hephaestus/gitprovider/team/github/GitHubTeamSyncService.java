@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.gitprovider.team.github;
 
+import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.*;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
@@ -216,7 +217,11 @@ public class GitHubTeamSyncService {
                 if (!teamMembershipRepository.existsByTeam_IdAndUser_Id(team.getId(), user.getId())) {
                     TeamMembership membership = new TeamMembership(team, user, TeamMembership.Role.MEMBER);
                     teamMembershipRepository.save(membership);
-                    logger.debug("Created membership for user {} in team {}", user.getLogin(), team.getName());
+                    logger.debug(
+                        "Created membership for user {} in team {}",
+                        sanitizeForLog(user.getLogin()),
+                        sanitizeForLog(team.getName())
+                    );
                 }
             }
         }

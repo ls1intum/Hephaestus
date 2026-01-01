@@ -1,5 +1,7 @@
 package de.tum.in.www1.hephaestus.gitprovider.user.github;
 
+import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
+
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.github.dto.GitHubUserDTO;
@@ -66,7 +68,7 @@ public class GitHubUserProcessor {
                 user.setHtmlUrl(dto.htmlUrl() != null ? dto.htmlUrl() : "");
                 user.setType(User.Type.USER);
                 User saved = userRepository.save(user);
-                logger.debug("Created user {} ({})", saved.getLogin(), saved.getId());
+                logger.debug("Created user {} ({})", sanitizeForLog(saved.getLogin()), saved.getId());
                 return saved;
             });
     }
