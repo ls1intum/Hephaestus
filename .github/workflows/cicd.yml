@@ -92,7 +92,7 @@ jobs:
               context: 'Preview / Coolify'
             });
 
-  quality:
+  Quality:
     uses: ./.github/workflows/ci-quality-gates.yml
     needs: [detect-changes]
     if: |
@@ -109,7 +109,7 @@ jobs:
       intelligence_service_changed: ${{ (needs.detect-changes.outputs.intelligence-service == 'true' || needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
       webhook_ingest_changed: ${{ (needs.detect-changes.outputs.webhook-ingest == 'true' || needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
 
-  security:
+  Security:
     uses: ./.github/workflows/ci-security-scan.yml
     needs: [detect-changes]
     if: |
@@ -122,7 +122,7 @@ jobs:
     with:
       should_skip: ${{ needs.detect-changes.outputs.should_skip }}
 
-  test:
+  Test:
     uses: ./.github/workflows/ci-tests.yml
     needs: [detect-changes]
     if: |
@@ -139,7 +139,7 @@ jobs:
       intelligence_service_changed: ${{ (needs.detect-changes.outputs.intelligence-service == 'true' || needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
       webhook_ingest_changed: ${{ (needs.detect-changes.outputs.webhook-ingest == 'true' || needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
 
-  docker:
+  Docker:
     uses: ./.github/workflows/ci-docker-build.yml
     needs: [detect-changes]
     if: |
@@ -162,7 +162,7 @@ jobs:
     permissions:
       actions: read
       statuses: write
-    needs: [detect-changes, quality, security, test, docker]
+    needs: [detect-changes, Quality, Security, Test, Docker]
     if: always()
     steps:
       - name: Generate workflow timeline
@@ -174,10 +174,10 @@ jobs:
         id: evaluate
         run: |
           echo "detect-changes: ${{ needs.detect-changes.result }}"
-          echo "quality:        ${{ needs.quality.result }}"
-          echo "security:       ${{ needs.security.result }}"
-          echo "test:           ${{ needs.test.result }}"
-          echo "docker:         ${{ needs.docker.result }}"
+          echo "Quality:        ${{ needs.Quality.result }}"
+          echo "Security:       ${{ needs.Security.result }}"
+          echo "Test:           ${{ needs.Test.result }}"
+          echo "Docker:         ${{ needs.Docker.result }}"
 
           if [[ "${{ contains(needs.*.result, 'failure') }}" == "true" ]]; then
             echo "status=failure" >> $GITHUB_OUTPUT
@@ -225,10 +225,10 @@ jobs:
             esac
           }
 
-          echo "| Quality | $(result_to_emoji '${{ needs.quality.result }}') |" >> $GITHUB_STEP_SUMMARY
-          echo "| Test | $(result_to_emoji '${{ needs.test.result }}') |" >> $GITHUB_STEP_SUMMARY
-          echo "| Security | $(result_to_emoji '${{ needs.security.result }}') |" >> $GITHUB_STEP_SUMMARY
-          echo "| Docker | $(result_to_emoji '${{ needs.docker.result }}') |" >> $GITHUB_STEP_SUMMARY
+          echo "| Quality | $(result_to_emoji '${{ needs.Quality.result }}') |" >> $GITHUB_STEP_SUMMARY
+          echo "| Test | $(result_to_emoji '${{ needs.Test.result }}') |" >> $GITHUB_STEP_SUMMARY
+          echo "| Security | $(result_to_emoji '${{ needs.Security.result }}') |" >> $GITHUB_STEP_SUMMARY
+          echo "| Docker | $(result_to_emoji '${{ needs.Docker.result }}') |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
           # Path filtering info
@@ -249,7 +249,7 @@ jobs:
             echo "" >> $GITHUB_STEP_SUMMARY
 
             # Quality failures
-            if [[ "${{ needs.quality.result }}" == "failure" ]]; then
+            if [[ "${{ needs.Quality.result }}" == "failure" ]]; then
               echo "<details><summary><b>❌ Quality Failed</b></summary>" >> $GITHUB_STEP_SUMMARY
               echo "" >> $GITHUB_STEP_SUMMARY
               echo "| Issue | Fix Command |" >> $GITHUB_STEP_SUMMARY
@@ -266,7 +266,7 @@ jobs:
             fi
 
             # Test failures
-            if [[ "${{ needs.test.result }}" == "failure" ]]; then
+            if [[ "${{ needs.Test.result }}" == "failure" ]]; then
               echo "<details><summary><b>❌ Tests Failed</b></summary>" >> $GITHUB_STEP_SUMMARY
               echo "" >> $GITHUB_STEP_SUMMARY
               echo "| Test Suite | Run Locally |" >> $GITHUB_STEP_SUMMARY
@@ -284,7 +284,7 @@ jobs:
             fi
 
             # Docker failures
-            if [[ "${{ needs.docker.result }}" == "failure" ]]; then
+            if [[ "${{ needs.Docker.result }}" == "failure" ]]; then
               echo "<details><summary><b>❌ Docker Failed</b></summary>" >> $GITHUB_STEP_SUMMARY
               echo "" >> $GITHUB_STEP_SUMMARY
               echo "Common causes:" >> $GITHUB_STEP_SUMMARY
@@ -299,7 +299,7 @@ jobs:
             fi
 
             # Security failures
-            if [[ "${{ needs.security.result }}" == "failure" ]]; then
+            if [[ "${{ needs.Security.result }}" == "failure" ]]; then
               echo "<details><summary><b>❌ Security Failed</b></summary>" >> $GITHUB_STEP_SUMMARY
               echo "" >> $GITHUB_STEP_SUMMARY
               echo "Check the **Security** tab for details on vulnerabilities." >> $GITHUB_STEP_SUMMARY
@@ -318,10 +318,10 @@ jobs:
             echo "### ⚡ Performance" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
             SKIPPED_COUNT=0
-            [[ "${{ needs.quality.result }}" == "skipped" ]] && ((SKIPPED_COUNT++))
-            [[ "${{ needs.test.result }}" == "skipped" ]] && ((SKIPPED_COUNT++))
-            [[ "${{ needs.security.result }}" == "skipped" ]] && ((SKIPPED_COUNT++))
-            [[ "${{ needs.docker.result }}" == "skipped" ]] && ((SKIPPED_COUNT++))
+            [[ "${{ needs.Quality.result }}" == "skipped" ]] && ((SKIPPED_COUNT++))
+            [[ "${{ needs.Test.result }}" == "skipped" ]] && ((SKIPPED_COUNT++))
+            [[ "${{ needs.Security.result }}" == "skipped" ]] && ((SKIPPED_COUNT++))
+            [[ "${{ needs.Docker.result }}" == "skipped" ]] && ((SKIPPED_COUNT++))
             if [[ $SKIPPED_COUNT -gt 0 ]]; then
               echo "🚀 **Path-based filtering saved time!** $SKIPPED_COUNT workflow(s) skipped because no relevant files changed." >> $GITHUB_STEP_SUMMARY
             else
