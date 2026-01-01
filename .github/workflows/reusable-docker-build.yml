@@ -1,0 +1,206 @@
+# Reusable Docker build workflow with registry-based caching
+# This is a local version of ls1intum/.github's workflow with caching support
+# to significantly speed up CI builds.
+#
+# Cache strategy: Registry cache (ghcr.io)
+# - Stores cache layers in a separate cache image tag (e.g., image:cache)
+# - Works across branches (PRs can use main's cache)
+# - No size limits (unlike GitHub Actions cache which is 10GB per repo)
+# - Persists indefinitely (not evicted like GHA cache)
+
+name: Docker Build (Cached)
+
+on:
+  workflow_call:
+    inputs:
+      image-name:
+        type: string
+        required: true
+        description: "Full image name (e.g., ls1intum/hephaestus/webapp)"
+      docker-file:
+        type: string
+        required: true
+        description: "Path to Dockerfile"
+      docker-context:
+        type: string
+        default: "."
+        description: "Docker build context"
+      registry:
+        type: string
+        default: "ghcr.io"
+        description: "Container registry"
+      tags:
+        type: string
+        required: false
+        description: "Additional tags (one per line)"
+      labels:
+        type: string
+        required: false
+        description: "OCI labels"
+      build-args:
+        type: string
+        required: false
+        description: "Build arguments"
+
+jobs:
+  build:
+    name: Build ${{ matrix.platform }} Docker Image
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - platform: linux/amd64
+            runner: ubuntu-24.04
+          - platform: linux/arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          buildkitd-config-inline: |
+            [registry."docker.io"]
+              mirrors = ["https://docker-mirror.ase.in.tum.de:8765"]
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ inputs.registry }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ inputs.registry }}/${{ inputs.image-name }}
+
+      - name: Prepare platform pair
+        id: prep
+        run: |
+          platform=${{ matrix.platform }}
+          echo "platform_pair=${platform//\//-}" >> $GITHUB_OUTPUT
+          image="${{ inputs.image-name }}"
+          echo "image_name=${image//\//-}" >> $GITHUB_OUTPUT
+
+      # Build with registry cache
+      # - cache-from: Pull cache from registry (main branch cache + current branch)
+      # - cache-to: Push cache to registry (only for non-PR builds to avoid cache pollution)
+      - name: Build and push
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ inputs.docker-context }}
+          file: ${{ inputs.docker-file }}
+          platforms: ${{ matrix.platform }}
+          build-args: ${{ inputs.build-args }}
+          labels: ${{ steps.meta.outputs.labels }}
+          outputs: type=image,"name=${{ inputs.registry }}/${{ inputs.image-name }}",push-by-digest=true,name-canonical=true,push=true
+          # Registry cache: stores cache in ghcr.io alongside images
+          # Use main branch cache as fallback, then current ref
+          cache-from: |
+            type=registry,ref=${{ inputs.registry }}/${{ inputs.image-name }}:cache-${{ steps.prep.outputs.platform_pair }}
+            type=registry,ref=${{ inputs.registry }}/${{ inputs.image-name }}:cache-main-${{ steps.prep.outputs.platform_pair }}
+          # Only write cache on main branch or when explicitly building (not PRs)
+          # This prevents cache pollution from experimental PR changes
+          cache-to: ${{ github.ref == 'refs/heads/main' && format('type=registry,ref={0}/{1}:cache-main-{2},mode=max', inputs.registry, inputs.image-name, steps.prep.outputs.platform_pair) || format('type=registry,ref={0}/{1}:cache-{2},mode=max', inputs.registry, inputs.image-name, steps.prep.outputs.platform_pair) }}
+
+      - name: Export digest
+        run: |
+          mkdir -p ${{ runner.temp }}/digests
+          digest="${{ steps.build.outputs.digest }}"
+          touch "${{ runner.temp }}/digests/${digest#sha256:}"
+
+      - name: Upload digest
+        uses: actions/upload-artifact@v4
+        with:
+          name: digests-${{ steps.prep.outputs.image_name }}-${{ steps.prep.outputs.platform_pair }}
+          path: ${{ runner.temp }}/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  merge:
+    name: Create manifest
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Prepare
+        id: prep
+        run: |
+          image="${{ inputs.image-name }}"
+          echo "image_name=${image//\//-}" >> $GITHUB_OUTPUT
+
+      - name: Download digests
+        uses: actions/download-artifact@v4
+        with:
+          path: ${{ runner.temp }}/digests
+          pattern: digests-${{ steps.prep.outputs.image_name }}-*
+          merge-multiple: true
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ inputs.registry }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Prepare tag configuration
+        id: tags
+        run: |
+          {
+            echo "tags<<EOF"
+            # Default tags
+            echo "type=raw,value=latest,enable={{is_default_branch}}"
+            echo "type=ref,event=branch"
+            echo "type=ref,event=pr"
+            echo "type=sha,prefix="
+            # Custom tags from input
+            if [ -n "${{ inputs.tags }}" ]; then
+              echo "${{ inputs.tags }}" | while IFS= read -r line || [[ -n "$line" ]]; do
+                line=$(echo "$line" | xargs)
+                if [ -n "$line" ]; then
+                  if [[ "$line" == *"type="* ]]; then
+                    echo "$line"
+                  else
+                    IFS=',' read -ra TAG_ARRAY <<< "$line"
+                    for tag in "${TAG_ARRAY[@]}"; do
+                      tag=$(echo "$tag" | xargs)
+                      if [ -n "$tag" ]; then
+                        echo "type=raw,value=${tag}"
+                      fi
+                    done
+                  fi
+                fi
+              done
+            fi
+            echo "EOF"
+          } >> $GITHUB_OUTPUT
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ inputs.registry }}/${{ inputs.image-name }}
+          tags: ${{ steps.tags.outputs.tags }}
+          labels: ${{ inputs.labels }}
+
+      - name: Create manifest and push
+        working-directory: ${{ runner.temp }}/digests
+        run: |
+          docker buildx imagetools create $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
+            $(printf '${{ inputs.registry }}/${{ inputs.image-name }}@sha256:%s ' *)
+
+      - name: Inspect image
+        run: |
+          docker buildx imagetools inspect ${{ inputs.registry }}/${{ inputs.image-name }}:${{ steps.meta.outputs.version }}

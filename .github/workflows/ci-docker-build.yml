@@ -35,7 +35,7 @@ jobs:
   webapp-build:
     name: "Webapp"
     if: inputs.should_skip != 'true' && inputs.webapp_changed == 'true'
-    uses: ls1intum/.github/.github/workflows/build-and-push-docker-image.yml@main
+    uses: ./.github/workflows/reusable-docker-build.yml
     with:
       image-name: "ls1intum/hephaestus/webapp"
       docker-file: "./webapp/Dockerfile"
@@ -57,7 +57,7 @@ jobs:
   application-server-build:
     name: "App Server"
     if: inputs.should_skip != 'true' && inputs.application_server_changed == 'true'
-    uses: ls1intum/.github/.github/workflows/build-and-push-docker-image.yml@main
+    uses: ./.github/workflows/reusable-docker-build.yml
     with:
       image-name: "ls1intum/hephaestus/application-server"
       docker-file: "./server/application-server/Dockerfile"
@@ -79,7 +79,7 @@ jobs:
   intelligence-service-build:
     name: "Intelligence"
     if: inputs.should_skip != 'true' && inputs.intelligence_service_changed == 'true'
-    uses: ls1intum/.github/.github/workflows/build-and-push-docker-image.yml@main
+    uses: ./.github/workflows/reusable-docker-build.yml
     with:
       image-name: "ls1intum/hephaestus/intelligence-service"
       docker-file: "./server/intelligence-service/Dockerfile"
@@ -101,7 +101,7 @@ jobs:
   webhook-ingest-build:
     name: "Webhook"
     if: inputs.should_skip != 'true' && inputs.webhook_ingest_changed == 'true'
-    uses: ls1intum/.github/.github/workflows/build-and-push-docker-image.yml@main
+    uses: ./.github/workflows/reusable-docker-build.yml
     with:
       image-name: "ls1intum/hephaestus/webhook-ingest"
       docker-file: "./server/webhook-ingest/Dockerfile"
