@@ -119,7 +119,7 @@ jobs:
       # Secret scanning
       - name: Run secret detection
         if: matrix.scan-type == 'secrets'
-        uses: trufflesecurity/trufflehog@v3.88.0
+        uses: trufflesecurity/trufflehog@v3.88.35
         with:
           path: ./
           base: ${{ github.event_name == 'pull_request' && github.base_ref || '' }}
