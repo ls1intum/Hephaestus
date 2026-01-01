@@ -65,12 +65,12 @@ Every merge to `main` with releasable changes (`feat:`, `fix:`, `perf:`, `revert
 
 Before any release, code must pass:
 
-| Gate            | Tool        | Purpose               |
-| --------------- | ----------- | --------------------- |
+| Gate            | Tool        | Purpose              |
+| --------------- | ----------- | -------------------- |
 | Database drift  | Liquibase   | JPA ↔ Schema sync    |
 | OpenAPI sync    | Diff check  | Client ↔ Server sync |
-| Java formatting | Spotless    | Code style            |
-| TypeScript      | Biome + tsc | Lint + typecheck      |
+| Java formatting | Spotless    | Code style           |
+| TypeScript      | Biome + tsc | Lint + typecheck     |
 
 ## 🔒 Security
 
@@ -166,7 +166,7 @@ CI only runs jobs for components that actually changed:
 
 ### Parallel Execution
 
-- 9 test types run in parallel
+- 11 test types run in parallel (3 app-server, 3 webapp, 3 intelligence-service, 1 webhook-ingest, 1 visual)
 - 8 quality gate checks run in parallel
 - 4 Docker builds × 2 architectures (amd64 + arm64)
 - `fail-fast: false` ensures all jobs complete for full feedback

@@ -339,5 +339,5 @@ jobs:
               state: 'success',
               target_url: 'https://coolify.hephaestus.aet.cit.tum.de/project/lc8sows0ok8g880sg4o4o84w/environment/ek8o8800g4wks84c8w8wcckc/application/wg44k0ccsoscsgcco8swc4ks/preview-deployments',
               description: 'Click Details to view Coolify preview deployments',
-              context: 'Coolify Preview'
+              context: 'Preview / Coolify'
             });

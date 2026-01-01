@@ -8,7 +8,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
  * Architecture Test Configuration
  *
  * Runs architecture tests WITHOUT database setup.
- * These tests enforce architectural rules and coding standards.
+ * Pattern: *.arch.test.ts
  */
 export default defineConfig({
   test: {
@@ -16,7 +16,7 @@ export default defineConfig({
     environment: "node",
     passWithNoTests: false,
     globals: true,
-    include: ["test/architecture/**/*.test.ts"],
+    include: ["test/**/*.arch.test.ts"],
     exclude: ["node_modules", "dist"],
     globalSetup: [],
     setupFiles: [],

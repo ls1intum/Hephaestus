@@ -8,7 +8,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
  * Unit Test Configuration
  *
  * Runs pure unit tests WITHOUT database setup.
- * Includes all *.test.ts except integration/ and architecture/ directories.
+ * Pattern: *.test.ts (excludes *.integration.test.ts and *.arch.test.ts)
  */
 export default defineConfig({
   test: {
@@ -20,9 +20,8 @@ export default defineConfig({
     exclude: [
       "node_modules",
       "dist",
-      "test/integration/**",
-      "test/architecture/**",
       "test/**/*.integration.test.ts",
+      "test/**/*.arch.test.ts",
     ],
     globalSetup: [],
     setupFiles: [],

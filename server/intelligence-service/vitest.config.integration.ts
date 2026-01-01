@@ -8,7 +8,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
  * Integration Test Configuration
  *
  * Runs integration tests WITH database setup (Testcontainers).
- * Includes test/integration/ directory and *.integration.test.ts files.
+ * Pattern: *.integration.test.ts
  */
 export default defineConfig({
   test: {
@@ -16,7 +16,7 @@ export default defineConfig({
     environment: "node",
     passWithNoTests: false,
     globals: true,
-    include: ["test/integration/**/*.test.ts", "test/**/*.integration.test.ts"],
+    include: ["test/**/*.integration.test.ts"],
     exclude: ["node_modules", "dist"],
     globalSetup: ["./test/global-setup.ts"],
     setupFiles: ["./test/setup.ts"],

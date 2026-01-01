@@ -208,7 +208,7 @@ jobs:
               state: 'success',
               target_url: '${{ steps.chromatic.outputs.storybookUrl }}',
               description: 'Click Details to view your Storybook',
-              context: 'Storybook Publish'
+              context: 'Preview / Storybook'
             });
 
       # Test result aggregation
