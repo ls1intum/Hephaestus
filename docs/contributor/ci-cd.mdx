@@ -74,9 +74,23 @@ Before any release, code must pass:
 
 ## 🔒 Security
 
-- **Trivy** — Scans Docker images for CVEs
+- **CodeQL** — SAST scanning via GitHub's Default Setup (automatic, zero maintenance)
+- **Trivy** — Scans dependencies for CVEs
+- **TruffleHog** — Secret detection in code and history
 - **Renovate** — Monitors dependencies for vulnerabilities
 - **Environment protection** — Production requires approval
+
+### CodeQL Default Setup
+
+CodeQL runs automatically via GitHub's Default Setup (enabled in repository settings), providing:
+
+- Scans on every push to main and protected branches
+- Scans on pull request creation and updates
+- Weekly scheduled scans for the full codebase
+- Incremental analysis (20% faster on PRs)
+- Zero maintenance — GitHub manages query updates
+
+This is more efficient than a custom workflow and doesn't consume CI minutes.
 
 ## 📦 Environments
 
@@ -108,7 +122,7 @@ Coolify handles PR previews:
 | `ci-quality-gates.yml` | Called by cicd.yml    | Code quality, formatting, schema validation        |
 | `ci-tests.yml`         | Called by cicd.yml    | Unit, integration, visual tests                    |
 | `ci-docker-build.yml`  | Called by cicd.yml    | Docker image builds per component                  |
-| `ci-security-scan.yml` | Called by cicd.yml    | SAST, dependency scanning, secret detection        |
+| `ci-security-scan.yml` | Called by cicd.yml    | Dependency scanning (Trivy), secret detection      |
 | `release.yml`          | On CI/CD Success      | Creates tag, deploys staging, gates production     |
 | `deploy-staging.yml`   | Called by release.yml | Deploys to staging                                 |
 | `deploy-prod.yml`      | workflow_dispatch     | Deploys to production (manual trigger)             |

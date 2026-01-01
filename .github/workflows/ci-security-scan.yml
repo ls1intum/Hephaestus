@@ -1,5 +1,9 @@
 name: Security
 
+# CodeQL SAST scanning is handled by GitHub's Default Setup (enabled in repo settings).
+# This provides automatic scanning on push/PR with incremental analysis and zero maintenance.
+# This workflow handles dependency scanning (Trivy) and secret detection (TruffleHog).
+
 on:
   workflow_call:
     inputs:
@@ -14,13 +18,11 @@ jobs:
     name: "${{ matrix.display-name }}"
     runs-on: ubuntu-latest
     if: inputs.should_skip != 'true'
-    timeout-minutes: 15
+    timeout-minutes: 10
     strategy:
       fail-fast: false
       matrix:
         include:
-          - scan-type: sast
-            display-name: "CodeQL"
           - scan-type: dependencies
             display-name: "Dependencies"
           - scan-type: secrets
@@ -32,47 +34,6 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: ${{ matrix.scan-type == 'secrets' && 0 || 1 }}
-
-      # Node.js only needed for SAST (CodeQL TypeScript analysis)
-      # Other scan types (dependencies, secrets) don't require Node.js
-      - name: Setup Node.js
-        if: matrix.scan-type == 'sast'
-        uses: actions/setup-node@v4
-        with:
-          node-version-file: ".node-version"
-          cache: "npm"
-          cache-dependency-path: |
-            package-lock.json
-            webapp/package-lock.json
-
-      - name: Initialize CodeQL
-        if: matrix.scan-type == 'sast'
-        uses: github/codeql-action/init@v3
-        with:
-          languages: java-kotlin, javascript-typescript
-          queries: security-extended
-          build-mode: none
-
-      - name: Setup build environment
-        if: matrix.scan-type == 'sast'
-        uses: ./.github/actions/setup-caches
-        with:
-          cache-type: "openapi-validation"
-          os: ${{ runner.os }}
-
-      - name: Build for CodeQL
-        if: matrix.scan-type == 'sast'
-        run: |
-          cd server/application-server && mvn compile -DskipTests --quiet && cd ../..
-          # npm ci already handles node_modules cleanup when package-lock.json changes
-          npm ci --workspaces --include=dev --include=optional --no-audit --progress=false
-          cd webapp && npx tsc --noEmit && cd ..
-          cd server/intelligence-service && npx tsc --noEmit && cd ../..
-          cd server/webhook-ingest && npx tsc --noEmit
-
-      - name: Perform CodeQL Analysis
-        if: matrix.scan-type == 'sast'
-        uses: github/codeql-action/analyze@v3
 
       - name: Trivy dependency scan
         if: matrix.scan-type == 'dependencies'
