@@ -118,9 +118,9 @@ jobs:
             webapp/.vite
             webapp/node_modules/.vite
             webapp/node_modules/.cache
-          key: ${{ runner.os }}-webapp-build-${{ hashFiles('package-lock.json', 'webapp/package-lock.json', 'webapp/biome.json', 'webapp/tsconfig.json', 'webapp/vite.config.js', 'webapp/components.json') }}-${{ github.sha }}
+          key: ${{ runner.os }}-webapp-build-${{ hashFiles('package-lock.json', 'webapp/package-lock.json', 'webapp/biome.json', 'webapp/tsconfig.json', 'webapp/vite.config.ts', 'webapp/components.json') }}-${{ github.sha }}
           restore-keys: |
-            ${{ runner.os }}-webapp-build-${{ hashFiles('package-lock.json', 'webapp/package-lock.json', 'webapp/biome.json', 'webapp/tsconfig.json', 'webapp/vite.config.js', 'webapp/components.json') }}-
+            ${{ runner.os }}-webapp-build-${{ hashFiles('package-lock.json', 'webapp/package-lock.json', 'webapp/biome.json', 'webapp/tsconfig.json', 'webapp/vite.config.ts', 'webapp/components.json') }}-
             ${{ runner.os }}-webapp-build-
 
       - name: Application-server formatting
