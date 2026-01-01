@@ -50,7 +50,10 @@ runs:
       with:
         path: |
           ~/.m2/repository
-          server/application-server/target
+          server/application-server/target/classes
+          server/application-server/target/test-classes
+          server/application-server/target/generated-sources
+          server/application-server/target/maven-status
         key: ${{ inputs.os }}-maven-${{ hashFiles('server/application-server/pom.xml') || 'no-pom' }}-${{ inputs.cache-type }}
         restore-keys: |
           ${{ inputs.os }}-maven-${{ hashFiles('server/application-server/pom.xml') || 'no-pom' }}-
