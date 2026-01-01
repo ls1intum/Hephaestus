@@ -117,20 +117,6 @@ jobs:
           cache-type: ${{ matrix.check }}
           os: ${{ runner.os }}
 
-      - name: Cache webapp build artifacts
-        if: steps.should_run.outputs.run == 'true' && matrix.check == 'webapp-quality'
-        uses: actions/cache@v4
-        with:
-          path: |
-            webapp/dist
-            webapp/.vite
-            webapp/node_modules/.vite
-            webapp/node_modules/.cache
-          key: ${{ runner.os }}-webapp-build-${{ hashFiles('package-lock.json', 'webapp/package-lock.json', 'webapp/biome.json', 'webapp/tsconfig.json', 'webapp/vite.config.ts', 'webapp/components.json') }}-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-webapp-build-${{ hashFiles('package-lock.json', 'webapp/package-lock.json', 'webapp/biome.json', 'webapp/tsconfig.json', 'webapp/vite.config.ts', 'webapp/components.json') }}-
-            ${{ runner.os }}-webapp-build-
-
       - name: Application-server formatting
         if: steps.should_run.outputs.run == 'true' && matrix.check == 'application-server-quality'
         run: |
@@ -145,37 +131,23 @@ jobs:
         working-directory: ./webapp
         run: |
           cd ..
-          # npm ci already handles node_modules cleanup when package-lock.json changes
-          npm ci --workspaces --include=dev --include=optional --no-audit --progress=false
+          npm ci --no-audit --progress=false
           node scripts/install-platform-binaries.mjs
           cd webapp
 
-          ISSUES_FOUND=()
-
+          # Run Biome check (includes formatting and linting)
           if ! npm run check; then
-            BIOME_VER=$(node -p "require('./package.json').devDependencies['@biomejs/biome'] || ''")
-            if ! npx -y @biomejs/cli-linux-x64@${BIOME_VER:-latest} check; then
-              ISSUES_FOUND+=("Biome checks failed. Run: npm run check -- --write")
-            fi
-          fi
-
-          if ! npx tsc --noEmit; then
-            ISSUES_FOUND+=("TypeScript errors found")
-          fi
-
-          if ! npm run build; then
-            cd .. && rm -rf node_modules
-            npm ci --workspaces --include=dev --include=optional --no-audit --progress=false
-            cd webapp
-            if ! npm run build; then
-              ISSUES_FOUND+=("Build failed")
-            fi
-          fi
-
-          if [ ${#ISSUES_FOUND[@]} -gt 0 ]; then
-            for issue in "${ISSUES_FOUND[@]}"; do echo "❌ $issue"; done
+            echo "❌ Biome checks failed. Run: npm run check -- --write"
             exit 1
           fi
+
+          # Run TypeScript type checking
+          if ! npm run typecheck; then
+            echo "❌ TypeScript errors found"
+            exit 1
+          fi
+
+          # Note: Build is tested in Docker build workflow, not needed here
 
       - name: Intelligence-service quality
         if: steps.should_run.outputs.run == 'true' && matrix.check == 'intelligence-service-quality'
