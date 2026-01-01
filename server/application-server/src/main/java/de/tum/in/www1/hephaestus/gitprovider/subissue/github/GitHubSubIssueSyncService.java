@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.gitprovider.subissue.github;
 
+import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.*;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
@@ -228,7 +229,11 @@ public class GitHubSubIssueSyncService {
                 totalLinked += syncSubIssuesForRepository(client, repo);
             } catch (Exception e) {
                 failedRepos++;
-                logger.error("Error syncing sub-issues for repository {}: {}", repo.getNameWithOwner(), e.getMessage());
+                logger.error(
+                    "Error syncing sub-issues for repository {}: {}",
+                    sanitizeForLog(repo.getNameWithOwner()),
+                    e.getMessage()
+                );
             }
         }
 
@@ -259,7 +264,7 @@ public class GitHubSubIssueSyncService {
     private int syncSubIssuesForRepository(HttpGraphQlClient client, Repository repository) {
         Optional<RepositoryOwnerAndName> parsedName = GitHubRepositoryNameParser.parse(repository.getNameWithOwner());
         if (parsedName.isEmpty()) {
-            logger.warn("Invalid repository name format: {}", repository.getNameWithOwner());
+            logger.warn("Invalid repository name format: {}", sanitizeForLog(repository.getNameWithOwner()));
             return 0;
         }
         String owner = parsedName.get().owner();
@@ -282,7 +287,10 @@ public class GitHubSubIssueSyncService {
                     .block(GRAPHQL_TIMEOUT);
 
                 if (issueConnection == null) {
-                    logger.warn("No response from GraphQL for repository {}", repository.getNameWithOwner());
+                    logger.warn(
+                        "No response from GraphQL for repository {}",
+                        sanitizeForLog(repository.getNameWithOwner())
+                    );
                     break;
                 }
 
@@ -294,7 +302,7 @@ public class GitHubSubIssueSyncService {
             } catch (Exception e) {
                 logger.error(
                     "Error syncing sub-issues for repository {}: {}",
-                    repository.getNameWithOwner(),
+                    sanitizeForLog(repository.getNameWithOwner()),
                     e.getMessage()
                 );
                 break;

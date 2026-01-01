@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.gitprovider.label.github;
 
+import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.GRAPHQL_TIMEOUT;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.LARGE_PAGE_SIZE;
 
@@ -67,9 +68,10 @@ public class GitHubLabelSyncService {
             return 0;
         }
 
+        String safeNameWithOwner = sanitizeForLog(repository.getNameWithOwner());
         Optional<RepositoryOwnerAndName> parsedName = GitHubRepositoryNameParser.parse(repository.getNameWithOwner());
         if (parsedName.isEmpty()) {
-            logger.warn("Invalid repository name format: {}", repository.getNameWithOwner());
+            logger.warn("Invalid repository name format: {}", safeNameWithOwner);
             return 0;
         }
         String owner = parsedName.get().owner();
@@ -119,17 +121,12 @@ public class GitHubLabelSyncService {
             logger.info(
                 "Synced {} labels for repository {} (removed {} stale)",
                 totalSynced,
-                repository.getNameWithOwner(),
+                safeNameWithOwner,
                 removedCount
             );
             return totalSynced;
         } catch (Exception e) {
-            logger.error(
-                "Error syncing labels for repository {}: {}",
-                repository.getNameWithOwner(),
-                e.getMessage(),
-                e
-            );
+            logger.error("Error syncing labels for repository {}: {}", safeNameWithOwner, e.getMessage(), e);
             return 0;
         }
     }
