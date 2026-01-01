@@ -9,16 +9,6 @@ on:
         type: string
         default: "false"
 
-# ┌──────────────────────────────────────────────────────────────────────────────┐
-# │ SECURITY SCANNING                                                            │
-# │ Comprehensive security analysis with multiple scan types.                    │
-# │                                                                               │
-# │ Scan types:                                                                   │
-# │ - sast: Static Application Security Testing (CodeQL)                         │
-# │ - dependencies: Dependency vulnerability scanning (Trivy)                    │
-# │ - secrets: Secret detection in code and git history (TruffleHog)             │
-# └──────────────────────────────────────────────────────────────────────────────┘
-
 jobs:
   security-scan:
     name: "Security: ${{ matrix.scan-type }}"
@@ -35,15 +25,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          # fetch-depth varies by scan type:
-          # - sast/dependencies: Shallow clone (1) - only need current code
-          # - secrets: Full history (0) - TruffleHog scans git history for PR diffs
-          #   to detect secrets that may have been committed and then removed
           fetch-depth: ${{ matrix.scan-type == 'secrets' && 0 || 1 }}
 
-      # Node.js setup for SAST only
-      # Other scan types (dependencies, secrets) don't require Node.js
-      - name: Setup Node.js (LTS) and npm cache
+      - name: Setup Node.js
         if: matrix.scan-type == 'sast'
         uses: actions/setup-node@v4
         with:
@@ -53,7 +37,6 @@ jobs:
             package-lock.json
             webapp/package-lock.json
 
-      # SAST (Static Application Security Testing)
       - name: Initialize CodeQL
         if: matrix.scan-type == 'sast'
         uses: github/codeql-action/init@v3
@@ -62,46 +45,28 @@ jobs:
           queries: security-extended
           build-mode: none
 
-      # Setup required build tools for CodeQL
-      - name: Setup build environment for CodeQL
+      - name: Setup build environment
         if: matrix.scan-type == 'sast'
         uses: ./.github/actions/setup-caches
         with:
           cache-type: "openapi-validation"
           os: ${{ runner.os }}
 
-      - name: Build for CodeQL analysis
+      - name: Build for CodeQL
         if: matrix.scan-type == 'sast'
         run: |
-          echo "🔨 Building for CodeQL analysis..."
-
-          # Java build
-          cd server/application-server
-          mvn compile -DskipTests --quiet
-
-          # Node.js (webapp) - Type-only build for CodeQL; avoid bundle to reduce native deps
-          cd ../..
+          cd server/application-server && mvn compile -DskipTests --quiet && cd ../..
           rm -rf node_modules
           npm ci --workspaces --include=dev --include=optional --no-audit --progress=false
-          cd webapp
-          npx tsc --noEmit
-
-          # Node.js (intelligence-service) - TypeScript build for CodeQL
-          cd ../server/intelligence-service
-          npx tsc --noEmit
-
-          # Node.js (webhook-ingest) - TypeScript build for CodeQL
-          cd ../webhook-ingest
-          npx tsc --noEmit
-
-          echo "✅ Build completed"
+          cd webapp && npx tsc --noEmit && cd ..
+          cd server/intelligence-service && npx tsc --noEmit && cd ..
+          cd webhook-ingest && npx tsc --noEmit
 
       - name: Perform CodeQL Analysis
         if: matrix.scan-type == 'sast'
         uses: github/codeql-action/analyze@v3
 
-      # Dependency vulnerability scanning
-      - name: Run Trivy dependency scan
+      - name: Trivy dependency scan
         if: matrix.scan-type == 'dependencies'
         uses: aquasecurity/trivy-action@0.31.0
         with:
@@ -116,8 +81,7 @@ jobs:
         with:
           sarif_file: "trivy-results.sarif"
 
-      # Secret scanning
-      - name: Run secret detection
+      - name: Secret detection
         if: matrix.scan-type == 'secrets'
         uses: trufflesecurity/trufflehog@v3.88.35
         with:

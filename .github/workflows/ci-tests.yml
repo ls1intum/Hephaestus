@@ -30,10 +30,6 @@ on:
         type: string
         default: "true"
 
-# Test Matrix: application-server (unit/integration/architecture), webapp (unit/storybook/visual),
-# intelligence-service (unit/integration/architecture), webhook-ingest (unit)
-# Each job runs only if relevant files changed (path-based filtering)
-
 jobs:
   tests:
     permissions:
@@ -62,8 +58,6 @@ jobs:
           ]
 
     steps:
-      # Path-based skip logic
-      # IMPORTANT: If adding a new test type to the matrix above, add a case here!
       - name: Determine if test should run
         id: should_run
         run: |
@@ -91,20 +85,15 @@ jobs:
 
       - name: Skip notification
         if: steps.should_run.outputs.run != 'true'
-        run: |
-          echo "⏭️ Skipping ${{ matrix.test-type }} - no relevant files changed"
-          echo "   This is expected behavior from path-based filtering."
+        run: echo "⏭️ Skipping ${{ matrix.test-type }} - no relevant files changed"
 
       - name: Checkout repository
         uses: actions/checkout@v4
         if: steps.should_run.outputs.run == 'true'
         with:
-          # Full history needed for:
-          # - Chromatic TurboSnap (detects changed stories for visual tests)
-          # - Git-based test filtering in some test frameworks
           fetch-depth: 0
 
-      - name: Setup Node.js and npm cache
+      - name: Setup Node.js
         if: steps.should_run.outputs.run == 'true'
         uses: actions/setup-node@v4
         with:
@@ -121,44 +110,23 @@ jobs:
           cache-type: ${{ matrix.test-type }}
           os: ${{ runner.os }}
 
-      # application-server tests
       - name: "Application-server ${{ matrix.test-type }} execution"
         if: steps.should_run.outputs.run == 'true' && startsWith(matrix.test-type, 'application-server-')
         run: |
-          echo "🧪 Running application-server ${{ matrix.test-type }} tests"
           cd server/application-server
-
-          # Clean previous test reports to ensure accurate reporting
           rm -rf target/surefire-reports/*
-
           case "${{ matrix.test-type }}" in
-            "application-server-unit")
-              mvn test -Dgroups="unit" -T 2C --batch-mode
-              ;;
-            "application-server-integration")
-              mvn test -Dgroups="integration" -T 2C --batch-mode
-              ;;
-            "application-server-architecture")
-              mvn test -Dgroups="architecture" -T 2C --batch-mode
-              ;;
+            "application-server-unit") mvn test -Dgroups="unit" -T 2C --batch-mode ;;
+            "application-server-integration") mvn test -Dgroups="integration" -T 2C --batch-mode ;;
+            "application-server-architecture") mvn test -Dgroups="architecture" -T 2C --batch-mode ;;
           esac
 
-      # Webapp tests
       - name: "Webapp ${{ matrix.test-type }} execution"
         if: steps.should_run.outputs.run == 'true' && startsWith(matrix.test-type, 'webapp-')
         run: |
-          echo "🧪 Running webapp ${{ matrix.test-type }} tests"
-
-          # Install from repo root for workspace/hoisted optional deps
           rm -rf node_modules
           npm ci --workspaces --include=dev --include=optional --no-audit --progress=false
-
-          # Check for rollup native binary (warning only)
-          npm ls @rollup/rollup-linux-x64-gnu || echo "⚠️ rollup native not installed yet"
-
-          # Force-install platform binaries
           node scripts/install-platform-binaries.mjs
-
           cd webapp
 
           case "${{ matrix.test-type }}" in
@@ -166,65 +134,38 @@ jobs:
               npm run test
               ;;
             "webapp-storybook")
-              # Install Playwright chromium browser for Vitest browser mode
-              # Note: setup-caches action caches ~/.cache/ms-playwright for faster installs
               npx playwright install chromium --with-deps
               npm run test:storybook
               ;;
             "webapp-visual")
-              if ! npm run build-storybook; then
-                echo "❌ Storybook build failed, retrying with clean install..."
-                cd ..
-                rm -rf node_modules
+              npm run build-storybook || {
+                cd .. && rm -rf node_modules
                 npm ci --workspaces --include=dev --include=optional --no-audit --progress=false
-                cd webapp
-                npm run build-storybook
-              fi
+                cd webapp && npm run build-storybook
+              }
               ;;
           esac
 
-      # Intelligence-service tests
       - name: "Intelligence-service ${{ matrix.test-type }} execution"
         if: steps.should_run.outputs.run == 'true' && startsWith(matrix.test-type, 'intelligence-service-')
         run: |
-          echo "🧪 Running intelligence-service ${{ matrix.test-type }} tests"
-
-          # Clean local node_modules but PRESERVE ~/.npm cache (restored by setup-node)
-          # The npm cache is used by npm ci to avoid re-downloading packages
           rm -rf node_modules server/intelligence-service/node_modules
           npm install --no-audit --progress=false
-
-          # Install platform binaries from package.json versions
           node scripts/install-platform-binaries.mjs
-
           cd server/intelligence-service
 
           case "${{ matrix.test-type }}" in
-            "intelligence-service-unit")
-              npm run test:unit
-              ;;
-            "intelligence-service-integration")
-              npm run test:integration
-              ;;
-            "intelligence-service-architecture")
-              npm run test:arch
-              ;;
+            "intelligence-service-unit") npm run test:unit ;;
+            "intelligence-service-integration") npm run test:integration ;;
+            "intelligence-service-architecture") npm run test:arch ;;
           esac
 
-      # Webhook-ingest tests
       - name: "Webhook-ingest ${{ matrix.test-type }} execution"
         if: steps.should_run.outputs.run == 'true' && matrix.test-type == 'webhook-ingest-unit'
         run: |
-          echo "🧪 Running webhook-ingest unit tests..."
-
-          # Clean local node_modules but PRESERVE ~/.npm cache (restored by setup-node)
-          # The npm cache is used by npm ci to avoid re-downloading packages
           rm -rf node_modules server/webhook-ingest/node_modules
           npm install --no-audit --progress=false
-
-          # Install platform binaries from package.json versions
           node scripts/install-platform-binaries.mjs
-
           cd server/webhook-ingest
           npm run test
 

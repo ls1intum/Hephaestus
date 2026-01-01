@@ -13,33 +13,25 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  # Change Detection: Determines which components changed for selective CI execution
-  # Add new service: update cicd.yml, ci-quality-gates.yml, ci-tests.yml, ci-docker-build.yml, setup-caches
   detect-changes:
     name: "Detect changes"
     runs-on: ubuntu-latest
-    # Required for dorny/paths-filter to access PR files via GitHub API
     permissions:
       pull-requests: read
       contents: read
     outputs:
-      # Component-level changes (string 'true'/'false')
       webapp: ${{ steps.filter.outputs.webapp }}
       application-server: ${{ steps.filter.outputs.application-server }}
       intelligence-service: ${{ steps.filter.outputs.intelligence-service }}
       webhook-ingest: ${{ steps.filter.outputs.webhook-ingest }}
       docs: ${{ steps.filter.outputs.docs }}
       ci-config: ${{ steps.filter.outputs.ci-config }}
-      # Aggregate: any code changed (not just docs/ci-config)
       any-code: ${{ steps.filter.outputs.webapp == 'true' || steps.filter.outputs.application-server == 'true' || steps.filter.outputs.intelligence-service == 'true' || steps.filter.outputs.webhook-ingest == 'true' }}
-      # Skip duplicate check
       should_skip: ${{ steps.skip_check.outputs.should_skip }}
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
         with:
-          # Full history for merge-base detection on push/merge_group events
-          # For PRs, paths-filter uses GitHub API and doesn't need history
           fetch-depth: 0
 
       - id: skip_check
@@ -58,11 +50,9 @@ jobs:
               - '.node-version'
             application-server:
               - 'server/application-server/**'
-              # db-utils.sh contains database migration tooling
               - 'scripts/db-utils.sh'
             intelligence-service:
               - 'server/intelligence-service/**'
-              # Scripts that affect intelligence-service builds/tooling
               - 'scripts/install-platform-binaries.mjs'
               - 'scripts/generate-mermaid-erd.ts'
               - 'scripts/postprocess-openapi-java.ts'
@@ -70,7 +60,6 @@ jobs:
               - 'package-lock.json'
             webhook-ingest:
               - 'server/webhook-ingest/**'
-              # Root package files affect workspace dependencies
               - 'package.json'
               - 'package-lock.json'
             docs:
@@ -79,11 +68,9 @@ jobs:
               - '.github/workflows/**'
               - '.github/actions/**'
 
-  # Quality Gates: Code quality and style checks (runs selectively)
   quality-gates:
     uses: ./.github/workflows/ci-quality-gates.yml
     needs: [detect-changes]
-    # Run if: any code changed, CI config changed, or not a PR (push to main/merge_group/dispatch)
     if: |
       needs.detect-changes.outputs.should_skip != 'true' && (
         needs.detect-changes.outputs.any-code == 'true' ||
@@ -93,13 +80,11 @@ jobs:
     secrets: inherit
     with:
       should_skip: ${{ needs.detect-changes.outputs.should_skip }}
-      # Pass change detection to sub-workflow for optimization
       webapp_changed: ${{ (needs.detect-changes.outputs.webapp == 'true' || needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
       application_server_changed: ${{ (needs.detect-changes.outputs.application-server == 'true' || needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
       intelligence_service_changed: ${{ (needs.detect-changes.outputs.intelligence-service == 'true' || needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
       webhook_ingest_changed: ${{ (needs.detect-changes.outputs.webhook-ingest == 'true' || needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
 
-  # Security Scanning: Vulnerability scanning (runs on code changes)
   security-scan:
     uses: ./.github/workflows/ci-security-scan.yml
     needs: [detect-changes]
@@ -113,7 +98,6 @@ jobs:
     with:
       should_skip: ${{ needs.detect-changes.outputs.should_skip }}
 
-  # Test Suite: Comprehensive test execution (runs selectively)
   test-suite:
     uses: ./.github/workflows/ci-tests.yml
     needs: [detect-changes]
@@ -126,13 +110,11 @@ jobs:
     secrets: inherit
     with:
       should_skip: ${{ needs.detect-changes.outputs.should_skip }}
-      # Note: Using ternary pattern to ensure string output for workflow_call string inputs
       webapp_changed: ${{ (needs.detect-changes.outputs.webapp == 'true' || needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
       application_server_changed: ${{ (needs.detect-changes.outputs.application-server == 'true' || needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
       intelligence_service_changed: ${{ (needs.detect-changes.outputs.intelligence-service == 'true' || needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
       webhook_ingest_changed: ${{ (needs.detect-changes.outputs.webhook-ingest == 'true' || needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
 
-  # Docker Builds: Build Docker images (runs selectively)
   docker-build:
     uses: ./.github/workflows/ci-docker-build.yml
     needs: [detect-changes]
@@ -145,16 +127,11 @@ jobs:
     secrets: inherit
     with:
       should_skip: ${{ needs.detect-changes.outputs.should_skip }}
-      # Docker builds should run when component OR CI config changes (Dockerfiles may have changed)
-      # Also always run on non-PR events (push to main, merge queue)
-      # Note: Using ternary pattern to ensure string output for workflow_call string inputs
       webapp_changed: ${{ (needs.detect-changes.outputs.webapp == 'true' || needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
       application_server_changed: ${{ (needs.detect-changes.outputs.application-server == 'true' || needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
       intelligence_service_changed: ${{ (needs.detect-changes.outputs.intelligence-service == 'true' || needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
       webhook_ingest_changed: ${{ (needs.detect-changes.outputs.webhook-ingest == 'true' || needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
 
-  # CI Status Gate: Single check for branch protection. Verifies all jobs passed or were skipped.
-  # Status: success=passed, skipped=filtered, failure/cancelled=blocks merge
   all-ci-passed:
     name: "CI Status Gate"
     runs-on: ubuntu-latest
@@ -165,7 +142,6 @@ jobs:
       [detect-changes, quality-gates, security-scan, test-suite, docker-build]
     if: always()
     steps:
-      # Generate visual timeline of the workflow for performance analysis
       - name: Generate workflow timeline
         uses: Kesin11/actions-timeline@v2
         with:
@@ -174,41 +150,24 @@ jobs:
       - name: Evaluate CI results
         id: evaluate
         run: |
-          echo "╔══════════════════════════════════════════════════════════════════╗"
-          echo "║                     CI RESULTS SUMMARY                           ║"
-          echo "╠══════════════════════════════════════════════════════════════════╣"
-          echo "║ detect-changes: ${{ needs.detect-changes.result }}"
-          echo "║ quality-gates:  ${{ needs.quality-gates.result }}"
-          echo "║ security-scan:  ${{ needs.security-scan.result }}"
-          echo "║ test-suite:     ${{ needs.test-suite.result }}"
-          echo "║ docker-build:   ${{ needs.docker-build.result }}"
-          echo "╚══════════════════════════════════════════════════════════════════╝"
-          echo ""
+          echo "detect-changes: ${{ needs.detect-changes.result }}"
+          echo "quality-gates:  ${{ needs.quality-gates.result }}"
+          echo "security-scan:  ${{ needs.security-scan.result }}"
+          echo "test-suite:     ${{ needs.test-suite.result }}"
+          echo "docker-build:   ${{ needs.docker-build.result }}"
 
-          # Failure check - any job that ran and failed
           if [[ "${{ contains(needs.*.result, 'failure') }}" == "true" ]]; then
-            echo "❌ BLOCKED: One or more CI jobs failed"
             echo "status=failure" >> $GITHUB_OUTPUT
             exit 1
           fi
 
-          # Cancellation check - any job cancelled (not skipped)
           if [[ "${{ contains(needs.*.result, 'cancelled') }}" == "true" ]]; then
-            echo "⚠️ BLOCKED: One or more CI jobs were cancelled"
             echo "status=cancelled" >> $GITHUB_OUTPUT
             exit 1
           fi
 
-          # Success: all jobs either passed or were skipped
-          # Note: 'skipped' status means path filtering determined no relevant changes
-          # for that component. This is expected and safe for branch protection.
-          echo "✅ PASSED: All required CI jobs succeeded"
           echo "status=success" >> $GITHUB_OUTPUT
 
-      # ────────────────────────────────────────────────────────────────────────
-      # GitHub Actions Job Summary
-      # Provides a rich markdown summary visible in the Actions UI
-      # ────────────────────────────────────────────────────────────────────────
       - name: Generate CI Summary
         if: always()
         run: |

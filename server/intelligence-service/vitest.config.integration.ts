@@ -8,9 +8,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
  * Integration Test Configuration
  *
  * Runs integration tests WITH database setup (Testcontainers).
- * Uses glob pattern: includes all *.integration.test.ts files.
- *
- * Usage: npx vitest run --config vitest.config.integration.ts
+ * Includes test/integration/ directory and *.integration.test.ts files.
  */
 export default defineConfig({
   test: {
@@ -18,29 +16,19 @@ export default defineConfig({
     environment: "node",
     passWithNoTests: false,
     globals: true,
-
-    // Glob pattern: all integration tests (require database)
-    include: ["test/**/*.integration.test.ts"],
+    include: ["test/integration/**/*.test.ts", "test/**/*.integration.test.ts"],
     exclude: ["node_modules", "dist"],
-
-    // Database setup with Testcontainers
     globalSetup: ["./test/global-setup.ts"],
     setupFiles: ["./test/setup.ts"],
-
-    // Execution - integration tests need more time
     pool: "threads",
     isolate: true,
     testTimeout: 60000,
     hookTimeout: 120000,
     watch: false,
     reporters: ["verbose", "junit"],
-
-    // Strict mode
     allowOnly: false,
     bail: 0,
     retry: 0,
-
-    // CI integration - JUnit reporter for GitHub Actions test summaries
     outputFile: {
       junit: "./test-results/junit-integration.xml",
     },

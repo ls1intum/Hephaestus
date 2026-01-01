@@ -31,20 +31,7 @@ on:
         type: string
         default: "true"
 
-# ┌──────────────────────────────────────────────────────────────────────────────┐
-# │ DOCKER IMAGE BUILDS                                                          │
-# │ Each component is built independently based on change detection.             │
-# │                                                                               │
-# │ Design decisions:                                                             │
-# │ - No intermediate job: Inputs are passed directly to build jobs to avoid     │
-# │   5-10s overhead of an intermediate "check-changes" job.                      │
-# │ - Individual jobs: Each component builds independently, allowing parallel     │
-# │   execution and selective skipping.                                           │
-# │ - External workflow: Uses shared org workflow for consistent Docker builds.   │
-# └──────────────────────────────────────────────────────────────────────────────┘
-
 jobs:
-  # Build webapp Docker image
   webapp-build:
     name: "Docker: webapp"
     if: inputs.should_skip != 'true' && inputs.webapp_changed == 'true'
@@ -67,7 +54,6 @@ jobs:
         hephaestus.component=webapp
     secrets: inherit
 
-  # Build application-server Docker image
   application-server-build:
     name: "Docker: application-server"
     if: inputs.should_skip != 'true' && inputs.application_server_changed == 'true'
@@ -90,7 +76,6 @@ jobs:
         hephaestus.component=application-server
     secrets: inherit
 
-  # Build intelligence-service Docker image
   intelligence-service-build:
     name: "Docker: intelligence-service"
     if: inputs.should_skip != 'true' && inputs.intelligence_service_changed == 'true'
@@ -113,7 +98,6 @@ jobs:
         hephaestus.component=intelligence-service
     secrets: inherit
 
-  # Build webhook-ingest Docker image
   webhook-ingest-build:
     name: "Docker: webhook-ingest"
     if: inputs.should_skip != 'true' && inputs.webhook_ingest_changed == 'true'
