@@ -1,4 +1,4 @@
-name: Tests
+name: Test
 
 on:
   workflow_call:
@@ -36,26 +36,34 @@ jobs:
       contents: read
       checks: write
       statuses: write
-    name: ${{ matrix.test-type }}
+    name: "${{ matrix.display-name }}"
     runs-on: ubuntu-latest
     if: inputs.should_skip != 'true'
     timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
-        test-type:
-          [
-            application-server-unit,
-            application-server-integration,
-            application-server-architecture,
-            webapp-unit,
-            webapp-storybook,
-            webapp-visual,
-            intelligence-service-unit,
-            intelligence-service-integration,
-            intelligence-service-architecture,
-            webhook-ingest-unit,
-          ]
+        include:
+          - test-type: application-server-unit
+            display-name: "App Server: Unit"
+          - test-type: application-server-integration
+            display-name: "App Server: Integration"
+          - test-type: application-server-architecture
+            display-name: "App Server: Architecture"
+          - test-type: webapp-unit
+            display-name: "Webapp: Unit"
+          - test-type: webapp-storybook
+            display-name: "Webapp: Storybook"
+          - test-type: webapp-visual
+            display-name: "Webapp: Visual"
+          - test-type: intelligence-service-unit
+            display-name: "Intelligence: Unit"
+          - test-type: intelligence-service-integration
+            display-name: "Intelligence: Integration"
+          - test-type: intelligence-service-architecture
+            display-name: "Intelligence: Architecture"
+          - test-type: webhook-ingest-unit
+            display-name: "Webhook: Unit"
 
     steps:
       - name: Determine if test should run

@@ -1,4 +1,4 @@
-name: Quality Gates
+name: Quality
 
 on:
   workflow_call:
@@ -32,24 +32,30 @@ on:
 
 jobs:
   quality-gates:
-    name: ${{ matrix.check }}
+    name: "${{ matrix.display-name }}"
     runs-on: ubuntu-latest
     if: inputs.should_skip != 'true'
     timeout-minutes: ${{ contains(fromJSON('["database-schema-validation", "database-documentation-validation", "database-models-validation"]'), matrix.check) && 20 || 15 }}
     strategy:
       fail-fast: false
       matrix:
-        check:
-          [
-            application-server-quality,
-            webapp-quality,
-            intelligence-service-quality,
-            webhook-ingest-quality,
-            openapi-validation,
-            database-schema-validation,
-            database-documentation-validation,
-            database-models-validation,
-          ]
+        include:
+          - check: application-server-quality
+            display-name: "App Server"
+          - check: webapp-quality
+            display-name: "Webapp"
+          - check: intelligence-service-quality
+            display-name: "Intelligence"
+          - check: webhook-ingest-quality
+            display-name: "Webhook"
+          - check: openapi-validation
+            display-name: "OpenAPI"
+          - check: database-schema-validation
+            display-name: "Database: Schema"
+          - check: database-documentation-validation
+            display-name: "Database: ERD"
+          - check: database-models-validation
+            display-name: "Database: Models"
     steps:
       - name: Determine if check should run
         id: should_run

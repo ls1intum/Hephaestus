@@ -1,4 +1,4 @@
-name: Docker Build
+name: Docker
 
 on:
   workflow_call:
@@ -33,7 +33,7 @@ on:
 
 jobs:
   webapp-build:
-    name: "Docker: webapp"
+    name: "Webapp"
     if: inputs.should_skip != 'true' && inputs.webapp_changed == 'true'
     uses: ls1intum/.github/.github/workflows/build-and-push-docker-image.yml@main
     with:
@@ -55,7 +55,7 @@ jobs:
     secrets: inherit
 
   application-server-build:
-    name: "Docker: application-server"
+    name: "App Server"
     if: inputs.should_skip != 'true' && inputs.application_server_changed == 'true'
     uses: ls1intum/.github/.github/workflows/build-and-push-docker-image.yml@main
     with:
@@ -77,7 +77,7 @@ jobs:
     secrets: inherit
 
   intelligence-service-build:
-    name: "Docker: intelligence-service"
+    name: "Intelligence"
     if: inputs.should_skip != 'true' && inputs.intelligence_service_changed == 'true'
     uses: ls1intum/.github/.github/workflows/build-and-push-docker-image.yml@main
     with:
@@ -99,7 +99,7 @@ jobs:
     secrets: inherit
 
   webhook-ingest-build:
-    name: "Docker: webhook-ingest"
+    name: "Webhook"
     if: inputs.should_skip != 'true' && inputs.webhook_ingest_changed == 'true'
     uses: ls1intum/.github/.github/workflows/build-and-push-docker-image.yml@main
     with:

@@ -1,4 +1,4 @@
-name: Security Scan
+name: Security
 
 on:
   workflow_call:
@@ -11,14 +11,20 @@ on:
 
 jobs:
   security-scan:
-    name: "Security: ${{ matrix.scan-type }}"
+    name: "${{ matrix.display-name }}"
     runs-on: ubuntu-latest
     if: inputs.should_skip != 'true'
     timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
-        scan-type: [sast, dependencies, secrets]
+        include:
+          - scan-type: sast
+            display-name: "CodeQL"
+          - scan-type: dependencies
+            display-name: "Dependencies"
+          - scan-type: secrets
+            display-name: "Secrets"
     permissions:
       security-events: write
       contents: read
