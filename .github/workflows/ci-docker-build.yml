@@ -52,7 +52,9 @@ jobs:
         org.opencontainers.image.vendor=AET TUM
         org.opencontainers.image.licenses=MIT
         hephaestus.component=webapp
-    secrets: inherit
+      dockerhub-username: ${{ vars.DOCKERHUB_USERNAME }}
+    secrets:
+      dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
 
   application-server-build:
     name: "App Server"
@@ -74,7 +76,9 @@ jobs:
         org.opencontainers.image.vendor=AET TUM
         org.opencontainers.image.licenses=MIT
         hephaestus.component=application-server
-    secrets: inherit
+      dockerhub-username: ${{ vars.DOCKERHUB_USERNAME }}
+    secrets:
+      dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
 
   intelligence-service-build:
     name: "Intelligence"
@@ -96,7 +100,9 @@ jobs:
         org.opencontainers.image.vendor=AET TUM
         org.opencontainers.image.licenses=MIT
         hephaestus.component=intelligence-service
-    secrets: inherit
+      dockerhub-username: ${{ vars.DOCKERHUB_USERNAME }}
+    secrets:
+      dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
 
   webhook-ingest-build:
     name: "Webhook"
@@ -118,4 +124,6 @@ jobs:
         org.opencontainers.image.vendor=AET TUM
         org.opencontainers.image.licenses=MIT
         hephaestus.component=webhook-ingest
-    secrets: inherit
+      dockerhub-username: ${{ vars.DOCKERHUB_USERNAME }}
+    secrets:
+      dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
