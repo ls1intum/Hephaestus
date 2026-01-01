@@ -145,7 +145,7 @@ jobs:
         working-directory: ./webapp
         run: |
           cd ..
-          rm -rf node_modules
+          # npm ci already handles node_modules cleanup when package-lock.json changes
           npm ci --workspaces --include=dev --include=optional --no-audit --progress=false
           node scripts/install-platform-binaries.mjs
           cd webapp
@@ -180,8 +180,8 @@ jobs:
       - name: Intelligence-service quality
         if: steps.should_run.outputs.run == 'true' && matrix.check == 'intelligence-service-quality'
         run: |
-          rm -rf node_modules server/intelligence-service/node_modules
-          npm install --no-audit --progress=false
+          # npm ci already handles node_modules cleanup when package-lock.json changes
+          npm ci --no-audit --progress=false
           node scripts/install-platform-binaries.mjs
 
           ISSUES_FOUND=()
@@ -197,8 +197,8 @@ jobs:
       - name: Webhook-ingest quality
         if: steps.should_run.outputs.run == 'true' && matrix.check == 'webhook-ingest-quality'
         run: |
-          rm -rf node_modules server/webhook-ingest/node_modules
-          npm install --no-audit --progress=false
+          # npm ci already handles node_modules cleanup when package-lock.json changes
+          npm ci --no-audit --progress=false
           node scripts/install-platform-binaries.mjs
 
           ISSUES_FOUND=()

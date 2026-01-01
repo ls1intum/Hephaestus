@@ -64,7 +64,7 @@ jobs:
         if: matrix.scan-type == 'sast'
         run: |
           cd server/application-server && mvn compile -DskipTests --quiet && cd ../..
-          rm -rf node_modules
+          # npm ci already handles node_modules cleanup when package-lock.json changes
           npm ci --workspaces --include=dev --include=optional --no-audit --progress=false
           cd webapp && npx tsc --noEmit && cd ..
           cd server/intelligence-service && npx tsc --noEmit && cd ../..
