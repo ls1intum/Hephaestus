@@ -65,8 +65,8 @@ jobs:
           rm -rf node_modules
           npm ci --workspaces --include=dev --include=optional --no-audit --progress=false
           cd webapp && npx tsc --noEmit && cd ..
-          cd server/intelligence-service && npx tsc --noEmit && cd ..
-          cd webhook-ingest && npx tsc --noEmit
+          cd server/intelligence-service && npx tsc --noEmit && cd ../..
+          cd server/webhook-ingest && npx tsc --noEmit
 
       - name: Perform CodeQL Analysis
         if: matrix.scan-type == 'sast'
