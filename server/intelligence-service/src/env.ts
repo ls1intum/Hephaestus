@@ -11,6 +11,7 @@ const ENV_FILE_PATH = process.env.NODE_ENV === "test" ? ".env.test" : ".env";
 expand(
 	config({
 		path: path.resolve(process.cwd(), ENV_FILE_PATH),
+		quiet: true, // Suppress dotenv info messages
 	}),
 );
 
