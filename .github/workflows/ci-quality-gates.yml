@@ -95,6 +95,8 @@ jobs:
         if: steps.should_run.outputs.run == 'true'
         uses: actions/checkout@v4
         with:
+          # Database checks need full history for git diff on schema/migrations
+          # Other quality checks only need HEAD for faster checkout
           fetch-depth: ${{ contains(matrix.check, 'database') && 0 || 1 }}
 
       - name: Setup Node.js

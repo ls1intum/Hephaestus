@@ -33,6 +33,8 @@ jobs:
         with:
           fetch-depth: ${{ matrix.scan-type == 'secrets' && 0 || 1 }}
 
+      # Node.js only needed for SAST (CodeQL TypeScript analysis)
+      # Other scan types (dependencies, secrets) don't require Node.js
       - name: Setup Node.js
         if: matrix.scan-type == 'sast'
         uses: actions/setup-node@v4
