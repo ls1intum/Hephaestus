@@ -17,7 +17,7 @@
     "generate:api:intelligence-service": "npm run generate:api:intelligence-service:clean && npm run generate:api:intelligence-service:specs && npm run generate:api:intelligence-service:client",
     "generate:api": "npm run generate:api:intelligence-service && npm run generate:api:application-server",
     "format:java": "node --import tsx scripts/run-quiet.ts prettier --write \"server/application-server/src/**/*.java\" --config-precedence prefer-file --config server/application-server/.prettierrc.yaml --ignore-path server/application-server/.prettierignore",
-    "format:java:check": "prettier --check server/application-server/src/**/*.java --config-precedence prefer-file --config server/application-server/.prettierrc.yaml --ignore-path server/application-server/.prettierignore",
+    "format:java:check": "node --import tsx scripts/run-quiet.ts prettier --check \"server/application-server/src/**/*.java\" --config-precedence prefer-file --config server/application-server/.prettierrc.yaml --ignore-path server/application-server/.prettierignore",
     "format:intelligence-service": "npm -w server/intelligence-service run format",
     "format:intelligence-service:check": "npm -w server/intelligence-service run format:check",
     "lint:intelligence-service": "npm -w server/intelligence-service run lint",

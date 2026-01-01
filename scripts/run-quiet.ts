@@ -65,13 +65,16 @@ function prettierTransform(line: string): string {
  * Summary for prettier runs.
  */
 function prettierSummary(lines: string[], exitCode: number): string {
-  const changedFiles = lines.filter(
-    (l) =>
+  const changedFiles = lines.filter((l) => {
+    // Exclude warning/error lines first to avoid false positives
+    if (l.includes("[warn]") || l.includes("[error]")) {
+      return false;
+    }
+    return (
       l.match(/\.(java|ts|tsx|js|jsx|json|css|scss|md)$/) &&
-      !l.includes("(unchanged)") &&
-      !l.includes("[warn]") &&
-      !l.includes("[error]"),
-  );
+      !l.includes("(unchanged)")
+    );
+  });
 
   const warnings = lines.filter((l) => l.includes("[warn]"));
   const errors = lines.filter((l) => l.includes("[error]"));
@@ -157,13 +160,12 @@ function openApiGenTransform(line: string): string {
  * Summary for OpenAPI generator runs.
  */
 function openApiGenSummary(lines: string[], exitCode: number): string {
-  // Look for the generated files count
-  const generatedLine = lines.find((l) => l.includes("written file"));
-  if (generatedLine) {
-    const match = lines.filter((l) => l.includes("written file")).length;
-    if (match > 0) {
-      return `Generated ${match} files.`;
-    }
+  // Count generated files by counting "written file" lines
+  const generatedFilesCount = lines.filter((l) =>
+    l.includes("written file"),
+  ).length;
+  if (generatedFilesCount > 0) {
+    return `Generated ${generatedFilesCount} files.`;
   }
 
   if (exitCode === 0) {
@@ -271,16 +273,17 @@ async function main(): Promise<void> {
   if (args.length === 0) {
     console.error("Usage: run-quiet.ts <tool> [args...]");
     console.error("Supported tools: prettier, openapi-gen");
-    process.exit(1);
+    process.exitCode = 1;
+    return;
   }
 
   const [tool, ...toolArgs] = args;
-  if (!tool) {
-    console.error("No tool specified");
-    process.exit(1);
-  }
-  const exitCode = await run(tool, toolArgs);
-  process.exit(exitCode);
+  // tool is guaranteed to be defined since args.length > 0
+  const exitCode = await run(tool as string, toolArgs);
+  process.exitCode = exitCode;
 }
 
-main();
+main().catch((error: unknown) => {
+  console.error(error);
+  process.exitCode = 1;
+});
