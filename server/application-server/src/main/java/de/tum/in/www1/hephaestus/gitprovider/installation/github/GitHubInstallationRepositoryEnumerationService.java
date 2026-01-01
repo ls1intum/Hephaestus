@@ -15,7 +15,17 @@ import org.springframework.web.reactive.function.client.WebClient;
 
 /**
  * Enumerates repositories accessible to a GitHub App installation so we can backfill monitors.
- * Uses GitHub REST API directly for repository enumeration.
+ * <p>
+ * <b>Why REST API instead of GraphQL:</b>
+ * GitHub's GraphQL API does not expose an endpoint to list installation repositories.
+ * The only way to enumerate repositories accessible to a GitHub App installation is via
+ * the REST API endpoint {@code GET /installation/repositories}. This is a GitHub API limitation,
+ * not a design choice.
+ * <p>
+ * Similarly, installation token minting ({@code POST /app/installations/{id}/access_tokens})
+ * is REST-only. These are the only REST endpoints in the gitprovider layer.
+ *
+ * @see <a href="https://docs.github.com/en/rest/apps/installations#list-repositories-accessible-to-the-app-installation">GitHub REST API - List installation repositories</a>
  */
 @Service
 public class GitHubInstallationRepositoryEnumerationService {

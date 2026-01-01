@@ -11,6 +11,15 @@ import org.springframework.stereotype.Service;
 
 /**
  * Factory for creating ProcessingContext instances.
+ * <p>
+ * This factory creates contexts for repository-scoped webhook events (issues, PRs, etc.)
+ * and sync operations. It resolves the workspace ID from the repository's organization.
+ * <p>
+ * <b>Installation events are handled differently:</b>
+ * Installation events (installation, installation_repositories, installation_target) are
+ * account-level events without repository context. They use the installation ID directly
+ * to resolve the workspace via {@link de.tum.in.www1.hephaestus.workspace.WorkspaceRepository#findByInstallationId(Long)}.
+ * These handlers don't use ProcessingContext.
  */
 @Service
 public class ProcessingContextFactory {

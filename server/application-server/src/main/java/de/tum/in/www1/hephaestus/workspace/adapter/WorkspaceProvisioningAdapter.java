@@ -1,9 +1,11 @@
 package de.tum.in.www1.hephaestus.workspace.adapter;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.WorkspaceProvisioningListener;
+import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationService;
 import de.tum.in.www1.hephaestus.workspace.RepositorySelection;
 import de.tum.in.www1.hephaestus.workspace.Workspace;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceInstallationService;
+import de.tum.in.www1.hephaestus.workspace.WorkspaceRepositoryMonitorService;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -15,9 +17,17 @@ public class WorkspaceProvisioningAdapter implements WorkspaceProvisioningListen
     private static final Logger logger = LoggerFactory.getLogger(WorkspaceProvisioningAdapter.class);
 
     private final WorkspaceInstallationService workspaceInstallationService;
+    private final WorkspaceRepositoryMonitorService repositoryMonitorService;
+    private final OrganizationService organizationService;
 
-    public WorkspaceProvisioningAdapter(WorkspaceInstallationService workspaceInstallationService) {
+    public WorkspaceProvisioningAdapter(
+        WorkspaceInstallationService workspaceInstallationService,
+        WorkspaceRepositoryMonitorService repositoryMonitorService,
+        OrganizationService organizationService
+    ) {
         this.workspaceInstallationService = workspaceInstallationService;
+        this.repositoryMonitorService = repositoryMonitorService;
+        this.organizationService = organizationService;
     }
 
     @Override
@@ -52,10 +62,19 @@ public class WorkspaceProvisioningAdapter implements WorkspaceProvisioningListen
             return;
         }
 
-        // Stop NATS consumer and mark workspace as appropriate
+        // 1. Stop NATS consumer for the workspace first (before removing monitors)
         workspaceInstallationService.stopNatsForInstallation(installationId);
-        workspaceInstallationService.updateWorkspaceStatus(installationId, Workspace.WorkspaceStatus.SUSPENDED);
-        logger.info("Handled installation deletion for installation {}", installationId);
+
+        // 2. Remove all repository monitors for this installation
+        repositoryMonitorService.removeAllRepositoriesFromMonitor(installationId);
+
+        // 3. Detach organization from installation (set installationId to null)
+        organizationService.detachInstallation(installationId);
+
+        // 4. Mark workspace as PURGED (not SUSPENDED - deleted is permanent)
+        workspaceInstallationService.updateWorkspaceStatus(installationId, Workspace.WorkspaceStatus.PURGED);
+
+        logger.info("Completed cleanup for deleted installation {}", installationId);
     }
 
     @Override

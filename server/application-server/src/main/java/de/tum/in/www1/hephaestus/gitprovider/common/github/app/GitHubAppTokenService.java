@@ -28,7 +28,18 @@ import org.springframework.web.reactive.function.client.WebClient;
 
 /**
  * Service for generating GitHub App JWT tokens and installation access tokens.
- * Uses GitHub REST API directly for token management.
+ * <p>
+ * <b>Why REST API instead of GraphQL:</b>
+ * GitHub App authentication (JWT generation and installation token minting) is only
+ * available via REST API. The GraphQL API requires an already-minted token, so the
+ * bootstrap process must use REST. This is a GitHub API limitation.
+ * <p>
+ * Endpoints used:
+ * <ul>
+ *   <li>{@code POST /app/installations/{installation_id}/access_tokens} - Mint installation token</li>
+ * </ul>
+ *
+ * @see <a href="https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/generating-an-installation-access-token-for-a-github-app">GitHub Docs - Installation Access Tokens</a>
  */
 @Service
 public class GitHubAppTokenService {
