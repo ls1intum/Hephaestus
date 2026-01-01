@@ -68,6 +68,30 @@ jobs:
               - '.github/workflows/**'
               - '.github/actions/**'
 
+  # Post preview links immediately (no waiting for other jobs)
+  preview-links:
+    name: "Preview / Coolify"
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    permissions:
+      statuses: write
+    timeout-minutes: 1
+    steps:
+      - name: Post Coolify preview link
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const sha = context.payload.pull_request.head.sha;
+            await github.rest.repos.createCommitStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              sha: sha,
+              state: 'success',
+              target_url: 'https://coolify.hephaestus.aet.cit.tum.de/project/lc8sows0ok8g880sg4o4o84w/environment/ek8o8800g4wks84c8w8wcckc/application/wg44k0ccsoscsgcco8swc4ks/preview-deployments',
+              description: 'Click Details to view Coolify preview deployments',
+              context: 'Preview / Coolify'
+            });
+
   quality:
     uses: ./.github/workflows/ci-quality-gates.yml
     needs: [detect-changes]
@@ -323,20 +347,4 @@ jobs:
               state: state,
               description: state === 'success' ? 'All CI checks passed' : 'One or more CI checks failed',
               context: 'All CI Passed'
-            });
-
-      - name: Create Coolify Preview status
-        if: always() && github.event_name == 'pull_request'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const sha = context.payload.pull_request?.head?.sha || context.sha;
-            await github.rest.repos.createCommitStatus({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              sha: sha,
-              state: 'success',
-              target_url: 'https://coolify.hephaestus.aet.cit.tum.de/project/lc8sows0ok8g880sg4o4o84w/environment/ek8o8800g4wks84c8w8wcckc/application/wg44k0ccsoscsgcco8swc4ks/preview-deployments',
-              description: 'Click Details to view Coolify preview deployments',
-              context: 'Preview / Coolify'
             });
