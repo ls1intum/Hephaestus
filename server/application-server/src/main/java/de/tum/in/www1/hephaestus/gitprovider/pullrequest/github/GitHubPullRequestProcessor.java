@@ -1,5 +1,7 @@
 package de.tum.in.www1.hephaestus.gitprovider.pullrequest.github;
 
+import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
+
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.events.DomainEvent;
 import de.tum.in.www1.hephaestus.gitprovider.common.events.EventContext;
@@ -88,7 +90,7 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
             eventPublisher.publishEvent(
                 new DomainEvent.PullRequestCreated(EventPayload.PullRequestData.from(pr), EventContext.from(context))
             );
-            logger.debug("Created PR #{} in {}", dto.number(), context.repository().getNameWithOwner());
+            logger.debug("Created PR #{} in {}", dto.number(), sanitizeForLog(context.repository().getNameWithOwner()));
         } else {
             pr = existingOpt.get();
             Set<String> changedFields = updatePullRequest(dto, pr, context.repository());
@@ -105,7 +107,7 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
                 logger.debug(
                     "Updated PR #{} in {} - changed: {}",
                     dto.number(),
-                    context.repository().getNameWithOwner(),
+                    sanitizeForLog(context.repository().getNameWithOwner()),
                     changedFields
                 );
             }

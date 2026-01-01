@@ -1,5 +1,7 @@
 package de.tum.in.www1.hephaestus.gitprovider.repository.github;
 
+import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
+
 import de.tum.in.www1.hephaestus.gitprovider.common.NatsMessageDeserializer;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContextFactory;
@@ -110,8 +112,8 @@ public class GitHubMemberMessageHandler extends GitHubMessageHandler<GitHubMembe
             collaboratorRepository.save(collaborator);
             logger.info(
                 "Added collaborator {} to {} with permission {}",
-                user.getLogin(),
-                repository.getNameWithOwner(),
+                sanitizeForLog(user.getLogin()),
+                sanitizeForLog(repository.getNameWithOwner()),
                 permission
             );
         }
@@ -122,12 +124,16 @@ public class GitHubMemberMessageHandler extends GitHubMessageHandler<GitHubMembe
 
         if (existingCollaborator.isPresent()) {
             collaboratorRepository.delete(existingCollaborator.get());
-            logger.info("Removed collaborator {} from {}", user.getLogin(), repository.getNameWithOwner());
+            logger.info(
+                "Removed collaborator {} from {}",
+                sanitizeForLog(user.getLogin()),
+                sanitizeForLog(repository.getNameWithOwner())
+            );
         } else {
             logger.debug(
                 "Collaborator {} not found in {} - may have been already removed",
-                user.getLogin(),
-                repository.getNameWithOwner()
+                sanitizeForLog(user.getLogin()),
+                sanitizeForLog(repository.getNameWithOwner())
             );
         }
     }

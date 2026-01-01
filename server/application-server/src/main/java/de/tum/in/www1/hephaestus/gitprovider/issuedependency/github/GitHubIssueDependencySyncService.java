@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.gitprovider.issuedependency.github;
 
+import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.*;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
@@ -210,9 +211,10 @@ public class GitHubIssueDependencySyncService {
      * Uses type-safe generated DTOs for GraphQL response handling.
      */
     private int syncRepositoryDependencies(HttpGraphQlClient client, Repository repo) {
+        String safeNameWithOwner = sanitizeForLog(repo.getNameWithOwner());
         Optional<RepositoryOwnerAndName> parsedName = GitHubRepositoryNameParser.parse(repo.getNameWithOwner());
         if (parsedName.isEmpty()) {
-            logger.warn("Invalid repository name format: {}", repo.getNameWithOwner());
+            logger.warn("Invalid repository name format: {}", safeNameWithOwner);
             return 0;
         }
         String owner = parsedName.get().owner();
@@ -234,7 +236,7 @@ public class GitHubIssueDependencySyncService {
                 .block(GRAPHQL_TIMEOUT);
 
             if (issueConnection == null || issueConnection.getNodes() == null) {
-                logger.warn("No response from GraphQL for repository {}", repo.getNameWithOwner());
+                logger.warn("No response from GraphQL for repository {}", safeNameWithOwner);
                 break;
             }
 

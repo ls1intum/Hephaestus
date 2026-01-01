@@ -1,5 +1,7 @@
 package de.tum.in.www1.hephaestus.gitprovider.issue.github;
 
+import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
+
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.events.DomainEvent;
 import de.tum.in.www1.hephaestus.gitprovider.common.events.EventContext;
@@ -98,7 +100,11 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
             eventPublisher.publishEvent(
                 new DomainEvent.IssueCreated(EventPayload.IssueData.from(issue), EventContext.from(context))
             );
-            logger.debug("Created issue #{} in {}", dto.number(), context.repository().getNameWithOwner());
+            logger.debug(
+                "Created issue #{} in {}",
+                dto.number(),
+                sanitizeForLog(context.repository().getNameWithOwner())
+            );
         } else {
             issue = existingOpt.get();
             Set<String> changedFields = updateIssue(dto, issue, repository);
@@ -115,7 +121,7 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
                 logger.debug(
                     "Updated issue #{} in {} - changed: {}",
                     dto.number(),
-                    context.repository().getNameWithOwner(),
+                    sanitizeForLog(context.repository().getNameWithOwner()),
                     changedFields
                 );
             }
