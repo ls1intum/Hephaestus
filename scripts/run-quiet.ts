@@ -120,8 +120,8 @@ function openApiGenFilter(line: string): boolean {
     return false;
   }
 
-  // Filter out repetitive 3.1.0 warnings (keep only first occurrence tracked externally)
-  // These are very long and appear multiple times
+  // Filter out all repetitive 3.1.0 warnings; these are very long, add little value,
+  // and appear multiple times in a single run.
   if (line.includes("3.1.0 specs is in development")) {
     return false;
   }
@@ -152,8 +152,8 @@ function openApiGenFilter(line: string): boolean {
  */
 function openApiGenTransform(line: string): string {
   // Shorten absolute paths to relative
-  const cwd = process.cwd();
-  return line.replace(new RegExp(cwd + "/", "g"), "");
+  const cwdPrefix = `${process.cwd()}/`;
+  return line.replaceAll(cwdPrefix, "");
 }
 
 /**
@@ -203,12 +203,10 @@ async function run(tool: string, args: string[]): Promise<number> {
   if (tool === "prettier") {
     command = "npx";
     commandArgs = ["prettier", ...args];
-  } else if (tool === "openapi-gen") {
+  } else {
+    // openapi-gen
     command = "npx";
     commandArgs = ["openapi-generator-cli", ...args];
-  } else {
-    command = tool;
-    commandArgs = args;
   }
 
   return new Promise((resolve) => {
