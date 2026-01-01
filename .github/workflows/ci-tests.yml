@@ -105,10 +105,13 @@ jobs:
           echo "⏭️ Skipping ${{ matrix.test-type }} - no relevant files changed"
           echo "   This is expected behavior from path-based filtering."
 
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
         if: steps.should_run.outputs.run == 'true'
         with:
-          # Full history for Chromatic TurboSnap (detects changed stories)
+          # Full history needed for:
+          # - Chromatic TurboSnap (detects changed stories for visual tests)
+          # - Git-based test filtering in some test frameworks
           fetch-depth: 0
 
       - name: Setup Node.js and npm cache
@@ -129,7 +132,7 @@ jobs:
           os: ${{ runner.os }}
 
       # application-server tests
-      - name: "application-server ${{ matrix.test-type }} execution"
+      - name: "Application-server ${{ matrix.test-type }} execution"
         if: steps.should_run.outputs.run == 'true' && startsWith(matrix.test-type, 'application-server-')
         run: |
           echo "🧪 Running application-server ${{ matrix.test-type }} tests"
@@ -170,22 +173,17 @@ jobs:
 
           case "${{ matrix.test-type }}" in
             "webapp-unit")
-              echo "🧪 Running webapp unit tests..."
               npm run test
               ;;
             "webapp-storybook")
-              echo "🧪 Running Storybook interaction tests with Playwright..."
               # Install Playwright chromium browser for Vitest browser mode
               # Note: setup-caches action caches ~/.cache/ms-playwright for faster installs
-              if [ -d ~/.cache/ms-playwright ]; then
-                echo "📦 Playwright cache found, checking if install needed..."
-              fi
               npx playwright install chromium --with-deps
               npm run test:storybook
               ;;
             "webapp-visual")
               if ! npm run build-storybook; then
-                echo "❌ Storybook build failed, retrying..."
+                echo "❌ Storybook build failed, retrying with clean install..."
                 cd ..
                 rm -rf node_modules
                 npm ci --workspaces --include=dev --include=optional --no-audit --progress=false
@@ -199,6 +197,8 @@ jobs:
       - name: "Intelligence-service ${{ matrix.test-type }} execution"
         if: steps.should_run.outputs.run == 'true' && startsWith(matrix.test-type, 'intelligence-service-')
         run: |
+          echo "🧪 Running intelligence-service ${{ matrix.test-type }} tests"
+
           # Clean local node_modules but PRESERVE ~/.npm cache (restored by setup-node)
           # The npm cache is used by npm ci to avoid re-downloading packages
           rm -rf node_modules server/intelligence-service/node_modules
@@ -211,11 +211,9 @@ jobs:
 
           case "${{ matrix.test-type }}" in
             "intelligence-service-unit")
-              echo "🧪 Running intelligence-service unit tests (pure unit tests, no database)..."
               npm run test:unit
               ;;
             "intelligence-service-integration")
-              echo "🧪 Running intelligence-service integration tests (with Testcontainers)..."
               npm run test:integration
               ;;
           esac
