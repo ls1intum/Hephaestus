@@ -101,7 +101,7 @@ jobs:
         with:
           # Full history needed only for Chromatic TurboSnap (webapp-visual)
           # Other tests only need HEAD for faster checkout
-          fetch-depth: ${{ matrix.test-type == 'webapp-visual' && 0 || 1 }}
+          fetch-depth: ${{ matrix.test-type == 'webapp-visual' && '0' || '1' }}
 
       - name: Setup Node.js
         if: steps.should_run.outputs.run == 'true'
