@@ -123,10 +123,12 @@ jobs:
         run: |
           cd server/application-server
           rm -rf target/surefire-reports/*
+          # Use -Dsurefire.includedGroups to override the property defined in pom.xml
+          # The pom.xml configures <groups>${surefire.includedGroups}</groups>
           case "${{ matrix.test-type }}" in
-            "application-server-unit") mvn test -Dgroups="unit" -T 2C --batch-mode ;;
-            "application-server-integration") mvn test -Dgroups="integration" -T 2C --batch-mode ;;
-            "application-server-architecture") mvn test -Dgroups="architecture" -T 2C --batch-mode ;;
+            "application-server-unit") ./mvnw test -Dsurefire.includedGroups="unit" -T 2C --batch-mode ;;
+            "application-server-integration") ./mvnw test -Dsurefire.includedGroups="integration" -T 2C --batch-mode ;;
+            "application-server-architecture") ./mvnw test -Dsurefire.includedGroups="architecture" -T 2C --batch-mode ;;
           esac
 
       - name: Run tests
