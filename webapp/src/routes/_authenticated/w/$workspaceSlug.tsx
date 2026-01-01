@@ -9,8 +9,9 @@ import { WorkspaceContext } from "@/hooks/use-workspace";
 /**
  * Error class for 403 Forbidden responses from the workspace API.
  * Thrown when the user lacks permission to access a workspace.
+ * Exported for use in error boundary type guards.
  */
-class WorkspaceForbiddenError extends Error {
+export class WorkspaceForbiddenError extends Error {
 	constructor(public slug: string) {
 		super(`Access denied to workspace: ${slug}`);
 		this.name = "WorkspaceForbiddenError";
