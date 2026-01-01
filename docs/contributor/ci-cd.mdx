@@ -102,12 +102,41 @@ Coolify handles PR previews:
 
 ## ⚙️ Key Workflows
 
-| Workflow             | Trigger               | Purpose                                        |
-| -------------------- | --------------------- | ---------------------------------------------- |
-| `cicd.yml`           | Push to main, PRs     | Tests, builds, quality gates                   |
-| `release.yml`        | On CI/CD Success      | Creates tag, deploys staging, gates production |
-| `deploy-staging.yml` | Called by release.yml | Deploys to staging                             |
-| `deploy-prod.yml`    | workflow_dispatch     | Deploys to production (manual trigger)         |
+| Workflow               | Trigger               | Purpose                                            |
+| ---------------------- | --------------------- | -------------------------------------------------- |
+| `cicd.yml`             | Push to main, PRs     | Orchestrator: change detection + workflow dispatch |
+| `ci-quality-gates.yml` | Called by cicd.yml    | Code quality, formatting, schema validation        |
+| `ci-tests.yml`         | Called by cicd.yml    | Unit, integration, visual tests                    |
+| `ci-docker-build.yml`  | Called by cicd.yml    | Docker image builds per component                  |
+| `ci-security-scan.yml` | Called by cicd.yml    | SAST, dependency scanning, secret detection        |
+| `release.yml`          | On CI/CD Success      | Creates tag, deploys staging, gates production     |
+| `deploy-staging.yml`   | Called by release.yml | Deploys to staging                                 |
+| `deploy-prod.yml`      | workflow_dispatch     | Deploys to production (manual trigger)             |
+
+### Workflow Architecture
+
+```mermaid
+graph LR
+    subgraph cicd.yml
+        DC[Detect Changes] --> QG[Quality Gates]
+        DC --> TS[Test Suite]
+        DC --> DB[Docker Build]
+        DC --> SS[Security Scan]
+    end
+
+    QG --> Gate[CI Status Gate]
+    TS --> Gate
+    DB --> Gate
+    SS --> Gate
+
+    Gate -->|All Pass| Release[release.yml]
+```
+
+The `cicd.yml` workflow:
+
+1. **Detects changes** using `dorny/paths-filter`
+2. **Dispatches sub-workflows** with component-specific flags
+3. **Aggregates results** in the CI Status Gate job
 
 ## 🎯 Performance Optimizations
 
@@ -219,3 +248,123 @@ The CI Status Gate job generates a visual **Mermaid timeline** showing:
 - Critical path identification
 
 This helps identify bottlenecks and optimization opportunities.
+
+## 🆕 Adding a New Service
+
+When adding a new service to the monorepo, update CI configuration in this order:
+
+### Step 1: Path Detection (`cicd.yml`)
+
+Add a path filter and output for the new service:
+
+```yaml
+# In detect-changes job outputs:
+outputs:
+  new-service: ${{ steps.filter.outputs.new-service }}
+
+# In paths-filter step:
+filters: |
+  new-service:
+    - 'server/new-service/**'
+    - 'package.json'
+    - 'package-lock.json'
+```
+
+Update the `any-code` aggregate output to include the new service.
+
+### Step 2: Quality Gates (`ci-quality-gates.yml`)
+
+1. **Add to matrix:**
+
+```yaml
+matrix:
+  check: [
+      # ... existing checks
+      new-service-quality,
+    ]
+```
+
+2. **Add case statement** in "Determine if check should run":
+
+```yaml
+"new-service-quality")
+  echo "run=${{ inputs.new_service_changed }}" >> $GITHUB_OUTPUT
+  ;;
+```
+
+3. **Add quality check step** with the appropriate linting/type checking commands.
+
+### Step 3: Tests (`ci-tests.yml`)
+
+1. **Add to matrix:**
+
+```yaml
+matrix:
+  test-type: [
+      # ... existing tests
+      new-service-unit,
+      new-service-integration, # if applicable
+    ]
+```
+
+2. **Add case statement** in "Determine if test should run":
+
+```yaml
+"new-service-unit"|"new-service-integration")
+  echo "run=${{ inputs.new_service_changed }}" >> $GITHUB_OUTPUT
+  ;;
+```
+
+3. **Add test execution step** with the test commands.
+
+4. **Add test result upload** for JUnit reporting.
+
+### Step 4: Docker Build (`ci-docker-build.yml`)
+
+Add a new build job:
+
+```yaml
+new-service-build:
+  name: "Docker: new-service"
+  if: inputs.should_skip != 'true' && inputs.new_service_changed == 'true'
+  uses: ls1intum/.github/.github/workflows/build-and-push-docker-image.yml@main
+  with:
+    image-name: "ls1intum/hephaestus/new-service"
+    docker-file: "./server/new-service/Dockerfile"
+    docker-context: "./server/new-service"
+    # ... rest of config
+```
+
+### Step 5: Caching (`setup-caches/action.yml`)
+
+Add the new service's cache-types to the appropriate conditions:
+
+```yaml
+# For Node.js services:
+- name: Cache Node.js dependencies
+  if: contains(fromJSON('["...", "new-service-quality", "new-service-unit"]'), inputs.cache-type)
+
+# For Java services:
+- name: Cache Maven dependencies
+  if: contains(fromJSON('["...", "new-service-unit"]'), inputs.cache-type)
+```
+
+### Step 6: Update Workflow Inputs
+
+In `cicd.yml`, add the new input to workflow calls:
+
+```yaml
+with:
+  new_service_changed: ${{ (needs.detect-changes.outputs.new-service == 'true' || ...) && 'true' || 'false' }}
+```
+
+### Verification Checklist
+
+After adding a new service, verify:
+
+- [ ] Path filter correctly detects changes to new service
+- [ ] Quality gates run only when new service changes
+- [ ] Tests run only when new service changes
+- [ ] Docker build runs only when new service changes
+- [ ] CI config changes trigger all jobs (safety net)
+- [ ] JUnit reports appear in Test Results tab
