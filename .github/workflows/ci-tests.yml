@@ -110,7 +110,7 @@ jobs:
           cache-type: ${{ matrix.test-type }}
           os: ${{ runner.os }}
 
-      - name: "Application-server ${{ matrix.test-type }} execution"
+      - name: Run tests
         if: steps.should_run.outputs.run == 'true' && startsWith(matrix.test-type, 'application-server-')
         run: |
           cd server/application-server
@@ -121,7 +121,7 @@ jobs:
             "application-server-architecture") mvn test -Dgroups="architecture" -T 2C --batch-mode ;;
           esac
 
-      - name: "Webapp ${{ matrix.test-type }} execution"
+      - name: Run tests
         if: steps.should_run.outputs.run == 'true' && startsWith(matrix.test-type, 'webapp-')
         run: |
           rm -rf node_modules
@@ -146,7 +146,7 @@ jobs:
               ;;
           esac
 
-      - name: "Intelligence-service ${{ matrix.test-type }} execution"
+      - name: Run tests
         if: steps.should_run.outputs.run == 'true' && startsWith(matrix.test-type, 'intelligence-service-')
         run: |
           rm -rf node_modules server/intelligence-service/node_modules
@@ -160,7 +160,7 @@ jobs:
             "intelligence-service-architecture") npm run test:arch ;;
           esac
 
-      - name: "Webhook-ingest ${{ matrix.test-type }} execution"
+      - name: Run tests
         if: steps.should_run.outputs.run == 'true' && matrix.test-type == 'webhook-ingest-unit'
         run: |
           rm -rf node_modules server/webhook-ingest/node_modules
