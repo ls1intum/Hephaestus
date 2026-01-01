@@ -164,16 +164,17 @@ Docker builds use **registry-based caching** to store intermediate layers in `gh
 
 | Component            | First Build | Cached Build | Cache Size |
 | -------------------- | ----------- | ------------ | ---------- |
-| Application Server   | ~7 min      | ~2 min       | ~500 MB    |
-| Webapp               | ~5 min      | ~1 min       | ~200 MB    |
-| Intelligence Service | ~4 min      | ~1 min       | ~150 MB    |
-| Webhook Ingest       | ~3 min      | ~1 min       | ~100 MB    |
+| Application Server   | ~7 min      | ~30 sec      | ~500 MB    |
+| Webapp               | ~5 min      | ~30 sec      | ~200 MB    |
+| Intelligence Service | ~4 min      | ~30 sec      | ~150 MB    |
+| Webhook Ingest       | ~3 min      | ~30 sec      | ~100 MB    |
 
 **How it works:**
 
 - `cache-from`: Pulls cached layers from registry (main branch + current branch)
 - `cache-to`: Pushes new layers with `mode=max` (all intermediate layers)
 - Separate cache tags per platform: `image:cache-linux-amd64`, `image:cache-linux-arm64`
+- Native builds: amd64 on x86 runners, arm64 on ARM runners (no QEMU emulation)
 
 **Benefits over GitHub Actions Cache:**
 
@@ -181,6 +182,18 @@ Docker builds use **registry-based caching** to store intermediate layers in `gh
 - No eviction after 7 days
 - Works across branches (PRs benefit from main's cache)
 - Persistent (survives cache clearing)
+
+### Docker Hub Authentication (Recommended)
+
+Without Docker Hub authentication, base image metadata resolution can be rate-limited, adding **2+ minutes** to every Docker build. To avoid this:
+
+1. Create a Docker Hub account (free tier is sufficient)
+2. Generate an access token at [hub.docker.com/settings/security](https://hub.docker.com/settings/security)
+3. Add repository variable and secret:
+   - **Variable**: `DOCKERHUB_USERNAME` = your Docker Hub username
+   - **Secret**: `DOCKERHUB_TOKEN` = your access token
+
+The Docker build workflow will automatically use these credentials if present, falling back to anonymous (slower) access if not configured.
 
 ### Parallel Execution
 
