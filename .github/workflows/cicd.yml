@@ -63,23 +63,55 @@ jobs:
   # Final: Aggregated success gate for branch protection
   all-ci-passed:
     runs-on: ubuntu-latest
-    needs:
-      [
-        quality-gates,
-        security-scan,
-        test-suite,
-        docker-build,
-      ]
+    permissions:
+      statuses: write
+    needs: [quality-gates, security-scan, test-suite, docker-build]
     if: always()
     steps:
       - name: Check all jobs passed
+        id: check
         run: |
           if [[ "${{ contains(needs.*.result, 'failure') }}" == "true" ]]; then
             echo "❌ One or more CI jobs failed"
+            echo "status=failure" >> "$GITHUB_OUTPUT"
             exit 1
           elif [[ "${{ contains(needs.*.result, 'cancelled') }}" == "true" ]]; then
             echo "⚠️ One or more CI jobs were cancelled"
+            echo "status=failure" >> "$GITHUB_OUTPUT"
             exit 1
           else
             echo "✅ All CI jobs passed successfully"
+            echo "status=success" >> "$GITHUB_OUTPUT"
           fi
+
+      - name: Create commit status
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const sha = context.payload.pull_request?.head?.sha || context.sha;
+            const state = '${{ steps.check.outputs.status }}' || 'failure';
+            await github.rest.repos.createCommitStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              sha: sha,
+              state: state,
+              description: state === 'success' ? 'All CI checks passed' : 'One or more CI checks failed',
+              context: 'All CI Passed'
+            });
+
+      - name: Create Coolify Preview status
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const sha = context.payload.pull_request?.head?.sha || context.sha;
+            await github.rest.repos.createCommitStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              sha: sha,
+              state: 'success',
+              target_url: 'https://coolify.hephaestus.aet.cit.tum.de/project/lc8sows0ok8g880sg4o4o84w/environment/ek8o8800g4wks84c8w8wcckc/application/wg44k0ccsoscsgcco8swc4ks/preview-deployments',
+              description: 'Click Details to view Coolify preview deployments',
+              context: 'Coolify Preview'
+            });
