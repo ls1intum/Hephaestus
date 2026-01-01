@@ -21,16 +21,14 @@ export default defineConfig({
     passWithNoTests: false,
     globals: true,
 
-    // Integration tests - require database
+    // Integration tests - require database (Testcontainers PostgreSQL)
+    // Pattern: *.integration.test.ts OR tests using createTestFixtures()
+    // Note: Keep explicit list to avoid accidentally running unit tests with DB overhead
     include: [
-      // Explicit integration tests
-      "test/integration/*.integration.test.ts",
-      "test/detector/detector.integration.test.ts",
-      // Tests that use database fixtures (createTestFixtures, etc.)
-      "test/vote/vote.test.ts",
-      "test/tools/tools.test.ts",
-      "test/tools/registry.test.ts",
-      "test/security/authorization.test.ts",
+      "test/**/*.integration.test.ts",
+      "test/vote/*.test.ts",
+      "test/tools/{tools,registry}.test.ts",
+      "test/security/*.test.ts",
       "test/documents/*.test.ts",
     ],
     exclude: ["node_modules", "dist"],

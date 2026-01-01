@@ -36,6 +36,7 @@ export default defineConfig({
       "test/prompts/*.test.ts",
       "test/detector/detector.test.ts",
       "test/mentor/tools/*.test.ts",
+      "test/architecture.test.ts",
     ],
     exclude: ["node_modules", "dist"],
 
