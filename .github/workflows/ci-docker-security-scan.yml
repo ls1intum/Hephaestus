@@ -16,15 +16,24 @@ jobs:
     if: inputs.should_skip != 'true'
     timeout-minutes: 15
     env:
-      TRIVY_QUIET: "true"          # suppress progress + DB noise
+      TRIVY_QUIET: "true" # suppress progress + DB noise
     strategy:
       fail-fast: false
       matrix:
         component:
-          - { name: "webapp",               image: "ghcr.io/ls1intum/hephaestus/webapp" }
-          - { name: "application-server",   image: "ghcr.io/ls1intum/hephaestus/application-server" }
-          - { name: "intelligence-service", image: "ghcr.io/ls1intum/hephaestus/intelligence-service" }
-          - { name: "webhook-ingest",       image: "ghcr.io/ls1intum/hephaestus/webhook-ingest" }
+          - { name: "webapp", image: "ghcr.io/ls1intum/hephaestus/webapp" }
+          - {
+              name: "application-server",
+              image: "ghcr.io/ls1intum/hephaestus/application-server",
+            }
+          - {
+              name: "intelligence-service",
+              image: "ghcr.io/ls1intum/hephaestus/intelligence-service",
+            }
+          - {
+              name: "webhook-ingest",
+              image: "ghcr.io/ls1intum/hephaestus/webhook-ingest",
+            }
 
     steps:
       - name: Checkout code
@@ -44,14 +53,14 @@ jobs:
           image-ref: ${{ matrix.component.image }}:${{ github.sha }}
           format: "sarif"
           output: "trivy-${{ matrix.component.name }}.sarif"
-          exit-code: "1"           # fail on HIGH/CRITICAL that have fixes
+          exit-code: "1" # fail on HIGH/CRITICAL that have fixes
           ignore-unfixed: true
           severity: "CRITICAL,HIGH"
           trivyignores: ".trivyignore"
           skip-setup-trivy: true
 
       - name: Upload SARIF to Security tab
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         if: always()
         with:
           sarif_file: "trivy-${{ matrix.component.name }}.sarif"
@@ -69,23 +78,23 @@ jobs:
         run: |
           echo "# 🛡️ Security Scan Results - ${{ matrix.component.name }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          
+
           SARIF_FILE="trivy-${{ matrix.component.name }}.sarif"
-          
+
           if [ ! -f "$SARIF_FILE" ]; then
             echo "❌ **SARIF file not found** - Scan may have failed" >> $GITHUB_STEP_SUMMARY
             exit 0
           fi
-          
+
           # Extract vulnerability counts and details
           TOTAL_VULNS=$(jq '.runs[0].results | length' "$SARIF_FILE" 2>/dev/null || echo "0")
-          
+
           # Extract severities for each result with correct variable scope
           SEVERITIES=$(jq -r '.runs[0] as $run | $run.results[] | .ruleIndex as $ri | ($run.tool.driver.rules[$ri].properties."security-severity" // "0")' "$SARIF_FILE" 2>/dev/null)
-          
+
           CRITICAL_COUNT=0
           HIGH_COUNT=0
-          
+
           while IFS= read -r severity; do
             if [ -n "$severity" ] && [ "$severity" != "null" ] && [ "$severity" != "0" ]; then
               if (( $(echo "$severity >= 9.0" | bc -l 2>/dev/null || echo "0") )); then
@@ -95,7 +104,7 @@ jobs:
               fi
             fi
           done <<< "$SEVERITIES"
-          
+
           # Component info
           echo "## 📦 Component Information" >> $GITHUB_STEP_SUMMARY
           echo "| Field | Value |" >> $GITHUB_STEP_SUMMARY
@@ -104,27 +113,27 @@ jobs:
           echo "| **Image** | \`${{ matrix.component.image }}:${{ github.sha }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "| **Scan Time** | $(date -u '+%Y-%m-%d %H:%M:%S UTC') |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          
+
           # Vulnerability summary
           echo "## 📊 Vulnerability Summary" >> $GITHUB_STEP_SUMMARY
           echo "| Severity | Count | Status |" >> $GITHUB_STEP_SUMMARY
           echo "|----------|-------|--------|" >> $GITHUB_STEP_SUMMARY
-          
+
           if [ "$CRITICAL_COUNT" -gt 0 ]; then
             echo "| 🔴 **Critical** | $CRITICAL_COUNT | ❌ Action Required |" >> $GITHUB_STEP_SUMMARY
           else
             echo "| 🔴 **Critical** | $CRITICAL_COUNT | ✅ Clean |" >> $GITHUB_STEP_SUMMARY
           fi
-          
+
           if [ "$HIGH_COUNT" -gt 0 ]; then
             echo "| 🟠 **High** | $HIGH_COUNT | ❌ Action Required |" >> $GITHUB_STEP_SUMMARY
           else
             echo "| 🟠 **High** | $HIGH_COUNT | ✅ Clean |" >> $GITHUB_STEP_SUMMARY
           fi
-          
+
           echo "| 📈 **Total** | $TOTAL_VULNS | - |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          
+
           # Overall status
           if [ "$TOTAL_VULNS" -eq 0 ]; then
             echo "## ✅ Security Status: CLEAN" >> $GITHUB_STEP_SUMMARY
@@ -137,7 +146,7 @@ jobs:
             echo "> 💡 Only low/medium severity vulnerabilities detected." >> $GITHUB_STEP_SUMMARY
           fi
           echo "" >> $GITHUB_STEP_SUMMARY
-          
+
           # Detailed vulnerability list (if any found)
           if [ "$TOTAL_VULNS" -gt 0 ]; then
             echo "## 🔍 Vulnerability Details" >> $GITHUB_STEP_SUMMARY
@@ -173,10 +182,10 @@ jobs:
             
             echo "</details>" >> $GITHUB_STEP_SUMMARY
           fi
-          
+
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "## 📋 Next Steps" >> $GITHUB_STEP_SUMMARY
-          
+
           if [ "$TOTAL_VULNS" -gt 0 ]; then
             echo "1. 🔍 **Review Details:** Check the [Security tab](../security) for full vulnerability details" >> $GITHUB_STEP_SUMMARY
             echo "2. 📥 **Download Report:** Access the SARIF artifact from this workflow run" >> $GITHUB_STEP_SUMMARY
@@ -187,7 +196,7 @@ jobs:
             echo "2. 📊 **Monitor:** Continue regular security scanning" >> $GITHUB_STEP_SUMMARY
             echo "3. 🔄 **Maintain:** Keep dependencies updated" >> $GITHUB_STEP_SUMMARY
           fi
-          
+
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "---" >> $GITHUB_STEP_SUMMARY
           echo "*Powered by [Trivy](https://aquasecurity.github.io/trivy/) • Report generated $(date -u '+%Y-%m-%d %H:%M:%S UTC')*" >> $GITHUB_STEP_SUMMARY

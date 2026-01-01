@@ -32,19 +32,21 @@ jobs:
 
       - name: "Validate PR title with commitlint"
         id: commitlint
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
         run: |
           # Use commitlint to validate PR title (single source of truth)
-          echo "${{ github.event.pull_request.title }}" | npx --no-install commitlint 2>&1 | tee /tmp/commitlint-output.txt
+          echo "$PR_TITLE" | npx --no-install commitlint 2>&1 | tee /tmp/commitlint-output.txt
           exit_code=${PIPESTATUS[1]}
-          
+
           # Capture output for the comment
           {
             echo 'error_message<<EOF'
             cat /tmp/commitlint-output.txt
             echo 'EOF'
           } >> "$GITHUB_OUTPUT"
-          
-          exit $exit_code
+
+          exit "$exit_code"
         continue-on-error: true
 
       - name: "Comment on PR with validation error"

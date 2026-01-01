@@ -1,24 +1,28 @@
 #!/usr/bin/env node
 import { execSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
 import { createRequire } from "node:module";
+import { homedir } from "node:os";
 import path from "node:path";
 import process from "node:process";
 
 const require = createRequire(import.meta.url);
 
+// Cache directory for platform binaries (persisted across CI runs)
+const CACHE_DIR = path.join(homedir(), ".cache", "platform-binaries");
+
 function log(msg) {
-	console.log(`[platform-binaries] ${msg}`);
+  console.log(`[platform-binaries] ${msg}`);
 }
 
 function getVersionSafe(getter, label) {
-	try {
-		const v = getter();
-		if (typeof v === "string" && v.trim()) return v;
-	} catch (e) {
-		log(`WARN: Unable to resolve version for ${label}: ${e.message}`);
-	}
-	return "";
+  try {
+    const v = getter();
+    if (typeof v === "string" && v.trim()) return v;
+  } catch (e) {
+    log(`WARN: Unable to resolve version for ${label}: ${e.message}`);
+  }
+  return "";
 }
 
 // Detect platform triplet we support
@@ -27,91 +31,184 @@ const isX64 = process.arch === "x64";
 const suffix = isLinux && isX64 ? "linux-x64-gnu" : "";
 
 if (!suffix) {
-	log(
-		"INFO: Non-linux/x64 platform detected; no native platform binaries to install.",
-	);
-	process.exit(0);
+  log(
+    "INFO: Non-linux/x64 platform detected; no native platform binaries to install.",
+  );
+  process.exit(0);
 }
 
 // Resolve versions from installed/declared packages
 const rollupVer = getVersionSafe(
-	() => require("rollup/package.json").version,
-	"rollup",
+  () => require("rollup/package.json").version,
+  "rollup",
 );
 
 function resolveLightningCssVersion() {
-	// Try npm ls first (works well with workspaces)
-	try {
-		const out = execSync("npm ls lightningcss --json", {
-			stdio: "pipe",
-		}).toString();
-		const json = JSON.parse(out);
-		if (json.dependencies?.lightningcss?.version) {
-			return json.dependencies.lightningcss.version;
-		}
-	} catch {}
-	// Fallback: resolve file path then read nearest package.json
-	try {
-		const entry = require.resolve("lightningcss/node/index.js");
-		let dir = path.dirname(entry);
-		while (dir && dir !== path.parse(dir).root) {
-			const pj = path.join(dir, "package.json");
-			try {
-				const data = JSON.parse(readFileSync(pj, "utf8"));
-				if (data.name === "lightningcss" && data.version) return data.version;
-			} catch {}
-			dir = path.dirname(dir);
-		}
-	} catch {}
-	return "";
+  // Try npm ls first (works well with workspaces)
+  try {
+    const out = execSync("npm ls lightningcss --json", {
+      stdio: "pipe",
+    }).toString();
+    const json = JSON.parse(out);
+    if (json.dependencies?.lightningcss?.version) {
+      return json.dependencies.lightningcss.version;
+    }
+  } catch {}
+  // Fallback: resolve file path then read nearest package.json
+  try {
+    const entry = require.resolve("lightningcss/node/index.js");
+    let dir = path.dirname(entry);
+    while (dir && dir !== path.parse(dir).root) {
+      const pj = path.join(dir, "package.json");
+      try {
+        const data = JSON.parse(readFileSync(pj, "utf8"));
+        if (data.name === "lightningcss" && data.version) return data.version;
+      } catch {}
+      dir = path.dirname(dir);
+    }
+  } catch {}
+  return "";
 }
 
 const lightningCssVer = resolveLightningCssVersion();
 
 // Biome version from root package.json (single source of truth)
 const biomeVer = getVersionSafe(
-	() => require("../package.json").devDependencies["@biomejs/biome"],
-	"@biomejs/biome",
+  () => require("../package.json").devDependencies["@biomejs/biome"],
+  "@biomejs/biome",
 );
 
+// Check if a package is already installed with the correct version
+function isPackageInstalled(name, version) {
+  try {
+    const pkgPath = path.join(
+      process.cwd(),
+      "node_modules",
+      ...name.split("/"),
+      "package.json",
+    );
+    const pkg = JSON.parse(readFileSync(pkgPath, "utf8"));
+    return pkg.version === version;
+  } catch {
+    return false;
+  }
+}
+
+// Try to restore a package from cache
+function restoreFromCache(name, version) {
+  const cacheKey = `${name.replace("/", "-")}-${version}`;
+  const cachePath = path.join(CACHE_DIR, cacheKey);
+  const destPath = path.join(process.cwd(), "node_modules", ...name.split("/"));
+
+  if (existsSync(cachePath)) {
+    try {
+      // Ensure parent directory exists
+      mkdirSync(path.dirname(destPath), { recursive: true });
+      // Remove existing if any
+      if (existsSync(destPath)) {
+        rmSync(destPath, { recursive: true, force: true });
+      }
+      // Copy from cache
+      cpSync(cachePath, destPath, { recursive: true });
+      log(`RESTORED from cache: ${name}@${version}`);
+      return true;
+    } catch (e) {
+      log(`WARN: Failed to restore ${name} from cache: ${e.message}`);
+    }
+  }
+  return false;
+}
+
+// Save a package to cache for future runs
+function saveToCache(name, version) {
+  const cacheKey = `${name.replace("/", "-")}-${version}`;
+  const cachePath = path.join(CACHE_DIR, cacheKey);
+  const srcPath = path.join(process.cwd(), "node_modules", ...name.split("/"));
+
+  if (existsSync(srcPath)) {
+    try {
+      mkdirSync(CACHE_DIR, { recursive: true });
+      if (existsSync(cachePath)) {
+        rmSync(cachePath, { recursive: true, force: true });
+      }
+      cpSync(srcPath, cachePath, { recursive: true });
+      log(`SAVED to cache: ${name}@${version}`);
+    } catch (e) {
+      log(`WARN: Failed to save ${name} to cache: ${e.message}`);
+    }
+  }
+}
+
+// Track packages that need installation and those to save to cache
 const pkgs = [];
-if (rollupVer) pkgs.push(`@rollup/rollup-${suffix}@${rollupVer}`);
-if (lightningCssVer) pkgs.push(`lightningcss-${suffix}@${lightningCssVer}`);
+const toSaveToCache = [];
+
+// Helper to check/restore/queue a package
+function processPackage(name, version) {
+  if (!version) return;
+  if (isPackageInstalled(name, version)) {
+    log(`SKIP: ${name}@${version} already installed`);
+    return;
+  }
+  // Try to restore from cache first
+  if (restoreFromCache(name, version)) {
+    return;
+  }
+  // Need to install via npm
+  pkgs.push(`${name}@${version}`);
+  toSaveToCache.push({ name, version });
+}
+
+if (rollupVer) {
+  processPackage(`@rollup/rollup-${suffix}`, rollupVer);
+}
+if (lightningCssVer) {
+  processPackage(`lightningcss-${suffix}`, lightningCssVer);
+}
 // Biome CLI package naming does not include -gnu suffix
-if (biomeVer) pkgs.push(`@biomejs/cli-linux-x64@${biomeVer}`);
+if (biomeVer) {
+  processPackage("@biomejs/cli-linux-x64", biomeVer);
+}
 
 if (pkgs.length === 0) {
-	log("INFO: No platform-specific packages to install (versions unresolved).");
-	process.exit(0);
+  log(
+    "INFO: All platform-specific packages already installed or restored from cache.",
+  );
+  process.exit(0);
 }
 
 log(`Installing platform binaries: ${pkgs.join(", ")}`);
 try {
-	// Install at repo root to match hoisted module locations; avoid lockfile churn
-	execSync(`npm i --no-save --no-audit --progress=false ${pkgs.join(" ")}`, {
-		stdio: "inherit",
-		env: { ...process.env, npm_config_package_lock: "false" },
-	});
+  // Install at repo root to match hoisted module locations; avoid lockfile churn
+  execSync(`npm i --no-save --no-audit --progress=false ${pkgs.join(" ")}`, {
+    stdio: "inherit",
+    env: { ...process.env, npm_config_package_lock: "false" },
+  });
+
+  // Save newly installed packages to cache for future runs
+  for (const { name, version } of toSaveToCache) {
+    saveToCache(name, version);
+  }
 } catch (e) {
-	log(`ERROR: Failed to install platform binaries: ${e.status || ""}`);
-	process.exit(1);
+  log(`ERROR: Failed to install platform binaries: ${e.status || ""}`);
+  process.exit(1);
 }
 
 // Verify presence
 const verifyPkgs = [
-	"@rollup/rollup-linux-x64-gnu",
-	"lightningcss-linux-x64-gnu",
-	"@biomejs/cli-linux-x64",
+  "@rollup/rollup-linux-x64-gnu",
+  "lightningcss-linux-x64-gnu",
+  "@biomejs/cli-linux-x64",
 ];
 
 for (const p of verifyPkgs) {
-	try {
-		execSync(`npm ls ${p}`, { stdio: "inherit" });
-	} catch {
-		log(
-			`WARN: ${p} not found after install (may be unused or version unresolved).`,
-		);
-	}
+  try {
+    execSync(`npm ls ${p}`, { stdio: "inherit" });
+  } catch {
+    log(
+      `WARN: ${p} not found after install (may be unused or version unresolved).`,
+    );
+  }
 }
 
 log("Done installing platform-specific binaries.");

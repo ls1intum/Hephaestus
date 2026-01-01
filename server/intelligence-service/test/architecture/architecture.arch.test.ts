@@ -10,7 +10,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 
-const SRC_DIR = path.resolve(__dirname, "../src");
+// Resolve to the actual src directory (two levels up from test/architecture/)
+const SRC_DIR = path.resolve(__dirname, "../../src");
 
 /**
  * Recursively get all TypeScript files in a directory
@@ -317,8 +318,13 @@ describe("Architecture: Security", () => {
 
 describe("Architecture: File Organization", () => {
 	it("index.ts files should only contain exports (barrel files)", () => {
+		// Exclude: routes (have handlers), db (generated), and the root src/index.ts (app entry point)
 		const indexFiles = getTypeScriptFiles(SRC_DIR).filter(
-			(f) => f.endsWith("/index.ts") && !f.includes("/routes/") && !f.includes("/db/"),
+			(f) =>
+				f.endsWith("/index.ts") &&
+				!f.includes("/routes/") &&
+				!f.includes("/db/") &&
+				f !== path.join(SRC_DIR, "index.ts"), // Exclude app entry point
 		);
 		const violations: string[] = [];
 

@@ -1,4 +1,8 @@
-name: Security Scan
+name: Security
+
+# CodeQL SAST scanning is handled by GitHub's Default Setup (enabled in repo settings).
+# This provides automatic scanning on push/PR with incremental analysis and zero maintenance.
+# This workflow handles dependency scanning (Trivy) and secret detection (TruffleHog).
 
 on:
   workflow_call:
@@ -10,83 +14,28 @@ on:
         default: "false"
 
 jobs:
-  # Comprehensive security scanning
   security-scan:
-    name: ${{ matrix.scan-type }}
+    name: "${{ matrix.display-name }}"
     runs-on: ubuntu-latest
     if: inputs.should_skip != 'true'
-    timeout-minutes: 15
+    timeout-minutes: 10
     strategy:
       fail-fast: false
       matrix:
-        scan-type: [sast, dependencies, secrets]
+        include:
+          - scan-type: dependencies
+            display-name: "Dependencies"
+          - scan-type: secrets
+            display-name: "Secrets"
     permissions:
       security-events: write
       contents: read
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: ${{ matrix.scan-type == 'secrets' && 0 || 1 }}
 
-      # Ensure stable Node/npm and caching for Node steps used in SAST
-      - name: Setup Node.js (LTS) and npm cache
-        uses: actions/setup-node@v4
-        with:
-          node-version-file: '.node-version'
-          cache: 'npm'
-          cache-dependency-path: |
-            package-lock.json
-            webapp/package-lock.json
-
-      # SAST (Static Application Security Testing)
-      - name: Initialize CodeQL
-        if: matrix.scan-type == 'sast'
-        uses: github/codeql-action/init@v3
-        with:
-          languages: java-kotlin, javascript-typescript
-          queries: security-extended
-          build-mode: none
-
-      # Setup required build tools for CodeQL
-      - name: Setup build environment for CodeQL
-        if: matrix.scan-type == 'sast'
-        uses: ./.github/actions/setup-caches
-        with:
-          cache-type: "openapi-validation"
-          os: ${{ runner.os }}
-
-      - name: Build for CodeQL analysis
-        if: matrix.scan-type == 'sast'
-        run: |
-          echo "🔨 Building for CodeQL analysis..."
-          
-          # Java build
-          cd server/application-server
-          mvn compile -DskipTests --quiet
-          
-          # Node.js (webapp) - Type-only build for CodeQL; avoid bundle to reduce native deps
-          cd ../..
-          rm -rf node_modules
-          npm ci --workspaces --include=dev --include=optional --no-audit --progress=false
-          cd webapp
-          npx tsc --noEmit
-
-          # Node.js (intelligence-service) - TypeScript build for CodeQL
-          cd ../server/intelligence-service
-          npx tsc --noEmit
-
-          # Node.js (webhook-ingest) - TypeScript build for CodeQL
-          cd ../webhook-ingest
-          npx tsc --noEmit
-
-          echo "✅ Build completed"
-
-      - name: Perform CodeQL Analysis
-        if: matrix.scan-type == 'sast'
-        uses: github/codeql-action/analyze@v3
-
-      # Dependency vulnerability scanning
-      - name: Run Trivy dependency scan
+      - name: Trivy dependency scan
         if: matrix.scan-type == 'dependencies'
         uses: aquasecurity/trivy-action@0.31.0
         with:
@@ -97,14 +46,13 @@ jobs:
 
       - name: Upload Trivy results
         if: matrix.scan-type == 'dependencies'
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: "trivy-results.sarif"
 
-      # Secret scanning
-      - name: Run secret detection
+      - name: Secret detection
         if: matrix.scan-type == 'secrets'
-        uses: trufflesecurity/trufflehog@main
+        uses: trufflesecurity/trufflehog@v3.88.35
         with:
           path: ./
           base: ${{ github.event_name == 'pull_request' && github.base_ref || '' }}
