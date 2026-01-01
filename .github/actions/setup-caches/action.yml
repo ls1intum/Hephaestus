@@ -61,6 +61,7 @@ runs:
 
     # Playwright browser caching for Storybook tests
     - name: Cache Playwright browsers
+      id: playwright-cache
       if: inputs.cache-type == 'webapp-storybook'
       uses: actions/cache@v4
       with:
@@ -68,6 +69,9 @@ runs:
         key: ${{ inputs.os }}-playwright-${{ hashFiles('webapp/package-lock.json') }}
         restore-keys: |
           ${{ inputs.os }}-playwright-
+
+    # NOTE: Playwright browser installation happens in ci-tests.yml after npm ci
+    # This cache just restores browsers from previous runs if available
 
     # Storybook build cache for visual tests
     - name: Cache Storybook build

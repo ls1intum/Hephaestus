@@ -99,6 +99,21 @@ jobs:
           username: ${{ inputs.dockerhub-username }}
           password: ${{ secrets.dockerhub-token }}
 
+      # Pre-pull base images BEFORE buildx starts its container.
+      # The docker-container driver creates a separate BuildKit container that doesn't
+      # inherit Docker Hub credentials, causing 2+ minute metadata resolution delays.
+      # By pulling on the host first, the images and metadata are cached in the Docker daemon,
+      # and buildx can access them through the Docker socket mount.
+      - name: Pre-pull base images for cache
+        if: ${{ inputs.dockerhub-username != '' }}
+        run: |
+          # Extract base images from Dockerfile and pull them
+          # This populates the local Docker cache with metadata, avoiding rate limits in buildx
+          grep -E '^FROM ' ${{ inputs.docker-file }} | sed 's/FROM //' | sed 's/ AS .*//' | while read -r image; do
+            echo "Pre-pulling: $image"
+            docker pull "$image" --quiet || echo "Warning: Could not pre-pull $image (may be build stage)"
+          done
+
       - name: Log in to Container Registry
         uses: docker/login-action@v3
         with:

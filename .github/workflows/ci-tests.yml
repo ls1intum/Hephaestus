@@ -136,8 +136,9 @@ jobs:
       - name: Run tests
         if: steps.should_run.outputs.run == 'true' && startsWith(matrix.test-type, 'webapp-')
         run: |
-          rm -rf node_modules
-          npm ci --workspaces --include=dev --include=optional --no-audit --progress=false
+          # Use npm ci only - it clears node_modules automatically when lock file changed
+          # No manual rm -rf needed (saves 60-90s of reinstalling cached packages)
+          npm ci --no-audit --progress=false
           node scripts/install-platform-binaries.mjs
           cd webapp
 
@@ -146,23 +147,20 @@ jobs:
               npm run test
               ;;
             "webapp-storybook")
+              # Install Playwright browsers (cached in ~/.cache/ms-playwright by setup-caches)
               npx playwright install chromium --with-deps
               npm run test:storybook
               ;;
             "webapp-visual")
-              npm run build-storybook || {
-                cd .. && rm -rf node_modules
-                npm ci --workspaces --include=dev --include=optional --no-audit --progress=false
-                cd webapp && npm run build-storybook
-              }
+              npm run build-storybook
               ;;
           esac
 
       - name: Run tests
         if: steps.should_run.outputs.run == 'true' && startsWith(matrix.test-type, 'intelligence-service-')
         run: |
-          rm -rf node_modules server/intelligence-service/node_modules
-          npm install --no-audit --progress=false
+          # Use npm ci - automatically handles node_modules when lock file changed
+          npm ci --no-audit --progress=false
           node scripts/install-platform-binaries.mjs
           cd server/intelligence-service
 
@@ -175,8 +173,8 @@ jobs:
       - name: Run tests
         if: steps.should_run.outputs.run == 'true' && matrix.test-type == 'webhook-ingest-unit'
         run: |
-          rm -rf node_modules server/webhook-ingest/node_modules
-          npm install --no-audit --progress=false
+          # Use npm ci - automatically handles node_modules when lock file changed
+          npm ci --no-audit --progress=false
           node scripts/install-platform-binaries.mjs
           cd server/webhook-ingest
           npm run test
