@@ -33,6 +33,10 @@ const meta = {
 			control: "text",
 			description: "The workspace slug that was denied access",
 		},
+		reason: {
+			control: "text",
+			description: "Custom reason for denial (overrides default message)",
+		},
 	},
 } satisfies Meta<typeof WorkspaceForbidden>;
 
@@ -67,5 +71,14 @@ export const EmptySlug: Story = {
 export const UnicodeSlug: Story = {
 	args: {
 		slug: "workspace-🔒-секретный",
+	},
+};
+
+/** Custom reason message for permission-specific denial (e.g., role requirements). */
+export const WithCustomReason: Story = {
+	args: {
+		slug: "admin-settings",
+		reason:
+			"You need the Owner role to access workspace settings. Contact your workspace owner to request elevated permissions.",
 	},
 };

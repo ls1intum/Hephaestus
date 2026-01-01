@@ -13,6 +13,8 @@ import {
 export interface WorkspaceForbiddenProps {
 	/** The slug that the user cannot access (optional, for display purposes) */
 	slug?: string;
+	/** Optional reason for denial (e.g., "Owner role required"). If provided, shown instead of generic message. */
+	reason?: string;
 }
 
 /**
@@ -25,7 +27,7 @@ export interface WorkspaceForbiddenProps {
  * - Icons marked aria-hidden to prevent redundant announcements
  * - Long slugs are truncated to prevent layout breakage
  */
-export function WorkspaceForbidden({ slug }: WorkspaceForbiddenProps) {
+export function WorkspaceForbidden({ slug, reason }: WorkspaceForbiddenProps) {
 	const navigate = useNavigate();
 	const containerRef = useRef<HTMLDivElement>(null);
 
@@ -58,7 +60,9 @@ export function WorkspaceForbidden({ slug }: WorkspaceForbiddenProps) {
 					</EmptyMedia>
 					<EmptyTitle>Access denied</EmptyTitle>
 					<EmptyDescription>
-						{displaySlug ? (
+						{reason ? (
+							reason
+						) : displaySlug ? (
 							<>
 								You don&apos;t have permission to access the workspace{" "}
 								<strong className="break-all" title={slug}>
