@@ -55,3 +55,17 @@ export const LongSlug: Story = {
 		slug: "this-is-an-extremely-long-workspace-slug-that-would-normally-break-the-layout-if-not-properly-handled",
 	},
 };
+
+/** Empty string slug shows generic message. */
+export const EmptySlug: Story = {
+	args: {
+		slug: "",
+	},
+};
+
+/** Unicode/emoji in slug - tests character handling. */
+export const UnicodeSlug: Story = {
+	args: {
+		slug: "workspace-🔒-секретный",
+	},
+};
