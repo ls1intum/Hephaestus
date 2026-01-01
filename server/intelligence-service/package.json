@@ -22,7 +22,7 @@
     "test:integration": "vitest run --config vitest.config.integration.ts",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "test:arch": "vitest run test/architecture.test.ts",
+    "test:arch": "vitest run --config vitest.config.arch.ts",
     "check": "biome check src scripts test drizzle.config.ts",
     "check:fix": "biome check --write --unsafe src scripts test drizzle.config.ts",
     "format": "biome format --write .",

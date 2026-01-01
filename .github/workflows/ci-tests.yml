@@ -30,18 +30,9 @@ on:
         type: string
         default: "true"
 
-# ┌──────────────────────────────────────────────────────────────────────────────┐
-# │ TEST SUITE                                                                   │
-# │ Matrix-based test execution with path-based filtering.                       │
-# │                                                                               │
-# │ Test types:                                                                  │
-# │ - application-server-*: JUnit tests (unit, integration, architecture)        │
-# │ - webapp-unit: Vitest unit tests                                             │
-# │ - webapp-storybook: Storybook interaction tests with Playwright/Vitest       │
-# │ - webapp-visual: Chromatic visual regression tests                           │
-# │ - intelligence-service-*: Vitest unit and integration tests (Testcontainers) │
-# │ - webhook-ingest-*: Vitest unit tests                                        │
-# └──────────────────────────────────────────────────────────────────────────────┘
+# Test Matrix: application-server (unit/integration/architecture), webapp (unit/storybook/visual),
+# intelligence-service (unit/integration/architecture), webhook-ingest (unit)
+# Each job runs only if relevant files changed (path-based filtering)
 
 jobs:
   tests:
@@ -66,14 +57,13 @@ jobs:
             webapp-visual,
             intelligence-service-unit,
             intelligence-service-integration,
+            intelligence-service-architecture,
             webhook-ingest-unit,
           ]
 
     steps:
-      # ────────────────────────────────────────────────────────────────────────
       # Path-based skip logic
       # IMPORTANT: If adding a new test type to the matrix above, add a case here!
-      # ────────────────────────────────────────────────────────────────────────
       - name: Determine if test should run
         id: should_run
         run: |
@@ -84,7 +74,7 @@ jobs:
             "application-server-unit"|"application-server-integration"|"application-server-architecture")
               echo "run=${{ inputs.application_server_changed }}" >> $GITHUB_OUTPUT
               ;;
-            "intelligence-service-unit"|"intelligence-service-integration")
+            "intelligence-service-unit"|"intelligence-service-integration"|"intelligence-service-architecture")
               echo "run=${{ inputs.intelligence_service_changed }}" >> $GITHUB_OUTPUT
               ;;
             "webhook-ingest-unit")
@@ -216,6 +206,9 @@ jobs:
             "intelligence-service-integration")
               npm run test:integration
               ;;
+            "intelligence-service-architecture")
+              npm run test:arch
+              ;;
           esac
 
       # Webhook-ingest tests
@@ -296,6 +289,15 @@ jobs:
           reporter: java-junit
           fail-on-error: false
 
+      - name: Upload webapp-storybook test results
+        if: steps.should_run.outputs.run == 'true' && always() && matrix.test-type == 'webapp-storybook'
+        uses: dorny/test-reporter@v2
+        with:
+          name: "Test Results - ${{ matrix.test-type }}"
+          path: "webapp/test-results/junit-storybook.xml"
+          reporter: java-junit
+          fail-on-error: false
+
       - name: Upload Chromatic test results
         if: steps.should_run.outputs.run == 'true' && always() && matrix.test-type == 'webapp-visual' && startsWith(steps.chromatic.outputs.storybookUrl, 'http')
         uses: dorny/test-reporter@v2
@@ -323,10 +325,7 @@ jobs:
           reporter: java-junit
           fail-on-error: false
 
-      # ────────────────────────────────────────────────────────────────────────
       # Test Summary for Job Summary
-      # Creates a human-readable test summary visible in the Actions UI
-      # ────────────────────────────────────────────────────────────────────────
       - name: Generate test summary
         if: steps.should_run.outputs.run == 'true' && always()
         run: |

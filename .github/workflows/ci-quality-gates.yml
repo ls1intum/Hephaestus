@@ -8,14 +8,7 @@ on:
         required: false
         type: string
         default: "false"
-      # Force run all checks (e.g., when CI config changes)
-      force_run:
-        description: "Force run all checks regardless of path changes"
-        required: false
-        type: string
-        default: "false"
       # Path-based change detection inputs for selective execution
-      # These should already include ci-config fallback logic from caller
       webapp_changed:
         description: "Whether webapp files changed (or should run for other reasons)"
         required: false
@@ -37,13 +30,8 @@ on:
         type: string
         default: "true"
 
-# ┌──────────────────────────────────────────────────────────────────────────────┐
-# │ QUALITY GATES                                                                │
-# │ Matrix-based quality checks with path-based filtering.                       │
-# │                                                                               │
-# │ Each check runs only if relevant files changed, saving CI resources.         │
-# │ The matrix is intentionally NOT dynamic to preserve GitHub's job visibility. │
-# └──────────────────────────────────────────────────────────────────────────────┘
+# Quality Gates: Matrix-based checks with path-based filtering.
+# Each check runs only if relevant files changed, saving CI resources.
 
 jobs:
   quality-gates:
@@ -66,11 +54,7 @@ jobs:
             database-models-validation,
           ]
     steps:
-      # ────────────────────────────────────────────────────────────────────────
-      # Path-based skip logic
-      # This happens at step level to avoid matrix complexity while saving resources
-      # IMPORTANT: If adding a new check to the matrix above, add a case here too!
-      # ────────────────────────────────────────────────────────────────────────
+      # Path-based skip logic - add case for new checks!
       - name: Determine if check should run
         id: should_run
         run: |

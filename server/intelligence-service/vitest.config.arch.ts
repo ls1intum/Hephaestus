@@ -5,33 +5,33 @@ import { defineConfig } from "vitest/config";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 /**
- * Integration Test Configuration
+ * Architecture Test Configuration
  *
- * Runs integration tests WITH database setup (Testcontainers).
- * Uses glob pattern: includes all *.integration.test.ts files.
+ * Runs architecture tests WITHOUT database setup.
+ * These tests enforce architectural rules and coding standards.
  *
- * Usage: npx vitest run --config vitest.config.integration.ts
+ * Usage: npx vitest run --config vitest.config.arch.ts
  */
 export default defineConfig({
   test: {
-    name: "integration",
+    name: "architecture",
     environment: "node",
     passWithNoTests: false,
     globals: true,
 
-    // Glob pattern: all integration tests (require database)
-    include: ["test/**/*.integration.test.ts"],
+    // Architecture tests only
+    include: ["test/**/*.arch.test.ts"],
     exclude: ["node_modules", "dist"],
 
-    // Database setup with Testcontainers
-    globalSetup: ["./test/global-setup.ts"],
-    setupFiles: ["./test/setup.ts"],
+    // NO database setup for architecture tests
+    globalSetup: [],
+    setupFiles: [],
 
-    // Execution - integration tests need more time
+    // Execution
     pool: "threads",
     isolate: true,
-    testTimeout: 60000,
-    hookTimeout: 120000,
+    testTimeout: 30000,
+    hookTimeout: 60000,
     watch: false,
     reporters: ["verbose", "junit"],
 
@@ -42,7 +42,7 @@ export default defineConfig({
 
     // CI integration - JUnit reporter for GitHub Actions test summaries
     outputFile: {
-      junit: "./test-results/junit-integration.xml",
+      junit: "./test-results/junit-arch.xml",
     },
   },
   resolve: {

@@ -7,10 +7,8 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 /**
  * Unit Test Configuration
  *
- * Runs pure unit tests WITHOUT database setup:
- * - Excludes *.integration.test.ts files
- * - Excludes tests that use database fixtures (createTestFixtures, etc.)
- * - No globalSetup/setupFiles (no Testcontainers)
+ * Runs pure unit tests WITHOUT database setup.
+ * Uses glob patterns: includes all *.test.ts, excludes integration/arch tests.
  *
  * Usage: npx vitest run --config vitest.config.unit.ts
  */
@@ -21,25 +19,14 @@ export default defineConfig({
     passWithNoTests: false,
     globals: true,
 
-    // Pure unit tests only - no database dependencies
-    include: [
-      "test/chat/transformer.test.ts",
-      "test/chat/edge-cases.test.ts",
-      "test/chat/chat-shared.test.ts",
-      "test/utils/error.test.ts",
-      "test/shared/ai/error-handler.test.ts",
-      "test/tools/definitions.test.ts",
-      "test/tools/merger.test.ts",
-      "test/tools/context.test.ts",
-      "test/tools/constants.test.ts",
-      "test/streaming/*.test.ts",
-      "test/prompts/*.test.ts",
-      "test/detector/detector.test.ts",
-      "test/mentor/tools/*.test.ts",
-      // Note: architecture.test.ts excluded - needs fixes before CI enforcement
-      // Run manually: npm run test:arch
+    // Glob pattern: all *.test.ts except integration and architecture tests
+    include: ["test/**/*.test.ts"],
+    exclude: [
+      "node_modules",
+      "dist",
+      "test/**/*.integration.test.ts",
+      "test/**/*.arch.test.ts",
     ],
-    exclude: ["node_modules", "dist"],
 
     // NO database setup for pure unit tests
     globalSetup: [],

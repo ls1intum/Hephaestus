@@ -13,24 +13,8 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  # ┌──────────────────────────────────────────────────────────────────────────┐
-  # │ CHANGE DETECTION                                                          │
-  # │ Detects which components changed for selective job execution.             │
-  # │ This significantly reduces CI time when only specific components change.  │
-  # │                                                                            │
-  # │ Adding a new service? Update these files:                                 │
-  # │ 1. cicd.yml: Add path filter below and output                             │
-  # │ 2. ci-quality-gates.yml: Add to matrix and case statement                 │
-  # │ 3. ci-tests.yml: Add to matrix and case statement                         │
-  # │ 4. ci-docker-build.yml: Add new build job                                 │
-  # │ 5. setup-caches/action.yml: Add to cache-type conditions                  │
-  # │                                                                            │
-  # │ Why fetch-depth: 0?                                                       │
-  # │ - For PRs: paths-filter uses GitHub API (no git history needed)           │
-  # │ - For pushes/merge_group: needs git history to find merge-base            │
-  # │ We use fetch-depth: 0 to handle all event types consistently.             │
-  # │ See: https://github.com/dorny/paths-filter#supported-workflows            │
-  # └──────────────────────────────────────────────────────────────────────────┘
+  # Change Detection: Determines which components changed for selective CI execution
+  # Add new service: update cicd.yml, ci-quality-gates.yml, ci-tests.yml, ci-docker-build.yml, setup-caches
   detect-changes:
     name: "Detect changes"
     runs-on: ubuntu-latest
@@ -95,10 +79,7 @@ jobs:
               - '.github/workflows/**'
               - '.github/actions/**'
 
-  # ┌──────────────────────────────────────────────────────────────────────────┐
-  # │ QUALITY GATES                                                             │
-  # │ Code quality and style checks - runs selectively based on changes.        │
-  # └──────────────────────────────────────────────────────────────────────────┘
+  # Quality Gates: Code quality and style checks (runs selectively)
   quality-gates:
     uses: ./.github/workflows/ci-quality-gates.yml
     needs: [detect-changes]
@@ -112,21 +93,13 @@ jobs:
     secrets: inherit
     with:
       should_skip: ${{ needs.detect-changes.outputs.should_skip }}
-      # Force run all checks when CI config changes or on non-PR events (push to main, merge queue)
-      # This ensures workflow changes are fully validated
-      # Note: Using ternary pattern to ensure string output for workflow_call string inputs
-      # See: https://github.com/actions/runner/issues/1483
-      force_run: ${{ (needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
-      # Pass change detection to sub-workflow for further optimization
+      # Pass change detection to sub-workflow for optimization
       webapp_changed: ${{ (needs.detect-changes.outputs.webapp == 'true' || needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
       application_server_changed: ${{ (needs.detect-changes.outputs.application-server == 'true' || needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
       intelligence_service_changed: ${{ (needs.detect-changes.outputs.intelligence-service == 'true' || needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
       webhook_ingest_changed: ${{ (needs.detect-changes.outputs.webhook-ingest == 'true' || needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
 
-  # ┌──────────────────────────────────────────────────────────────────────────┐
-  # │ SECURITY SCANNING                                                         │
-  # │ Vulnerability scanning - runs on code changes for safety.                 │
-  # └──────────────────────────────────────────────────────────────────────────┘
+  # Security Scanning: Vulnerability scanning (runs on code changes)
   security-scan:
     uses: ./.github/workflows/ci-security-scan.yml
     needs: [detect-changes]
@@ -140,10 +113,7 @@ jobs:
     with:
       should_skip: ${{ needs.detect-changes.outputs.should_skip }}
 
-  # ┌──────────────────────────────────────────────────────────────────────────┐
-  # │ TEST SUITE                                                                │
-  # │ Comprehensive test execution - runs selectively based on changes.        │
-  # └──────────────────────────────────────────────────────────────────────────┘
+  # Test Suite: Comprehensive test execution (runs selectively)
   test-suite:
     uses: ./.github/workflows/ci-tests.yml
     needs: [detect-changes]
@@ -162,10 +132,7 @@ jobs:
       intelligence_service_changed: ${{ (needs.detect-changes.outputs.intelligence-service == 'true' || needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
       webhook_ingest_changed: ${{ (needs.detect-changes.outputs.webhook-ingest == 'true' || needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
 
-  # ┌──────────────────────────────────────────────────────────────────────────┐
-  # │ DOCKER BUILDS                                                             │
-  # │ Builds Docker images - runs selectively based on component changes.       │
-  # └──────────────────────────────────────────────────────────────────────────┘
+  # Docker Builds: Build Docker images (runs selectively)
   docker-build:
     uses: ./.github/workflows/ci-docker-build.yml
     needs: [detect-changes]
@@ -186,22 +153,8 @@ jobs:
       intelligence_service_changed: ${{ (needs.detect-changes.outputs.intelligence-service == 'true' || needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
       webhook_ingest_changed: ${{ (needs.detect-changes.outputs.webhook-ingest == 'true' || needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
 
-  # ┌──────────────────────────────────────────────────────────────────────────┐
-  # │ CI STATUS GATE                                                            │
-  # │ Aggregated success gate for branch protection rules.                      │
-  # │                                                                            │
-  # │ Why this job exists:                                                       │
-  # │ - Branch protection requires a single check for merge eligibility         │
-  # │ - With path-based filtering, individual jobs may be skipped               │
-  # │ - Skipped jobs count as "success" for branch protection, but we need      │
-  # │   explicit verification that no jobs failed or were cancelled             │
-  # │                                                                            │
-  # │ Status interpretation:                                                     │
-  # │ - 'success': Job ran and passed                                           │
-  # │ - 'skipped': Job was skipped (path filtering or condition not met)        │
-  # │ - 'failure': Job ran and failed - BLOCKS MERGE                            │
-  # │ - 'cancelled': Job was cancelled - BLOCKS MERGE                           │
-  # └──────────────────────────────────────────────────────────────────────────┘
+  # CI Status Gate: Single check for branch protection. Verifies all jobs passed or were skipped.
+  # Status: success=passed, skipped=filtered, failure/cancelled=blocks merge
   all-ci-passed:
     name: "CI Status Gate"
     runs-on: ubuntu-latest
