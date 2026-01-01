@@ -37,16 +37,16 @@ graph TD
 
 ## ⚡ Pipeline Timeline
 
-| Stage                 | Duration                   | Notes                   |
-| --------------------- | -------------------------- | ----------------------- |
-| Quality gates         | ~3 min                     | Parallel with tests     |
-| Tests                 | ~3 min                     | Parallel with gates     |
-| Docker builds         | ~7 min                     | Uses layer caching      |
-| semantic-release      | ~1 min                     | Creates tag + changelog |
-| Staging deploy        | ~2 min                     | Automatic               |
-| **Your verification** | You decide                 | Check staging           |
-| Production deploy     | ~2 min                     | After approval          |
-| **Total**             | **~15 min + verification** |                         |
+| Stage                 | Duration                   | Notes                       |
+| --------------------- | -------------------------- | --------------------------- |
+| Quality gates         | ~3 min                     | Parallel with tests         |
+| Tests                 | ~3 min                     | Parallel with gates         |
+| Docker builds         | ~3 min (cached)            | Registry cache, ~7 min cold |
+| semantic-release      | ~1 min                     | Creates tag + changelog     |
+| Staging deploy        | ~2 min                     | Automatic                   |
+| **Your verification** | You decide                 | Check staging               |
+| Production deploy     | ~2 min                     | After approval              |
+| **Total**             | **~12 min + verification** | ~8 min with full cache hits |
 
 ## 🚀 Release Flow
 
@@ -160,9 +160,27 @@ CI only runs jobs for components that actually changed:
 
 ### Docker Layer Caching
 
-- All images built every run
-- Aggressive caching makes unchanged builds instant
-- Ensures every commit is deployable
+Docker builds use **registry-based caching** to store intermediate layers in `ghcr.io`:
+
+| Component            | First Build | Cached Build | Cache Size |
+| -------------------- | ----------- | ------------ | ---------- |
+| Application Server   | ~7 min      | ~2 min       | ~500 MB    |
+| Webapp               | ~5 min      | ~1 min       | ~200 MB    |
+| Intelligence Service | ~4 min      | ~1 min       | ~150 MB    |
+| Webhook Ingest       | ~3 min      | ~1 min       | ~100 MB    |
+
+**How it works:**
+
+- `cache-from`: Pulls cached layers from registry (main branch + current branch)
+- `cache-to`: Pushes new layers with `mode=max` (all intermediate layers)
+- Separate cache tags per platform: `image:cache-linux-amd64`, `image:cache-linux-arm64`
+
+**Benefits over GitHub Actions Cache:**
+
+- No 10GB size limit (registry is unlimited)
+- No eviction after 7 days
+- Works across branches (PRs benefit from main's cache)
+- Persistent (survives cache clearing)
 
 ### Parallel Execution
 
