@@ -73,6 +73,20 @@ runs:
     # NOTE: Playwright browser installation happens in ci-tests.yml after npm ci
     # This cache just restores browsers from previous runs if available
 
+    # Platform-specific binary caching for Linux runners
+    # These packages (@rollup/rollup-linux-x64-gnu, lightningcss-linux-x64-gnu, @biomejs/cli-linux-x64)
+    # are installed via scripts/install-platform-binaries.mjs after npm ci.
+    # We cache them in ~/.cache/platform-binaries and restore after npm ci wipes node_modules.
+    - name: Cache platform binaries
+      id: platform-cache
+      if: contains(fromJSON('["webapp-quality", "webapp-visual", "webapp-unit", "webapp-storybook", "intelligence-service-quality", "intelligence-service-unit", "intelligence-service-integration", "intelligence-service-architecture", "webhook-ingest-quality", "webhook-ingest-unit"]'), inputs.cache-type) && runner.os == 'Linux'
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/platform-binaries
+        key: ${{ inputs.os }}-platform-binaries-${{ hashFiles('package.json') }}
+        restore-keys: |
+          ${{ inputs.os }}-platform-binaries-
+
     # Storybook build cache for visual tests
     - name: Cache Storybook build
       if: contains(fromJSON('["webapp-visual", "webapp-storybook"]'), inputs.cache-type)

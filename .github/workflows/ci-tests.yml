@@ -52,8 +52,14 @@ jobs:
             display-name: "App Server: Architecture"
           - test-type: webapp-unit
             display-name: "Webapp: Unit"
+          # Storybook tests are sharded (2 shards) for faster execution
+          # Each shard runs ~half the tests, reducing total time from 157s to ~80s
           - test-type: webapp-storybook
-            display-name: "Webapp: Storybook"
+            display-name: "Webapp: Storybook (1/2)"
+            shard: "1/2"
+          - test-type: webapp-storybook
+            display-name: "Webapp: Storybook (2/2)"
+            shard: "2/2"
           - test-type: webapp-visual
             display-name: "Webapp: Visual"
           - test-type: intelligence-service-unit
@@ -149,7 +155,8 @@ jobs:
             "webapp-storybook")
               # Install Playwright browsers (cached in ~/.cache/ms-playwright by setup-caches)
               npx playwright install chromium --with-deps
-              npm run test:storybook
+              # Use sharding to split tests across parallel runners (157s -> ~80s per shard)
+              npm run test:storybook -- --shard=${{ matrix.shard || '1/1' }}
               ;;
             "webapp-visual")
               npm run build-storybook
@@ -244,7 +251,7 @@ jobs:
         if: steps.should_run.outputs.run == 'true' && always() && matrix.test-type == 'webapp-storybook'
         uses: dorny/test-reporter@v2
         with:
-          name: "Test Results - ${{ matrix.test-type }}"
+          name: "Test Results - ${{ matrix.display-name }}"
           path: "webapp/test-results/junit-storybook.xml"
           reporter: java-junit
           fail-on-error: false
