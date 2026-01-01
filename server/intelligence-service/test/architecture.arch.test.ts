@@ -317,8 +317,13 @@ describe("Architecture: Security", () => {
 
 describe("Architecture: File Organization", () => {
 	it("index.ts files should only contain exports (barrel files)", () => {
+		// Exclude: routes (have handlers), db (generated), and the root src/index.ts (app entry point)
 		const indexFiles = getTypeScriptFiles(SRC_DIR).filter(
-			(f) => f.endsWith("/index.ts") && !f.includes("/routes/") && !f.includes("/db/"),
+			(f) =>
+				f.endsWith("/index.ts") &&
+				!f.includes("/routes/") &&
+				!f.includes("/db/") &&
+				f !== path.join(SRC_DIR, "index.ts"), // Exclude app entry point
 		);
 		const violations: string[] = [];
 
