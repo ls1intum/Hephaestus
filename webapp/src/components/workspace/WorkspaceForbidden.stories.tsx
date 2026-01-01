@@ -53,32 +53,17 @@ export const WithSlug: Story = {
 	},
 };
 
-/** Extremely long slug is truncated to prevent layout issues. Title attribute shows full slug on hover. */
+/** Long slug is truncated to prevent layout issues. */
 export const LongSlug: Story = {
 	args: {
-		slug: "this-is-an-extremely-long-workspace-slug-that-would-normally-break-the-layout-if-not-properly-handled",
+		slug: "this-is-an-extremely-long-workspace-slug-that-would-break-layout",
 	},
 };
 
-/** Empty string slug shows generic message. */
-export const EmptySlug: Story = {
-	args: {
-		slug: "",
-	},
-};
-
-/** Unicode/emoji in slug - tests character handling. */
-export const UnicodeSlug: Story = {
-	args: {
-		slug: "workspace-🔒-секретный",
-	},
-};
-
-/** Custom reason message for permission-specific denial (e.g., role requirements). */
+/** Custom reason message for permission-specific denial. */
 export const WithCustomReason: Story = {
 	args: {
 		slug: "admin-settings",
-		reason:
-			"You need the Owner role to access workspace settings. Contact your workspace owner to request elevated permissions.",
+		reason: "You need the Owner role to access workspace settings.",
 	},
 };

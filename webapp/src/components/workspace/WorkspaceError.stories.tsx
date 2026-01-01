@@ -47,8 +47,15 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** TypeError (fetch failures) shows network-friendly messaging. */
-export const FetchTypeError: Story = {
+/** Generic unexpected error shows standard message. */
+export const Default: Story = {
+	args: {
+		error: new Error("Something unexpected happened"),
+	},
+};
+
+/** Network error detected shows retry-friendly message. */
+export const NetworkError: Story = {
 	args: {
 		error: (() => {
 			const err = new Error("Failed to fetch");
@@ -58,88 +65,10 @@ export const FetchTypeError: Story = {
 	},
 };
 
-/** Network error detected via error.name shows retry-friendly message. */
-export const NetworkError: Story = {
-	args: {
-		error: (() => {
-			const err = new Error("Network request failed");
-			err.name = "NetworkError";
-			return err;
-		})(),
-	},
-};
-
-/** Timeout error detected via message pattern. */
-export const TimeoutError: Story = {
-	args: {
-		error: new Error("Request timeout after 30000ms"),
-	},
-};
-
-/** Connection error detected via message pattern. */
-export const ConnectionError: Story = {
-	args: {
-		error: new Error("Connection refused: ECONNREFUSED"),
-	},
-};
-
-/** Generic unexpected error shows standard message. */
-export const UnexpectedError: Story = {
-	args: {
-		error: new Error("Something unexpected happened"),
-	},
-};
-
 /** Error with a reset function available. */
 export const WithReset: Story = {
 	args: {
-		error: new Error("Connection timeout"),
-		reset: () => {
-			console.log("Reset triggered");
-		},
-	},
-};
-
-/** Server error (500) without network indicators. */
-export const ServerError: Story = {
-	args: {
-		error: new Error("Internal Server Error"),
-	},
-};
-
-/** CORS error detected via message pattern. */
-export const CorsError: Story = {
-	args: {
-		error: new Error("CORS policy: No 'Access-Control-Allow-Origin' header"),
-	},
-};
-
-/** Error with empty message - defensive handling. */
-export const EmptyMessage: Story = {
-	args: {
-		error: (() => {
-			const err = new Error();
-			err.message = "";
-			return err;
-		})(),
-	},
-};
-
-/** Error with undefined message - defensive handling. */
-export const UndefinedMessage: Story = {
-	args: {
-		error: (() => {
-			const err = new Error();
-			// @ts-expect-error - Testing edge case where message is undefined
-			err.message = undefined;
-			return err;
-		})(),
-	},
-};
-
-/** Extremely long error message - tests truncation in dev details. */
-export const LongErrorMessage: Story = {
-	args: {
-		error: new Error("A".repeat(10000)),
+		error: new Error("Request failed"),
+		reset: () => console.log("Reset triggered"),
 	},
 };

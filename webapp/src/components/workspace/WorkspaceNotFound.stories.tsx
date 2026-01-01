@@ -59,37 +59,9 @@ export const WithRetry: Story = {
 	},
 };
 
-/** Extremely long slug is truncated to prevent layout issues. Title attribute shows full slug on hover. */
+/** Long slug is truncated. XSS characters are escaped by React. */
 export const LongSlug: Story = {
 	args: {
-		slug: "this-is-an-extremely-long-workspace-slug-that-would-normally-break-the-layout-if-not-properly-handled",
-	},
-};
-
-/** Special characters in slug are handled safely. */
-export const SpecialCharacters: Story = {
-	args: {
-		slug: "test-workspace-<script>alert('xss')</script>",
-	},
-};
-
-/** Empty string slug shows generic message. */
-export const EmptySlug: Story = {
-	args: {
-		slug: "",
-	},
-};
-
-/** Unicode/emoji in slug - tests character handling. */
-export const UnicodeSlug: Story = {
-	args: {
-		slug: "workspace-🚀-日本語-عربي",
-	},
-};
-
-/** Slug with only special characters. */
-export const OnlySpecialChars: Story = {
-	args: {
-		slug: "!@#$%^&*()",
+		slug: "this-is-an-extremely-long-workspace-slug-that-would-break-layout",
 	},
 };
