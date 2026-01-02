@@ -252,7 +252,7 @@ function AppSidebarContainer() {
 	};
 
 	const handleAddWorkspace = () => {
-		// TODO: Replace with actual GitHub App installation URL or a proper dialog
+		// Workspace creation requires GitHub App installation - admin-initiated flow
 		alert(
 			"To create a workspace, please install the Hephaestus GitHub App on your repository. Contact your administrator for the installation URL.",
 		);

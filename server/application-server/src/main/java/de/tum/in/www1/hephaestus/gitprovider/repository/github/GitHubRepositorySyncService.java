@@ -4,13 +4,10 @@ import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubClientExecutor;
 import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationRepository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
-import de.tum.in.www1.hephaestus.workspace.WorkspaceService;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Collection;
-import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 import org.kohsuke.github.GHFileNotFoundException;
 import org.kohsuke.github.GHRepository;
 import org.kohsuke.github.HttpException;
@@ -39,60 +36,6 @@ public class GitHubRepositorySyncService {
 
     @Autowired
     private GitHubRepositoryConverter repositoryConverter;
-
-    @Lazy
-    @Autowired
-    private WorkspaceService workspaceService;
-
-    /**
-     * Syncs all repositories owned by a specific GitHub user or organization.
-     *
-     * @param owner The GitHub username (login) of the repository owner.
-     */
-    //TODO: Consider deleting this method -> not used in the application
-    public void syncAllRepositoriesOfOwner(Long workspaceId, String owner) {
-        try {
-            gitHubClientExecutor.execute(workspaceId, gh -> {
-                var builder = gh.searchRepositories().user(owner);
-                var iterator = builder.list().withPageSize(100).iterator();
-                while (iterator.hasNext()) {
-                    var ghRepositories = iterator.nextPage();
-                    ghRepositories.forEach(this::processRepository);
-                }
-                return null;
-            });
-        } catch (IOException e) {
-            logger.error(
-                "Failed to obtain GitHub client or list repositories for owner {}: {}",
-                owner,
-                e.getMessage(),
-                e
-            );
-        }
-    }
-
-    /**
-     * Syncs a list of repositories specified by their full names (e.g.,
-     * "owner/repo").
-     *
-     * @param nameWithOwners A list of repository full names in the format
-     *                       "owner/repo".
-     * @return A list of successfully fetched GitHub repositories.
-     */
-    //TODO: Consider deleting this method -> not used in the application
-    public List<GHRepository> syncAllRepositories(Set<String> nameWithOwners) {
-        return workspaceService
-            .listAllWorkspaces()
-            .stream()
-            .flatMap(ws ->
-                nameWithOwners
-                    .stream()
-                    .map(nameWithOwner -> syncRepository(ws.getId(), nameWithOwner))
-                    .filter(Optional::isPresent)
-                    .map(Optional::get)
-            )
-            .toList();
-    }
 
     /**
      * Syncs a single GitHub repository by its full name (e.g., "owner/repo").

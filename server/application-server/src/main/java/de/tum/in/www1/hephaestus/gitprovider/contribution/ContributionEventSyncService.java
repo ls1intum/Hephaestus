@@ -50,7 +50,8 @@ public class ContributionEventSyncService {
         event.setSourceId(pullRequestReview.getId());
         event.setActor(pullRequestReview.getAuthor());
         event.setOccurredAt(pullRequestReview.getSubmittedAt());
-        event.setXpAwarded(0); // TODO: Real XP calculation
+        // XP calculation is a future feature; placeholder value until gamification system is implemented
+        event.setXpAwarded(0);
         contributionEventRepository.saveAndFlush(event);
     }
 }
