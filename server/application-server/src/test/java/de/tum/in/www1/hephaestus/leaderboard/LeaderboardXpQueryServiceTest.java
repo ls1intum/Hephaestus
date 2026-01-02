@@ -52,11 +52,11 @@ class LeaderboardXpQueryServiceTest {
     @BeforeEach
     void setUp() {
         service = new LeaderboardXpQueryService(activityEventRepository, userRepository);
-        
+
         // Default mock for distinct PR count query - returns empty list (0 PRs) by default
-        when(activityEventRepository.findDistinctReviewedPullRequestCountsByActors(
-            any(), anySet(), any(), any()
-        )).thenReturn(List.of());
+        when(
+            activityEventRepository.findDistinctReviewedPullRequestCountsByActors(any(), anySet(), any(), any())
+        ).thenReturn(List.of());
     }
 
     @Nested

@@ -32,7 +32,7 @@ import org.mockito.quality.Strictness;
 
 /**
  * Unit tests for ActivityEventListener.
- * 
+ *
  * <p>Tests verify that activity events are correctly recorded using event payload data
  * and getReferenceById() for entity references (no N+1 queries).
  */
@@ -341,10 +341,7 @@ class ActivityEventListenerTest {
         void skipsPullRequests() {
             PullRequest pullRequest = createPullRequest(11L);
 
-            var event = new DomainEvent.IssueCreated(
-                EventPayload.IssueData.from(pullRequest),
-                createContext()
-            );
+            var event = new DomainEvent.IssueCreated(EventPayload.IssueData.from(pullRequest), createContext());
 
             listener.onIssueCreated(event);
 
@@ -384,11 +381,7 @@ class ActivityEventListenerTest {
         void skipsPullRequests() {
             PullRequest pullRequest = createPullRequest(13L);
 
-            var event = new DomainEvent.IssueClosed(
-                EventPayload.IssueData.from(pullRequest),
-                null,
-                createContext()
-            );
+            var event = new DomainEvent.IssueClosed(EventPayload.IssueData.from(pullRequest), null, createContext());
 
             listener.onIssueClosed(event);
 

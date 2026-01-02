@@ -41,6 +41,8 @@ public enum ActivityEventType {
     REVIEW_UNKNOWN("review.unknown"),
     /** Review dismissed - XP adjustment event (negative XP to reverse original review) */
     REVIEW_DISMISSED("review.dismissed"),
+    /** Review edited - state or content changed (e.g., COMMENTED → APPROVED) */
+    REVIEW_EDITED("review.edited"),
 
     // ========================================================================
     // Comments (Collaboration quality - for leaderboard scoring)

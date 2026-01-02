@@ -9,6 +9,8 @@ import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.Mannequin;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.Organization;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.User;
 import java.net.URI;
+import java.time.Instant;
+import java.time.OffsetDateTime;
 import org.springframework.lang.Nullable;
 
 /**
@@ -36,15 +38,25 @@ public record GitHubUserDTO(
     @JsonProperty("location") String location,
     @JsonProperty("blog") String blog,
     @JsonProperty("followers") Integer followers,
-    @JsonProperty("following") Integer following
+    @JsonProperty("following") Integer following,
+    // Timestamp fields - populated from full user fetch via GraphQL
+    @JsonProperty("created_at") Instant createdAt,
+    @JsonProperty("updated_at") Instant updatedAt
 ) {
     /**
      * Compact constructor for backward compatibility with minimal user references.
      * Profile fields default to null.
      */
-    public GitHubUserDTO(Long id, Long databaseId, String login, String avatarUrl, 
-                         String htmlUrl, String name, String email) {
-        this(id, databaseId, login, avatarUrl, htmlUrl, name, email, null, null, null, null, null, null);
+    public GitHubUserDTO(
+        Long id,
+        Long databaseId,
+        String login,
+        String avatarUrl,
+        String htmlUrl,
+        String name,
+        String email
+    ) {
+        this(id, databaseId, login, avatarUrl, htmlUrl, name, email, null, null, null, null, null, null, null, null);
     }
 
     /**
@@ -105,7 +117,10 @@ public record GitHubUserDTO(
             user.getLocation(),
             uriToString(user.getWebsiteUrl()),
             user.getFollowers() != null ? user.getFollowers().getTotalCount() : null,
-            user.getFollowing() != null ? user.getFollowing().getTotalCount() : null
+            user.getFollowing() != null ? user.getFollowing().getTotalCount() : null,
+            // Timestamp fields
+            offsetDateTimeToInstant(user.getCreatedAt()),
+            offsetDateTimeToInstant(user.getUpdatedAt())
         );
     }
 
@@ -202,5 +217,9 @@ public record GitHubUserDTO(
 
     private static String uriToString(@Nullable URI uri) {
         return uri != null ? uri.toString() : null;
+    }
+
+    private static Instant offsetDateTimeToInstant(@Nullable OffsetDateTime odt) {
+        return odt != null ? odt.toInstant() : null;
     }
 }

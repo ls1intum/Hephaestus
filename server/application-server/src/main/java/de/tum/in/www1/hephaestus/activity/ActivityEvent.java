@@ -63,7 +63,10 @@ import org.hibernate.annotations.Type;
         // User activity queries: mentor context with time range
         @Index(name = "idx_activity_event_actor_occurred", columnList = "actor_id, occurred_at DESC"),
         // Combined workspace + user queries: activity breakdown
-        @Index(name = "idx_activity_event_workspace_actor_occurred", columnList = "workspace_id, actor_id, occurred_at DESC"),
+        @Index(
+            name = "idx_activity_event_workspace_actor_occurred",
+            columnList = "workspace_id, actor_id, occurred_at DESC"
+        ),
         // Attribution queries: correlation chain lookups
         @Index(name = "idx_activity_event_correlation", columnList = "correlation_id"),
     }
@@ -124,6 +127,18 @@ public class ActivityEvent {
     /** Groups related events: notification.sent → notification.clicked → pr.opened */
     @Column(name = "correlation_id")
     private UUID correlationId;
+
+    /**
+     * Context explaining why this event was recorded.
+     *
+     * <p>Examples: "webhook", "sync", "backfill", "manual_correction", "scheduled"
+     *
+     * <p>This field completes the audit trail (WHO, WHAT, WHEN, WHERE, WHY) by
+     * documenting the trigger/source of the event, enabling forensic analysis
+     * of event chains during incident investigations.
+     */
+    @Column(name = "trigger_context", length = 64)
+    private String triggerContext;
 
     /**
      * XP points earned for this activity (computed at event time).

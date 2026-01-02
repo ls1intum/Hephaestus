@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import de.tum.in.www1.hephaestus.activity.badpracticedetector.BadPracticeDetectorScheduler;
 import de.tum.in.www1.hephaestus.gitprovider.common.events.DomainEvent;
 import de.tum.in.www1.hephaestus.gitprovider.label.Label;
 import de.tum.in.www1.hephaestus.gitprovider.label.LabelRepository;
@@ -18,6 +17,7 @@ import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
+import de.tum.in.www1.hephaestus.practices.detection.BadPracticeDetectorScheduler;
 import de.tum.in.www1.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.in.www1.hephaestus.workspace.AccountType;
 import de.tum.in.www1.hephaestus.workspace.Workspace;

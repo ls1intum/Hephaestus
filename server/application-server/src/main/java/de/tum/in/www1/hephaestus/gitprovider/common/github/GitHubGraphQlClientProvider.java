@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.gitprovider.common.github;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.exception.CircuitBreakerOpenException;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.app.GitHubAppTokenService;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.app.GitHubAppTokenService.InstallationToken;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.AuthMode;

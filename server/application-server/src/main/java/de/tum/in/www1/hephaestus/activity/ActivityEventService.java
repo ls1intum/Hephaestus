@@ -7,13 +7,18 @@ import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.workspace.Workspace;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceRepository;
 import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.DistributionSummary;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
+import io.micrometer.observation.annotation.Observed;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.time.Instant;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.cache.annotation.CacheEvict;
+import org.slf4j.MDC;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.TransientDataAccessException;
 import org.springframework.lang.Nullable;
@@ -67,23 +72,38 @@ class ActivityEventService {
      */
     public static final int CURRENT_SCHEMA_VERSION = 1;
 
+    private static final int MAX_STACK_TRACE_LENGTH = 4000;
+    private static final int MAX_RETRY_ATTEMPTS = 3;
+
     private final ActivityEventRepository eventRepository;
+    private final DeadLetterEventRepository deadLetterRepository;
     private final WorkspaceRepository workspaceRepository;
     private final ExperiencePointProperties xpProperties;
+    private final LeaderboardCacheManager cacheManager;
     private final Counter eventsRecordedCounter;
     private final Counter eventsDuplicateCounter;
     private final Counter eventsFailedCounter;
+    private final Counter deadLettersPersistedCounter;
+    private final Timer recordTimer;
+    private final DistributionSummary xpDistribution;
     private final MeterRegistry meterRegistry;
+
+    // Pre-registered timers per event type to avoid cardinality bomb
+    private final ConcurrentHashMap<ActivityEventType, Timer> eventTypeTimers = new ConcurrentHashMap<>();
 
     public ActivityEventService(
         ActivityEventRepository eventRepository,
+        DeadLetterEventRepository deadLetterRepository,
         WorkspaceRepository workspaceRepository,
         ExperiencePointProperties xpProperties,
+        LeaderboardCacheManager cacheManager,
         MeterRegistry meterRegistry
     ) {
         this.eventRepository = eventRepository;
+        this.deadLetterRepository = deadLetterRepository;
         this.workspaceRepository = workspaceRepository;
         this.xpProperties = xpProperties;
+        this.cacheManager = cacheManager;
         this.eventsRecordedCounter = Counter.builder("activity.events.recorded")
             .description("Number of activity events recorded")
             .register(meterRegistry);
@@ -93,7 +113,38 @@ class ActivityEventService {
         this.eventsFailedCounter = Counter.builder("activity.events.failed")
             .description("Number of activity events that failed to record after retries")
             .register(meterRegistry);
+        this.deadLettersPersistedCounter = Counter.builder("activity.dead_letters.persisted")
+            .description("Number of failed events persisted to dead letter storage")
+            .register(meterRegistry);
+        this.recordTimer = Timer.builder("activity.events.record.duration")
+            .description("Time to persist activity event")
+            .publishPercentiles(0.5, 0.95, 0.99)
+            .register(meterRegistry);
+        this.xpDistribution = DistributionSummary.builder("activity.xp.distribution")
+            .description("Distribution of XP values recorded")
+            .publishPercentiles(0.5, 0.95, 0.99)
+            .register(meterRegistry);
         this.meterRegistry = meterRegistry;
+
+        // Register gauge for pending dead letters
+        deadLetterRepository.count(); // Initialize lazy count
+        meterRegistry.gauge("activity.dead_letters.pending", deadLetterRepository, repo ->
+            repo.countByStatus(DeadLetterEvent.Status.PENDING)
+        );
+    }
+
+    /**
+     * Get or create a timer for the given event type.
+     * Pre-registers timers to avoid unbounded cardinality.
+     */
+    private Timer getTimerForEventType(ActivityEventType eventType) {
+        return eventTypeTimers.computeIfAbsent(eventType, type ->
+            Timer.builder("activity.events.record.duration.by_type")
+                .description("Time to persist activity event by type")
+                .tag("eventType", type.name())
+                .publishPercentiles(0.5, 0.95, 0.99)
+                .register(meterRegistry)
+        );
     }
 
     /**
@@ -113,11 +164,12 @@ class ActivityEventService {
      *         </ul>
      */
     @Transactional
-    @CacheEvict(value = "leaderboardXp", allEntries = true)
+    @Observed(name = "activity.record", contextualName = "record-activity-event")
     @Retryable(
         retryFor = TransientDataAccessException.class,
         maxAttempts = 3,
-        backoff = @Backoff(delay = 100, multiplier = 2, maxDelay = 1000)
+        backoff = @Backoff(delay = 100, multiplier = 2, maxDelay = 1000),
+        listeners = "activityRetryListener"
     )
     public boolean record(
         Long workspaceId,
@@ -168,16 +220,30 @@ class ActivityEventService {
             .sourceSystem(sourceSystem.getValue())
             .payload(payload)
             .schemaVersion(CURRENT_SCHEMA_VERSION)
+            .triggerContext("webhook") // Default context for webhook-triggered events
             .build();
 
         try {
-            Timer.builder("activity.events.record.duration")
-                .description("Time to persist activity event")
-                .tag("eventType", eventType.name())
-                .register(meterRegistry)
-                .record(() -> eventRepository.save(event));
+            // Use pre-registered timers to avoid cardinality explosion
+            Timer eventTimer = getTimerForEventType(eventType);
+            eventTimer.record(() -> eventRepository.save(event));
+            recordTimer.record(() -> {}); // Record overall duration
+
             eventsRecordedCounter.increment();
-            logger.debug("Recorded: {} {} xp={}", eventType, targetId, roundedXp);
+            xpDistribution.record(roundedXp);
+
+            // Evict cache only for this workspace (granular invalidation)
+            cacheManager.evictWorkspace(workspaceId);
+
+            // Structured logging with trace context
+            logger.info(
+                "activity.event.recorded eventType={} targetId={} xp={} workspaceId={} actorId={}",
+                eventType,
+                targetId,
+                roundedXp,
+                workspaceId,
+                actor != null ? actor.getId() : null
+            );
             return true;
         } catch (DataIntegrityViolationException e) {
             eventsDuplicateCounter.increment();
@@ -276,9 +342,19 @@ class ActivityEventService {
      * Recovery method called when all retry attempts are exhausted.
      * This method signature must match the retryable method parameters.
      *
-     * <p><strong>Dead Letter Handling:</strong> Failed events are logged with full context
-     * for manual investigation. Consider adding a dead letter table for persistence
-     * if automated retry is needed.
+     * <p><strong>Dead Letter Handling:</strong> Failed events are persisted to the
+     * {@code dead_letter_event} table for later investigation and potential retry.
+     * This ensures no event data is lost even when the primary write path fails.
+     *
+     * <p><strong>Monitoring:</strong> Dead letters can be monitored via:
+     * <ul>
+     *   <li>{@code activity.events.failed} - Counter for alerting</li>
+     *   <li>{@code activity.dead_letters.persisted} - Counter for dead letter persistence</li>
+     *   <li>Query the {@code dead_letter_event} table for investigation</li>
+     * </ul>
+     *
+     * @see DeadLetterEvent
+     * @see DeadLetterEventRepository
      */
     @Recover
     public boolean recoverFromTransientError(
@@ -295,18 +371,142 @@ class ActivityEventService {
         @Nullable Map<String, Object> payload
     ) {
         eventsFailedCounter.increment();
-        // Log with structured context for dead letter investigation
-        logger.error(
-            "DEAD_LETTER: Failed to record activity event after retries. " +
-            "workspaceId={}, eventType={}, targetId={}, xp={}, source={}, error={}",
-            workspaceId,
-            eventType,
-            targetId,
-            xp,
-            sourceSystem,
-            e.getMessage(),
-            e
-        );
+
+        // Build deterministic event key for correlation
+        String eventKey = ActivityEvent.buildKey(eventType, targetId, occurredAt);
+
+        // Extract stack trace (truncated to avoid bloat)
+        String stackTrace = truncateStackTrace(e);
+
+        // Use MDC for structured logging context
+        try (
+            var ignored = MDC.putCloseable("eventKey", eventKey);
+            var ignored2 = MDC.putCloseable("workspaceId", String.valueOf(workspaceId));
+            var ignored3 = MDC.putCloseable("eventType", eventType.name())
+        ) {
+            // Log with full context for immediate alerting
+            logger.error(
+                "DEAD_LETTER: Failed to record activity event after {} retries. " +
+                    "eventKey={}, workspaceId={}, eventType={}, targetType={}, targetId={}, " +
+                    "xp={}, source={}, actorId={}, repositoryId={}, errorType={}, error={}",
+                MAX_RETRY_ATTEMPTS,
+                eventKey,
+                workspaceId,
+                eventType,
+                targetType,
+                targetId,
+                xp,
+                sourceSystem,
+                actor != null ? actor.getId() : null,
+                repository != null ? repository.getId() : null,
+                e.getClass().getName(),
+                e.getMessage(),
+                e
+            );
+
+            // Persist to dead letter storage for later investigation/retry
+            persistDeadLetter(
+                workspaceId,
+                eventType,
+                occurredAt,
+                actor,
+                repository,
+                targetType,
+                targetId,
+                xp,
+                sourceSystem,
+                payload,
+                e,
+                stackTrace
+            );
+        }
+
         return false;
+    }
+
+    /**
+     * Persist a failed event to dead letter storage.
+     *
+     * <p>This method is best-effort: if dead letter persistence itself fails,
+     * we log the error but don't throw, since the original failure is already logged.
+     */
+    private void persistDeadLetter(
+        Long workspaceId,
+        ActivityEventType eventType,
+        Instant occurredAt,
+        @Nullable User actor,
+        @Nullable Repository repository,
+        ActivityTargetType targetType,
+        Long targetId,
+        double xp,
+        SourceSystem sourceSystem,
+        @Nullable Map<String, Object> payload,
+        Exception error,
+        String stackTrace
+    ) {
+        try {
+            DeadLetterEvent deadLetter = DeadLetterEvent.builder()
+                .workspaceId(workspaceId)
+                .eventType(eventType)
+                .occurredAt(occurredAt)
+                .actorId(actor != null ? actor.getId() : null)
+                .repositoryId(repository != null ? repository.getId() : null)
+                .targetType(targetType.getValue())
+                .targetId(targetId)
+                .xp(xp)
+                .sourceSystem(sourceSystem.getValue())
+                .payload(payload)
+                .errorMessage(truncateString(error.getMessage(), 2000))
+                .errorType(error.getClass().getName())
+                .stackTrace(stackTrace)
+                .retryCount(MAX_RETRY_ATTEMPTS)
+                .status(DeadLetterEvent.Status.PENDING)
+                .build();
+
+            deadLetterRepository.save(deadLetter);
+            deadLettersPersistedCounter.increment();
+
+            logger.info(
+                "Dead letter persisted for later retry. deadLetterId={}, eventType={}, targetId={}",
+                deadLetter.getId(),
+                eventType,
+                targetId
+            );
+        } catch (Exception persistError) {
+            // Dead letter persistence failed - log but don't throw
+            // The original failure is already logged, this is defense-in-depth
+            logger.error(
+                "CRITICAL: Failed to persist dead letter. Event data may be lost. " +
+                    "workspaceId={}, eventType={}, targetId={}, persistError={}",
+                workspaceId,
+                eventType,
+                targetId,
+                persistError.getMessage(),
+                persistError
+            );
+        }
+    }
+
+    /**
+     * Truncate stack trace to avoid database bloat.
+     */
+    private String truncateStackTrace(Exception e) {
+        StringWriter sw = new StringWriter();
+        e.printStackTrace(new PrintWriter(sw));
+        String fullTrace = sw.toString();
+        return truncateString(fullTrace, MAX_STACK_TRACE_LENGTH);
+    }
+
+    /**
+     * Truncate a string to the specified maximum length.
+     */
+    private String truncateString(String value, int maxLength) {
+        if (value == null) {
+            return null;
+        }
+        if (value.length() <= maxLength) {
+            return value;
+        }
+        return value.substring(0, maxLength - 3) + "...";
     }
 }

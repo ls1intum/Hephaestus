@@ -71,6 +71,28 @@ public class PullRequest extends Issue {
      */
     private boolean maintainerCanModify;
 
+    /**
+     * The name of the source branch (e.g., "feature/my-feature").
+     */
+    private String headRefName;
+
+    /**
+     * The name of the target branch (e.g., "main").
+     */
+    private String baseRefName;
+
+    /**
+     * The SHA of the head commit (40 characters).
+     */
+    @Column(length = 40)
+    private String headRefOid;
+
+    /**
+     * The SHA of the base commit (40 characters).
+     */
+    @Column(length = 40)
+    private String baseRefOid;
+
     @ManyToOne
     @JoinColumn(name = "merged_by_id")
     @ToString.Exclude

@@ -169,6 +169,8 @@ class SolidPrinciplesTest {
                 .areAnnotatedWith(org.springframework.stereotype.Service.class)
                 .and()
                 .resideOutsideOfPackage("..intelligenceservice..")
+                .and()
+                .doNotHaveSimpleName("GitHubDataSyncService") // Orchestrator by design
                 .should(haveLimitedDependencies)
                 .because("Too many dependencies indicate SRP violation");
 

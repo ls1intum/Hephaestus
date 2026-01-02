@@ -162,10 +162,12 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
     ) {
         return findDistinctReviewedPullRequestCountsByActors(workspaceId, actorIds, since, until)
             .stream()
-            .collect(java.util.stream.Collectors.toMap(
-                DistinctPrCountProjection::getActorId,
-                DistinctPrCountProjection::getPrCount
-            ));
+            .collect(
+                java.util.stream.Collectors.toMap(
+                    DistinctPrCountProjection::getActorId,
+                    DistinctPrCountProjection::getPrCount
+                )
+            );
     }
 
     /**
@@ -293,4 +295,26 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
         Long getTargetId();
         Double getXp();
     }
+
+    // ========================================================================
+    // Integrity Verification Queries
+    // ========================================================================
+
+    /**
+     * Find a random sample of events for integrity verification.
+     *
+     * <p>Uses PostgreSQL's TABLESAMPLE for efficient random sampling
+     * without full table scan.
+     *
+     * @param pageable page request with sample size limit
+     * @return random sample of events
+     */
+    @Query(
+        value = """
+        SELECT * FROM activity_event
+        TABLESAMPLE SYSTEM_ROWS(:#{#pageable.pageSize})
+        """,
+        nativeQuery = true
+    )
+    List<ActivityEvent> findRandomSample(org.springframework.data.domain.Pageable pageable);
 }

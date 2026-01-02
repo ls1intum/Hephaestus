@@ -65,18 +65,20 @@ class XpPrecisionTest {
     class RoundToIntDouble {
 
         @ParameterizedTest(name = "{0} rounds to {1}")
-        @CsvSource({
-            "0.0, 0",
-            "0.4, 0",
-            "0.5, 1",
-            "0.6, 1",
-            "1.0, 1",
-            "1.4, 1",
-            "1.5, 2",
-            "99.4, 99",
-            "99.5, 100",
-            "99.9, 100"
-        })
+        @CsvSource(
+            {
+                "0.0, 0",
+                "0.4, 0",
+                "0.5, 1",
+                "0.6, 1",
+                "1.0, 1",
+                "1.4, 1",
+                "1.5, 2",
+                "99.4, 99",
+                "99.5, 100",
+                "99.9, 100",
+            }
+        )
         @DisplayName("uses HALF_UP rounding for integer conversion")
         void usesHalfUpForIntegers(double input, int expected) {
             assertThat(XpPrecision.roundToInt(input)).isEqualTo(expected);

@@ -302,11 +302,7 @@ class CrossCuttingModuleBoundaryTest {
                 .haveSimpleNameEndingWith("Config")
                 .should()
                 .dependOnClassesThat()
-                .resideInAnyPackage(
-                    "..leaderboard..repository..",
-                    "..activity..repository..",
-                    "..mentor..repository.."
-                )
+                .resideInAnyPackage("..leaderboard..repository..", "..activity..repository..", "..mentor..repository..")
                 .allowEmptyShould(true)
                 .because("Config should wire up services, not access repositories directly");
             rule.check(classes);
@@ -424,12 +420,7 @@ class CrossCuttingModuleBoundaryTest {
                 .resideInAPackage("..workspace.validation..")
                 .should()
                 .dependOnClassesThat()
-                .resideInAnyPackage(
-                    "..leaderboard..",
-                    "..activity..",
-                    "..mentor..",
-                    "..gitprovider..sync.."
-                )
+                .resideInAnyPackage("..leaderboard..", "..activity..", "..mentor..", "..gitprovider..sync..")
                 .allowEmptyShould(true)
                 .because("Validation should be pure logic without external service dependencies");
             rule.check(classes);

@@ -46,18 +46,10 @@ public class CacheConfig {
         SimpleCacheManager cacheManager = new SimpleCacheManager();
 
         // Leaderboard cache: 60 second TTL for hot queries, also evicted on writes
-        CaffeineCache leaderboardXpCache = buildCache(
-            "leaderboardXp",
-            LEADERBOARD_CACHE_TTL_SECONDS,
-            meterRegistry
-        );
+        CaffeineCache leaderboardXpCache = buildCache("leaderboardXp", LEADERBOARD_CACHE_TTL_SECONDS, meterRegistry);
 
         // Contributors cache: 1 hour TTL, also evicted by CacheScheduler
-        CaffeineCache contributorsCache = buildCache(
-            "contributors",
-            LONG_CACHE_TTL_SECONDS,
-            meterRegistry
-        );
+        CaffeineCache contributorsCache = buildCache("contributors", LONG_CACHE_TTL_SECONDS, meterRegistry);
 
         // PR templates cache: 1 hour TTL
         CaffeineCache pullRequestTemplatesCache = buildCache(
@@ -66,11 +58,7 @@ public class CacheConfig {
             meterRegistry
         );
 
-        cacheManager.setCaches(Arrays.asList(
-            leaderboardXpCache,
-            contributorsCache,
-            pullRequestTemplatesCache
-        ));
+        cacheManager.setCaches(Arrays.asList(leaderboardXpCache, contributorsCache, pullRequestTemplatesCache));
 
         return cacheManager;
     }

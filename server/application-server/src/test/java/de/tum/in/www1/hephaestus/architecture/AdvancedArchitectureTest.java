@@ -346,6 +346,8 @@ class AdvancedArchitectureTest {
                 .resideInAPackage("..activity..")
                 .orShould()
                 .resideInAPackage("..workspace..")
+                .orShould()
+                .resideInAPackage("..practices..")
                 .because("Event handlers should be discoverable or colocated with domain");
             rule.check(classes);
         }
@@ -374,6 +376,7 @@ class AdvancedArchitectureTest {
                     boolean inAdapterPackage =
                         javaClass.getPackageName().contains(".adapter") ||
                         javaClass.getPackageName().contains(".impl") ||
+                        javaClass.getPackageName().contains(".notification") || // Notification module implements activity SPIs
                         javaClass.getSimpleName().endsWith("Adapter") ||
                         javaClass.getSimpleName().endsWith("Provider");
 
@@ -623,12 +626,14 @@ class AdvancedArchitectureTest {
                 .and()
                 .resideOutsideOfPackage("..activity..")
                 .and()
+                .resideOutsideOfPackage("..practices..") // Code health module uses intelligence service for AI detection
+                .and()
                 .resideOutsideOfPackage("..config..") // Config wires up the client
                 .should()
                 .dependOnClassesThat()
                 .resideInAPackage("..intelligenceservice..")
                 .because("Generated clients should be wrapped in adapters");
-            // Only mentor, activity, and config should use intelligence service
+            // Only mentor, activity, practices, and config should use intelligence service
             rule.check(classes);
         }
 

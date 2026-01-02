@@ -38,10 +38,7 @@ public class LeaderboardXpQueryService {
     private final ActivityEventRepository activityEventRepository;
     private final UserRepository userRepository;
 
-    public LeaderboardXpQueryService(
-        ActivityEventRepository activityEventRepository,
-        UserRepository userRepository
-    ) {
+    public LeaderboardXpQueryService(ActivityEventRepository activityEventRepository, UserRepository userRepository) {
         this.activityEventRepository = activityEventRepository;
         this.userRepository = userRepository;
     }

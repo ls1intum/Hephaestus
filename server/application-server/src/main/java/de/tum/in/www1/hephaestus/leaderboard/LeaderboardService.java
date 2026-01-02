@@ -146,7 +146,7 @@ public class LeaderboardService {
         // Add zero-score entries for team members without activity
         for (User member : allTeamMembers) {
             if (member.getId() != null && !activityData.containsKey(member.getId())) {
-                // New record signature: user, totalScore, eventCount, approvals, changeRequests, 
+                // New record signature: user, totalScore, eventCount, approvals, changeRequests,
                 // comments, unknowns, issueComments, codeComments, reviewedPrCount
                 activityData.put(member.getId(), new LeaderboardUserXp(member, 0, 0, 0, 0, 0, 0, 0, 0, 0));
             }

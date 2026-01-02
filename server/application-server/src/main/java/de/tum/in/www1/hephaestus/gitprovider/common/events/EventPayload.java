@@ -190,7 +190,8 @@ public final class EventPayload {
                 comment.getCreatedAt(),
                 comment.getIssue() != null ? comment.getIssue().getId() : null,
                 comment.getIssue() != null && comment.getIssue().getRepository() != null
-                    ? comment.getIssue().getRepository().getId() : null
+                    ? comment.getIssue().getRepository().getId()
+                    : null
             );
         }
     }
@@ -220,8 +221,7 @@ public final class EventPayload {
                 review.getAuthor() != null ? review.getAuthor().getId() : null,
                 review.getPullRequest().getId(),
                 review.getSubmittedAt(),
-                review.getPullRequest().getRepository() != null
-                    ? review.getPullRequest().getRepository().getId() : null
+                review.getPullRequest().getRepository() != null ? review.getPullRequest().getRepository().getId() : null
             );
         }
     }
@@ -243,7 +243,9 @@ public final class EventPayload {
         @Nullable Long repositoryId
     ) {
         public static ReviewCommentData from(PullRequestReviewComment comment) {
-            PullRequest pr = comment.getReview() != null ? comment.getReview().getPullRequest() : comment.getPullRequest();
+            PullRequest pr = comment.getReview() != null
+                ? comment.getReview().getPullRequest()
+                : comment.getPullRequest();
             return new ReviewCommentData(
                 comment.getId(),
                 comment.getBody(),

@@ -43,7 +43,9 @@ public record RecordActivityCommand(
     @NotNull Long targetId,
     @Min(0) double xp,
     @NotNull SourceSystem sourceSystem,
-    @Nullable Map<String, Object> payload
+    @Nullable Map<String, Object> payload,
+    /** Context explaining why this event was recorded (webhook, sync, backfill, scheduled). */
+    @Nullable String triggerContext
 ) {
     /**
      * Create a simple command for events without a repository context.

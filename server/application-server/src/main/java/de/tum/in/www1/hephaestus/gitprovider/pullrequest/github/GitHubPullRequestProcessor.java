@@ -262,6 +262,16 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
         pr.setMergeable(dto.isMergeable());
         pr.setMaintainerCanModify(dto.maintainerCanModify());
 
+        // Head/base branch references
+        if (dto.head() != null) {
+            pr.setHeadRefName(dto.head().ref());
+            pr.setHeadRefOid(dto.head().sha());
+        }
+        if (dto.base() != null) {
+            pr.setBaseRefName(dto.base().ref());
+            pr.setBaseRefOid(dto.base().sha());
+        }
+
         // Link author
         if (dto.author() != null) {
             User author = findOrCreateUser(dto.author());
@@ -407,6 +417,28 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
         if (pr.isMaintainerCanModify() != dto.maintainerCanModify()) {
             pr.setMaintainerCanModify(dto.maintainerCanModify());
             changedFields.add("maintainerCanModify");
+        }
+
+        // Update head/base branch references
+        if (dto.head() != null) {
+            if (!Objects.equals(pr.getHeadRefName(), dto.head().ref())) {
+                pr.setHeadRefName(dto.head().ref());
+                changedFields.add("headRefName");
+            }
+            if (!Objects.equals(pr.getHeadRefOid(), dto.head().sha())) {
+                pr.setHeadRefOid(dto.head().sha());
+                changedFields.add("headRefOid");
+            }
+        }
+        if (dto.base() != null) {
+            if (!Objects.equals(pr.getBaseRefName(), dto.base().ref())) {
+                pr.setBaseRefName(dto.base().ref());
+                changedFields.add("baseRefName");
+            }
+            if (!Objects.equals(pr.getBaseRefOid(), dto.base().sha())) {
+                pr.setBaseRefOid(dto.base().sha());
+                changedFields.add("baseRefOid");
+            }
         }
 
         pr.setUpdatedAt(dto.updatedAt());

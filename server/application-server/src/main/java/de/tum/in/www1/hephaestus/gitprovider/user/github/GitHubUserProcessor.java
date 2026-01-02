@@ -40,7 +40,7 @@ public class GitHubUserProcessor {
      * Find an existing user or create a new one from the DTO.
      * <p>
      * This method is idempotent - calling it multiple times with the same DTO
-     * will return the same user entity. Profile fields (bio, company, location, 
+     * will return the same user entity. Profile fields (bio, company, location,
      * blog, followers, following) are synced when available in the DTO.
      *
      * @param dto the GitHub user DTO
@@ -89,7 +89,7 @@ public class GitHubUserProcessor {
      */
     private User updateProfileFields(User existing, GitHubUserDTO dto) {
         boolean changed = false;
-        
+
         // Update basic fields that might have changed
         if (dto.avatarUrl() != null && !dto.avatarUrl().equals(existing.getAvatarUrl())) {
             existing.setAvatarUrl(dto.avatarUrl());
@@ -99,7 +99,7 @@ public class GitHubUserProcessor {
             existing.setName(dto.name());
             changed = true;
         }
-        
+
         // Profile fields - only update if DTO has data (non-null means it came from full fetch)
         if (dto.bio() != null) {
             existing.setDescription(dto.bio());
@@ -129,10 +129,21 @@ public class GitHubUserProcessor {
             existing.setFollowing(dto.following());
             changed = true;
         }
-        
+        if (dto.createdAt() != null && !dto.createdAt().equals(existing.getCreatedAt())) {
+            existing.setCreatedAt(dto.createdAt());
+            changed = true;
+        }
+        if (dto.updatedAt() != null && !dto.updatedAt().equals(existing.getUpdatedAt())) {
+            existing.setUpdatedAt(dto.updatedAt());
+            changed = true;
+        }
+
         if (changed) {
-            logger.debug("Updated profile fields for user {} ({})", 
-                sanitizeForLog(existing.getLogin()), existing.getId());
+            logger.debug(
+                "Updated profile fields for user {} ({})",
+                sanitizeForLog(existing.getLogin()),
+                existing.getId()
+            );
             return userRepository.save(existing);
         }
         return existing;
@@ -162,6 +173,12 @@ public class GitHubUserProcessor {
         }
         if (dto.following() != null) {
             user.setFollowing(dto.following());
+        }
+        if (dto.createdAt() != null) {
+            user.setCreatedAt(dto.createdAt());
+        }
+        if (dto.updatedAt() != null) {
+            user.setUpdatedAt(dto.updatedAt());
         }
     }
 

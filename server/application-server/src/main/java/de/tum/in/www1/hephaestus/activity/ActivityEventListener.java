@@ -74,8 +74,12 @@ public class ActivityEventListener {
     public void onPullRequestCreated(DomainEvent.PullRequestCreated event) {
         var pr = event.pullRequest();
         if (pr.authorId() == null || pr.createdAt() == null) {
-            log.warn("PR created event missing required data: prId={}, authorId={}, createdAt={}",
-                pr.id(), pr.authorId(), pr.createdAt());
+            log.warn(
+                "PR created event missing required data: prId={}, authorId={}, createdAt={}",
+                pr.id(),
+                pr.authorId(),
+                pr.createdAt()
+            );
             return;
         }
         safeRecord("PR opened", pr.id(), () ->
@@ -207,14 +211,20 @@ public class ActivityEventListener {
     public void onReviewSubmitted(DomainEvent.ReviewSubmitted event) {
         var reviewData = event.review();
         if (reviewData.authorId() == null || reviewData.repositoryId() == null) {
-            log.warn("Review submitted event missing required data: reviewId={}, authorId={}, repositoryId={}",
-                reviewData.id(), reviewData.authorId(), reviewData.repositoryId());
+            log.warn(
+                "Review submitted event missing required data: reviewId={}, authorId={}, repositoryId={}",
+                reviewData.id(),
+                reviewData.authorId(),
+                reviewData.repositoryId()
+            );
             return;
         }
         // Calculate XP using ALL reviews for this PR by this author (per-PR harmonic mean)
         // This is a necessary query to get the harmonic mean calculation right
-        List<PullRequestReview> allReviewsForPrByAuthor = reviewRepository
-            .findByPullRequestIdAndAuthorId(reviewData.pullRequestId(), reviewData.authorId());
+        List<PullRequestReview> allReviewsForPrByAuthor = reviewRepository.findByPullRequestIdAndAuthorId(
+            reviewData.pullRequestId(),
+            reviewData.authorId()
+        );
         double xp = xpCalc.calculateReviewExperiencePoints(allReviewsForPrByAuthor);
         Instant occurredAt = reviewData.submittedAt() != null ? reviewData.submittedAt() : Instant.now();
         safeRecord("review", reviewData.id(), () ->
@@ -237,14 +247,18 @@ public class ActivityEventListener {
     public void onReviewDismissed(DomainEvent.ReviewDismissed event) {
         var reviewData = event.review();
         if (reviewData.authorId() == null || reviewData.repositoryId() == null) {
-            log.warn("Review dismissed event missing required data: reviewId={}, authorId={}, repositoryId={}",
-                reviewData.id(), reviewData.authorId(), reviewData.repositoryId());
+            log.warn(
+                "Review dismissed event missing required data: reviewId={}, authorId={}, repositoryId={}",
+                reviewData.id(),
+                reviewData.authorId(),
+                reviewData.repositoryId()
+            );
             return;
         }
         // Record a REVIEW_DISMISSED event with 0 XP - dismissals don't affect XP
         // since dismissed reviews still count for the leaderboard
         double xpAdjustment = 0.0;
-        
+
         safeRecord("review dismissed", reviewData.id(), () ->
             activityEventService.record(
                 event.context().workspaceId(),
@@ -260,13 +274,62 @@ public class ActivityEventListener {
         );
     }
 
+    /**
+     * Handle review edited events.
+     *
+     * <p>When a review is edited (e.g., state changes from COMMENTED to APPROVED),
+     * we record a new event with the updated state. The XP is recalculated based
+     * on the new review state and all reviews for the PR by this author.
+     *
+     * <p>Note: This creates a new event rather than updating the original,
+     * maintaining an immutable audit trail of all review activity.
+     */
+    @Async
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onReviewEdited(DomainEvent.ReviewEdited event) {
+        var reviewData = event.review();
+        if (reviewData.authorId() == null || reviewData.repositoryId() == null) {
+            log.warn(
+                "Review edited event missing required data: reviewId={}, authorId={}, repositoryId={}",
+                reviewData.id(),
+                reviewData.authorId(),
+                reviewData.repositoryId()
+            );
+            return;
+        }
+        // Recalculate XP based on updated review state
+        List<PullRequestReview> allReviewsForPrByAuthor = reviewRepository.findByPullRequestIdAndAuthorId(
+            reviewData.pullRequestId(),
+            reviewData.authorId()
+        );
+        double xp = xpCalc.calculateReviewExperiencePoints(allReviewsForPrByAuthor);
+        Instant occurredAt = reviewData.submittedAt() != null ? reviewData.submittedAt() : Instant.now();
+        safeRecord("review edited", reviewData.id(), () ->
+            activityEventService.record(
+                event.context().workspaceId(),
+                ActivityEventType.REVIEW_EDITED,
+                occurredAt,
+                userRepository.getReferenceById(reviewData.authorId()),
+                repositoryRepository.getReferenceById(reviewData.repositoryId()),
+                ActivityTargetType.REVIEW,
+                reviewData.id(),
+                xp,
+                mapSource(event.context().source())
+            )
+        );
+    }
+
     @Async
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onCommentCreated(DomainEvent.CommentCreated event) {
         var commentData = event.comment();
         if (commentData.authorId() == null || commentData.repositoryId() == null) {
-            log.warn("Comment created event missing required data: commentId={}, authorId={}, repositoryId={}",
-                commentData.id(), commentData.authorId(), commentData.repositoryId());
+            log.warn(
+                "Comment created event missing required data: commentId={}, authorId={}, repositoryId={}",
+                commentData.id(),
+                commentData.authorId(),
+                commentData.repositoryId()
+            );
             return;
         }
         // Note: XP calculation currently needs body length - we have body in commentData
@@ -294,8 +357,12 @@ public class ActivityEventListener {
     public void onReviewCommentCreated(DomainEvent.ReviewCommentCreated event) {
         var commentData = event.comment();
         if (commentData.authorId() == null || commentData.repositoryId() == null) {
-            log.warn("Review comment created event missing required data: commentId={}, authorId={}, repositoryId={}",
-                commentData.id(), commentData.authorId(), commentData.repositoryId());
+            log.warn(
+                "Review comment created event missing required data: commentId={}, authorId={}, repositoryId={}",
+                commentData.id(),
+                commentData.authorId(),
+                commentData.repositoryId()
+            );
             return;
         }
         Instant occurredAt = commentData.createdAt() != null ? commentData.createdAt() : Instant.now();

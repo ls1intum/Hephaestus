@@ -86,9 +86,7 @@ public final class XpPrecision {
      * @return XP rounded to 2 decimal places
      */
     public static double round(double xp) {
-        return BigDecimal.valueOf(xp)
-            .setScale(DECIMAL_PLACES, ROUNDING_MODE)
-            .doubleValue();
+        return BigDecimal.valueOf(xp).setScale(DECIMAL_PLACES, ROUNDING_MODE).doubleValue();
     }
 
     /**
@@ -101,9 +99,7 @@ public final class XpPrecision {
      * @return XP rounded to nearest integer
      */
     public static int roundToInt(double xp) {
-        return BigDecimal.valueOf(xp)
-            .setScale(0, ROUNDING_MODE)
-            .intValue();
+        return BigDecimal.valueOf(xp).setScale(0, ROUNDING_MODE).intValue();
     }
 
     /**

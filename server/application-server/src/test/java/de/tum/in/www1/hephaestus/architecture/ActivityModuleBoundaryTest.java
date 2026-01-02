@@ -71,7 +71,9 @@ class ActivityModuleBoundaryTest {
                 .dependOnClassesThat()
                 .resideInAPackage("..leaderboard..repository..")
                 .allowEmptyShould(true)
-                .because("Activity should not depend on leaderboard - use domain events for cross-module communication");
+                .because(
+                    "Activity should not depend on leaderboard - use domain events for cross-module communication"
+                );
             rule.check(classes);
         }
 
@@ -211,7 +213,8 @@ class ActivityModuleBoundaryTest {
                     "org.springframework..",
                     "org.slf4j..",
                     "org.hibernate..",
-                    ""  // primitives
+                    "lombok..", // Lombok-generated code
+                    "" // primitives
                 )
                 .allowEmptyShould(true)
                 .because("badpracticedetector should only depend on allowed packages");
@@ -275,12 +278,7 @@ class ActivityModuleBoundaryTest {
                 .resideInAPackage("..activity.scoring..")
                 .should()
                 .dependOnClassesThat()
-                .resideInAnyPackage(
-                    "..leaderboard..",
-                    "..mentor..",
-                    "..notification..",
-                    "..profile.."
-                )
+                .resideInAnyPackage("..leaderboard..", "..mentor..", "..notification..", "..profile..")
                 .allowEmptyShould(true)
                 .because("Scoring should be a pure calculation module");
             rule.check(classes);

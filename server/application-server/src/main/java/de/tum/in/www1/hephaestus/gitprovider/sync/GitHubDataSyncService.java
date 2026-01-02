@@ -16,6 +16,7 @@ import de.tum.in.www1.hephaestus.gitprovider.pullrequest.github.GitHubPullReques
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.github.GitHubPullRequestReviewCommentSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
+import de.tum.in.www1.hephaestus.gitprovider.repository.collaborator.github.GitHubCollaboratorSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.repository.github.GitHubRepositorySyncService;
 import de.tum.in.www1.hephaestus.gitprovider.subissue.github.GitHubSubIssueSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.team.github.GitHubTeamSyncService;
@@ -55,6 +56,7 @@ public class GitHubDataSyncService {
     private final GitHubTeamSyncService teamSyncService;
     private final GitHubOrganizationSyncService organizationSyncService;
     private final GitHubRepositorySyncService repositorySyncService;
+    private final GitHubCollaboratorSyncService collaboratorSyncService;
 
     private final AsyncTaskExecutor monitoringExecutor;
 
@@ -73,6 +75,7 @@ public class GitHubDataSyncService {
         GitHubTeamSyncService teamSyncService,
         GitHubOrganizationSyncService organizationSyncService,
         GitHubRepositorySyncService repositorySyncService,
+        GitHubCollaboratorSyncService collaboratorSyncService,
         @Qualifier("monitoringExecutor") AsyncTaskExecutor monitoringExecutor
     ) {
         this.syncCooldownInMinutes = syncCooldownInMinutes;
@@ -89,6 +92,7 @@ public class GitHubDataSyncService {
         this.teamSyncService = teamSyncService;
         this.organizationSyncService = organizationSyncService;
         this.repositorySyncService = repositorySyncService;
+        this.collaboratorSyncService = collaboratorSyncService;
         this.monitoringExecutor = monitoringExecutor;
     }
 
@@ -132,6 +136,12 @@ public class GitHubDataSyncService {
                 );
             }
 
+            // Sync collaborators
+            int collaboratorsCount = syncCollaboratorsIfNeeded(syncTarget, workspaceId, repositoryId);
+            if (collaboratorsCount >= 0) {
+                log.debug("Synced {} collaborators for {}", collaboratorsCount, safeNameWithOwner);
+            }
+
             // Sync labels
             int labelsCount = labelSyncService.syncLabelsForRepository(workspaceId, repositoryId);
             log.debug("Synced {} labels for {}", labelsCount, safeNameWithOwner);
@@ -168,9 +178,10 @@ public class GitHubDataSyncService {
             );
 
             log.info(
-                "Completed GraphQL sync for {}: repo metadata {}, {} labels, {} milestones, {} issues, {} issue comments, {} PRs, {} PR review comments",
+                "Completed GraphQL sync for {}: repo metadata {}, {} collaborators, {} labels, {} milestones, {} issues, {} issue comments, {} PRs, {} PR review comments",
                 safeNameWithOwner,
                 syncedRepository.isPresent() ? "synced" : "failed",
+                collaboratorsCount >= 0 ? collaboratorsCount : "skipped",
                 labelsCount,
                 milestonesCount,
                 issuesCount,
@@ -300,6 +311,42 @@ public class GitHubDataSyncService {
         } catch (Exception e) {
             log.error("Error syncing sub-issues for workspace {}: {}", workspaceId, e.getMessage(), e);
         }
+    }
+
+    /**
+     * Syncs collaborators for a repository if the cooldown has expired.
+     *
+     * @param syncTarget   the sync target containing cooldown timestamps
+     * @param workspaceId  the workspace ID
+     * @param repositoryId the repository ID
+     * @return number of collaborators synced, or -1 if skipped due to cooldown
+     */
+    private int syncCollaboratorsIfNeeded(SyncTarget syncTarget, Long workspaceId, Long repositoryId) {
+        Instant cooldownThreshold = Instant.now().minusSeconds(syncCooldownInMinutes * 60L);
+        boolean shouldSync =
+            syncTarget.lastCollaboratorsSyncedAt() == null ||
+            syncTarget.lastCollaboratorsSyncedAt().isBefore(cooldownThreshold);
+
+        if (!shouldSync) {
+            log.debug(
+                "Skipping collaborator sync for repository {} (cooldown active, last synced at {})",
+                repositoryId,
+                syncTarget.lastCollaboratorsSyncedAt()
+            );
+            return -1;
+        }
+
+        int count = collaboratorSyncService.syncCollaboratorsForRepository(workspaceId, repositoryId);
+
+        // Update sync timestamp
+        syncTargetProvider.updateSyncTimestamp(
+            workspaceId,
+            syncTarget.repositoryNameWithOwner(),
+            SyncType.COLLABORATORS,
+            Instant.now()
+        );
+
+        return count;
     }
 
     private boolean shouldSync(SyncTarget target) {

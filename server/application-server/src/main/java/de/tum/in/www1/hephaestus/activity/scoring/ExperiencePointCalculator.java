@@ -30,9 +30,11 @@ import org.springframework.stereotype.Component;
  * is on a PR accessed via Issue. Ideally, XP calculation would be pure functions
  * taking primitive values, but this would require callers to resolve the
  * PullRequest before calling. This is a known trade-off for API simplicity.
+ *
+ * @see ExperiencePointStrategy
  */
 @Component
-public class ExperiencePointCalculator {
+public class ExperiencePointCalculator implements ExperiencePointStrategy {
 
     private static final Logger logger = LoggerFactory.getLogger(ExperiencePointCalculator.class);
 
@@ -116,6 +118,7 @@ public class ExperiencePointCalculator {
      * @param reviews list of reviews to score
      * @return total XP for all reviews
      */
+    @Override
     public double calculateReviewExperiencePoints(List<PullRequestReview> reviews) {
         return calculateReviewExperiencePoints(reviews, 0);
     }
@@ -196,11 +199,80 @@ public class ExperiencePointCalculator {
     }
 
     /**
+     * Calculate XP for a single review (simplified API).
+     *
+     * @param review the review to calculate XP for
+     * @return XP for this review
+     */
+    @Override
+    public double calculateReviewExperiencePoints(PullRequestReview review) {
+        return calculateReviewExperiencePoints(List.of(review));
+    }
+
+    /**
+     * Calculate XP for creating an issue.
+     *
+     * @param issue the created issue
+     * @return XP for issue creation
+     */
+    @Override
+    public double calculateIssueCreatedExperiencePoints(Issue issue) {
+        return properties.getXpIssueCreated();
+    }
+
+    /**
+     * Calculate XP for opening a pull request.
+     *
+     * @param pullRequest the opened pull request
+     * @return XP for PR creation
+     */
+    @Override
+    public double calculatePullRequestOpenedExperiencePoints(PullRequest pullRequest) {
+        return properties.getXpPullRequestOpened();
+    }
+
+    /**
+     * Calculate XP for merging a pull request.
+     *
+     * @param pullRequest the merged pull request
+     * @return XP for PR merge
+     */
+    @Override
+    public double calculatePullRequestMergedExperiencePoints(PullRequest pullRequest) {
+        return properties.getXpPullRequestMerged();
+    }
+
+    /**
+     * Calculate XP for marking a PR ready for review.
+     *
+     * @param pullRequest the PR marked ready
+     * @return XP for readiness transition
+     */
+    @Override
+    public double calculatePullRequestReadyExperiencePoints(PullRequest pullRequest) {
+        return properties.getXpPullRequestReady();
+    }
+
+    /**
+     * Calculate XP for an inline review comment.
+     *
+     * @param bodyLength length of the comment body
+     * @return XP for review comment
+     */
+    @Override
+    public double calculateReviewCommentExperiencePoints(int bodyLength) {
+        // Substantive comments (>50 chars) earn full XP, trivial ones earn half
+        double base = properties.getXpReviewComment();
+        return bodyLength > 50 ? base : base * 0.5;
+    }
+
+    /**
      * Calculate experience points for an issue comment on a pull request.
      *
      * @param issueComment the comment to score
      * @return XP for the comment
      */
+    @Override
     public double calculateIssueCommentExperiencePoints(IssueComment issueComment) {
         Issue issue = issueComment.getIssue();
         if (issue == null) {

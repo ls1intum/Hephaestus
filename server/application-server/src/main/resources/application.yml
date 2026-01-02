@@ -297,3 +297,7 @@ resilience4j:
                 baseConfig: default
             githubRest:
                 baseConfig: default
+            intelligence-service:
+                baseConfig: default
+                slowCallDurationThreshold: 30s
+                waitDurationInOpenState: 60s
