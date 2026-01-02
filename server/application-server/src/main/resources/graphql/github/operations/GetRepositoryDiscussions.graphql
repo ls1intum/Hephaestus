@@ -1,0 +1,171 @@
+# GraphQL query for fetching repository discussions with all fields
+# Used by GraphQL-based sync services
+
+query GetRepositoryDiscussions($owner: String!, $name: String!, $first: Int!, $after: String) {
+    rateLimit {
+        cost
+        remaining
+        resetAt
+    }
+    repository(owner: $owner, name: $name) {
+        discussions(first: $first, after: $after, orderBy: { field: UPDATED_AT, direction: DESC }) {
+            pageInfo {
+                hasNextPage
+                endCursor
+            }
+            totalCount
+            nodes {
+                id
+                databaseId
+                number
+                title
+                body
+                url
+                createdAt
+                updatedAt
+                closedAt
+                answerChosenAt
+                locked
+                activeLockReason
+
+                # State info
+                closed
+                stateReason
+
+                # Author
+                author {
+                    __typename
+                    ... on User {
+                        id
+                        databaseId
+                        login
+                        avatarUrl
+                        name
+                        email
+                    }
+                    ... on Bot {
+                        id
+                        databaseId
+                        login
+                        avatarUrl
+                    }
+                }
+
+                # Answer chosen by
+                answerChosenBy {
+                    __typename
+                    ... on User {
+                        id
+                        databaseId
+                        login
+                        avatarUrl
+                    }
+                }
+
+                # Category (note: DiscussionCategory only has id, not databaseId)
+                category {
+                    id
+                    name
+                    slug
+                    emoji
+                    description
+                    isAnswerable
+                    createdAt
+                }
+
+                # Answer comment (if exists)
+                answer {
+                    id
+                    databaseId
+                    body
+                    createdAt
+                    updatedAt
+                    isAnswer
+                    author {
+                        __typename
+                        ... on User {
+                            id
+                            databaseId
+                            login
+                            avatarUrl
+                        }
+                        ... on Bot {
+                            id
+                            databaseId
+                            login
+                            avatarUrl
+                        }
+                    }
+                }
+
+                # Labels
+                labels(first: 50) {
+                    nodes {
+                        id
+                        name
+                        description
+                        color
+                    }
+                }
+
+                # Comments (top-level only, replies fetched separately if needed)
+                comments(first: 50) {
+                    totalCount
+                    pageInfo {
+                        hasNextPage
+                        endCursor
+                    }
+                    nodes {
+                        id
+                        databaseId
+                        body
+                        createdAt
+                        updatedAt
+                        isAnswer
+                        author {
+                            __typename
+                            ... on User {
+                                id
+                                databaseId
+                                login
+                                avatarUrl
+                            }
+                            ... on Bot {
+                                id
+                                databaseId
+                                login
+                                avatarUrl
+                            }
+                        }
+                        # Nested replies
+                        replies(first: 20) {
+                            totalCount
+                            nodes {
+                                id
+                                databaseId
+                                body
+                                createdAt
+                                updatedAt
+                                author {
+                                    __typename
+                                    ... on User {
+                                        id
+                                        databaseId
+                                        login
+                                        avatarUrl
+                                    }
+                                    ... on Bot {
+                                        id
+                                        databaseId
+                                        login
+                                        avatarUrl
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
