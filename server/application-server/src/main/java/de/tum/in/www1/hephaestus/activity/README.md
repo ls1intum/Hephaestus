@@ -79,21 +79,11 @@ XP = (10 × interactionScore × complexityScore) / (interactionScore + complexit
 
 ### Dismissed Reviews
 
-Dismissed reviews are intentionally excluded from XP calculation.
+Dismissed reviews **are included** in XP calculation. The effort of providing feedback
+is valuable regardless of whether the review was later dismissed (e.g., due to new commits
+making it stale, or the maintainer overriding the decision).
 
-| Reason                       | Impact                                              |
-| ---------------------------- | --------------------------------------------------- |
-| Stale review (new commits)   | Original feedback no longer applies                 |
-| Rejected by maintainer       | Review quality deemed insufficient                  |
-| Overridden decision          | Approval/rejection was overruled                    |
-
-Awarding XP for dismissed reviews would:
-
-- Incentivize low-quality "drive-by" approvals
-- Double-count XP when reviewer resubmits
-- Reward outdated feedback
-
-See `ExperiencePointCalculator.calculateReviewExperiencePoints()` for implementation.
+This matches the original leaderboard behavior where all reviews contribute to the score.
 
 ### Complexity Tiers
 

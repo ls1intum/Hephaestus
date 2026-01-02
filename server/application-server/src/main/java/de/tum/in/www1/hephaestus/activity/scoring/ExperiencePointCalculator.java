@@ -123,25 +123,9 @@ public class ExperiencePointCalculator {
     /**
      * Calculate experience points for reviews with additional issue comments.
      *
-     * <h4>Dismissed Reviews</h4>
-     * <p><strong>Dismissed reviews are intentionally excluded from XP calculation.</strong>
-     *
-     * <p>Rationale: A dismissed review typically indicates one of:
-     * <ul>
-     *   <li>The review was invalidated by new commits (stale review)</li>
-     *   <li>The review was rejected by the PR author or maintainer</li>
-     *   <li>The reviewer's feedback was overridden</li>
-     * </ul>
-     *
-     * <p>Awarding XP for dismissed reviews would:
-     * <ul>
-     *   <li>Incentivize low-quality "drive-by" approvals that get dismissed</li>
-     *   <li>Double-count XP when a reviewer resubmits after dismissal</li>
-     *   <li>Reward outdated feedback that may no longer apply</li>
-     * </ul>
-     *
-     * <p>If a reviewer's feedback was valuable but dismissed due to new commits,
-     * they will earn XP when they re-review with a non-dismissed state.
+     * <p><strong>Dismissed reviews are included in XP calculation.</strong>
+     * The effort of providing feedback is valuable regardless of whether the review
+     * was later dismissed (e.g., due to new commits making it stale).
      *
      * @param reviews list of reviews to score
      * @param issueCommentCount number of issue comments
@@ -150,7 +134,6 @@ public class ExperiencePointCalculator {
     public double calculateReviewExperiencePoints(List<PullRequestReview> reviews, int issueCommentCount) {
         List<PullRequestReview> eligibleReviews = reviews
             .stream()
-            .filter(review -> !review.isDismissed()) // See Javadoc: dismissed reviews yield 0 XP
             .filter(review -> !isSelfAssignedReview(review))
             .toList();
 

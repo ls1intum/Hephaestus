@@ -107,12 +107,12 @@ class ExperiencePointCalculatorTest {
     }
 
     @Nested
-    @DisplayName("Dismissed Review Exclusion")
-    class DismissedReviewExclusion {
+    @DisplayName("Dismissed Review Handling")
+    class DismissedReviewHandling {
 
         @Test
-        @DisplayName("excludes dismissed reviews from XP calculation - dismissed reviews yield zero XP")
-        void excludesDismissedReviews() {
+        @DisplayName("includes dismissed reviews in XP calculation - effort is still valuable")
+        void includesDismissedReviews() {
             User author = createUser(1L, "author");
             User reviewer = createUser(2L, "reviewer");
 
@@ -124,13 +124,13 @@ class ExperiencePointCalculatorTest {
             double experiencePoints = calculator.calculateReviewExperiencePoints(List.of(dismissedReview));
 
             assertThat(experiencePoints)
-                .as("Dismissed reviews should not earn XP - see ExperiencePointCalculator Javadoc for rationale")
-                .isZero();
+                .as("Dismissed reviews should earn XP - the effort of providing feedback is valuable")
+                .isGreaterThan(0.0);
         }
 
         @Test
-        @DisplayName("includes non-dismissed reviews in XP calculation")
-        void includesNonDismissedReviews() {
+        @DisplayName("dismissed and non-dismissed reviews both earn XP")
+        void bothDismissedAndActiveEarnXp() {
             User author = createUser(1L, "author");
             User reviewer = createUser(2L, "reviewer");
 
@@ -139,14 +139,21 @@ class ExperiencePointCalculatorTest {
             PullRequestReview activeReview = createApprovedReview(reviewer, pullRequest);
             activeReview.setDismissed(false);
 
-            double experiencePoints = calculator.calculateReviewExperiencePoints(List.of(activeReview));
+            PullRequestReview dismissedReview = createApprovedReview(reviewer, pullRequest);
+            dismissedReview.setDismissed(true);
 
-            assertThat(experiencePoints).isGreaterThan(0.0);
+            double activeXp = calculator.calculateReviewExperiencePoints(List.of(activeReview));
+            double dismissedXp = calculator.calculateReviewExperiencePoints(List.of(dismissedReview));
+
+            // Both should earn XP - dismissed status doesn't affect XP
+            assertThat(activeXp).isGreaterThan(0.0);
+            assertThat(dismissedXp).isGreaterThan(0.0);
+            assertThat(dismissedXp).isEqualTo(activeXp);
         }
 
         @Test
-        @DisplayName("only counts non-dismissed reviews when mix of dismissed and active exist")
-        void mixedDismissedAndActiveReviews() {
+        @DisplayName("mixed dismissed and active reviews all count toward XP")
+        void mixedDismissedAndActiveReviewsAllCount() {
             User author = createUser(1L, "author");
             User reviewer1 = createUser(2L, "reviewer1");
             User reviewer2 = createUser(3L, "reviewer2");
@@ -162,8 +169,8 @@ class ExperiencePointCalculatorTest {
             double mixedXp = calculator.calculateReviewExperiencePoints(List.of(dismissedReview, activeReview));
             double activeOnlyXp = calculator.calculateReviewExperiencePoints(List.of(activeReview));
 
-            // XP from mixed list should equal XP from active-only list (dismissed is excluded)
-            assertThat(mixedXp).isEqualTo(activeOnlyXp);
+            // XP from mixed list should be greater than active-only (both reviews count)
+            assertThat(mixedXp).isGreaterThan(activeOnlyXp);
         }
     }
 

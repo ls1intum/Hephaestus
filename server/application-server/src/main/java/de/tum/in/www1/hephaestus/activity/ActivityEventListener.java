@@ -241,19 +241,9 @@ public class ActivityEventListener {
                 reviewData.id(), reviewData.authorId(), reviewData.repositoryId());
             return;
         }
-        // Record a REVIEW_DISMISSED event with negative XP to reverse the original review's XP
-        // The original review's XP was calculated including this review, so we need to
-        // recalculate what the XP would be without this review and record the difference
-        List<PullRequestReview> remainingReviews = reviewRepository
-            .findByPullRequestIdAndAuthorId(reviewData.pullRequestId(), reviewData.authorId())
-            .stream()
-            .filter(r -> !r.getId().equals(reviewData.id()) && !r.isDismissed())
-            .toList();
-        double newXp = remainingReviews.isEmpty() ? 0.0 : xpCalc.calculateReviewExperiencePoints(remainingReviews);
-        List<PullRequestReview> allReviews = reviewRepository
-            .findByPullRequestIdAndAuthorId(reviewData.pullRequestId(), reviewData.authorId());
-        double oldXp = xpCalc.calculateReviewExperiencePoints(allReviews);
-        double xpAdjustment = newXp - oldXp; // Will be negative or zero
+        // Record a REVIEW_DISMISSED event with 0 XP - dismissals don't affect XP
+        // since dismissed reviews still count for the leaderboard
+        double xpAdjustment = 0.0;
         
         safeRecord("review dismissed", reviewData.id(), () ->
             activityEventService.record(

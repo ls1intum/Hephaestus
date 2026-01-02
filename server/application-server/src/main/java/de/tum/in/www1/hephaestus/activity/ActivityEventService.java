@@ -248,8 +248,37 @@ class ActivityEventService {
     }
 
     /**
+     * Record an activity event using a command object.
+     *
+     * <p>This is the preferred API for recording events - cleaner than the
+     * 10-parameter method and provides compile-time safety via the builder pattern.
+     *
+     * @param command the command containing all event data
+     * @return true if recorded successfully, false otherwise
+     * @see RecordActivityCommand
+     */
+    public boolean record(RecordActivityCommand command) {
+        return record(
+            command.workspaceId(),
+            command.eventType(),
+            command.occurredAt(),
+            command.actor(),
+            command.repository(),
+            command.targetType(),
+            command.targetId(),
+            command.xp(),
+            command.sourceSystem(),
+            command.payload()
+        );
+    }
+
+    /**
      * Recovery method called when all retry attempts are exhausted.
      * This method signature must match the retryable method parameters.
+     *
+     * <p><strong>Dead Letter Handling:</strong> Failed events are logged with full context
+     * for manual investigation. Consider adding a dead letter table for persistence
+     * if automated retry is needed.
      */
     @Recover
     public boolean recoverFromTransientError(
@@ -266,12 +295,17 @@ class ActivityEventService {
         @Nullable Map<String, Object> payload
     ) {
         eventsFailedCounter.increment();
+        // Log with structured context for dead letter investigation
         logger.error(
-            "Failed to record activity event after retries: workspaceId={}, eventType={}, targetId={}, error={}",
+            "DEAD_LETTER: Failed to record activity event after retries. " +
+            "workspaceId={}, eventType={}, targetId={}, xp={}, source={}, error={}",
             workspaceId,
             eventType,
             targetId,
-            e.getMessage()
+            xp,
+            sourceSystem,
+            e.getMessage(),
+            e
         );
         return false;
     }

@@ -7,7 +7,11 @@ import io.hypersistence.utils.hibernate.type.json.JsonType;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.PositiveOrZero;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
+import java.util.HexFormat;
 import java.util.Map;
 import java.util.UUID;
 import lombok.AllArgsConstructor;
@@ -169,6 +173,37 @@ public class ActivityEvent {
     @Column(name = "schema_version", nullable = false)
     private int schemaVersion = 1;
 
+    /**
+     * XP formula version used for this event.
+     *
+     * <p>This tracks which version of the XP calculation formula was used
+     * when computing the XP value. This enables:
+     * <ul>
+     *   <li>Historical accuracy: Explain why old events have specific XP</li>
+     *   <li>Audit trail: Track formula changes over time</li>
+     *   <li>Recalculation: Optionally recompute XP with new formula</li>
+     * </ul>
+     *
+     * <p>Formula versions:
+     * <ul>
+     *   <li>1 = Original harmonic mean formula</li>
+     *   <li>2 = Future updates (document changes here)</li>
+     * </ul>
+     */
+    @Builder.Default
+    @Column(name = "formula_version", nullable = false)
+    private int formulaVersion = 1;
+
+    /**
+     * SHA-256 hash of event content for tamper detection.
+     *
+     * <p>Computed from: eventKey + eventType + occurredAt + targetId + xp + schemaVersion.
+     * This provides an audit trail integrity guarantee - any modification to
+     * event content would invalidate the hash.
+     */
+    @Column(name = "content_hash", length = 64)
+    private String contentHash;
+
     @PrePersist
     protected void onCreate() {
         if (id == null) {
@@ -177,6 +212,47 @@ public class ActivityEvent {
         if (ingestedAt == null) {
             ingestedAt = Instant.now();
         }
+        if (contentHash == null) {
+            contentHash = computeContentHash();
+        }
+    }
+
+    /**
+     * Compute SHA-256 hash of event content for integrity verification.
+     *
+     * @return hex-encoded SHA-256 hash of event content
+     */
+    private String computeContentHash() {
+        String content = String.format(
+            "%s|%s|%s|%s|%.2f|%d|%d",
+            eventKey,
+            eventType != null ? eventType.getValue() : "",
+            occurredAt != null ? occurredAt.toEpochMilli() : 0,
+            targetId != null ? targetId : 0,
+            xp,
+            schemaVersion,
+            formulaVersion
+        );
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(content.getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(hash);
+        } catch (NoSuchAlgorithmException e) {
+            // SHA-256 is guaranteed to be available in all Java implementations
+            throw new IllegalStateException("SHA-256 not available", e);
+        }
+    }
+
+    /**
+     * Verify the integrity of this event by comparing stored hash with computed hash.
+     *
+     * @return true if the event content has not been tampered with
+     */
+    public boolean verifyIntegrity() {
+        if (contentHash == null) {
+            return false;
+        }
+        return contentHash.equals(computeContentHash());
     }
 
     /**
