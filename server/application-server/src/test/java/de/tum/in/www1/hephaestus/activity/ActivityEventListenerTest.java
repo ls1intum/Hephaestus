@@ -17,7 +17,7 @@ import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import java.time.Instant;
-import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -273,15 +273,15 @@ class ActivityEventListenerTest {
             PullRequest pullRequest = createPullRequest(10L);
             PullRequestReview review = createReview(5L, pullRequest);
             review.setState(PullRequestReview.State.APPROVED);
-            // Mock the review query needed for XP calculation (this is still needed for harmonic mean calc)
-            when(reviewRepository.findByPullRequestIdAndAuthorId(10L, 100L)).thenReturn(List.of(review));
-            when(experiencePointCalculator.calculateReviewExperiencePoints(List.of(review))).thenReturn(7.5);
+            // Mock findById to return the single review for XP calculation
+            when(reviewRepository.findById(5L)).thenReturn(Optional.of(review));
+            when(experiencePointCalculator.calculateReviewExperiencePoints(review)).thenReturn(7.5);
 
             var event = new DomainEvent.ReviewSubmitted(createReviewData(review), createContext());
 
             listener.onReviewSubmitted(event);
 
-            verify(experiencePointCalculator).calculateReviewExperiencePoints(List.of(review));
+            verify(experiencePointCalculator).calculateReviewExperiencePoints(review);
             verify(activityEventService).record(
                 eq(42L),
                 eq(ActivityEventType.REVIEW_APPROVED),

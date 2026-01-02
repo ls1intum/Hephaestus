@@ -8,7 +8,6 @@ import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReview
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import java.time.Instant;
-import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Async;
@@ -219,13 +218,14 @@ public class ActivityEventListener {
             );
             return;
         }
-        // Calculate XP using ALL reviews for this PR by this author (per-PR harmonic mean)
-        // This is a necessary query to get the harmonic mean calculation right
-        List<PullRequestReview> allReviewsForPrByAuthor = reviewRepository.findByPullRequestIdAndAuthorId(
-            reviewData.pullRequestId(),
-            reviewData.authorId()
-        );
-        double xp = xpCalc.calculateReviewExperiencePoints(allReviewsForPrByAuthor);
+        // Calculate XP for THIS single review only - not cumulative across all reviews.
+        // Each event stores XP for its own review to avoid double-counting when aggregated.
+        PullRequestReview review = reviewRepository.findById(reviewData.id()).orElse(null);
+        if (review == null) {
+            log.warn("Review not found for XP calculation: reviewId={}", reviewData.id());
+            return;
+        }
+        double xp = xpCalc.calculateReviewExperiencePoints(review);
         Instant occurredAt = reviewData.submittedAt() != null ? reviewData.submittedAt() : Instant.now();
         safeRecord("review", reviewData.id(), () ->
             activityEventService.record(
@@ -297,12 +297,14 @@ public class ActivityEventListener {
             );
             return;
         }
-        // Recalculate XP based on updated review state
-        List<PullRequestReview> allReviewsForPrByAuthor = reviewRepository.findByPullRequestIdAndAuthorId(
-            reviewData.pullRequestId(),
-            reviewData.authorId()
-        );
-        double xp = xpCalc.calculateReviewExperiencePoints(allReviewsForPrByAuthor);
+        // Calculate XP for THIS single review only - not cumulative across all reviews.
+        // Each event stores XP for its own review to avoid double-counting when aggregated.
+        PullRequestReview review = reviewRepository.findById(reviewData.id()).orElse(null);
+        if (review == null) {
+            log.warn("Review not found for XP calculation: reviewId={}", reviewData.id());
+            return;
+        }
+        double xp = xpCalc.calculateReviewExperiencePoints(review);
         Instant occurredAt = reviewData.submittedAt() != null ? reviewData.submittedAt() : Instant.now();
         safeRecord("review edited", reviewData.id(), () ->
             activityEventService.record(

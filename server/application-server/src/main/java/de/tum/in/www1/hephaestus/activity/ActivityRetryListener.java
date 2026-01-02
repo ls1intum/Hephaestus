@@ -6,7 +6,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.retry.RetryCallback;
 import org.springframework.retry.RetryContext;
-import org.springframework.retry.listener.RetryListenerSupport;
+import org.springframework.retry.RetryListener;
 import org.springframework.stereotype.Component;
 
 /**
@@ -25,7 +25,7 @@ import org.springframework.stereotype.Component;
  * </ul>
  */
 @Component("activityRetryListener")
-public class ActivityRetryListener extends RetryListenerSupport {
+public class ActivityRetryListener implements RetryListener {
 
     private static final Logger logger = LoggerFactory.getLogger(ActivityRetryListener.class);
 

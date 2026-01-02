@@ -16,16 +16,21 @@ import org.junit.jupiter.api.Test;
 /**
  * Activity Module Boundary Tests.
  *
- * <p>The activity module has a complex internal structure:
+ * <p>The activity module has a focused internal structure:
  * <ul>
- *   <li><b>activity root</b> - Core activity event handling and scoring</li>
- *   <li><b>activity.badpractice</b> - Bad practice entity persistence (repositories, feedback)</li>
- *   <li><b>activity.badpracticedetector</b> - Bad practice detection logic (scheduler, detector, event listeners)</li>
- *   <li><b>activity.model</b> - Activity domain models</li>
+ *   <li><b>activity root</b> - Core activity event handling and leaderboard cache</li>
  *   <li><b>activity.scoring</b> - XP/scoring calculations</li>
  * </ul>
  *
- * <p>These tests enforce proper separation of concerns within the activity module.
+ * <p>Note: Bad practice detection is in the separate <b>practices</b> module:
+ * <ul>
+ *   <li><b>practices.model</b> - Bad practice entities (BadPracticeDetection, PullRequestBadPractice, etc.)</li>
+ *   <li><b>practices.detection</b> - Detection logic (scheduler, detector, event listeners)</li>
+ *   <li><b>practices.spi</b> - Service provider interfaces (BadPracticeNotificationSender, UserRoleChecker)</li>
+ *   <li><b>practices.feedback</b> - Feedback handling</li>
+ * </ul>
+ *
+ * <p>These tests enforce proper separation of concerns within the activity module and practices module.
  *
  * @see ArchitectureTestConstants
  */
@@ -156,53 +161,53 @@ class ActivityModuleBoundaryTest {
     }
 
     // ========================================================================
-    // BAD PRACTICE SUBMODULE ISOLATION
+    // PRACTICES MODULE ISOLATION
     // ========================================================================
 
     @Nested
-    @DisplayName("Bad Practice Submodule Isolation")
-    class BadPracticeSubmoduleTests {
+    @DisplayName("Practices Module Isolation")
+    class PracticesModuleTests {
 
         /**
-         * badpractice package (persistence) should not depend on badpracticedetector (logic).
+         * practices.model package (persistence) should not depend on practices.detection (logic).
          *
-         * <p>The badpractice package contains repositories and feedback services.
-         * The badpracticedetector package contains detection logic and schedulers.
-         * Persistence layer should not depend on detection logic.
+         * <p>The practices.model package contains entities and repositories.
+         * The practices.detection package contains detection logic and schedulers.
+         * Model/persistence layer should not depend on detection logic.
          */
         @Test
-        @DisplayName("badpractice does not depend on badpracticedetector")
-        void badpracticeDoesNotDependOnDetector() {
+        @DisplayName("practices.model does not depend on practices.detection")
+        void practicesModelDoesNotDependOnDetection() {
             ArchRule rule = noClasses()
                 .that()
-                .resideInAPackage("..activity.badpractice..")
+                .resideInAPackage("..practices.model..")
                 .should()
                 .dependOnClassesThat()
-                .resideInAPackage("..activity.badpracticedetector..")
+                .resideInAPackage("..practices.detection..")
                 .allowEmptyShould(true)
-                .because("Persistence layer (badpractice) should not depend on detection logic (badpracticedetector)");
+                .because("Model layer (practices.model) should not depend on detection logic (practices.detection)");
             rule.check(classes);
         }
 
         /**
-         * badpracticedetector can depend on badpractice repositories.
+         * practices.detection can depend on practices.model and practices.spi.
          *
-         * <p>The detector uses repositories to persist detected bad practices.
+         * <p>The detector uses model entities and SPI interfaces.
          * This is the expected direction of dependency.
          */
         @Test
-        @DisplayName("badpracticedetector may depend on badpractice (verify direction)")
+        @DisplayName("practices.detection may depend on practices.model (verify direction)")
         void verifyDetectorDependencyDirection() {
             // This test documents the expected dependency direction.
-            // badpracticedetector → badpractice is allowed
-            // badpractice → badpracticedetector is NOT allowed (tested above)
+            // practices.detection → practices.model is allowed
+            // practices.model → practices.detection is NOT allowed (tested above)
             ArchRule rule = classes()
                 .that()
-                .resideInAPackage("..activity.badpracticedetector..")
+                .resideInAPackage("..practices.detection..")
                 .should()
                 .onlyDependOnClassesThat()
                 .resideInAnyPackage(
-                    "..activity..",
+                    "..practices..",
                     "..gitprovider..",
                     "..workspace..",
                     "..intelligenceservice..",
@@ -217,24 +222,24 @@ class ActivityModuleBoundaryTest {
                     "" // primitives
                 )
                 .allowEmptyShould(true)
-                .because("badpracticedetector should only depend on allowed packages");
+                .because("practices.detection should only depend on allowed packages");
             rule.check(classes);
         }
 
         /**
-         * Bad practice detector should not depend on leaderboard.
+         * Practices detection should not depend on leaderboard.
          */
         @Test
-        @DisplayName("badpracticedetector does not depend on leaderboard")
-        void badpracticeDetectorDoesNotDependOnLeaderboard() {
+        @DisplayName("practices.detection does not depend on leaderboard")
+        void practicesDetectionDoesNotDependOnLeaderboard() {
             ArchRule rule = noClasses()
                 .that()
-                .resideInAPackage("..activity.badpracticedetector..")
+                .resideInAPackage("..practices.detection..")
                 .should()
                 .dependOnClassesThat()
                 .resideInAPackage("..leaderboard..")
                 .allowEmptyShould(true)
-                .because("Bad practice detection is independent of leaderboard");
+                .because("Practices detection is independent of leaderboard");
             rule.check(classes);
         }
     }
@@ -286,47 +291,31 @@ class ActivityModuleBoundaryTest {
     }
 
     // ========================================================================
-    // ACTIVITY MODEL ISOLATION
+    // PRACTICES MODULE CONTROLLER ISOLATION
     // ========================================================================
 
     @Nested
-    @DisplayName("Activity Model Isolation")
-    class ActivityModelTests {
+    @DisplayName("Practices Controller Isolation")
+    class PracticesControllerTests {
 
         /**
-         * Activity models should not depend on service layer.
+         * PracticesController should be the only entry point for practices-related API.
          *
-         * <p>Models are pure domain objects - they should not have
-         * dependencies on services which would create circular dependencies.
+         * <p>All bad practice detection, resolution, and feedback endpoints should be
+         * consolidated in PracticesController, not scattered across other controllers.
          */
         @Test
-        @DisplayName("Activity models do not depend on services")
-        void activityModelsDoNotDependOnServices() {
-            ArchRule rule = noClasses()
+        @DisplayName("Practices has a dedicated controller")
+        void practicesHasDedicatedController() {
+            ArchRule rule = classes()
                 .that()
-                .resideInAPackage("..activity.model..")
-                .should()
-                .dependOnClassesThat()
-                .haveSimpleNameEndingWith("Service")
-                .allowEmptyShould(true)
-                .because("Domain models should not depend on service layer");
-            rule.check(classes);
-        }
-
-        /**
-         * Activity models should not depend on controllers.
-         */
-        @Test
-        @DisplayName("Activity models do not depend on controllers")
-        void activityModelsDoNotDependOnControllers() {
-            ArchRule rule = noClasses()
-                .that()
-                .resideInAPackage("..activity.model..")
-                .should()
-                .dependOnClassesThat()
+                .resideInAPackage("..practices..")
+                .and()
                 .haveSimpleNameEndingWith("Controller")
+                .should()
+                .haveSimpleName("PracticesController")
                 .allowEmptyShould(true)
-                .because("Domain models should not depend on presentation layer");
+                .because("All practices endpoints should be in PracticesController");
             rule.check(classes);
         }
     }

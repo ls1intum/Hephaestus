@@ -7,7 +7,6 @@ import de.tum.in.www1.hephaestus.intelligenceservice.api.DetectorApi;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.BadPractice;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.DetectorRequest;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.DetectorResponse;
-import de.tum.in.www1.hephaestus.practices.detection.BadPracticeDetectionRepository;
 import de.tum.in.www1.hephaestus.practices.model.BadPracticeDetection;
 import de.tum.in.www1.hephaestus.practices.model.DetectionResult;
 import de.tum.in.www1.hephaestus.practices.model.PullRequestBadPractice;

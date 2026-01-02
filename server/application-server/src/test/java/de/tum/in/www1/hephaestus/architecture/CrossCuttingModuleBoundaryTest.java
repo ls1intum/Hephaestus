@@ -83,7 +83,7 @@ class CrossCuttingModuleBoundaryTest {
                 .resideInAPackage("..contributors..")
                 .should()
                 .dependOnClassesThat()
-                .resideInAnyPackage("..activity..service..", "..activity..repository..", "..activity.badpractice..")
+                .resideInAnyPackage("..activity..service..", "..activity..repository..", "..practices..")
                 .allowEmptyShould(true)
                 .because("Contributors module should not depend on activity internals");
             rule.check(classes);

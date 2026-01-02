@@ -17,6 +17,7 @@ import de.tum.in.www1.hephaestus.practices.model.DetectionResult;
 import de.tum.in.www1.hephaestus.practices.model.PullRequestBadPractice;
 import de.tum.in.www1.hephaestus.practices.model.PullRequestBadPracticeDTO;
 import de.tum.in.www1.hephaestus.practices.model.PullRequestBadPracticeState;
+import de.tum.in.www1.hephaestus.practices.model.PullRequestWithBadPracticesDTO;
 import de.tum.in.www1.hephaestus.workspace.Workspace;
 import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContextResolver;
@@ -95,15 +96,17 @@ public class PracticesController {
                           .map(PullRequestBadPracticeDTO::fromPullRequestBadPractice)
                           .toList();
 
+                List<String> badPracticeTitles = badPractices.stream().map(PullRequestBadPracticeDTO::title).toList();
+
+                List<PullRequestBadPracticeDTO> oldBadPractices = badPracticeRepository
+                    .findByPullRequestId(pr.getId())
+                    .stream()
+                    .filter(badPractice -> !badPracticeTitles.contains(badPractice.getTitle()))
+                    .map(PullRequestBadPracticeDTO::fromPullRequestBadPractice)
+                    .toList();
+
                 String summary = lastDetection != null ? lastDetection.getSummary() : "";
-                return new PullRequestWithBadPracticesDTO(
-                    pr.getId(),
-                    pr.getNumber(),
-                    pr.getTitle(),
-                    pr.getHtmlUrl(),
-                    summary,
-                    badPractices
-                );
+                return PullRequestWithBadPracticesDTO.fromPullRequest(pr, summary, badPractices, oldBadPractices);
             })
             .collect(Collectors.toList());
 
@@ -137,16 +140,18 @@ public class PracticesController {
                   .map(PullRequestBadPracticeDTO::fromPullRequestBadPractice)
                   .toList();
 
+        List<String> badPracticeTitles = badPractices.stream().map(PullRequestBadPracticeDTO::title).toList();
+
+        List<PullRequestBadPracticeDTO> oldBadPractices = badPracticeRepository
+            .findByPullRequestId(pr.getId())
+            .stream()
+            .filter(badPractice -> !badPracticeTitles.contains(badPractice.getTitle()))
+            .map(PullRequestBadPracticeDTO::fromPullRequestBadPractice)
+            .toList();
+
         String summary = lastDetection != null ? lastDetection.getSummary() : "";
         return ResponseEntity.ok(
-            new PullRequestWithBadPracticesDTO(
-                pr.getId(),
-                pr.getNumber(),
-                pr.getTitle(),
-                pr.getHtmlUrl(),
-                summary,
-                badPractices
-            )
+            PullRequestWithBadPracticesDTO.fromPullRequest(pr, summary, badPractices, oldBadPractices)
         );
     }
 
@@ -326,14 +331,4 @@ public class PracticesController {
 
     /** Response for user bad practices listing */
     public record UserPracticesDTO(String login, List<PullRequestWithBadPracticesDTO> pullRequests) {}
-
-    /** Response for pull request with its bad practices */
-    public record PullRequestWithBadPracticesDTO(
-        Long id,
-        int number,
-        String title,
-        String htmlUrl,
-        String summary,
-        List<PullRequestBadPracticeDTO> badPractices
-    ) {}
 }
