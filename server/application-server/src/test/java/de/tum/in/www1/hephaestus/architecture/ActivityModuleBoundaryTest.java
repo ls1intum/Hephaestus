@@ -218,7 +218,8 @@ class ActivityModuleBoundaryTest {
                     "org.springframework..",
                     "org.slf4j..",
                     "org.hibernate..",
-                    "lombok..", // Lombok-generated code
+                    "lombok..",
+                    "io.github.resilience4j..", // Circuit breaker for resilient external calls
                     "" // primitives
                 )
                 .allowEmptyShould(true)

@@ -9,6 +9,7 @@ import de.tum.in.www1.hephaestus.gitprovider.common.events.EventContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.events.EventPayload;
 import de.tum.in.www1.hephaestus.gitprovider.common.events.RepositoryRef;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
+import de.tum.in.www1.hephaestus.gitprovider.issuecomment.IssueCommentRepository;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReview;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReviewRepository;
@@ -51,6 +52,9 @@ class ActivityEventListenerTest {
     private PullRequestReviewRepository reviewRepository;
 
     @Mock
+    private IssueCommentRepository issueCommentRepository;
+
+    @Mock
     private UserRepository userRepository;
 
     @Mock
@@ -78,6 +82,7 @@ class ActivityEventListenerTest {
             activityEventService,
             experiencePointCalculator,
             reviewRepository,
+            issueCommentRepository,
             userRepository,
             repositoryRepository
         );

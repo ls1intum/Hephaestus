@@ -3,6 +3,8 @@ package de.tum.in.www1.hephaestus.activity;
 import de.tum.in.www1.hephaestus.activity.scoring.ExperiencePointCalculator;
 import de.tum.in.www1.hephaestus.gitprovider.common.events.DomainEvent;
 import de.tum.in.www1.hephaestus.gitprovider.common.events.EventContext;
+import de.tum.in.www1.hephaestus.gitprovider.issuecomment.IssueComment;
+import de.tum.in.www1.hephaestus.gitprovider.issuecomment.IssueCommentRepository;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReview;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReviewRepository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
@@ -39,6 +41,7 @@ public class ActivityEventListener {
     private final ActivityEventService activityEventService;
     private final ExperiencePointCalculator xpCalc;
     private final PullRequestReviewRepository reviewRepository;
+    private final IssueCommentRepository issueCommentRepository;
     private final UserRepository userRepository;
     private final RepositoryRepository repositoryRepository;
 
@@ -46,12 +49,14 @@ public class ActivityEventListener {
         ActivityEventService activityEventService,
         ExperiencePointCalculator xpCalc,
         PullRequestReviewRepository reviewRepository,
+        IssueCommentRepository issueCommentRepository,
         UserRepository userRepository,
         RepositoryRepository repositoryRepository
     ) {
         this.activityEventService = activityEventService;
         this.xpCalc = xpCalc;
         this.reviewRepository = reviewRepository;
+        this.issueCommentRepository = issueCommentRepository;
         this.userRepository = userRepository;
         this.repositoryRepository = repositoryRepository;
     }
@@ -334,11 +339,18 @@ public class ActivityEventListener {
             );
             return;
         }
-        // Note: XP calculation currently needs body length - we have body in commentData
-        // For now, use a fixed XP since we don't have the full comment entity
-        // TODO: Consider adding body length to CommentData or simplifying XP calculation
-        double xp = xpCalc.getXpReviewComment(); // Use review comment XP as fallback
+        // Fetch the full IssueComment entity to calculate complexity-weighted XP
+        // using the harmonic mean formula from the old scoring system
+        IssueComment issueComment = issueCommentRepository.findById(commentData.id()).orElse(null);
+        double xp;
+        if (issueComment != null) {
+            xp = xpCalc.calculateIssueCommentExperiencePoints(issueComment);
+        } else {
+            log.warn("IssueComment not found for XP calculation, using fallback: commentId={}", commentData.id());
+            xp = xpCalc.getXpReviewComment();
+        }
         Instant occurredAt = commentData.createdAt() != null ? commentData.createdAt() : Instant.now();
+        final double finalXp = xp;
         safeRecord("comment", commentData.id(), () ->
             activityEventService.record(
                 event.context().workspaceId(),
@@ -348,7 +360,7 @@ public class ActivityEventListener {
                 repositoryRepository.getReferenceById(commentData.repositoryId()),
                 ActivityTargetType.ISSUE_COMMENT,
                 commentData.id(),
-                xp,
+                finalXp,
                 mapSource(event.context().source())
             )
         );

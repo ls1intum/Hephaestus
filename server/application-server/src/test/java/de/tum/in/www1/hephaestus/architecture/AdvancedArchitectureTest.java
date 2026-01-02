@@ -242,17 +242,25 @@ class AdvancedArchitectureTest {
                     boolean hasSecurityAnnotation =
                         method.isAnnotatedWith(PreAuthorize.class) ||
                         method.getOwner().isAnnotatedWith(PreAuthorize.class) ||
-                        // Check for custom security annotations on method
+                        // Check for custom security annotations on method (Ensure* or Require*)
                         method
                             .getAnnotations()
                             .stream()
-                            .anyMatch(a -> a.getRawType().getName().contains("Require")) ||
-                        // Check for custom security annotations on class
+                            .anyMatch(
+                                a ->
+                                    a.getRawType().getName().contains("Require") ||
+                                    a.getRawType().getName().contains("Ensure")
+                            ) ||
+                        // Check for custom security annotations on class (Ensure* or Require*)
                         method
                             .getOwner()
                             .getAnnotations()
                             .stream()
-                            .anyMatch(a -> a.getRawType().getName().contains("Require"));
+                            .anyMatch(
+                                a ->
+                                    a.getRawType().getName().contains("Require") ||
+                                    a.getRawType().getName().contains("Ensure")
+                            );
 
                     if (!hasSecurityAnnotation) {
                         events.add(

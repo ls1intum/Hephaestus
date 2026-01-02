@@ -234,7 +234,7 @@ public class PracticesController {
         requireAssignee(badPractice.getPullrequest(), currentUser);
         requireValidResolveState(state);
 
-        badPractice.setState(state);
+        badPractice.setUserState(state);
         badPracticeRepository.save(badPractice);
         return ResponseEntity.ok().build();
     }

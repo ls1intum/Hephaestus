@@ -1,6 +1,5 @@
 package de.tum.in.www1.hephaestus.activity;
 
-import de.tum.in.www1.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.in.www1.hephaestus.security.EnsureSuperAdminUser;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -15,8 +14,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -37,13 +34,11 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/admin/dead-letters")
 @RequiredArgsConstructor
-@EnsureSuperAdminUser // Defense-in-depth: class-level security
+@EnsureSuperAdminUser
 @Tag(name = "Dead Letter Admin", description = "Administrative operations for failed activity events")
 public class DeadLetterAdminController {
 
-    private static final Logger logger = LoggerFactory.getLogger(DeadLetterAdminController.class);
-    private final DeadLetterEventRepository deadLetterRepository;
-    private final ActivityEventService activityEventService;
+    private final DeadLetterEventService deadLetterEventService;
 
     @GetMapping("/pending")
     @Operation(
@@ -54,7 +49,7 @@ public class DeadLetterAdminController {
     public ResponseEntity<List<DeadLetterSummaryDTO>> getPending(
         @RequestParam(defaultValue = "100") @Min(1) @Max(1000) int limit
     ) {
-        List<DeadLetterEvent> pending = deadLetterRepository.findPendingForRetry(limit);
+        List<DeadLetterEvent> pending = deadLetterEventService.findPendingForRetry(limit);
         List<DeadLetterSummaryDTO> summaries = pending.stream().map(this::toSummary).toList();
         return ResponseEntity.ok(summaries);
     }
@@ -67,9 +62,7 @@ public class DeadLetterAdminController {
     @ApiResponse(responseCode = "200", description = "Dead letter details")
     @ApiResponse(responseCode = "404", description = "Dead letter not found")
     public ResponseEntity<DeadLetterDetailDTO> getById(@PathVariable UUID id) {
-        DeadLetterEvent event = deadLetterRepository
-            .findById(id)
-            .orElseThrow(() -> new EntityNotFoundException("DeadLetterEvent", id.toString()));
+        DeadLetterEvent event = deadLetterEventService.findById(id);
         return ResponseEntity.ok(toDetail(event));
     }
 
@@ -81,13 +74,7 @@ public class DeadLetterAdminController {
     @ApiResponse(responseCode = "200", description = "Dead letter discarded")
     @ApiResponse(responseCode = "404", description = "Dead letter not found")
     public ResponseEntity<Void> discard(@PathVariable UUID id, @Valid @RequestBody DiscardReasonDTO reason) {
-        DeadLetterEvent event = deadLetterRepository
-            .findById(id)
-            .orElseThrow(() -> new EntityNotFoundException("DeadLetterEvent", id.toString()));
-
-        logger.info("ADMIN_ACTION: Discarding dead letter {} with reason: {}", id, reason.reason());
-        event.markDiscarded(reason.reason());
-        deadLetterRepository.save(event);
+        deadLetterEventService.discard(id, reason.reason());
         return ResponseEntity.ok().build();
     }
 
@@ -96,42 +83,8 @@ public class DeadLetterAdminController {
     @ApiResponse(responseCode = "200", description = "Retry result")
     @ApiResponse(responseCode = "404", description = "Dead letter not found")
     public ResponseEntity<RetryResultDTO> retry(@PathVariable UUID id) {
-        DeadLetterEvent event = deadLetterRepository
-            .findById(id)
-            .orElseThrow(() -> new EntityNotFoundException("DeadLetterEvent", id.toString()));
-
-        if (event.getStatus() != DeadLetterEvent.Status.PENDING) {
-            return ResponseEntity.ok(new RetryResultDTO(false, "Dead letter is not in PENDING status"));
-        }
-
-        logger.info("ADMIN_ACTION: Retrying dead letter {}", id);
-
-        try {
-            boolean success = activityEventService.record(
-                event.getWorkspaceId(),
-                event.getEventType(),
-                event.getOccurredAt(),
-                null, // Actor reference not preserved in dead letter
-                null, // Repository reference not preserved in dead letter
-                ActivityTargetType.fromValue(event.getTargetType()),
-                event.getTargetId(),
-                event.getXp(),
-                SourceSystem.fromValue(event.getSourceSystem()),
-                null // Payload not preserved
-            );
-
-            if (success) {
-                event.markResolved("Admin retry via API");
-                deadLetterRepository.save(event);
-                logger.info("ADMIN_ACTION: Dead letter {} successfully retried", id);
-                return ResponseEntity.ok(new RetryResultDTO(true, "Event successfully recorded"));
-            } else {
-                return ResponseEntity.ok(new RetryResultDTO(false, "Event was a duplicate (already recorded)"));
-            }
-        } catch (Exception e) {
-            logger.error("ADMIN_ACTION: Failed to retry dead letter {}: {}", id, e.getMessage());
-            return ResponseEntity.ok(new RetryResultDTO(false, "Retry failed: " + e.getMessage()));
-        }
+        DeadLetterEventService.RetryResult result = deadLetterEventService.retry(id);
+        return ResponseEntity.ok(new RetryResultDTO(result.success(), result.message()));
     }
 
     @GetMapping("/stats")
@@ -141,18 +94,10 @@ public class DeadLetterAdminController {
     )
     @ApiResponse(responseCode = "200", description = "Statistics")
     public ResponseEntity<DeadLetterStatsDTO> getStats() {
-        long pending = deadLetterRepository.countByStatus(DeadLetterEvent.Status.PENDING);
-        long resolved = deadLetterRepository.countByStatus(DeadLetterEvent.Status.RESOLVED);
-        long discarded = deadLetterRepository.countByStatus(DeadLetterEvent.Status.DISCARDED);
-
-        List<Object[]> byTypeRaw = deadLetterRepository.countPendingByEventType();
-        Map<String, Long> byType = byTypeRaw
-            .stream()
-            .collect(
-                java.util.stream.Collectors.toMap(row -> ((ActivityEventType) row[0]).name(), row -> (Long) row[1])
-            );
-
-        return ResponseEntity.ok(new DeadLetterStatsDTO(pending, resolved, discarded, byType));
+        DeadLetterEventService.DeadLetterStats stats = deadLetterEventService.getStats();
+        return ResponseEntity.ok(
+            new DeadLetterStatsDTO(stats.pending(), stats.resolved(), stats.discarded(), stats.byEventType())
+        );
     }
 
     // DTO conversions
