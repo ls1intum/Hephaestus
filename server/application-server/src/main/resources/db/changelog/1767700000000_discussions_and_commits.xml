@@ -1,0 +1,536 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+    =====================================================================================
+    Discussions and Commits Migration
+    =====================================================================================
+    
+    This migration adds support for GitHub Discussions and Git Commits:
+    
+    1. Discussion Category - Categories for discussions (Q&A support)
+    2. Discussion - GitHub Discussions entity
+    3. Discussion Label - Many-to-many relationship for discussion labels
+    4. Discussion Comment - Comments on discussions with reply threading
+    5. Git Commit - Provider-agnostic commit entity
+    6. Git Commit File Change - Files changed in commits
+    
+    See: docs/contributor/database-migration.mdx
+    =====================================================================================
+    -->
+
+    <!-- ==================== SECTION 1: Discussion Category ==================== -->
+
+    <changeSet id="1767700000000-create-discussion-category" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <tableExists tableName="discussion_category"/>
+            </not>
+        </preConditions>
+        <comment>
+            Uses VARCHAR for id because GitHub's GraphQL API doesn't expose databaseId
+            for DiscussionCategory - only the node ID (e.g., "DIC_kwDOBk...").
+        </comment>
+        <createTable tableName="discussion_category">
+            <column name="id" type="VARCHAR(128)">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="name" type="VARCHAR(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="slug" type="VARCHAR(128)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="emoji" type="VARCHAR(32)">
+                <constraints nullable="true"/>
+            </column>
+            <column name="description" type="TEXT">
+                <constraints nullable="true"/>
+            </column>
+            <column name="is_answerable" type="BOOLEAN" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+            <column name="repository_id" type="BIGINT">
+                <constraints nullable="true"/>
+            </column>
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="true"/>
+            </column>
+            <column name="updated_at" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="true"/>
+            </column>
+        </createTable>
+
+        <addForeignKeyConstraint
+            baseTableName="discussion_category"
+            baseColumnNames="repository_id"
+            constraintName="fk_discussion_category_repository"
+            referencedTableName="repository"
+            referencedColumnNames="id"
+            onDelete="CASCADE"/>
+
+        <addUniqueConstraint
+            tableName="discussion_category"
+            columnNames="repository_id, slug"
+            constraintName="uk_discussion_category_repo_slug"/>
+
+        <createIndex tableName="discussion_category" indexName="idx_discussion_category_repository">
+            <column name="repository_id"/>
+        </createIndex>
+    </changeSet>
+
+    <!-- ==================== SECTION 2: Discussion ==================== -->
+
+    <changeSet id="1767700000000-create-discussion" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <tableExists tableName="discussion"/>
+            </not>
+        </preConditions>
+        <createTable tableName="discussion">
+            <column name="id" type="BIGINT">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="number" type="INTEGER">
+                <constraints nullable="false"/>
+            </column>
+            <column name="title" type="VARCHAR(512)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="body" type="TEXT">
+                <constraints nullable="true"/>
+            </column>
+            <column name="html_url" type="VARCHAR(512)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="state" type="VARCHAR(16)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="state_reason" type="VARCHAR(32)">
+                <constraints nullable="true"/>
+            </column>
+            <column name="is_locked" type="BOOLEAN" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+            <column name="active_lock_reason" type="VARCHAR(32)">
+                <constraints nullable="true"/>
+            </column>
+            <column name="comment_count" type="INTEGER" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+            <column name="closed_at" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="true"/>
+            </column>
+            <column name="answer_chosen_at" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="true"/>
+            </column>
+            <column name="last_sync_at" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="true"/>
+            </column>
+            <column name="repository_id" type="BIGINT">
+                <constraints nullable="true"/>
+            </column>
+            <column name="author_id" type="BIGINT">
+                <constraints nullable="true"/>
+            </column>
+            <column name="category_id" type="VARCHAR(128)">
+                <constraints nullable="true"/>
+            </column>
+            <column name="answer_chosen_by_id" type="BIGINT">
+                <constraints nullable="true"/>
+            </column>
+            <column name="answer_comment_id" type="BIGINT">
+                <constraints nullable="true"/>
+            </column>
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="true"/>
+            </column>
+            <column name="updated_at" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="true"/>
+            </column>
+        </createTable>
+
+        <addForeignKeyConstraint
+            baseTableName="discussion"
+            baseColumnNames="repository_id"
+            constraintName="fk_discussion_repository"
+            referencedTableName="repository"
+            referencedColumnNames="id"
+            onDelete="CASCADE"/>
+
+        <addForeignKeyConstraint
+            baseTableName="discussion"
+            baseColumnNames="author_id"
+            constraintName="fk_discussion_author"
+            referencedTableName="hephaestus_user"
+            referencedColumnNames="id"
+            onDelete="SET NULL"/>
+
+        <addForeignKeyConstraint
+            baseTableName="discussion"
+            baseColumnNames="category_id"
+            constraintName="fk_discussion_category"
+            referencedTableName="discussion_category"
+            referencedColumnNames="id"
+            onDelete="SET NULL"/>
+
+        <addForeignKeyConstraint
+            baseTableName="discussion"
+            baseColumnNames="answer_chosen_by_id"
+            constraintName="fk_discussion_answer_chosen_by"
+            referencedTableName="hephaestus_user"
+            referencedColumnNames="id"
+            onDelete="SET NULL"/>
+
+        <addUniqueConstraint
+            tableName="discussion"
+            columnNames="repository_id, number"
+            constraintName="uk_discussion_repo_number"/>
+
+        <createIndex tableName="discussion" indexName="idx_discussion_repository">
+            <column name="repository_id"/>
+        </createIndex>
+        <createIndex tableName="discussion" indexName="idx_discussion_author">
+            <column name="author_id"/>
+        </createIndex>
+        <createIndex tableName="discussion" indexName="idx_discussion_category">
+            <column name="category_id"/>
+        </createIndex>
+        <createIndex tableName="discussion" indexName="idx_discussion_state">
+            <column name="state"/>
+        </createIndex>
+    </changeSet>
+
+    <!-- ==================== SECTION 3: Discussion Label (Many-to-Many) ==================== -->
+
+    <changeSet id="1767700000000-create-discussion-label" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <tableExists tableName="discussion_label"/>
+            </not>
+        </preConditions>
+        <createTable tableName="discussion_label">
+            <column name="discussion_id" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="label_id" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+
+        <addPrimaryKey
+            tableName="discussion_label"
+            columnNames="discussion_id, label_id"
+            constraintName="pk_discussion_label"/>
+
+        <addForeignKeyConstraint
+            baseTableName="discussion_label"
+            baseColumnNames="discussion_id"
+            constraintName="fk_discussion_label_discussion"
+            referencedTableName="discussion"
+            referencedColumnNames="id"
+            onDelete="CASCADE"/>
+
+        <addForeignKeyConstraint
+            baseTableName="discussion_label"
+            baseColumnNames="label_id"
+            constraintName="fk_discussion_label_label"
+            referencedTableName="label"
+            referencedColumnNames="id"
+            onDelete="CASCADE"/>
+
+        <createIndex tableName="discussion_label" indexName="idx_discussion_label_label">
+            <column name="label_id"/>
+        </createIndex>
+    </changeSet>
+
+    <!-- ==================== SECTION 4: Discussion Comment ==================== -->
+
+    <changeSet id="1767700000000-create-discussion-comment" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <tableExists tableName="discussion_comment"/>
+            </not>
+        </preConditions>
+        <createTable tableName="discussion_comment">
+            <column name="id" type="BIGINT">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="body" type="TEXT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="is_answer" type="BOOLEAN" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+            <column name="is_minimized" type="BOOLEAN" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+            <column name="minimized_reason" type="VARCHAR(64)">
+                <constraints nullable="true"/>
+            </column>
+            <column name="author_association" type="VARCHAR(32)">
+                <constraints nullable="true"/>
+            </column>
+            <column name="last_sync_at" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="true"/>
+            </column>
+            <column name="discussion_id" type="BIGINT">
+                <constraints nullable="true"/>
+            </column>
+            <column name="author_id" type="BIGINT">
+                <constraints nullable="true"/>
+            </column>
+            <column name="parent_comment_id" type="BIGINT">
+                <constraints nullable="true"/>
+            </column>
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="true"/>
+            </column>
+            <column name="updated_at" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="true"/>
+            </column>
+        </createTable>
+
+        <addForeignKeyConstraint
+            baseTableName="discussion_comment"
+            baseColumnNames="discussion_id"
+            constraintName="fk_discussion_comment_discussion"
+            referencedTableName="discussion"
+            referencedColumnNames="id"
+            onDelete="CASCADE"/>
+
+        <addForeignKeyConstraint
+            baseTableName="discussion_comment"
+            baseColumnNames="author_id"
+            constraintName="fk_discussion_comment_author"
+            referencedTableName="hephaestus_user"
+            referencedColumnNames="id"
+            onDelete="SET NULL"/>
+
+        <addForeignKeyConstraint
+            baseTableName="discussion_comment"
+            baseColumnNames="parent_comment_id"
+            constraintName="fk_discussion_comment_parent"
+            referencedTableName="discussion_comment"
+            referencedColumnNames="id"
+            onDelete="CASCADE"/>
+
+        <createIndex tableName="discussion_comment" indexName="idx_discussion_comment_discussion">
+            <column name="discussion_id"/>
+        </createIndex>
+        <createIndex tableName="discussion_comment" indexName="idx_discussion_comment_author">
+            <column name="author_id"/>
+        </createIndex>
+        <createIndex tableName="discussion_comment" indexName="idx_discussion_comment_parent">
+            <column name="parent_comment_id"/>
+        </createIndex>
+        <createIndex tableName="discussion_comment" indexName="idx_discussion_comment_is_answer">
+            <column name="is_answer"/>
+        </createIndex>
+    </changeSet>
+
+    <!-- Add answer_comment_id FK after discussion_comment table exists -->
+    <changeSet id="1767700000000-add-discussion-answer-fk" author="hephaestus">
+        <addForeignKeyConstraint
+            baseTableName="discussion"
+            baseColumnNames="answer_comment_id"
+            constraintName="fk_discussion_answer_comment"
+            referencedTableName="discussion_comment"
+            referencedColumnNames="id"
+            onDelete="SET NULL"/>
+
+        <createIndex tableName="discussion" indexName="idx_discussion_answer_comment">
+            <column name="answer_comment_id"/>
+        </createIndex>
+    </changeSet>
+
+    <!-- ==================== SECTION 5: Git Commit ==================== -->
+
+    <changeSet id="1767700000000-create-git-commit" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <tableExists tableName="git_commit"/>
+            </not>
+        </preConditions>
+        <createTable tableName="git_commit">
+            <!-- SHA is the primary key - globally unique -->
+            <column name="sha" type="VARCHAR(40)">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="abbreviated_sha" type="VARCHAR(12)">
+                <constraints nullable="true"/>
+            </column>
+            <column name="message" type="TEXT">
+                <constraints nullable="true"/>
+            </column>
+            <column name="message_headline" type="VARCHAR(512)">
+                <constraints nullable="true"/>
+            </column>
+            <column name="html_url" type="VARCHAR(512)">
+                <constraints nullable="true"/>
+            </column>
+            <column name="authored_at" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="true"/>
+            </column>
+            <column name="committed_at" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="true"/>
+            </column>
+            <column name="pushed_at" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="true"/>
+            </column>
+            <!-- Git author/committer metadata (may differ from linked users) -->
+            <column name="author_name" type="VARCHAR(256)">
+                <constraints nullable="true"/>
+            </column>
+            <column name="author_email" type="VARCHAR(256)">
+                <constraints nullable="true"/>
+            </column>
+            <column name="committer_name" type="VARCHAR(256)">
+                <constraints nullable="true"/>
+            </column>
+            <column name="committer_email" type="VARCHAR(256)">
+                <constraints nullable="true"/>
+            </column>
+            <!-- Statistics -->
+            <column name="additions" type="INTEGER">
+                <constraints nullable="true"/>
+            </column>
+            <column name="deletions" type="INTEGER">
+                <constraints nullable="true"/>
+            </column>
+            <column name="changed_files" type="INTEGER">
+                <constraints nullable="true"/>
+            </column>
+            <!-- Metadata -->
+            <column name="ref_name" type="VARCHAR(256)">
+                <constraints nullable="true"/>
+            </column>
+            <column name="is_merge_commit" type="BOOLEAN" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+            <column name="is_distinct" type="BOOLEAN" defaultValueBoolean="true">
+                <constraints nullable="false"/>
+            </column>
+            <column name="last_sync_at" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="true"/>
+            </column>
+            <!-- Relationships -->
+            <column name="repository_id" type="BIGINT">
+                <constraints nullable="true"/>
+            </column>
+            <column name="author_id" type="BIGINT">
+                <constraints nullable="true"/>
+            </column>
+            <column name="committer_id" type="BIGINT">
+                <constraints nullable="true"/>
+            </column>
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+
+        <addForeignKeyConstraint
+            baseTableName="git_commit"
+            baseColumnNames="repository_id"
+            constraintName="fk_git_commit_repository"
+            referencedTableName="repository"
+            referencedColumnNames="id"
+            onDelete="CASCADE"/>
+
+        <addForeignKeyConstraint
+            baseTableName="git_commit"
+            baseColumnNames="author_id"
+            constraintName="fk_git_commit_author"
+            referencedTableName="hephaestus_user"
+            referencedColumnNames="id"
+            onDelete="SET NULL"/>
+
+        <addForeignKeyConstraint
+            baseTableName="git_commit"
+            baseColumnNames="committer_id"
+            constraintName="fk_git_commit_committer"
+            referencedTableName="hephaestus_user"
+            referencedColumnNames="id"
+            onDelete="SET NULL"/>
+
+        <addUniqueConstraint
+            tableName="git_commit"
+            columnNames="repository_id, sha"
+            constraintName="uk_git_commit_repo_sha"/>
+
+        <createIndex tableName="git_commit" indexName="idx_git_commit_repository">
+            <column name="repository_id"/>
+        </createIndex>
+        <createIndex tableName="git_commit" indexName="idx_git_commit_author">
+            <column name="author_id"/>
+        </createIndex>
+        <createIndex tableName="git_commit" indexName="idx_git_commit_committer">
+            <column name="committer_id"/>
+        </createIndex>
+        <createIndex tableName="git_commit" indexName="idx_git_commit_committed_at">
+            <column name="committed_at"/>
+        </createIndex>
+        <createIndex tableName="git_commit" indexName="idx_git_commit_ref_name">
+            <column name="ref_name"/>
+        </createIndex>
+    </changeSet>
+
+    <!-- ==================== SECTION 6: Git Commit File Change ==================== -->
+
+    <changeSet id="1767700000000-create-git-commit-file-change" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <tableExists tableName="git_commit_file_change"/>
+            </not>
+        </preConditions>
+        <createTable tableName="git_commit_file_change">
+            <column name="id" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="commit_sha" type="VARCHAR(40)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="filename" type="VARCHAR(1024)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="change_type" type="VARCHAR(16)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="additions" type="INTEGER">
+                <constraints nullable="true"/>
+            </column>
+            <column name="deletions" type="INTEGER">
+                <constraints nullable="true"/>
+            </column>
+            <column name="patch" type="TEXT">
+                <constraints nullable="true"/>
+            </column>
+            <column name="previous_filename" type="VARCHAR(1024)">
+                <constraints nullable="true"/>
+            </column>
+        </createTable>
+
+        <addForeignKeyConstraint
+            baseTableName="git_commit_file_change"
+            baseColumnNames="commit_sha"
+            constraintName="fk_git_commit_file_change_commit"
+            referencedTableName="git_commit"
+            referencedColumnNames="sha"
+            onDelete="CASCADE"/>
+
+        <createIndex tableName="git_commit_file_change" indexName="idx_git_commit_file_change_commit">
+            <column name="commit_sha"/>
+        </createIndex>
+        <createIndex tableName="git_commit_file_change" indexName="idx_git_commit_file_change_filename">
+            <column name="filename"/>
+        </createIndex>
+    </changeSet>
+
+</databaseChangeLog>

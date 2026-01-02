@@ -41,4 +41,5 @@
     <include file="./changelog/1767287604000_add_triage_permission.xml" relativeToChangelogFile="true"/>
     <include file="./changelog/1767500000000_activity_event_performance_indexes.xml" relativeToChangelogFile="true"/>
     <include file="./changelog/1767600000000_activity_event_xp_constraint.xml" relativeToChangelogFile="true"/>
+    <include file="./changelog/1767700000000_discussions_and_commits.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog>

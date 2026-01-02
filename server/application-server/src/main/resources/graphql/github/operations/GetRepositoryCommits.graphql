@@ -1,0 +1,96 @@
+# GraphQL query for fetching repository commits with all fields
+# Used by GraphQL-based sync services
+
+query GetRepositoryCommits(
+    $owner: String!
+    $name: String!
+    $qualifiedName: String!
+    $first: Int!
+    $after: String
+    $since: GitTimestamp
+) {
+    rateLimit {
+        cost
+        remaining
+        resetAt
+    }
+    repository(owner: $owner, name: $name) {
+        ref(qualifiedName: $qualifiedName) {
+            name
+            prefix
+            target {
+                ... on Commit {
+                    history(first: $first, after: $after, since: $since) {
+                        pageInfo {
+                            hasNextPage
+                            endCursor
+                        }
+                        totalCount
+                        nodes {
+                            id
+                            oid
+                            abbreviatedOid
+                            message
+                            messageHeadline
+                            messageBody
+                            committedDate
+                            authoredDate
+                            additions
+                            deletions
+                            changedFilesIfAvailable
+                            url
+
+                            # Author info (git metadata)
+                            author {
+                                name
+                                email
+                                date
+                                avatarUrl
+                                user {
+                                    id
+                                    databaseId
+                                    login
+                                    avatarUrl
+                                    name
+                                }
+                            }
+
+                            # Committer info (git metadata)
+                            committer {
+                                name
+                                email
+                                date
+                                avatarUrl
+                                user {
+                                    id
+                                    databaseId
+                                    login
+                                    avatarUrl
+                                    name
+                                }
+                            }
+
+                            # Associated pull requests
+                            associatedPullRequests(first: 5) {
+                                nodes {
+                                    id
+                                    number
+                                    title
+                                    state
+                                }
+                            }
+
+                            # Parents (for merge commit detection)
+                            parents(first: 5) {
+                                totalCount
+                                nodes {
+                                    oid
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
