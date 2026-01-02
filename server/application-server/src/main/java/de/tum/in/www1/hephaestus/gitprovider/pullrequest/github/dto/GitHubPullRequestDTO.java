@@ -2,7 +2,9 @@ package de.tum.in.www1.hephaestus.gitprovider.pullrequest.github.dto;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.MergeableState;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.PullRequest;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.PullRequestReviewDecision;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.PullRequestState;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.ReviewRequest;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.ReviewRequestConnection;
@@ -10,6 +12,8 @@ import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.User;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.UserConnection;
 import de.tum.in.www1.hephaestus.gitprovider.label.github.dto.GitHubLabelDTO;
 import de.tum.in.www1.hephaestus.gitprovider.milestone.github.dto.GitHubMilestoneDTO;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequest.MergeStateStatus;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequest.ReviewDecision;
 import de.tum.in.www1.hephaestus.gitprovider.repository.github.dto.GitHubRepositoryRefDTO;
 import de.tum.in.www1.hephaestus.gitprovider.user.github.dto.GitHubUserDTO;
 import java.math.BigInteger;
@@ -60,7 +64,12 @@ public record GitHubPullRequestDTO(
     @JsonProperty("milestone") GitHubMilestoneDTO milestone,
     @JsonProperty("head") GitHubBranchRefDTO head,
     @JsonProperty("base") GitHubBranchRefDTO base,
-    @JsonProperty("repository") GitHubRepositoryRefDTO repository
+    @JsonProperty("repository") GitHubRepositoryRefDTO repository,
+    // GraphQL-only fields
+    @Nullable ReviewDecision reviewDecision,
+    @Nullable MergeStateStatus mergeStateStatus,
+    @Nullable Boolean isMergeable,
+    boolean maintainerCanModify
 ) {
     /**
      * Get the database ID, preferring databaseId over id for GraphQL responses.
@@ -85,6 +94,12 @@ public record GitHubPullRequestDTO(
 
         boolean isMerged = pr.getMergedAt() != null;
 
+        // Extract commits count from connection
+        int commitsCount = 0;
+        if (pr.getCommits() != null) {
+            commitsCount = pr.getCommits().getTotalCount();
+        }
+
         return new GitHubPullRequestDTO(
             null,
             toLong(pr.getFullDatabaseId()),
@@ -99,15 +114,15 @@ public record GitHubPullRequestDTO(
             toInstant(pr.getClosedAt()),
             toInstant(pr.getMergedAt()),
             GitHubUserDTO.fromActor(pr.getMergedBy()),
-            null, // mergeCommitSha not in basic query
+            pr.getMergeCommit() != null ? pr.getMergeCommit().getOid() : null,
             pr.getIsDraft(),
             isMerged,
             null, // mergeable
-            false, // locked
+            pr.getLocked(),
             pr.getAdditions(),
             pr.getDeletions(),
             pr.getChangedFiles(),
-            0, // commits count
+            commitsCount,
             0, // comments count
             0, // review comments count
             GitHubUserDTO.fromActor(pr.getAuthor()),
@@ -117,11 +132,66 @@ public record GitHubPullRequestDTO(
             GitHubMilestoneDTO.fromMilestone(pr.getMilestone()),
             new GitHubBranchRefDTO(pr.getHeadRefName(), pr.getHeadRefOid(), null),
             new GitHubBranchRefDTO(pr.getBaseRefName(), pr.getBaseRefOid(), null),
-            null
+            null,
+            // GraphQL-only fields
+            convertReviewDecision(pr.getReviewDecision()),
+            convertMergeStateStatus(pr.getMergeStateStatus()),
+            convertMergeableState(pr.getMergeable()),
+            pr.getMaintainerCanModify()
         );
     }
 
     // ========== CONVERSION HELPERS ==========
+
+    @Nullable
+    private static ReviewDecision convertReviewDecision(@Nullable PullRequestReviewDecision decision) {
+        if (decision == null) {
+            return null;
+        }
+        return switch (decision) {
+            case APPROVED -> ReviewDecision.APPROVED;
+            case CHANGES_REQUESTED -> ReviewDecision.CHANGES_REQUESTED;
+            case REVIEW_REQUIRED -> ReviewDecision.REVIEW_REQUIRED;
+        };
+    }
+
+    /**
+     * Maps GraphQL MergeStateStatus to our domain model.
+     *
+     * <p>Note: The DRAFT status is deprecated by GitHub but still returned in the schema.
+     * We map it to BLOCKED since draft PRs are effectively blocked from merging.
+     */
+    @Nullable
+    @SuppressWarnings("deprecation") // DRAFT is deprecated but still in the schema
+    private static MergeStateStatus convertMergeStateStatus(
+        @Nullable de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.MergeStateStatus status
+    ) {
+        if (status == null) {
+            return null;
+        }
+        return switch (status) {
+            case BEHIND -> MergeStateStatus.BEHIND;
+            case BLOCKED -> MergeStateStatus.BLOCKED;
+            case CLEAN -> MergeStateStatus.CLEAN;
+            case DIRTY -> MergeStateStatus.DIRTY;
+            case DRAFT -> MergeStateStatus.BLOCKED; // DRAFT is deprecated, map to BLOCKED
+            case HAS_HOOKS -> MergeStateStatus.HAS_HOOKS;
+            case UNKNOWN -> MergeStateStatus.UNKNOWN;
+            case UNSTABLE -> MergeStateStatus.UNSTABLE;
+        };
+    }
+
+    @Nullable
+    private static Boolean convertMergeableState(@Nullable MergeableState state) {
+        if (state == null) {
+            return null;
+        }
+        return switch (state) {
+            case MERGEABLE -> true;
+            case CONFLICTING -> false;
+            case UNKNOWN -> null;
+        };
+    }
 
     @Nullable
     private static Long toLong(@Nullable BigInteger value) {

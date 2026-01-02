@@ -278,6 +278,7 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
         issue.setStateReason(convertStateReason(dto.stateReason()));
         issue.setHtmlUrl(dto.htmlUrl());
         issue.setCommentsCount(dto.commentsCount());
+        issue.setLocked(dto.locked());
         issue.setCreatedAt(dto.createdAt());
         issue.setUpdatedAt(dto.updatedAt());
         issue.setClosedAt(dto.closedAt());
@@ -361,6 +362,12 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
         if (issue.getCommentsCount() != newCommentsCount) {
             issue.setCommentsCount(newCommentsCount);
             changedFields.add("commentsCount");
+        }
+
+        // Locked status
+        if (issue.isLocked() != dto.locked()) {
+            issue.setLocked(dto.locked());
+            changedFields.add("locked");
         }
 
         // Timestamps

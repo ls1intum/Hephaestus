@@ -6,12 +6,14 @@ import static java.util.stream.Collectors.*;
 import de.tum.in.www1.hephaestus.activity.ActivityBreakdownProjection;
 import de.tum.in.www1.hephaestus.activity.ActivityEventRepository;
 import de.tum.in.www1.hephaestus.activity.ActivityXpProjection;
+import de.tum.in.www1.hephaestus.activity.scoring.XpPrecision;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import java.time.Instant;
 import java.util.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -36,9 +38,28 @@ public class LeaderboardXpQueryService {
     private final ActivityEventRepository activityEventRepository;
     private final UserRepository userRepository;
 
-    public LeaderboardXpQueryService(ActivityEventRepository activityEventRepository, UserRepository userRepository) {
+    public LeaderboardXpQueryService(
+        ActivityEventRepository activityEventRepository,
+        UserRepository userRepository
+    ) {
         this.activityEventRepository = activityEventRepository;
         this.userRepository = userRepository;
+    }
+
+    /**
+     * Builds a deterministic cache key from team IDs.
+     *
+     * <p>This method is called via SpEL from the @Cacheable annotation to ensure
+     * consistent cache keys regardless of Set implementation.
+     *
+     * @param teamIds the team IDs to create a key from
+     * @return sorted, comma-joined string of team IDs (empty string if empty)
+     */
+    public String buildTeamIdsCacheKey(Set<Long> teamIds) {
+        if (teamIds == null || teamIds.isEmpty()) {
+            return "";
+        }
+        return teamIds.stream().sorted().map(String::valueOf).collect(joining(","));
     }
 
     /**
@@ -57,13 +78,25 @@ public class LeaderboardXpQueryService {
     /**
      * Get XP totals for actors in specific teams.
      *
+     * <p>Results are cached for 60 seconds (TTL) to reduce database load on hot leaderboard queries.
+     * The cache is also eagerly evicted when new activity events are recorded via
+     * {@link de.tum.in.www1.hephaestus.activity.ActivityEventService}.
+     *
+     * <p>Cache metrics (hits, misses, evictions, size) are exposed via Micrometer
+     * under the {@code cache.*} namespace with tag {@code cache=leaderboardXp}.
+     *
      * @param workspaceId the workspace
      * @param since start of timeframe (inclusive)
      * @param until end of timeframe (exclusive)
      * @param teamIds team IDs to filter by (empty = all teams)
      * @return map of actor ID to XP data
+     * @see de.tum.in.www1.hephaestus.config.CacheConfig
      */
     @Transactional(readOnly = true)
+    @Cacheable(
+        value = "leaderboardXp",
+        key = "#workspaceId + '_' + #since.toEpochMilli() + '_' + #until.toEpochMilli() + '_' + #root.target.buildTeamIdsCacheKey(#teamIds)"
+    )
     public Map<Long, LeaderboardUserXp> getLeaderboardData(
         Long workspaceId,
         Instant since,
@@ -124,7 +157,8 @@ public class LeaderboardXpQueryService {
                 continue;
             }
 
-            int totalScore = xp.getTotalExperiencePoints() != null ? xp.getTotalExperiencePoints().intValue() : 0;
+            // Use HALF_UP rounding for fair score calculation (not truncation)
+            int totalScore = XpPrecision.roundToInt(xp.getTotalExperiencePoints());
             int eventCount = xp.getEventCount() != null ? xp.getEventCount().intValue() : 0;
 
             builders.put(actorId, new LeaderboardUserXp.Builder(user, totalScore, eventCount));
@@ -144,15 +178,32 @@ public class LeaderboardXpQueryService {
                 case REVIEW_APPROVED -> builder.addApprovals(count);
                 case REVIEW_CHANGES_REQUESTED -> builder.addChangeRequests(count);
                 case REVIEW_COMMENTED -> builder.addComments(count);
+                case REVIEW_UNKNOWN -> builder.addUnknowns(count);
                 case COMMENT_CREATED -> builder.addIssueComments(count);
                 case REVIEW_COMMENT_CREATED -> builder.addCodeComments(count);
                 default -> {
-                    // PR events don't contribute to review stats
+                    // PR events and REVIEW_DISMISSED don't contribute to review stats
                 }
             }
         }
 
-        // 7. Build immutable results
+        // 7. Query distinct PR counts per user from the reviews table
+        // This counts DISTINCT PRs, not events (fixing numberOfReviewedPRs regression)
+        Map<Long, Long> distinctPrCountsByUser = activityEventRepository.countDistinctReviewedPullRequestsByActors(
+            workspaceId,
+            actorIds,
+            since,
+            until
+        );
+
+        // Set the distinct PR counts on each builder
+        for (Map.Entry<Long, LeaderboardUserXp.Builder> entry : builders.entrySet()) {
+            Long actorId = entry.getKey();
+            int prCount = distinctPrCountsByUser.getOrDefault(actorId, 0L).intValue();
+            entry.getValue().setReviewedPrCount(prCount);
+        }
+
+        // 8. Build immutable results
         Map<Long, LeaderboardUserXp> result = builders
             .entrySet()
             .stream()

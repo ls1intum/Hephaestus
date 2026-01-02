@@ -54,6 +54,10 @@ public class Repository extends BaseGitServiceEntity {
     @Column(columnDefinition = "TEXT")
     private String description;
 
+    // External URL, can vary widely
+    @Column(length = 1024)
+    private String homepage;
+
     @NonNull
     private Instant pushedAt;
 
@@ -66,8 +70,22 @@ public class Repository extends BaseGitServiceEntity {
     @Enumerated(EnumType.STRING)
     private Repository.Visibility visibility;
 
+    private int stargazersCount;
+
+    private int watchersCount;
+
     @NonNull
     private String defaultBranch;
+
+    private boolean hasIssues;
+
+    private boolean hasProjects;
+
+    private boolean hasWiki;
+
+    private boolean hasDiscussions;
+
+    private boolean hasSponsorships;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "organization_id", foreignKey = @ForeignKey(name = "fk_repository_organization"))
@@ -99,4 +117,24 @@ public class Repository extends BaseGitServiceEntity {
         INTERNAL,
         UNKNOWN,
     }
+
+    /*
+     * Field coverage notes (GitHub API → entity mapping):
+     *
+     * Supported fields synced from GitHub GraphQL API:
+     * - id/databaseId, name, nameWithOwner, url, description, homepageUrl
+     * - pushedAt, defaultBranchRef, visibility, isArchived, isDisabled, isPrivate
+     * - stargazerCount, hasIssuesEnabled, hasProjectsEnabled, hasWikiEnabled
+     * - hasDiscussionsEnabled, hasSponsorshipsEnabled
+     * - owner (Organization or User) → linked via organization relation
+     *
+     * Fields available in GraphQL but intentionally NOT synced:
+     * - forkCount, watchers (deprecated in GraphQL, use stargazerCount)
+     * - hasVulnerabilityAlertsEnabled (requires admin access)
+     * - isFork, isTemplate, isMirror (not needed for ETL consumers)
+     * - licenseInfo, primaryLanguage (out of scope for current use cases)
+     *
+     * Note: watchersCount is mapped from stargazerCount for backward compatibility
+     * since GitHub's GraphQL API deprecated the watchers field in favor of stargazers.
+     */
 }

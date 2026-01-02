@@ -97,6 +97,23 @@ public class BadPracticeDetectorScheduler {
         runAutomaticDetectionForAllIfEnabled(pullRequest, Instant.now(), false);
     }
 
+    /**
+     * Triggers immediate bad practice detection when a ready-related label is added.
+     * Used by the event-based architecture where individual label events are received.
+     *
+     * @param pullRequest the PR that was labeled
+     * @param labelName   the name of the label that was added
+     */
+    public void detectBadPracticeForPrIfReadyLabel(PullRequest pullRequest, String labelName) {
+        if (
+            READY_TO_REVIEW.equals(labelName) ||
+            READY_FOR_REVIEW.equals(labelName) ||
+            READY_TO_MERGE.equals(labelName)
+        ) {
+            runAutomaticDetectionForAllIfEnabled(pullRequest, Instant.now(), true);
+        }
+    }
+
     private void runAutomaticDetectionForAllIfEnabled(
         PullRequest pullRequest,
         Instant scheduledTime,

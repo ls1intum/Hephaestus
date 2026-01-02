@@ -16,6 +16,10 @@ import org.springframework.lang.Nullable;
  * <p>
  * Used across all entities: issues, pull requests, comments, reviews, etc.
  * Provides factory methods for creating from both REST (webhook) and GraphQL responses.
+ * <p>
+ * <b>Profile Fields:</b> Contains optional profile fields (bio, company, location, blog)
+ * that are populated when fetching full user details via GraphQL GetUser query.
+ * These may be null for minimal user references from webhooks.
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record GitHubUserDTO(
@@ -25,8 +29,24 @@ public record GitHubUserDTO(
     @JsonProperty("avatar_url") String avatarUrl,
     @JsonProperty("html_url") String htmlUrl,
     @JsonProperty("name") String name,
-    @JsonProperty("email") String email
+    @JsonProperty("email") String email,
+    // Profile fields - populated from full user fetch, may be null from webhooks
+    @JsonProperty("bio") String bio,
+    @JsonProperty("company") String company,
+    @JsonProperty("location") String location,
+    @JsonProperty("blog") String blog,
+    @JsonProperty("followers") Integer followers,
+    @JsonProperty("following") Integer following
 ) {
+    /**
+     * Compact constructor for backward compatibility with minimal user references.
+     * Profile fields default to null.
+     */
+    public GitHubUserDTO(Long id, Long databaseId, String login, String avatarUrl, 
+                         String htmlUrl, String name, String email) {
+        this(id, databaseId, login, avatarUrl, htmlUrl, name, email, null, null, null, null, null, null);
+    }
+
     /**
      * Get the database ID, preferring databaseId over id for GraphQL responses.
      */
@@ -62,6 +82,9 @@ public record GitHubUserDTO(
 
     /**
      * Creates a GitHubUserDTO from a GraphQL User model.
+     * <p>
+     * Captures all profile fields available from the GetUser query:
+     * bio, company, location, websiteUrl, followers, following.
      */
     @Nullable
     public static GitHubUserDTO fromUser(@Nullable User user) {
@@ -75,7 +98,14 @@ public record GitHubUserDTO(
             uriToString(user.getAvatarUrl()),
             uriToString(user.getUrl()),
             user.getName(),
-            user.getEmail()
+            user.getEmail(),
+            // Profile fields
+            user.getBio(),
+            user.getCompany(),
+            user.getLocation(),
+            uriToString(user.getWebsiteUrl()),
+            user.getFollowers() != null ? user.getFollowers().getTotalCount() : null,
+            user.getFollowing() != null ? user.getFollowing().getTotalCount() : null
         );
     }
 

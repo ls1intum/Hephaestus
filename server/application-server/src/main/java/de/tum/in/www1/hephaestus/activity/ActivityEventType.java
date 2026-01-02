@@ -23,6 +23,10 @@ public enum ActivityEventType {
     PULL_REQUEST_MERGED("pull_request.merged"),
     /** Pull request closed without merge */
     PULL_REQUEST_CLOSED("pull_request.closed"),
+    /** Pull request reopened - lifecycle tracking */
+    PULL_REQUEST_REOPENED("pull_request.reopened"),
+    /** Pull request marked ready for review (draft→ready transition) */
+    PULL_REQUEST_READY("pull_request.ready"),
 
     // ========================================================================
     // Review Lifecycle (Effectiveness metrics)
@@ -33,6 +37,10 @@ public enum ActivityEventType {
     REVIEW_CHANGES_REQUESTED("review.changes_requested"),
     /** Review with comments only (no approval/rejection) */
     REVIEW_COMMENTED("review.commented"),
+    /** Review with unknown state (API returned unknown/pending state) */
+    REVIEW_UNKNOWN("review.unknown"),
+    /** Review dismissed - XP adjustment event (negative XP to reverse original review) */
+    REVIEW_DISMISSED("review.dismissed"),
 
     // ========================================================================
     // Comments (Collaboration quality - for leaderboard scoring)
@@ -40,7 +48,15 @@ public enum ActivityEventType {
     /** Comment created on issue or pull request (general discussion) */
     COMMENT_CREATED("comment.created"),
     /** Inline code review comment created (higher-value feedback) */
-    REVIEW_COMMENT_CREATED("review_comment.created");
+    REVIEW_COMMENT_CREATED("review_comment.created"),
+
+    // ========================================================================
+    // Issue Lifecycle (Work tracking)
+    // ========================================================================
+    /** Issue created - drives work creation */
+    ISSUE_CREATED("issue.created"),
+    /** Issue closed - work completion signal */
+    ISSUE_CLOSED("issue.closed");
 
     private final String value;
 

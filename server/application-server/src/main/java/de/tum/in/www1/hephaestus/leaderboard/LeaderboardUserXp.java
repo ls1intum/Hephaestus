@@ -14,8 +14,10 @@ import de.tum.in.www1.hephaestus.gitprovider.user.User;
  * @param approvals number of review approvals
  * @param changeRequests number of change requests
  * @param comments number of review comments
+ * @param unknowns number of reviews with unknown state
  * @param issueComments number of issue comments
  * @param codeComments number of inline code comments
+ * @param reviewedPrCount number of DISTINCT pull requests reviewed (set from query)
  */
 public record LeaderboardUserXp(
     User user,
@@ -24,14 +26,17 @@ public record LeaderboardUserXp(
     int approvals,
     int changeRequests,
     int comments,
+    int unknowns,
     int issueComments,
-    int codeComments
+    int codeComments,
+    int reviewedPrCount
 ) {
     /**
-     * Number of unique pull requests reviewed (approvals + change requests + comments).
+     * Number of unique pull requests reviewed.
+     * This is set from a distinct PR count query, not derived from event counts.
      */
     public int reviewedPullRequestCount() {
-        return approvals + changeRequests + comments;
+        return reviewedPrCount;
     }
 
     /**
@@ -48,8 +53,10 @@ public record LeaderboardUserXp(
         private int approvals = 0;
         private int changeRequests = 0;
         private int comments = 0;
+        private int unknowns = 0;
         private int issueComments = 0;
         private int codeComments = 0;
+        private int reviewedPrCount = 0;
 
         public Builder(User user, int totalScore, int eventCount) {
             this.user = user;
@@ -72,6 +79,11 @@ public record LeaderboardUserXp(
             return this;
         }
 
+        public Builder addUnknowns(int count) {
+            this.unknowns += count;
+            return this;
+        }
+
         public Builder addIssueComments(int count) {
             this.issueComments += count;
             return this;
@@ -79,6 +91,11 @@ public record LeaderboardUserXp(
 
         public Builder addCodeComments(int count) {
             this.codeComments += count;
+            return this;
+        }
+
+        public Builder setReviewedPrCount(int count) {
+            this.reviewedPrCount = count;
             return this;
         }
 
@@ -90,8 +107,10 @@ public record LeaderboardUserXp(
                 approvals,
                 changeRequests,
                 comments,
+                unknowns,
                 issueComments,
-                codeComments
+                codeComments,
+                reviewedPrCount
             );
         }
     }

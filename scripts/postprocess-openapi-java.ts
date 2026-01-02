@@ -32,13 +32,24 @@ const REPLACEMENT_TEXT =
 const VERSION_PATTERN = /^\s*\* The version of the OpenAPI document.*$/gm;
 
 /**
+ * Checks if the class already has a class-level @SuppressWarnings annotation.
+ * Method-level @SuppressWarnings annotations should not prevent adding a class-level one.
+ */
+function hasClassLevelSuppressWarnings(content: string): boolean {
+	// Check for @SuppressWarnings immediately before public class/enum/interface
+	const classLevelPattern =
+		/@SuppressWarnings\s*\([^)]*\)\s*\n\s*public\s+(?:class|enum|interface)\s+/;
+	return classLevelPattern.test(content);
+}
+
+/**
  * Adds @SuppressWarnings("all") annotation to the class to suppress all warnings.
  * This is necessary because the OpenAPI generator produces imports that may not be used
  * in every file and uses deprecated APIs that we have no control over.
  */
 function addSuppressWarnings(content: string): string {
-	// Skip if @SuppressWarnings already present
-	if (content.includes("@SuppressWarnings")) {
+	// Skip if class-level @SuppressWarnings already present
+	if (hasClassLevelSuppressWarnings(content)) {
 		return content;
 	}
 

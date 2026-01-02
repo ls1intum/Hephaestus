@@ -11,6 +11,7 @@ import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.PullReques
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewthread.PullRequestReviewThread;
 import de.tum.in.www1.hephaestus.gitprovider.team.Team;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
+import java.time.Instant;
 import org.springframework.lang.NonNull;
 import org.springframework.lang.Nullable;
 
@@ -38,7 +39,11 @@ public final class EventPayload {
         @Nullable String stateReason,
         @NonNull String htmlUrl,
         boolean isPullRequest,
-        @NonNull RepositoryRef repository
+        @NonNull RepositoryRef repository,
+        @Nullable Long authorId,
+        @Nullable Instant createdAt,
+        @Nullable Instant updatedAt,
+        @Nullable Instant closedAt
     ) {
         public static IssueData from(Issue issue) {
             return new IssueData(
@@ -50,7 +55,11 @@ public final class EventPayload {
                 issue.getStateReason() != null ? issue.getStateReason().name() : null,
                 issue.getHtmlUrl(),
                 issue.isPullRequest(),
-                RepositoryRef.from(issue.getRepository())
+                RepositoryRef.from(issue.getRepository()),
+                issue.getAuthor() != null ? issue.getAuthor().getId() : null,
+                issue.getCreatedAt(),
+                issue.getUpdatedAt(),
+                issue.getClosedAt()
             );
         }
     }
@@ -74,7 +83,13 @@ public final class EventPayload {
         int deletions,
         int changedFiles,
         @NonNull String htmlUrl,
-        @NonNull RepositoryRef repository
+        @NonNull RepositoryRef repository,
+        @Nullable Long authorId,
+        @Nullable Instant createdAt,
+        @Nullable Instant updatedAt,
+        @Nullable Instant closedAt,
+        @Nullable Instant mergedAt,
+        @Nullable Long mergedById
     ) {
         public static PullRequestData from(PullRequest pr) {
             return new PullRequestData(
@@ -89,7 +104,13 @@ public final class EventPayload {
                 pr.getDeletions(),
                 pr.getChangedFiles(),
                 pr.getHtmlUrl(),
-                RepositoryRef.from(pr.getRepository())
+                RepositoryRef.from(pr.getRepository()),
+                pr.getAuthor() != null ? pr.getAuthor().getId() : null,
+                pr.getCreatedAt(),
+                pr.getUpdatedAt(),
+                pr.getClosedAt(),
+                pr.getMergedAt(),
+                pr.getMergedBy() != null ? pr.getMergedBy().getId() : null
             );
         }
     }
@@ -151,9 +172,26 @@ public final class EventPayload {
     // Comment Event Payload
     // ========================================================================
 
-    public record CommentData(@NonNull Long id, @Nullable String body, @NonNull String htmlUrl) {
+    public record CommentData(
+        @NonNull Long id,
+        @Nullable String body,
+        @NonNull String htmlUrl,
+        @Nullable Long authorId,
+        @Nullable Instant createdAt,
+        @Nullable Long issueId,
+        @Nullable Long repositoryId
+    ) {
         public static CommentData from(IssueComment comment) {
-            return new CommentData(comment.getId(), comment.getBody(), comment.getHtmlUrl());
+            return new CommentData(
+                comment.getId(),
+                comment.getBody(),
+                comment.getHtmlUrl(),
+                comment.getAuthor() != null ? comment.getAuthor().getId() : null,
+                comment.getCreatedAt(),
+                comment.getIssue() != null ? comment.getIssue().getId() : null,
+                comment.getIssue() != null && comment.getIssue().getRepository() != null
+                    ? comment.getIssue().getRepository().getId() : null
+            );
         }
     }
 
@@ -168,7 +206,9 @@ public final class EventPayload {
         boolean isDismissed,
         @NonNull String htmlUrl,
         @Nullable Long authorId,
-        @NonNull Long pullRequestId
+        @NonNull Long pullRequestId,
+        @Nullable Instant submittedAt,
+        @Nullable Long repositoryId
     ) {
         public static ReviewData from(PullRequestReview review) {
             return new ReviewData(
@@ -178,7 +218,10 @@ public final class EventPayload {
                 review.isDismissed(),
                 review.getHtmlUrl(),
                 review.getAuthor() != null ? review.getAuthor().getId() : null,
-                review.getPullRequest().getId()
+                review.getPullRequest().getId(),
+                review.getSubmittedAt(),
+                review.getPullRequest().getRepository() != null
+                    ? review.getPullRequest().getRepository().getId() : null
             );
         }
     }
@@ -194,9 +237,13 @@ public final class EventPayload {
         int line,
         @NonNull String htmlUrl,
         @Nullable Long reviewId,
-        @Nullable Long authorId
+        @Nullable Long authorId,
+        @Nullable Instant createdAt,
+        @Nullable Long pullRequestId,
+        @Nullable Long repositoryId
     ) {
         public static ReviewCommentData from(PullRequestReviewComment comment) {
+            PullRequest pr = comment.getReview() != null ? comment.getReview().getPullRequest() : comment.getPullRequest();
             return new ReviewCommentData(
                 comment.getId(),
                 comment.getBody(),
@@ -204,7 +251,10 @@ public final class EventPayload {
                 comment.getLine(),
                 comment.getHtmlUrl(),
                 comment.getReview() != null ? comment.getReview().getId() : null,
-                comment.getAuthor() != null ? comment.getAuthor().getId() : null
+                comment.getAuthor() != null ? comment.getAuthor().getId() : null,
+                comment.getCreatedAt(),
+                pr != null ? pr.getId() : null,
+                pr != null && pr.getRepository() != null ? pr.getRepository().getId() : null
             );
         }
     }

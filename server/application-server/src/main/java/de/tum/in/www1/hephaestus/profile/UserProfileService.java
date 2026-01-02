@@ -2,6 +2,7 @@ package de.tum.in.www1.hephaestus.profile;
 
 import de.tum.in.www1.hephaestus.activity.ActivityEventRepository;
 import de.tum.in.www1.hephaestus.activity.ActivityTargetType;
+import de.tum.in.www1.hephaestus.activity.scoring.XpPrecision;
 import de.tum.in.www1.hephaestus.core.LoggingUtils;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.issuecomment.IssueComment;
@@ -200,7 +201,7 @@ public class UserProfileService {
             .collect(
                 Collectors.toMap(
                     ActivityEventRepository.TargetXpProjection::getTargetId,
-                    p -> p.getXp() != null ? p.getXp().intValue() : 0,
+                    p -> XpPrecision.roundToInt(p.getXp()), // HALF_UP rounding for fairness
                     (a, b) -> a // In case of duplicates, keep first
                 )
             );

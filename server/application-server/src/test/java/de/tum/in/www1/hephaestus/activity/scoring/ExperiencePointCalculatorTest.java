@@ -107,6 +107,67 @@ class ExperiencePointCalculatorTest {
     }
 
     @Nested
+    @DisplayName("Dismissed Review Exclusion")
+    class DismissedReviewExclusion {
+
+        @Test
+        @DisplayName("excludes dismissed reviews from XP calculation - dismissed reviews yield zero XP")
+        void excludesDismissedReviews() {
+            User author = createUser(1L, "author");
+            User reviewer = createUser(2L, "reviewer");
+
+            PullRequest pullRequest = createPullRequest(author);
+
+            PullRequestReview dismissedReview = createApprovedReview(reviewer, pullRequest);
+            dismissedReview.setDismissed(true);
+
+            double experiencePoints = calculator.calculateReviewExperiencePoints(List.of(dismissedReview));
+
+            assertThat(experiencePoints)
+                .as("Dismissed reviews should not earn XP - see ExperiencePointCalculator Javadoc for rationale")
+                .isZero();
+        }
+
+        @Test
+        @DisplayName("includes non-dismissed reviews in XP calculation")
+        void includesNonDismissedReviews() {
+            User author = createUser(1L, "author");
+            User reviewer = createUser(2L, "reviewer");
+
+            PullRequest pullRequest = createPullRequest(author);
+
+            PullRequestReview activeReview = createApprovedReview(reviewer, pullRequest);
+            activeReview.setDismissed(false);
+
+            double experiencePoints = calculator.calculateReviewExperiencePoints(List.of(activeReview));
+
+            assertThat(experiencePoints).isGreaterThan(0.0);
+        }
+
+        @Test
+        @DisplayName("only counts non-dismissed reviews when mix of dismissed and active exist")
+        void mixedDismissedAndActiveReviews() {
+            User author = createUser(1L, "author");
+            User reviewer1 = createUser(2L, "reviewer1");
+            User reviewer2 = createUser(3L, "reviewer2");
+
+            PullRequest pullRequest = createPullRequest(author);
+
+            PullRequestReview dismissedReview = createApprovedReview(reviewer1, pullRequest);
+            dismissedReview.setDismissed(true);
+
+            PullRequestReview activeReview = createApprovedReview(reviewer2, pullRequest);
+            activeReview.setDismissed(false);
+
+            double mixedXp = calculator.calculateReviewExperiencePoints(List.of(dismissedReview, activeReview));
+            double activeOnlyXp = calculator.calculateReviewExperiencePoints(List.of(activeReview));
+
+            // XP from mixed list should equal XP from active-only list (dismissed is excluded)
+            assertThat(mixedXp).isEqualTo(activeOnlyXp);
+        }
+    }
+
+    @Nested
     @DisplayName("Complexity Scoring")
     class ComplexityScoring {
 

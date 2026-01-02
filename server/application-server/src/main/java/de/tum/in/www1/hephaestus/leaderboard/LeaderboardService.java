@@ -126,15 +126,34 @@ public class LeaderboardService {
         // ========================================================================
         // XP and breakdown from activity events (source of truth)
         // ========================================================================
-        Map<Long, LeaderboardUserXp> activityData = leaderboardXpQueryService.getLeaderboardData(
-            workspaceId,
-            after,
-            before,
-            teamIds
+        Map<Long, LeaderboardUserXp> activityData = new HashMap<>(
+            leaderboardXpQueryService.getLeaderboardData(workspaceId, after, before, teamIds)
         );
 
+        // ========================================================================
+        // Include ALL team members, even those with zero activity
+        // This ensures everyone appears on the leaderboard (matching main branch behavior)
+        // ========================================================================
+        List<User> allTeamMembers;
+        if (team.isPresent() && !teamIds.isEmpty()) {
+            allTeamMembers = userRepository.findAllByTeamIds(teamIds);
+        } else if (workspace.getAccountLogin() != null) {
+            allTeamMembers = userRepository.findAllHumanInTeamsOfOrganization(workspace.getAccountLogin());
+        } else {
+            allTeamMembers = Collections.emptyList();
+        }
+
+        // Add zero-score entries for team members without activity
+        for (User member : allTeamMembers) {
+            if (member.getId() != null && !activityData.containsKey(member.getId())) {
+                // New record signature: user, totalScore, eventCount, approvals, changeRequests, 
+                // comments, unknowns, issueComments, codeComments, reviewedPrCount
+                activityData.put(member.getId(), new LeaderboardUserXp(member, 0, 0, 0, 0, 0, 0, 0, 0, 0));
+            }
+        }
+
         if (activityData.isEmpty()) {
-            logger.info("No activity events found for leaderboard");
+            logger.info("No team members found for leaderboard");
             return Collections.emptyList();
         }
 
@@ -217,7 +236,7 @@ public class LeaderboardService {
                 data.approvals(),
                 data.changeRequests(),
                 data.comments() + data.issueComments(),
-                0, // numberOfUnknowns - not tracked in activity events
+                data.unknowns(), // numberOfUnknowns - now properly tracked in activity events
                 data.codeComments()
             );
             result.add(entry);

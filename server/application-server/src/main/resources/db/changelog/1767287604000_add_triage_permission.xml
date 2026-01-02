@@ -1,0 +1,39 @@
+<?xml version="1.1" encoding="UTF-8" standalone="no"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                   http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+    Add TRIAGE Permission Level
+
+    This changelog documents the addition of the TRIAGE permission level to the
+    TeamRepositoryPermission.PermissionLevel enum.
+
+    GitHub permissions hierarchy:
+    - READ: Read access only
+    - TRIAGE: Can manage issues/PRs without write access (new)
+    - WRITE: Push to non-protected branches
+    - MAINTAIN: Repository maintenance without admin access
+    - ADMIN: Full repository access
+
+    The permission column is a VARCHAR(32), so no schema change is needed.
+    Existing data is not affected since TRIAGE permissions were previously
+    mapped to READ - new syncs will now correctly store TRIAGE.
+
+    Note: This is a documentation changeset. The enum value TRIAGE is now
+    supported in the TeamRepositoryPermission.PermissionLevel enum.
+    -->
+
+    <!-- Changeset 1: Document TRIAGE permission addition (no-op for schema) -->
+    <changeSet id="1767287604000-1-add-triage-permission-doc" author="hephaestus">
+        <comment>
+            Added TRIAGE permission level to TeamRepositoryPermission.PermissionLevel enum.
+            No schema migration needed - the permission column is VARCHAR(32).
+            Previously, GitHub TRIAGE permissions were incorrectly mapped to READ.
+            After this change, they are correctly stored as TRIAGE.
+        </comment>
+        <empty/>
+    </changeSet>
+
+</databaseChangeLog>

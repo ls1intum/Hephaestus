@@ -4,23 +4,33 @@ import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.*;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.RepositoryPermission;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.TeamConnection;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.TeamMemberConnection;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.TeamMemberEdge;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.TeamMemberRole;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.TeamPrivacy;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.TeamRepositoryConnection;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.TeamRepositoryEdge;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.User;
+import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
+import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.gitprovider.team.Team;
 import de.tum.in.www1.hephaestus.gitprovider.team.TeamRepository;
 import de.tum.in.www1.hephaestus.gitprovider.team.github.dto.GitHubTeamEventDTO;
 import de.tum.in.www1.hephaestus.gitprovider.team.membership.TeamMembership;
 import de.tum.in.www1.hephaestus.gitprovider.team.membership.TeamMembershipRepository;
+import de.tum.in.www1.hephaestus.gitprovider.team.permission.TeamRepositoryPermission;
 import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserProcessor;
 import de.tum.in.www1.hephaestus.gitprovider.user.github.dto.GitHubUserDTO;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.graphql.client.HttpGraphQlClient;
@@ -47,6 +57,7 @@ public class GitHubTeamSyncService {
 
     private final TeamRepository teamRepository;
     private final TeamMembershipRepository teamMembershipRepository;
+    private final RepositoryRepository repositoryRepository;
     private final GitHubGraphQlClientProvider graphQlClientProvider;
     private final GitHubTeamProcessor teamProcessor;
     private final GitHubUserProcessor userProcessor;
@@ -54,12 +65,14 @@ public class GitHubTeamSyncService {
     public GitHubTeamSyncService(
         TeamRepository teamRepository,
         TeamMembershipRepository teamMembershipRepository,
+        RepositoryRepository repositoryRepository,
         GitHubGraphQlClientProvider graphQlClientProvider,
         GitHubTeamProcessor teamProcessor,
         GitHubUserProcessor userProcessor
     ) {
         this.teamRepository = teamRepository;
         this.teamMembershipRepository = teamMembershipRepository;
+        this.repositoryRepository = repositoryRepository;
         this.graphQlClientProvider = graphQlClientProvider;
         this.teamProcessor = teamProcessor;
         this.userProcessor = userProcessor;
@@ -109,6 +122,7 @@ public class GitHubTeamSyncService {
                     if (team != null) {
                         syncedTeamIds.add(team.getId());
                         syncTeamMemberships(client, team, graphQlTeam, organizationLogin);
+                        syncTeamRepoPermissions(client, team, graphQlTeam, organizationLogin);
                         totalSynced++;
                     }
                 }
@@ -160,7 +174,7 @@ public class GitHubTeamSyncService {
      * Synchronizes team memberships from the GraphQL response.
      * <p>
      * For each member in the team's members connection, this method ensures the
-     * user exists and creates a TeamMembership record if one doesn't already exist.
+     * user exists and creates or updates a TeamMembership record with the correct role.
      * If the team has more than 100 members, this method paginates through all members
      * using the GetTeamMembers query.
      *
@@ -176,12 +190,12 @@ public class GitHubTeamSyncService {
         String organizationLogin
     ) {
         var membersConnection = graphQlTeam.getMembers();
-        if (membersConnection == null || membersConnection.getNodes() == null) {
+        if (membersConnection == null || membersConnection.getEdges() == null) {
             return;
         }
 
-        // Collect all members - paginate if needed
-        List<User> allMembers = new ArrayList<>(membersConnection.getNodes());
+        // Collect all member edges (with roles) - paginate if needed
+        List<TeamMemberEdge> allMemberEdges = new ArrayList<>(membersConnection.getEdges());
         var membersPageInfo = membersConnection.getPageInfo();
 
         if (membersPageInfo != null && Boolean.TRUE.equals(membersPageInfo.getHasNextPage())) {
@@ -190,21 +204,35 @@ public class GitHubTeamSyncService {
                 team.getName(),
                 membersConnection.getTotalCount()
             );
-            List<User> additionalMembers = fetchAllTeamMembers(
+            List<TeamMemberEdge> additionalMemberEdges = fetchAllTeamMemberEdges(
                 client,
                 organizationLogin,
                 graphQlTeam.getSlug(),
                 membersPageInfo.getEndCursor()
             );
-            allMembers.addAll(additionalMembers);
+            allMemberEdges.addAll(additionalMemberEdges);
         }
+
+        // Build existing memberships map for efficient lookup and role update
+        Map<Long, TeamMembership> existingMemberships = team
+            .getMemberships()
+            .stream()
+            .collect(Collectors.toMap(tm -> tm.getUser().getId(), tm -> tm));
 
         Set<Long> syncedMemberIds = new HashSet<>();
 
-        for (var graphQlUser : allMembers) {
-            if (graphQlUser == null || graphQlUser.getDatabaseId() == null) {
+        for (var memberEdge : allMemberEdges) {
+            if (memberEdge == null || memberEdge.getNode() == null || memberEdge.getNode().getDatabaseId() == null) {
                 continue;
             }
+
+            User graphQlUser = memberEdge.getNode();
+            TeamMemberRole graphQlRole = memberEdge.getRole();
+
+            // Convert GraphQL role to TeamMembership.Role
+            TeamMembership.Role role = (graphQlRole == TeamMemberRole.MAINTAINER)
+                ? TeamMembership.Role.MAINTAINER
+                : TeamMembership.Role.MEMBER;
 
             // Convert GraphQL User to GitHubUserDTO and ensure user exists
             GitHubUserDTO userDTO = convertUserToDTO(graphQlUser);
@@ -213,14 +241,29 @@ public class GitHubTeamSyncService {
             if (user != null) {
                 syncedMemberIds.add(user.getId());
 
-                // Create membership if it doesn't exist
-                if (!teamMembershipRepository.existsByTeam_IdAndUser_Id(team.getId(), user.getId())) {
-                    TeamMembership membership = new TeamMembership(team, user, TeamMembership.Role.MEMBER);
+                TeamMembership existingMembership = existingMemberships.get(user.getId());
+                if (existingMembership != null) {
+                    // Update role if changed
+                    if (existingMembership.getRole() != role) {
+                        logger.info(
+                            "Updating role for user {} in team {} from {} to {}",
+                            sanitizeForLog(user.getLogin()),
+                            sanitizeForLog(team.getName()),
+                            existingMembership.getRole(),
+                            role
+                        );
+                        existingMembership.setRole(role);
+                        teamMembershipRepository.save(existingMembership);
+                    }
+                } else {
+                    // Create new membership
+                    TeamMembership membership = new TeamMembership(team, user, role);
                     teamMembershipRepository.save(membership);
                     logger.debug(
-                        "Created membership for user {} in team {}",
+                        "Created membership for user {} in team {} with role {}",
                         sanitizeForLog(user.getLogin()),
-                        sanitizeForLog(team.getName())
+                        sanitizeForLog(team.getName()),
+                        role
                     );
                 }
             }
@@ -231,21 +274,115 @@ public class GitHubTeamSyncService {
     }
 
     /**
-     * Fetches all remaining team members using pagination.
+     * Synchronizes team repository permissions from the GraphQL response.
+     * <p>
+     * For each repository in the team's repositories connection, this method creates
+     * or updates TeamRepositoryPermission records with the correct permission level.
+     *
+     * @param client          the GraphQL client for additional queries
+     * @param team            the Team entity
+     * @param graphQlTeam     the GraphQL team object containing repositories
+     * @param organizationLogin the organization login for pagination queries
+     */
+    private void syncTeamRepoPermissions(
+        HttpGraphQlClient client,
+        Team team,
+        de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.Team graphQlTeam,
+        String organizationLogin
+    ) {
+        var reposConnection = graphQlTeam.getRepositories();
+        if (reposConnection == null || reposConnection.getEdges() == null) {
+            return;
+        }
+
+        // Collect all repository edges - paginate if needed
+        List<TeamRepositoryEdge> allRepoEdges = new ArrayList<>(reposConnection.getEdges());
+        var reposPageInfo = reposConnection.getPageInfo();
+
+        if (reposPageInfo != null && Boolean.TRUE.equals(reposPageInfo.getHasNextPage())) {
+            logger.debug(
+                "Team {} has more than 100 repositories (totalCount={}), fetching additional pages",
+                team.getName(),
+                reposConnection.getTotalCount()
+            );
+            List<TeamRepositoryEdge> additionalRepoEdges = fetchAllTeamRepositoryEdges(
+                client,
+                organizationLogin,
+                graphQlTeam.getSlug(),
+                reposPageInfo.getEndCursor()
+            );
+            allRepoEdges.addAll(additionalRepoEdges);
+        }
+
+        Set<TeamRepositoryPermission> freshPermissions = new HashSet<>();
+
+        for (var repoEdge : allRepoEdges) {
+            if (repoEdge == null || repoEdge.getNode() == null || repoEdge.getNode().getDatabaseId() == null) {
+                continue;
+            }
+
+            Long repoId = repoEdge.getNode().getDatabaseId().longValue();
+
+            // Skip unknown repos (not monitored by this workspace)
+            if (!repositoryRepository.existsById(repoId)) {
+                continue;
+            }
+
+            Repository repoRef = repositoryRepository.getReferenceById(repoId);
+            TeamRepositoryPermission.PermissionLevel level = convertPermission(repoEdge.getPermission());
+
+            // Find existing permission or create new
+            TeamRepositoryPermission permission = team
+                .getRepoPermissions()
+                .stream()
+                .filter(existing -> Objects.equals(existing.getRepository().getId(), repoId))
+                .findFirst()
+                .orElseGet(() -> new TeamRepositoryPermission(team, repoRef, level));
+
+            permission.setPermission(level);
+            freshPermissions.add(permission);
+        }
+
+        team.clearAndAddRepoPermissions(freshPermissions);
+        logger.debug(
+            "Synced {} repository permissions for team {}",
+            freshPermissions.size(),
+            sanitizeForLog(team.getName())
+        );
+    }
+
+    /**
+     * Converts GraphQL RepositoryPermission to TeamRepositoryPermission.PermissionLevel.
+     */
+    private TeamRepositoryPermission.PermissionLevel convertPermission(RepositoryPermission graphQlPermission) {
+        if (graphQlPermission == null) {
+            return TeamRepositoryPermission.PermissionLevel.READ;
+        }
+        return switch (graphQlPermission) {
+            case ADMIN -> TeamRepositoryPermission.PermissionLevel.ADMIN;
+            case MAINTAIN -> TeamRepositoryPermission.PermissionLevel.MAINTAIN;
+            case WRITE -> TeamRepositoryPermission.PermissionLevel.WRITE;
+            case TRIAGE -> TeamRepositoryPermission.PermissionLevel.TRIAGE;
+            case READ -> TeamRepositoryPermission.PermissionLevel.READ;
+        };
+    }
+
+    /**
+     * Fetches all remaining team member edges (with roles) using pagination.
      *
      * @param client            the GraphQL client
      * @param organizationLogin the organization login
      * @param teamSlug          the team slug
      * @param startCursor       the cursor to start from
-     * @return list of all remaining members
+     * @return list of all remaining member edges with roles
      */
-    private List<User> fetchAllTeamMembers(
+    private List<TeamMemberEdge> fetchAllTeamMemberEdges(
         HttpGraphQlClient client,
         String organizationLogin,
         String teamSlug,
         String startCursor
     ) {
-        List<User> allMembers = new ArrayList<>();
+        List<TeamMemberEdge> allMemberEdges = new ArrayList<>();
         String cursor = startCursor;
         boolean hasNextPage = true;
 
@@ -260,40 +397,38 @@ public class GitHubTeamSyncService {
                 .toEntity(TeamMemberConnection.class)
                 .block(GRAPHQL_TIMEOUT);
 
-            if (response == null || response.getNodes() == null) {
+            if (response == null || response.getEdges() == null) {
                 break;
             }
 
-            allMembers.addAll(response.getNodes());
+            allMemberEdges.addAll(response.getEdges());
 
             var pageInfo = response.getPageInfo();
             hasNextPage = pageInfo != null && Boolean.TRUE.equals(pageInfo.getHasNextPage());
             cursor = pageInfo != null ? pageInfo.getEndCursor() : null;
         }
 
-        return allMembers;
+        return allMemberEdges;
     }
 
     /**
-     * Fetches all remaining team repositories using pagination.
+     * Fetches all remaining team repository edges (with permissions) using pagination.
      *
      * @param client            the GraphQL client
      * @param organizationLogin the organization login
      * @param teamSlug          the team slug
      * @param startCursor       the cursor to start from
-     * @return the repository connection with all remaining repositories
+     * @return list of all remaining repository edges with permissions
      */
-    private TeamRepositoryConnection fetchAllTeamRepositories(
+    private List<TeamRepositoryEdge> fetchAllTeamRepositoryEdges(
         HttpGraphQlClient client,
         String organizationLogin,
         String teamSlug,
         String startCursor
     ) {
-        List<de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.TeamRepositoryEdge> allEdges =
-            new ArrayList<>();
+        List<TeamRepositoryEdge> allEdges = new ArrayList<>();
         String cursor = startCursor;
         boolean hasNextPage = true;
-        Integer totalCount = null;
 
         while (hasNextPage) {
             TeamRepositoryConnection response = client
@@ -311,20 +446,13 @@ public class GitHubTeamSyncService {
             }
 
             allEdges.addAll(response.getEdges());
-            if (totalCount == null) {
-                totalCount = response.getTotalCount();
-            }
 
             var pageInfo = response.getPageInfo();
             hasNextPage = pageInfo != null && Boolean.TRUE.equals(pageInfo.getHasNextPage());
             cursor = pageInfo != null ? pageInfo.getEndCursor() : null;
         }
 
-        // Create a new connection with all edges
-        TeamRepositoryConnection result = new TeamRepositoryConnection();
-        result.setEdges(allEdges);
-        result.setTotalCount(totalCount);
-        return result;
+        return allEdges;
     }
 
     /**

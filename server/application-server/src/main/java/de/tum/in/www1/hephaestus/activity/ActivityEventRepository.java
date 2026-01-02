@@ -2,6 +2,7 @@ package de.tum.in.www1.hephaestus.activity;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -112,38 +113,125 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
         @Param("until") Instant until
     );
 
+    /**
+     * Count DISTINCT pull requests reviewed by each actor.
+     *
+     * <p>This query counts unique PRs via the reviews, not event counts.
+     * Joins through activity events to reviews to get the distinct PR IDs.
+     *
+     * @param workspaceId the workspace
+     * @param actorIds actors to count for
+     * @param since start of timeframe (inclusive)
+     * @param until end of timeframe (exclusive)
+     * @return map of actor ID to distinct PR count
+     */
+    @Query(
+        """
+        SELECT e.actor.id as actorId, COUNT(DISTINCT r.pullRequest.id) as prCount
+        FROM ActivityEvent e
+        JOIN PullRequestReview r ON r.id = e.targetId
+        WHERE e.workspace.id = :workspaceId
+        AND e.actor.id IN :actorIds
+        AND e.targetType = 'review'
+        AND e.eventType IN (
+            de.tum.in.www1.hephaestus.activity.ActivityEventType.REVIEW_APPROVED,
+            de.tum.in.www1.hephaestus.activity.ActivityEventType.REVIEW_CHANGES_REQUESTED,
+            de.tum.in.www1.hephaestus.activity.ActivityEventType.REVIEW_COMMENTED,
+            de.tum.in.www1.hephaestus.activity.ActivityEventType.REVIEW_UNKNOWN
+        )
+        AND e.occurredAt >= :since
+        AND e.occurredAt < :until
+        GROUP BY e.actor.id
+        """
+    )
+    List<DistinctPrCountProjection> findDistinctReviewedPullRequestCountsByActors(
+        @Param("workspaceId") Long workspaceId,
+        @Param("actorIds") Set<Long> actorIds,
+        @Param("since") Instant since,
+        @Param("until") Instant until
+    );
+
+    /**
+     * Helper method to convert projection list to a map.
+     */
+    default Map<Long, Long> countDistinctReviewedPullRequestsByActors(
+        Long workspaceId,
+        Set<Long> actorIds,
+        Instant since,
+        Instant until
+    ) {
+        return findDistinctReviewedPullRequestCountsByActors(workspaceId, actorIds, since, until)
+            .stream()
+            .collect(java.util.stream.Collectors.toMap(
+                DistinctPrCountProjection::getActorId,
+                DistinctPrCountProjection::getPrCount
+            ));
+    }
+
+    /**
+     * Projection for distinct PR count by actor.
+     */
+    interface DistinctPrCountProjection {
+        Long getActorId();
+        Long getPrCount();
+    }
+
     // ========================================================================
     // Existing Queries
     // ========================================================================
 
-    /** Events for a workspace in time range */
+    /** Events for a workspace in time range with limit for safety */
     @Query(
         """
         SELECT e FROM ActivityEvent e
         WHERE e.workspace.id = :workspaceId
         AND e.occurredAt >= :since
         ORDER BY e.occurredAt DESC
+        LIMIT :limit
         """
     )
-    List<ActivityEvent> findByWorkspace(@Param("workspaceId") Long workspaceId, @Param("since") Instant since);
+    List<ActivityEvent> findByWorkspaceWithLimit(
+        @Param("workspaceId") Long workspaceId,
+        @Param("since") Instant since,
+        @Param("limit") int limit
+    );
 
-    /** Mentor context: recent activity for a user */
+    /** Events for a workspace in time range - default limit 1000 */
+    default List<ActivityEvent> findByWorkspace(Long workspaceId, Instant since) {
+        return findByWorkspaceWithLimit(workspaceId, since, 1000);
+    }
+
+    /** Mentor context: recent activity for a user with limit for safety */
     @Query(
         """
         SELECT e FROM ActivityEvent e
         WHERE e.actor.id = :actorId
         AND e.occurredAt >= :since
         ORDER BY e.occurredAt DESC
+        LIMIT :limit
         """
     )
-    List<ActivityEvent> findByActor(@Param("actorId") Long actorId, @Param("since") Instant since);
+    List<ActivityEvent> findByActorWithLimit(
+        @Param("actorId") Long actorId,
+        @Param("since") Instant since,
+        @Param("limit") int limit
+    );
 
-    /** Email attribution: get event chain by correlation ID */
+    /** Mentor context: recent activity for a user - default limit 100 */
+    default List<ActivityEvent> findByActor(Long actorId, Instant since) {
+        return findByActorWithLimit(actorId, since, 100);
+    }
+
+    /**
+     * Email attribution: get event chain by correlation ID.
+     * Limited to 100 events per correlation chain (safety bound).
+     */
     @Query(
         """
         SELECT e FROM ActivityEvent e
         WHERE e.correlationId = :correlationId
         ORDER BY e.occurredAt ASC
+        LIMIT 100
         """
     )
     List<ActivityEvent> findByCorrelationId(@Param("correlationId") UUID correlationId);

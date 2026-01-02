@@ -12,6 +12,11 @@ import de.tum.in.www1.hephaestus.workspace.Workspace;
 import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContextResolver;
 import de.tum.in.www1.hephaestus.workspace.context.WorkspaceScopedController;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -23,6 +28,7 @@ import org.springframework.web.bind.annotation.*;
 @WorkspaceScopedController
 @RequestMapping("/activity")
 @RequiredArgsConstructor
+@Tag(name = "Activity", description = "User activity and bad practice detection")
 public class ActivityController {
 
     private final ActivityService activityService;
@@ -32,6 +38,15 @@ public class ActivityController {
     private final WorkspaceContextResolver workspaceResolver;
 
     @GetMapping("/{login}")
+    @Operation(
+        summary = "Get activity for a user",
+        description = "Retrieves activity data including pull requests and bad practices for a user"
+    )
+    @ApiResponse(
+        responseCode = "200",
+        description = "Activity data returned",
+        content = @Content(schema = @Schema(implementation = ActivityDTO.class))
+    )
     public ResponseEntity<ActivityDTO> getActivityByUser(
         WorkspaceContext workspaceContext,
         @PathVariable String login
@@ -42,6 +57,12 @@ public class ActivityController {
     }
 
     @PostMapping("/user/{login}/badpractices")
+    @Operation(
+        summary = "Detect bad practices for a user",
+        description = "Triggers bad practice detection for all pull requests of the specified user"
+    )
+    @ApiResponse(responseCode = "200", description = "Detection completed successfully")
+    @ApiResponse(responseCode = "400", description = "Detection failed due to no updates on pull requests")
     public ResponseEntity<Void> detectBadPracticesByUser(
         WorkspaceContext workspaceContext,
         @PathVariable String login
@@ -58,6 +79,12 @@ public class ActivityController {
     }
 
     @PostMapping("/pullrequest/{pullRequestId}/badpractices")
+    @Operation(
+        summary = "Detect bad practices for a pull request",
+        description = "Triggers bad practice detection for a specific pull request"
+    )
+    @ApiResponse(responseCode = "200", description = "Detection completed successfully")
+    @ApiResponse(responseCode = "400", description = "Detection failed due to no updates on pull request")
     public ResponseEntity<Void> detectBadPracticesForPullRequest(
         WorkspaceContext workspaceContext,
         @PathVariable Long pullRequestId
@@ -75,6 +102,11 @@ public class ActivityController {
     }
 
     @PostMapping("/badpractice/{badPracticeId}/resolve")
+    @Operation(
+        summary = "Resolve a bad practice",
+        description = "Updates the state of a bad practice to FIXED, WONT_FIX, or WRONG"
+    )
+    @ApiResponse(responseCode = "200", description = "Bad practice resolved successfully")
     public ResponseEntity<Void> resolveBadPractice(
         WorkspaceContext workspaceContext,
         @PathVariable Long badPracticeId,
@@ -91,6 +123,11 @@ public class ActivityController {
     }
 
     @PostMapping("/badpractice/{badPracticeId}/feedback")
+    @Operation(
+        summary = "Provide feedback for a bad practice",
+        description = "Submits user feedback for a detected bad practice"
+    )
+    @ApiResponse(responseCode = "200", description = "Feedback submitted successfully")
     public ResponseEntity<Void> provideFeedbackForBadPractice(
         WorkspaceContext workspaceContext,
         @PathVariable Long badPracticeId,

@@ -22,5 +22,11 @@ query GetUser($login: String!) {
         twitterUsername
         createdAt
         updatedAt
+        followers {
+            totalCount
+        }
+        following {
+            totalCount
+        }
     }
 }

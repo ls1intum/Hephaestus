@@ -155,6 +155,9 @@ hephaestus:
         contributors:
             # Eviction rate in milliseconds (1 hour)
             evict-rate: 3600000
+        leaderboard-xp:
+            # Eviction rate in milliseconds (60 seconds - leaderboard data is moderately hot)
+            evict-rate: 60000
     mail:
         enabled: ${MAIL_ENABLED:false}
         sender: ${MAIL_SENDER:hephaestus@gmail.com} # use gmail email address for local testing

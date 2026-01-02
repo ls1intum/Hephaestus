@@ -70,4 +70,27 @@ public class ExperiencePointProperties {
      * XP awarded for each inline review comment.
      */
     private double xpReviewComment = 0.5;
+
+    /**
+     * XP awarded when a pull request is marked ready for review (draft→ready).
+     * Rewards the effort of preparing work for collaboration.
+     */
+    private double xpPullRequestReady = 0.5;
+
+    /**
+     * XP awarded when an issue is created.
+     * Rewards contribution to work identification and planning.
+     */
+    private double xpIssueCreated = 0.5;
+
+    // ========================================================================
+    // Safety Bounds
+    // ========================================================================
+
+    /**
+     * Maximum XP that can be awarded per event.
+     * Events with computed XP above this cap will be clamped.
+     * Used as a safety bound against outliers and potential bugs.
+     */
+    private double maxXpPerEvent = 1000.0;
 }

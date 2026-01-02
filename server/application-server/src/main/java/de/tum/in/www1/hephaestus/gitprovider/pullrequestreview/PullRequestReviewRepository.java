@@ -131,4 +131,29 @@ public interface PullRequestReviewRepository extends JpaRepository<PullRequestRe
         """
     )
     Instant findEarliestSubmissionInstant(@Param("workspaceId") Long workspaceId, @Param("userId") Long userId);
+
+    /**
+     * Find all reviews for a specific pull request by a specific author.
+     * Used for calculating per-PR XP (aggregating all reviews together for harmonic mean).
+     *
+     * @param pullRequestId the pull request ID
+     * @param authorId the author ID
+     * @return list of reviews by this author on this PR
+     */
+    @Query(
+        value = """
+        SELECT prr
+        FROM PullRequestReview prr
+        LEFT JOIN FETCH prr.author
+        LEFT JOIN FETCH prr.pullRequest
+        LEFT JOIN FETCH prr.comments
+        WHERE prr.pullRequest.id = :pullRequestId
+            AND prr.author.id = :authorId
+        ORDER BY prr.submittedAt ASC
+        """
+    )
+    List<PullRequestReview> findByPullRequestIdAndAuthorId(
+        @Param("pullRequestId") Long pullRequestId,
+        @Param("authorId") Long authorId
+    );
 }

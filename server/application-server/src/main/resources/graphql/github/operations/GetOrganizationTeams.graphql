@@ -25,18 +25,22 @@ query GetOrganizationTeams($login: String!, $first: Int!, $after: String) {
                 createdAt
                 updatedAt
 
-                # Team members
+                # Team members with roles - uses edges to get role field
                 members(first: 100) {
                     totalCount
                     pageInfo {
                         hasNextPage
+                        endCursor
                     }
-                    nodes {
-                        id
-                        databaseId
-                        login
-                        avatarUrl
-                        name
+                    edges {
+                        role
+                        node {
+                            id
+                            databaseId
+                            login
+                            avatarUrl
+                            name
+                        }
                     }
                 }
 
@@ -53,6 +57,7 @@ query GetOrganizationTeams($login: String!, $first: Int!, $after: String) {
                     totalCount
                     pageInfo {
                         hasNextPage
+                        endCursor
                     }
                     edges {
                         permission

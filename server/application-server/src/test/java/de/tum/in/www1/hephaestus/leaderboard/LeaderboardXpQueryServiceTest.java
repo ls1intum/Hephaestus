@@ -22,6 +22,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 
 /**
  * Unit tests for LeaderboardXpQueryService.
@@ -32,6 +34,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 @Tag("unit")
 @DisplayName("LeaderboardXpQueryService")
 @ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 class LeaderboardXpQueryServiceTest {
 
     private static final Long WORKSPACE_ID = 1L;
@@ -49,6 +52,11 @@ class LeaderboardXpQueryServiceTest {
     @BeforeEach
     void setUp() {
         service = new LeaderboardXpQueryService(activityEventRepository, userRepository);
+        
+        // Default mock for distinct PR count query - returns empty list (0 PRs) by default
+        when(activityEventRepository.findDistinctReviewedPullRequestCountsByActors(
+            any(), anySet(), any(), any()
+        )).thenReturn(List.of());
     }
 
     @Nested

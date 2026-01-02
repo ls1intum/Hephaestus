@@ -6,6 +6,7 @@ import de.tum.in.www1.hephaestus.workspace.Workspace;
 import io.hypersistence.utils.hibernate.type.json.JsonType;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.PositiveOrZero;
 import java.time.Instant;
 import java.util.Map;
 import java.util.UUID;
@@ -13,6 +14,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.Immutable;
 import org.hibernate.annotations.Type;
 
 /**
@@ -30,12 +32,36 @@ import org.hibernate.annotations.Type;
  *
  * <h3>Idempotency</h3>
  * <p>Deduplicated by {@code (workspace_id, event_key)}.
+ *
+ * <h3>Indexes</h3>
+ * <p>Optimized for leaderboard and activity queries:
+ * <ul>
+ *   <li>workspace_id + occurred_at: Leaderboard aggregations with time range</li>
+ *   <li>actor_id + occurred_at: User activity feed (mentor context)</li>
+ *   <li>workspace_id + actor_id + occurred_at: Combined workspace + user queries</li>
+ *   <li>correlation_id: Email attribution chain lookups</li>
+ * </ul>
+ *
+ * <h3>Immutability</h3>
+ * <p>Annotated with {@code @Immutable} to prevent accidental updates at the Hibernate level.
+ * Activity events are append-only; corrections are made by recording new events.
  */
 @Entity
+@Immutable
 @Table(
     name = "activity_event",
     uniqueConstraints = {
         @UniqueConstraint(name = "uk_activity_event_workspace_key", columnNames = { "workspace_id", "event_key" }),
+    },
+    indexes = {
+        // Leaderboard queries: workspace aggregations with time range
+        @Index(name = "idx_activity_event_workspace_occurred", columnList = "workspace_id, occurred_at DESC"),
+        // User activity queries: mentor context with time range
+        @Index(name = "idx_activity_event_actor_occurred", columnList = "actor_id, occurred_at DESC"),
+        // Combined workspace + user queries: activity breakdown
+        @Index(name = "idx_activity_event_workspace_actor_occurred", columnList = "workspace_id, actor_id, occurred_at DESC"),
+        // Attribution queries: correlation chain lookups
+        @Index(name = "idx_activity_event_correlation", columnList = "correlation_id"),
     }
 )
 @Getter
@@ -95,8 +121,21 @@ public class ActivityEvent {
     @Column(name = "correlation_id")
     private UUID correlationId;
 
-    /** XP points earned for this activity (computed at event time) */
+    /**
+     * XP points earned for this activity (computed at event time).
+     *
+     * <p><strong>Precision policy:</strong> Values are rounded to 2 decimal places
+     * using HALF_UP rounding before storage. This ensures consistent aggregation
+     * and fair leaderboard scoring.
+     *
+     * <p><strong>Validation:</strong> Enforced non-negative via {@code @PositiveOrZero}
+     * and database CHECK constraint. Negative XP is only allowed for correction
+     * events (e.g., {@code REVIEW_DISMISSED}) which are handled specially.
+     *
+     * @see de.tum.in.www1.hephaestus.activity.scoring.XpPrecision
+     */
     @Builder.Default
+    @PositiveOrZero
     @Column(name = "xp", nullable = false)
     private double xp = 0.0;
 
@@ -110,6 +149,26 @@ public class ActivityEvent {
     @Column(name = "ingested_at", nullable = false)
     private Instant ingestedAt;
 
+    /**
+     * Schema version for forward compatibility and event evolution.
+     *
+     * <p><strong>When to increment:</strong>
+     * <ul>
+     *   <li>Event structure changes (new required fields, field renames)</li>
+     *   <li>XP calculation formula changes (to distinguish old vs new scoring)</li>
+     *   <li>Payload format changes (new required keys, changed semantics)</li>
+     * </ul>
+     *
+     * <p><strong>Migration pattern:</strong> Use {@link ActivityEventService#migrateToCurrentVersion}
+     * to upgrade events from older schema versions when processing historical data.
+     *
+     * @see ActivityEventService#CURRENT_SCHEMA_VERSION
+     * @see ActivityEventService#migrateToCurrentVersion(ActivityEvent)
+     */
+    @Builder.Default
+    @Column(name = "schema_version", nullable = false)
+    private int schemaVersion = 1;
+
     @PrePersist
     protected void onCreate() {
         if (id == null) {
@@ -120,7 +179,18 @@ public class ActivityEvent {
         }
     }
 
-    /** Build event key for idempotency */
+    /**
+     * Build a deterministic event key for idempotent upserts.
+     *
+     * <p>The key format is {@code {event_type}:{target_id}:{timestamp_ms}}.
+     * This ensures that duplicate events (same action on same entity at same time)
+     * are deduplicated at the database level via unique constraint.
+     *
+     * @param type the event type (e.g., PULL_REQUEST_OPENED)
+     * @param targetId the ID of the target entity
+     * @param timestamp when the event occurred
+     * @return a deterministic key for idempotency checking
+     */
     public static String buildKey(ActivityEventType type, Long targetId, Instant timestamp) {
         return String.format("%s:%d:%d", type.getValue(), targetId, timestamp.toEpochMilli());
     }

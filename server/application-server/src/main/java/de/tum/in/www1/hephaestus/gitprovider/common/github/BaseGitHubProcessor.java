@@ -52,6 +52,14 @@ public abstract class BaseGitHubProcessor {
         }
         return userRepository
             .findById(userId)
+            .map(existingUser -> {
+                // Update email if available and not already set
+                if (dto.email() != null && existingUser.getEmail() == null) {
+                    existingUser.setEmail(dto.email());
+                    return userRepository.save(existingUser);
+                }
+                return existingUser;
+            })
             .orElseGet(() -> {
                 User user = new User();
                 user.setId(userId);
@@ -59,6 +67,16 @@ public abstract class BaseGitHubProcessor {
                 user.setAvatarUrl(dto.avatarUrl());
                 // Use login as fallback for name if null (name is @NonNull)
                 user.setName(dto.name() != null ? dto.name() : dto.login());
+                // Set email if available from DTO
+                user.setEmail(dto.email());
+                // Set htmlUrl if available
+                if (dto.htmlUrl() != null) {
+                    user.setHtmlUrl(dto.htmlUrl());
+                } else {
+                    user.setHtmlUrl("https://github.com/" + dto.login());
+                }
+                // Default type to USER
+                user.setType(User.Type.USER);
                 return userRepository.save(user);
             });
     }

@@ -37,4 +37,8 @@
     <include file="./changelog/1765054498281_changelog.xml" relativeToChangelogFile="true"/>
     <include file="./changelog/1765851336797_changelog.xml" relativeToChangelogFile="true"/>
     <include file="./changelog/1767300000000_graphql_sync_migration.xml" relativeToChangelogFile="true"/>
+    <include file="./changelog/1767400000000_activity_event_ledger_enhancements.xml" relativeToChangelogFile="true"/>
+    <include file="./changelog/1767287604000_add_triage_permission.xml" relativeToChangelogFile="true"/>
+    <include file="./changelog/1767500000000_activity_event_performance_indexes.xml" relativeToChangelogFile="true"/>
+    <include file="./changelog/1767600000000_activity_event_xp_constraint.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog>

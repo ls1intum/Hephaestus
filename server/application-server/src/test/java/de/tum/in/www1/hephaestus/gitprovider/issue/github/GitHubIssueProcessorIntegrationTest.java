@@ -173,6 +173,7 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
             Instant.parse("2025-11-01T21:42:45Z"),
             Instant.parse("2025-11-01T21:42:45Z"),
             null, // closedAt
+            false, // locked
             createAuthorDto(),
             null, // assignees
             null, // labels
@@ -207,6 +208,7 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
                 Instant.now(),
                 Instant.now(),
                 null,
+                false, // locked
                 createAuthorDto(),
                 null,
                 null,
@@ -243,6 +245,7 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
                 Instant.now(),
                 Instant.now(),
                 null,
+                false, // locked
                 createAuthorDto(),
                 null,
                 null,
@@ -281,6 +284,7 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
                 Instant.now(),
                 Instant.now(),
                 null,
+                false, // locked
                 createAuthorDto(),
                 null,
                 null,
@@ -399,6 +403,7 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
                 Instant.now(),
                 Instant.now(),
                 null,
+                false, // locked
                 createAuthorDto(),
                 null,
                 null,
@@ -433,6 +438,7 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
                 Instant.now(),
                 Instant.now(),
                 null,
+                false, // locked
                 null, // null author
                 null,
                 null,
@@ -470,6 +476,7 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
                 Instant.now(),
                 Instant.now(),
                 null,
+                false, // locked
                 createAuthorDto(),
                 null,
                 List.of(labelDto),
@@ -516,6 +523,7 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
                 Instant.now(),
                 Instant.now(),
                 null,
+                false, // locked
                 createAuthorDto(),
                 List.of(assigneeDto),
                 null,
@@ -564,6 +572,7 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
                 Instant.now(),
                 Instant.now(),
                 null,
+                false, // locked
                 createAuthorDto(),
                 null,
                 null,
@@ -619,6 +628,7 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
                 Instant.now(),
                 Instant.now(),
                 null,
+                false, // locked
                 createAuthorDto(),
                 null,
                 null,
@@ -678,6 +688,7 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
                 Instant.parse("2025-11-01T21:42:45Z"),
                 Instant.parse("2025-11-01T21:42:45Z"),
                 null,
+                false, // locked
                 createAuthorDto(),
                 null,
                 null,
@@ -759,6 +770,7 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
                 Instant.now(),
                 Instant.now(),
                 null,
+                false, // locked
                 null,
                 null,
                 null,
@@ -819,6 +831,7 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
                 Instant.now(),
                 Instant.now(),
                 null,
+                false, // locked
                 null,
                 null,
                 null,
@@ -863,6 +876,7 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
                 Instant.now(),
                 Instant.now(),
                 Instant.now(),
+                false, // locked
                 createAuthorDto(),
                 null,
                 null,
@@ -918,6 +932,7 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
                 Instant.now(),
                 Instant.now(),
                 null,
+                false, // locked
                 null,
                 null,
                 null,
@@ -957,6 +972,7 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
                 Instant.now(),
                 Instant.now(),
                 Instant.now(),
+                false, // locked
                 createAuthorDto(),
                 null,
                 null,
@@ -1025,6 +1041,7 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
                 Instant.now(),
                 Instant.now(),
                 null,
+                false, // locked
                 createAuthorDto(),
                 null,
                 List.of(labelDto),
@@ -1194,6 +1211,7 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
                 Instant.now(),
                 Instant.now(),
                 null,
+                false, // locked
                 null,
                 null,
                 null,
@@ -1231,6 +1249,7 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
                 null,
                 null,
                 null,
+                false, // locked
                 null,
                 null,
                 null,
@@ -1264,6 +1283,7 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
                 Instant.now(),
                 Instant.now(),
                 null,
+                false, // locked
                 null,
                 null,
                 null,
@@ -1298,6 +1318,7 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
                 Instant.now(),
                 Instant.now(),
                 null,
+                false, // locked
                 null,
                 null,
                 null,
@@ -1332,6 +1353,7 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
                 Instant.now(),
                 Instant.now(),
                 Instant.now(),
+                false, // locked
                 null,
                 null,
                 null,
@@ -1366,6 +1388,7 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
                 Instant.now(),
                 Instant.now(),
                 null,
+                false, // locked
                 createAuthorDto(),
                 List.of(), // empty assignees
                 null,
@@ -1400,6 +1423,7 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
                 Instant.now(),
                 Instant.now(),
                 null,
+                false, // locked
                 createAuthorDto(),
                 null,
                 List.of(), // empty labels

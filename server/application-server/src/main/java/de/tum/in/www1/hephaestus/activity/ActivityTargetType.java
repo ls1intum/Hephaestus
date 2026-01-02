@@ -25,7 +25,12 @@ public enum ActivityTargetType {
     /**
      * Target is a review comment (inline code comment on a PR).
      */
-    REVIEW_COMMENT("review_comment");
+    REVIEW_COMMENT("review_comment"),
+
+    /**
+     * Target is an issue (not a pull request).
+     */
+    ISSUE("issue");
 
     private final String value;
 

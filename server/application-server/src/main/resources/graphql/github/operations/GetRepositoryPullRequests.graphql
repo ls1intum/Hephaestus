@@ -33,9 +33,26 @@ query GetRepositoryPullRequests(
                 closedAt
                 mergedAt
                 isDraft
+                locked
                 additions
                 deletions
                 changedFiles
+
+                # Review and merge state (GraphQL only)
+                reviewDecision
+                mergeStateStatus
+                mergeable
+                maintainerCanModify
+
+                # Commits count
+                commits(first: 0) {
+                    totalCount
+                }
+
+                # Merge commit (available when PR is merged)
+                mergeCommit {
+                    oid
+                }
 
                 # Head and base refs
                 headRefName

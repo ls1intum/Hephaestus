@@ -246,13 +246,21 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
         pr.setMergedAt(dto.mergedAt());
         pr.setDraft(dto.isDraft());
         pr.setMerged(dto.isMerged());
+        pr.setLocked(dto.locked());
         pr.setAdditions(dto.additions());
         pr.setDeletions(dto.deletions());
         pr.setChangedFiles(dto.changedFiles());
         pr.setCommits(dto.commits());
         pr.setCommentsCount(dto.commentsCount());
+        pr.setMergeCommitSha(dto.mergeCommitSha());
         pr.setRepository(repository);
         pr.setHasPullRequest(true); // It is a PR
+
+        // GraphQL-only fields
+        pr.setReviewDecision(dto.reviewDecision());
+        pr.setMergeStateStatus(dto.mergeStateStatus());
+        pr.setMergeable(dto.isMergeable());
+        pr.setMaintainerCanModify(dto.maintainerCanModify());
 
         // Link author
         if (dto.author() != null) {
@@ -357,6 +365,12 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
             changedFields.add("mergedBy");
         }
 
+        // Update mergeCommitSha (available from webhook payloads on merge)
+        if (dto.mergeCommitSha() != null && !Objects.equals(pr.getMergeCommitSha(), dto.mergeCommitSha())) {
+            pr.setMergeCommitSha(dto.mergeCommitSha());
+            changedFields.add("mergeCommitSha");
+        }
+
         if (pr.getAdditions() != dto.additions()) {
             pr.setAdditions(dto.additions());
             changedFields.add("additions");
@@ -370,6 +384,29 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
         if (pr.getCommits() != dto.commits()) {
             pr.setCommits(dto.commits());
             changedFields.add("commits");
+        }
+
+        if (pr.isLocked() != dto.locked()) {
+            pr.setLocked(dto.locked());
+            changedFields.add("locked");
+        }
+
+        // Update GraphQL-only fields (only if provided, null means not fetched)
+        if (dto.reviewDecision() != null && !Objects.equals(pr.getReviewDecision(), dto.reviewDecision())) {
+            pr.setReviewDecision(dto.reviewDecision());
+            changedFields.add("reviewDecision");
+        }
+        if (dto.mergeStateStatus() != null && !Objects.equals(pr.getMergeStateStatus(), dto.mergeStateStatus())) {
+            pr.setMergeStateStatus(dto.mergeStateStatus());
+            changedFields.add("mergeStateStatus");
+        }
+        if (dto.isMergeable() != null && !Objects.equals(pr.getMergeable(), dto.isMergeable())) {
+            pr.setMergeable(dto.isMergeable());
+            changedFields.add("isMergeable");
+        }
+        if (pr.isMaintainerCanModify() != dto.maintainerCanModify()) {
+            pr.setMaintainerCanModify(dto.maintainerCanModify());
+            changedFields.add("maintainerCanModify");
         }
 
         pr.setUpdatedAt(dto.updatedAt());

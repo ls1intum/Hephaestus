@@ -92,6 +92,20 @@ public class ExperiencePointCalculator {
         return properties.getXpReviewComment();
     }
 
+    /**
+     * Get XP for pull request marked ready for review (configurable).
+     */
+    public double getXpPullRequestReady() {
+        return properties.getXpPullRequestReady();
+    }
+
+    /**
+     * Get XP for issue created (configurable).
+     */
+    public double getXpIssueCreated() {
+        return properties.getXpIssueCreated();
+    }
+
     // ========================================================================
     // Review Experience Points
     // ========================================================================
@@ -109,6 +123,26 @@ public class ExperiencePointCalculator {
     /**
      * Calculate experience points for reviews with additional issue comments.
      *
+     * <h4>Dismissed Reviews</h4>
+     * <p><strong>Dismissed reviews are intentionally excluded from XP calculation.</strong>
+     *
+     * <p>Rationale: A dismissed review typically indicates one of:
+     * <ul>
+     *   <li>The review was invalidated by new commits (stale review)</li>
+     *   <li>The review was rejected by the PR author or maintainer</li>
+     *   <li>The reviewer's feedback was overridden</li>
+     * </ul>
+     *
+     * <p>Awarding XP for dismissed reviews would:
+     * <ul>
+     *   <li>Incentivize low-quality "drive-by" approvals that get dismissed</li>
+     *   <li>Double-count XP when a reviewer resubmits after dismissal</li>
+     *   <li>Reward outdated feedback that may no longer apply</li>
+     * </ul>
+     *
+     * <p>If a reviewer's feedback was valuable but dismissed due to new commits,
+     * they will earn XP when they re-review with a non-dismissed state.
+     *
      * @param reviews list of reviews to score
      * @param issueCommentCount number of issue comments
      * @return total XP for all reviews and comments
@@ -116,7 +150,7 @@ public class ExperiencePointCalculator {
     public double calculateReviewExperiencePoints(List<PullRequestReview> reviews, int issueCommentCount) {
         List<PullRequestReview> eligibleReviews = reviews
             .stream()
-            .filter(review -> !review.isDismissed())
+            .filter(review -> !review.isDismissed()) // See Javadoc: dismissed reviews yield 0 XP
             .filter(review -> !isSelfAssignedReview(review))
             .toList();
 
@@ -186,11 +220,20 @@ public class ExperiencePointCalculator {
      */
     public double calculateIssueCommentExperiencePoints(IssueComment issueComment) {
         Issue issue = issueComment.getIssue();
+        if (issue == null) {
+            logger.warn("Issue comment has no associated issue");
+            return 0;
+        }
+
         PullRequest pullRequest;
 
         if (issue.isPullRequest()) {
             pullRequest = (PullRequest) issue;
         } else {
+            if (issue.getRepository() == null) {
+                logger.warn("Issue has no repository, cannot find associated pull request");
+                return 0;
+            }
             var optionalPullRequest = pullRequestRepository.findByRepositoryIdAndNumber(
                 issue.getRepository().getId(),
                 issue.getNumber()
@@ -202,8 +245,16 @@ public class ExperiencePointCalculator {
             pullRequest = optionalPullRequest.get();
         }
 
-        // No XP for commenting on your own pull request
-        if (pullRequest.getAuthor().getId().equals(issueComment.getAuthor().getId())) {
+        // No XP for commenting on your own pull request (with null checks)
+        User prAuthor = pullRequest.getAuthor();
+        User commentAuthor = issueComment.getAuthor();
+        if (
+            prAuthor != null &&
+            commentAuthor != null &&
+            prAuthor.getId() != null &&
+            commentAuthor.getId() != null &&
+            prAuthor.getId().equals(commentAuthor.getId())
+        ) {
             return 0;
         }
 
@@ -279,9 +330,19 @@ public class ExperiencePointCalculator {
 
     /**
      * Check if the reviewer is the same as the pull request author.
+     * Returns false if any required data is null (defensive check).
      */
     private boolean isSelfReview(PullRequestReview review) {
-        return review.getAuthor().getId().equals(review.getPullRequest().getAuthor().getId());
+        User reviewer = review.getAuthor();
+        PullRequest pr = review.getPullRequest();
+        if (reviewer == null || reviewer.getId() == null || pr == null) {
+            return false;
+        }
+        User prAuthor = pr.getAuthor();
+        if (prAuthor == null || prAuthor.getId() == null) {
+            return false;
+        }
+        return reviewer.getId().equals(prAuthor.getId());
     }
 
     /**

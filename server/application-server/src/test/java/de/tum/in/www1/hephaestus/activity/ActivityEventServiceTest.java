@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
+import de.tum.in.www1.hephaestus.activity.scoring.ExperiencePointProperties;
 import de.tum.in.www1.hephaestus.workspace.Workspace;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceRepository;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -32,13 +33,18 @@ class ActivityEventServiceTest {
     @Mock
     private WorkspaceRepository workspaceRepository;
 
+    @Mock
+    private ExperiencePointProperties xpProperties;
+
     private MeterRegistry meterRegistry;
     private ActivityEventService service;
 
     @BeforeEach
     void setUp() {
         meterRegistry = new SimpleMeterRegistry();
-        service = new ActivityEventService(eventRepository, workspaceRepository, meterRegistry);
+        // Use lenient stubbing since not all tests exercise XP clamping path
+        lenient().when(xpProperties.getMaxXpPerEvent()).thenReturn(1000.0);
+        service = new ActivityEventService(eventRepository, workspaceRepository, xpProperties, meterRegistry);
     }
 
     @Test
@@ -121,5 +127,69 @@ class ActivityEventServiceTest {
         // Assert
         assertThat(result).isFalse();
         verifyNoInteractions(eventRepository);
+    }
+
+    @Test
+    @DisplayName("record clamps negative XP to zero")
+    void record_negativeXp_clampsToZero() {
+        // Arrange
+        Workspace workspace = new Workspace();
+        workspace.setId(1L);
+        when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
+        when(eventRepository.save(any(ActivityEvent.class))).thenAnswer(inv -> {
+            ActivityEvent event = inv.getArgument(0);
+            // Verify XP was clamped to 0
+            assertThat(event.getXp()).isEqualTo(0.0);
+            return event;
+        });
+
+        // Act
+        boolean result = service.record(
+            1L,
+            ActivityEventType.PULL_REQUEST_OPENED,
+            Instant.now(),
+            null,
+            null,
+            ActivityTargetType.PULL_REQUEST,
+            100L,
+            -50.0, // negative XP
+            SourceSystem.GITHUB
+        );
+
+        // Assert
+        assertThat(result).isTrue();
+        verify(eventRepository).save(any(ActivityEvent.class));
+    }
+
+    @Test
+    @DisplayName("record clamps XP above maximum to maxXpPerEvent")
+    void record_excessiveXp_clampsToMax() {
+        // Arrange
+        Workspace workspace = new Workspace();
+        workspace.setId(1L);
+        when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
+        when(eventRepository.save(any(ActivityEvent.class))).thenAnswer(inv -> {
+            ActivityEvent event = inv.getArgument(0);
+            // Verify XP was clamped to max (1000.0 as configured in setUp)
+            assertThat(event.getXp()).isEqualTo(1000.0);
+            return event;
+        });
+
+        // Act
+        boolean result = service.record(
+            1L,
+            ActivityEventType.PULL_REQUEST_OPENED,
+            Instant.now(),
+            null,
+            null,
+            ActivityTargetType.PULL_REQUEST,
+            100L,
+            9999.0, // excessive XP
+            SourceSystem.GITHUB
+        );
+
+        // Assert
+        assertThat(result).isTrue();
+        verify(eventRepository).save(any(ActivityEvent.class));
     }
 }

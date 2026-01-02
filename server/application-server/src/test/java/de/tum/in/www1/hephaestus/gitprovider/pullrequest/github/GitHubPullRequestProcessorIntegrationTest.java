@@ -146,8 +146,8 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
             FIXTURE_AUTHOR_LOGIN,
             "https://avatars.githubusercontent.com/u/" + FIXTURE_AUTHOR_ID,
             "https://github.com/" + FIXTURE_AUTHOR_LOGIN,
-            null,
-            null
+            null, // name
+            null // email
         );
     }
 
@@ -184,7 +184,11 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
             null, // milestone
             null, // head
             null, // base
-            null // repository
+            null, // repository
+            null, // reviewDecision
+            null, // mergeStateStatus
+            null, // isMergeable
+            false // maintainerCanModify
         );
     }
 
@@ -231,7 +235,11 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
                 null,
                 null,
                 null,
-                null
+                null,
+            null, // reviewDecision
+            null, // mergeStateStatus
+            null, // isMergeable
+            false // maintainerCanModify
             );
 
             // When
@@ -280,7 +288,11 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
                 null,
                 null,
                 null,
-                null
+                null,
+            null, // reviewDecision
+            null, // mergeStateStatus
+            null, // isMergeable
+            false // maintainerCanModify
             );
 
             // Verify the fallback works
@@ -331,7 +343,11 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
                 null,
                 null,
                 null,
-                null
+                null,
+            null, // reviewDecision
+            null, // mergeStateStatus
+            null, // isMergeable
+            false // maintainerCanModify
             );
 
             // Verify fallback returns null
@@ -432,7 +448,11 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
                 null,
                 null,
                 null,
-                null
+                null,
+                        null, // reviewDecision
+                        null, // mergeStateStatus
+                        null, // isMergeable
+                        false // maintainerCanModify
             );
 
             // When
@@ -494,7 +514,11 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
                 milestoneDto,
                 null,
                 null,
-                null
+                null,
+            null, // reviewDecision
+            null, // mergeStateStatus
+            null, // isMergeable
+            false // maintainerCanModify
             );
 
             // When
@@ -552,7 +576,11 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
                 null,
                 null,
                 null,
-                null
+                null,
+            null, // reviewDecision
+            null, // mergeStateStatus
+            null, // isMergeable
+            false // maintainerCanModify
             );
 
             // When
@@ -605,7 +633,11 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
                 null,
                 null,
                 null,
-                null
+                null,
+            null, // reviewDecision
+            null, // mergeStateStatus
+            null, // isMergeable
+            false // maintainerCanModify
             );
 
             // When
@@ -661,7 +693,11 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
                 null,
                 null,
                 null,
-                null
+                null,
+            null, // reviewDecision
+            null, // mergeStateStatus
+            null, // isMergeable
+            false // maintainerCanModify
             );
             processor.process(draftDto, createContext());
             eventListener.clear();
@@ -698,7 +734,11 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
                 null,
                 null,
                 null,
-                null
+                null,
+            null, // reviewDecision
+            null, // mergeStateStatus
+            null, // isMergeable
+            false // maintainerCanModify
             );
 
             // When
@@ -755,7 +795,11 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
                 null,
                 null,
                 null,
-                null
+                null,
+            null, // reviewDecision
+            null, // mergeStateStatus
+            null, // isMergeable
+            false // maintainerCanModify
             );
 
             // When
@@ -812,7 +856,11 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
                 null,
                 null,
                 null,
-                null
+                null,
+            null, // reviewDecision
+            null, // mergeStateStatus
+            null, // isMergeable
+            false // maintainerCanModify
             );
 
             // When
@@ -872,7 +920,11 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
                 null,
                 null,
                 null,
-                null
+                null,
+                        null, // reviewDecision
+                        null, // mergeStateStatus
+                        null, // isMergeable
+                        false // maintainerCanModify
             );
 
             // When
@@ -921,7 +973,11 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
                 null,
                 null,
                 null,
-                null
+                null,
+                        null, // reviewDecision
+                        null, // mergeStateStatus
+                        null, // isMergeable
+                        false // maintainerCanModify
             );
             processor.process(withLabelDto, createContext());
             eventListener.clear();
@@ -954,11 +1010,15 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
                 createAuthorDto(),
                 null,
                 null,
-                List.of(),
-                null,
-                null,
-                null,
-                null // empty labels
+                List.of(), // labels
+                null, // milestone
+                null, // head
+                null, // base
+                null, // repository
+                null, // reviewDecision
+                null, // mergeStateStatus
+                null, // isMergeable
+                false // maintainerCanModify
             );
 
             // When

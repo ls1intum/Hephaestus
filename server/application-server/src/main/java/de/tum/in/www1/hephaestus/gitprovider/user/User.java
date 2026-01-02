@@ -37,9 +37,19 @@ public class User extends BaseGitServiceEntity {
     @NonNull
     private String avatarUrl;
 
+    // AKA bio - user's profile description
+    private String description;
+
     @NonNull
     // Equals login if not fetched / existing
     private String name;
+
+    private String company;
+
+    // Url - user's website/blog from their profile
+    private String blog;
+
+    private String location;
 
     private String email;
 
@@ -49,6 +59,13 @@ public class User extends BaseGitServiceEntity {
     @NonNull
     @Enumerated(EnumType.STRING)
     private User.Type type;
+
+    private int followers;
+
+    private int following;
+
+    // Current ranking points for the leaderboard leagues
+    private int leaguePoints;
 
     @OneToMany(mappedBy = "user")
     @ToString.Exclude
@@ -108,18 +125,20 @@ public class User extends BaseGitServiceEntity {
     public void removeTeam(Team team) {
         teamMemberships.removeIf(m -> m.getTeam() != null && m.getTeam().equals(team));
     }
-    // Ignored GitHub properties:
-    // - totalPrivateRepos
-    // - ownedPrivateRepos
-    // - publicRepos
-    // - publicGists
-    // - privateGists
-    // - collaborators
-    // - is_verified (org?)
-    // - disk_usage
-    // - suspended_at (user)
-    // - twitter_username
-    // - billing_email (org)
-    // - has_organization_projects (org)
-    // - has_repository_projects (org)
+    // ========== INTENTIONALLY OMITTED GITHUB PROPERTIES ==========
+    // These fields are available from GitHub API but deliberately not persisted:
+    //
+    // Privacy/Compliance:
+    // - twitter_username: Social media handles not needed for core functionality
+    // - publicRepos: Count can be derived, not needed for user profiles
+    //
+    // Private/Org-specific (not accessible with standard tokens):
+    // - totalPrivateRepos, ownedPrivateRepos, privateGists
+    // - collaborators, disk_usage
+    // - is_verified, billing_email (org-specific)
+    // - has_organization_projects, has_repository_projects (org-specific)
+    // - suspended_at
+    //
+    // Derived/Unused:
+    // - publicGists: Not relevant to PR/code review workflows
 }

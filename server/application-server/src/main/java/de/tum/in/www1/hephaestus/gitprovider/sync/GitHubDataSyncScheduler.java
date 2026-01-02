@@ -100,14 +100,10 @@ public class GitHubDataSyncScheduler {
 
             // Wrap sync operations with context propagation for async threads
             Runnable syncTask = syncContextProvider.wrapWithContext(() -> {
-                // Sync repositories
+                // Sync repositories, organizations, and teams (via syncSyncTarget)
                 for (SyncTarget target : session.syncTargets()) {
                     dataSyncService.syncSyncTarget(target);
                 }
-
-                // TODO: User and Team sync via GraphQL not yet implemented
-                // dataSyncService.syncUsers(session.workspaceId());
-                // dataSyncService.syncTeams(session.workspaceId());
 
                 // Sync sub-issues, issue types, and issue dependencies via GraphQL
                 // These are workspace-level operations (fetched across all repositories)

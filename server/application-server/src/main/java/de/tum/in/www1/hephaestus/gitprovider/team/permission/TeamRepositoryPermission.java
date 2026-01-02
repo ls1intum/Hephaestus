@@ -60,6 +60,7 @@ public class TeamRepositoryPermission {
 
     public enum PermissionLevel {
         READ,
+        TRIAGE,
         WRITE,
         MAINTAIN,
         ADMIN,

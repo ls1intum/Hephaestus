@@ -1,5 +1,6 @@
 # GraphQL query for fetching team members with pagination
 # Used to paginate through all members when a team has more than 100 members
+# Uses edges instead of nodes to get the role field (MAINTAINER or MEMBER)
 
 query GetTeamMembers($orgLogin: String!, $teamSlug: String!, $first: Int!, $after: String) {
     rateLimit {
@@ -15,12 +16,15 @@ query GetTeamMembers($orgLogin: String!, $teamSlug: String!, $first: Int!, $afte
                     hasNextPage
                     endCursor
                 }
-                nodes {
-                    id
-                    databaseId
-                    login
-                    avatarUrl
-                    name
+                edges {
+                    role
+                    node {
+                        id
+                        databaseId
+                        login
+                        avatarUrl
+                        name
+                    }
                 }
             }
         }

@@ -40,12 +40,19 @@ public class GitHubRepositorySyncService {
                 nameWithOwner
                 description
                 url
+                homepageUrl
                 visibility
                 isArchived
                 isDisabled
                 isFork
                 isPrivate
                 pushedAt
+                stargazerCount
+                hasIssuesEnabled
+                hasProjectsEnabled
+                hasWikiEnabled
+                hasDiscussionsEnabled
+                hasSponsorshipsEnabled
                 defaultBranchRef {
                     name
                 }
@@ -150,6 +157,7 @@ public class GitHubRepositorySyncService {
             repository.setNameWithOwner(repoData.getNameWithOwner());
             repository.setDescription(repoData.getDescription());
             repository.setHtmlUrl(repoData.getUrl() != null ? repoData.getUrl().toString() : null);
+            repository.setHomepage(repoData.getHomepageUrl() != null ? repoData.getHomepageUrl().toString() : null);
             repository.setOrganization(organization);
 
             // Set private status
@@ -179,6 +187,19 @@ public class GitHubRepositorySyncService {
             } else {
                 repository.setVisibility(Repository.Visibility.PRIVATE);
             }
+
+            // Set stargazer and watcher counts
+            // Note: GitHub GraphQL uses stargazerCount; watchersCount is set to same value
+            // since the legacy watchers field is deprecated in GraphQL
+            repository.setStargazersCount(repoData.getStargazerCount());
+            repository.setWatchersCount(repoData.getStargazerCount());
+
+            // Set feature flags
+            repository.setHasIssues(repoData.getHasIssuesEnabled());
+            repository.setHasProjects(repoData.getHasProjectsEnabled());
+            repository.setHasWiki(repoData.getHasWikiEnabled());
+            repository.setHasDiscussions(repoData.getHasDiscussionsEnabled());
+            repository.setHasSponsorships(repoData.getHasSponsorshipsEnabled());
 
             repository = repositoryRepository.save(repository);
             logger.debug("Synced repository: {}", safeNameWithOwner);
