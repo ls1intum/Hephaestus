@@ -177,7 +177,7 @@ jobs:
               state: 'success',
               target_url: 'https://${{ env.PREVIEW_URL }}',
               description: 'Click Details to view Docs Preview',
-              context: 'Docs Preview'
+              context: 'Preview / Docs'
             });
 
   # Teardown handled by cd-docs-teardown.yml (separate workflow for reliability)

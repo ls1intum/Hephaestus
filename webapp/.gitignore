@@ -6,3 +6,6 @@ dist-ssr
 
 *storybook.log
 storybook-static
+
+# Test results (CI)
+test-results/
