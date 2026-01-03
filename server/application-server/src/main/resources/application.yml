@@ -30,6 +30,10 @@ spring:
             hibernate:
                 integrator_provider: de.tum.in.www1.hephaestus.ClassImportIntegratorIntegratorProvider
                 format_sql: "true"
+                jdbc:
+                    batch_size: 50
+                order_inserts: true
+                order_updates: true
 
     liquibase:
         change-log: classpath:db/master.xml
@@ -67,6 +71,12 @@ spring:
     mustache:
         check-template-location: false
 
+    # GraphQL client configuration for GitHub API operations
+    # Operations are colocated with the schema at graphql/github/operations/
+    graphql:
+        client:
+            document-locations: classpath:graphql/github/operations/
+
 springdoc:
     default-produces-media-type: application/json
     writer-with-order-by-keys: true
@@ -80,6 +90,10 @@ logging:
 
 hephaestus:
     host-url: https://hephaestus.ase.cit.tum.de/
+
+    cors:
+        allowed-origins:
+            - ${CLIENT_HOST:http://localhost:4200}
 
     webapp:
         url: ${CLIENT_HOST:http://localhost:4200}
@@ -141,6 +155,9 @@ hephaestus:
         contributors:
             # Eviction rate in milliseconds (1 hour)
             evict-rate: 3600000
+        leaderboard-xp:
+            # Eviction rate in milliseconds (60 seconds - leaderboard data is moderately hot)
+            evict-rate: 60000
     mail:
         enabled: ${MAIL_ENABLED:false}
         sender: ${MAIL_SENDER:hephaestus@gmail.com} # use gmail email address for local testing
@@ -258,3 +275,29 @@ slack:
 
 sentry:
     dsn: ""
+
+# ═══════════════════════════════════════════════════════════════════════════
+# RESILIENCE4J CIRCUIT BREAKER
+# ═══════════════════════════════════════════════════════════════════════════
+# Protects against cascading failures when GitHub API is unavailable
+# See ResilienceConfig.java for default values; these can be overridden here
+resilience4j:
+    circuitbreaker:
+        configs:
+            default:
+                slidingWindowSize: 10
+                failureRateThreshold: 50
+                waitDurationInOpenState: 30s
+                permittedNumberOfCallsInHalfOpenState: 3
+                minimumNumberOfCalls: 5
+                slowCallDurationThreshold: 10s
+                slowCallRateThreshold: 80
+        instances:
+            githubGraphQl:
+                baseConfig: default
+            githubRest:
+                baseConfig: default
+            intelligence-service:
+                baseConfig: default
+                slowCallDurationThreshold: 30s
+                waitDurationInOpenState: 60s

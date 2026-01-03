@@ -1,136 +1,174 @@
 package de.tum.in.www1.hephaestus.gitprovider.milestone.github;
 
+import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.GRAPHQL_TIMEOUT;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.LARGE_PAGE_SIZE;
+
+import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser.RepositoryOwnerAndName;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.MilestoneConnection;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.MilestoneState;
 import de.tum.in.www1.hephaestus.gitprovider.milestone.Milestone;
 import de.tum.in.www1.hephaestus.gitprovider.milestone.MilestoneRepository;
+import de.tum.in.www1.hephaestus.gitprovider.milestone.github.dto.GitHubMilestoneDTO;
+import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
-import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserSyncService;
-import java.io.IOException;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
-import org.kohsuke.github.GHIssueState;
-import org.kohsuke.github.GHMilestone;
-import org.kohsuke.github.GHRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.graphql.client.HttpGraphQlClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * Service for synchronizing GitHub milestones via GraphQL API.
+ * <p>
+ * This service fetches milestones via GraphQL and delegates to {@link GitHubMilestoneProcessor}
+ * for persistence, ensuring a single source of truth for milestone processing logic.
+ */
 @Service
 public class GitHubMilestoneSyncService {
 
     private static final Logger logger = LoggerFactory.getLogger(GitHubMilestoneSyncService.class);
+    private static final String GET_MILESTONES_DOCUMENT = "GetRepositoryMilestones";
 
     private final MilestoneRepository milestoneRepository;
     private final RepositoryRepository repositoryRepository;
-    private final GitHubMilestoneConverter milestoneConverter;
-    private final GitHubUserSyncService userSyncService;
+    private final GitHubGraphQlClientProvider graphQlClientProvider;
+    private final GitHubMilestoneProcessor milestoneProcessor;
 
     public GitHubMilestoneSyncService(
         MilestoneRepository milestoneRepository,
         RepositoryRepository repositoryRepository,
-        GitHubMilestoneConverter milestoneConverter,
-        GitHubUserSyncService userSyncService
+        GitHubGraphQlClientProvider graphQlClientProvider,
+        GitHubMilestoneProcessor milestoneProcessor
     ) {
         this.milestoneRepository = milestoneRepository;
         this.repositoryRepository = repositoryRepository;
-        this.milestoneConverter = milestoneConverter;
-        this.userSyncService = userSyncService;
+        this.graphQlClientProvider = graphQlClientProvider;
+        this.milestoneProcessor = milestoneProcessor;
     }
 
     /**
-     * Synchronizes all milestones of a list of GitHub repositories with the local
-     * repository.
+     * Synchronizes all milestones for a repository using GraphQL.
      *
-     * @param repositories the list of GitHub repositories whose milestones are to
-     *                     be synchronized
-     */
-    public void syncMilestonesOfAllRepositories(List<GHRepository> repositories) {
-        repositories.stream().forEach(this::syncMilestonesOfRepository);
-    }
-
-    /**
-     * Synchronizes milestones for a specific GitHub repository with the local
-     * repository.
-     *
-     * @param repository the GitHub repository whose milestones are to be
-     *                   synchronized
+     * @param workspaceId  the workspace ID for authentication
+     * @param repositoryId the repository ID to sync milestones for
+     * @return number of milestones synced
      */
     @Transactional
-    public void syncMilestonesOfRepository(GHRepository repository) {
+    public int syncMilestonesForRepository(Long workspaceId, Long repositoryId) {
+        Repository repository = repositoryRepository.findById(repositoryId).orElse(null);
         if (repository == null) {
-            return;
+            logger.warn("Repository {} not found, cannot sync milestones", repositoryId);
+            return 0;
         }
 
-        List<GHMilestone> remoteMilestones;
+        String safeNameWithOwner = sanitizeForLog(repository.getNameWithOwner());
+        Optional<RepositoryOwnerAndName> parsedName = GitHubRepositoryNameParser.parse(repository.getNameWithOwner());
+        if (parsedName.isEmpty()) {
+            logger.warn("Invalid repository name format: {}", safeNameWithOwner);
+            return 0;
+        }
+        String owner = parsedName.get().owner();
+        String name = parsedName.get().name();
+
+        HttpGraphQlClient client = graphQlClientProvider.forWorkspace(workspaceId);
+        ProcessingContext context = ProcessingContext.forSync(workspaceId, repository);
+
         try {
-            remoteMilestones = repository.listMilestones(GHIssueState.ALL).withPageSize(100).toList();
-        } catch (IOException listingError) {
-            logger.warn(
-                "Failed to list milestones for repositoryId={}: {}",
-                repository.getId(),
-                listingError.getMessage()
-            );
-            return;
+            Set<Integer> syncedNumbers = new HashSet<>();
+            int totalSynced = 0;
+            String cursor = null;
+            boolean hasNextPage = true;
+
+            while (hasNextPage) {
+                MilestoneConnection response = client
+                    .documentName(GET_MILESTONES_DOCUMENT)
+                    .variable("owner", owner)
+                    .variable("name", name)
+                    .variable("first", LARGE_PAGE_SIZE)
+                    .variable("after", cursor)
+                    .retrieve("repository.milestones")
+                    .toEntity(MilestoneConnection.class)
+                    .block(GRAPHQL_TIMEOUT);
+
+                if (response == null || response.getNodes() == null) {
+                    break;
+                }
+
+                for (var graphQlMilestone : response.getNodes()) {
+                    GitHubMilestoneDTO dto = convertToDTO(graphQlMilestone);
+                    Milestone milestone = milestoneProcessor.process(dto, repository, null, context);
+                    if (milestone != null) {
+                        syncedNumbers.add(milestone.getNumber());
+                        totalSynced++;
+                    }
+                }
+
+                var pageInfo = response.getPageInfo();
+                hasNextPage = pageInfo != null && Boolean.TRUE.equals(pageInfo.getHasNextPage());
+                cursor = pageInfo != null ? pageInfo.getEndCursor() : null;
+            }
+
+            // Remove milestones that no longer exist
+            removeDeletedMilestones(repository.getId(), syncedNumbers, context);
+
+            logger.info("Synced {} milestones for repository {}", totalSynced, safeNameWithOwner);
+            return totalSynced;
+        } catch (Exception e) {
+            logger.error("Error syncing milestones for repository {}: {}", safeNameWithOwner, e.getMessage(), e);
+            return 0;
         }
+    }
 
-        Set<Long> seenMilestoneIds = new HashSet<>(remoteMilestones.size());
-        remoteMilestones.forEach(ghMilestone -> {
-            seenMilestoneIds.add(ghMilestone.getId());
-            processMilestone(ghMilestone);
-        });
-
-        var repositoryId = repository.getId();
-        List<Milestone> existingMilestones = milestoneRepository.findAllByRepository_Id(repositoryId);
+    private void removeDeletedMilestones(Long repositoryId, Set<Integer> syncedNumbers, ProcessingContext context) {
+        List<Milestone> existing = milestoneRepository.findAllByRepository_Id(repositoryId);
         int removed = 0;
-        for (Milestone milestone : existingMilestones) {
-            if (!seenMilestoneIds.contains(milestone.getId())) {
-                milestoneRepository.delete(milestone);
+        for (Milestone milestone : existing) {
+            if (!syncedNumbers.contains(milestone.getNumber())) {
+                milestoneProcessor.delete(milestone.getId(), context);
                 removed++;
             }
         }
-
         if (removed > 0) {
             logger.info("Deleted {} stale milestones for repositoryId={}", removed, repositoryId);
         }
     }
 
     /**
-     * Processes a GitHub milestone and ensures it is synchronized with the local
-     * repository.
-     *
-     * @param ghMilestone the GitHub milestone to process
-     * @return the synchronized local Milestone entity, or null if synchronization
-     *         fails
+     * Converts a GraphQL Milestone to a GitHubMilestoneDTO.
+     * Note: GraphQL doesn't expose databaseId for milestones, so id will be null.
+     * The processor handles this by using number-based lookup as fallback.
      */
-    @Transactional
-    public Milestone processMilestone(GHMilestone ghMilestone) {
-        var result = milestoneRepository
-            .findById(ghMilestone.getId())
-            .map(milestone -> milestoneConverter.update(ghMilestone, milestone))
-            .orElseGet(() -> milestoneConverter.convert(ghMilestone));
+    private GitHubMilestoneDTO convertToDTO(
+        de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.Milestone graphQlMilestone
+    ) {
+        return new GitHubMilestoneDTO(
+            null, // id - GraphQL doesn't expose databaseId for milestones
+            graphQlMilestone.getNumber(),
+            graphQlMilestone.getTitle(),
+            graphQlMilestone.getDescription(),
+            convertState(graphQlMilestone.getState()).name().toLowerCase(),
+            graphQlMilestone.getDueOn() != null ? graphQlMilestone.getDueOn().toInstant() : null,
+            graphQlMilestone.getUrl() != null ? graphQlMilestone.getUrl().toString() : null,
+            graphQlMilestone.getOpenIssueCount(),
+            graphQlMilestone.getClosedIssueCount()
+        );
+    }
 
-        if (result == null) {
-            return null;
+    private Milestone.State convertState(MilestoneState graphQlState) {
+        if (graphQlState == null) {
+            return Milestone.State.OPEN;
         }
-
-        // Link with existing repository if not already linked
-        if (result.getRepository() == null) {
-            // Extract name with owner from the repository URL
-            // Example: https://api.github.com/repos/ls1intum/Artemis/milestones/257
-            var nameWithOwner = ghMilestone.getUrl().toString().split("/repos/")[1].split("/milestones")[0];
-            repositoryRepository.findByNameWithOwner(nameWithOwner).ifPresent(result::setRepository);
-        }
-
-        // Link creator
-        var creator = ghMilestone.getCreator();
-        if (creator != null) {
-            var resultCreator = userSyncService.getOrCreateUser(creator);
-            result.setCreator(resultCreator);
-        } else {
-            result.setCreator(null);
-        }
-
-        return milestoneRepository.save(result);
+        return switch (graphQlState) {
+            case CLOSED -> Milestone.State.CLOSED;
+            case OPEN -> Milestone.State.OPEN;
+        };
     }
 }

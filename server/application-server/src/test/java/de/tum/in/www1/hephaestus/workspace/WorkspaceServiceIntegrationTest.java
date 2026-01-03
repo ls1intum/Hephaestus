@@ -7,7 +7,6 @@ import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.workspace.exception.WorkspaceLifecycleViolationException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.kohsuke.github.GHRepositorySelection;
 import org.springframework.beans.factory.annotation.Autowired;
 
 @DisplayName("Workspace service integration")
@@ -103,7 +102,11 @@ class WorkspaceServiceIntegrationTest extends AbstractWorkspaceIntegrationTest {
         workspace.setPersonalAccessToken(null);
         workspaceRepository.save(workspace);
 
-        Workspace promoted = workspaceService.ensureForInstallation(95711017L, "ls1intum", GHRepositorySelection.ALL);
+        Workspace promoted = workspaceInstallationService.createOrUpdateFromInstallation(
+            95711017L,
+            "ls1intum",
+            RepositorySelection.ALL
+        );
 
         Workspace persisted = workspaceRepository.findById(promoted.getId()).orElseThrow();
 

@@ -1,0 +1,116 @@
+<?xml version="1.1" encoding="UTF-8" standalone="no"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                   http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+    Activity Event Ledger Enhancements
+
+    This changelog consolidates improvements to the activity_event table for
+    proper event sourcing and ledger immutability:
+
+    1. schema_version field - Enables forward compatibility for event evolution
+    2. actor_id FK fix - SET NULL on delete to preserve history
+    3. repository_id FK fix - SET NULL on delete to preserve history
+
+    The activity ledger remains immutable and auditable even when referenced
+    entities are removed, which is critical for event sourcing patterns.
+    -->
+
+    <!-- Changeset 1: Add schema_version field for event evolution -->
+    <changeSet id="1767400000000-1-add-schema-version" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <tableExists tableName="activity_event"/>
+            <not>
+                <columnExists tableName="activity_event" columnName="schema_version"/>
+            </not>
+        </preConditions>
+        <addColumn tableName="activity_event">
+            <column name="schema_version" type="INTEGER" defaultValueNumeric="1">
+                <constraints nullable="false"/>
+            </column>
+        </addColumn>
+        <rollback>
+            <dropColumn tableName="activity_event" columnName="schema_version"/>
+        </rollback>
+        <comment>Add schema_version field for forward compatibility and event evolution</comment>
+    </changeSet>
+
+    <!-- Changeset 2: Fix actor_id FK with ON DELETE SET NULL -->
+    <changeSet id="1767400000000-2-fix-actor-fk" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <foreignKeyConstraintExists foreignKeyName="fk_activity_event_actor"/>
+        </preConditions>
+        <dropForeignKeyConstraint
+            baseTableName="activity_event"
+            constraintName="fk_activity_event_actor"/>
+        <addForeignKeyConstraint
+            baseTableName="activity_event"
+            baseColumnNames="actor_id"
+            referencedTableName="user"
+            referencedColumnNames="id"
+            constraintName="fk_activity_event_actor"
+            onDelete="SET NULL"/>
+        <rollback>
+            <dropForeignKeyConstraint baseTableName="activity_event" constraintName="fk_activity_event_actor"/>
+            <addForeignKeyConstraint
+                baseTableName="activity_event"
+                baseColumnNames="actor_id"
+                referencedTableName="user"
+                referencedColumnNames="id"
+                constraintName="fk_activity_event_actor"/>
+        </rollback>
+        <comment>Update actor_id FK to SET NULL on delete - preserve activity history when user is deleted</comment>
+    </changeSet>
+
+    <!-- Changeset 3: Fix repository_id FK with ON DELETE SET NULL -->
+    <changeSet id="1767400000000-3-fix-repository-fk" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <foreignKeyConstraintExists foreignKeyName="fk_activity_event_repository"/>
+        </preConditions>
+        <dropForeignKeyConstraint
+            baseTableName="activity_event"
+            constraintName="fk_activity_event_repository"/>
+        <addForeignKeyConstraint
+            baseTableName="activity_event"
+            baseColumnNames="repository_id"
+            referencedTableName="repository"
+            referencedColumnNames="id"
+            constraintName="fk_activity_event_repository"
+            onDelete="SET NULL"/>
+        <rollback>
+            <dropForeignKeyConstraint baseTableName="activity_event" constraintName="fk_activity_event_repository"/>
+            <addForeignKeyConstraint
+                baseTableName="activity_event"
+                baseColumnNames="repository_id"
+                referencedTableName="repository"
+                referencedColumnNames="id"
+                constraintName="fk_activity_event_repository"/>
+        </rollback>
+        <comment>Update repository_id FK to SET NULL on delete - preserve activity history when repository is deleted</comment>
+    </changeSet>
+
+    <!-- Changeset 4: Add index on target_id and target_type for efficient target lookups -->
+    <changeSet id="1767400000000-4-add-target-index" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <tableExists tableName="activity_event"/>
+            <columnExists tableName="activity_event" columnName="target_id"/>
+            <columnExists tableName="activity_event" columnName="target_type"/>
+            <not>
+                <indexExists indexName="idx_activity_event_target"/>
+            </not>
+        </preConditions>
+        <createIndex tableName="activity_event" indexName="idx_activity_event_target">
+            <column name="target_id"/>
+            <column name="target_type"/>
+        </createIndex>
+        <rollback>
+            <dropIndex tableName="activity_event" indexName="idx_activity_event_target"/>
+        </rollback>
+        <comment>Add composite index on (target_id, target_type) to optimize queries filtering by target</comment>
+    </changeSet>
+
+    <!-- Note: workspace_id FK remains RESTRICT (default) - events are deleted with workspace -->
+
+</databaseChangeLog>

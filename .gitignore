@@ -1,9 +1,12 @@
 .venv
 .DS_Store
 
-# Idea files
+# IDE files
 .idea/
 *.iml
+.project
+.classpath
+.settings/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

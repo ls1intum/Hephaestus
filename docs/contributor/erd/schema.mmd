@@ -9,6 +9,23 @@ erDiagram
 
     direction LR
 
+    ActivityEvent {
+        UUID id PK
+        VARCHAR(255) event_key UK "NOT NULL"
+        VARCHAR(64) event_type "NOT NULL"
+        TIMESTAMPTZ occurred_at "NOT NULL"
+        BIGINT actor_id FK
+        BIGINT workspace_id FK,UK "NOT NULL"
+        BIGINT repository_id FK
+        VARCHAR(32) target_type
+        BIGINT target_id
+        VARCHAR(32) source_system "NOT NULL"
+        UUID correlation_id
+        DOUBLE xp "NOT NULL"
+        JSONB payload
+        TIMESTAMPTZ ingested_at "NOT NULL"
+    }
+
     BadPracticeDetection {
         BIGINT id PK
         TIMESTAMPTZ detection_time
@@ -58,15 +75,6 @@ erDiagram
         BIGINT workspace_id FK "NOT NULL"
     }
 
-    ContributionEvent {
-        BIGINT id PK
-        TIMESTAMPTZ occurred_at "NOT NULL"
-        BIGINT source_id UK "NOT NULL"
-        VARCHAR(32) source_type UK "NOT NULL"
-        INTEGER xp_awarded "NOT NULL"
-        BIGINT actor_id FK "NOT NULL"
-    }
-
     Document {
         UUID id PK
         INTEGER version_number PK
@@ -95,11 +103,7 @@ erDiagram
         INTEGER commits
         INTEGER deletions
         BOOLEAN is_draft
-        BOOLEAN is_mergeable
         BOOLEAN is_merged
-        BOOLEAN maintainer_can_modify
-        VARCHAR(255) merge_commit_sha
-        VARCHAR(255) mergeable_state
         TIMESTAMPTZ merged_at
         BIGINT author_id FK
         BIGINT milestone_id FK
@@ -111,11 +115,21 @@ erDiagram
         VARCHAR(32) state_reason
         TEXT body
         TEXT bad_practice_summary
+        BIGINT parent_issue_id FK
+        INTEGER sub_issues_total
+        INTEGER sub_issues_completed
+        INTEGER sub_issues_percent_completed
+        VARCHAR(128) issue_type_id FK
     }
 
     IssueAssignee {
         BIGINT issue_id PK,FK
         BIGINT user_id PK,FK
+    }
+
+    IssueBlocking {
+        BIGINT blocked_issue_id PK,FK
+        BIGINT blocking_issue_id PK,FK
     }
 
     IssueComment {
@@ -132,6 +146,15 @@ erDiagram
     IssueLabel {
         BIGINT issue_id PK,FK
         BIGINT label_id PK,FK
+    }
+
+    IssueType {
+        VARCHAR(128) id PK
+        VARCHAR(128) name "NOT NULL"
+        TEXT description
+        VARCHAR(20) color "NOT NULL"
+        BOOLEAN is_enabled "NOT NULL"
+        BIGINT organization_id FK "NOT NULL"
     }
 
     Label {
@@ -169,6 +192,7 @@ erDiagram
         BIGINT installation_id
         VARCHAR(255) login UK "NOT NULL"
         VARCHAR(255) name
+        BIGINT workspace_id
     }
 
     OrganizationMembership {
@@ -205,10 +229,8 @@ erDiagram
         INTEGER line "NOT NULL"
         VARCHAR(255) original_commit_id
         INTEGER original_line "NOT NULL"
-        INTEGER original_position "NOT NULL"
         INTEGER original_start_line
         VARCHAR(255) path
-        INTEGER position "NOT NULL"
         VARCHAR(255) side
         INTEGER start_line
         VARCHAR(255) start_side
@@ -230,7 +252,7 @@ erDiagram
         BIGINT pull_request_id FK "NOT NULL"
         BIGINT root_comment_id FK,UK
         BIGINT provider_thread_id
-        VARCHAR(64) node_id
+        VARCHAR(128) node_id
         TEXT path
         INTEGER line
         INTEGER start_line
@@ -260,11 +282,7 @@ erDiagram
         TIMESTAMPTZ created_at
         TIMESTAMPTZ updated_at
         VARCHAR(255) default_branch
-        VARCHAR(255) description
-        BOOLEAN has_issues "NOT NULL"
-        BOOLEAN has_projects "NOT NULL"
-        BOOLEAN has_wiki "NOT NULL"
-        VARCHAR(1024) homepage
+        TEXT description
         VARCHAR(512) html_url
         BOOLEAN is_archived "NOT NULL"
         BOOLEAN is_disabled "NOT NULL"
@@ -272,9 +290,7 @@ erDiagram
         VARCHAR(255) name
         VARCHAR(150) name_with_owner
         TIMESTAMPTZ pushed_at
-        INTEGER stargazers_count "NOT NULL"
         VARCHAR(255) visibility
-        INTEGER watchers_count "NOT NULL"
         BIGINT organization_id FK
     }
 
@@ -335,18 +351,11 @@ erDiagram
         TIMESTAMPTZ created_at
         TIMESTAMPTZ updated_at
         VARCHAR(255) avatar_url
-        VARCHAR(255) blog
-        VARCHAR(255) company
-        VARCHAR(255) description
         VARCHAR(255) email
-        INTEGER followers "NOT NULL"
-        INTEGER following "NOT NULL"
         VARCHAR(255) html_url
-        VARCHAR(255) location
         VARCHAR(255) login
         VARCHAR(255) name
         VARCHAR(255) type
-        INTEGER league_points "NOT NULL"
         BOOLEAN notifications_enabled "NOT NULL"
         BOOLEAN participate_in_research "NOT NULL"
     }
@@ -377,6 +386,9 @@ erDiagram
         TIMESTAMPTZ updated_at
         TIMESTAMPTZ members_synced_at
         TIMESTAMPTZ teams_synced_at
+        TIMESTAMP sub_issues_synced_at
+        TIMESTAMP issue_types_synced_at
+        TIMESTAMP issue_dependencies_synced_at
     }
 
     WorkspaceMembership {
@@ -398,6 +410,7 @@ erDiagram
 
     %% Relationships
     %% One-to-One relationships
+    Workspace ||--|| ActivityEvent : has
     ChatMessage ||--|| ChatMessagePart : has
     ChatMessage ||--|| ChatThread : references
     PullRequestReviewComment ||--|| PullRequestReviewThread : reviewed
@@ -406,21 +419,25 @@ erDiagram
     Workspace ||--|| WorkspaceMembership : belongs_to
 
     %% One-to-Many relationships
+    User ||--o{ ActivityEvent : references
+    Repository ||--o{ ActivityEvent : has
     Issue ||--o{ BadPracticeDetection : references
     PullRequestBadPractice ||--o{ BadPracticeFeedback : references
     ChatMessage ||--o{ ChatMessage : references
     ChatThread ||--o{ ChatMessage : has
     User ||--o{ ChatThread : has
     Workspace ||--o{ ChatThread : has
-    User ||--o{ ContributionEvent : references
     User ||--o{ Document : has
     Workspace ||--o{ Document : has
     User ||--o{ Issue : authored_by
+    IssueType ||--o{ Issue : has
     User ||--o{ Issue : merged_by
     Milestone ||--o{ Issue : has
+    Issue ||--o{ Issue : has
     Repository ||--o{ Issue : has
     User ||--o{ IssueComment : commented_on
     Issue ||--o{ IssueComment : commented_on
+    Organization ||--o{ IssueType : has
     Repository ||--o{ Label : labeled
     User ||--o{ Milestone : created_by
     Repository ||--o{ Milestone : has
@@ -442,6 +459,8 @@ erDiagram
     %% Many-to-Many relationships
     Issue }o--o{ IssueAssignee : assigned_to
     User }o--o{ IssueAssignee : assigned_to
+    Issue }o--o{ IssueBlocking : has
+    Issue }o--o{ IssueBlocking : has
     Issue }o--o{ IssueLabel : labeled
     Label }o--o{ IssueLabel : labeled
     Issue }o--o{ PullRequestRequestedReviewer : reviewed

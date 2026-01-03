@@ -1,63 +1,78 @@
 package de.tum.in.www1.hephaestus.gitprovider.issuecomment.github;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.NatsMessageDeserializer;
+import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
+import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContextFactory;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventAction;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
-import de.tum.in.www1.hephaestus.gitprovider.issue.github.GitHubIssueSyncService;
-import de.tum.in.www1.hephaestus.gitprovider.issuecomment.IssueCommentRepository;
-import de.tum.in.www1.hephaestus.gitprovider.repository.github.GitHubRepositorySyncService;
-import org.kohsuke.github.GHEvent;
-import org.kohsuke.github.GHEventPayload;
+import de.tum.in.www1.hephaestus.gitprovider.issue.github.GitHubIssueProcessor;
+import de.tum.in.www1.hephaestus.gitprovider.issuecomment.github.dto.GitHubIssueCommentEventDTO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * Handles GitHub issue_comment webhook events.
+ */
 @Component
-public class GitHubIssueCommentMessageHandler extends GitHubMessageHandler<GHEventPayload.IssueComment> {
+public class GitHubIssueCommentMessageHandler extends GitHubMessageHandler<GitHubIssueCommentEventDTO> {
 
     private static final Logger logger = LoggerFactory.getLogger(GitHubIssueCommentMessageHandler.class);
 
-    private final IssueCommentRepository issueCommentRepository;
-    private final GitHubRepositorySyncService repositorySyncService;
-    private final GitHubIssueSyncService issueSyncService;
-    private final GitHubIssueCommentSyncService issueCommentSyncService;
+    private final ProcessingContextFactory contextFactory;
+    private final GitHubIssueProcessor issueProcessor;
+    private final GitHubIssueCommentProcessor commentProcessor;
 
-    private GitHubIssueCommentMessageHandler(
-        IssueCommentRepository issueCommentRepository,
-        GitHubRepositorySyncService repositorySyncService,
-        GitHubIssueSyncService issueSyncService,
-        GitHubIssueCommentSyncService issueCommentSyncService
+    GitHubIssueCommentMessageHandler(
+        ProcessingContextFactory contextFactory,
+        GitHubIssueProcessor issueProcessor,
+        GitHubIssueCommentProcessor commentProcessor,
+        NatsMessageDeserializer deserializer
     ) {
-        super(GHEventPayload.IssueComment.class);
-        this.issueCommentRepository = issueCommentRepository;
-        this.repositorySyncService = repositorySyncService;
-        this.issueSyncService = issueSyncService;
-        this.issueCommentSyncService = issueCommentSyncService;
+        super(GitHubIssueCommentEventDTO.class, deserializer);
+        this.contextFactory = contextFactory;
+        this.issueProcessor = issueProcessor;
+        this.commentProcessor = commentProcessor;
     }
 
     @Override
-    protected void handleEvent(GHEventPayload.IssueComment eventPayload) {
-        var action = eventPayload.getAction();
-        var repository = eventPayload.getRepository();
-        var issue = eventPayload.getIssue();
-        var comment = eventPayload.getComment();
-        logger.info(
-            "Received issue comment event for repository: {}, issue: {}, action: {}, commentId: {}",
-            repository.getFullName(),
-            issue.getNumber(),
-            action,
-            comment.getId()
-        );
-        repositorySyncService.processRepository(repository);
-        issueSyncService.processIssue(issue);
+    protected String getEventKey() {
+        return "issue_comment";
+    }
 
-        if (action.equals("deleted")) {
-            issueCommentRepository.deleteById(comment.getId());
-        } else {
-            issueCommentSyncService.processIssueComment(comment);
+    @Override
+    @Transactional
+    protected void handleEvent(GitHubIssueCommentEventDTO event) {
+        var commentDto = event.comment();
+        var issueDto = event.issue();
+
+        if (commentDto == null || issueDto == null) {
+            logger.warn("Received issue_comment event with missing data");
+            return;
         }
-    }
 
-    @Override
-    protected GHEvent getHandlerEvent() {
-        return GHEvent.ISSUE_COMMENT;
+        logger.info(
+            "Received issue_comment event: action={}, issue=#{}, comment={}, repo={}",
+            event.action(),
+            issueDto.number(),
+            commentDto.id(),
+            event.repository() != null ? event.repository().fullName() : "unknown"
+        );
+
+        ProcessingContext context = contextFactory.forWebhookEvent(event).orElse(null);
+        if (context == null) {
+            return;
+        }
+
+        // Ensure issue exists
+        issueProcessor.process(issueDto, context);
+
+        // Handle comment action
+        if (event.actionType() == GitHubEventAction.IssueComment.DELETED) {
+            commentProcessor.delete(commentDto.id(), context);
+        } else {
+            commentProcessor.process(commentDto, issueDto.getDatabaseId(), context);
+        }
     }
 }

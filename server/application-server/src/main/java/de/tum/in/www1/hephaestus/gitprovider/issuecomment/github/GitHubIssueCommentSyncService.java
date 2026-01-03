@@ -1,112 +1,175 @@
 package de.tum.in.www1.hephaestus.gitprovider.issuecomment.github;
 
+import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.DEFAULT_PAGE_SIZE;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.GRAPHQL_TIMEOUT;
+
+import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser.RepositoryOwnerAndName;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.IssueCommentConnection;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.PageInfo;
+import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.issue.IssueRepository;
-import de.tum.in.www1.hephaestus.gitprovider.issue.github.GitHubIssueConverter;
 import de.tum.in.www1.hephaestus.gitprovider.issuecomment.IssueComment;
-import de.tum.in.www1.hephaestus.gitprovider.issuecomment.IssueCommentRepository;
-import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserSyncService;
-import java.io.IOException;
-import java.util.List;
-import org.kohsuke.github.GHIssue;
-import org.kohsuke.github.GHIssueComment;
+import de.tum.in.www1.hephaestus.gitprovider.issuecomment.github.dto.GitHubIssueCommentEventDTO.GitHubCommentDTO;
+import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
+import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
+import java.util.Optional;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Stream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.graphql.client.ClientGraphQlResponse;
+import org.springframework.graphql.client.HttpGraphQlClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * Service for synchronizing GitHub issue comments via GraphQL API.
+ * <p>
+ * Uses typed GraphQL models for type-safe deserialization and delegates
+ * persistence to GitHubIssueCommentProcessor.
+ */
 @Service
 public class GitHubIssueCommentSyncService {
 
-    private static final Logger logger = LoggerFactory.getLogger(GitHubIssueCommentSyncService.class);
+    private static final Logger log = LoggerFactory.getLogger(GitHubIssueCommentSyncService.class);
+    private static final String QUERY_DOCUMENT = "GetIssueComments";
 
-    private final IssueCommentRepository issueCommentRepository;
+    private final RepositoryRepository repositoryRepository;
     private final IssueRepository issueRepository;
-    private final GitHubIssueCommentConverter issueCommentConverter;
-    private final GitHubIssueConverter issueConverter;
-    private final GitHubUserSyncService userSyncService;
+    private final GitHubGraphQlClientProvider graphQlClientProvider;
+    private final GitHubIssueCommentProcessor commentProcessor;
 
     public GitHubIssueCommentSyncService(
-        IssueCommentRepository issueCommentRepository,
+        RepositoryRepository repositoryRepository,
         IssueRepository issueRepository,
-        GitHubIssueCommentConverter issueCommentConverter,
-        GitHubIssueConverter issueConverter,
-        GitHubUserSyncService userSyncService
+        GitHubGraphQlClientProvider graphQlClientProvider,
+        GitHubIssueCommentProcessor commentProcessor
     ) {
-        this.issueCommentRepository = issueCommentRepository;
+        this.repositoryRepository = repositoryRepository;
         this.issueRepository = issueRepository;
-        this.issueCommentConverter = issueCommentConverter;
-        this.issueConverter = issueConverter;
-        this.userSyncService = userSyncService;
+        this.graphQlClientProvider = graphQlClientProvider;
+        this.commentProcessor = commentProcessor;
     }
 
     /**
-     * Syncs all issue comments from the specified list of GitHub issues.
+     * Synchronizes all comments for all issues in a repository.
+     * <p>
+     * Uses streaming to avoid loading all issues into memory at once.
      *
-     * @param ghIssues The GitHub issues to sync the comments of.
+     * @param workspaceId  the workspace ID for authentication
+     * @param repositoryId the repository ID to sync comments for
+     * @return number of comments synced
      */
-    public void syncIssueCommentsOfAllIssues(List<GHIssue> ghIssues) {
-        ghIssues.stream().forEach(ghIssue -> syncIssueCommentsOfIssue(ghIssue));
+    @Transactional(readOnly = true)
+    public int syncForRepository(Long workspaceId, Long repositoryId) {
+        Repository repository = repositoryRepository.findById(repositoryId).orElse(null);
+        if (repository == null) {
+            log.warn("Repository {} not found, skipping comment sync", repositoryId);
+            return 0;
+        }
+
+        AtomicInteger totalSynced = new AtomicInteger(0);
+        AtomicInteger issueCount = new AtomicInteger(0);
+
+        try (Stream<Issue> issueStream = issueRepository.streamAllByRepository_Id(repositoryId)) {
+            issueStream.forEach(issue -> {
+                totalSynced.addAndGet(syncForIssue(workspaceId, issue));
+                issueCount.incrementAndGet();
+            });
+        }
+
+        String safeNameWithOwner = sanitizeForLog(repository.getNameWithOwner());
+        if (issueCount.get() == 0) {
+            log.info("No issues found for {}, skipping comment sync", safeNameWithOwner);
+            return 0;
+        }
+
+        log.info("Synced {} comments for {} issues in {}", totalSynced.get(), issueCount.get(), safeNameWithOwner);
+        return totalSynced.get();
     }
 
     /**
-     * Syncs issue comments from a specific GitHub issue.
-     *
-     * @param ghIssue The GitHub issue to sync the comments of.
-     */
-    public void syncIssueCommentsOfIssue(GHIssue ghIssue) {
-        var builder = ghIssue.queryComments();
-        builder.list().withPageSize(100).forEach(this::processIssueComment);
-    }
-
-    /**
-     * Processes a single GitHub issue comment by updating or creating it in the
-     * local repository.
-     * Manages associations with issues and authors.
-     *
-     * @param ghIssueComment The GitHub issue comment to process.
-     * @return The updated or newly created IssueComment entity, or {@code null} if
-     *         an error occurred during update.
+     * Synchronizes all comments for a single issue.
      */
     @Transactional
-    public IssueComment processIssueComment(GHIssueComment ghIssueComment) {
-        var result = issueCommentRepository
-            .findById(ghIssueComment.getId())
-            .map(issueComment -> {
-                try {
-                    if (
-                        issueComment.getUpdatedAt() == null ||
-                        issueComment.getUpdatedAt().isBefore(ghIssueComment.getUpdatedAt())
-                    ) {
-                        return issueCommentConverter.update(ghIssueComment, issueComment);
-                    }
-                    return issueComment;
-                } catch (IOException e) {
-                    logger.error("Failed to update issue comment {}: {}", ghIssueComment.getId(), e.getMessage());
-                    return null;
+    public int syncForIssue(Long workspaceId, Issue issue) {
+        if (issue == null || issue.getRepository() == null) {
+            log.warn("Issue or repository is null, skipping comment sync");
+            return 0;
+        }
+
+        Repository repository = issue.getRepository();
+        String nameWithOwner = repository.getNameWithOwner();
+        String safeNameWithOwner = sanitizeForLog(nameWithOwner);
+        Optional<RepositoryOwnerAndName> parsedName = GitHubRepositoryNameParser.parse(nameWithOwner);
+        if (parsedName.isEmpty()) {
+            log.warn("Invalid repository name format: {}", safeNameWithOwner);
+            return 0;
+        }
+        RepositoryOwnerAndName ownerAndName = parsedName.get();
+
+        HttpGraphQlClient client = graphQlClientProvider.forWorkspace(workspaceId);
+        ProcessingContext context = ProcessingContext.forSync(workspaceId, repository);
+
+        int totalSynced = 0;
+        String cursor = null;
+        boolean hasMore = true;
+
+        while (hasMore) {
+            try {
+                ClientGraphQlResponse response = client
+                    .documentName(QUERY_DOCUMENT)
+                    .variable("owner", ownerAndName.owner())
+                    .variable("name", ownerAndName.name())
+                    .variable("number", issue.getNumber())
+                    .variable("first", DEFAULT_PAGE_SIZE)
+                    .variable("after", cursor)
+                    .execute()
+                    .block(GRAPHQL_TIMEOUT);
+
+                if (response == null || !response.isValid()) {
+                    log.warn("Invalid GraphQL response: {}", response != null ? response.getErrors() : "null");
+                    break;
                 }
-            })
-            .orElseGet(() -> issueCommentConverter.convert(ghIssueComment));
 
-        if (result == null) {
-            return null;
+                IssueCommentConnection connection = response
+                    .field("repository.issue.comments")
+                    .toEntity(IssueCommentConnection.class);
+
+                if (connection == null || connection.getNodes() == null || connection.getNodes().isEmpty()) {
+                    break;
+                }
+
+                for (var graphQlComment : connection.getNodes()) {
+                    GitHubCommentDTO dto = GitHubCommentDTO.fromIssueComment(graphQlComment);
+                    if (dto != null) {
+                        IssueComment entity = commentProcessor.process(dto, issue.getId(), context);
+                        if (entity != null) {
+                            totalSynced++;
+                        }
+                    }
+                }
+
+                PageInfo pageInfo = connection.getPageInfo();
+                hasMore = pageInfo != null && Boolean.TRUE.equals(pageInfo.getHasNextPage());
+                cursor = pageInfo != null ? pageInfo.getEndCursor() : null;
+            } catch (Exception e) {
+                log.error(
+                    "Error syncing comments for issue #{} in {}: {}",
+                    issue.getNumber(),
+                    safeNameWithOwner,
+                    e.getMessage(),
+                    e
+                );
+                break;
+            }
         }
 
-        // Link issue
-        var ghIssue = ghIssueComment.getParent();
-        var resultIssue = issueRepository
-            .findById(ghIssue.getId())
-            .orElseGet(() -> issueRepository.save(issueConverter.convert(ghIssue)));
-        result.setIssue(resultIssue);
-
-        // Link author
-        try {
-            var author = ghIssueComment.getUser();
-            var resultAuthor = userSyncService.getOrCreateUser(author);
-            result.setAuthor(resultAuthor);
-        } catch (IOException e) {
-            logger.error("Failed to link author for issue comment {}: {}", ghIssueComment.getId(), e.getMessage());
-        }
-
-        return issueCommentRepository.save(result);
+        log.debug("Synced {} comments for issue #{} in {}", totalSynced, issue.getNumber(), safeNameWithOwner);
+        return totalSynced;
     }
 }

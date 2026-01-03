@@ -33,6 +33,7 @@ import org.hibernate.validator.constraints.*;
   StreamPart.JSON_PROPERTY_TYPE
 })
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
+@SuppressWarnings("all")
 public class StreamPart extends HashMap<String, Object> {
   public static final String JSON_PROPERTY_TYPE = "type";
   private String type;

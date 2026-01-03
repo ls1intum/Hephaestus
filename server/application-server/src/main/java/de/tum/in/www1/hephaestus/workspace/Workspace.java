@@ -1,8 +1,10 @@
 package de.tum.in.www1.hephaestus.workspace;
 
+import de.tum.in.www1.hephaestus.core.security.EncryptedStringConverter;
 import de.tum.in.www1.hephaestus.gitprovider.organization.Organization;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
+import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -27,7 +29,6 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
-import org.kohsuke.github.GHRepositorySelection;
 
 @Entity
 @Table(name = "workspace")
@@ -46,6 +47,15 @@ public class Workspace {
     private Instant teamsSyncedAt;
 
     private Instant membersSyncedAt;
+
+    /** Last sync time for sub-issue relationships (parent-child) via GraphQL */
+    private Instant subIssuesSyncedAt;
+
+    /** Last sync time for organization issue types via GraphQL */
+    private Instant issueTypesSyncedAt;
+
+    /** Last sync time for issue dependencies (blocked_by/blocking) via GraphQL */
+    private Instant issueDependenciesSyncedAt;
 
     @Column(name = "slug", unique = true, nullable = false, length = 64)
     @NotBlank(message = "Workspace slug is required")
@@ -88,12 +98,14 @@ public class Workspace {
     @NotNull(message = "Account type is required")
     private AccountType accountType;
 
+    // Encrypted at rest using AES-256-GCM
+    @Convert(converter = EncryptedStringConverter.class)
     @Column(name = "personal_access_token", columnDefinition = "TEXT")
     @ToString.Exclude
     private String personalAccessToken;
 
     @Enumerated(EnumType.STRING)
-    private GHRepositorySelection githubRepositorySelection; // ALL / SELECTED
+    private RepositorySelection githubRepositorySelection; // ALL / SELECTED
 
     private Instant installationLinkedAt;
 
@@ -123,12 +135,14 @@ public class Workspace {
     @Column(name = "leaderboard_notification_channel_id", length = 100)
     private String leaderboardNotificationChannelId;
 
-    // TODO: Encrypt at rest using JPA AttributeConverter with AES-256-GCM
+    // Encrypted at rest using AES-256-GCM
+    @Convert(converter = EncryptedStringConverter.class)
     @Column(name = "slack_token", columnDefinition = "TEXT")
     @ToString.Exclude
     private String slackToken;
 
-    // TODO: Encrypt at rest using JPA AttributeConverter with AES-256-GCM
+    // Encrypted at rest using AES-256-GCM
+    @Convert(converter = EncryptedStringConverter.class)
     @Column(name = "slack_signing_secret", columnDefinition = "TEXT")
     @ToString.Exclude
     private String slackSigningSecret;
@@ -144,7 +158,8 @@ public class Workspace {
         this.updatedAt = Instant.now();
     }
 
-    //TODO: Only temporary to differentiate between ls1intum <-> orgs installed via GHApp. To be deleted in the future
+    // TODO: Only temporary to differentiate between ls1intum <-> orgs installed via
+    // GHApp. To be deleted in the future
     public enum GitProviderMode {
         PAT_ORG,
         GITHUB_APP_INSTALLATION,

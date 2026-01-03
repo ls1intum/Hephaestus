@@ -21,6 +21,8 @@
 		"paths": {
 			"@/*": ["./src/*"]
 		},
+		// Silence baseUrl deprecation warning for TypeScript 7.0
+		"ignoreDeprecations": "6.0",
 
 		// ═══════════════════════════════════════════════════════════════════════════
 		// STRICTEST Type Checking (from @tsconfig/strictest + extras)

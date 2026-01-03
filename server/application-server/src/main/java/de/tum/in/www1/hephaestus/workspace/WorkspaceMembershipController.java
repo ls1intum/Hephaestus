@@ -32,7 +32,6 @@ import org.springframework.web.bind.annotation.*;
 public class WorkspaceMembershipController {
 
     private final WorkspaceMembershipService workspaceMembershipService;
-    private final WorkspaceMembershipRepository workspaceMembershipRepository;
     private final UserRepository userRepository;
     private final WorkspaceAccessService accessService;
 
@@ -45,7 +44,7 @@ public class WorkspaceMembershipController {
     @GetMapping("/me")
     public ResponseEntity<WorkspaceMembershipDTO> getCurrentUserMembership(WorkspaceContext context) {
         User currentUser = requireCurrentUser();
-        WorkspaceMembership membership = requireMembership(context.id(), currentUser.getId());
+        WorkspaceMembership membership = workspaceMembershipService.getMembership(context.id(), currentUser.getId());
         return ResponseEntity.ok(WorkspaceMembershipDTO.from(membership));
     }
 
@@ -67,8 +66,8 @@ public class WorkspaceMembershipController {
         int pageSize = Math.min(size, 100);
         Pageable pageable = PageRequest.of(page, pageSize, Sort.by("createdAt").ascending());
 
-        List<WorkspaceMembershipDTO> memberships = workspaceMembershipRepository
-            .findAllByWorkspace_Id(context.id(), pageable)
+        List<WorkspaceMembershipDTO> memberships = workspaceMembershipService
+            .listMembers(context.id(), pageable)
             .map(WorkspaceMembershipDTO::from)
             .getContent();
 
@@ -143,8 +142,8 @@ public class WorkspaceMembershipController {
     }
 
     private WorkspaceMembership requireMembership(Long workspaceId, Long userId) {
-        return workspaceMembershipRepository
-            .findByWorkspace_IdAndUser_Id(workspaceId, userId)
+        return workspaceMembershipService
+            .findMembership(workspaceId, userId)
             .orElseThrow(() -> new EntityNotFoundException("WorkspaceMembership", userId));
     }
 
@@ -158,14 +157,8 @@ public class WorkspaceMembershipController {
     }
 
     private void requireNotLastOwner(WorkspaceContext context, WorkspaceMembership membership) {
-        if (membership.getRole() == WorkspaceRole.OWNER) {
-            long ownerCount = workspaceMembershipRepository.countByWorkspace_IdAndRole(
-                context.id(),
-                WorkspaceRole.OWNER
-            );
-            if (ownerCount <= 1) {
-                throw new LastOwnerRemovalException(context.slug());
-            }
+        if (workspaceMembershipService.isLastOwner(context.id(), membership)) {
+            throw new LastOwnerRemovalException(context.slug());
         }
     }
 }

@@ -1,12 +1,21 @@
 package de.tum.in.www1.hephaestus.gitprovider.team;
 
+import de.tum.in.www1.hephaestus.core.WorkspaceAgnostic;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+/**
+ * Repository for team entities.
+ *
+ * <p>Workspace-agnostic: Teams are scoped through their organization field
+ * which contains {@code workspaceId}. Lookups by organization or team ID
+ * inherently carry workspace context.
+ */
 @Repository
+@WorkspaceAgnostic("Teams are scoped through organization which contains workspaceId")
 public interface TeamRepository extends JpaRepository<Team, Long> {
     List<Team> findAllByName(String name);
 

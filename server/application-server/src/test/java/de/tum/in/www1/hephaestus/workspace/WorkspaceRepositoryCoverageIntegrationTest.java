@@ -12,7 +12,6 @@ import java.util.Locale;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.kohsuke.github.GHRepositorySelection;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
@@ -21,7 +20,7 @@ class WorkspaceRepositoryCoverageIntegrationTest extends BaseIntegrationTest {
     private static final long INSTALLATION_ID = 9912345L;
 
     @Autowired
-    private WorkspaceService workspaceService;
+    private WorkspaceRepositoryMonitorService workspaceRepositoryMonitorService;
 
     @Autowired
     private WorkspaceRepository workspaceRepository;
@@ -43,7 +42,7 @@ class WorkspaceRepositoryCoverageIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("ensureAllInstallationRepositoriesCovered adds missing monitors and prunes stale ones")
     void shouldReconcileMonitorsForInstallation() {
-        Workspace workspace = persistWorkspace(GHRepositorySelection.ALL);
+        Workspace workspace = persistWorkspace(RepositorySelection.ALL);
         repositoryToMonitorRepository.save(buildMonitor(workspace, "HephaestusTest/Orphaned"));
 
         when(repositoryEnumerator.enumerate(INSTALLATION_ID)).thenReturn(
@@ -53,7 +52,7 @@ class WorkspaceRepositoryCoverageIntegrationTest extends BaseIntegrationTest {
             )
         );
 
-        workspaceService.ensureAllInstallationRepositoriesCovered(INSTALLATION_ID);
+        workspaceRepositoryMonitorService.ensureAllInstallationRepositoriesCovered(INSTALLATION_ID);
 
         List<RepositoryToMonitor> monitors = repositoryToMonitorRepository.findByWorkspaceId(workspace.getId());
         assertThat(monitors)
@@ -67,13 +66,13 @@ class WorkspaceRepositoryCoverageIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("ensureAllInstallationRepositoriesCovered runs for SELECTED installations")
     void shouldRespectSelectedInstallations() {
-        Workspace workspace = persistWorkspace(GHRepositorySelection.SELECTED);
+        Workspace workspace = persistWorkspace(RepositorySelection.SELECTED);
 
         when(repositoryEnumerator.enumerate(INSTALLATION_ID)).thenReturn(
             List.of(snapshot(3L, "HephaestusTest/HelloWorld", "HelloWorld", true))
         );
 
-        workspaceService.ensureAllInstallationRepositoriesCovered(INSTALLATION_ID);
+        workspaceRepositoryMonitorService.ensureAllInstallationRepositoriesCovered(INSTALLATION_ID);
 
         List<RepositoryToMonitor> monitors = repositoryToMonitorRepository.findByWorkspaceId(workspace.getId());
         assertThat(monitors)
@@ -81,7 +80,7 @@ class WorkspaceRepositoryCoverageIntegrationTest extends BaseIntegrationTest {
             .containsExactly("HephaestusTest/HelloWorld");
     }
 
-    private Workspace persistWorkspace(GHRepositorySelection selection) {
+    private Workspace persistWorkspace(RepositorySelection selection) {
         return workspaceRepository.save(
             WorkspaceTestFixtures.installationWorkspace(INSTALLATION_ID, "HephaestusTest")
                 .withRepositorySelection(selection)

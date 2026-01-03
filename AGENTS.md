@@ -174,7 +174,7 @@ Run the relevant commands locally before opening a PR:
 | Webapp tests | `npm run test:webapp` |
 | Webapp typecheck | `npm run typecheck:webapp` |
 | Webapp Storybook | `npm -w webapp run build-storybook` |
-| Application-server tests | **Three test tiers:** <br>• `./mvnw test` runs unit tests (`@Tag("unit")`) <br>• `./mvnw verify` runs unit + integration tests (`@Tag("integration")`) <br>• `./mvnw test -Plive-tests` runs live GitHub API tests (`@Tag("live")`) <br><br>Live tests require GitHub App credentials configured in `application-live-local.yml` (gitignored). The Maven profile is the single guard—tests only run when explicitly activated. |
+| Application-server tests | **Four test tiers:** <br>• `./mvnw test` runs unit tests (`@Tag("unit")`) <br>• `./mvnw verify` runs unit + integration tests (`@Tag("integration")`) <br>• `./mvnw test -Parchitecture-tests` runs ArchUnit architecture tests (`@Tag("architecture")`) <br>• `./mvnw test -Plive-tests` runs live GitHub API tests (`@Tag("live")`) <br><br>Live tests require GitHub App credentials configured in `application-live-local.yml` (gitignored). Maven profiles guard test execution—tests only run when explicitly activated. |
 
 **Script naming conventions:**
 

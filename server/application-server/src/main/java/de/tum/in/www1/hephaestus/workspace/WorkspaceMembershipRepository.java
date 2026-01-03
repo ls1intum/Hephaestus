@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.workspace;
 
+import de.tum.in.www1.hephaestus.core.WorkspaceAgnostic;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceMembership.WorkspaceRole;
 import java.util.Collection;
@@ -17,6 +18,7 @@ import org.springframework.data.repository.query.Param;
  * Manages the relationship between users and workspaces, including role
  * assignments.
  */
+@WorkspaceAgnostic("Queried by explicit workspace ID - membership queries always workspace-scoped")
 public interface WorkspaceMembershipRepository extends JpaRepository<WorkspaceMembership, WorkspaceMembership.Id> {
     List<WorkspaceMembership> findByWorkspace_Id(Long workspaceId);
 

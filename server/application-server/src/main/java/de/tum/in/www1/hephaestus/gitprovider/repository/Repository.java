@@ -83,6 +83,10 @@ public class Repository extends BaseGitServiceEntity {
 
     private boolean hasWiki;
 
+    private boolean hasDiscussions;
+
+    private boolean hasSponsorships;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "organization_id", foreignKey = @ForeignKey(name = "fk_repository_organization"))
     private Organization organization;
@@ -113,24 +117,24 @@ public class Repository extends BaseGitServiceEntity {
         INTERNAL,
         UNKNOWN,
     }
+
     /*
-     * Webhook coverage (repository & member events → repository):
-     * Supported (webhook, no extra fetch):
-     * - repository.id/full_name/name/html_url/private/visibility/description/homepage.
-     * - repository.pushed_at/default_branch/stargazers_count/watchers_count.
-     * - repository.archived/disabled/has_issues/has_projects/has_wiki.
-     * - repository.owner (type=Organization) → linked via organization relation when payload.owner.type == "Organization".
-     * - Relationships populated by dedicated handlers: collaborators (RepositoryCollaborator) and teamRepoPermissions.
-     * Ignored although hub4j exposes them from payloads:
-     * - repository.has_discussions/has_downloads/has_pages/topics/size/fork/forks_count/open_issues_count/subscribers_count/network_count.
-     *   Reason: cached telemetry not needed for ETL downstream consumers.
-     * - repository.allow_* merge toggles, template_repository, parent/source fork lineage (handled separately if required).
-     * - repository.owner when type == "User" (we scope ETL to organization-owned workspaces).
-     * Desired but missing in hub4j/github-api 2.0-rc.5 (available via REST/GraphQL):
-     * - REST GET /repos/{owner}/{repo} → security_and_analysis, custom_properties, rulesets[].
-     * - GraphQL Repository.rulesets, Repository.codeScanningAlerts, Repository.latestRelease, Repository.branchProtectionRules.
-     * Requires extra fetch (out-of-scope for now):
-     * - GET /repos/{owner}/{repo}/topics, /languages, /collaborators/{username}/permission for fine-grained permissions.
-     * - GraphQL Repository.vulnerabilityAlerts / Dependabot data, releases & deployments collections.
+     * Field coverage notes (GitHub API → entity mapping):
+     *
+     * Supported fields synced from GitHub GraphQL API:
+     * - id/databaseId, name, nameWithOwner, url, description, homepageUrl
+     * - pushedAt, defaultBranchRef, visibility, isArchived, isDisabled, isPrivate
+     * - stargazerCount, hasIssuesEnabled, hasProjectsEnabled, hasWikiEnabled
+     * - hasDiscussionsEnabled, hasSponsorshipsEnabled
+     * - owner (Organization or User) → linked via organization relation
+     *
+     * Fields available in GraphQL but intentionally NOT synced:
+     * - forkCount, watchers (deprecated in GraphQL, use stargazerCount)
+     * - hasVulnerabilityAlertsEnabled (requires admin access)
+     * - isFork, isTemplate, isMirror (not needed for ETL consumers)
+     * - licenseInfo, primaryLanguage (out of scope for current use cases)
+     *
+     * Note: watchersCount is mapped from stargazerCount for backward compatibility
+     * since GitHub's GraphQL API deprecated the watchers field in favor of stargazers.
      */
 }

@@ -33,8 +33,11 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class IntelligenceServiceConfig {
 
-    @Value("${hephaestus.intelligence-service.url}")
-    private String intelligenceServiceUrl;
+    private final String intelligenceServiceUrl;
+
+    public IntelligenceServiceConfig(@Value("${hephaestus.intelligence-service.url}") String intelligenceServiceUrl) {
+        this.intelligenceServiceUrl = intelligenceServiceUrl;
+    }
 
     @Bean
     public ApiClient intelligenceApiClient() {

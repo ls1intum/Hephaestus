@@ -2,8 +2,8 @@ package de.tum.in.www1.hephaestus.gitprovider.sync;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandlerRegistry;
-import de.tum.in.www1.hephaestus.workspace.RepositoryToMonitor;
-import de.tum.in.www1.hephaestus.workspace.Workspace;
+import de.tum.in.www1.hephaestus.gitprovider.common.spi.NatsSubscriptionProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.spi.NatsSubscriptionProvider.NatsSubscriptionInfo;
 import io.nats.client.Connection;
 import io.nats.client.ConsumerContext;
 import io.nats.client.ErrorListener;
@@ -37,6 +37,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.context.event.EventListener;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Service;
@@ -64,29 +65,14 @@ public class NatsConsumerService {
 
     private final AtomicBoolean shuttingDown = new AtomicBoolean(false);
 
-    @Value("${nats.enabled}")
-    private boolean isNatsEnabled;
-
-    @Value("${nats.timeframe}")
-    private int timeframe;
-
-    @Value("${nats.server}")
-    private String natsServer;
-
-    @Value("${nats.durable-consumer-name}")
-    private String durableConsumerName;
-
-    @Value("${nats.consumer.ack-wait-minutes:5}")
-    private int consumerAckWaitMinutes;
-
-    @Value("${nats.consumer.max-ack-pending:500}")
-    private int maxAckPending;
-
-    @Value("${nats.consumer.reconnect-delay-seconds:2}")
-    private int reconnectDelaySeconds;
-
-    @Value("${nats.consumer.request-timeout-seconds:10}")
-    private int requestTimeoutSeconds;
+    private final boolean isNatsEnabled;
+    private final int timeframe;
+    private final String natsServer;
+    private final String durableConsumerName;
+    private final int consumerAckWaitMinutes;
+    private final int maxAckPending;
+    private final int reconnectDelaySeconds;
+    private final int requestTimeoutSeconds;
 
     private Connection natsConnection;
 
@@ -103,9 +89,30 @@ public class NatsConsumerService {
     private final ExecutorService virtualThreadExecutor = Executors.newVirtualThreadPerTaskExecutor();
 
     private final GitHubMessageHandlerRegistry handlerRegistry;
+    private final NatsSubscriptionProvider subscriptionProvider;
 
-    public NatsConsumerService(GitHubMessageHandlerRegistry handlerRegistry) {
+    public NatsConsumerService(
+        @Lazy GitHubMessageHandlerRegistry handlerRegistry,
+        NatsSubscriptionProvider subscriptionProvider,
+        @Value("${nats.enabled}") boolean isNatsEnabled,
+        @Value("${nats.timeframe}") int timeframe,
+        @Value("${nats.server}") String natsServer,
+        @Value("${nats.durable-consumer-name}") String durableConsumerName,
+        @Value("${nats.consumer.ack-wait-minutes:5}") int consumerAckWaitMinutes,
+        @Value("${nats.consumer.max-ack-pending:500}") int maxAckPending,
+        @Value("${nats.consumer.reconnect-delay-seconds:2}") int reconnectDelaySeconds,
+        @Value("${nats.consumer.request-timeout-seconds:10}") int requestTimeoutSeconds
+    ) {
         this.handlerRegistry = handlerRegistry;
+        this.subscriptionProvider = subscriptionProvider;
+        this.isNatsEnabled = isNatsEnabled;
+        this.timeframe = timeframe;
+        this.natsServer = natsServer;
+        this.durableConsumerName = durableConsumerName;
+        this.consumerAckWaitMinutes = consumerAckWaitMinutes;
+        this.maxAckPending = maxAckPending;
+        this.reconnectDelaySeconds = reconnectDelaySeconds;
+        this.requestTimeoutSeconds = requestTimeoutSeconds;
     }
 
     @EventListener(ApplicationReadyEvent.class)
@@ -138,7 +145,7 @@ public class NatsConsumerService {
                 Thread.currentThread().interrupt();
                 return;
             } catch (IOException e) {
-                logger.error("NATS connection error: {}", e.getMessage());
+                logger.error("NATS connection error: {}", e.getMessage(), e);
                 backoffBeforeRetry();
             }
         }
@@ -168,14 +175,12 @@ public class NatsConsumerService {
      * Creates a single consumer that subscribes to ALL repositories in the workspace.
      * Messages are processed sequentially to avoid race conditions.
      *
-     * @param workspace The workspace to start consuming for
+     * @param workspaceId The workspace ID to start consuming for
      */
-    public void startConsumingWorkspace(Workspace workspace) {
-        if (!isNatsEnabled || shuttingDown.get()) {
+    public void startConsumingWorkspace(Long workspaceId) {
+        if (!isNatsEnabled || shuttingDown.get() || workspaceId == null) {
             return;
         }
-
-        Long workspaceId = workspace.getId();
 
         // Check if consumer already exists
         if (workspaceConsumers.containsKey(workspaceId)) {
@@ -192,7 +197,7 @@ public class NatsConsumerService {
         virtualThreadExecutor.submit(() -> {
             try {
                 ensureNatsConnectionEstablished();
-                setupWorkspaceConsumer(workspace);
+                setupWorkspaceConsumer(workspaceId);
             } catch (Exception e) {
                 logger.error("Failed to start consumer for workspace id={}: {}", workspaceId, e.getMessage(), e);
             } finally {
@@ -206,14 +211,13 @@ public class NatsConsumerService {
      * Call this when repositories are added/removed from a workspace.
      * NOTE: Does NOT start a consumer if one doesn't exist - use startConsumingWorkspace for that.
      *
-     * @param workspace The workspace with updated repositories
+     * @param workspaceId The workspace ID with updated repositories
      */
-    public void updateWorkspaceConsumer(Workspace workspace) {
-        if (!isNatsEnabled || shuttingDown.get()) {
+    public void updateWorkspaceConsumer(Long workspaceId) {
+        if (!isNatsEnabled || shuttingDown.get() || workspaceId == null) {
             return;
         }
 
-        Long workspaceId = workspace.getId();
         WorkspaceConsumer existing = workspaceConsumers.get(workspaceId);
 
         if (existing == null) {
@@ -228,7 +232,7 @@ public class NatsConsumerService {
 
         virtualThreadExecutor.submit(() -> {
             try {
-                String[] newSubjects = buildWorkspaceSubjects(workspace);
+                String[] newSubjects = buildWorkspaceSubjects(workspaceId);
                 existing.updateSubjects(newSubjects);
                 logger.info("Updated consumer subjects for workspace id={}", workspaceId);
             } catch (Exception e) {
@@ -240,10 +244,12 @@ public class NatsConsumerService {
     /**
      * Stops consuming events for a workspace.
      *
-     * @param workspace The workspace to stop consuming for
+     * @param workspaceId The workspace ID to stop consuming for
      */
-    public void stopConsumingWorkspace(Workspace workspace) {
-        Long workspaceId = workspace.getId();
+    public void stopConsumingWorkspace(Long workspaceId) {
+        if (workspaceId == null) {
+            return;
+        }
         WorkspaceConsumer consumer = workspaceConsumers.remove(workspaceId);
 
         if (consumer == null) {
@@ -257,7 +263,7 @@ public class NatsConsumerService {
                 cleanupConsumer(consumer.consumerName);
                 logger.info("Stopped consumer for workspace id={}", workspaceId);
             } catch (Exception e) {
-                logger.error("Error stopping consumer for workspace id={}: {}", workspaceId, e.getMessage());
+                logger.error("Error stopping consumer for workspace id={}: {}", workspaceId, e.getMessage(), e);
             }
         });
     }
@@ -266,9 +272,8 @@ public class NatsConsumerService {
     // Internal implementation
     // =========================================================================
 
-    private void setupWorkspaceConsumer(Workspace workspace) throws IOException {
-        Long workspaceId = workspace.getId();
-        String[] subjects = buildWorkspaceSubjects(workspace);
+    private void setupWorkspaceConsumer(Long workspaceId) throws IOException {
+        String[] subjects = buildWorkspaceSubjects(workspaceId);
 
         if (subjects.length == 0) {
             logger.info("No subjects to consume for workspace id={} - skipping consumer setup", workspaceId);
@@ -374,19 +379,24 @@ public class NatsConsumerService {
         return streamContext.createOrUpdateConsumer(configBuilder.build());
     }
 
-    private String[] buildWorkspaceSubjects(Workspace workspace) {
+    private String[] buildWorkspaceSubjects(Long workspaceId) {
+        var subscriptionInfoOpt = subscriptionProvider.getSubscriptionInfo(workspaceId);
+        if (subscriptionInfoOpt.isEmpty()) {
+            logger.warn("No subscription info found for workspace id={}", workspaceId);
+            return new String[0];
+        }
+
+        NatsSubscriptionInfo subscriptionInfo = subscriptionInfoOpt.get();
         Set<String> subjects = new HashSet<>();
 
         // Add subjects for all repositories in the workspace
-        Set<RepositoryToMonitor> repos = workspace.getRepositoriesToMonitor();
-        for (RepositoryToMonitor repo : repos) {
-            subjects.addAll(Arrays.asList(getRepositorySubjects(repo.getNameWithOwner())));
+        for (String repoNameWithOwner : subscriptionInfo.repositoryNamesWithOwner()) {
+            subjects.addAll(Arrays.asList(getRepositorySubjects(repoNameWithOwner)));
         }
 
         // Add organization-level subjects if workspace has an organization
-        String orgLogin = workspace.getAccountLogin();
-        if (orgLogin != null && !orgLogin.isBlank()) {
-            subjects.addAll(Arrays.asList(getOrganizationSubjects(orgLogin)));
+        if (subscriptionInfo.hasOrganization()) {
+            subjects.addAll(Arrays.asList(getOrganizationSubjects(subscriptionInfo.organizationLogin())));
         }
 
         return subjects.toArray(String[]::new);
@@ -471,8 +481,11 @@ public class NatsConsumerService {
                 natsConnection = Nats.connect(buildNatsOptions());
                 logger.info("Connected to NATS server.");
             } catch (IOException | InterruptedException e) {
-                logger.error("Failed to connect to NATS server: {}", e.getMessage());
-                throw new RuntimeException("Failed to establish NATS connection", e);
+                logger.error("Failed to connect to NATS server: {}", e.getMessage(), e);
+                throw new de.tum.in.www1.hephaestus.gitprovider.sync.exception.NatsConnectionException(
+                    "Failed to establish NATS connection",
+                    e
+                );
             }
         }
     }
@@ -649,12 +662,15 @@ public class NatsConsumerService {
                 processorThread = null;
             }
 
-            // Drain remaining messages (NAK them)
+            // Drain remaining messages (NAK them) - exceptions during shutdown are expected
             Message msg;
             while ((msg = messageQueue.poll()) != null) {
                 try {
                     msg.nak();
-                } catch (Exception ignored) {}
+                } catch (Exception e) {
+                    // Expected during shutdown when connection is already closed
+                    logger.trace("Ignored NAK error during shutdown: {}", e.getMessage());
+                }
             }
         }
 

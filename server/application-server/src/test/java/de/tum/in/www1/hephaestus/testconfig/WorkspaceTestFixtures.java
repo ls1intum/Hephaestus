@@ -1,9 +1,9 @@
 package de.tum.in.www1.hephaestus.testconfig;
 
 import de.tum.in.www1.hephaestus.workspace.AccountType;
+import de.tum.in.www1.hephaestus.workspace.RepositorySelection;
 import de.tum.in.www1.hephaestus.workspace.RepositoryToMonitor;
 import de.tum.in.www1.hephaestus.workspace.Workspace;
-import org.kohsuke.github.GHRepositorySelection;
 
 /**
  * Shared test fixtures for workspace-related integration tests.
@@ -61,7 +61,7 @@ public final class WorkspaceTestFixtures {
             return this;
         }
 
-        public WorkspaceBuilder withRepositorySelection(GHRepositorySelection selection) {
+        public WorkspaceBuilder withRepositorySelection(RepositorySelection selection) {
             workspace.setGithubRepositorySelection(selection);
             return this;
         }

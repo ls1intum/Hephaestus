@@ -9,8 +9,6 @@ import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.PullReques
 import de.tum.in.www1.hephaestus.gitprovider.repository.collaborator.RepositoryCollaborator;
 import de.tum.in.www1.hephaestus.gitprovider.team.Team;
 import de.tum.in.www1.hephaestus.gitprovider.team.membership.TeamMembership;
-import de.tum.in.www1.hephaestus.workspace.WorkspaceMembership;
-import jakarta.persistence.CascadeType;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -39,7 +37,7 @@ public class User extends BaseGitServiceEntity {
     @NonNull
     private String avatarUrl;
 
-    // AKA bio
+    // AKA bio - user's profile description
     private String description;
 
     @NonNull
@@ -48,7 +46,7 @@ public class User extends BaseGitServiceEntity {
 
     private String company;
 
-    // Url
+    // Url - user's website/blog from their profile
     private String blog;
 
     private String location;
@@ -65,6 +63,9 @@ public class User extends BaseGitServiceEntity {
     private int followers;
 
     private int following;
+
+    // Current ranking points for the leaderboard leagues
+    private int leaguePoints;
 
     @OneToMany(mappedBy = "user")
     @ToString.Exclude
@@ -102,18 +103,14 @@ public class User extends BaseGitServiceEntity {
     @ToString.Exclude
     private Set<PullRequestReviewComment> reviewComments = new HashSet<>();
 
-    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
-    @ToString.Exclude
-    private Set<WorkspaceMembership> workspaceMemberships = new HashSet<>();
+    // Note: WorkspaceMembership is accessed via WorkspaceMembershipRepository, not via User entity.
+    // The relationship is unidirectional from WorkspaceMembership → User to maintain module separation.
 
     @NonNull
     private boolean notificationsEnabled = true;
 
     @NonNull
     private boolean participateInResearch = true;
-
-    // Current ranking points for the leaderboard leagues
-    private int leaguePoints;
 
     public enum Type {
         USER,
@@ -128,18 +125,20 @@ public class User extends BaseGitServiceEntity {
     public void removeTeam(Team team) {
         teamMemberships.removeIf(m -> m.getTeam() != null && m.getTeam().equals(team));
     }
-    // Ignored GitHub properties:
-    // - totalPrivateRepos
-    // - ownedPrivateRepos
-    // - publicRepos
-    // - publicGists
-    // - privateGists
-    // - collaborators
-    // - is_verified (org?)
-    // - disk_usage
-    // - suspended_at (user)
-    // - twitter_username
-    // - billing_email (org)
-    // - has_organization_projects (org)
-    // - has_repository_projects (org)
+    // ========== INTENTIONALLY OMITTED GITHUB PROPERTIES ==========
+    // These fields are available from GitHub API but deliberately not persisted:
+    //
+    // Privacy/Compliance:
+    // - twitter_username: Social media handles not needed for core functionality
+    // - publicRepos: Count can be derived, not needed for user profiles
+    //
+    // Private/Org-specific (not accessible with standard tokens):
+    // - totalPrivateRepos, ownedPrivateRepos, privateGists
+    // - collaborators, disk_usage
+    // - is_verified, billing_email (org-specific)
+    // - has_organization_projects, has_repository_projects (org-specific)
+    // - suspended_at
+    //
+    // Derived/Unused:
+    // - publicGists: Not relevant to PR/code review workflows
 }

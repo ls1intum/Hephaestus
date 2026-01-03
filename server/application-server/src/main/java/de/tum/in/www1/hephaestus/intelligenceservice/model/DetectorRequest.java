@@ -43,6 +43,7 @@ import org.hibernate.validator.constraints.*;
   DetectorRequest.JSON_PROPERTY_PULL_REQUEST_TEMPLATE
 })
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
+@SuppressWarnings("all")
 public class DetectorRequest {
   public static final String JSON_PROPERTY_TITLE = "title";
   private String title;
