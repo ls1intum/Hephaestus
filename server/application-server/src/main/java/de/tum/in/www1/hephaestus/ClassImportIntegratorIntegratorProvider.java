@@ -8,7 +8,7 @@ import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestInfoDTO;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryInfoDTO;
 import de.tum.in.www1.hephaestus.gitprovider.team.TeamInfoDTO;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserInfoDTO;
-import de.tum.in.www1.hephaestus.profile.ProfileReviewActivityDTO;
+import de.tum.in.www1.hephaestus.profile.dto.ProfileReviewActivityDTO;
 import io.hypersistence.utils.hibernate.type.util.ClassImportIntegrator;
 import java.util.ArrayList;
 import java.util.List;

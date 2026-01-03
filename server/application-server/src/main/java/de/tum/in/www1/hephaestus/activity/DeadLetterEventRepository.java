@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.activity;
 
+import de.tum.in.www1.hephaestus.core.WorkspaceAgnostic;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -15,6 +16,7 @@ import org.springframework.stereotype.Repository;
  * <p>Provides queries for investigation, retry, and cleanup workflows.
  */
 @Repository
+@WorkspaceAgnostic("System-wide debugging and recovery - dead letters span all workspaces")
 public interface DeadLetterEventRepository extends JpaRepository<DeadLetterEvent, UUID> {
     /**
      * Find all pending dead letters for a workspace, ordered by creation time.

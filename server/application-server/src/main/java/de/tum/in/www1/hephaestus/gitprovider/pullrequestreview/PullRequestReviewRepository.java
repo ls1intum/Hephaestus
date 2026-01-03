@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.gitprovider.pullrequestreview;
 
+import de.tum.in.www1.hephaestus.core.WorkspaceAgnostic;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
@@ -135,11 +136,13 @@ public interface PullRequestReviewRepository extends JpaRepository<PullRequestRe
     /**
      * Find all reviews for a specific pull request by a specific author.
      * Used for calculating per-PR XP (aggregating all reviews together for harmonic mean).
+     * PullRequest ID inherently has workspace through repository.organization.workspaceId.
      *
      * @param pullRequestId the pull request ID
      * @param authorId the author ID
      * @return list of reviews by this author on this PR
      */
+    @WorkspaceAgnostic("PullRequest ID has workspace through repository.organization")
     @Query(
         value = """
         SELECT prr

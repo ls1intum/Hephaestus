@@ -7,6 +7,7 @@ import com.slack.api.methods.response.auth.AuthTestResponse;
 import com.slack.api.methods.response.chat.ChatPostMessageResponse;
 import com.slack.api.model.User;
 import com.slack.api.model.block.LayoutBlock;
+import de.tum.in.www1.hephaestus.core.WorkspaceAgnostic;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -17,10 +18,16 @@ import org.springframework.stereotype.Service;
 
 /**
  * Light wrapper around the Slack App to send messages to the Slack workspace.
+ *
+ * <p>Workspace-agnostic: This is a system-level integration service that handles
+ * Slack communication. The actual workspace context is passed by callers when
+ * sending messages (channel IDs are workspace-specific).
+ *
  * @implNote Use the exposed method to test the Slack connection beforehand.
  */
 @Service
 @ConditionalOnProperty(prefix = "hephaestus.leaderboard.notification", name = "enabled", havingValue = "true")
+@WorkspaceAgnostic("System-level Slack integration - callers provide workspace context via channel IDs")
 public class SlackMessageService {
 
     private static final Logger logger = LoggerFactory.getLogger(SlackMessageService.class);

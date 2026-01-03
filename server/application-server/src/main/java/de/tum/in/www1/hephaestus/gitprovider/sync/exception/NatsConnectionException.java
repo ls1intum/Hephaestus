@@ -1,4 +1,4 @@
-package de.tum.in.www1.hephaestus.gitprovider.sync;
+package de.tum.in.www1.hephaestus.gitprovider.sync.exception;
 
 import java.io.Serial;
 

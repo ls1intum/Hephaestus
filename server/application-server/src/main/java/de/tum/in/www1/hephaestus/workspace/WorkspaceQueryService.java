@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.workspace;
 
+import de.tum.in.www1.hephaestus.core.WorkspaceAgnostic;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
@@ -16,9 +17,14 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>
  * This service provides query methods for finding and listing workspaces
  * without modifying state. All methods are read-only transactions.
+ *
+ * <p>Workspace-agnostic: This service manages workspaces themselves, operating
+ * at the admin/registry level. It answers "which workspaces exist?" not
+ * "what data is in a workspace?".
  */
 @Service
 @Transactional(readOnly = true)
+@WorkspaceAgnostic("Manages workspaces themselves - operates at admin/registry level")
 public class WorkspaceQueryService {
 
     private final WorkspaceRepository workspaceRepository;

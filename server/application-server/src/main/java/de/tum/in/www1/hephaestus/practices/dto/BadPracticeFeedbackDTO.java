@@ -1,4 +1,4 @@
-package de.tum.in.www1.hephaestus.practices.model;
+package de.tum.in.www1.hephaestus.practices.dto;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;

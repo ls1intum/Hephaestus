@@ -1,6 +1,7 @@
 package de.tum.in.www1.hephaestus.workspace;
 
 import de.tum.in.www1.hephaestus.core.LoggingUtils;
+import de.tum.in.www1.hephaestus.core.WorkspaceAgnostic;
 import de.tum.in.www1.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.in.www1.hephaestus.gitprovider.label.Label;
 import de.tum.in.www1.hephaestus.gitprovider.label.LabelRepository;
@@ -39,8 +40,12 @@ import org.springframework.transaction.annotation.Transactional;
  *   <li>{@link WorkspaceRepositoryMonitorService} - repository monitoring</li>
  *   <li>{@link WorkspaceActivationService} - activation/startup</li>
  * </ul>
+ *
+ * <p>Workspace-agnostic: This service manages workspaces themselves (the tenant root),
+ * not data within workspaces. Methods take workspace slug/context as parameters.
  */
 @Service
+@WorkspaceAgnostic("Manages workspaces themselves - the tenant root, not data within workspaces")
 public class WorkspaceService {
 
     private static final Logger logger = LoggerFactory.getLogger(WorkspaceService.class);

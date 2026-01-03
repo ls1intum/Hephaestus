@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.activity;
 
+import de.tum.in.www1.hephaestus.core.WorkspaceAgnostic;
 import de.tum.in.www1.hephaestus.core.exception.EntityNotFoundException;
 import java.util.List;
 import java.util.Map;
@@ -20,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
+@WorkspaceAgnostic("System-wide debugging and recovery - dead letters span all workspaces")
 public class DeadLetterEventService {
 
     private static final Logger logger = LoggerFactory.getLogger(DeadLetterEventService.class);

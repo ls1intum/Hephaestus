@@ -1,6 +1,7 @@
 package de.tum.in.www1.hephaestus.workspace;
 
 import de.tum.in.www1.hephaestus.core.LoggingUtils;
+import de.tum.in.www1.hephaestus.core.WorkspaceAgnostic;
 import de.tum.in.www1.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.in.www1.hephaestus.gitprovider.installation.github.GitHubInstallationRepositoryEnumerationService;
 import de.tum.in.www1.hephaestus.gitprovider.label.Label;
@@ -30,8 +31,13 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Service for managing repository monitoring within workspaces.
  * Handles adding, removing, and listing monitored repositories.
+ *
+ * <p>Workspace-agnostic: This service manages the workspace-repository mapping
+ * configuration itself. All methods take workspace slug/context as parameters
+ * to identify which workspace to operate on.
  */
 @Service
+@WorkspaceAgnostic("Manages workspace-repository mapping configuration")
 public class WorkspaceRepositoryMonitorService {
 
     private static final Logger logger = LoggerFactory.getLogger(WorkspaceRepositoryMonitorService.class);

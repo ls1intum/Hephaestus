@@ -2,6 +2,7 @@ package de.tum.in.www1.hephaestus.contributors;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import de.tum.in.www1.hephaestus.core.WorkspaceAgnostic;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -21,8 +22,12 @@ import org.springframework.web.reactive.function.client.WebClientResponseExcepti
 
 /**
  * Service for fetching Hephaestus project contributors from GitHub.
+ *
+ * <p>Workspace-agnostic: This service fetches contributors to the Hephaestus project
+ * itself (meta information about the application), not tenant-specific data.
  */
 @Service
+@WorkspaceAgnostic("Fetches Hephaestus project contributors - meta info, not tenant data")
 public class ContributorService {
 
     private static final Logger logger = LoggerFactory.getLogger(ContributorService.class);

@@ -482,7 +482,10 @@ public class NatsConsumerService {
                 logger.info("Connected to NATS server.");
             } catch (IOException | InterruptedException e) {
                 logger.error("Failed to connect to NATS server: {}", e.getMessage(), e);
-                throw new NatsConnectionException("Failed to establish NATS connection", e);
+                throw new de.tum.in.www1.hephaestus.gitprovider.sync.exception.NatsConnectionException(
+                    "Failed to establish NATS connection",
+                    e
+                );
             }
         }
     }

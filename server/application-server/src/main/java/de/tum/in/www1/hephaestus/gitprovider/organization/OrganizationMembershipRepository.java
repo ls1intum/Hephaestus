@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.gitprovider.organization;
 
+import de.tum.in.www1.hephaestus.core.WorkspaceAgnostic;
 import java.util.Collection;
 import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -7,6 +8,13 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+/**
+ * Repository for organization membership records.
+ *
+ * <p>Workspace-agnostic: All queries filter by Organization ID which has
+ * workspace context through {@code organization.workspaceId}. Used during sync operations.
+ */
+@WorkspaceAgnostic("Queries filter by Organization ID which has workspace through its workspaceId field")
 public interface OrganizationMembershipRepository
     extends JpaRepository<OrganizationMembership, OrganizationMembershipId> {
     @Query("SELECT m.userId FROM OrganizationMembership m WHERE m.organizationId = :orgId")

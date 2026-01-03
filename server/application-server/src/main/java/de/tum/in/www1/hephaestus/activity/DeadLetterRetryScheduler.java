@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.activity;
 
+import de.tum.in.www1.hephaestus.core.WorkspaceAgnostic;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -22,6 +23,10 @@ import org.springframework.stereotype.Component;
  *
  * <p>Periodically attempts to retry pending dead letters to recover from
  * transient failures. This reduces manual intervention for temporary issues.
+ *
+ * <p>Workspace-agnostic: This is a system-wide debugging/recovery mechanism.
+ * Dead letters are infrastructure events that failed processing and need
+ * retry regardless of which workspace they belong to.
  *
  * <h3>Retry Strategy</h3>
  * <ul>
@@ -48,6 +53,7 @@ import org.springframework.stereotype.Component;
  * @see DeadLetterEvent
  */
 @Component
+@WorkspaceAgnostic("System-wide debugging/recovery mechanism for failed event processing")
 public class DeadLetterRetryScheduler implements HealthIndicator {
 
     private static final Logger logger = LoggerFactory.getLogger(DeadLetterRetryScheduler.class);

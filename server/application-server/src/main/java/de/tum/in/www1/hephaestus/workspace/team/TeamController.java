@@ -1,10 +1,6 @@
 package de.tum.in.www1.hephaestus.workspace.team;
 
-import de.tum.in.www1.hephaestus.gitprovider.team.Team;
 import de.tum.in.www1.hephaestus.gitprovider.team.TeamInfoDTO;
-import de.tum.in.www1.hephaestus.gitprovider.team.TeamInfoDTOConverter;
-import de.tum.in.www1.hephaestus.gitprovider.team.TeamRepository;
-import de.tum.in.www1.hephaestus.gitprovider.team.permission.TeamRepositoryPermissionRepository;
 import de.tum.in.www1.hephaestus.workspace.Workspace;
 import de.tum.in.www1.hephaestus.workspace.authorization.RequireAtLeastWorkspaceAdmin;
 import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContext;
@@ -16,7 +12,6 @@ import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -36,20 +31,11 @@ public class TeamController {
 
     private static final Logger logger = LoggerFactory.getLogger(TeamController.class);
 
-    private final TeamRepository teamRepo;
-    private final TeamInfoDTOConverter converter;
-    private final TeamRepositoryPermissionRepository permissionRepository;
+    private final TeamService teamService;
     private final WorkspaceContextResolver workspaceResolver;
 
-    public TeamController(
-        TeamRepository teamRepo,
-        TeamInfoDTOConverter converter,
-        TeamRepositoryPermissionRepository permissionRepository,
-        WorkspaceContextResolver workspaceResolver
-    ) {
-        this.teamRepo = teamRepo;
-        this.converter = converter;
-        this.permissionRepository = permissionRepository;
+    public TeamController(TeamService teamService, WorkspaceContextResolver workspaceResolver) {
+        this.teamService = teamService;
         this.workspaceResolver = workspaceResolver;
     }
 
@@ -60,20 +46,11 @@ public class TeamController {
      * @return list of teams with their members and permissions
      */
     @GetMapping
-    @Transactional(readOnly = true)
     @Operation(summary = "List teams", description = "Returns all teams in the workspace organization")
     public ResponseEntity<List<TeamInfoDTO>> getAllTeams(WorkspaceContext workspaceContext) {
         logger.info("Listing teams for workspace {}", workspaceContext.slug());
         Workspace workspace = workspaceResolver.requireWorkspace(workspaceContext);
-        if (workspace.getAccountLogin() == null) {
-            return ResponseEntity.ok(List.of());
-        }
-
-        List<TeamInfoDTO> teams = teamRepo
-            .findWithCollectionsByOrganizationIgnoreCase(workspace.getAccountLogin())
-            .stream()
-            .map(converter::convert)
-            .toList();
+        List<TeamInfoDTO> teams = teamService.getAllTeams(workspace);
         return ResponseEntity.ok(teams);
     }
 
@@ -98,17 +75,12 @@ public class TeamController {
     ) {
         logger.info("Updating team {} visibility in workspace {}", id, workspaceContext.slug());
         Workspace workspace = workspaceResolver.requireWorkspace(workspaceContext);
+
         // Accept hidden flag from body (preferred) or from query parameter as fallback
-        final var resolvedHidden = hidden != null ? hidden : hiddenParam;
-        return teamRepo
-            .findById(id)
-            .filter(team -> belongsToWorkspace(team, workspace))
-            .map(team -> {
-                team.setHidden(Boolean.TRUE.equals(resolvedHidden));
-                teamRepo.save(team);
-                return ResponseEntity.ok().<Void>build();
-            })
-            .orElse(ResponseEntity.notFound().build());
+        Boolean resolvedHidden = hidden != null ? hidden : hiddenParam;
+
+        boolean updated = teamService.updateTeamVisibility(workspace, id, resolvedHidden);
+        return updated ? ResponseEntity.ok().build() : ResponseEntity.notFound().build();
     }
 
     @PostMapping("/{teamId}/repositories/{repositoryId}/visibility")
@@ -127,30 +99,15 @@ public class TeamController {
             workspaceContext.slug()
         );
         Workspace workspace = workspaceResolver.requireWorkspace(workspaceContext);
-        final var resolvedHidden = hiddenFromContributions != null
+
+        Boolean resolvedHidden = hiddenFromContributions != null
             ? hiddenFromContributions
             : hiddenFromContributionsParam;
-
         if (resolvedHidden == null) {
             return ResponseEntity.badRequest().build();
         }
 
-        // Use findWithTeamBy... to eagerly load the team for the workspace check
-        return permissionRepository
-            .findWithTeamByTeam_IdAndRepository_Id(teamId, repositoryId)
-            .filter(permission -> belongsToWorkspace(permission.getTeam(), workspace))
-            .map(permission -> {
-                permission.setHiddenFromContributions(Boolean.TRUE.equals(resolvedHidden));
-                permissionRepository.save(permission);
-                return ResponseEntity.ok().<Void>build();
-            })
-            .orElse(ResponseEntity.notFound().build());
-    }
-
-    private boolean belongsToWorkspace(Team team, Workspace workspace) {
-        if (team == null || workspace == null || workspace.getAccountLogin() == null) {
-            return false;
-        }
-        return workspace.getAccountLogin().equalsIgnoreCase(team.getOrganization());
+        boolean updated = teamService.updateRepositoryVisibility(workspace, teamId, repositoryId, resolvedHidden);
+        return updated ? ResponseEntity.ok().build() : ResponseEntity.notFound().build();
     }
 }

@@ -16,6 +16,8 @@ import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserInfoDTO;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
+import de.tum.in.www1.hephaestus.profile.dto.ProfileDTO;
+import de.tum.in.www1.hephaestus.profile.dto.ProfileReviewActivityDTO;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceMembershipService;
 import java.time.Duration;
 import java.time.Instant;

@@ -4,20 +4,16 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.*;
 import static de.tum.in.www1.hephaestus.architecture.ArchitectureTestConstants.*;
 
 import com.tngtech.archunit.core.domain.JavaClass;
-import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.domain.JavaMethod;
-import com.tngtech.archunit.core.importer.ClassFileImporter;
-import com.tngtech.archunit.core.importer.ImportOption;
 import com.tngtech.archunit.lang.ArchCondition;
 import com.tngtech.archunit.lang.ArchRule;
 import com.tngtech.archunit.lang.ConditionEvents;
 import com.tngtech.archunit.lang.SimpleConditionEvent;
+import de.tum.in.www1.hephaestus.core.WorkspaceAgnostic;
 import java.util.Set;
 import java.util.stream.Collectors;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -40,63 +36,44 @@ import org.springframework.transaction.event.TransactionalEventListener;
  * @see ArchitectureTestConstants
  */
 @DisplayName("Multi-Tenancy Architecture")
-@Tag("architecture")
-class MultiTenancyArchitectureTest {
+class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
 
-    private static JavaClasses classes;
+    /**
+     * Schedulers that are legitimately workspace-agnostic.
+     *
+     * <p>These scheduled jobs operate on system-wide data or infrastructure,
+     * not tenant-specific data. Each entry is documented with its justification.
+     *
+     * <p><b>EMPTY:</b> All schedulers now use {@link WorkspaceAgnostic} annotation directly.
+     */
+    static final Set<String> WORKSPACE_AGNOSTIC_SCHEDULERS = Set.of();
 
     /**
      * Repositories that are legitimately workspace-agnostic.
      * These are shared infrastructure or lookup tables.
+     *
+     * <p><b>EMPTY:</b> All repositories now use {@link WorkspaceAgnostic} annotation directly.
+     * Prefer annotating classes with {@link WorkspaceAgnostic} instead of adding here.
      */
-    static final Set<String> WORKSPACE_AGNOSTIC_REPOSITORIES = Set.of(
-        // Lookup by external ID (GitHub node ID) - used during sync
-        "UserRepository",
-        "LabelRepository",
-        "MilestoneRepository",
-        "IssueTypeRepository",
-        // Workspace itself is the tenant root
-        "WorkspaceRepository",
-        "WorkspaceSlugHistoryRepository",
-        // Membership is queried by workspace explicitly
-        "WorkspaceMembershipRepository",
-        // Dead letter is system-wide for debugging
-        "DeadLetterEventRepository"
-    );
+    static final Set<String> WORKSPACE_AGNOSTIC_REPOSITORIES = Set.of();
+
+    /**
+     * Services that are legitimately workspace-agnostic.
+     * These operate at user, system, or admin scope rather than workspace scope.
+     *
+     * <p><b>EMPTY:</b> All services now use {@link WorkspaceAgnostic} annotation directly.
+     * Prefer annotating classes with {@link WorkspaceAgnostic} instead of adding here.
+     */
+    static final Set<String> WORKSPACE_AGNOSTIC_SERVICES = Set.of();
 
     /**
      * Repository methods that are legitimately workspace-agnostic.
      * Format: "RepositoryName.methodName"
+     *
+     * <p><b>EMPTY:</b> All methods now use {@link WorkspaceAgnostic} annotation directly,
+     * either on the method itself or on the containing class.
      */
-    static final Set<String> WORKSPACE_AGNOSTIC_METHODS = Set.of(
-        // Sync operations that look up by external GitHub ID
-        "PullRequestRepository.findByRepositoryIdAndNumber",
-        "PullRequestRepository.findAllSyncedPullRequestNumbers",
-        "PullRequestRepository.streamAllByRepository_Id",
-        "PullRequestRepository.findAllByRepository_Id",
-        "IssueRepository.findByRepositoryIdAndNumber",
-        "IssueRepository.findAllSyncedIssueNumbers",
-        "PullRequestReviewRepository.findByPullRequestIdAndAuthorId",
-        "RepositoryRepository.findByNameWithOwner",
-        "RepositoryRepository.findByOrganization_IdAndName",
-        "OrganizationRepository.findByLogin",
-        "TeamRepository.findByOrganization_IdAndSlug",
-        // Account lookup by external ID
-        "UserRepository.findByLogin",
-        "UserRepository.findByLoginIgnoreCase",
-        // Repository monitor lookup for sync
-        "RepositoryToMonitorRepository.findByNameWithOwner",
-        // First contribution is a global query
-        "PullRequestRepository.firstContributionByAuthorLogin"
-    );
-
-    @BeforeAll
-    static void setUp() {
-        classes = new ClassFileImporter()
-            .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
-            .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_JARS)
-            .importPackages(BASE_PACKAGE);
-    }
+    static final Set<String> WORKSPACE_AGNOSTIC_METHODS = Set.of();
 
     // ========================================================================
     // REPOSITORY WORKSPACE FILTERING
@@ -134,6 +111,11 @@ class MultiTenancyArchitectureTest {
                     String repoName = method.getOwner().getSimpleName();
                     String methodKey = repoName + "." + method.getName();
 
+                    // Skip if class is annotated as workspace-agnostic
+                    if (method.getOwner().isAnnotatedWith(WorkspaceAgnostic.class)) {
+                        return;
+                    }
+
                     // Skip workspace-agnostic repositories
                     if (WORKSPACE_AGNOSTIC_REPOSITORIES.contains(repoName)) {
                         return;
@@ -141,6 +123,11 @@ class MultiTenancyArchitectureTest {
 
                     // Skip explicitly allowed methods
                     if (WORKSPACE_AGNOSTIC_METHODS.contains(methodKey)) {
+                        return;
+                    }
+
+                    // Skip methods annotated with @WorkspaceAgnostic
+                    if (method.isAnnotatedWith(WorkspaceAgnostic.class)) {
                         return;
                     }
 
@@ -201,6 +188,11 @@ class MultiTenancyArchitectureTest {
                 @Override
                 public void check(JavaClass javaClass, ConditionEvents events) {
                     String repoName = javaClass.getSimpleName();
+
+                    // Skip if class is annotated as workspace-agnostic
+                    if (javaClass.isAnnotatedWith(WorkspaceAgnostic.class)) {
+                        return;
+                    }
 
                     // Skip workspace-agnostic repositories
                     if (WORKSPACE_AGNOSTIC_REPOSITORIES.contains(repoName)) {
@@ -272,7 +264,6 @@ class MultiTenancyArchitectureTest {
                 .and()
                 .areInterfaces()
                 .should(haveWorkspaceScopedMethods)
-                .allowEmptyShould(true)
                 .because("Repositories should provide workspace-scoped query methods");
 
             rule.check(classes);
@@ -318,6 +309,16 @@ class MultiTenancyArchitectureTest {
                         return;
                     }
 
+                    // Skip if class is annotated as workspace-agnostic
+                    if (javaClass.isAnnotatedWith(WorkspaceAgnostic.class)) {
+                        return;
+                    }
+
+                    // Skip explicitly workspace-agnostic schedulers
+                    if (WORKSPACE_AGNOSTIC_SCHEDULERS.contains(javaClass.getSimpleName())) {
+                        return;
+                    }
+
                     // Get all field and constructor parameter types
                     Set<String> dependencies = javaClass
                         .getFields()
@@ -345,7 +346,7 @@ class MultiTenancyArchitectureTest {
                                 String.format(
                                     "SCHEDULED JOB CONTEXT: %s has @Scheduled methods but no workspace " +
                                         "iteration dependencies. Add SyncTargetProvider or WorkspaceRepository " +
-                                        "to iterate workspaces and set context.",
+                                        "to iterate workspaces and set context, or add to WORKSPACE_AGNOSTIC_SCHEDULERS if truly system-wide.",
                                     javaClass.getSimpleName()
                                 )
                             )
@@ -481,6 +482,7 @@ class MultiTenancyArchitectureTest {
                                 "PullRequest", // Through repository.organization.workspaceId
                                 "Issue", // Through repository.organization.workspaceId
                                 "Review", // Through PR
+                                "Comment", // Through PR -> repository.organization.workspaceId
                                 "ApplicationReadyEvent", // Spring lifecycle, no workspace needed
                                 "ContextRefreshedEvent" // Spring lifecycle, no workspace needed
                             );
@@ -518,6 +520,19 @@ class MultiTenancyArchitectureTest {
         }
 
         /**
+         * Async event listeners that are known to carry workspace context through their event payloads.
+         *
+         * <p>These listeners handle domain events where workspace context is preserved via entity
+         * relationships in the event payload (e.g., Comment -> PullRequest -> Repository -> Organization -> workspaceId).
+         */
+        static final Set<String> ASYNC_LISTENERS_WITH_PAYLOAD_CONTEXT = Set.of(
+            // ActivityEventListener handles CommentCreated, ReviewSubmitted events which carry full entity graphs
+            "ActivityEventListener",
+            // BadPracticeEventListener handles PullRequestUpdated events which carry full entity graphs
+            "BadPracticeEventListener"
+        );
+
+        /**
          * @Async event listeners should not lose workspace context.
          *
          * <p>When @Async is combined with @TransactionalEventListener, the
@@ -544,6 +559,11 @@ class MultiTenancyArchitectureTest {
                         );
 
                     if (!hasAsyncEventListeners) {
+                        return;
+                    }
+
+                    // Skip listeners that are known to carry context through event payloads
+                    if (ASYNC_LISTENERS_WITH_PAYLOAD_CONTEXT.contains(javaClass.getSimpleName())) {
                         return;
                     }
 
@@ -574,13 +594,13 @@ class MultiTenancyArchitectureTest {
                         );
 
                     if (hasRepositoryDependency && !usesPayloadEvents) {
-                        // Log for manual review - async listeners with repo access need scrutiny
+                        // Async listeners with repo access need explicit context propagation
                         events.add(
-                            SimpleConditionEvent.satisfied(
+                            SimpleConditionEvent.violated(
                                 javaClass,
                                 String.format(
-                                    "ASYNC CONTEXT AUDIT: %s has @Async event listeners with repository access. " +
-                                        "Verify workspace context is available (via event payload or MDC propagation).",
+                                    "ASYNC CONTEXT RISK: %s has @Async event listeners with repository access. " +
+                                        "Ensure workspace context is propagated via event payload or MDC propagation.",
                                     javaClass.getSimpleName()
                                 )
                             )
@@ -662,14 +682,24 @@ class MultiTenancyArchitectureTest {
                         // that are called with workspace context already established
                         String ownerName = method.getOwner().getSimpleName();
 
-                        // Skip internal/private-like method patterns
+                        // Skip workspace-agnostic services (user-scoped, system-wide, admin)
+                        if (WORKSPACE_AGNOSTIC_SERVICES.contains(ownerName)) {
+                            return;
+                        }
+
+                        // Skip if class is annotated as workspace-agnostic
+                        if (method.getOwner().isAnnotatedWith(WorkspaceAgnostic.class)) {
+                            return;
+                        }
+
+                        // Public methods returning lists without workspace scoping are potential risks
                         if (methodName.startsWith("get") || methodName.startsWith("find")) {
                             events.add(
-                                SimpleConditionEvent.satisfied(
+                                SimpleConditionEvent.violated(
                                     method,
                                     String.format(
-                                        "SERVICE AUDIT: %s.%s returns a list but has no obvious workspace parameter. " +
-                                            "Verify workspace scoping is applied internally.",
+                                        "SERVICE WORKSPACE RISK: %s.%s returns a list but has no obvious workspace parameter. " +
+                                            "Add workspace parameter or document that scoping is applied internally.",
                                         ownerName,
                                         methodName
                                     )
@@ -691,7 +721,6 @@ class MultiTenancyArchitectureTest {
                 .areDeclaredInClassesThat()
                 .resideOutsideOfPackage("..intelligenceservice..")
                 .should(beWorkspaceScopedIfReturningList)
-                .allowEmptyShould(true)
                 .because("Services returning lists should be workspace-scoped");
 
             rule.check(classes);
@@ -744,6 +773,23 @@ class MultiTenancyArchitectureTest {
                         controllerName.contains("Status") ||
                         controllerName.contains("Actuator")
                     ) {
+                        return;
+                    }
+
+                    // Skip user account operations - these are USER-scoped, not WORKSPACE-scoped.
+                    // Users can access their account settings regardless of workspace context.
+                    if (controllerName.contains("Account")) {
+                        return;
+                    }
+
+                    // Skip workspace registry operations - these are ADMIN operations that happen
+                    // BEFORE a workspace context exists (creating/listing workspaces).
+                    if (controllerName.contains("WorkspaceRegistry")) {
+                        return;
+                    }
+
+                    // Skip explicitly global endpoints that aggregate across all workspaces
+                    if (methodName.equals("listGlobalContributors")) {
                         return;
                     }
 

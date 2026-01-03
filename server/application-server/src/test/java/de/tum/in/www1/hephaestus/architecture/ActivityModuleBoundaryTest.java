@@ -3,14 +3,9 @@ package de.tum.in.www1.hephaestus.architecture;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.*;
 import static de.tum.in.www1.hephaestus.architecture.ArchitectureTestConstants.*;
 
-import com.tngtech.archunit.core.domain.JavaClasses;
-import com.tngtech.archunit.core.importer.ClassFileImporter;
-import com.tngtech.archunit.core.importer.ImportOption;
 import com.tngtech.archunit.lang.ArchRule;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -35,18 +30,7 @@ import org.junit.jupiter.api.Test;
  * @see ArchitectureTestConstants
  */
 @DisplayName("Activity Module Boundaries")
-@Tag("architecture")
-class ActivityModuleBoundaryTest {
-
-    private static JavaClasses classes;
-
-    @BeforeAll
-    static void setUp() {
-        classes = new ClassFileImporter()
-            .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
-            .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_JARS)
-            .importPackages(BASE_PACKAGE);
-    }
+class ActivityModuleBoundaryTest extends HephaestusArchitectureTest {
 
     // ========================================================================
     // ACTIVITY MODULE ISOLATION
@@ -75,7 +59,6 @@ class ActivityModuleBoundaryTest {
                 .orShould()
                 .dependOnClassesThat()
                 .resideInAPackage("..leaderboard..repository..")
-                .allowEmptyShould(true)
                 .because(
                     "Activity should not depend on leaderboard - use domain events for cross-module communication"
                 );
@@ -97,7 +80,6 @@ class ActivityModuleBoundaryTest {
                 .should()
                 .dependOnClassesThat()
                 .resideInAPackage("..mentor..")
-                .allowEmptyShould(true)
                 .because("Activity and mentor are independent feature modules");
             rule.check(classes);
         }
@@ -117,7 +99,6 @@ class ActivityModuleBoundaryTest {
                 .should()
                 .dependOnClassesThat()
                 .resideInAPackage("..notification..")
-                .allowEmptyShould(true)
                 .because("Activity should use domain events to trigger notifications");
             rule.check(classes);
         }
@@ -137,7 +118,6 @@ class ActivityModuleBoundaryTest {
                 .should()
                 .dependOnClassesThat()
                 .resideInAPackage("..profile..")
-                .allowEmptyShould(true)
                 .because("Profile depends on activity, not vice versa");
             rule.check(classes);
         }
@@ -154,7 +134,6 @@ class ActivityModuleBoundaryTest {
                 .should()
                 .dependOnClassesThat()
                 .resideInAPackage("..contributors..")
-                .allowEmptyShould(true)
                 .because("Activity should not depend on contributors");
             rule.check(classes);
         }
@@ -184,7 +163,6 @@ class ActivityModuleBoundaryTest {
                 .should()
                 .dependOnClassesThat()
                 .resideInAPackage("..practices.detection..")
-                .allowEmptyShould(true)
                 .because("Model layer (practices.model) should not depend on detection logic (practices.detection)");
             rule.check(classes);
         }
@@ -222,7 +200,6 @@ class ActivityModuleBoundaryTest {
                     "io.github.resilience4j..", // Circuit breaker for resilient external calls
                     "" // primitives
                 )
-                .allowEmptyShould(true)
                 .because("practices.detection should only depend on allowed packages");
             rule.check(classes);
         }
@@ -239,7 +216,6 @@ class ActivityModuleBoundaryTest {
                 .should()
                 .dependOnClassesThat()
                 .resideInAPackage("..leaderboard..")
-                .allowEmptyShould(true)
                 .because("Practices detection is independent of leaderboard");
             rule.check(classes);
         }
@@ -268,7 +244,6 @@ class ActivityModuleBoundaryTest {
                 .should()
                 .dependOnClassesThat()
                 .haveSimpleNameEndingWith("Controller")
-                .allowEmptyShould(true)
                 .because("Scoring logic should be independent of presentation layer");
             rule.check(classes);
         }
@@ -285,7 +260,6 @@ class ActivityModuleBoundaryTest {
                 .should()
                 .dependOnClassesThat()
                 .resideInAnyPackage("..leaderboard..", "..mentor..", "..notification..", "..profile..")
-                .allowEmptyShould(true)
                 .because("Scoring should be a pure calculation module");
             rule.check(classes);
         }
@@ -315,7 +289,6 @@ class ActivityModuleBoundaryTest {
                 .haveSimpleNameEndingWith("Controller")
                 .should()
                 .haveSimpleName("PracticesController")
-                .allowEmptyShould(true)
                 .because("All practices endpoints should be in PracticesController");
             rule.check(classes);
         }

@@ -1,18 +1,7 @@
 package de.tum.in.www1.hephaestus.practices;
 
-import de.tum.in.www1.hephaestus.core.exception.AccessForbiddenException;
-import de.tum.in.www1.hephaestus.core.exception.EntityNotFoundException;
-import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
-import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
-import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
-import de.tum.in.www1.hephaestus.gitprovider.user.User;
-import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
-import de.tum.in.www1.hephaestus.practices.detection.BadPracticeDetectionRepository;
-import de.tum.in.www1.hephaestus.practices.detection.PullRequestBadPracticeDetector;
-import de.tum.in.www1.hephaestus.practices.detection.PullRequestBadPracticeRepository;
+import de.tum.in.www1.hephaestus.practices.dto.BadPracticeFeedbackDTO;
 import de.tum.in.www1.hephaestus.practices.feedback.BadPracticeFeedbackService;
-import de.tum.in.www1.hephaestus.practices.model.BadPracticeDetection;
-import de.tum.in.www1.hephaestus.practices.model.BadPracticeFeedbackDTO;
 import de.tum.in.www1.hephaestus.practices.model.DetectionResult;
 import de.tum.in.www1.hephaestus.practices.model.PullRequestBadPractice;
 import de.tum.in.www1.hephaestus.practices.model.PullRequestBadPracticeDTO;
@@ -29,8 +18,6 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.List;
-import java.util.Set;
-import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -49,12 +36,8 @@ import org.springframework.web.bind.annotation.*;
 @Tag(name = "Code Practices", description = "Bad practice detection and resolution")
 public class PracticesController {
 
-    private final PullRequestBadPracticeDetector detector;
+    private final PracticesService practicesService;
     private final BadPracticeFeedbackService feedbackService;
-    private final PullRequestBadPracticeRepository badPracticeRepository;
-    private final BadPracticeDetectionRepository detectionRepository;
-    private final UserRepository userRepository;
-    private final PullRequestRepository pullRequestRepository;
     private final WorkspaceContextResolver workspaceResolver;
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -76,41 +59,8 @@ public class PracticesController {
         @PathVariable String login
     ) {
         Workspace workspace = workspaceResolver.requireWorkspace(workspaceContext);
-
-        List<PullRequest> pullRequests = pullRequestRepository.findAssignedByLoginAndStates(
-            login,
-            Set.of(Issue.State.OPEN),
-            workspace.getId()
-        );
-
-        List<PullRequestWithBadPracticesDTO> prWithBadPractices = pullRequests
-            .stream()
-            .map(pr -> {
-                BadPracticeDetection lastDetection = detectionRepository.findMostRecentByPullRequestId(pr.getId());
-
-                List<PullRequestBadPracticeDTO> badPractices = lastDetection == null
-                    ? List.of()
-                    : lastDetection
-                          .getBadPractices()
-                          .stream()
-                          .map(PullRequestBadPracticeDTO::fromPullRequestBadPractice)
-                          .toList();
-
-                List<String> badPracticeTitles = badPractices.stream().map(PullRequestBadPracticeDTO::title).toList();
-
-                List<PullRequestBadPracticeDTO> oldBadPractices = badPracticeRepository
-                    .findByPullRequestId(pr.getId())
-                    .stream()
-                    .filter(badPractice -> !badPracticeTitles.contains(badPractice.getTitle()))
-                    .map(PullRequestBadPracticeDTO::fromPullRequestBadPractice)
-                    .toList();
-
-                String summary = lastDetection != null ? lastDetection.getSummary() : "";
-                return PullRequestWithBadPracticesDTO.fromPullRequest(pr, summary, badPractices, oldBadPractices);
-            })
-            .collect(Collectors.toList());
-
-        return ResponseEntity.ok(new UserPracticesDTO(login, prWithBadPractices));
+        List<PullRequestWithBadPracticesDTO> pullRequests = practicesService.getBadPracticesForUser(workspace, login);
+        return ResponseEntity.ok(new UserPracticesDTO(login, pullRequests));
     }
 
     @GetMapping("/pullrequest/{pullRequestId}")
@@ -128,31 +78,11 @@ public class PracticesController {
         @PathVariable Long pullRequestId
     ) {
         Workspace workspace = workspaceResolver.requireWorkspace(workspaceContext);
-        PullRequest pr = requirePullRequestInWorkspace(pullRequestId, workspace);
-
-        BadPracticeDetection lastDetection = detectionRepository.findMostRecentByPullRequestId(pr.getId());
-
-        List<PullRequestBadPracticeDTO> badPractices = lastDetection == null
-            ? List.of()
-            : lastDetection
-                  .getBadPractices()
-                  .stream()
-                  .map(PullRequestBadPracticeDTO::fromPullRequestBadPractice)
-                  .toList();
-
-        List<String> badPracticeTitles = badPractices.stream().map(PullRequestBadPracticeDTO::title).toList();
-
-        List<PullRequestBadPracticeDTO> oldBadPractices = badPracticeRepository
-            .findByPullRequestId(pr.getId())
-            .stream()
-            .filter(badPractice -> !badPracticeTitles.contains(badPractice.getTitle()))
-            .map(PullRequestBadPracticeDTO::fromPullRequestBadPractice)
-            .toList();
-
-        String summary = lastDetection != null ? lastDetection.getSummary() : "";
-        return ResponseEntity.ok(
-            PullRequestWithBadPracticesDTO.fromPullRequest(pr, summary, badPractices, oldBadPractices)
+        PullRequestWithBadPracticesDTO result = practicesService.getBadPracticesForPullRequest(
+            workspace,
+            pullRequestId
         );
+        return ResponseEntity.ok(result);
     }
 
     @GetMapping("/badpractice/{id}")
@@ -170,8 +100,8 @@ public class PracticesController {
         @PathVariable Long id
     ) {
         Workspace workspace = workspaceResolver.requireWorkspace(workspaceContext);
-        PullRequestBadPractice badPractice = requireBadPracticeInWorkspace(id, workspace);
-        return ResponseEntity.ok(PullRequestBadPracticeDTO.fromPullRequestBadPractice(badPractice));
+        PullRequestBadPracticeDTO result = practicesService.getBadPractice(workspace, id);
+        return ResponseEntity.ok(result);
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -190,10 +120,7 @@ public class PracticesController {
         @PathVariable String login
     ) {
         Workspace workspace = workspaceResolver.requireWorkspace(workspaceContext);
-        User currentUser = requireCurrentUser();
-        requireSameUser(currentUser, login);
-
-        DetectionResult result = detector.detectForUser(workspace.getId(), login);
+        DetectionResult result = practicesService.detectForUser(workspace, login);
         return ResponseEntity.ok(new DetectionResultDTO(result));
     }
 
@@ -209,11 +136,7 @@ public class PracticesController {
         @PathVariable Long pullRequestId
     ) {
         Workspace workspace = workspaceResolver.requireWorkspace(workspaceContext);
-        User currentUser = requireCurrentUser();
-        PullRequest pullRequest = requirePullRequestInWorkspace(pullRequestId, workspace);
-        requireAssignee(pullRequest, currentUser);
-
-        DetectionResult result = detector.detectAndSyncBadPractices(pullRequest);
+        DetectionResult result = practicesService.detectForPullRequest(workspace, pullRequestId);
         return ResponseEntity.ok(new DetectionResultDTO(result));
     }
 
@@ -229,13 +152,7 @@ public class PracticesController {
         @RequestParam("state") PullRequestBadPracticeState state
     ) {
         Workspace workspace = workspaceResolver.requireWorkspace(workspaceContext);
-        User currentUser = requireCurrentUser();
-        PullRequestBadPractice badPractice = requireBadPracticeInWorkspace(id, workspace);
-        requireAssignee(badPractice.getPullrequest(), currentUser);
-        requireValidResolveState(state);
-
-        badPractice.setUserState(state);
-        badPracticeRepository.save(badPractice);
+        practicesService.resolveBadPractice(workspace, id, state);
         return ResponseEntity.ok().build();
     }
 
@@ -252,74 +169,9 @@ public class PracticesController {
         @RequestBody @Valid BadPracticeFeedbackDTO feedback
     ) {
         Workspace workspace = workspaceResolver.requireWorkspace(workspaceContext);
-        User currentUser = requireCurrentUser();
-        PullRequestBadPractice badPractice = requireBadPracticeInWorkspace(id, workspace);
-        requireAssignee(badPractice.getPullrequest(), currentUser);
-
+        PullRequestBadPractice badPractice = practicesService.getBadPracticeForFeedback(workspace, id);
         feedbackService.provideFeedback(workspace, badPractice, feedback);
         return ResponseEntity.ok().build();
-    }
-
-    // ══════════════════════════════════════════════════════════════════════════
-    // Helper methods
-    // ══════════════════════════════════════════════════════════════════════════
-
-    private User requireCurrentUser() {
-        return userRepository
-            .getCurrentUser()
-            .orElseThrow(() -> new AccessForbiddenException("User not authenticated"));
-    }
-
-    private void requireSameUser(User currentUser, String login) {
-        if (!currentUser.getLogin().equals(login)) {
-            throw new AccessForbiddenException("Cannot access practices for another user");
-        }
-    }
-
-    private void requireAssignee(PullRequest pullRequest, User user) {
-        if (!pullRequest.getAssignees().contains(user)) {
-            throw new AccessForbiddenException("User is not an assignee of this pull request");
-        }
-    }
-
-    private void requireValidResolveState(PullRequestBadPracticeState state) {
-        if (
-            state != PullRequestBadPracticeState.FIXED &&
-            state != PullRequestBadPracticeState.WONT_FIX &&
-            state != PullRequestBadPracticeState.WRONG
-        ) {
-            throw new IllegalArgumentException("Invalid state: must be FIXED, WONT_FIX, or WRONG");
-        }
-    }
-
-    private PullRequest requirePullRequestInWorkspace(Long pullRequestId, Workspace workspace) {
-        PullRequest pr = pullRequestRepository
-            .findById(pullRequestId)
-            .orElseThrow(() -> new EntityNotFoundException("PullRequest", pullRequestId));
-        if (!belongsToWorkspace(pr, workspace)) {
-            throw new EntityNotFoundException("PullRequest", pullRequestId);
-        }
-        return pr;
-    }
-
-    private PullRequestBadPractice requireBadPracticeInWorkspace(Long badPracticeId, Workspace workspace) {
-        PullRequestBadPractice bp = badPracticeRepository
-            .findById(badPracticeId)
-            .orElseThrow(() -> new EntityNotFoundException("BadPractice", badPracticeId));
-        if (!belongsToWorkspace(bp.getPullrequest(), workspace)) {
-            throw new EntityNotFoundException("BadPractice", badPracticeId);
-        }
-        return bp;
-    }
-
-    private boolean belongsToWorkspace(PullRequest pullRequest, Workspace workspace) {
-        return (
-            pullRequest != null &&
-            pullRequest.getRepository() != null &&
-            pullRequest.getRepository().getOrganization() != null &&
-            pullRequest.getRepository().getOrganization().getWorkspaceId() != null &&
-            pullRequest.getRepository().getOrganization().getWorkspaceId().equals(workspace.getId())
-        );
     }
 
     // ══════════════════════════════════════════════════════════════════════════

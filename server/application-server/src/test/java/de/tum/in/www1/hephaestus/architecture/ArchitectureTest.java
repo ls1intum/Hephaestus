@@ -5,14 +5,9 @@ import static com.tngtech.archunit.library.GeneralCodingRules.*;
 import static com.tngtech.archunit.library.dependencies.SlicesRuleDefinition.slices;
 import static de.tum.in.www1.hephaestus.architecture.ArchitectureTestConstants.*;
 
-import com.tngtech.archunit.core.domain.JavaClasses;
-import com.tngtech.archunit.core.importer.ClassFileImporter;
-import com.tngtech.archunit.core.importer.ImportOption;
 import com.tngtech.archunit.lang.ArchRule;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -35,18 +30,7 @@ import org.junit.jupiter.api.Test;
  * @see <a href="https://www.archunit.org/userguide/html/000_Index.html">ArchUnit User Guide</a>
  */
 @DisplayName("Core Architecture")
-@Tag("architecture")
-class ArchitectureTest {
-
-    private static JavaClasses classes;
-
-    @BeforeAll
-    static void setUp() {
-        classes = new ClassFileImporter()
-            .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
-            .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_JARS)
-            .importPackages(BASE_PACKAGE);
-    }
+class ArchitectureTest extends HephaestusArchitectureTest {
 
     // ========================================================================
     // STRUCTURAL INTEGRITY - Critical architectural invariants
@@ -76,33 +60,6 @@ class ArchitectureTest {
         }
 
         /**
-         * Gitprovider is a self-contained bounded context.
-         *
-         * <p>The gitprovider module represents a unified domain aggregate for
-         * GitHub data synchronization. Internal dependencies between its
-         * sub-packages (issue, repository, user, etc.) are expected due to
-         * JPA entity relationships. However, gitprovider should not depend
-         * on feature modules (leaderboard, activity, mentor, etc.).
-         *
-         * <p>Note: Cycles within gitprovider are acceptable because entities
-         * like Issue, PullRequest, Repository have bidirectional JPA relationships
-         * which is standard ORM practice.
-         */
-        @Test
-        @DisplayName("Gitprovider does not depend on feature modules")
-        void gitproviderDoesNotDependOnFeatureModules() {
-            // Gitprovider is infrastructure - it should not depend on features
-            ArchRule rule = noClasses()
-                .that()
-                .resideInAPackage("..gitprovider..")
-                .should()
-                .dependOnClassesThat()
-                .resideInAnyPackage("..activity..", "..leaderboard..", "..mentor..", "..notification..", "..profile..")
-                .because("Gitprovider is shared infrastructure and must not depend on feature modules");
-            rule.check(classes);
-        }
-
-        /**
          * Controllers should only delegate to services.
          *
          * <p>Controllers are thin entry points - they should not contain
@@ -123,42 +80,12 @@ class ArchitectureTest {
     }
 
     // ========================================================================
-    // MODULE BOUNDARIES - Bounded context and SPI patterns
+    // MODULE BOUNDARIES - SPI patterns (main isolation tests in ModuleBoundaryTest)
     // ========================================================================
 
     @Nested
     @DisplayName("Module Boundaries")
     class ModuleBoundaries {
-
-        /**
-         * The gitprovider module is the core sync engine.
-         *
-         * <p>It should NOT depend on feature modules (workspace, leaderboard, etc.)
-         * Instead, it defines SPIs that feature modules implement.
-         */
-        @Test
-        @DisplayName("gitprovider core does not depend on feature modules")
-        void gitproviderDoesNotDependOnFeatureModules() {
-            ArchRule rule = noClasses()
-                .that()
-                .resideInAPackage("..gitprovider..")
-                .and()
-                .resideOutsideOfPackage("..gitprovider.common.spi..")
-                .should()
-                .dependOnClassesThat()
-                .resideInAnyPackage(
-                    "..workspace..",
-                    "..leaderboard..",
-                    "..mentor..",
-                    "..activity..",
-                    "..profile..",
-                    "..account..",
-                    "..contributors..",
-                    "..notification.."
-                )
-                .because("gitprovider is the core ETL engine; feature modules depend on it via SPIs");
-            rule.check(classes);
-        }
 
         /**
          * SPI interfaces define the contract for dependency inversion.

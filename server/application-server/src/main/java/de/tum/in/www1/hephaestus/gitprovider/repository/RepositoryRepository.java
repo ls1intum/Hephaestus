@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.gitprovider.repository;
 
+import de.tum.in.www1.hephaestus.core.WorkspaceAgnostic;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -8,6 +9,11 @@ import org.springframework.data.repository.query.Param;
 
 @org.springframework.stereotype.Repository
 public interface RepositoryRepository extends JpaRepository<Repository, Long> {
+    /**
+     * Finds a repository by its full name (owner/name).
+     * Used during sync operations to check if repository exists.
+     */
+    @WorkspaceAgnostic("Sync operation - lookup by external GitHub identifier")
     Optional<Repository> findByNameWithOwner(String nameWithOwner);
 
     List<Repository> findByNameWithOwnerStartingWithIgnoreCase(String prefix);

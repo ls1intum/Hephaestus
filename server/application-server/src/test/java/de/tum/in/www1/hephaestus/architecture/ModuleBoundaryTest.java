@@ -2,19 +2,12 @@ package de.tum.in.www1.hephaestus.architecture;
 
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.*;
 import static de.tum.in.www1.hephaestus.architecture.ArchitectureTestConstants.*;
+import static de.tum.in.www1.hephaestus.architecture.conditions.HephaestusConditions.*;
 
 import com.tngtech.archunit.core.domain.JavaClass;
-import com.tngtech.archunit.core.domain.JavaClasses;
-import com.tngtech.archunit.core.importer.ClassFileImporter;
-import com.tngtech.archunit.core.importer.ImportOption;
-import com.tngtech.archunit.lang.ArchCondition;
 import com.tngtech.archunit.lang.ArchRule;
-import com.tngtech.archunit.lang.ConditionEvents;
-import com.tngtech.archunit.lang.SimpleConditionEvent;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -39,18 +32,7 @@ import org.junit.jupiter.api.Test;
  * @see ArchitectureTestConstants
  */
 @DisplayName("Module Boundaries")
-@Tag("architecture")
-class ModuleBoundaryTest {
-
-    private static JavaClasses classes;
-
-    @BeforeAll
-    static void setUp() {
-        classes = new ClassFileImporter()
-            .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
-            .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_JARS)
-            .importPackages(BASE_PACKAGE);
-    }
+class ModuleBoundaryTest extends HephaestusArchitectureTest {
 
     // ========================================================================
     // SPI (SERVICE PROVIDER INTERFACE) PATTERN
@@ -80,7 +62,6 @@ class ModuleBoundaryTest {
                 .areNotMemberClasses()
                 .should()
                 .beInterfaces()
-                .allowEmptyShould(true)
                 .because("SPI classes define contracts and should be interfaces");
             rule.check(classes);
         }
@@ -109,7 +90,6 @@ class ModuleBoundaryTest {
                 .haveSimpleNameNotEndingWith("Test")
                 .should()
                 .implement(JavaClass.Predicates.resideInAPackage("..spi.."))
-                .allowEmptyShould(true)
                 .because("Workspace adapters bridge workspace context to gitprovider via SPIs");
             rule.check(classes);
         }
@@ -135,7 +115,6 @@ class ModuleBoundaryTest {
                     "org.springframework.beans..",
                     "org.springframework.context.."
                 )
-                .allowEmptyShould(true)
                 .because("SPIs should be framework-agnostic contracts");
             rule.check(classes);
         }
@@ -167,16 +146,17 @@ class ModuleBoundaryTest {
                 .should()
                 .dependOnClassesThat()
                 .resideInAPackage("..workspace..")
-                .allowEmptyShould(true)
                 .because("Gitprovider should depend on SPIs, not workspace implementation");
             rule.check(classes);
         }
 
         /**
-         * Gitprovider should not depend on other feature modules.
+         * Gitprovider should not depend on feature modules.
          *
-         * <p>Cross-cutting concerns should be handled via domain events,
-         * not direct dependencies.
+         * <p>This is the SINGLE SOURCE OF TRUTH for gitprovider isolation.
+         * Cross-cutting concerns should be handled via domain events, not direct dependencies.
+         *
+         * <p>CRITICAL: Keep this list in sync with the actual feature modules.
          */
         @Test
         @DisplayName("Gitprovider does not depend on feature modules")
@@ -192,9 +172,9 @@ class ModuleBoundaryTest {
                     "..mentor..",
                     "..notification..",
                     "..profile..",
-                    "..account.."
+                    "..account..",
+                    "..contributors.."
                 )
-                .allowEmptyShould(true) // Allow if gitprovider classes not loaded
                 .because("Gitprovider should be isolated - use domain events for cross-cutting concerns");
             rule.check(classes);
         }
@@ -218,7 +198,6 @@ class ModuleBoundaryTest {
                 .resideOutsideOfPackage("..sync..") // Sync orchestrators can dispatch to providers
                 .should()
                 .resideInAPackage("..github..")
-                .allowEmptyShould(true)
                 .because("GitHub-specific logic should be in github/ subpackages for multi-provider support");
             rule.check(classes);
         }
@@ -276,7 +255,6 @@ class ModuleBoundaryTest {
                 .areNotInterfaces()
                 .should()
                 .resideInAPackage("..events..")
-                .allowEmptyShould(true)
                 .because("Domain events should be in events packages");
             rule.check(classes);
         }
@@ -299,35 +277,6 @@ class ModuleBoundaryTest {
         @Test
         @DisplayName("Utility classes are final or have private constructors")
         void utilityClassesAreFinalOrPrivateConstructor() {
-            ArchCondition<JavaClass> beFinalOrHavePrivateConstructor = new ArchCondition<>(
-                "be final or have only private constructors"
-            ) {
-                @Override
-                public void check(JavaClass javaClass, ConditionEvents events) {
-                    boolean isFinal = javaClass
-                        .getModifiers()
-                        .contains(com.tngtech.archunit.core.domain.JavaModifier.FINAL);
-                    boolean hasOnlyPrivateConstructors = javaClass
-                        .getConstructors()
-                        .stream()
-                        .allMatch(c ->
-                            c.getModifiers().contains(com.tngtech.archunit.core.domain.JavaModifier.PRIVATE)
-                        );
-
-                    if (!isFinal && !hasOnlyPrivateConstructors) {
-                        events.add(
-                            SimpleConditionEvent.violated(
-                                javaClass,
-                                String.format(
-                                    "%s should be final or have private constructor",
-                                    javaClass.getSimpleName()
-                                )
-                            )
-                        );
-                    }
-                }
-            };
-
             ArchRule rule = classes()
                 .that()
                 .haveSimpleNameEndingWith("Utils")
@@ -335,8 +284,7 @@ class ModuleBoundaryTest {
                 .haveSimpleNameEndingWith("Util")
                 .or()
                 .haveSimpleNameEndingWith("Helper")
-                .should(beFinalOrHavePrivateConstructor)
-                .allowEmptyShould(true)
+                .should(beFinalOrHaveOnlyPrivateConstructors())
                 .because("Utility classes should not be instantiated or extended");
             rule.check(classes);
         }
@@ -359,37 +307,6 @@ class ModuleBoundaryTest {
         @Test
         @DisplayName("DTOs are records or have final fields")
         void dtosAreImmutable() {
-            ArchCondition<JavaClass> beRecordOrHaveFinalFields = new ArchCondition<>(
-                "be a record or have only final fields"
-            ) {
-                @Override
-                public void check(JavaClass javaClass, ConditionEvents events) {
-                    // Records are inherently immutable
-                    if (javaClass.isRecord()) {
-                        return;
-                    }
-
-                    // Check if all instance fields are final
-                    boolean hasNonFinalField = javaClass
-                        .getFields()
-                        .stream()
-                        .filter(f -> !f.getModifiers().contains(com.tngtech.archunit.core.domain.JavaModifier.STATIC))
-                        .anyMatch(f -> !f.getModifiers().contains(com.tngtech.archunit.core.domain.JavaModifier.FINAL));
-
-                    if (hasNonFinalField) {
-                        events.add(
-                            SimpleConditionEvent.violated(
-                                javaClass,
-                                String.format(
-                                    "%s has mutable fields - should be a record or use final fields",
-                                    javaClass.getSimpleName()
-                                )
-                            )
-                        );
-                    }
-                }
-            };
-
             ArchRule rule = classes()
                 .that()
                 .haveSimpleNameEndingWith("DTO")
@@ -397,8 +314,7 @@ class ModuleBoundaryTest {
                 .haveSimpleNameEndingWith("Dto")
                 .and()
                 .resideOutsideOfPackage(GENERATED_INTELLIGENCE_SERVICE_PACKAGE)
-                .should(beRecordOrHaveFinalFields)
-                .allowEmptyShould(true)
+                .should(beImmutable())
                 .because("DTOs should be immutable for thread safety");
             rule.check(classes);
         }
@@ -432,7 +348,6 @@ class ModuleBoundaryTest {
                 .areAssignableTo(org.springframework.data.repository.Repository.class)
                 .should()
                 .beInterfaces()
-                .allowEmptyShould(true)
                 .because("Spring Data repositories should be interfaces");
             rule.check(classes);
         }
@@ -462,8 +377,78 @@ class ModuleBoundaryTest {
                 .resideInAPackage(BASE_PACKAGE + "..")
                 .should()
                 .beAssignableTo(RuntimeException.class)
-                .allowEmptyShould(true)
                 .because("Custom exceptions should be unchecked for cleaner APIs");
+            rule.check(classes);
+        }
+    }
+
+    // ========================================================================
+    // SPI BYPASS DETECTION
+    // ========================================================================
+
+    @Nested
+    @DisplayName("SPI Bypass Detection")
+    class SpiBypassDetectionTests {
+
+        /**
+         * Feature modules should only depend on gitprovider's public contracts.
+         *
+         * <p>Feature modules (leaderboard, activity, profile, practices) must NOT bypass
+         * the SPI layer and directly depend on gitprovider internals like:
+         * <ul>
+         *   <li>gitprovider.sync - internal sync orchestration</li>
+         *   <li>gitprovider.installation - internal installation management</li>
+         *   <li>gitprovider.common.github - GitHub-specific internal code</li>
+         * </ul>
+         *
+         * <p>They SHOULD depend on:
+         * <ul>
+         *   <li>gitprovider.common.spi - Service Provider Interfaces</li>
+         *   <li>gitprovider.common.dto - Data Transfer Objects</li>
+         *   <li>gitprovider.common.events - Domain events</li>
+         *   <li>gitprovider entity packages (for reading data)</li>
+         * </ul>
+         */
+        @Test
+        @DisplayName("Feature modules do not bypass gitprovider SPIs")
+        void featureModulesDoNotBypassGitproviderSpis() {
+            // Internal packages that should NOT be accessed directly by feature modules
+            String[] forbiddenInternalPackages = {
+                "..gitprovider.sync..",
+                "..gitprovider.installation..",
+                "..gitprovider.common.github..",
+            };
+
+            ArchRule rule = noClasses()
+                .that()
+                .resideInAnyPackage("..leaderboard..", "..activity..", "..profile..", "..practices..")
+                .should()
+                .dependOnClassesThat()
+                .resideInAnyPackage(forbiddenInternalPackages)
+                .because(
+                    "Feature modules should depend on gitprovider SPIs (..spi..), DTOs (..dto..), " +
+                        "or events (..events..) - not internal packages like sync or installation"
+                );
+            rule.check(classes);
+        }
+
+        /**
+         * Verifies that feature modules use the SPI pattern correctly.
+         *
+         * <p>When feature modules need to provide functionality to gitprovider (callbacks,
+         * context providers), they should implement SPIs defined in gitprovider.common.spi,
+         * not create ad-hoc coupling.
+         */
+        @Test
+        @DisplayName("Feature modules do not depend on gitprovider GitHub service implementations")
+        void featureModulesDoNotDependOnGitHubServiceImplementations() {
+            ArchRule rule = noClasses()
+                .that()
+                .resideInAnyPackage("..leaderboard..", "..activity..", "..profile..", "..practices..")
+                .should()
+                .dependOnClassesThat()
+                .resideInAPackage("..gitprovider..github..service..")
+                .because("Feature modules should use SPIs, not depend on provider-specific service implementations");
             rule.check(classes);
         }
     }
@@ -490,7 +475,6 @@ class ModuleBoundaryTest {
                 .should()
                 .dependOnClassesThat()
                 .resideInAnyPackage("..workspace..internal..", "..workspace..adapter..")
-                .allowEmptyShould(true)
                 .because("Leaderboard should depend on workspace public API, not internals");
             rule.check(classes);
         }
@@ -510,7 +494,6 @@ class ModuleBoundaryTest {
                 .should()
                 .dependOnClassesThat()
                 .resideInAnyPackage("..leaderboard..internal..", "..leaderboard..repository..")
-                .allowEmptyShould(true)
                 .because("Activity should not depend on leaderboard internal classes");
             rule.check(classes);
         }
@@ -529,7 +512,6 @@ class ModuleBoundaryTest {
                 .should()
                 .dependOnClassesThat()
                 .resideInAnyPackage("..leaderboard..", "..activity..", "..notification..")
-                .allowEmptyShould(true)
                 .because("Mentor should be isolated from other feature modules");
             rule.check(classes);
         }
@@ -549,7 +531,6 @@ class ModuleBoundaryTest {
                 .should()
                 .dependOnClassesThat()
                 .resideInAnyPackage("..gitprovider..sync..", "..gitprovider..github..service..")
-                .allowEmptyShould(true)
                 .because("Profile should only read data, not depend on sync internals");
             rule.check(classes);
         }
@@ -569,7 +550,6 @@ class ModuleBoundaryTest {
                 .should()
                 .dependOnClassesThat()
                 .resideInAnyPackage("..leaderboard..service..", "..activity..service..", "..mentor..service..")
-                .allowEmptyShould(true)
                 .because("Notification should use domain events for cross-module communication");
             rule.check(classes);
         }

@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.activity;
 
+import de.tum.in.www1.hephaestus.core.WorkspaceAgnostic;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -24,6 +25,10 @@ import org.springframework.stereotype.Component;
  * <p>Periodically samples random events and verifies their content hash
  * to detect potential tampering or data corruption.
  *
+ * <p>Workspace-agnostic: This is a system-wide integrity audit that verifies
+ * activity event hashes across all workspaces. It's an infrastructure-level
+ * security mechanism, not a tenant-specific operation.
+ *
  * <h3>Alerting</h3>
  * <p>Corrupted events are logged at ERROR level and counted via metrics.
  * Configure alerts on the {@code activity.integrity.corrupted} metric.
@@ -31,6 +36,7 @@ import org.springframework.stereotype.Component;
  * @see ActivityEvent#verifyIntegrity()
  */
 @Component
+@WorkspaceAgnostic("System-wide integrity audit - verifies event hashes across all workspaces")
 public class ActivityIntegrityScheduler implements HealthIndicator {
 
     private static final Logger logger = LoggerFactory.getLogger(ActivityIntegrityScheduler.class);

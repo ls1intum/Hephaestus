@@ -1,6 +1,7 @@
 package de.tum.in.www1.hephaestus.workspace;
 
 import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -55,8 +56,8 @@ public class RepositoryToMonitor {
      */
     private Instant backfillLastRunAt;
 
-    @ManyToOne
-    @JoinColumn(name = "workspace_id")
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "workspace_id", nullable = false)
     @ToString.Exclude
     private Workspace workspace;
 

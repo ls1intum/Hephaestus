@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.gitprovider.pullrequest;
 
+import de.tum.in.www1.hephaestus.core.WorkspaceAgnostic;
 import jakarta.persistence.QueryHint;
 import java.time.Instant;
 import java.util.List;
@@ -15,6 +16,11 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Repository
 public interface PullRequestRepository extends JpaRepository<PullRequest, Long> {
+    /**
+     * Finds the earliest contribution date for a user across all workspaces.
+     * Used for global contributor statistics display.
+     */
+    @WorkspaceAgnostic("Global query for contributor page - shows first contribution across all workspaces")
     @Query(
         """
         SELECT MIN(p.createdAt)
@@ -67,6 +73,11 @@ public interface PullRequestRepository extends JpaRepository<PullRequest, Long> 
         @Param("workspaceId") Long workspaceId
     );
 
+    /**
+     * Finds a PR by repository ID and number for sync operations.
+     * Repository ID inherently has workspace through organization.workspaceId.
+     */
+    @WorkspaceAgnostic("Sync operation - Repository ID has workspace through organization")
     @Query(
         """
         SELECT p
@@ -83,6 +94,11 @@ public interface PullRequestRepository extends JpaRepository<PullRequest, Long> 
         @Param("number") int number
     );
 
+    /**
+     * Finds all synced PR numbers for a repository during sync operations.
+     * Repository ID inherently has workspace through organization.workspaceId.
+     */
+    @WorkspaceAgnostic("Sync operation - Repository ID has workspace through organization")
     @Query(
         """
         SELECT p.number
@@ -96,14 +112,17 @@ public interface PullRequestRepository extends JpaRepository<PullRequest, Long> 
 
     /**
      * Finds all pull requests belonging to a repository.
+     * Repository ID inherently has workspace through organization.workspaceId.
      *
      * @param repositoryId the repository ID
      * @return list of pull requests for the repository
      */
+    @WorkspaceAgnostic("Sync operation - Repository ID has workspace through organization")
     List<PullRequest> findAllByRepository_Id(Long repositoryId);
 
     /**
      * Streams all pull requests belonging to a repository.
+     * Repository ID inherently has workspace through organization.workspaceId.
      * <p>
      * Must be used within a try-with-resources block to ensure the stream is closed
      * and the database connection is released. The calling method must be annotated
@@ -112,6 +131,7 @@ public interface PullRequestRepository extends JpaRepository<PullRequest, Long> 
      * @param repositoryId the repository ID
      * @return stream of pull requests for the repository
      */
+    @WorkspaceAgnostic("Sync operation - Repository ID has workspace through organization")
     @QueryHints(@QueryHint(name = org.hibernate.jpa.HibernateHints.HINT_FETCH_SIZE, value = "50"))
     Stream<PullRequest> streamAllByRepository_Id(Long repositoryId);
 }

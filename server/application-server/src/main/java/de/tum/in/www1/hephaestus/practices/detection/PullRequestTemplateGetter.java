@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.practices.detection;
 
+import de.tum.in.www1.hephaestus.core.WorkspaceAgnostic;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.cache.annotation.CacheEvict;
@@ -13,8 +14,13 @@ import org.springframework.web.client.RestTemplate;
  *
  * <p>Templates are cached and periodically refreshed to minimize API calls
  * while ensuring reasonable freshness.
+ *
+ * <p>Workspace-agnostic: This is a cache management component. The scheduled
+ * eviction is infrastructure-level maintenance, not tenant-specific. Template
+ * fetching is keyed by repository name which has implicit workspace scope.
  */
 @Component
+@WorkspaceAgnostic("Cache management - scheduled eviction is infrastructure maintenance")
 public class PullRequestTemplateGetter {
 
     private static final Logger logger = LoggerFactory.getLogger(PullRequestTemplateGetter.class);

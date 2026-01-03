@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.practices.detection;
 
+import de.tum.in.www1.hephaestus.core.WorkspaceAgnostic;
 import de.tum.in.www1.hephaestus.practices.model.PullRequestBadPractice;
 import jakarta.transaction.Transactional;
 import java.util.List;
@@ -10,12 +11,19 @@ import org.springframework.stereotype.Repository;
 
 /**
  * Repository for pull request bad practice records.
+ *
+ * <p>Workspace-agnostic: All queries filter by PullRequest ID which has
+ * workspace context through {@code pullRequest.repository.organization.workspaceId}.
  */
 @Repository
+@WorkspaceAgnostic("Queries filter by PullRequest ID which has workspace through repository.organization")
 public interface PullRequestBadPracticeRepository extends JpaRepository<PullRequestBadPractice, Long> {
     /**
      * Finds the most recent version of each bad practice for a given pull request.
      * Groups by title and returns only the latest detection for each.
+     *
+     * <p>Workspace-agnostic: PullRequest ID inherently has workspace through
+     * repository.organization.workspaceId chain.
      *
      * @param pullRequestId the pull request ID
      * @return list of bad practices with their most recent state

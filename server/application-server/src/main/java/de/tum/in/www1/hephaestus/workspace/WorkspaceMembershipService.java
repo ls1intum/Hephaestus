@@ -334,4 +334,69 @@ public class WorkspaceMembershipService {
         member.setId(new WorkspaceMembership.Id(workspace.getId(), user.getId()));
         return member;
     }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // Query methods for controller
+    // ══════════════════════════════════════════════════════════════════════════
+
+    /**
+     * Gets a workspace membership by workspace and user ID.
+     *
+     * @param workspaceId Workspace ID
+     * @param userId User ID
+     * @return The membership
+     * @throws IllegalArgumentException if membership not found
+     */
+    @Transactional(readOnly = true)
+    public WorkspaceMembership getMembership(Long workspaceId, Long userId) {
+        return workspaceMembershipRepository
+            .findByWorkspace_IdAndUser_Id(workspaceId, userId)
+            .orElseThrow(() -> new IllegalArgumentException("Workspace membership not found"));
+    }
+
+    /**
+     * Gets a workspace membership by workspace and user ID, or empty if not found.
+     *
+     * @param workspaceId Workspace ID
+     * @param userId User ID
+     * @return Optional containing the membership if found
+     */
+    @Transactional(readOnly = true)
+    public Optional<WorkspaceMembership> findMembership(Long workspaceId, Long userId) {
+        return workspaceMembershipRepository.findByWorkspace_IdAndUser_Id(workspaceId, userId);
+    }
+
+    /**
+     * Lists all members of a workspace with pagination.
+     *
+     * @param workspaceId Workspace ID
+     * @param pageable Pagination parameters
+     * @return Page of workspace memberships
+     */
+    @Transactional(readOnly = true)
+    public org.springframework.data.domain.Page<WorkspaceMembership> listMembers(
+        Long workspaceId,
+        org.springframework.data.domain.Pageable pageable
+    ) {
+        return workspaceMembershipRepository.findAllByWorkspace_Id(workspaceId, pageable);
+    }
+
+    /**
+     * Checks if removing a member would leave the workspace without owners.
+     *
+     * @param workspaceId Workspace ID
+     * @param membership The membership to check
+     * @return true if the membership is the last owner
+     */
+    @Transactional(readOnly = true)
+    public boolean isLastOwner(Long workspaceId, WorkspaceMembership membership) {
+        if (membership.getRole() != WorkspaceMembership.WorkspaceRole.OWNER) {
+            return false;
+        }
+        long ownerCount = workspaceMembershipRepository.countByWorkspace_IdAndRole(
+            workspaceId,
+            WorkspaceMembership.WorkspaceRole.OWNER
+        );
+        return ownerCount <= 1;
+    }
 }

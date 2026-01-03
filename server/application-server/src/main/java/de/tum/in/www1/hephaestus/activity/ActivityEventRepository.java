@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.activity;
 
+import de.tum.in.www1.hephaestus.core.WorkspaceAgnostic;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -203,7 +204,13 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
         return findByWorkspaceWithLimit(workspaceId, since, 1000);
     }
 
-    /** Mentor context: recent activity for a user with limit for safety */
+    /**
+     * Mentor context: recent activity for a user with limit for safety.
+     *
+     * <p>Workspace-agnostic: Used by AI mentor which operates with actor context
+     * already established. The mentor session is user-specific, not workspace-scoped.
+     */
+    @WorkspaceAgnostic("Mentor context query - actor ID implies user scope, not tenant boundary")
     @Query(
         """
         SELECT e FROM ActivityEvent e
@@ -227,7 +234,11 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
     /**
      * Email attribution: get event chain by correlation ID.
      * Limited to 100 events per correlation chain (safety bound).
+     *
+     * <p>Workspace-agnostic: Correlation IDs are globally unique UUIDs. Events in the
+     * same correlation chain belong to the same workspace by design.
      */
+    @WorkspaceAgnostic("Correlation IDs are globally unique - workspace implicit in the chain")
     @Query(
         """
         SELECT e FROM ActivityEvent e
@@ -306,9 +317,13 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
      * <p>Uses PostgreSQL's TABLESAMPLE for efficient random sampling
      * without full table scan.
      *
+     * <p>Workspace-agnostic: System-wide integrity verification operation.
+     * Used by admin/system jobs to spot-check data consistency.
+     *
      * @param pageable page request with sample size limit
      * @return random sample of events
      */
+    @WorkspaceAgnostic("System-wide integrity verification - admin operation")
     @Query(
         value = """
         SELECT * FROM activity_event

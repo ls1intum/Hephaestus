@@ -1,4 +1,4 @@
-package de.tum.in.www1.hephaestus.profile;
+package de.tum.in.www1.hephaestus.profile.dto;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestInfoDTO;

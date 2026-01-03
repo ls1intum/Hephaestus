@@ -2,19 +2,17 @@ package de.tum.in.www1.hephaestus.architecture;
 
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.*;
 import static de.tum.in.www1.hephaestus.architecture.ArchitectureTestConstants.*;
+import static de.tum.in.www1.hephaestus.architecture.conditions.HephaestusConditions.*;
 
 import com.tngtech.archunit.core.domain.JavaClass;
-import com.tngtech.archunit.core.domain.JavaClasses;
-import com.tngtech.archunit.core.importer.ClassFileImporter;
-import com.tngtech.archunit.core.importer.ImportOption;
+import com.tngtech.archunit.core.domain.JavaField;
+import com.tngtech.archunit.core.domain.JavaModifier;
 import com.tngtech.archunit.lang.ArchCondition;
 import com.tngtech.archunit.lang.ArchRule;
 import com.tngtech.archunit.lang.ConditionEvents;
 import com.tngtech.archunit.lang.SimpleConditionEvent;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -24,26 +22,17 @@ import org.junit.jupiter.api.Test;
  * <ul>
  *   <li>God class detection (SRP violations)</li>
  *   <li>Constructor parameter limits</li>
- *   <li>Return type safety</li>
+ *   <li>Interface Segregation Principle</li>
+ *   <li>Dependency Inversion patterns</li>
  * </ul>
  *
  * <p>All thresholds are defined in {@link ArchitectureTestConstants}.
+ * <p>NOTE: Consolidated from SolidPrinciplesTest.java - unique ISP/DIP tests merged here.
  *
  * @see ArchitectureTestConstants
  */
 @DisplayName("Code Quality")
-@Tag("architecture")
-class CodeQualityTest {
-
-    private static JavaClasses classes;
-
-    @BeforeAll
-    static void setUp() {
-        classes = new ClassFileImporter()
-            .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
-            .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_JARS)
-            .importPackages(BASE_PACKAGE);
-    }
+class CodeQualityTest extends HephaestusArchitectureTest {
 
     // ========================================================================
     // GOD CLASS DETECTION
@@ -70,37 +59,6 @@ class CodeQualityTest {
                 "GitHubDataSyncService" // Coordinates 15 entity-specific sync services
             );
 
-            ArchCondition<JavaClass> haveLimitedParams = new ArchCondition<>(
-                "have at most " + MAX_SERVICE_DEPENDENCIES + " constructor parameters"
-            ) {
-                @Override
-                public void check(JavaClass javaClass, ConditionEvents events) {
-                    if (orchestratorExceptions.contains(javaClass.getSimpleName())) {
-                        return; // Skip orchestrator exceptions
-                    }
-                    long maxParams = javaClass
-                        .getConstructors()
-                        .stream()
-                        .mapToLong(c -> c.getRawParameterTypes().size())
-                        .max()
-                        .orElse(0);
-
-                    if (maxParams > MAX_SERVICE_DEPENDENCIES) {
-                        events.add(
-                            SimpleConditionEvent.violated(
-                                javaClass,
-                                String.format(
-                                    "GOD CLASS: %s has %d constructor params (max %d) - split into smaller services",
-                                    javaClass.getSimpleName(),
-                                    maxParams,
-                                    MAX_SERVICE_DEPENDENCIES
-                                )
-                            )
-                        );
-                    }
-                }
-            };
-
             ArchRule rule = classes()
                 .that()
                 .haveSimpleNameEndingWith("Service")
@@ -108,7 +66,7 @@ class CodeQualityTest {
                 .areAnnotatedWith(org.springframework.stereotype.Service.class)
                 .and()
                 .resideOutsideOfPackage("..intelligenceservice..")
-                .should(haveLimitedParams)
+                .should(haveAtMostConstructorParameters(MAX_SERVICE_DEPENDENCIES, orchestratorExceptions))
                 .because("God classes with many dependencies violate SRP and are hard to test");
 
             rule.check(classes);
@@ -120,75 +78,33 @@ class CodeQualityTest {
         @Test
         @DisplayName("Controllers have max 5 dependencies")
         void controllersAreThin() {
-            ArchCondition<JavaClass> haveFewDeps = new ArchCondition<>(
-                "have at most " + MAX_CONTROLLER_DEPENDENCIES + " constructor parameters"
-            ) {
-                @Override
-                public void check(JavaClass javaClass, ConditionEvents events) {
-                    long maxParams = javaClass
-                        .getConstructors()
-                        .stream()
-                        .mapToLong(c -> c.getRawParameterTypes().size())
-                        .max()
-                        .orElse(0);
-
-                    if (maxParams > MAX_CONTROLLER_DEPENDENCIES) {
-                        events.add(
-                            SimpleConditionEvent.violated(
-                                javaClass,
-                                String.format(
-                                    "FAT CONTROLLER: %s has %d dependencies (max %d) - extract to services",
-                                    javaClass.getSimpleName(),
-                                    maxParams,
-                                    MAX_CONTROLLER_DEPENDENCIES
-                                )
-                            )
-                        );
-                    }
-                }
-            };
-
             ArchRule rule = classes()
                 .that()
                 .areAnnotatedWith(org.springframework.web.bind.annotation.RestController.class)
-                .should(haveFewDeps)
+                .should(haveAtMostConstructorParameters(MAX_CONTROLLER_DEPENDENCIES))
                 .because("Controllers should delegate to services, not orchestrate many dependencies");
 
             rule.check(classes);
         }
-    }
-
-    // ========================================================================
-    // EXCEPTION HANDLING
-    // ========================================================================
-
-    @Nested
-    @DisplayName("Exception Handling")
-    class ExceptionHandlingTests {
 
         /**
-         * Methods returning Optional should not also return null.
+         * Services should not have excessive business methods.
          *
-         * <p>Optional was introduced to eliminate null checks - returning
-         * null from an Optional-returning method defeats the purpose.
+         * <p>Classes with too many business methods violate SRP and should be split.
+         * Business methods exclude getters, setters, equals, hashCode, toString, and constructors.
          */
         @Test
-        @DisplayName("Optional return types discourage null")
-        void optionalMethodsExist() {
-            // This is a documentation test - actual enforcement happens at runtime
-            // Just verify we have Optional usage in the codebase
+        @DisplayName("Services have limited business methods (max 25)")
+        void servicesHaveLimitedBusinessMethods() {
             ArchRule rule = classes()
                 .that()
-                .resideInAPackage(BASE_PACKAGE + "..")
-                .should()
-                .bePublic()
-                .orShould()
-                .bePackagePrivate()
-                .orShould()
-                .beProtected()
-                .orShould()
-                .bePrivate()
-                .allowEmptyShould(true);
+                .haveSimpleNameEndingWith("Service")
+                .and()
+                .areAnnotatedWith(org.springframework.stereotype.Service.class)
+                .and()
+                .resideOutsideOfPackage("..intelligenceservice..")
+                .should(haveAtMostBusinessMethods(MAX_SERVICE_METHODS))
+                .because("Services with many methods violate SRP and should be split into focused services");
 
             rule.check(classes);
         }
@@ -223,7 +139,8 @@ class CodeQualityTest {
         void methodsHaveLimitedParameters() {
             // Methods that have command-object overloads but need many params for Spring annotations
             java.util.Set<String> allowedOverloads = java.util.Set.of(
-                "ActivityEventService.record" // Has RecordActivityCommand overload; params needed for @Retryable
+                "ActivityEventService.record", // Has RecordActivityCommand overload; params needed for @Retryable
+                "ActivityEventService.recordWithContext" // Internal method called by record(); same parameter pattern
             );
 
             ArchCondition<JavaClass> haveMethodsWithLimitedParams = new ArchCondition<>(
@@ -350,60 +267,341 @@ class CodeQualityTest {
     class SecurityPatternTests {
 
         /**
-         * Services handling tokens should be in security/auth packages.
+         * Services handling tokens should be in appropriate security-related packages.
+         *
+         * <p>Token services are sensitive and should be in one of:
+         * <ul>
+         *   <li>Security packages (auth, security) - for authentication tokens</li>
+         *   <li>App packages - for session tokens</li>
+         *   <li>Common packages - for shared token utilities</li>
+         *   <li>GitHub packages - for GitHub-specific token handling</li>
+         * </ul>
          */
         @Test
         @DisplayName("Token services in appropriate packages")
         void tokenServicesInSecurityPackages() {
+            ArchCondition<JavaClass> beInTokenAppropriatePackage = new ArchCondition<>(
+                "be in security, auth, app, common, or github package"
+            ) {
+                @Override
+                public void check(JavaClass javaClass, ConditionEvents events) {
+                    String packageName = javaClass.getPackageName();
+                    boolean isInAppropriatePackage =
+                        packageName.contains(".app") ||
+                        packageName.contains(".auth") ||
+                        packageName.contains(".security") ||
+                        packageName.contains(".common") ||
+                        packageName.contains(".github");
+
+                    if (!isInAppropriatePackage) {
+                        events.add(
+                            SimpleConditionEvent.violated(
+                                javaClass,
+                                String.format(
+                                    "%s handles tokens but is not in app/auth/security/common/github package",
+                                    javaClass.getSimpleName()
+                                )
+                            )
+                        );
+                    }
+                }
+            };
+
             ArchRule rule = classes()
                 .that()
                 .haveSimpleNameContaining("Token")
                 .and()
                 .haveSimpleNameEndingWith("Service")
-                .should()
-                .resideInAPackage("..app..")
-                .orShould()
-                .resideInAPackage("..auth..")
-                .orShould()
-                .resideInAPackage("..security..")
-                .orShould()
-                .resideInAPackage("..common..")
-                .orShould()
-                .resideInAPackage("..github..")
-                .allowEmptyShould(true)
-                .because("Token handling should be centralized in security packages");
+                .should(beInTokenAppropriatePackage)
+                .because("Token handling should be centralized in security-related packages");
 
             rule.check(classes);
         }
     }
 
     // ========================================================================
-    // NAMING CONVENTIONS
+    // INTERFACE SEGREGATION PRINCIPLE (merged from SolidPrinciplesTest)
     // ========================================================================
 
     @Nested
-    @DisplayName("Advanced Naming")
-    class AdvancedNamingTests {
+    @DisplayName("Interface Segregation Principle")
+    class InterfaceSegregationTests {
 
         /**
-         * DTOs should use consistent suffix.
+         * Interfaces should have limited methods.
+         *
+         * <p>Fat interfaces force implementations to provide methods they
+         * don't need. Prefer small, focused interfaces.
          */
         @Test
-        @DisplayName("Response DTOs end with DTO suffix")
-        void dtosHaveConsistentNaming() {
+        @DisplayName("Interfaces have limited methods (max 8)")
+        void interfacesHaveLimitedMethods() {
+            ArchCondition<JavaClass> haveLimitedMethods = new ArchCondition<>(
+                "have at most " + MAX_INTERFACE_METHODS + " methods"
+            ) {
+                @Override
+                public void check(JavaClass javaClass, ConditionEvents events) {
+                    // Skip Spring Data repositories - they have many default methods
+                    if (javaClass.isAssignableTo(org.springframework.data.repository.Repository.class)) {
+                        return;
+                    }
+
+                    int methodCount = (int) javaClass
+                        .getMethods()
+                        .stream()
+                        .filter(m -> !m.getModifiers().contains(JavaModifier.STATIC))
+                        .filter(m -> m.getModifiers().contains(JavaModifier.ABSTRACT))
+                        .count();
+
+                    if (methodCount > MAX_INTERFACE_METHODS) {
+                        events.add(
+                            SimpleConditionEvent.violated(
+                                javaClass,
+                                String.format(
+                                    "%s has %d abstract methods (max %d) - ISP violation",
+                                    javaClass.getSimpleName(),
+                                    methodCount,
+                                    MAX_INTERFACE_METHODS
+                                )
+                            )
+                        );
+                    }
+                }
+            };
+
             ArchRule rule = classes()
                 .that()
-                .haveSimpleNameEndingWith("Response")
+                .areInterfaces()
+                .and()
+                .resideInAPackage(BASE_PACKAGE + "..")
                 .and()
                 .resideOutsideOfPackage("..intelligenceservice..")
                 .and()
-                .areNotInterfaces()
-                .should()
-                .haveSimpleNameEndingWith("DTO")
-                .orShould()
-                .haveSimpleNameEndingWith("Response")
-                .allowEmptyShould(true)
-                .because("Response types should be clearly identifiable");
+                .resideOutsideOfPackage(GENERATED_GRAPHQL_PACKAGE)
+                .should(haveLimitedMethods)
+                .because("Interfaces should be small and focused (ISP)");
+
+            rule.check(classes);
+        }
+
+        /**
+         * SPI interfaces should be particularly focused.
+         *
+         * <p>Service Provider Interfaces define module contracts -
+         * they should be minimal.
+         */
+        @Test
+        @DisplayName("SPI interfaces are focused (max 8 methods)")
+        void spiInterfacesAreFocused() {
+            ArchCondition<JavaClass> beFocused = new ArchCondition<>("have at most " + MAX_SPI_METHODS + " methods") {
+                @Override
+                public void check(JavaClass javaClass, ConditionEvents events) {
+                    int methodCount = (int) javaClass
+                        .getMethods()
+                        .stream()
+                        .filter(m -> m.getModifiers().contains(JavaModifier.ABSTRACT))
+                        .count();
+
+                    if (methodCount > MAX_SPI_METHODS) {
+                        events.add(
+                            SimpleConditionEvent.violated(
+                                javaClass,
+                                String.format(
+                                    "SPI %s has %d methods (max %d) - split interface",
+                                    javaClass.getSimpleName(),
+                                    methodCount,
+                                    MAX_SPI_METHODS
+                                )
+                            )
+                        );
+                    }
+                }
+            };
+
+            ArchRule rule = classes()
+                .that()
+                .areInterfaces()
+                .and()
+                .resideInAPackage("..spi..")
+                .should(beFocused)
+                .because("SPI interfaces should be minimal");
+
+            rule.check(classes);
+        }
+    }
+
+    // ========================================================================
+    // DEPENDENCY INVERSION (merged from SolidPrinciplesTest)
+    // ========================================================================
+
+    @Nested
+    @DisplayName("Dependency Inversion")
+    class DependencyInversionTests {
+
+        /**
+         * Limit ObjectProvider usage for lazy resolution / cycle breaking.
+         *
+         * <p>ObjectProvider is a valid way to break cycles, but should
+         * be used sparingly. Known usages are documented here.
+         */
+        @Test
+        @DisplayName("ObjectProvider usage is limited to known cases")
+        void objectProviderUsageIsLimited() {
+            java.util.Set<String> knownCycleBreakers = java.util.Set.of(
+                "WorkspaceActivationService",
+                "WorkspaceRepositoryMonitorService"
+            );
+
+            ArchCondition<JavaField> beInKnownClass = new ArchCondition<>("be in a known cycle-breaking class") {
+                @Override
+                public void check(JavaField field, ConditionEvents events) {
+                    String ownerName = field.getOwner().getSimpleName();
+                    if (!knownCycleBreakers.contains(ownerName)) {
+                        events.add(
+                            SimpleConditionEvent.violated(
+                                field,
+                                String.format(
+                                    "NEW ObjectProvider usage in %s - add to knownCycleBreakers if intentional",
+                                    field.getFullName()
+                                )
+                            )
+                        );
+                    }
+                }
+            };
+
+            ArchRule rule = fields()
+                .that()
+                .haveRawType(org.springframework.beans.factory.ObjectProvider.class)
+                .should(beInKnownClass)
+                .because("ObjectProvider usage should be limited to documented cycle-breaking cases");
+
+            rule.check(classes);
+        }
+    }
+
+    // ========================================================================
+    // LISKOV SUBSTITUTION PRINCIPLE (merged from SolidPrinciplesTest)
+    // ========================================================================
+
+    @Nested
+    @DisplayName("Liskov Substitution Principle")
+    class LiskovSubstitutionTests {
+
+        /**
+         * Services should not declare generic Exception in methods.
+         *
+         * <p>LSP principle: methods should declare specific exceptions.
+         */
+        @Test
+        @DisplayName("Service methods do not declare generic Exception")
+        void serviceMethodsDoNotDeclareGenericException() {
+            ArchCondition<JavaClass> notDeclareGenericException = new ArchCondition<>(
+                "not declare generic Exception in methods"
+            ) {
+                @Override
+                public void check(JavaClass javaClass, ConditionEvents events) {
+                    javaClass
+                        .getMethods()
+                        .stream()
+                        .filter(m -> m.getOwner().equals(javaClass))
+                        .filter(m -> !m.getName().startsWith("$"))
+                        .filter(m -> !m.getName().equals("<init>"))
+                        .forEach(method -> {
+                            boolean declaresGenericException = method
+                                .getThrowsClause()
+                                .stream()
+                                .anyMatch(t -> t.getRawType().getName().equals("java.lang.Exception"));
+                            if (declaresGenericException) {
+                                events.add(
+                                    SimpleConditionEvent.violated(
+                                        javaClass,
+                                        String.format(
+                                            "LSP: %s.%s declares generic Exception - use specific exceptions",
+                                            javaClass.getSimpleName(),
+                                            method.getName()
+                                        )
+                                    )
+                                );
+                            }
+                        });
+                }
+            };
+
+            ArchRule rule = classes()
+                .that()
+                .haveSimpleNameEndingWith("Service")
+                .and()
+                .areAnnotatedWith(org.springframework.stereotype.Service.class)
+                .and()
+                .resideOutsideOfPackage("..intelligenceservice..")
+                .should(notDeclareGenericException)
+                .because("LSP: specific exceptions are required for substitutability");
+
+            rule.check(classes);
+        }
+
+        /**
+         * Service implementations should not throw UnsupportedOperationException.
+         *
+         * <p>LSP principle: a subtype should be substitutable for its supertype.
+         * Throwing UnsupportedOperationException indicates the implementation doesn't
+         * properly fulfill its contract - violating LSP.
+         *
+         * <p><strong>Detection method:</strong> This check scans method bytecode for
+         * instantiation of UnsupportedOperationException, which catches both direct throws
+         * and throws via utility methods.
+         */
+        @Test
+        @DisplayName("Service implementations do not throw UnsupportedOperationException")
+        void serviceImplementationsDoNotThrowUnsupportedOperationException() {
+            ArchCondition<JavaClass> notThrowUnsupportedOperationException = new ArchCondition<>(
+                "not throw UnsupportedOperationException"
+            ) {
+                @Override
+                public void check(JavaClass javaClass, ConditionEvents events) {
+                    javaClass
+                        .getMethods()
+                        .stream()
+                        .filter(m -> m.getOwner().equals(javaClass))
+                        .filter(m -> !m.getName().startsWith("$"))
+                        .filter(m -> !m.getName().startsWith("lambda$"))
+                        .filter(m -> !m.getName().equals("<init>"))
+                        .forEach(method -> {
+                            // Check if method instantiates UnsupportedOperationException
+                            boolean throwsUnsupported = method
+                                .getConstructorCallsFromSelf()
+                                .stream()
+                                .anyMatch(call ->
+                                    call.getTargetOwner().getName().equals("java.lang.UnsupportedOperationException")
+                                );
+
+                            if (throwsUnsupported) {
+                                events.add(
+                                    SimpleConditionEvent.violated(
+                                        javaClass,
+                                        String.format(
+                                            "LSP: %s.%s throws UnsupportedOperationException - " +
+                                                "indicates contract violation, consider interface redesign",
+                                            javaClass.getSimpleName(),
+                                            method.getName()
+                                        )
+                                    )
+                                );
+                            }
+                        });
+                }
+            };
+
+            ArchRule rule = classes()
+                .that()
+                .haveSimpleNameEndingWith("Service")
+                .and()
+                .areAnnotatedWith(org.springframework.stereotype.Service.class)
+                .and()
+                .resideOutsideOfPackage("..intelligenceservice..")
+                .should(notThrowUnsupportedOperationException)
+                .because("LSP: implementations must honor contracts, not refuse operations");
 
             rule.check(classes);
         }

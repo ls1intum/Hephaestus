@@ -2,23 +2,19 @@ package de.tum.in.www1.hephaestus.architecture;
 
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.*;
 import static de.tum.in.www1.hephaestus.architecture.ArchitectureTestConstants.*;
+import static de.tum.in.www1.hephaestus.architecture.conditions.HephaestusConditions.*;
 
 import com.tngtech.archunit.core.domain.JavaClass;
-import com.tngtech.archunit.core.domain.JavaClasses;
-import com.tngtech.archunit.core.domain.JavaField;
 import com.tngtech.archunit.core.domain.JavaMethod;
-import com.tngtech.archunit.core.importer.ClassFileImporter;
-import com.tngtech.archunit.core.importer.ImportOption;
 import com.tngtech.archunit.lang.ArchCondition;
 import com.tngtech.archunit.lang.ArchRule;
 import com.tngtech.archunit.lang.ConditionEvents;
 import com.tngtech.archunit.lang.SimpleConditionEvent;
+import de.tum.in.www1.hephaestus.core.WorkspaceAgnostic;
 import java.util.Set;
 import java.util.stream.Collectors;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -37,10 +33,7 @@ import org.junit.jupiter.api.Test;
  * @see ArchitectureTestConstants
  */
 @DisplayName("Data Isolation Architecture")
-@Tag("architecture")
-class DataIsolationArchitectureTest {
-
-    private static JavaClasses classes;
+class DataIsolationArchitectureTest extends HephaestusArchitectureTest {
 
     /**
      * Entity types that are workspace-scoped through their relationship chain.
@@ -51,6 +44,7 @@ class DataIsolationArchitectureTest {
         "ActivityEvent", // has Workspace field
         "RepositoryToMonitor", // has Workspace field
         "WorkspaceMembership", // has Workspace field
+        "ChatThread", // has Workspace field
         // Through repository.organization.workspaceId
         "PullRequest",
         "Issue",
@@ -67,7 +61,13 @@ class DataIsolationArchitectureTest {
         // Bad practice entities through PR
         "BadPracticeDetection",
         "PullRequestBadPractice",
-        "BadPracticeFeedback"
+        "BadPracticeFeedback",
+        // Through chat thread -> workspace
+        "ChatMessage", // through ChatThread.workspace
+        "ChatMessagePart", // through ChatMessage.thread.workspace
+        "ChatMessageVote", // through ChatMessage (via messageId) -> ChatThread.workspace
+        // Through organization.workspaceId (ID-based relationship)
+        "OrganizationMembership" // organizationId -> Organization.workspaceId
     );
 
     /**
@@ -81,14 +81,6 @@ class DataIsolationArchitectureTest {
         "IssueType", // GitHub issue types are workspace-scoped through issue
         "DeadLetterEvent" // System-wide debugging
     );
-
-    @BeforeAll
-    static void setUp() {
-        classes = new ClassFileImporter()
-            .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
-            .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_JARS)
-            .importPackages(BASE_PACKAGE);
-    }
 
     // ========================================================================
     // ENTITY WORKSPACE RELATIONSHIPS
@@ -187,74 +179,11 @@ class DataIsolationArchitectureTest {
         @Test
         @DisplayName("Direct workspace relationships are not nullable")
         void directWorkspaceRelationshipsNotNullable() {
-            ArchCondition<JavaField> beNotNullableIfWorkspace = new ArchCondition<>(
-                "be not nullable if Workspace type"
-            ) {
-                @Override
-                public void check(JavaField field, ConditionEvents events) {
-                    if (!field.getRawType().getSimpleName().equals("Workspace")) {
-                        return;
-                    }
-
-                    // Check for @NotNull or @JoinColumn(nullable = false)
-                    boolean hasNotNullAnnotation =
-                        field.isAnnotatedWith(jakarta.validation.constraints.NotNull.class) ||
-                        field.isAnnotatedWith("org.jetbrains.annotations.NotNull");
-
-                    // Check JoinColumn for nullable = false
-                    boolean hasNonNullableJoinColumn = field
-                        .getAnnotations()
-                        .stream()
-                        .filter(a -> a.getRawType().getSimpleName().equals("JoinColumn"))
-                        .findFirst()
-                        .map(a -> {
-                            // JoinColumn has nullable attribute
-                            try {
-                                Object nullable = a.getExplicitlyDeclaredProperty("nullable");
-                                return Boolean.FALSE.equals(nullable);
-                            } catch (Exception e) {
-                                return false;
-                            }
-                        })
-                        .orElse(false);
-
-                    // Check ManyToOne for optional = false
-                    boolean hasRequiredManyToOne = field
-                        .getAnnotations()
-                        .stream()
-                        .filter(a -> a.getRawType().getSimpleName().equals("ManyToOne"))
-                        .findFirst()
-                        .map(a -> {
-                            try {
-                                Object optional = a.getExplicitlyDeclaredProperty("optional");
-                                return Boolean.FALSE.equals(optional);
-                            } catch (Exception e) {
-                                return false;
-                            }
-                        })
-                        .orElse(false);
-
-                    if (!hasNotNullAnnotation && !hasNonNullableJoinColumn && !hasRequiredManyToOne) {
-                        events.add(
-                            SimpleConditionEvent.violated(
-                                field,
-                                String.format(
-                                    "NULLABLE WORKSPACE: %s.%s is a Workspace field without @NotNull or " +
-                                        "@JoinColumn(nullable=false). This could lead to orphaned data.",
-                                    field.getOwner().getSimpleName(),
-                                    field.getName()
-                                )
-                            )
-                        );
-                    }
-                }
-            };
-
             ArchRule rule = fields()
                 .that()
                 .areDeclaredInClassesThat()
                 .areAnnotatedWith(jakarta.persistence.Entity.class)
-                .should(beNotNullableIfWorkspace)
+                .should(beNotNullableIfWorkspaceType())
                 .because("Workspace relationships should be required to prevent orphaned data");
 
             rule.check(classes);
@@ -396,6 +325,16 @@ class DataIsolationArchitectureTest {
 
                     String methodKey = repoName + "." + methodName;
                     if (MultiTenancyArchitectureTest.WORKSPACE_AGNOSTIC_METHODS.contains(methodKey)) {
+                        return;
+                    }
+
+                    // Skip methods or classes annotated with @WorkspaceAgnostic
+                    if (method.isAnnotatedWith(WorkspaceAgnostic.class)) {
+                        return;
+                    }
+
+                    // Skip if the repository class is annotated as workspace-agnostic
+                    if (method.getOwner().isAnnotatedWith(WorkspaceAgnostic.class)) {
                         return;
                     }
 

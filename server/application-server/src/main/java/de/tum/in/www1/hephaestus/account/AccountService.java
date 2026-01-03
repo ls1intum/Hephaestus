@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.account;
 
+import de.tum.in.www1.hephaestus.core.WorkspaceAgnostic;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.integrations.posthog.PosthogClient;
@@ -21,6 +22,7 @@ import org.springframework.web.server.ResponseStatusException;
  * Separated from git provider concerns to maintain clean architecture.
  */
 @Service
+@WorkspaceAgnostic("User-scoped account operations - not workspace-specific")
 public class AccountService {
 
     private static final Logger logger = LoggerFactory.getLogger(AccountService.class);

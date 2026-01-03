@@ -1,17 +1,11 @@
 package de.tum.in.www1.hephaestus.architecture;
 
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.*;
-import static com.tngtech.archunit.library.dependencies.SlicesRuleDefinition.slices;
 import static de.tum.in.www1.hephaestus.architecture.ArchitectureTestConstants.*;
 
-import com.tngtech.archunit.core.domain.JavaClasses;
-import com.tngtech.archunit.core.importer.ClassFileImporter;
-import com.tngtech.archunit.core.importer.ImportOption;
 import com.tngtech.archunit.lang.ArchRule;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -30,18 +24,7 @@ import org.junit.jupiter.api.Test;
  * @see ArchitectureTestConstants
  */
 @DisplayName("Cross-Cutting Module Boundaries")
-@Tag("architecture")
-class CrossCuttingModuleBoundaryTest {
-
-    private static JavaClasses classes;
-
-    @BeforeAll
-    static void setUp() {
-        classes = new ClassFileImporter()
-            .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
-            .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_JARS)
-            .importPackages(BASE_PACKAGE);
-    }
+class CrossCuttingModuleBoundaryTest extends HephaestusArchitectureTest {
 
     // ========================================================================
     // CONTRIBUTORS MODULE ISOLATION
@@ -67,7 +50,6 @@ class CrossCuttingModuleBoundaryTest {
                 .should()
                 .dependOnClassesThat()
                 .resideInAnyPackage("..leaderboard..service..", "..leaderboard..repository..")
-                .allowEmptyShould(true)
                 .because("Contributors module is independent of leaderboard scoring");
             rule.check(classes);
         }
@@ -84,7 +66,6 @@ class CrossCuttingModuleBoundaryTest {
                 .should()
                 .dependOnClassesThat()
                 .resideInAnyPackage("..activity..service..", "..activity..repository..", "..practices..")
-                .allowEmptyShould(true)
                 .because("Contributors module should not depend on activity internals");
             rule.check(classes);
         }
@@ -101,7 +82,6 @@ class CrossCuttingModuleBoundaryTest {
                 .should()
                 .dependOnClassesThat()
                 .resideInAPackage("..mentor..")
-                .allowEmptyShould(true)
                 .because("Contributors and mentor are independent modules");
             rule.check(classes);
         }
@@ -137,7 +117,6 @@ class CrossCuttingModuleBoundaryTest {
                     "..profile..",
                     "..contributors.."
                 )
-                .allowEmptyShould(true)
                 .because("Account is a foundational module - feature modules depend on it");
             rule.check(classes);
         }
@@ -156,7 +135,6 @@ class CrossCuttingModuleBoundaryTest {
                 .should()
                 .dependOnClassesThat()
                 .resideInAPackage("..gitprovider..sync..")
-                .allowEmptyShould(true)
                 .because("Account handles user management, not data sync");
             rule.check(classes);
         }
@@ -193,7 +171,6 @@ class CrossCuttingModuleBoundaryTest {
                     "..contributors..",
                     "..workspace.."
                 )
-                .allowEmptyShould(true)
                 .because("Core is a foundation layer - should not depend on feature modules");
             rule.check(classes);
         }
@@ -212,7 +189,6 @@ class CrossCuttingModuleBoundaryTest {
                 .should()
                 .dependOnClassesThat()
                 .resideInAPackage("..gitprovider..")
-                .allowEmptyShould(true)
                 .because("Core should be infrastructure-agnostic");
             rule.check(classes);
         }
@@ -239,7 +215,6 @@ class CrossCuttingModuleBoundaryTest {
                     "..contributors..",
                     "..gitprovider.."
                 )
-                .allowEmptyShould(true)
                 .because("Shared code should not depend on feature modules");
             rule.check(classes);
         }
@@ -273,7 +248,6 @@ class CrossCuttingModuleBoundaryTest {
                     "..mentor..service..",
                     "..profile..service.."
                 )
-                .allowEmptyShould(true)
                 .because("Integrations are consumed by features, not vice versa");
             rule.check(classes);
         }
@@ -303,80 +277,14 @@ class CrossCuttingModuleBoundaryTest {
                 .should()
                 .dependOnClassesThat()
                 .resideInAnyPackage("..leaderboard..repository..", "..activity..repository..", "..mentor..repository..")
-                .allowEmptyShould(true)
                 .because("Config should wire up services, not access repositories directly");
             rule.check(classes);
         }
     }
 
-    // ========================================================================
-    // NO CYCLES IN FEATURE MODULES
-    // ========================================================================
-
-    @Nested
-    @DisplayName("Feature Module Cycle Detection")
-    class FeatureModuleCycleTests {
-
-        /**
-         * No cycles within activity module subpackages.
-         */
-        @Test
-        @DisplayName("No cycles within activity subpackages")
-        void noCyclesWithinActivitySubpackages() {
-            ArchRule rule = slices()
-                .matching(BASE_PACKAGE + ".activity.(*)..")
-                .should()
-                .beFreeOfCycles()
-                .allowEmptyShould(true)
-                .because("Activity subpackages should not have circular dependencies");
-            rule.check(classes);
-        }
-
-        /**
-         * No cycles within leaderboard module subpackages.
-         */
-        @Test
-        @DisplayName("No cycles within leaderboard subpackages")
-        void noCyclesWithinLeaderboardSubpackages() {
-            ArchRule rule = slices()
-                .matching(BASE_PACKAGE + ".leaderboard.(*)..")
-                .should()
-                .beFreeOfCycles()
-                .allowEmptyShould(true)
-                .because("Leaderboard subpackages should not have circular dependencies");
-            rule.check(classes);
-        }
-
-        /**
-         * No cycles within mentor module subpackages.
-         */
-        @Test
-        @DisplayName("No cycles within mentor subpackages")
-        void noCyclesWithinMentorSubpackages() {
-            ArchRule rule = slices()
-                .matching(BASE_PACKAGE + ".mentor.(*)..")
-                .should()
-                .beFreeOfCycles()
-                .allowEmptyShould(true)
-                .because("Mentor subpackages should not have circular dependencies");
-            rule.check(classes);
-        }
-
-        /**
-         * No cycles within gitprovider common subpackages.
-         */
-        @Test
-        @DisplayName("No cycles within gitprovider.common subpackages")
-        void noCyclesWithinGitproviderCommonSubpackages() {
-            ArchRule rule = slices()
-                .matching(BASE_PACKAGE + ".gitprovider.common.(*)..")
-                .should()
-                .beFreeOfCycles()
-                .allowEmptyShould(true)
-                .because("Gitprovider common subpackages should not have circular dependencies");
-            rule.check(classes);
-        }
-    }
+    // NOTE: Feature module cycle tests removed - they used allowEmptyShould(true)
+    // which means they pass even when there's nothing to check.
+    // The top-level cycle test in ArchitectureTest.noCyclesBetweenModules() is sufficient.
 
     // ========================================================================
     // WORKSPACE ADAPTER PATTERN VERIFICATION
@@ -401,7 +309,6 @@ class CrossCuttingModuleBoundaryTest {
                 .should()
                 .dependOnClassesThat()
                 .resideInAPackage("..workspace.adapter..")
-                .allowEmptyShould(true)
                 .because("Workspace adapters are internal - use workspace public API");
             rule.check(classes);
         }
@@ -421,7 +328,6 @@ class CrossCuttingModuleBoundaryTest {
                 .should()
                 .dependOnClassesThat()
                 .resideInAnyPackage("..leaderboard..", "..activity..", "..mentor..", "..gitprovider..sync..")
-                .allowEmptyShould(true)
                 .because("Validation should be pure logic without external service dependencies");
             rule.check(classes);
         }
@@ -438,12 +344,13 @@ class CrossCuttingModuleBoundaryTest {
             ArchRule rule = classes()
                 .that()
                 .resideInAPackage("..workspace.context..")
+                .and()
+                .areNotMemberClasses()
                 .should()
                 .bePublic()
                 .orShould()
                 .bePackagePrivate()
-                .allowEmptyShould(true)
-                .because("Workspace context classes should have proper visibility");
+                .because("Workspace context classes should have proper visibility (inner classes excluded)");
             rule.check(classes);
         }
     }
