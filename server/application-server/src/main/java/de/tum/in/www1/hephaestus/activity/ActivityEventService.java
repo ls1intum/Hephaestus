@@ -183,6 +183,41 @@ class ActivityEventService {
         SourceSystem sourceSystem,
         @Nullable Map<String, Object> payload
     ) {
+        return recordWithContext(
+            workspaceId,
+            eventType,
+            occurredAt,
+            actor,
+            repository,
+            targetType,
+            targetId,
+            xp,
+            sourceSystem,
+            payload,
+            "webhook"
+        );
+    }
+
+    /**
+     * Record an activity event with explicit trigger context.
+     *
+     * <p>Use this method when you need to specify why the event was recorded
+     * (e.g., "sync", "backfill", "scheduled", "manual").
+     */
+    @Transactional
+    public boolean recordWithContext(
+        Long workspaceId,
+        ActivityEventType eventType,
+        Instant occurredAt,
+        @Nullable User actor,
+        @Nullable Repository repository,
+        ActivityTargetType targetType,
+        Long targetId,
+        double xp,
+        SourceSystem sourceSystem,
+        @Nullable Map<String, Object> payload,
+        @Nullable String triggerContext
+    ) {
         Workspace workspace = workspaceRepository.findById(workspaceId).orElse(null);
         if (workspace == null) {
             eventsFailedCounter.increment();
@@ -220,7 +255,7 @@ class ActivityEventService {
             .sourceSystem(sourceSystem.getValue())
             .payload(payload)
             .schemaVersion(CURRENT_SCHEMA_VERSION)
-            .triggerContext("webhook") // Default context for webhook-triggered events
+            .triggerContext(triggerContext != null ? triggerContext : "webhook")
             .build();
 
         try {
@@ -268,12 +303,6 @@ class ActivityEventService {
         if (event.getSchemaVersion() == CURRENT_SCHEMA_VERSION) {
             return event;
         }
-
-        // Future: Add migration logic when schema evolves
-        // Example for v2:
-        // if (event.getSchemaVersion() < 2) {
-        //     event = migrateV1ToV2(event);
-        // }
 
         logger.debug(
             "Migrated event {} from schema v{} to v{}",
@@ -324,7 +353,7 @@ class ActivityEventService {
      * @see RecordActivityCommand
      */
     public boolean record(RecordActivityCommand command) {
-        return record(
+        return recordWithContext(
             command.workspaceId(),
             command.eventType(),
             command.occurredAt(),
@@ -334,7 +363,8 @@ class ActivityEventService {
             command.targetId(),
             command.xp(),
             command.sourceSystem(),
-            command.payload()
+            command.payload(),
+            command.triggerContext()
         );
     }
 

@@ -68,6 +68,9 @@ public class DeadLetterEventService {
     /**
      * Retries a dead letter event by re-recording the activity.
      *
+     * <p>Increments the retry count on failure to track attempts for
+     * eventual auto-discard after max retries.
+     *
      * @param id the dead letter ID
      * @return result containing success status and message
      * @throws EntityNotFoundException if not found
@@ -97,15 +100,21 @@ public class DeadLetterEventService {
             );
 
             if (success) {
-                event.markResolved("Admin retry via API");
+                event.markResolved("Retry successful");
                 deadLetterRepository.save(event);
                 logger.info("Dead letter {} successfully retried", id);
                 return new RetryResult(true, "Event successfully recorded");
             } else {
-                return new RetryResult(false, "Event was a duplicate (already recorded)");
+                // Duplicate means it was already recorded - treat as success
+                event.markResolved("Already recorded (duplicate)");
+                deadLetterRepository.save(event);
+                return new RetryResult(true, "Event was already recorded");
             }
         } catch (Exception e) {
-            logger.error("Failed to retry dead letter {}: {}", id, e.getMessage());
+            // Increment retry count on failure
+            int newCount = event.incrementRetryCount();
+            deadLetterRepository.save(event);
+            logger.error("Failed to retry dead letter {}: {} (attempt {})", id, e.getMessage(), newCount);
             return new RetryResult(false, "Retry failed: " + e.getMessage());
         }
     }

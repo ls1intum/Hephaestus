@@ -197,4 +197,13 @@ public class DeadLetterEvent {
         this.resolvedAt = Instant.now();
         this.resolutionNotes = reason;
     }
+
+    /**
+     * Increment the retry count after a failed retry attempt.
+     *
+     * @return the new retry count
+     */
+    public int incrementRetryCount() {
+        return ++this.retryCount;
+    }
 }

@@ -132,7 +132,6 @@ public class LeaderboardService {
 
         // ========================================================================
         // Include ALL team members, even those with zero activity
-        // This ensures everyone appears on the leaderboard (matching main branch behavior)
         // ========================================================================
         List<User> allTeamMembers;
         if (team.isPresent() && !teamIds.isEmpty()) {
