@@ -1122,4 +1122,51 @@
         <dropColumn tableName="issue" columnName="last_detection_time"/>
     </changeSet>
 
+    <!-- ==================== SECTION 24: Issue Enum CHECK Constraints ==================== -->
+    <!--
+    Add CHECK constraints for enum columns to ensure data integrity at the database level.
+    These constraints mirror the Hibernate-generated constraints for consistency between
+    local (Hibernate auto-DDL) and CI (Liquibase-only) environments.
+    -->
+
+    <changeSet id="1767900000000-12" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="issue" columnName="merge_state_status"/>
+            <sqlCheck expectedResult="0">
+                SELECT COUNT(*) FROM information_schema.table_constraints 
+                WHERE constraint_name = 'issue_merge_state_status_check' AND table_name = 'issue'
+            </sqlCheck>
+        </preConditions>
+        <comment>Add CHECK constraint for merge_state_status enum values (GitHub MergeStateStatus)</comment>
+        <sql>
+            ALTER TABLE issue ADD CONSTRAINT issue_merge_state_status_check
+            CHECK ((merge_state_status)::text = ANY (ARRAY['BEHIND'::text, 'BLOCKED'::text, 'CLEAN'::text, 'DIRTY'::text, 'HAS_HOOKS'::text, 'UNKNOWN'::text, 'UNSTABLE'::text]));
+        </sql>
+        <rollback>
+            <sql>
+                ALTER TABLE issue DROP CONSTRAINT IF EXISTS issue_merge_state_status_check;
+            </sql>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="1767900000000-13" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="issue" columnName="review_decision"/>
+            <sqlCheck expectedResult="0">
+                SELECT COUNT(*) FROM information_schema.table_constraints 
+                WHERE constraint_name = 'issue_review_decision_check' AND table_name = 'issue'
+            </sqlCheck>
+        </preConditions>
+        <comment>Add CHECK constraint for review_decision enum values (GitHub PullRequestReviewDecision)</comment>
+        <sql>
+            ALTER TABLE issue ADD CONSTRAINT issue_review_decision_check
+            CHECK ((review_decision)::text = ANY (ARRAY['APPROVED'::text, 'CHANGES_REQUESTED'::text, 'REVIEW_REQUIRED'::text]));
+        </sql>
+        <rollback>
+            <sql>
+                ALTER TABLE issue DROP CONSTRAINT IF EXISTS issue_review_decision_check;
+            </sql>
+        </rollback>
+    </changeSet>
+
 </databaseChangeLog>

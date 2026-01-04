@@ -350,7 +350,7 @@ class ActivityEventServiceIntegrationTest extends BaseIntegrationTest {
             List<ActivityEvent> events = activityEventRepository.findAll();
             assertThat(events).hasSize(1);
 
-            String expectedKey = String.format("pr.opened:42:%d", occurredAt.toEpochMilli());
+            String expectedKey = String.format("pull_request.opened:42:%d", occurredAt.toEpochMilli());
             assertThat(events.get(0).getEventKey()).isEqualTo(expectedKey);
         }
     }
