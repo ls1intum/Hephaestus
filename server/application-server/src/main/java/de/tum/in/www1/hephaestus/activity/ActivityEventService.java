@@ -19,6 +19,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
+import org.springframework.core.env.Environment;
+import org.springframework.core.env.Profiles;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.TransientDataAccessException;
 import org.springframework.lang.Nullable;
@@ -97,7 +99,8 @@ public class ActivityEventService {
         WorkspaceRepository workspaceRepository,
         ExperiencePointProperties xpProperties,
         LeaderboardCacheManager cacheManager,
-        MeterRegistry meterRegistry
+        MeterRegistry meterRegistry,
+        Environment environment
     ) {
         this.eventRepository = eventRepository;
         this.deadLetterRepository = deadLetterRepository;
@@ -126,11 +129,12 @@ public class ActivityEventService {
             .register(meterRegistry);
         this.meterRegistry = meterRegistry;
 
-        // Register gauge for pending dead letters
-        deadLetterRepository.count(); // Initialize lazy count
-        meterRegistry.gauge("activity.dead_letters.pending", deadLetterRepository, repo ->
-            repo.countByStatus(DeadLetterEvent.Status.PENDING)
-        );
+        // Register gauge for pending dead letters (skip in specs profile - no DB tables)
+        if (!environment.acceptsProfiles(Profiles.of("specs"))) {
+            meterRegistry.gauge("activity.dead_letters.pending", deadLetterRepository, repo ->
+                repo.countByStatus(DeadLetterEvent.Status.PENDING)
+            );
+        }
     }
 
     /**

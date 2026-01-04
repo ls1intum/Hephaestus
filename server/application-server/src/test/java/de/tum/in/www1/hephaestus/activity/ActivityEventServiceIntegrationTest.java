@@ -71,17 +71,25 @@ class ActivityEventServiceIntegrationTest extends BaseIntegrationTest {
 
         // Create user
         testUser = new User();
+        testUser.setId(12345L);
         testUser.setLogin("test-user");
+        testUser.setName("Test User");
         testUser.setAvatarUrl("https://example.com/avatar.png");
+        testUser.setHtmlUrl("https://github.com/test-user");
+        testUser.setType(User.Type.USER);
+        testUser.setCreatedAt(Instant.now());
+        testUser.setUpdatedAt(Instant.now());
         testUser = userRepository.save(testUser);
 
         // Create repository
         testRepository = new Repository();
+        testRepository.setId(67890L);
         testRepository.setName("test-repo");
         testRepository.setNameWithOwner("test-org/test-repo");
         testRepository.setHtmlUrl("https://github.com/test-org/test-repo");
         testRepository.setVisibility(Repository.Visibility.PUBLIC);
         testRepository.setDefaultBranch("main");
+        testRepository.setPushedAt(Instant.now());
         testRepository.setCreatedAt(Instant.now());
         testRepository.setUpdatedAt(Instant.now());
         testRepository = repositoryRepository.save(testRepository);
