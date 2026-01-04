@@ -448,6 +448,7 @@ class CodeQualityTest extends HephaestusArchitectureTest {
         @DisplayName("ObjectProvider usage is limited to known cases")
         void objectProviderUsageIsLimited() {
             java.util.Set<String> knownCycleBreakers = java.util.Set.of(
+                "ActivityEventBackfillService", // Self-injection for @Transactional(REQUIRES_NEW) via AOP proxy
                 "WorkspaceActivationService",
                 "WorkspaceRepositoryMonitorService"
             );

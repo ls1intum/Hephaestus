@@ -430,7 +430,7 @@ public class WorkspaceRepositoryMonitorService {
     }
 
     private void deleteRepositoryMonitor(Workspace workspace, RepositoryToMonitor monitor) {
-        repositoryToMonitorRepository.delete(monitor);
+        // Remove from collection first - orphanRemoval=true will handle deletion
         workspace.getRepositoriesToMonitor().remove(monitor);
         workspaceRepository.save(workspace);
         if (shouldUseNats(workspace)) {
