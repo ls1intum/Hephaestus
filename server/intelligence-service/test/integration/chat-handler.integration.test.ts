@@ -28,6 +28,24 @@ import {
 	testUuid,
 } from "../mocks";
 
+/**
+ * Drains a streaming response body to ensure the stream completes
+ * before cleanup runs. For SSE responses, fetch() resolves when headers
+ * are received, not when the stream finishes writing to the database.
+ */
+async function drainResponse(response: Response): Promise<void> {
+	const reader = response.body?.getReader();
+	if (!reader) return;
+	try {
+		while (true) {
+			const { done } = await reader.read();
+			if (done) break;
+		}
+	} finally {
+		reader.releaseLock();
+	}
+}
+
 describe("Chat Handler Full Integration", () => {
 	let fixtures: TestFixtures;
 	const createdThreadIds: string[] = [];
@@ -76,6 +94,7 @@ describe("Chat Handler Full Integration", () => {
 			});
 
 			const response = await app.fetch(request);
+			await drainResponse(response);
 
 			// Should return 200 and start SSE stream (even if model fails later)
 			expect(response.status).toBe(200);
@@ -201,6 +220,7 @@ describe("Chat Handler Full Integration", () => {
 			});
 
 			const response = await app.fetch(request);
+			await drainResponse(response);
 			expect(response.status).toBe(200);
 
 			// Thread should be created (even if stream fails later)
@@ -231,7 +251,8 @@ describe("Chat Handler Full Integration", () => {
 				}),
 			});
 
-			await app.fetch(request);
+			const response = await app.fetch(request);
+			await drainResponse(response);
 
 			const thread = await getThreadById(threadId);
 			expect(thread?.workspaceId).toBe(fixtures.workspace.id);
@@ -267,6 +288,7 @@ describe("Chat Handler Full Integration", () => {
 			});
 
 			const response = await app.fetch(request);
+			await drainResponse(response);
 			expect(response.status).toBe(200);
 
 			// User message should be persisted
@@ -303,7 +325,8 @@ describe("Chat Handler Full Integration", () => {
 				}),
 			});
 
-			await app.fetch(request);
+			const response = await app.fetch(request);
+			await drainResponse(response);
 
 			const messages = await getMessagesByThreadId(threadId);
 			const userMessage = messages.find((m) => m.id === messageId);
@@ -340,6 +363,7 @@ describe("Chat Handler Full Integration", () => {
 			});
 
 			const response = await app.fetch(request);
+			await drainResponse(response);
 
 			expect(response.headers.get("content-type")).toContain("text/event-stream");
 			expect(response.headers.get("cache-control")).toContain("no-cache");
@@ -356,7 +380,7 @@ describe("Chat Handler Full Integration", () => {
 			createdThreadIds.push(threadId);
 
 			// First message
-			await app.fetch(
+			const firstResponse = await app.fetch(
 				new Request("http://localhost/mentor/chat", {
 					method: "POST",
 					headers: {
@@ -375,9 +399,10 @@ describe("Chat Handler Full Integration", () => {
 					}),
 				}),
 			);
+			await drainResponse(firstResponse);
 
 			// Second message
-			await app.fetch(
+			const secondResponse = await app.fetch(
 				new Request("http://localhost/mentor/chat", {
 					method: "POST",
 					headers: {
@@ -396,6 +421,7 @@ describe("Chat Handler Full Integration", () => {
 					}),
 				}),
 			);
+			await drainResponse(secondResponse);
 
 			const messages = await getMessagesByThreadId(threadId);
 			const userMessages = messages.filter((m) => m.role === "user");
@@ -443,6 +469,7 @@ describe("Chat Handler Full Integration", () => {
 			});
 
 			const response = await app.fetch(request);
+			await drainResponse(response);
 			expect(response.status).toBe(200);
 		});
 	});
