@@ -30,7 +30,7 @@
     </scm>
     <properties>
         <java.version>21</java.version>
-        <app.profiles>local,dev</app.profiles>
+        <app.profiles>local</app.profiles>
 
         <!-- Test Configuration -->
         <maven.test.failure.ignore>false</maven.test.failure.ignore>

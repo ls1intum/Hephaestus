@@ -121,7 +121,6 @@ class PullRequestBadPracticeDetectorTest {
             when(badPracticeDetectionRepository.findMostRecentByPullRequestId(PR_ID)).thenReturn(null);
             when(pullRequestTemplateGetter.getPullRequestTemplate(REPO_NAME_WITH_OWNER)).thenReturn(TEMPLATE_CONTENT);
             when(detectorApi.detectBadPractices(any())).thenReturn(createEmptyDetectorResponse());
-            when(pullRequestRepository.save(any())).thenReturn(pullRequest);
             when(badPracticeDetectionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
             // Act
@@ -145,14 +144,20 @@ class PullRequestBadPracticeDetectorTest {
             Instant lastDetection = Instant.now();
             Instant lastUpdate = lastDetection.minusSeconds(3600); // Updated 1 hour before detection
             pullRequest.setUpdatedAt(lastUpdate);
-            pullRequest.setLastDetectionTime(lastDetection);
+
+            // Create a previous detection that was done after the PR was last updated
+            BadPracticeDetection previousDetection = new BadPracticeDetection();
+            previousDetection.setDetectionTime(lastDetection);
+            previousDetection.setBadPractices(List.of());
+
+            when(badPracticeDetectionRepository.findMostRecentByPullRequestId(PR_ID)).thenReturn(previousDetection);
 
             // Act
             DetectionResult result = detector.detectAndSyncBadPractices(pullRequest);
 
             // Assert
             assertThat(result).isEqualTo(DetectionResult.ERROR_NO_UPDATE_ON_PULLREQUEST);
-            verifyNoInteractions(detectorApi);
+            verify(detectorApi, never()).detectBadPractices(any());
         }
 
         @Test
@@ -165,12 +170,16 @@ class PullRequestBadPracticeDetectorTest {
             Instant lastDetection = Instant.now().minusSeconds(3600);
             Instant lastUpdate = Instant.now();
             pullRequest.setUpdatedAt(lastUpdate);
-            pullRequest.setLastDetectionTime(lastDetection);
 
-            when(badPracticeDetectionRepository.findMostRecentByPullRequestId(PR_ID)).thenReturn(null);
+            // Previous detection was before the PR update
+            BadPracticeDetection previousDetection = new BadPracticeDetection();
+            previousDetection.setDetectionTime(lastDetection);
+            previousDetection.setBadPractices(List.of());
+            previousDetection.setSummary("");
+
+            when(badPracticeDetectionRepository.findMostRecentByPullRequestId(PR_ID)).thenReturn(previousDetection);
             when(pullRequestTemplateGetter.getPullRequestTemplate(REPO_NAME_WITH_OWNER)).thenReturn(TEMPLATE_CONTENT);
             when(detectorApi.detectBadPractices(any())).thenReturn(createEmptyDetectorResponse());
-            when(pullRequestRepository.save(any())).thenReturn(pullRequest);
             when(badPracticeDetectionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
             // Act
@@ -189,12 +198,10 @@ class PullRequestBadPracticeDetectorTest {
             Repository repository = createRepository();
             pullRequest.setRepository(repository);
             pullRequest.setUpdatedAt(Instant.now());
-            pullRequest.setLastDetectionTime(null);
 
             when(badPracticeDetectionRepository.findMostRecentByPullRequestId(PR_ID)).thenReturn(null);
             when(pullRequestTemplateGetter.getPullRequestTemplate(REPO_NAME_WITH_OWNER)).thenReturn(TEMPLATE_CONTENT);
             when(detectorApi.detectBadPractices(any())).thenReturn(createEmptyDetectorResponse());
-            when(pullRequestRepository.save(any())).thenReturn(pullRequest);
             when(badPracticeDetectionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
             // Act
@@ -223,7 +230,6 @@ class PullRequestBadPracticeDetectorTest {
             when(badPracticeDetectionRepository.findMostRecentByPullRequestId(PR_ID)).thenReturn(null);
             when(pullRequestTemplateGetter.getPullRequestTemplate(REPO_NAME_WITH_OWNER)).thenReturn(TEMPLATE_CONTENT);
             when(detectorApi.detectBadPractices(any())).thenReturn(response);
-            when(pullRequestRepository.save(any())).thenReturn(pullRequest);
             when(badPracticeDetectionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
             // Act
@@ -244,7 +250,6 @@ class PullRequestBadPracticeDetectorTest {
             when(badPracticeDetectionRepository.findMostRecentByPullRequestId(PR_ID)).thenReturn(null);
             when(pullRequestTemplateGetter.getPullRequestTemplate(REPO_NAME_WITH_OWNER)).thenReturn(TEMPLATE_CONTENT);
             when(detectorApi.detectBadPractices(any())).thenReturn(createEmptyDetectorResponse());
-            when(pullRequestRepository.save(any())).thenReturn(pullRequest);
             when(badPracticeDetectionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
             // Act
@@ -267,7 +272,6 @@ class PullRequestBadPracticeDetectorTest {
             when(badPracticeDetectionRepository.findMostRecentByPullRequestId(PR_ID)).thenReturn(null);
             when(pullRequestTemplateGetter.getPullRequestTemplate(REPO_NAME_WITH_OWNER)).thenReturn(TEMPLATE_CONTENT);
             when(detectorApi.detectBadPractices(any())).thenReturn(response);
-            when(pullRequestRepository.save(any())).thenReturn(pullRequest);
             when(badPracticeDetectionRepository.save(badPracticeDetectionCaptor.capture())).thenAnswer(inv ->
                 inv.getArgument(0)
             );
@@ -284,8 +288,8 @@ class PullRequestBadPracticeDetectorTest {
         }
 
         @Test
-        @DisplayName("updates pull request with last detection time and summary")
-        void updatesPullRequestWithLastDetectionTimeAndSummary() {
+        @DisplayName("stores detection time and summary in BadPracticeDetection")
+        void storesDetectionTimeAndSummaryInBadPracticeDetection() {
             // Arrange
             PullRequest pullRequest = createPullRequest();
             Repository repository = createRepository();
@@ -296,8 +300,9 @@ class PullRequestBadPracticeDetectorTest {
             when(badPracticeDetectionRepository.findMostRecentByPullRequestId(PR_ID)).thenReturn(null);
             when(pullRequestTemplateGetter.getPullRequestTemplate(REPO_NAME_WITH_OWNER)).thenReturn(TEMPLATE_CONTENT);
             when(detectorApi.detectBadPractices(any())).thenReturn(response);
-            when(pullRequestRepository.save(any())).thenReturn(pullRequest);
-            when(badPracticeDetectionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+            when(badPracticeDetectionRepository.save(badPracticeDetectionCaptor.capture())).thenAnswer(inv ->
+                inv.getArgument(0)
+            );
 
             Instant beforeDetection = Instant.now();
 
@@ -305,9 +310,9 @@ class PullRequestBadPracticeDetectorTest {
             detector.detectAndSyncBadPractices(pullRequest);
 
             // Assert
-            verify(pullRequestRepository).save(pullRequest);
-            assertThat(pullRequest.getLastDetectionTime()).isAfterOrEqualTo(beforeDetection);
-            assertThat(pullRequest.getBadPracticeSummary()).isEqualTo(BAD_PRACTICE_SUMMARY);
+            BadPracticeDetection savedDetection = badPracticeDetectionCaptor.getValue();
+            assertThat(savedDetection.getDetectionTime()).isAfterOrEqualTo(beforeDetection);
+            assertThat(savedDetection.getSummary()).isEqualTo(BAD_PRACTICE_SUMMARY);
         }
     }
 
@@ -328,7 +333,6 @@ class PullRequestBadPracticeDetectorTest {
             when(detectorApi.detectBadPractices(detectorRequestCaptor.capture())).thenReturn(
                 createEmptyDetectorResponse()
             );
-            when(pullRequestRepository.save(any())).thenReturn(pullRequest);
             when(badPracticeDetectionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
             // Act
@@ -359,13 +363,16 @@ class PullRequestBadPracticeDetectorTest {
             BadPracticeDetection previousDetection = new BadPracticeDetection();
             previousDetection.setSummary("Previous summary");
             previousDetection.setBadPractices(List.of(existingBadPractice));
+            previousDetection.setDetectionTime(Instant.now().minusSeconds(7200)); // Detection was 2 hours ago
+
+            // Set PR update time after the previous detection
+            pullRequest.setUpdatedAt(Instant.now());
 
             when(badPracticeDetectionRepository.findMostRecentByPullRequestId(PR_ID)).thenReturn(previousDetection);
             when(pullRequestTemplateGetter.getPullRequestTemplate(REPO_NAME_WITH_OWNER)).thenReturn(TEMPLATE_CONTENT);
             when(detectorApi.detectBadPractices(detectorRequestCaptor.capture())).thenReturn(
                 createEmptyDetectorResponse()
             );
-            when(pullRequestRepository.save(any())).thenReturn(pullRequest);
             when(badPracticeDetectionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
             // Act
@@ -373,7 +380,6 @@ class PullRequestBadPracticeDetectorTest {
 
             // Assert
             DetectorRequest capturedRequest = detectorRequestCaptor.getValue();
-            assertThat(capturedRequest.getBadPracticeSummary()).isEqualTo("Previous summary");
             assertThat(capturedRequest.getBadPractices()).hasSize(1);
             assertThat(capturedRequest.getBadPractices().get(0).getTitle()).isEqualTo("Missing description");
         }
@@ -444,7 +450,6 @@ class PullRequestBadPracticeDetectorTest {
             when(detectorApi.detectBadPractices(detectorRequestCaptor.capture())).thenReturn(
                 createEmptyDetectorResponse()
             );
-            when(pullRequestRepository.save(any())).thenReturn(pullRequest);
             when(badPracticeDetectionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
             // Act
@@ -470,7 +475,6 @@ class PullRequestBadPracticeDetectorTest {
             when(detectorApi.detectBadPractices(detectorRequestCaptor.capture())).thenReturn(
                 createEmptyDetectorResponse()
             );
-            when(pullRequestRepository.save(any())).thenReturn(pullRequest);
             when(badPracticeDetectionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
             // Act
@@ -495,7 +499,6 @@ class PullRequestBadPracticeDetectorTest {
             when(detectorApi.detectBadPractices(detectorRequestCaptor.capture())).thenReturn(
                 createEmptyDetectorResponse()
             );
-            when(pullRequestRepository.save(any())).thenReturn(pullRequest);
             when(badPracticeDetectionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
             // Act
@@ -523,7 +526,6 @@ class PullRequestBadPracticeDetectorTest {
             when(detectorApi.detectBadPractices(detectorRequestCaptor.capture())).thenReturn(
                 createEmptyDetectorResponse()
             );
-            when(pullRequestRepository.save(any())).thenReturn(pullRequest);
             when(badPracticeDetectionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
             // Act
@@ -551,7 +553,6 @@ class PullRequestBadPracticeDetectorTest {
             when(detectorApi.detectBadPractices(detectorRequestCaptor.capture())).thenReturn(
                 createEmptyDetectorResponse()
             );
-            when(pullRequestRepository.save(any())).thenReturn(pullRequest);
             when(badPracticeDetectionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
             // Act
@@ -579,7 +580,6 @@ class PullRequestBadPracticeDetectorTest {
             when(detectorApi.detectBadPractices(detectorRequestCaptor.capture())).thenReturn(
                 createEmptyDetectorResponse()
             );
-            when(pullRequestRepository.save(any())).thenReturn(pullRequest);
             when(badPracticeDetectionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
             // Act
@@ -603,7 +603,6 @@ class PullRequestBadPracticeDetectorTest {
             when(detectorApi.detectBadPractices(detectorRequestCaptor.capture())).thenReturn(
                 createEmptyDetectorResponse()
             );
-            when(pullRequestRepository.save(any())).thenReturn(pullRequest);
             when(badPracticeDetectionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
             // Act
@@ -640,7 +639,6 @@ class PullRequestBadPracticeDetectorTest {
             when(badPracticeDetectionRepository.findMostRecentByPullRequestId(PR_ID)).thenReturn(null);
             when(pullRequestTemplateGetter.getPullRequestTemplate(REPO_NAME_WITH_OWNER)).thenReturn(TEMPLATE_CONTENT);
             when(detectorApi.detectBadPractices(any())).thenReturn(response);
-            when(pullRequestRepository.save(any())).thenReturn(pullRequest);
             when(badPracticeDetectionRepository.save(badPracticeDetectionCaptor.capture())).thenAnswer(inv ->
                 inv.getArgument(0)
             );
@@ -663,6 +661,7 @@ class PullRequestBadPracticeDetectorTest {
             PullRequest pullRequest = createPullRequest();
             Repository repository = createRepository();
             pullRequest.setRepository(repository);
+            pullRequest.setUpdatedAt(Instant.now());
 
             PullRequestBadPractice existingBadPractice = new PullRequestBadPractice();
             existingBadPractice.setTitle("Missing description");
@@ -673,6 +672,7 @@ class PullRequestBadPracticeDetectorTest {
             BadPracticeDetection previousDetection = new BadPracticeDetection();
             previousDetection.setSummary("Previous summary");
             previousDetection.setBadPractices(List.of(existingBadPractice));
+            previousDetection.setDetectionTime(Instant.now().minusSeconds(3600));
 
             BadPractice newBadPractice = new BadPractice();
             newBadPractice.setTitle("Missing description");
@@ -687,7 +687,6 @@ class PullRequestBadPracticeDetectorTest {
             when(badPracticeDetectionRepository.findMostRecentByPullRequestId(PR_ID)).thenReturn(previousDetection);
             when(pullRequestTemplateGetter.getPullRequestTemplate(REPO_NAME_WITH_OWNER)).thenReturn(TEMPLATE_CONTENT);
             when(detectorApi.detectBadPractices(any())).thenReturn(response);
-            when(pullRequestRepository.save(any())).thenReturn(pullRequest);
             when(badPracticeDetectionRepository.save(badPracticeDetectionCaptor.capture())).thenAnswer(inv ->
                 inv.getArgument(0)
             );

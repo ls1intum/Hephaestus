@@ -37,19 +37,9 @@ public class User extends BaseGitServiceEntity {
     @NonNull
     private String avatarUrl;
 
-    // AKA bio - user's profile description
-    private String description;
-
     @NonNull
     // Equals login if not fetched / existing
     private String name;
-
-    private String company;
-
-    // Url - user's website/blog from their profile
-    private String blog;
-
-    private String location;
 
     private String email;
 
@@ -59,13 +49,6 @@ public class User extends BaseGitServiceEntity {
     @NonNull
     @Enumerated(EnumType.STRING)
     private User.Type type;
-
-    private int followers;
-
-    private int following;
-
-    // Current ranking points for the leaderboard leagues
-    private int leaguePoints;
 
     @OneToMany(mappedBy = "user")
     @ToString.Exclude

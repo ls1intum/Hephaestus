@@ -22,12 +22,6 @@ public class PullRequest extends Issue {
 
     private Instant mergedAt;
 
-    /**
-     * The SHA of the merge commit created when the PR was merged.
-     * Available from REST webhook payloads; not available via GraphQL.
-     */
-    private String mergeCommitSha;
-
     private boolean isDraft;
 
     private boolean isMerged;
@@ -64,12 +58,6 @@ public class PullRequest extends Issue {
      */
     @Nullable
     private Boolean mergeable;
-
-    /**
-     * Whether maintainers can modify the pull request.
-     * Only relevant for cross-repository PRs.
-     */
-    private boolean maintainerCanModify;
 
     /**
      * The name of the source branch (e.g., "feature/my-feature").
@@ -119,42 +107,19 @@ public class PullRequest extends Issue {
     @ToString.Exclude
     private Set<PullRequestReviewThread> reviewThreads = new HashSet<>();
 
-    @Column(columnDefinition = "TEXT")
-    private String badPracticeSummary;
-
-    protected Instant lastDetectionTime;
-
     @Override
     public boolean isPullRequest() {
         return true;
     }
     /*
-     * Webhook payload fields currently ignored (no additional REST request required):
-     * Fields:
-     * - pull_request.auto_merge (github/pull_request.* payloads, accessible via GHPullRequest#getAutoMerge()). Reason: converter never calls getAutoMerge().
-     * - pull_request.base (github/pull_request.* payloads, accessible via GHPullRequest#getBase()). Reason: converter never maps the GHCommitPointer.
-     * - pull_request.head (github/pull_request.* payloads, accessible via GHPullRequest#getHead()). Reason: converter never maps the GHCommitPointer.
-     * - pull_request.review_comments (github/pull_request.synchronize.json, already populated in payload). Reason: converter ignores the webhook-provided counter.
-     * Relationships:
-     * - pull_request.requested_teams (github/pull_request.review_requested.json via GHPullRequest#getRequestedTeams()). Reason: converter omits team reviewer linkage.
+     * Fields dropped in 1767500000000 migration (previously unused):
+     * - mergeCommitSha (REST-only, not exposed via GraphQL)
+     * - maintainerCanModify (cross-repo PRs only)
+     * - badPracticeSummary, lastDetectionTime (deprecated AI features)
      *
-     * Data that would require additional REST fetches (not yet wired):
-     * - pull request commits (GHPullRequest#listCommits(); follows commits_url).
-     * - pull request file diffs (GHPullRequest#listFiles(); follows files endpoint).
-     * - commit status details (statuses_url leads to status and check-run APIs).
-     *
-     * Payload attributes not surfaced by hub4j/github-api 2.0-rc.5:
-     * - pull_request.statuses_url (REST pointer available in payload only).
-     * - pull_request.rebaseable (REST field exposed only after refresh).
-     * - MergeQueueEntry.position / MergeQueueEntry.estimatedTimeToMerge (GraphQL only).
-     * - PullRequest.closingIssuesReferences (GraphQL only).
-     * - PullRequest.commits.nodes.commit.statusCheckRollup (GraphQL only).
-     * - PullRequest.mergeQueueEntry (GraphQL only).
-     * - PullRequest.commits.nodes.commit.checkSuites / checkRuns (GraphQL + REST check-runs API lacking hub4j bindings).
-     *
-     * Explicitly not persisted today:
-     * - pull_request.diff_url (clients recompute on demand).
-     * - pull_request.patch_url (clients recompute on demand).
-     * - pull_request.issue_url (derivable from repository + number).
+     * Other fields intentionally not synced:
+     * - MergeQueueEntry.position / MergeQueueEntry.estimatedTimeToMerge (GraphQL only)
+     * - PullRequest.closingIssuesReferences (GraphQL only)
+     * - PullRequest.commits.nodes.commit.statusCheckRollup (GraphQL only)
      */
 }

@@ -54,7 +54,7 @@ import org.springframework.transaction.annotation.Transactional;
  * @see ActivityEventListener The only intended caller of this service
  */
 @Service
-class ActivityEventService {
+public class ActivityEventService {
 
     private static final Logger logger = LoggerFactory.getLogger(ActivityEventService.class);
 
@@ -203,6 +203,15 @@ class ActivityEventService {
      *
      * <p>Use this method when you need to specify why the event was recorded
      * (e.g., "sync", "backfill", "scheduled", "manual").
+     *
+     * <h3>Idempotency</h3>
+     * <p>This method is idempotent: duplicate events (same workspace_id + event_key) are
+     * silently skipped by checking existence BEFORE attempting the insert. This pre-check
+     * is critical because {@code DataIntegrityViolationException} from unique constraint
+     * violations is thrown at transaction commit time, not at {@code save()} time. Without
+     * the pre-check, batch callers (e.g., backfill) would fail entire batches on duplicates.
+     *
+     * @return true if recorded successfully, false if duplicate or workspace not found
      */
     @Transactional
     public boolean recordWithContext(
@@ -241,6 +250,17 @@ class ActivityEventService {
         double roundedXp = XpPrecision.round(clampedXp);
 
         String eventKey = ActivityEvent.buildKey(eventType, targetId, occurredAt);
+
+        // Check for duplicate BEFORE attempting insert.
+        // This is critical because DataIntegrityViolationException is thrown at transaction
+        // commit time, not at save() time. When running in batch transactions (e.g., backfill),
+        // the exception would propagate past our try-catch and fail the entire batch.
+        // By checking first, we avoid the constraint violation entirely.
+        if (eventRepository.existsByWorkspaceIdAndEventKey(workspaceId, eventKey)) {
+            eventsDuplicateCounter.increment();
+            logger.debug("Duplicate skipped (pre-check): {}", eventKey);
+            return false;
+        }
 
         ActivityEvent event = ActivityEvent.builder()
             .eventKey(eventKey)

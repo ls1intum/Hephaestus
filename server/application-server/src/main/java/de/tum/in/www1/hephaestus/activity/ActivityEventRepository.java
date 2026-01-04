@@ -314,22 +314,17 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
     /**
      * Find a random sample of events for integrity verification.
      *
-     * <p>Uses PostgreSQL's TABLESAMPLE for efficient random sampling
-     * without full table scan.
+     * <p>Uses ORDER BY RANDOM() with LIMIT for random sampling.
+     * This is less efficient than TABLESAMPLE on very large tables but
+     * works without requiring the tsm_system_rows extension.
      *
      * <p>Workspace-agnostic: System-wide integrity verification operation.
      * Used by admin/system jobs to spot-check data consistency.
      *
-     * @param pageable page request with sample size limit
+     * @param limit maximum number of events to return
      * @return random sample of events
      */
     @WorkspaceAgnostic("System-wide integrity verification - admin operation")
-    @Query(
-        value = """
-        SELECT * FROM activity_event
-        TABLESAMPLE SYSTEM_ROWS(:#{#pageable.pageSize})
-        """,
-        nativeQuery = true
-    )
-    List<ActivityEvent> findRandomSample(org.springframework.data.domain.Pageable pageable);
+    @Query(value = "SELECT * FROM activity_event ORDER BY RANDOM() LIMIT :limit", nativeQuery = true)
+    List<ActivityEvent> findRandomSample(@Param("limit") int limit);
 }

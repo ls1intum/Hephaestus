@@ -1,28 +1,53 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<databaseChangeLog
-    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
-    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
-        https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+<?xml version="1.1" encoding="UTF-8" standalone="no"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                   http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
 
     <!--
-    =====================================================================================
-    GraphQL Sync Migration - Replacing hub4j with typed GraphQL
-    =====================================================================================
-    
-    This migration consolidates all schema changes for the hub4j removal refactoring:
-    
-    1. Activity Event Ledger - New event sourcing table for leaderboard/mentor
-    2. Sub-Issues and Issue Types - GitHub hierarchy support  
-    3. Schema Cleanup - Dropping unused columns from hub4j era
-    4. Performance Indexes - Adding missing FK indexes
-    
+    =======================================================================================
+    Consolidated GraphQL Sync Migration
+    =======================================================================================
+
+    This changelog consolidates all schema changes for the hub4j removal refactoring
+    and activity event ledger implementation. It combines the following migrations:
+
+    1. TRIAGE permission level documentation
+    2. Activity Event Ledger - Event sourcing table for leaderboard/mentor
+    3. Issue Types and Sub-Issues - GitHub hierarchy support
+    4. Schema Cleanup - Dropping unused columns from hub4j era
+    5. Performance Indexes - FK indexes and covering indexes
+    6. Activity Event Enhancements - schema_version, FK fixes, XP constraints
+    7. Dead Letter Event Table - Failed event persistence
+    8. Trigger Context - Audit trail enhancement
+
+    Original files consolidated:
+    - 1767287604000_add_triage_permission.xml
+    - 1767300000000_graphql_sync_migration.xml
+    - 1767400000000_activity_event_ledger_enhancements.xml
+    - 1767500000000_activity_event_performance_indexes.xml
+    - 1767600000000_activity_event_xp_constraint.xml
+    - 1767700000000_dead_letter_event_table.xml
+    - 1767800000000_activity_event_trigger_context.xml
+
     See: docs/contributor/database-migration.mdx
-    =====================================================================================
+    =======================================================================================
     -->
 
-    <!-- ==================== SECTION 1: Drop Legacy Tables ==================== -->
-    
+    <!-- ==================== SECTION 1: Documentation Changesets ==================== -->
+
+    <changeSet id="1767287604000-1-add-triage-permission-doc" author="hephaestus">
+        <comment>
+            Added TRIAGE permission level to TeamRepositoryPermission.PermissionLevel enum.
+            No schema migration needed - the permission column is VARCHAR(32).
+            Previously, GitHub TRIAGE permissions were incorrectly mapped to READ.
+            After this change, they are correctly stored as TRIAGE.
+        </comment>
+        <empty/>
+    </changeSet>
+
+    <!-- ==================== SECTION 2: Drop Legacy Tables ==================== -->
+
     <changeSet id="1767300000000-drop-contribution-event" author="hephaestus">
         <preConditions onFail="MARK_RAN">
             <tableExists tableName="contribution_event"/>
@@ -30,12 +55,12 @@
         <dropTable tableName="contribution_event"/>
     </changeSet>
 
-    <!-- ==================== SECTION 2: Activity Event Ledger ==================== -->
+    <!-- ==================== SECTION 3: Activity Event Ledger ==================== -->
     <!--
     MINIMAL Activity Event Ledger - The Stripe/Square Approach
-    
+
     One table. 11 columns. 4 indexes. That's it.
-    
+
     Supports:
     - Leaderboard: COUNT(*) GROUP BY actor_id, event_type
     - Mentor context: WHERE actor_id = ? ORDER BY occurred_at DESC
@@ -140,7 +165,7 @@
             constraintName="fk_activity_event_repository"/>
     </changeSet>
 
-    <!-- ==================== SECTION 3: Issue Types ==================== -->
+    <!-- ==================== SECTION 4: Issue Types ==================== -->
 
     <changeSet id="1767300000000-create-issue-type-table" author="hephaestus">
         <preConditions onFail="MARK_RAN">
@@ -182,7 +207,7 @@
         </createIndex>
     </changeSet>
 
-    <!-- ==================== SECTION 4: Sub-Issues Hierarchy ==================== -->
+    <!-- ==================== SECTION 5: Sub-Issues Hierarchy ==================== -->
 
     <changeSet id="1767300000000-add-sub-issue-hierarchy" author="hephaestus">
         <preConditions onFail="MARK_RAN">
@@ -253,7 +278,7 @@
         </createIndex>
     </changeSet>
 
-    <!-- ==================== SECTION 5: Issue Dependencies ==================== -->
+    <!-- ==================== SECTION 6: Issue Dependencies ==================== -->
 
     <changeSet id="1767300000000-create-issue-blocking-table" author="hephaestus">
         <preConditions onFail="MARK_RAN">
@@ -298,7 +323,7 @@
         </createIndex>
     </changeSet>
 
-    <!-- ==================== SECTION 6: Workspace Sync Timestamps ==================== -->
+    <!-- ==================== SECTION 7: Workspace Sync Timestamps ==================== -->
 
     <changeSet id="1767300000000-add-workspace-sync-timestamps" author="hephaestus">
         <preConditions onFail="MARK_RAN">
@@ -319,7 +344,7 @@
         </addColumn>
     </changeSet>
 
-    <!-- ==================== SECTION 7: Organization Workspace ID ==================== -->
+    <!-- ==================== SECTION 8: Organization Workspace ID ==================== -->
 
     <changeSet id="1767300000000-add-organization-workspace-id" author="hephaestus">
         <preConditions onFail="MARK_RAN">
@@ -334,7 +359,7 @@
         </addColumn>
     </changeSet>
 
-    <!-- ==================== SECTION 8: Drop Unused User Columns ==================== -->
+    <!-- ==================== SECTION 9: Drop Unused User Columns ==================== -->
     <!--
     Remove columns from user table that were synced by hub4j but never used.
     These fields were deprecated and have no feature use.
@@ -397,7 +422,7 @@
         <dropColumn tableName="hephaestus_user" columnName="league_points"/>
     </changeSet>
 
-    <!-- ==================== SECTION 9: Drop Unused Repository Columns ==================== -->
+    <!-- ==================== SECTION 10: Drop Unused Repository Columns ==================== -->
 
     <changeSet id="1767300000000-drop-repo-has-issues" author="hephaestus">
         <preConditions onFail="MARK_RAN">
@@ -441,7 +466,7 @@
         <dropColumn tableName="repository" columnName="watchers_count"/>
     </changeSet>
 
-    <!-- ==================== SECTION 10: Drop Unused Issue Columns ==================== -->
+    <!-- ==================== SECTION 11: Drop Unused Issue Columns ==================== -->
 
     <changeSet id="1767300000000-drop-issue-is-mergeable" author="hephaestus">
         <preConditions onFail="MARK_RAN">
@@ -471,7 +496,7 @@
         <dropColumn tableName="issue" columnName="mergeable_state"/>
     </changeSet>
 
-    <!-- ==================== SECTION 11: Drop Unused PR Columns ==================== -->
+    <!-- ==================== SECTION 12: Drop Unused PR Columns ==================== -->
 
     <changeSet id="1767300000000-drop-pr-bad-practice-summary" author="hephaestus">
         <preConditions onFail="MARK_RAN">
@@ -487,7 +512,7 @@
         <dropColumn tableName="pullrequest" columnName="last_detection_time"/>
     </changeSet>
 
-    <!-- ==================== SECTION 12: Drop Deprecated PR Review Comment Columns ==================== -->
+    <!-- ==================== SECTION 13: Drop Deprecated PR Review Comment Columns ==================== -->
 
     <changeSet id="1767300000000-drop-pr-review-comment-position" author="hephaestus">
         <preConditions onFail="MARK_RAN">
@@ -503,7 +528,7 @@
         <dropColumn tableName="pull_request_review_comment" columnName="original_position"/>
     </changeSet>
 
-    <!-- ==================== SECTION 13: Column Type Fixes ==================== -->
+    <!-- ==================== SECTION 14: Column Type Fixes ==================== -->
 
     <changeSet id="1767300000000-fix-nodeid-column-length" author="hephaestus">
         <modifyDataType tableName="pull_request_review_thread"
@@ -515,7 +540,7 @@
         <sql>ALTER TABLE repository ALTER COLUMN description TYPE TEXT;</sql>
     </changeSet>
 
-    <!-- ==================== SECTION 14: Performance Indexes ==================== -->
+    <!-- ==================== SECTION 15: Performance Indexes ==================== -->
     <!-- Each index in its own changeset with precondition for idempotency -->
 
     <changeSet id="1767300000000-idx-issue-repository-id" author="hephaestus">
@@ -623,6 +648,344 @@
         </preConditions>
         <createIndex tableName="chat_message" indexName="idx_chat_message_thread_id">
             <column name="thread_id"/>
+        </createIndex>
+    </changeSet>
+
+    <!-- ==================== SECTION 16: Activity Event Ledger Enhancements ==================== -->
+    <!--
+    Improvements to the activity_event table for proper event sourcing and ledger immutability:
+    1. schema_version field - Enables forward compatibility for event evolution
+    2. actor_id FK fix - SET NULL on delete to preserve history
+    3. repository_id FK fix - SET NULL on delete to preserve history
+    -->
+
+    <changeSet id="1767400000000-1-add-schema-version" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <tableExists tableName="activity_event"/>
+            <not>
+                <columnExists tableName="activity_event" columnName="schema_version"/>
+            </not>
+        </preConditions>
+        <addColumn tableName="activity_event">
+            <column name="schema_version" type="INTEGER" defaultValueNumeric="1">
+                <constraints nullable="false"/>
+            </column>
+        </addColumn>
+        <rollback>
+            <dropColumn tableName="activity_event" columnName="schema_version"/>
+        </rollback>
+        <comment>Add schema_version field for forward compatibility and event evolution</comment>
+    </changeSet>
+
+    <changeSet id="1767400000000-2-fix-actor-fk" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <foreignKeyConstraintExists foreignKeyName="fk_activity_event_actor"/>
+        </preConditions>
+        <dropForeignKeyConstraint
+            baseTableName="activity_event"
+            constraintName="fk_activity_event_actor"/>
+        <addForeignKeyConstraint
+            baseTableName="activity_event"
+            baseColumnNames="actor_id"
+            referencedTableName="user"
+            referencedColumnNames="id"
+            constraintName="fk_activity_event_actor"
+            onDelete="SET NULL"/>
+        <rollback>
+            <dropForeignKeyConstraint baseTableName="activity_event" constraintName="fk_activity_event_actor"/>
+            <addForeignKeyConstraint
+                baseTableName="activity_event"
+                baseColumnNames="actor_id"
+                referencedTableName="user"
+                referencedColumnNames="id"
+                constraintName="fk_activity_event_actor"/>
+        </rollback>
+        <comment>Update actor_id FK to SET NULL on delete - preserve activity history when user is deleted</comment>
+    </changeSet>
+
+    <changeSet id="1767400000000-3-fix-repository-fk" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <foreignKeyConstraintExists foreignKeyName="fk_activity_event_repository"/>
+        </preConditions>
+        <dropForeignKeyConstraint
+            baseTableName="activity_event"
+            constraintName="fk_activity_event_repository"/>
+        <addForeignKeyConstraint
+            baseTableName="activity_event"
+            baseColumnNames="repository_id"
+            referencedTableName="repository"
+            referencedColumnNames="id"
+            constraintName="fk_activity_event_repository"
+            onDelete="SET NULL"/>
+        <rollback>
+            <dropForeignKeyConstraint baseTableName="activity_event" constraintName="fk_activity_event_repository"/>
+            <addForeignKeyConstraint
+                baseTableName="activity_event"
+                baseColumnNames="repository_id"
+                referencedTableName="repository"
+                referencedColumnNames="id"
+                constraintName="fk_activity_event_repository"/>
+        </rollback>
+        <comment>Update repository_id FK to SET NULL on delete - preserve activity history when repository is deleted</comment>
+    </changeSet>
+
+    <changeSet id="1767400000000-4-add-target-index" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <tableExists tableName="activity_event"/>
+            <columnExists tableName="activity_event" columnName="target_id"/>
+            <columnExists tableName="activity_event" columnName="target_type"/>
+            <not>
+                <indexExists indexName="idx_activity_event_target"/>
+            </not>
+        </preConditions>
+        <createIndex tableName="activity_event" indexName="idx_activity_event_target">
+            <column name="target_id"/>
+            <column name="target_type"/>
+        </createIndex>
+        <rollback>
+            <dropIndex tableName="activity_event" indexName="idx_activity_event_target"/>
+        </rollback>
+        <comment>Add composite index on (target_id, target_type) to optimize queries filtering by target</comment>
+    </changeSet>
+
+    <!-- ==================== SECTION 17: Activity Event Performance Indexes ==================== -->
+    <!--
+    Additional indexes for leaderboard query performance with proper descending order.
+    Note: Some indexes may be similar to those created in the table creation changeset,
+    but these have optimized column ordering for specific query patterns.
+    -->
+
+    <changeSet id="1767500000000-1-idx-workspace-occurred" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <tableExists tableName="activity_event"/>
+            <not>
+                <indexExists indexName="idx_activity_event_workspace_occurred"/>
+            </not>
+        </preConditions>
+        <createIndex tableName="activity_event" indexName="idx_activity_event_workspace_occurred">
+            <column name="workspace_id"/>
+            <column name="occurred_at" descending="true"/>
+        </createIndex>
+        <rollback>
+            <dropIndex tableName="activity_event" indexName="idx_activity_event_workspace_occurred"/>
+        </rollback>
+        <comment>Composite index for leaderboard aggregation queries filtering by workspace and time range</comment>
+    </changeSet>
+
+    <changeSet id="1767500000000-2-idx-actor-occurred" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <tableExists tableName="activity_event"/>
+            <not>
+                <indexExists indexName="idx_activity_event_actor_occurred"/>
+            </not>
+        </preConditions>
+        <createIndex tableName="activity_event" indexName="idx_activity_event_actor_occurred">
+            <column name="actor_id"/>
+            <column name="occurred_at" descending="true"/>
+        </createIndex>
+        <rollback>
+            <dropIndex tableName="activity_event" indexName="idx_activity_event_actor_occurred"/>
+        </rollback>
+        <comment>Composite index for mentor context queries - user activity feed with time ordering</comment>
+    </changeSet>
+
+    <changeSet id="1767500000000-3-idx-workspace-actor-occurred" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <tableExists tableName="activity_event"/>
+            <not>
+                <indexExists indexName="idx_activity_event_workspace_actor_occurred"/>
+            </not>
+        </preConditions>
+        <createIndex tableName="activity_event" indexName="idx_activity_event_workspace_actor_occurred">
+            <column name="workspace_id"/>
+            <column name="actor_id"/>
+            <column name="occurred_at" descending="true"/>
+        </createIndex>
+        <rollback>
+            <dropIndex tableName="activity_event" indexName="idx_activity_event_workspace_actor_occurred"/>
+        </rollback>
+        <comment>Composite index for activity breakdown queries filtering by workspace and specific actors</comment>
+    </changeSet>
+
+    <!-- Note: idx_activity_event_correlation is already created in the table creation changeset -->
+
+    <!-- ==================== SECTION 18: Activity Event XP Data Integrity ==================== -->
+    <!--
+    Data integrity constraints for the XP column:
+    1. CHECK constraint to ensure XP >= 0 at database level
+    2. Covering index for leaderboard SUM(xp) queries (index-only scans)
+    -->
+
+    <changeSet id="1767600000000-1-check-xp-non-negative" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <tableExists tableName="activity_event"/>
+            <columnExists tableName="activity_event" columnName="xp"/>
+        </preConditions>
+        <sql>
+            ALTER TABLE activity_event
+            ADD CONSTRAINT chk_activity_event_xp_non_negative
+            CHECK (xp >= 0);
+        </sql>
+        <rollback>
+            <sql>
+                ALTER TABLE activity_event
+                DROP CONSTRAINT IF EXISTS chk_activity_event_xp_non_negative;
+            </sql>
+        </rollback>
+        <comment>Ensure XP values are non-negative at database level - defense-in-depth with service layer clamping</comment>
+    </changeSet>
+
+    <!--
+    Covering index for leaderboard aggregation - enables index-only scans for:
+        SELECT actor_id, SUM(xp), COUNT(*)
+        FROM activity_event
+        WHERE workspace_id = ? AND occurred_at >= ? AND occurred_at < ?
+        GROUP BY actor_id
+    -->
+    <changeSet id="1767600000000-2-covering-index-leaderboard" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <tableExists tableName="activity_event"/>
+            <not>
+                <indexExists indexName="idx_activity_event_leaderboard_covering"/>
+            </not>
+        </preConditions>
+        <createIndex tableName="activity_event" indexName="idx_activity_event_leaderboard_covering">
+            <column name="workspace_id"/>
+            <column name="occurred_at" descending="true"/>
+            <column name="actor_id"/>
+            <column name="xp"/>
+        </createIndex>
+        <rollback>
+            <dropIndex tableName="activity_event" indexName="idx_activity_event_leaderboard_covering"/>
+        </rollback>
+        <comment>Covering index for leaderboard SUM(xp) GROUP BY actor_id queries - enables index-only scans</comment>
+    </changeSet>
+
+    <!-- ==================== SECTION 19: Dead Letter Event Storage ==================== -->
+    <!--
+    Dead letter table for persisting activity events that failed to record after retry exhaustion.
+    Enables investigation of failure patterns, automated retry, and audit trail.
+
+    Resolution workflow:
+    1. Event fails after retries → stored with status=PENDING
+    2. Scheduled job or operator investigates
+    3. On success: mark RESOLVED; on permanent failure: mark DISCARDED
+    4. Cleanup job purges resolved/discarded events after 30 days
+    -->
+
+    <changeSet id="1767700000000-1-create-dead-letter-event-table" author="hephaestus">
+        <createTable tableName="dead_letter_event">
+            <column name="id" type="UUID">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="workspace_id" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="event_type" type="VARCHAR(64)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="occurred_at" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="false"/>
+            </column>
+            <column name="actor_id" type="BIGINT"/>
+            <column name="repository_id" type="BIGINT"/>
+            <column name="target_type" type="VARCHAR(32)"/>
+            <column name="target_id" type="BIGINT"/>
+            <column name="xp" type="DOUBLE PRECISION">
+                <constraints nullable="false"/>
+            </column>
+            <column name="source_system" type="VARCHAR(32)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="payload" type="JSONB"/>
+            <column name="error_message" type="VARCHAR(2000)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="error_type" type="VARCHAR(256)"/>
+            <column name="stack_trace" type="TEXT"/>
+            <column name="retry_count" type="INTEGER" defaultValue="0">
+                <constraints nullable="false"/>
+            </column>
+            <column name="status" type="VARCHAR(16)" defaultValue="PENDING">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="resolved_at" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="resolution_notes" type="VARCHAR(1000)"/>
+        </createTable>
+        <comment>Create dead_letter_event table for persisting failed activity events</comment>
+    </changeSet>
+
+    <changeSet id="1767700000000-2-dead-letter-status-created-index" author="hephaestus">
+        <createIndex tableName="dead_letter_event" indexName="idx_dead_letter_status_created">
+            <column name="status"/>
+            <column name="created_at"/>
+        </createIndex>
+        <comment>Index for finding pending dead letters for retry</comment>
+    </changeSet>
+
+    <changeSet id="1767700000000-3-dead-letter-workspace-created-index" author="hephaestus">
+        <createIndex tableName="dead_letter_event" indexName="idx_dead_letter_workspace_created">
+            <column name="workspace_id"/>
+            <column name="created_at" descending="true"/>
+        </createIndex>
+        <comment>Index for workspace-specific dead letter queries</comment>
+    </changeSet>
+
+    <changeSet id="1767700000000-4-dead-letter-event-type-index" author="hephaestus">
+        <createIndex tableName="dead_letter_event" indexName="idx_dead_letter_event_type">
+            <column name="event_type"/>
+            <column name="created_at" descending="true"/>
+        </createIndex>
+        <comment>Index for analyzing failure patterns by event type</comment>
+    </changeSet>
+
+    <changeSet id="1767700000000-5-dead-letter-status-check" author="hephaestus">
+        <sql>
+            ALTER TABLE dead_letter_event
+            ADD CONSTRAINT chk_dead_letter_status
+            CHECK (status IN ('PENDING', 'RESOLVED', 'DISCARDED'));
+        </sql>
+        <rollback>
+            <sql>
+                ALTER TABLE dead_letter_event
+                DROP CONSTRAINT IF EXISTS chk_dead_letter_status;
+            </sql>
+        </rollback>
+        <comment>Ensure status is one of the allowed values</comment>
+    </changeSet>
+
+    <!-- ==================== SECTION 20: Activity Event Trigger Context ==================== -->
+    <!--
+    Add trigger_context column for audit trail completeness - captures WHY the event occurred.
+    -->
+
+    <changeSet id="1767800000000-1" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <columnExists tableName="activity_event" columnName="trigger_context"/>
+            </not>
+        </preConditions>
+        <comment>Add trigger_context column for audit trail completeness (WHY the event occurred)</comment>
+        <addColumn tableName="activity_event">
+            <column name="trigger_context" type="varchar(64)">
+                <constraints nullable="true"/>
+            </column>
+        </addColumn>
+    </changeSet>
+
+    <changeSet id="1767800000000-2" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <indexExists indexName="idx_activity_event_trigger_context"/>
+            </not>
+        </preConditions>
+        <comment>Index for querying events by trigger context (debugging, audit)</comment>
+        <createIndex tableName="activity_event" indexName="idx_activity_event_trigger_context">
+            <column name="trigger_context"/>
         </createIndex>
     </changeSet>
 

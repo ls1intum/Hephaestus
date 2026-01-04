@@ -23,8 +23,9 @@ public interface RepositoryRepository extends JpaRepository<Repository, Long> {
         SELECT DISTINCT r
         FROM Repository r
         JOIN PullRequest pr ON r.id = pr.repository.id
+        JOIN RepositoryToMonitor rtm ON rtm.nameWithOwner = r.nameWithOwner
         WHERE pr.author.login ILIKE :contributorLogin
-            AND r.organization.workspaceId = :workspaceId
+            AND rtm.workspace.id = :workspaceId
         ORDER BY r.name ASC
         """
     )
@@ -37,7 +38,8 @@ public interface RepositoryRepository extends JpaRepository<Repository, Long> {
         """
         SELECT r
         FROM Repository r
-        WHERE r.organization.workspaceId = :workspaceId
+        JOIN RepositoryToMonitor rtm ON rtm.nameWithOwner = r.nameWithOwner
+        WHERE rtm.workspace.id = :workspaceId
         ORDER BY r.name ASC
         """
     )

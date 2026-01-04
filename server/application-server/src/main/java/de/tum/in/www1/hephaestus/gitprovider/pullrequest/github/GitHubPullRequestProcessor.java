@@ -252,7 +252,6 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
         pr.setChangedFiles(dto.changedFiles());
         pr.setCommits(dto.commits());
         pr.setCommentsCount(dto.commentsCount());
-        pr.setMergeCommitSha(dto.mergeCommitSha());
         pr.setRepository(repository);
         pr.setHasPullRequest(true); // It is a PR
 
@@ -260,7 +259,6 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
         pr.setReviewDecision(dto.reviewDecision());
         pr.setMergeStateStatus(dto.mergeStateStatus());
         pr.setMergeable(dto.isMergeable());
-        pr.setMaintainerCanModify(dto.maintainerCanModify());
 
         // Head/base branch references
         if (dto.head() != null) {
@@ -375,12 +373,6 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
             changedFields.add("mergedBy");
         }
 
-        // Update mergeCommitSha (available from webhook payloads on merge)
-        if (dto.mergeCommitSha() != null && !Objects.equals(pr.getMergeCommitSha(), dto.mergeCommitSha())) {
-            pr.setMergeCommitSha(dto.mergeCommitSha());
-            changedFields.add("mergeCommitSha");
-        }
-
         if (pr.getAdditions() != dto.additions()) {
             pr.setAdditions(dto.additions());
             changedFields.add("additions");
@@ -413,10 +405,6 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
         if (dto.isMergeable() != null && !Objects.equals(pr.getMergeable(), dto.isMergeable())) {
             pr.setMergeable(dto.isMergeable());
             changedFields.add("isMergeable");
-        }
-        if (pr.isMaintainerCanModify() != dto.maintainerCanModify()) {
-            pr.setMaintainerCanModify(dto.maintainerCanModify());
-            changedFields.add("maintainerCanModify");
         }
 
         // Update head/base branch references

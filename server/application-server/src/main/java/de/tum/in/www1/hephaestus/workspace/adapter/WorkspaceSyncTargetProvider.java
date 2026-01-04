@@ -102,6 +102,7 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public Optional<WorkspaceSyncMetadata> getWorkspaceSyncMetadata(Long workspaceId) {
         return workspaceRepository.findById(workspaceId).map(this::toWorkspaceSyncMetadata);
     }

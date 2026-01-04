@@ -24,6 +24,10 @@ erDiagram
         DOUBLE xp "NOT NULL"
         JSONB payload
         TIMESTAMPTZ ingested_at "NOT NULL"
+        INTEGER schema_version "NOT NULL"
+        VARCHAR(64) trigger_context
+        VARCHAR(64) content_hash
+        INTEGER formula_version "NOT NULL"
     }
 
     BadPracticeDetection {
@@ -75,6 +79,29 @@ erDiagram
         BIGINT workspace_id FK "NOT NULL"
     }
 
+    DeadLetterEvent {
+        UUID id PK
+        BIGINT workspace_id "NOT NULL"
+        VARCHAR(64) event_type "NOT NULL"
+        TIMESTAMPTZ occurred_at "NOT NULL"
+        BIGINT actor_id
+        BIGINT repository_id
+        VARCHAR(32) target_type
+        BIGINT target_id
+        DOUBLE xp "NOT NULL"
+        VARCHAR(32) source_system "NOT NULL"
+        JSONB payload
+        VARCHAR(2000) error_message "NOT NULL"
+        VARCHAR(256) error_type
+        TEXT stack_trace
+        INTEGER retry_count "NOT NULL"
+        VARCHAR(16) status "NOT NULL"
+        TIMESTAMPTZ created_at "NOT NULL"
+        TIMESTAMPTZ updated_at
+        TIMESTAMPTZ resolved_at
+        VARCHAR(1000) resolution_notes
+    }
+
     Document {
         UUID id PK
         INTEGER version_number PK
@@ -120,6 +147,13 @@ erDiagram
         INTEGER sub_issues_completed
         INTEGER sub_issues_percent_completed
         VARCHAR(128) issue_type_id FK
+        VARCHAR(255) base_ref_name
+        VARCHAR(40) base_ref_oid
+        VARCHAR(255) head_ref_name
+        VARCHAR(40) head_ref_oid
+        VARCHAR(255) merge_state_status
+        BOOLEAN mergeable
+        VARCHAR(255) review_decision
     }
 
     IssueAssignee {

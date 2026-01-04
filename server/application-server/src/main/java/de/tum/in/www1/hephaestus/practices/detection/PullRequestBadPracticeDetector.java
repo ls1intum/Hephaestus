@@ -117,10 +117,15 @@ public class PullRequestBadPracticeDetector {
     public DetectionResult detectAndSyncBadPractices(PullRequest pullRequest) {
         logger.info("Detecting bad practices for pull request: {}", pullRequest.getId());
 
+        // Check if detection is needed based on last detection time from BadPracticeDetection
+        BadPracticeDetection lastDetection = badPracticeDetectionRepository.findMostRecentByPullRequestId(
+            pullRequest.getId()
+        );
         if (
             pullRequest.getUpdatedAt() != null &&
-            pullRequest.getLastDetectionTime() != null &&
-            pullRequest.getUpdatedAt().isBefore(pullRequest.getLastDetectionTime())
+            lastDetection != null &&
+            lastDetection.getDetectionTime() != null &&
+            pullRequest.getUpdatedAt().isBefore(lastDetection.getDetectionTime())
         ) {
             logger.info("Pull request has not been updated since last detection. Skipping detection.");
             return DetectionResult.ERROR_NO_UPDATE_ON_PULLREQUEST;
@@ -174,7 +179,6 @@ public class PullRequestBadPracticeDetector {
         detectorRequest.setLifecycleState(lifecycleState.getState());
         detectorRequest.setRepositoryName(pullRequest.getRepository().getName());
         detectorRequest.setPullRequestNumber(BigDecimal.valueOf(pullRequest.getNumber()));
-        detectorRequest.setBadPracticeSummary(summary);
         detectorRequest.setBadPractices(
             existingBadPractices.stream().map(this::convertToIntelligenceBadPractice).toList()
         );
@@ -200,10 +204,6 @@ public class PullRequestBadPracticeDetector {
             emptyDetection.setTraceId(null);
             return emptyDetection;
         }
-
-        pullRequest.setLastDetectionTime(Instant.now());
-        pullRequest.setBadPracticeSummary(detectorResponse.getBadPracticeSummary());
-        pullRequestRepository.save(pullRequest);
 
         List<PullRequestBadPractice> detectedBadPractices = detectorResponse
             .getBadPractices()

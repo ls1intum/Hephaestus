@@ -15,7 +15,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.actuate.health.Health;
 import org.springframework.boot.actuate.health.HealthIndicator;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -107,7 +106,7 @@ public class ActivityIntegrityScheduler implements HealthIndicator {
 
         Timer.Sample timerSample = Timer.start();
         try {
-            List<ActivityEvent> sample = eventRepository.findRandomSample(PageRequest.of(0, sampleSize));
+            List<ActivityEvent> sample = eventRepository.findRandomSample(sampleSize);
 
             if (sample.isEmpty()) {
                 logger.debug("No events to verify");

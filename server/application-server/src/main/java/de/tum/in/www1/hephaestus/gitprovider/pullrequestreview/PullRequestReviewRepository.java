@@ -16,12 +16,13 @@ public interface PullRequestReviewRepository extends JpaRepository<PullRequestRe
         SELECT prr
         FROM PullRequestReview prr
         LEFT JOIN FETCH prr.author
-        LEFT JOIN FETCH prr.pullRequest
-        LEFT JOIN FETCH prr.pullRequest.repository
+        LEFT JOIN FETCH prr.pullRequest pr
+        LEFT JOIN FETCH pr.repository r
         LEFT JOIN FETCH prr.comments
+        JOIN RepositoryToMonitor rtm ON rtm.nameWithOwner = r.nameWithOwner
         WHERE prr.author.login ILIKE :authorLogin
             AND prr.submittedAt >= :activitySince
-            AND prr.pullRequest.repository.organization.workspaceId = :workspaceId
+            AND rtm.workspace.id = :workspaceId
         ORDER BY prr.submittedAt DESC
         """
     )
@@ -36,12 +37,13 @@ public interface PullRequestReviewRepository extends JpaRepository<PullRequestRe
         SELECT prr
         FROM PullRequestReview prr
         LEFT JOIN FETCH prr.author
-        LEFT JOIN FETCH prr.pullRequest
-        LEFT JOIN FETCH prr.pullRequest.repository
+        LEFT JOIN FETCH prr.pullRequest pr
+        LEFT JOIN FETCH pr.repository r
         LEFT JOIN FETCH prr.comments
+        JOIN RepositoryToMonitor rtm ON rtm.nameWithOwner = r.nameWithOwner
         WHERE prr.author.login ILIKE :authorLogin
             AND prr.submittedAt BETWEEN :after AND :before
-            AND prr.pullRequest.repository.organization.workspaceId = :workspaceId
+            AND rtm.workspace.id = :workspaceId
         ORDER BY prr.submittedAt DESC
         """
     )
@@ -57,13 +59,14 @@ public interface PullRequestReviewRepository extends JpaRepository<PullRequestRe
         SELECT prr
         FROM PullRequestReview prr
         LEFT JOIN FETCH prr.author
-        LEFT JOIN FETCH prr.pullRequest
-        LEFT JOIN FETCH prr.pullRequest.repository
+        LEFT JOIN FETCH prr.pullRequest pr
+        LEFT JOIN FETCH pr.repository r
         LEFT JOIN FETCH prr.comments
+        JOIN RepositoryToMonitor rtm ON rtm.nameWithOwner = r.nameWithOwner
         WHERE
             prr.submittedAt BETWEEN :after AND :before
             AND prr.author.type = 'USER'
-            AND prr.pullRequest.repository.organization.workspaceId = :workspaceId
+            AND rtm.workspace.id = :workspaceId
         ORDER BY prr.submittedAt DESC
         """
     )
@@ -78,32 +81,33 @@ public interface PullRequestReviewRepository extends JpaRepository<PullRequestRe
         SELECT prr
         FROM PullRequestReview prr
         LEFT JOIN FETCH prr.author
-        LEFT JOIN FETCH prr.pullRequest
-        LEFT JOIN FETCH prr.pullRequest.repository
+        LEFT JOIN FETCH prr.pullRequest pr
+        LEFT JOIN FETCH pr.repository r
         LEFT JOIN FETCH prr.comments
+        JOIN RepositoryToMonitor rtm ON rtm.nameWithOwner = r.nameWithOwner
         WHERE
             prr.submittedAt BETWEEN :after AND :before
             AND prr.author.type = 'USER'
-            AND prr.pullRequest.repository.organization.workspaceId = :workspaceId
+            AND rtm.workspace.id = :workspaceId
             AND EXISTS (
                 SELECT 1
                 FROM TeamRepositoryPermission trp
                 JOIN trp.team t
-                WHERE trp.repository = prr.pullRequest.repository
+                WHERE trp.repository = r
                 AND t.id IN :teamIds
                 AND trp.hiddenFromContributions = false
                 AND (
                     NOT EXISTS (
                         SELECT l
                         FROM t.labels l
-                        WHERE l.repository = prr.pullRequest.repository
+                        WHERE l.repository = r
                     )
                     OR
                     EXISTS (
                         SELECT l
                         FROM t.labels l
-                        WHERE l.repository = prr.pullRequest.repository
-                        AND l MEMBER OF prr.pullRequest.labels
+                        WHERE l.repository = r
+                        AND l MEMBER OF pr.labels
                     )
                 )
             )
@@ -127,8 +131,11 @@ public interface PullRequestReviewRepository extends JpaRepository<PullRequestRe
         value = """
         SELECT MIN(prr.submittedAt)
         FROM PullRequestReview prr
+        JOIN prr.pullRequest pr
+        JOIN pr.repository r
+        JOIN RepositoryToMonitor rtm ON rtm.nameWithOwner = r.nameWithOwner
         WHERE prr.author.id = :userId
-            AND prr.pullRequest.repository.organization.workspaceId = :workspaceId
+            AND rtm.workspace.id = :workspaceId
         """
     )
     Instant findEarliestSubmissionInstant(@Param("workspaceId") Long workspaceId, @Param("userId") Long userId);

@@ -38,10 +38,11 @@ public interface PullRequestRepository extends JpaRepository<PullRequest, Long> 
         LEFT JOIN FETCH p.labels
         JOIN FETCH p.author
         LEFT JOIN FETCH p.assignees
-        LEFT JOIN FETCH p.repository
+        LEFT JOIN FETCH p.repository r
+        JOIN RepositoryToMonitor rtm ON rtm.nameWithOwner = r.nameWithOwner
         WHERE (p.author.login ILIKE :assigneeLogin OR LOWER(:assigneeLogin) IN (SELECT LOWER(u.login) FROM p.assignees u))
             AND p.state IN :states
-            AND p.repository.organization.workspaceId = :workspaceId
+            AND rtm.workspace.id = :workspaceId
         ORDER BY p.createdAt DESC
         """
     )
@@ -58,11 +59,12 @@ public interface PullRequestRepository extends JpaRepository<PullRequest, Long> 
         LEFT JOIN FETCH p.labels
         JOIN FETCH p.author
         LEFT JOIN FETCH p.assignees
-        LEFT JOIN FETCH p.repository
+        LEFT JOIN FETCH p.repository r
+        JOIN RepositoryToMonitor rtm ON rtm.nameWithOwner = r.nameWithOwner
         WHERE (p.author.login ILIKE :assigneeLogin OR LOWER(:assigneeLogin) IN (SELECT LOWER(u.login) FROM p.assignees u))
             AND p.state IN :states
             AND p.updatedAt >= :activitySince
-            AND p.repository.organization.workspaceId = :workspaceId
+            AND rtm.workspace.id = :workspaceId
         ORDER BY p.createdAt DESC
         """
     )
@@ -152,4 +154,49 @@ public interface PullRequestRepository extends JpaRepository<PullRequest, Long> 
     @WorkspaceAgnostic("Sync operation - Repository ID has workspace through organization")
     @QueryHints(@QueryHint(name = org.hibernate.jpa.HibernateHints.HINT_FETCH_SIZE, value = "50"))
     Stream<PullRequest> streamAllByRepository_Id(Long repositoryId);
+
+    /**
+     * Finds all pull requests belonging to a repository with reviews and their comments eagerly fetched.
+     * Used by backfill operations to avoid LazyInitializationException when accessing
+     * reviews and their comments after EntityManager.clear().
+     *
+     * <p>The XP calculator needs review.comments.size() for bonus calculation, so we must
+     * fetch both the reviews and their comments in the same query.
+     *
+     * @param repositoryId the repository ID
+     * @return list of pull requests with reviews and comments for the repository
+     */
+    @WorkspaceAgnostic("Backfill operation - Repository ID has workspace through organization")
+    @Query(
+        """
+        SELECT DISTINCT p
+        FROM PullRequest p
+        LEFT JOIN FETCH p.reviews r
+        LEFT JOIN FETCH r.comments
+        LEFT JOIN FETCH p.repository
+        WHERE p.repository.id = :repositoryId
+        """
+    )
+    List<PullRequest> findAllByRepositoryIdWithReviews(@Param("repositoryId") Long repositoryId);
+
+    /**
+     * Finds all pull requests belonging to a repository with review comments eagerly fetched.
+     * Used by backfill operations to avoid LazyInitializationException when accessing
+     * reviewComments after EntityManager.clear().
+     *
+     * @param repositoryId the repository ID
+     * @return list of pull requests with review comments for the repository
+     */
+    @WorkspaceAgnostic("Backfill operation - Repository ID has workspace through organization")
+    @Query(
+        """
+        SELECT DISTINCT p
+        FROM PullRequest p
+        LEFT JOIN FETCH p.reviewComments rc
+        LEFT JOIN FETCH rc.author
+        LEFT JOIN FETCH p.repository
+        WHERE p.repository.id = :repositoryId
+        """
+    )
+    List<PullRequest> findAllByRepositoryIdWithReviewComments(@Param("repositoryId") Long repositoryId);
 }

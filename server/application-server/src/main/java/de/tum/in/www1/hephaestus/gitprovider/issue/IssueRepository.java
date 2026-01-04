@@ -61,4 +61,24 @@ public interface IssueRepository extends JpaRepository<Issue, Long> {
         """
     )
     Set<Integer> findAllIssueNumbersWithPullRequest(@Param("repositoryId") long repositoryId);
+
+    /**
+     * Finds all issues belonging to a repository with comments eagerly fetched.
+     * Used by backfill operations to avoid LazyInitializationException when accessing
+     * comments after EntityManager.clear().
+     *
+     * @param repositoryId the repository ID
+     * @return list of issues with comments for the repository
+     */
+    @Query(
+        """
+        SELECT DISTINCT i
+        FROM Issue i
+        LEFT JOIN FETCH i.comments c
+        LEFT JOIN FETCH c.author
+        LEFT JOIN FETCH i.repository
+        WHERE i.repository.id = :repositoryId
+        """
+    )
+    List<Issue> findAllByRepositoryIdWithComments(@Param("repositoryId") Long repositoryId);
 }

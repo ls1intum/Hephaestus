@@ -3,6 +3,7 @@
 import {
 	bigint,
 	boolean,
+	check,
 	doublePrecision,
 	foreignKey,
 	index,
@@ -41,8 +42,17 @@ export const activityEvent = pgTable(
 		ingestedAt: timestamp("ingested_at", { withTimezone: true, mode: "string" })
 			.defaultNow()
 			.notNull(),
+		schemaVersion: integer("schema_version").default(1).notNull(),
+		triggerContext: varchar("trigger_context", { length: 64 }),
+		contentHash: varchar("content_hash", { length: 64 }),
+		formulaVersion: integer("formula_version").notNull(),
 	},
 	(table) => [
+		index("idx_activity_event_actor_occurred").using(
+			"btree",
+			table.actorId.asc().nullsLast(),
+			table.occurredAt.desc().nullsFirst(),
+		),
 		index("idx_activity_event_actor_time").using(
 			"btree",
 			table.actorId.asc().nullsLast(),
@@ -55,10 +65,37 @@ export const activityEvent = pgTable(
 			table.actorId.asc().nullsLast(),
 			table.occurredAt.asc().nullsLast(),
 		),
+		index("idx_activity_event_leaderboard_covering").using(
+			"btree",
+			table.workspaceId.asc().nullsLast(),
+			table.occurredAt.desc().nullsFirst(),
+			table.actorId.asc().nullsLast(),
+			table.xp.asc().nullsLast(),
+		),
+		index("idx_activity_event_target").using(
+			"btree",
+			table.targetId.asc().nullsLast(),
+			table.targetType.asc().nullsLast(),
+		),
+		index("idx_activity_event_trigger_context").using(
+			"btree",
+			table.triggerContext.asc().nullsLast(),
+		),
 		index("idx_activity_event_type_time").using(
 			"btree",
 			table.eventType.asc().nullsLast(),
 			table.occurredAt.asc().nullsLast(),
+		),
+		index("idx_activity_event_workspace_actor_occurred").using(
+			"btree",
+			table.workspaceId.asc().nullsLast(),
+			table.actorId.asc().nullsLast(),
+			table.occurredAt.desc().nullsFirst(),
+		),
+		index("idx_activity_event_workspace_occurred").using(
+			"btree",
+			table.workspaceId.asc().nullsLast(),
+			table.occurredAt.desc().nullsFirst(),
 		),
 		index("idx_activity_event_workspace_time").using(
 			"btree",
@@ -74,13 +111,14 @@ export const activityEvent = pgTable(
 			columns: [table.actorId],
 			foreignColumns: [user.id],
 			name: "fk_activity_event_actor",
-		}),
+		}).onDelete("set null"),
 		foreignKey({
 			columns: [table.repositoryId],
 			foreignColumns: [repository.id],
 			name: "fk_activity_event_repository",
-		}),
+		}).onDelete("set null"),
 		unique("uk_activity_event_workspace_key").on(table.eventKey, table.workspaceId),
+		check("chk_activity_event_xp_non_negative", sql`xp >= (0)::double precision`),
 	],
 );
 
@@ -243,6 +281,57 @@ export const chatThread = pgTable(
 	],
 );
 
+export const deadLetterEvent = pgTable(
+	"dead_letter_event",
+	{
+		id: uuid().primaryKey().notNull(),
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		workspaceId: bigint("workspace_id", { mode: "number" }).notNull(),
+		eventType: varchar("event_type", { length: 64 }).notNull(),
+		occurredAt: timestamp("occurred_at", { withTimezone: true, mode: "string" }).notNull(),
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		actorId: bigint("actor_id", { mode: "number" }),
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		repositoryId: bigint("repository_id", { mode: "number" }),
+		targetType: varchar("target_type", { length: 32 }),
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		targetId: bigint("target_id", { mode: "number" }),
+		xp: doublePrecision().notNull(),
+		sourceSystem: varchar("source_system", { length: 32 }).notNull(),
+		payload: jsonb(),
+		errorMessage: varchar("error_message", { length: 2000 }).notNull(),
+		errorType: varchar("error_type", { length: 256 }),
+		stackTrace: text("stack_trace"),
+		retryCount: integer("retry_count").default(0).notNull(),
+		status: varchar({ length: 16 }).default("PENDING").notNull(),
+		createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }).notNull(),
+		updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" }),
+		resolvedAt: timestamp("resolved_at", { withTimezone: true, mode: "string" }),
+		resolutionNotes: varchar("resolution_notes", { length: 1000 }),
+	},
+	(table) => [
+		index("idx_dead_letter_event_type").using(
+			"btree",
+			table.eventType.asc().nullsLast(),
+			table.createdAt.desc().nullsFirst(),
+		),
+		index("idx_dead_letter_status_created").using(
+			"btree",
+			table.status.asc().nullsLast(),
+			table.createdAt.asc().nullsLast(),
+		),
+		index("idx_dead_letter_workspace_created").using(
+			"btree",
+			table.workspaceId.asc().nullsLast(),
+			table.createdAt.desc().nullsFirst(),
+		),
+		check(
+			"chk_dead_letter_status",
+			sql`(status)::text = ANY ((ARRAY['PENDING'::character varying, 'RESOLVED'::character varying, 'DISCARDED'::character varying])::text[])`,
+		),
+	],
+);
+
 export const document = pgTable(
 	"document",
 	{
@@ -326,6 +415,13 @@ export const issue = pgTable(
 		subIssuesCompleted: integer("sub_issues_completed"),
 		subIssuesPercentCompleted: integer("sub_issues_percent_completed"),
 		issueTypeId: varchar("issue_type_id", { length: 128 }),
+		baseRefName: varchar("base_ref_name", { length: 255 }),
+		baseRefOid: varchar("base_ref_oid", { length: 40 }),
+		headRefName: varchar("head_ref_name", { length: 255 }),
+		headRefOid: varchar("head_ref_oid", { length: 40 }),
+		mergeStateStatus: varchar("merge_state_status", { length: 255 }),
+		mergeable: boolean(),
+		reviewDecision: varchar("review_decision", { length: 255 }),
 	},
 	(table) => [
 		index("idx_issue_author_id").using("btree", table.authorId.asc().nullsLast()),
@@ -363,6 +459,14 @@ export const issue = pgTable(
 			foreignColumns: [issueType.id],
 			name: "fk_issue_issue_type",
 		}).onDelete("set null"),
+		check(
+			"issue_merge_state_status_check",
+			sql`(merge_state_status)::text = ANY ((ARRAY['BEHIND'::character varying, 'BLOCKED'::character varying, 'CLEAN'::character varying, 'DIRTY'::character varying, 'HAS_HOOKS'::character varying, 'UNKNOWN'::character varying, 'UNSTABLE'::character varying])::text[])`,
+		),
+		check(
+			"issue_review_decision_check",
+			sql`(review_decision)::text = ANY ((ARRAY['APPROVED'::character varying, 'CHANGES_REQUESTED'::character varying, 'REVIEW_REQUIRED'::character varying])::text[])`,
+		),
 	],
 );
 

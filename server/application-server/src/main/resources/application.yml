@@ -91,13 +91,22 @@ logging:
 hephaestus:
     host-url: https://hephaestus.ase.cit.tum.de/
 
+    # ═══════════════════════════════════════════════════════════════════════════
+    # ACTIVITY EVENT BACKFILL
+    # ═══════════════════════════════════════════════════════════════════════════
+    # One-time migration to backfill activity events from historical data.
+    # Enable this ONCE when deploying to a new environment, then disable.
+    # The backfill is idempotent - running multiple times will not create duplicates.
+    activity:
+        backfill-on-startup: ${HEPHAESTUS_ACTIVITY_BACKFILL_ON_STARTUP:false}
+
     cors:
         allowed-origins:
             - ${CLIENT_HOST:http://localhost:4200}
 
     webapp:
         url: ${CLIENT_HOST:http://localhost:4200}
-    
+
     leaderboard:
         schedule:
             day: 2
@@ -109,7 +118,7 @@ hephaestus:
         # PR authors whose assignee-reviewers don't earn points (e.g., AI bots)
         self-review-author-logins:
             - Copilot
-    
+
     # ═══════════════════════════════════════════════════════════════════════════
     # WORKSPACE CONFIGURATION
     # ═══════════════════════════════════════════════════════════════════════════
@@ -147,7 +156,7 @@ hephaestus:
             repositories-to-monitor:
                 - ls1intum/Hephaestus
                 - ls1intum/Artemis
-    
+
     intelligence-service:
         url: http://localhost:8000
 
@@ -178,8 +187,6 @@ hephaestus:
         api-host: ${POSTHOG_API_HOST:https://app.posthog.com}
         project-id: ${POSTHOG_PROJECT_ID:}
         personal-api-key: ${POSTHOG_PERSONAL_API_KEY:}
-
-
 
 keycloak:
     url: http://localhost:8081

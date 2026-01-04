@@ -13,13 +13,14 @@ public interface IssueCommentRepository extends JpaRepository<IssueComment, Long
         SELECT ic
         FROM IssueComment ic
         LEFT JOIN FETCH ic.author
-        LEFT JOIN FETCH ic.issue
-        LEFT JOIN FETCH ic.issue.repository
+        LEFT JOIN FETCH ic.issue i
+        LEFT JOIN FETCH i.repository r
+        JOIN RepositoryToMonitor rtm ON rtm.nameWithOwner = r.nameWithOwner
         WHERE
             ic.author.login ILIKE :authorLogin
             AND ic.createdAt >= :activitySince
-            AND ic.issue.repository.organization.workspaceId = :workspaceId
-            AND (:onlyFromPullRequests = false OR ic.issue.htmlUrl LIKE '%/pull/%')
+            AND rtm.workspace.id = :workspaceId
+            AND (:onlyFromPullRequests = false OR i.htmlUrl LIKE '%/pull/%')
         ORDER BY ic.createdAt DESC
         """
     )
@@ -35,13 +36,14 @@ public interface IssueCommentRepository extends JpaRepository<IssueComment, Long
         SELECT ic
         FROM IssueComment ic
         LEFT JOIN FETCH ic.author
-        LEFT JOIN FETCH ic.issue
-        LEFT JOIN FETCH ic.issue.repository
+        LEFT JOIN FETCH ic.issue i
+        LEFT JOIN FETCH i.repository r
+        JOIN RepositoryToMonitor rtm ON rtm.nameWithOwner = r.nameWithOwner
         WHERE
             ic.author.login ILIKE :authorLogin
             AND ic.createdAt BETWEEN :after AND :before
-            AND ic.issue.repository.organization.workspaceId = :workspaceId
-            AND (:onlyFromPullRequests = false OR ic.issue.htmlUrl LIKE '%/pull/%')
+            AND rtm.workspace.id = :workspaceId
+            AND (:onlyFromPullRequests = false OR i.htmlUrl LIKE '%/pull/%')
         ORDER BY ic.createdAt DESC
         """
     )
@@ -58,13 +60,14 @@ public interface IssueCommentRepository extends JpaRepository<IssueComment, Long
         SELECT ic
         FROM IssueComment ic
         LEFT JOIN FETCH ic.author
-        LEFT JOIN FETCH ic.issue
-        LEFT JOIN FETCH ic.issue.repository
+        LEFT JOIN FETCH ic.issue i
+        LEFT JOIN FETCH i.repository r
+        JOIN RepositoryToMonitor rtm ON rtm.nameWithOwner = r.nameWithOwner
         WHERE
             ic.createdAt BETWEEN :after AND :before
             AND ic.author.type = 'USER'
-            AND ic.issue.repository.organization.workspaceId = :workspaceId
-            AND (:onlyFromPullRequests = false OR ic.issue.htmlUrl LIKE '%/pull/%')
+            AND rtm.workspace.id = :workspaceId
+            AND (:onlyFromPullRequests = false OR i.htmlUrl LIKE '%/pull/%')
         ORDER BY ic.createdAt DESC
         """
     )
@@ -80,31 +83,32 @@ public interface IssueCommentRepository extends JpaRepository<IssueComment, Long
         SELECT ic
         FROM IssueComment ic
         LEFT JOIN FETCH ic.author
-        LEFT JOIN FETCH ic.issue
-        LEFT JOIN FETCH ic.issue.repository
+        LEFT JOIN FETCH ic.issue i
+        LEFT JOIN FETCH i.repository r
+        JOIN RepositoryToMonitor rtm ON rtm.nameWithOwner = r.nameWithOwner
         WHERE
             ic.createdAt BETWEEN :after AND :before
             AND ic.author.type = 'USER'
-            AND ic.issue.repository.organization.workspaceId = :workspaceId
+            AND rtm.workspace.id = :workspaceId
             AND EXISTS (
                 SELECT 1
                 FROM TeamRepositoryPermission trp
                 JOIN trp.team t
-                WHERE trp.repository = ic.issue.repository
+                WHERE trp.repository = r
                 AND t.id IN :teamIds
                 AND trp.hiddenFromContributions = false
                 AND (
                     NOT EXISTS (
                         SELECT l
                         FROM t.labels l
-                        WHERE l.repository = ic.issue.repository
+                        WHERE l.repository = r
                     )
                     OR
                     EXISTS (
                         SELECT l
                         FROM t.labels l
-                        WHERE l.repository = ic.issue.repository
-                        AND l MEMBER OF ic.issue.labels
+                        WHERE l.repository = r
+                        AND l MEMBER OF i.labels
                     )
                 )
             )
@@ -114,7 +118,7 @@ public interface IssueCommentRepository extends JpaRepository<IssueComment, Long
                 WHERE tm.team.id IN :teamIds
                 AND tm.user = ic.author
             )
-            AND (:onlyFromPullRequests = false OR ic.issue.htmlUrl LIKE '%/pull/%')
+            AND (:onlyFromPullRequests = false OR i.htmlUrl LIKE '%/pull/%')
         ORDER BY ic.createdAt DESC
         """
     )
@@ -130,8 +134,11 @@ public interface IssueCommentRepository extends JpaRepository<IssueComment, Long
         """
         SELECT MIN(ic.createdAt)
         FROM IssueComment ic
+        JOIN ic.issue i
+        JOIN i.repository r
+        JOIN RepositoryToMonitor rtm ON rtm.nameWithOwner = r.nameWithOwner
         WHERE ic.author.id = :userId
-            AND ic.issue.repository.organization.workspaceId = :workspaceId
+            AND rtm.workspace.id = :workspaceId
         """
     )
     Instant findEarliestCreatedAt(@Param("workspaceId") Long workspaceId, @Param("userId") Long userId);
