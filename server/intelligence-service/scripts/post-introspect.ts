@@ -82,10 +82,22 @@ content = content
 content = content.replace(/\.default\('\)\.notNull\(\)/g, ".default('').notNull()");
 content = content.replace(/\.default\('\)/g, ".default('')");
 
-// Remove `import { sql } from "drizzle-orm"` only if sql template literal is not used in schema
+// Handle `import { sql } from "drizzle-orm"`:
+// - Remove it if sql template literal is not used in schema
+// - Add it if sql template literal IS used but import is missing
 // (e.g., CHECK constraints use sql`...` syntax and need the import)
 const sqlTemplateUsageRegex = /\bsql`/;
-if (!sqlTemplateUsageRegex.test(content)) {
+const sqlImportRegex = /import\s*\{\s*sql\s*\}\s*from\s*["']drizzle-orm["']/;
+const usesSqlTemplate = sqlTemplateUsageRegex.test(content);
+const hasSqlImport = sqlImportRegex.test(content);
+
+if (usesSqlTemplate && !hasSqlImport) {
+	// Add the sql import after the header banner (before other imports)
+	const sqlImport = 'import { sql } from "drizzle-orm";\n';
+	const headerEndIndex = content.indexOf(headerBanner) + headerBanner.length;
+	content = content.slice(0, headerEndIndex) + sqlImport + content.slice(headerEndIndex);
+} else if (!usesSqlTemplate && hasSqlImport) {
+	// Remove unused sql import
 	content = content.replace(/\n?import\s*\{\s*sql\s*\}\s*from\s*"drizzle-orm"\s*;?\s*\n?/g, "\n");
 	content = content.replace(/\n?import\s*\{\s*sql\s*\}\s*from\s*'drizzle-orm'\s*;?\s*\n?/g, "\n");
 	content = content.replace(

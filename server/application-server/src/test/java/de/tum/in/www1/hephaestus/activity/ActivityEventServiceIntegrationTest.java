@@ -7,6 +7,7 @@ import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.testconfig.BaseIntegrationTest;
+import de.tum.in.www1.hephaestus.workspace.AccountType;
 import de.tum.in.www1.hephaestus.workspace.Workspace;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceRepository;
 import java.time.Instant;
@@ -64,6 +65,8 @@ class ActivityEventServiceIntegrationTest extends BaseIntegrationTest {
         testWorkspace = new Workspace();
         testWorkspace.setWorkspaceSlug("test-workspace");
         testWorkspace.setDisplayName("Test Workspace");
+        testWorkspace.setAccountLogin("test-org");
+        testWorkspace.setAccountType(AccountType.ORG);
         testWorkspace = workspaceRepository.save(testWorkspace);
 
         // Create user

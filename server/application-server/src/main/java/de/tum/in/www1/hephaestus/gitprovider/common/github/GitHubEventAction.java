@@ -28,6 +28,7 @@ public sealed interface GitHubEventAction {
         UNLOCKED,
         TRANSFERRED,
         TYPED,
+        UNTYPED,
         UNKNOWN;
 
         @Override
@@ -55,6 +56,7 @@ public sealed interface GitHubEventAction {
                 case "unlocked" -> UNLOCKED;
                 case "transferred" -> TRANSFERRED;
                 case "typed" -> TYPED;
+                case "untyped" -> UNTYPED;
                 default -> UNKNOWN;
             };
         }

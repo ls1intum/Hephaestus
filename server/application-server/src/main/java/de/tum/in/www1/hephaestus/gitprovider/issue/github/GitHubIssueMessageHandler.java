@@ -94,6 +94,11 @@ public class GitHubIssueMessageHandler extends GitHubMessageHandler<GitHubIssueE
                     issueProcessor.process(issueDto, context);
                 }
             }
+            case GitHubEventAction.Issue.TYPED -> {
+                String orgLogin = event.organization() != null ? event.organization().login() : null;
+                issueProcessor.processTyped(issueDto, event.issueType(), orgLogin, context);
+            }
+            case GitHubEventAction.Issue.UNTYPED -> issueProcessor.processUntyped(issueDto, context);
             default -> {
                 logger.debug("Unhandled issue action: {}", event.action());
                 issueProcessor.process(issueDto, context);

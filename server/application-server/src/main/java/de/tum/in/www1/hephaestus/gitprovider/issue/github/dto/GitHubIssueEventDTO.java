@@ -17,6 +17,7 @@ public record GitHubIssueEventDTO(
     @JsonProperty("action") String action,
     @JsonProperty("issue") GitHubIssueDTO issue,
     @JsonProperty("repository") GitHubRepositoryRefDTO repository,
+    @JsonProperty("organization") GitHubOrgRefDTO organization,
     @JsonProperty("sender") GitHubUserDTO sender,
     @JsonProperty("label") GitHubLabelDTO label,
     @JsonProperty("type") GitHubIssueTypeDTO issueType,
@@ -25,4 +26,10 @@ public record GitHubIssueEventDTO(
     public GitHubEventAction.Issue actionType() {
         return GitHubEventAction.Issue.fromString(action);
     }
+
+    /**
+     * DTO for organization reference in issue events.
+     */
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record GitHubOrgRefDTO(@JsonProperty("id") Long id, @JsonProperty("login") String login) {}
 }

@@ -24,8 +24,7 @@ import java.time.Instant;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Lazy;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -82,14 +81,7 @@ public class ActivityEventBackfillService {
     /** Default batch size for processing entities */
     private static final int DEFAULT_BATCH_SIZE = 500;
 
-    /**
-     * Self-injection to ensure @Transactional(REQUIRES_NEW) is applied via Spring AOP proxy.
-     * Without this, internal method calls bypass the proxy and transactions aren't started.
-     */
-    @Lazy
-    @Autowired
-    private ActivityEventBackfillService self;
-
+    private final ObjectProvider<ActivityEventBackfillService> selfProvider;
     private final ActivityEventService activityEventService;
     private final ExperiencePointCalculator xpCalculator;
     private final WorkspaceRepository workspaceRepository;
@@ -102,6 +94,7 @@ public class ActivityEventBackfillService {
     private final EntityManager entityManager;
 
     public ActivityEventBackfillService(
+        ObjectProvider<ActivityEventBackfillService> selfProvider,
         ActivityEventService activityEventService,
         ExperiencePointCalculator xpCalculator,
         WorkspaceRepository workspaceRepository,
@@ -113,6 +106,7 @@ public class ActivityEventBackfillService {
         IssueRepository issueRepository,
         EntityManager entityManager
     ) {
+        this.selfProvider = selfProvider;
         this.activityEventService = activityEventService;
         this.xpCalculator = xpCalculator;
         this.workspaceRepository = workspaceRepository;
@@ -241,7 +235,7 @@ public class ActivityEventBackfillService {
             }
 
             List<PullRequest> chunk = batch.subList(start, end);
-            self.processPullRequestBatch(chunk, workspaceId, progress);
+            selfProvider.getObject().processPullRequestBatch(chunk, workspaceId, progress);
 
             // Clear entity manager to prevent memory buildup
             entityManager.clear();
@@ -378,7 +372,7 @@ public class ActivityEventBackfillService {
         int batchCount = 0;
         for (PullRequest pr : pullRequests) {
             // Process each PR's reviews in its own transaction via self-injection
-            self.processReviewsForPullRequest(pr, workspaceId, progress);
+            selfProvider.getObject().processReviewsForPullRequest(pr, workspaceId, progress);
 
             batchCount++;
             // Clear periodically to prevent memory issues
@@ -514,7 +508,7 @@ public class ActivityEventBackfillService {
 
         for (Issue issue : issues) {
             for (IssueComment comment : issue.getComments()) {
-                self.processIssueComment(comment, workspaceId, progress);
+                selfProvider.getObject().processIssueComment(comment, workspaceId, progress);
 
                 batchCount++;
                 // Clear periodically
@@ -610,7 +604,7 @@ public class ActivityEventBackfillService {
 
         for (PullRequest pr : pullRequests) {
             for (PullRequestReviewComment comment : pr.getReviewComments()) {
-                self.processReviewComment(comment, workspaceId, progress);
+                selfProvider.getObject().processReviewComment(comment, workspaceId, progress);
 
                 batchCount++;
                 // Clear periodically
@@ -712,7 +706,7 @@ public class ActivityEventBackfillService {
             }
 
             List<Issue> chunk = issues.subList(start, end);
-            self.processIssueBatch(chunk, workspaceId, progress);
+            selfProvider.getObject().processIssueBatch(chunk, workspaceId, progress);
 
             entityManager.clear();
             page++;
