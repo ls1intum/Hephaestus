@@ -11,13 +11,36 @@
  * - HEPHAESTUS_TEST_DATABASE_URL: Custom connection URL for local mode
  * - HEPHAESTUS_TEST_DB_USER: Custom username (default: test)
  * - HEPHAESTUS_TEST_DB_PASSWORD: Custom password (default: test)
+ *
+ * IMPORTANT: This globalSetup runs in a separate process from test workers.
+ * Data is shared via a temp file that setupFiles reads.
  */
 
+import fs from "node:fs";
+import path from "node:path";
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from "@testcontainers/postgresql";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Client, Pool } from "pg";
 
 import * as schema from "../src/shared/db/schema";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// IPC: Share data between globalSetup and test workers via temp file
+// ─────────────────────────────────────────────────────────────────────────────
+
+const TEST_CONFIG_FILE = path.join(__dirname, ".test-config.json");
+
+function writeTestConfig(config: { databaseUrl: string; usingLocalDb: boolean }): void {
+	fs.writeFileSync(TEST_CONFIG_FILE, JSON.stringify(config), "utf-8");
+}
+
+function cleanupTestConfig(): void {
+	try {
+		fs.unlinkSync(TEST_CONFIG_FILE);
+	} catch {
+		// File may not exist, that's fine
+	}
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Constants
@@ -240,6 +263,13 @@ export async function setup(): Promise<void> {
 		idleTimeoutMillis: 30_000,
 	});
 
+	// Write config to temp file for test workers to read
+	writeTestConfig({
+		databaseUrl: connectionString,
+		usingLocalDb: usingLocalDatabase,
+	});
+
+	// Keep these for backwards compatibility with any code that uses them
 	globalThis.__TEST_POSTGRES_CONTAINER__ = container ?? undefined;
 	globalThis.__TEST_POSTGRES_POOL__ = pool ?? undefined;
 	globalThis.__TEST_DATABASE_URL__ = connectionString;
@@ -260,6 +290,9 @@ export async function teardown(): Promise<void> {
 	if (container && !usingLocalDatabase) {
 		await container.stop();
 	}
+
+	// Clean up temp config file
+	cleanupTestConfig();
 
 	console.log("✅ Cleanup complete");
 }

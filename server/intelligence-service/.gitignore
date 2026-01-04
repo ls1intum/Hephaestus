@@ -27,3 +27,7 @@ lerna-debug.log*
 # misc
 .DS_Store
 .devtools/
+
+# test
+test/.test-config.json
+test-results/

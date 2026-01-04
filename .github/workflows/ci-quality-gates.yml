@@ -1,4 +1,4 @@
-name: Quality Gates
+name: Quality
 
 on:
   workflow_call:
@@ -8,536 +8,269 @@ on:
         required: false
         type: string
         default: "false"
+      # Path-based change detection inputs for selective execution
+      webapp_changed:
+        description: "Whether webapp files changed (or should run for other reasons)"
+        required: false
+        type: string
+        default: "true"
+      application_server_changed:
+        description: "Whether application-server files changed (or should run for other reasons)"
+        required: false
+        type: string
+        default: "true"
+      intelligence_service_changed:
+        description: "Whether intelligence-service files changed (or should run for other reasons)"
+        required: false
+        type: string
+        default: "true"
+      webhook_ingest_changed:
+        description: "Whether webhook-ingest files changed (or should run for other reasons)"
+        required: false
+        type: string
+        default: "true"
 
 jobs:
-  # Quality gates with intelligent caching and error handling
   quality-gates:
-    name: ${{ matrix.check }}
+    name: "${{ matrix.display-name }}"
     runs-on: ubuntu-latest
     if: inputs.should_skip != 'true'
     timeout-minutes: ${{ contains(fromJSON('["database-schema-validation", "database-documentation-validation", "database-models-validation"]'), matrix.check) && 20 || 15 }}
     strategy:
       fail-fast: false
       matrix:
-        check:
-          [
-            application-server-quality,
-            webapp-quality,
-            intelligence-service-quality,
-            webhook-ingest-quality,
-            openapi-validation,
-            database-schema-validation,
-            database-documentation-validation,
-            database-models-validation,
-          ]
+        include:
+          - check: application-server-quality
+            display-name: "App Server"
+          - check: webapp-quality
+            display-name: "Webapp"
+          - check: intelligence-service-quality
+            display-name: "Intelligence"
+          - check: webhook-ingest-quality
+            display-name: "Webhook"
+          - check: openapi-validation
+            display-name: "OpenAPI"
+          - check: database-schema-validation
+            display-name: "Database: Schema"
+          - check: database-documentation-validation
+            display-name: "Database: ERD"
+          - check: database-models-validation
+            display-name: "Database: Models"
     steps:
+      - name: Determine if check should run
+        id: should_run
+        run: |
+          case "${{ matrix.check }}" in
+            "webapp-quality")
+              echo "run=${{ inputs.webapp_changed }}" >> $GITHUB_OUTPUT
+              ;;
+            "application-server-quality"|"database-schema-validation"|"database-documentation-validation"|"openapi-validation")
+              echo "run=${{ inputs.application_server_changed }}" >> $GITHUB_OUTPUT
+              ;;
+            "intelligence-service-quality"|"database-models-validation")
+              # intelligence-service depends on application-server schema for DB models
+              if [[ "${{ inputs.intelligence_service_changed }}" == "true" || "${{ inputs.application_server_changed }}" == "true" ]]; then
+                echo "run=true" >> $GITHUB_OUTPUT
+              else
+                echo "run=false" >> $GITHUB_OUTPUT
+              fi
+              ;;
+            "webhook-ingest-quality")
+              echo "run=${{ inputs.webhook_ingest_changed }}" >> $GITHUB_OUTPUT
+              ;;
+            *)
+              # Unknown check type - fail explicitly to catch missing case statements
+              echo "::error::Unknown check type '${{ matrix.check }}' in ci-quality-gates.yml matrix."
+              echo "::error::Please add a case for this check in the 'Determine if check should run' step."
+              echo "run=false" >> $GITHUB_OUTPUT
+              exit 1
+              ;;
+          esac
+
+      - name: Skip notification
+        if: steps.should_run.outputs.run != 'true'
+        run: echo "⏭️ Skipping ${{ matrix.check }} - no relevant files changed"
+
       - name: Checkout repository
+        if: steps.should_run.outputs.run == 'true'
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          # Database checks need full history for git diff on schema/migrations
+          # Other quality checks only need HEAD for faster checkout
+          fetch-depth: ${{ contains(matrix.check, 'database') && 0 || 1 }}
 
-      # Ensure a stable Node/npm toolchain and proper npm caching
-      - name: Setup Node.js (LTS) and npm cache
+      - name: Setup Node.js
+        if: steps.should_run.outputs.run == 'true'
         uses: actions/setup-node@v4
         with:
-          node-version-file: '.node-version'
-          cache: 'npm'
+          node-version-file: ".node-version"
+          cache: "npm"
           cache-dependency-path: |
             package-lock.json
             webapp/package-lock.json
             server/intelligence-service/package-lock.json
 
-
-      # Advanced cache setup with fallback
-      - name: Setup shared caches
+      - name: Setup caches
+        if: steps.should_run.outputs.run == 'true'
         uses: ./.github/actions/setup-caches
         with:
           cache-type: ${{ matrix.check }}
           os: ${{ runner.os }}
 
-      # Additional cache for webapp build artifacts
-      - name: Cache webapp build artifacts
-        if: matrix.check == 'webapp-quality'
-        uses: actions/cache@v4
-        with:
-          path: |
-            webapp/dist
-            webapp/.vite
-            webapp/node_modules/.vite
-            webapp/node_modules/.cache
-          key: ${{ runner.os }}-webapp-build-${{ hashFiles('package-lock.json', 'webapp/package-lock.json', 'webapp/biome.json', 'webapp/tsconfig.json', 'webapp/vite.config.js', 'webapp/components.json') }}-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-webapp-build-${{ hashFiles('package-lock.json', 'webapp/package-lock.json', 'webapp/biome.json', 'webapp/tsconfig.json', 'webapp/vite.config.js', 'webapp/components.json') }}-
-            ${{ runner.os }}-webapp-build-
-
-      # application-server code quality and formatting
-      - name: application-server formatting & static analysis
-        if: matrix.check == 'application-server-quality'
+      - name: Application-server formatting
+        if: steps.should_run.outputs.run == 'true' && matrix.check == 'application-server-quality'
         run: |
-          echo "🔍 Checking application-server code formatting..."
-
-          # Always install to avoid half-restored caches
           npm ci --prefer-offline --no-audit
-
           if ! npm run format:java:check; then
-            echo "❌ application-server formatting failed. Run: npm run format:java"
+            echo "❌ Formatting failed. Run: npm run format:java"
             exit 1
           fi
 
-          echo "✅ application-server formatting passed"
-
-      # Webapp quality checks with comprehensive validation
-      - name: Webapp quality & type checking
-        if: matrix.check == 'webapp-quality'
+      - name: Webapp quality
+        if: steps.should_run.outputs.run == 'true' && matrix.check == 'webapp-quality'
         working-directory: ./webapp
         run: |
-          echo "🔍 Running webapp quality checks..."
-
-          # Always install at repo root to ensure hoisted deps (incl. platform optionals) are present
           cd ..
-          rm -rf node_modules
-          npm ci --workspaces --include=dev --include=optional --no-audit --progress=false
-          # Optional: report native package presence (warnings only) at the hoist root
-          npm ls @rollup/rollup-linux-x64-gnu || echo "⚠️ rollup native not installed yet"
-          npm ls @biomejs/cli-linux-x64 || echo "⚠️ biome binary not installed yet (will try npx fallback)"
-          # Force-install platform binaries deterministically
+          npm ci --no-audit --progress=false
           node scripts/install-platform-binaries.mjs
           cd webapp
 
-          ISSUES_FOUND=()
-
-          echo "🎨 Running Biome checks..."
+          # Run Biome check (includes formatting and linting)
           if ! npm run check; then
-            echo "❌ Biome checks failed (attempting npx fallback to platform-specific CLI)..."
-            BIOME_VER=$(node -p "require('./package.json').devDependencies['@biomejs/biome'] || ''")
-            if ! npx -y @biomejs/cli-linux-x64@${BIOME_VER:-latest} check; then
-              ISSUES_FOUND+=("Biome checks failed. Run: npm run check -- --write")
-            else
-              echo "✅ Biome checks passed via pinned platform CLI fallback (${BIOME_VER:-latest})"
-            fi
-          else
-            echo "✅ Biome checks passed"
-          fi
-
-          echo "📊 Running TypeScript check..."
-          if ! npx tsc --noEmit; then
-            echo "❌ TypeScript check failed"
-            ISSUES_FOUND+=("TypeScript compilation errors found")
-          else
-            echo "✅ TypeScript check passed"
-          fi
-
-          echo "🏗️ Running build check..."
-          if ! npm run build; then
-            echo "❌ Build failed (retrying after clean reinstall at root to pull any missed optionals)..."
-            cd ..
-            rm -rf node_modules
-            npm ci --workspaces --include=dev --include=optional --no-audit --progress=false
-            cd webapp
-            if ! npm run build; then
-              ISSUES_FOUND+=("Build failed")
-            else
-              echo "✅ Build passed after reinstall"
-            fi
-          else
-            echo "✅ Build check passed"
-          fi
-
-          if [ ${#ISSUES_FOUND[@]} -gt 0 ]; then
-            echo ""
-            echo "❌ Webapp quality issues found:"
-            for issue in "${ISSUES_FOUND[@]}"; do
-              echo "  • $issue"
-            done
+            echo "❌ Biome checks failed. Run: npm run check -- --write"
             exit 1
           fi
 
-          echo "✅ All webapp quality checks passed"
-
-      - name: Docs quality gate
-        if: matrix.check == 'docs-quality'
-        working-directory: ./docs
-        run: |
-          echo "📚 Running docs quality checks..."
-
-          npm ci --no-audit --progress=false
-
-          ISSUES_FOUND=()
-
-          echo "📝 TypeScript check..."
+          # Run TypeScript type checking
           if ! npm run typecheck; then
-            ISSUES_FOUND+=("TypeScript errors in docs config")
-          else
-            echo "✅ TypeScript check passed"
-          fi
-
-          echo "📋 Markdown style check..."
-          if ! npm run lint:md; then
-            ISSUES_FOUND+=("Markdown style issues - run: npm run docs:lint:md")
-          else
-            echo "✅ Markdown style check passed"
-          fi
-
-          echo "🏗️ Building documentation (strict mode: broken links will fail)..."
-          if ! npm run build; then
-            ISSUES_FOUND+=("Docs build failed - check for broken links or markdown errors")
-          else
-            echo "✅ Docs build passed"
-          fi
-
-          if [ ${#ISSUES_FOUND[@]} -gt 0 ]; then
-            echo ""
-            echo "❌ Docs quality issues found:"
-            for issue in "${ISSUES_FOUND[@]}"; do
-              echo "  • $issue"
-            done
+            echo "❌ TypeScript errors found"
             exit 1
           fi
 
-          echo "✅ All docs quality checks passed"
+          # Note: Build is tested in Docker build workflow, not needed here
 
-      # intelligence-service quality checks with comprehensive validation
-      - name: intelligence-service quality & type checking
-        if: matrix.check == 'intelligence-service-quality'
+      - name: Intelligence-service quality
+        if: steps.should_run.outputs.run == 'true' && matrix.check == 'intelligence-service-quality'
         run: |
-          echo "🔍 Running intelligence-service quality checks..."
-          # Clean install and explicitly install linux biome binary
-          # The package-lock.json from macOS may not include linux platform binaries
-          rm -rf node_modules server/intelligence-service/node_modules ~/.npm
-          npm install --no-audit --progress=false
-          # Install platform binaries from package.json versions (no hardcoding)
+          # npm ci already handles node_modules cleanup when package-lock.json changes
+          npm ci --no-audit --progress=false
           node scripts/install-platform-binaries.mjs
 
           ISSUES_FOUND=()
-
-          echo "🎨 Linting (Biome)..."
-          if ! npm -w server/intelligence-service run check; then
-            echo "❌ Biome check failed"
-            ISSUES_FOUND+=("Biome check failed. Run: cd server/intelligence-service && npm run check -- --fix")
-          else
-            echo "✅ Biome linting passed"
-          fi
-
-          echo "📊 TypeScript typecheck..."
-          if ! npm -w server/intelligence-service run typecheck; then
-            echo "❌ TypeScript typecheck failed"
-            ISSUES_FOUND+=("TypeScript typecheck failed. Run: cd server/intelligence-service && npm run typecheck")
-          else
-            echo "✅ TypeScript typecheck passed"
-          fi
-
-          echo "🧪 Build check..."
-          if ! npm -w server/intelligence-service run build; then
-            echo "❌ Build failed"
-            ISSUES_FOUND+=("Build failed. Run: cd server/intelligence-service && npm run build")
-          else
-            echo "✅ Build passed"
-          fi
+          npm -w server/intelligence-service run check || ISSUES_FOUND+=("Biome check failed")
+          npm -w server/intelligence-service run typecheck || ISSUES_FOUND+=("TypeScript failed")
+          npm -w server/intelligence-service run build || ISSUES_FOUND+=("Build failed")
 
           if [ ${#ISSUES_FOUND[@]} -gt 0 ]; then
-            echo ""
-            echo "❌ intelligence-service quality issues found:"
-            for issue in "${ISSUES_FOUND[@]}"; do
-              echo "  • $issue"
-            done
+            for issue in "${ISSUES_FOUND[@]}"; do echo "❌ $issue"; done
             exit 1
           fi
 
-          echo "✅ intelligence-service quality checks passed"
-
-      # webhook-ingest quality checks with comprehensive validation
-      - name: webhook-ingest quality & type checking
-        if: matrix.check == 'webhook-ingest-quality'
+      - name: Webhook-ingest quality
+        if: steps.should_run.outputs.run == 'true' && matrix.check == 'webhook-ingest-quality'
         run: |
-          echo "🔍 Running webhook-ingest quality checks..."
-          # Clean install and explicitly install linux biome binary
-          rm -rf node_modules server/webhook-ingest/node_modules ~/.npm
-          npm install --no-audit --progress=false
-          # Install platform binaries from package.json versions (no hardcoding)
+          # npm ci already handles node_modules cleanup when package-lock.json changes
+          npm ci --no-audit --progress=false
           node scripts/install-platform-binaries.mjs
 
           ISSUES_FOUND=()
-
-          echo "🎨 Linting (Biome)..."
-          if ! npm -w server/webhook-ingest run check; then
-            echo "❌ Biome check failed"
-            ISSUES_FOUND+=("Biome check failed. Run: cd server/webhook-ingest && npm run check -- --fix")
-          else
-            echo "✅ Biome linting passed"
-          fi
-
-          echo "📊 TypeScript typecheck..."
-          if ! npm -w server/webhook-ingest run typecheck; then
-            echo "❌ TypeScript typecheck failed"
-            ISSUES_FOUND+=("TypeScript typecheck failed. Run: cd server/webhook-ingest && npm run typecheck")
-          else
-            echo "✅ TypeScript typecheck passed"
-          fi
-
-          echo "🧪 Running tests..."
-          if ! npm -w server/webhook-ingest run test; then
-            echo "❌ Tests failed"
-            ISSUES_FOUND+=("Tests failed. Run: cd server/webhook-ingest && npm run test")
-          else
-            echo "✅ Tests passed"
-          fi
-
-          echo "🏗️ Build check..."
-          if ! npm -w server/webhook-ingest run build; then
-            echo "❌ Build failed"
-            ISSUES_FOUND+=("Build failed. Run: cd server/webhook-ingest && npm run build")
-          else
-            echo "✅ Build passed"
-          fi
+          npm -w server/webhook-ingest run check || ISSUES_FOUND+=("Biome check failed")
+          npm -w server/webhook-ingest run typecheck || ISSUES_FOUND+=("TypeScript failed")
+          npm -w server/webhook-ingest run test || ISSUES_FOUND+=("Tests failed")
+          npm -w server/webhook-ingest run build || ISSUES_FOUND+=("Build failed")
 
           if [ ${#ISSUES_FOUND[@]} -gt 0 ]; then
-            echo ""
-            echo "❌ webhook-ingest quality issues found:"
-            for issue in "${ISSUES_FOUND[@]}"; do
-              echo "  • $issue"
-            done
+            for issue in "${ISSUES_FOUND[@]}"; do echo "❌ $issue"; done
             exit 1
           fi
 
-          echo "✅ webhook-ingest quality checks passed"
-
-      # OpenAPI validation with intelligent auto-commit
-      - name: OpenAPI validation & synchronization
-        if: matrix.check == 'openapi-validation'
+      - name: OpenAPI validation
+        if: steps.should_run.outputs.run == 'true' && matrix.check == 'openapi-validation'
         env:
-          # Required for intelligence-service OpenAPI export (uses fake provider, no actual API calls)
           DATABASE_URL: postgresql://fake:fake@localhost:5432/fake
           MODEL_NAME: fake:model
           DETECTION_MODEL_NAME: fake:model
         run: |
-          echo "🔍 Validating OpenAPI specifications and clients..."
-
-          # Install all dependencies including workspaces (always, to avoid cache drift)
-          # The root npm ci handles all workspaces including intelligence-service
           npm ci --prefer-offline --no-audit
-
-          # Setup application-server environment
           cd server/application-server
-          if [ ! -d "target" ]; then
-            mvn compile -DskipTests --quiet
-          fi
+          [ ! -d "target" ] && mvn compile -DskipTests --quiet
           cd ../..
 
-          echo "🔄 Generating OpenAPI specifications and clients..."
           npm run generate:api
-
-          # Check for any changes
           git add .
-
           if ! git diff --cached --quiet; then
-            echo "❌ OpenAPI validation failed - changes detected"
-            echo "Fix: Add the 'autocommit-openapi' label to this PR or run 'npm run generate:api' locally"
+            echo "❌ OpenAPI out of sync. Run: npm run generate:api"
             exit 1
-          else
-            echo "✅ OpenAPI validation passed - all specs are up to date"
           fi
 
-      # Database schema validation - JPA entities vs committed migrations
       - name: Database schema validation
-        if: matrix.check == 'database-schema-validation'
+        if: steps.should_run.outputs.run == 'true' && matrix.check == 'database-schema-validation'
         run: |
-          echo "🔍 Validating JPA entities match committed migrations..."
+          docker run -d --name postgres-schema \
+            -e POSTGRES_DB=hephaestus -e POSTGRES_PASSWORD=root -e POSTGRES_USER=root \
+            -p 5432:5432 postgres:16
+          until docker exec postgres-schema pg_isready -U root -d hephaestus; do sleep 2; done
 
-          # Start PostgreSQL service for schema operations
-          echo "🐘 Starting PostgreSQL service..."
-          docker run -d \
-            --name postgres-schema \
-            -e POSTGRES_DB=hephaestus \
-            -e POSTGRES_PASSWORD=root \
-            -e POSTGRES_USER=root \
-            -p 5432:5432 \
-            --health-cmd="pg_isready" \
-            --health-interval=10s \
-            --health-timeout=5s \
-            --health-retries=5 \
-            postgres:16
-
-          # Wait for PostgreSQL to be ready
-          echo "⏳ Waiting for PostgreSQL..."
-          until docker exec postgres-schema pg_isready -U root -d hephaestus; do
-            sleep 2
-          done
-
-          # Set environment variables for database connection
           export SPRING_DATASOURCE_URL="jdbc:postgresql://localhost:5432/hephaestus"
           export SPRING_DATASOURCE_USERNAME="root"
           export SPRING_DATASOURCE_PASSWORD="root"
 
-          # Install dependencies (tsx, pg) needed for db-utils.sh scripts
           npm ci --prefer-offline --no-audit
-
-          # Build application-server for schema operations
-          echo "🏗️ Building application-server..."
-          cd server/application-server
-          if ! mvn compile -DskipTests --quiet; then
-            echo "❌ Failed to build application-server"
-            docker stop postgres-schema && docker rm postgres-schema
-            exit 1
-          fi
-          cd ../..
-
-          # Check for schema drift between JPA entities and committed migrations
-          echo "📊 Checking for schema drift..."
-          if ! scripts/db-utils.sh draft-changelog; then
-            echo "❌ Failed to generate draft changelog"
-            docker stop postgres-schema && docker rm postgres-schema
-            exit 1
-          fi
-
-          # Clean up PostgreSQL container
+          cd server/application-server && mvn compile -DskipTests --quiet && cd ../..
+          scripts/db-utils.sh draft-changelog || { docker stop postgres-schema && docker rm postgres-schema; exit 1; }
           docker stop postgres-schema && docker rm postgres-schema
 
-          # Check results
           if [ -f "server/application-server/src/main/resources/db/changelog_new.xml" ]; then
-            echo "❌ Schema drift detected. Run: npm run db:draft-changelog and follow the documentation"
-            echo "Generated migration:"
+            echo "❌ Schema drift detected. Run: npm run db:draft-changelog"
             cat server/application-server/src/main/resources/db/changelog_new.xml
             exit 1
-          else
-            echo "✅ Schema validation passed"
           fi
 
-      # Database documentation validation - ERD matches migration-based schema
       - name: Database documentation validation
-        if: matrix.check == 'database-documentation-validation'
+        if: steps.should_run.outputs.run == 'true' && matrix.check == 'database-documentation-validation'
         run: |
-          echo "📊 Validating ERD documentation matches migration-based schema..."
+          docker run -d --name postgres-erd \
+            -e POSTGRES_DB=hephaestus -e POSTGRES_PASSWORD=root -e POSTGRES_USER=root \
+            -p 5432:5432 postgres:16
+          until docker exec postgres-erd pg_isready -U root -d hephaestus; do sleep 2; done
 
-          # Start PostgreSQL service for ERD generation
-          echo "🐘 Starting PostgreSQL service..."
-          docker run -d \
-            --name postgres-erd \
-            -e POSTGRES_DB=hephaestus \
-            -e POSTGRES_PASSWORD=root \
-            -e POSTGRES_USER=root \
-            -p 5432:5432 \
-            --health-cmd="pg_isready" \
-            --health-interval=10s \
-            --health-timeout=5s \
-            --health-retries=5 \
-            postgres:16
-
-          # Wait for PostgreSQL to be ready
-          echo "⏳ Waiting for PostgreSQL..."
-          until docker exec postgres-erd pg_isready -U root -d hephaestus; do
-            sleep 2
-          done
-
-          # Set environment variables for database connection
           export SPRING_DATASOURCE_URL="jdbc:postgresql://localhost:5432/hephaestus"
           export SPRING_DATASOURCE_USERNAME="root"
           export SPRING_DATASOURCE_PASSWORD="root"
 
-          # Install dependencies (tsx, pg) needed for db-utils.sh scripts
           npm ci --prefer-offline --no-audit
-
-          # Build application-server for ERD operations
-          echo "🏗️ Building application-server..."
-          cd server/application-server
-          if ! mvn compile -DskipTests --quiet; then
-            echo "❌ Failed to build application-server"
-            docker stop postgres-erd && docker rm postgres-erd
-            exit 1
-          fi
-          cd ../..
-
-          # Generate ERD documentation from committed migration-based schema
-          echo "📈 Generating ERD from committed migration-based schema..."
-          if ! scripts/db-utils.sh generate-erd; then
-            echo "❌ Failed to generate ERD documentation"
-            docker stop postgres-erd && docker rm postgres-erd
-            exit 1
-          fi
-
-          # Clean up PostgreSQL container
+          cd server/application-server && mvn compile -DskipTests --quiet && cd ../..
+          scripts/db-utils.sh generate-erd || { docker stop postgres-erd && docker rm postgres-erd; exit 1; }
           docker stop postgres-erd && docker rm postgres-erd
 
-          # Check if ERD documentation is up to date
           git add docs/contributor/erd/schema.mmd
-
           if ! git diff --cached --quiet docs/contributor/erd/schema.mmd; then
-            echo "❌ ERD documentation validation failed - outdated ERD"
-            echo "Fix: npm run db:generate-erd-docs"
+            echo "❌ ERD outdated. Run: npm run db:generate-erd-docs"
             exit 1
-          else
-            echo "✅ ERD documentation validation passed (up-to-date with committed migrations)"
           fi
 
-      # Database models validation - Drizzle ORM models match committed migrations
       - name: Database models validation
-        if: matrix.check == 'database-models-validation'
+        if: steps.should_run.outputs.run == 'true' && matrix.check == 'database-models-validation'
         run: |
-          echo "🔍 Validating intelligence-service DB models match committed migrations..."
-
-          # Install all dependencies including workspaces for intelligence-service tooling
           npm ci --prefer-offline --no-audit
-
-          # Install Linux biome binary - npm ci may restore cached node_modules from macOS
-          # which doesn't include the platform-specific binary for Linux
-          # Uses versions from package.json (no hardcoding)
           node scripts/install-platform-binaries.mjs
 
-          # Start PostgreSQL service for model operations
-          echo "🐘 Starting PostgreSQL service..."
-          docker run -d \
-            --name postgres-models \
-            -e POSTGRES_DB=hephaestus \
-            -e POSTGRES_PASSWORD=root \
-            -e POSTGRES_USER=root \
-            -p 5432:5432 \
-            --health-cmd="pg_isready" \
-            --health-interval=10s \
-            --health-timeout=5s \
-            --health-retries=5 \
-            postgres:16
+          docker run -d --name postgres-models \
+            -e POSTGRES_DB=hephaestus -e POSTGRES_PASSWORD=root -e POSTGRES_USER=root \
+            -p 5432:5432 postgres:16
+          until docker exec postgres-models pg_isready -U root -d hephaestus; do sleep 2; done
 
-          # Wait for PostgreSQL to be ready
-          echo "⏳ Waiting for PostgreSQL..."
-          until docker exec postgres-models pg_isready -U root -d hephaestus; do
-            sleep 2
-          done
-
-          # Set environment variables for database connection
           export SPRING_DATASOURCE_URL="jdbc:postgresql://localhost:5432/hephaestus"
           export SPRING_DATASOURCE_USERNAME="root"
           export SPRING_DATASOURCE_PASSWORD="root"
 
-          # Build application-server for schema operations
-          echo "🏗️ Building application-server..."
-          cd server/application-server
-          if ! mvn compile -DskipTests --quiet; then
-            echo "❌ Failed to build application-server"
-            docker stop postgres-models && docker rm postgres-models
-            exit 1
-          fi
-          cd ../..
-
-          # Generate intelligence-service DB models from committed migration-based schema
-          echo "📊 Generating intelligence-service DB models from committed migration-based schema..."
-          if ! scripts/db-utils.sh generate-models-intelligence-service; then
-            echo "❌ Failed to generate intelligence-service DB models"
-            docker stop postgres-models && docker rm postgres-models
-            exit 1
-          fi
-
-          # Clean up PostgreSQL container
+          cd server/application-server && mvn compile -DskipTests --quiet && cd ../..
+          scripts/db-utils.sh generate-models-intelligence-service || { docker stop postgres-models && docker rm postgres-models; exit 1; }
           docker stop postgres-models && docker rm postgres-models
 
-          # Check if generated models match committed versions
           git add server/intelligence-service/src/shared/db/schema.ts
-
           if ! git diff --cached --quiet server/intelligence-service/src/shared/db/schema.ts; then
-            echo "❌ Intelligence-service DB models validation failed - models are out of sync"
-            echo "Generated models differ from committed version:"
+            echo "❌ DB models out of sync. Run: npm run db:generate-models:intelligence-service"
             git diff --cached server/intelligence-service/src/shared/db/schema.ts
-            echo ""
-            echo "Fix: npm run db:generate-models:intelligence-service"
             exit 1
-          else
-            echo "✅ Intelligence-service DB models validation passed (models are up-to-date)"
           fi
