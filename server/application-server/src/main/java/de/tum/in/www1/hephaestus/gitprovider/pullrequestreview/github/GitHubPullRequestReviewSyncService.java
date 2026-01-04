@@ -29,13 +29,12 @@ public class GitHubPullRequestReviewSyncService {
     private final ContributionEventSyncService contributionEventSyncService;
 
     public GitHubPullRequestReviewSyncService(
-        PullRequestReviewRepository pullRequestReviewRepository,
-        PullRequestRepository pullRequestRepository,
-        GitHubPullRequestReviewConverter pullRequestReviewConverter,
-        GitHubPullRequestConverter pullRequestConverter,
-        GitHubUserSyncService userSyncService,
-        ContributionEventSyncService contributionEventSyncService
-    ) {
+            PullRequestReviewRepository pullRequestReviewRepository,
+            PullRequestRepository pullRequestRepository,
+            GitHubPullRequestReviewConverter pullRequestReviewConverter,
+            GitHubPullRequestConverter pullRequestConverter,
+            GitHubUserSyncService userSyncService,
+            ContributionEventSyncService contributionEventSyncService) {
         this.pullRequestReviewRepository = pullRequestReviewRepository;
         this.pullRequestRepository = pullRequestRepository;
         this.pullRequestReviewConverter = pullRequestReviewConverter;
@@ -69,7 +68,7 @@ public class GitHubPullRequestReviewSyncService {
      *
      * @param ghPullRequestReview the GitHub pull request review to process
      * @return the updated or newly created PullRequestReview entity, or
-     * {@code null} if an error occurred
+     *         {@code null} if an error occurred
      */
     @Transactional
     public PullRequestReview processPullRequestReview(GHPullRequestReview ghPullRequestReview) {
@@ -78,14 +77,13 @@ public class GitHubPullRequestReviewSyncService {
 
     @Transactional
     public PullRequestReview processPullRequestReview(
-        GHPullRequestReview ghPullRequestReview,
-        GHPullRequest fallbackPullRequest,
-        GHUser fallbackUser
-    ) {
+            GHPullRequestReview ghPullRequestReview,
+            GHPullRequest fallbackPullRequest,
+            GHUser fallbackUser) {
         var result = pullRequestReviewRepository
-            .findById(ghPullRequestReview.getId())
-            .map(pullRequestReview -> pullRequestReviewConverter.update(ghPullRequestReview, pullRequestReview))
-            .orElseGet(() -> pullRequestReviewConverter.convert(ghPullRequestReview));
+                .findById(ghPullRequestReview.getId())
+                .map(pullRequestReview -> pullRequestReviewConverter.update(ghPullRequestReview, pullRequestReview))
+                .orElseGet(() -> pullRequestReviewConverter.convert(ghPullRequestReview));
 
         if (result == null) {
             return null;
@@ -97,19 +95,17 @@ public class GitHubPullRequestReviewSyncService {
             pullRequest = ghPullRequestReview.getParent();
         } catch (NullPointerException ignored) {
             logger.warn(
-                "Hub4j pull request review {} missing parent reference; falling back to event payload.",
-                ghPullRequestReview.getId()
-            );
+                    "Hub4j pull request review {} missing parent reference; falling back to event payload.",
+                    ghPullRequestReview.getId());
         }
         if (pullRequest == null) {
             pullRequest = fallbackPullRequest;
         }
         if (pullRequest == null) {
             logger.error(
-                "Failed to link pull request for pull request review {}: {}",
-                ghPullRequestReview.getId(),
-                "Parent pull request not available"
-            );
+                    "Failed to link pull request for pull request review {}: {}",
+                    ghPullRequestReview.getId(),
+                    "Parent pull request not available");
             return null;
         }
         var resultPullRequest = pullRequestRepository.findById(pullRequest.getId()).orElse(null);
@@ -124,10 +120,9 @@ public class GitHubPullRequestReviewSyncService {
             user = ghPullRequestReview.getUser();
         } catch (IOException | NullPointerException e) {
             logger.error(
-                "Failed to link author for pull request review {}: {}",
-                ghPullRequestReview.getId(),
-                e.getMessage()
-            );
+                    "Failed to link author for pull request review {}: {}",
+                    ghPullRequestReview.getId(),
+                    e.getMessage());
         }
         if (user == null) {
             user = fallbackUser;
@@ -137,9 +132,8 @@ public class GitHubPullRequestReviewSyncService {
             result.setAuthor(resultAuthor);
         } else {
             logger.warn(
-                "No author information available for pull request review {}; leaving review without author.",
-                ghPullRequestReview.getId()
-            );
+                    "No author information available for pull request review {}; leaving review without author.",
+                    ghPullRequestReview.getId());
             result.setAuthor(null);
         }
 

@@ -3,6 +3,8 @@ package de.tum.in.www1.hephaestus.gitprovider.pullrequestreview;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
+
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -10,8 +12,31 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface PullRequestReviewRepository extends JpaRepository<PullRequestReview, Long> {
-    @Query(
-        value = """
+
+    /**
+     * Fetches a PullRequestReview with all associations needed for scoring
+     * calculations.
+     * This includes: author, pullRequest, pullRequest.author,
+     * pullRequest.assignees, and comments.
+     * Use this method when you need to calculate XP scores to avoid
+     * LazyInitializationException.
+     *
+     * @param id the review ID
+     * @return the review with all scoring dependencies eagerly fetched
+     */
+    @Query(value = """
+        SELECT prr
+        FROM PullRequestReview prr
+        LEFT JOIN FETCH prr.author
+        LEFT JOIN FETCH prr.pullRequest pr
+        LEFT JOIN FETCH pr.author
+        LEFT JOIN FETCH pr.assignees
+        LEFT JOIN FETCH prr.comments
+        WHERE prr.id = :id
+        """)
+    Optional<PullRequestReview> findByIdWithScoringDependencies(@Param("id") Long id);
+
+    @Query(value = """
         SELECT prr
         FROM PullRequestReview prr
         LEFT JOIN FETCH prr.author
@@ -22,16 +47,13 @@ public interface PullRequestReviewRepository extends JpaRepository<PullRequestRe
             AND prr.submittedAt >= :activitySince
             AND prr.pullRequest.repository.organization.workspace.id = :workspaceId
         ORDER BY prr.submittedAt DESC
-        """
-    )
+        """)
     List<PullRequestReview> findAllByAuthorLoginSince(
         @Param("authorLogin") String authorLogin,
         @Param("activitySince") Instant activitySince,
-        @Param("workspaceId") Long workspaceId
-    );
+        @Param("workspaceId") Long workspaceId);
 
-    @Query(
-        value = """
+    @Query(value = """
         SELECT prr
         FROM PullRequestReview prr
         LEFT JOIN FETCH prr.author
@@ -42,17 +64,14 @@ public interface PullRequestReviewRepository extends JpaRepository<PullRequestRe
             AND prr.submittedAt BETWEEN :after AND :before
             AND prr.pullRequest.repository.organization.workspace.id = :workspaceId
         ORDER BY prr.submittedAt DESC
-        """
-    )
+        """)
     List<PullRequestReview> findAllByAuthorLoginInTimeframe(
         @Param("authorLogin") String authorLogin,
         @Param("after") Instant after,
         @Param("before") Instant before,
-        @Param("workspaceId") Long workspaceId
-    );
+        @Param("workspaceId") Long workspaceId);
 
-    @Query(
-        value = """
+    @Query(value = """
         SELECT prr
         FROM PullRequestReview prr
         LEFT JOIN FETCH prr.author
@@ -64,16 +83,13 @@ public interface PullRequestReviewRepository extends JpaRepository<PullRequestRe
             AND prr.author.type = 'USER'
             AND prr.pullRequest.repository.organization.workspace.id = :workspaceId
         ORDER BY prr.submittedAt DESC
-        """
-    )
+        """)
     List<PullRequestReview> findAllInTimeframe(
         @Param("after") Instant after,
         @Param("before") Instant before,
-        @Param("workspaceId") Long workspaceId
-    );
+        @Param("workspaceId") Long workspaceId);
 
-    @Query(
-        value = """
+    @Query(value = """
         SELECT prr
         FROM PullRequestReview prr
         LEFT JOIN FETCH prr.author
@@ -113,22 +129,18 @@ public interface PullRequestReviewRepository extends JpaRepository<PullRequestRe
                 AND tm.user = prr.author
             )
         ORDER BY prr.submittedAt DESC
-        """
-    )
+        """)
     List<PullRequestReview> findAllInTimeframeOfTeams(
         @Param("after") Instant after,
         @Param("before") Instant before,
         @Param("teamIds") Collection<Long> teamIds,
-        @Param("workspaceId") Long workspaceId
-    );
+        @Param("workspaceId") Long workspaceId);
 
-    @Query(
-        value = """
+    @Query(value = """
         SELECT MIN(prr.submittedAt)
         FROM PullRequestReview prr
         WHERE prr.author.id = :userId
             AND prr.pullRequest.repository.organization.workspace.id = :workspaceId
-        """
-    )
+        """)
     Instant findEarliestSubmissionInstant(@Param("workspaceId") Long workspaceId, @Param("userId") Long userId);
 }
