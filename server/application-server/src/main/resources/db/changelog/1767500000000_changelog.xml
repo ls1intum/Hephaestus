@@ -989,4 +989,137 @@
         </createIndex>
     </changeSet>
 
+    <!-- ==================== SECTION 21: Pull Request GraphQL Fields ==================== -->
+    <!--
+    Add fields for PR merge state, review decision, and ref information from GraphQL API.
+    These replace the webhook-based mergeable fields with GraphQL equivalents.
+    -->
+
+    <changeSet id="1767900000000-1" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <columnExists tableName="issue" columnName="merge_state_status"/>
+            </not>
+        </preConditions>
+        <comment>Add merge_state_status for GraphQL MergeStateStatus enum</comment>
+        <addColumn tableName="issue">
+            <column name="merge_state_status" type="VARCHAR(255)"/>
+        </addColumn>
+    </changeSet>
+
+    <changeSet id="1767900000000-2" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <columnExists tableName="issue" columnName="mergeable"/>
+            </not>
+        </preConditions>
+        <comment>Add mergeable boolean for GraphQL mergeable field</comment>
+        <addColumn tableName="issue">
+            <column name="mergeable" type="BOOLEAN"/>
+        </addColumn>
+    </changeSet>
+
+    <changeSet id="1767900000000-3" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <columnExists tableName="issue" columnName="review_decision"/>
+            </not>
+        </preConditions>
+        <comment>Add review_decision for GraphQL PullRequestReviewDecision enum</comment>
+        <addColumn tableName="issue">
+            <column name="review_decision" type="VARCHAR(255)"/>
+        </addColumn>
+    </changeSet>
+
+    <changeSet id="1767900000000-4" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <columnExists tableName="issue" columnName="head_ref_name"/>
+            </not>
+        </preConditions>
+        <comment>Add head/base ref names and OIDs for PR branch information</comment>
+        <addColumn tableName="issue">
+            <column name="head_ref_name" type="VARCHAR(255)"/>
+        </addColumn>
+    </changeSet>
+
+    <changeSet id="1767900000000-5" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <columnExists tableName="issue" columnName="head_ref_oid"/>
+            </not>
+        </preConditions>
+        <addColumn tableName="issue">
+            <column name="head_ref_oid" type="VARCHAR(40)"/>
+        </addColumn>
+    </changeSet>
+
+    <changeSet id="1767900000000-6" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <columnExists tableName="issue" columnName="base_ref_name"/>
+            </not>
+        </preConditions>
+        <addColumn tableName="issue">
+            <column name="base_ref_name" type="VARCHAR(255)"/>
+        </addColumn>
+    </changeSet>
+
+    <changeSet id="1767900000000-7" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <columnExists tableName="issue" columnName="base_ref_oid"/>
+            </not>
+        </preConditions>
+        <addColumn tableName="issue">
+            <column name="base_ref_oid" type="VARCHAR(40)"/>
+        </addColumn>
+    </changeSet>
+
+    <!-- ==================== SECTION 22: Activity Event Formula Version ==================== -->
+
+    <changeSet id="1767900000000-8" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <columnExists tableName="activity_event" columnName="content_hash"/>
+            </not>
+        </preConditions>
+        <comment>Add content_hash for deduplication based on event content</comment>
+        <addColumn tableName="activity_event">
+            <column name="content_hash" type="VARCHAR(64)"/>
+        </addColumn>
+    </changeSet>
+
+    <changeSet id="1767900000000-9" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <columnExists tableName="activity_event" columnName="formula_version"/>
+            </not>
+        </preConditions>
+        <comment>Add formula_version to track XP calculation algorithm version</comment>
+        <addColumn tableName="activity_event">
+            <column name="formula_version" type="INTEGER" defaultValueNumeric="1">
+                <constraints nullable="false"/>
+            </column>
+        </addColumn>
+    </changeSet>
+
+    <!-- ==================== SECTION 23: Cleanup Deprecated Issue Columns ==================== -->
+
+    <changeSet id="1767900000000-10" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="issue" columnName="bad_practice_summary"/>
+        </preConditions>
+        <comment>Drop deprecated bad_practice_summary column (moved to separate analysis system)</comment>
+        <dropColumn tableName="issue" columnName="bad_practice_summary"/>
+    </changeSet>
+
+    <changeSet id="1767900000000-11" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="issue" columnName="last_detection_time"/>
+        </preConditions>
+        <comment>Drop deprecated last_detection_time column (moved to separate analysis system)</comment>
+        <dropColumn tableName="issue" columnName="last_detection_time"/>
+    </changeSet>
+
 </databaseChangeLog>

@@ -138,10 +138,8 @@ erDiagram
         BIGINT merged_by_id FK
         BOOLEAN has_pull_request "NOT NULL"
         TIMESTAMP last_sync_at
-        TIMESTAMPTZ last_detection_time
         VARCHAR(32) state_reason
         TEXT body
-        TEXT bad_practice_summary
         BIGINT parent_issue_id FK
         INTEGER sub_issues_total
         INTEGER sub_issues_completed
