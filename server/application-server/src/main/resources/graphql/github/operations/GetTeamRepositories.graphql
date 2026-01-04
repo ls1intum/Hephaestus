@@ -9,6 +9,7 @@ query GetTeamRepositories($orgLogin: String!, $teamSlug: String!, $first: Int!, 
     }
     organization(login: $orgLogin) {
         team(slug: $teamSlug) {
+            __typename
             repositories(first: $first, after: $after) {
                 totalCount
                 pageInfo {
@@ -18,6 +19,7 @@ query GetTeamRepositories($orgLogin: String!, $teamSlug: String!, $first: Int!, 
                 edges {
                     permission
                     node {
+                        __typename
                         id
                         databaseId
                         name

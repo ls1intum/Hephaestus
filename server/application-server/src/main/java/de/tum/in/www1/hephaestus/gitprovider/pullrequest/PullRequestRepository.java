@@ -111,6 +111,24 @@ public interface PullRequestRepository extends JpaRepository<PullRequest, Long> 
     Set<Integer> findAllSyncedPullRequestNumbers(@Param("repositoryId") long repositoryId);
 
     /**
+     * Finds a pull request by ID with assignees eagerly fetched.
+     * Used by BadPracticeEventListener to avoid LazyInitializationException
+     * when assignees are accessed after the Hibernate session is closed.
+     *
+     * @param id the pull request ID
+     * @return the pull request with assignees loaded, or empty if not found
+     */
+    @WorkspaceAgnostic("Event processing - PR ID is known from domain event")
+    @Query(
+        """
+        SELECT p FROM PullRequest p
+        LEFT JOIN FETCH p.assignees
+        WHERE p.id = :id
+        """
+    )
+    Optional<PullRequest> findByIdWithAssignees(@Param("id") Long id);
+
+    /**
      * Finds all pull requests belonging to a repository.
      * Repository ID inherently has workspace through organization.workspaceId.
      *

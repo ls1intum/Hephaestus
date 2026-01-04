@@ -123,10 +123,18 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
     }
 
     private WorkspaceSyncMetadata toWorkspaceSyncMetadata(Workspace workspace) {
+        // Derive organization login: prefer the linked organization, fall back to accountLogin.
+        // The accountLogin is always the GitHub account (org or user) that owns the repositories,
+        // so it's safe to use for organization-level operations like team sync.
+        // For user accounts, the team sync will simply find no teams (which is expected).
+        String orgLogin = workspace.getOrganization() != null
+            ? workspace.getOrganization().getLogin()
+            : workspace.getAccountLogin();
+
         return new WorkspaceSyncMetadata(
             workspace.getId(),
             workspace.getDisplayName(),
-            workspace.getOrganization() != null ? workspace.getOrganization().getLogin() : null,
+            orgLogin,
             workspace.getOrganization() != null ? workspace.getOrganization().getId() : null,
             workspace.getIssueTypesSyncedAt(),
             workspace.getIssueDependenciesSyncedAt(),

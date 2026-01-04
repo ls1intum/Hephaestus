@@ -159,7 +159,7 @@ public class BadPracticeEventListener {
      */
     private void scheduleDetectionWithDelay(Long pullRequestId, int pullRequestNumber) {
         try {
-            PullRequest pullRequest = pullRequestRepository.findById(pullRequestId).orElse(null);
+            PullRequest pullRequest = pullRequestRepository.findByIdWithAssignees(pullRequestId).orElse(null);
             if (pullRequest == null) {
                 logger.warn(
                     "PR #{} (id={}) not found in database, skipping detection",
@@ -185,7 +185,7 @@ public class BadPracticeEventListener {
      */
     private void triggerReadyLabelDetection(Long pullRequestId, int pullRequestNumber, String labelName) {
         try {
-            PullRequest pullRequest = pullRequestRepository.findById(pullRequestId).orElse(null);
+            PullRequest pullRequest = pullRequestRepository.findByIdWithAssignees(pullRequestId).orElse(null);
             if (pullRequest == null) {
                 logger.warn(
                     "PR #{} (id={}) not found in database, skipping detection",
@@ -211,7 +211,7 @@ public class BadPracticeEventListener {
      */
     private void triggerClosedDetection(Long pullRequestId, int pullRequestNumber) {
         try {
-            PullRequest pullRequest = pullRequestRepository.findById(pullRequestId).orElse(null);
+            PullRequest pullRequest = pullRequestRepository.findByIdWithAssignees(pullRequestId).orElse(null);
             if (pullRequest == null) {
                 logger.warn(
                     "PR #{} (id={}) not found in database, skipping detection",

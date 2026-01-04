@@ -68,7 +68,7 @@ public class GitHubPullRequestReviewSyncService {
      * @param repositoryId the repository ID to sync reviews for
      * @return number of reviews synced
      */
-    @Transactional(readOnly = true)
+    @Transactional
     public int syncForRepository(Long workspaceId, Long repositoryId) {
         Repository repository = repositoryRepository.findById(repositoryId).orElse(null);
         if (repository == null) {

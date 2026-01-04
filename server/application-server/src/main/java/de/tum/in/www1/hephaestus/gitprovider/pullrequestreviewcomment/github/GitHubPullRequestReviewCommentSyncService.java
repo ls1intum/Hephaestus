@@ -85,7 +85,7 @@ public class GitHubPullRequestReviewCommentSyncService {
      * @param repositoryId the repository ID to sync comments for
      * @return number of comments synced
      */
-    @Transactional(readOnly = true)
+    @Transactional
     public int syncCommentsForRepository(Long workspaceId, Long repositoryId) {
         Repository repository = repositoryRepository.findById(repositoryId).orElse(null);
         if (repository == null) {

@@ -20,12 +20,12 @@
     </changeSet>
 
     <changeSet id="1767800000000-2" author="hephaestus">
-        <comment>Index for querying events by trigger context (debugging, audit)</comment>
         <preConditions onFail="MARK_RAN">
             <not>
                 <indexExists indexName="idx_activity_event_trigger_context"/>
             </not>
         </preConditions>
+        <comment>Index for querying events by trigger context (debugging, audit)</comment>
         <createIndex tableName="activity_event" indexName="idx_activity_event_trigger_context">
             <column name="trigger_context"/>
         </createIndex>

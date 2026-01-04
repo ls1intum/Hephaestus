@@ -15,6 +15,7 @@ query GetOrganizationTeams($login: String!, $first: Int!, $after: String) {
             }
             totalCount
             nodes {
+                __typename
                 id
                 databaseId
                 slug
@@ -35,6 +36,7 @@ query GetOrganizationTeams($login: String!, $first: Int!, $after: String) {
                     edges {
                         role
                         node {
+                            __typename
                             id
                             databaseId
                             login
@@ -46,6 +48,7 @@ query GetOrganizationTeams($login: String!, $first: Int!, $after: String) {
 
                 # Parent team
                 parentTeam {
+                    __typename
                     id
                     databaseId
                     slug
@@ -62,6 +65,7 @@ query GetOrganizationTeams($login: String!, $first: Int!, $after: String) {
                     edges {
                         permission
                         node {
+                            __typename
                             id
                             databaseId
                             name

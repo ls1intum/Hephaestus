@@ -10,6 +10,7 @@ query GetTeamMembers($orgLogin: String!, $teamSlug: String!, $first: Int!, $afte
     }
     organization(login: $orgLogin) {
         team(slug: $teamSlug) {
+            __typename
             members(first: $first, after: $after) {
                 totalCount
                 pageInfo {
@@ -19,6 +20,7 @@ query GetTeamMembers($orgLogin: String!, $teamSlug: String!, $first: Int!, $afte
                 edges {
                     role
                     node {
+                        __typename
                         id
                         databaseId
                         login

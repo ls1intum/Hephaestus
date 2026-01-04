@@ -83,22 +83,46 @@ public abstract class BaseGitHubProcessor {
 
     /**
      * Find an existing label or create a new one from the DTO.
+     * <p>
+     * Tries ID-based lookup first (webhooks provide ID), then falls back to
+     * name-based lookup (GraphQL doesn't provide numeric ID). If creating a new
+     * label without an ID, generates a deterministic negative ID to avoid
+     * collision with real GitHub IDs.
      */
     @Nullable
     protected Label findOrCreateLabel(GitHubLabelDTO dto, Repository repository) {
-        if (dto == null || dto.id() == null) {
+        if (dto == null || dto.name() == null || dto.name().isBlank()) {
             return null;
         }
-        return labelRepository
-            .findById(dto.id())
-            .orElseGet(() -> {
-                Label label = new Label();
-                label.setId(dto.id());
-                label.setName(dto.name());
-                label.setColor(dto.color());
-                label.setRepository(repository);
-                return labelRepository.save(label);
-            });
+
+        // Try ID-based lookup first (webhooks provide ID), then name-based (GraphQL doesn't)
+        java.util.Optional<Label> existingOpt;
+        if (dto.id() != null) {
+            existingOpt = labelRepository.findById(dto.id());
+        } else {
+            existingOpt = labelRepository.findByRepositoryIdAndName(repository.getId(), dto.name());
+        }
+
+        return existingOpt.orElseGet(() -> {
+            Label label = new Label();
+            // Use provided ID or generate deterministic one
+            label.setId(dto.id() != null ? dto.id() : generateDeterministicLabelId(repository.getId(), dto.name()));
+            label.setName(dto.name());
+            label.setColor(dto.color());
+            label.setRepository(repository);
+            return labelRepository.save(label);
+        });
+    }
+
+    /**
+     * Generate a deterministic negative ID for labels created from GraphQL data.
+     * <p>
+     * Uses negative values to avoid collision with real GitHub label IDs which are
+     * always positive.
+     */
+    private Long generateDeterministicLabelId(Long repositoryId, String labelName) {
+        long hash = repositoryId * 31L + labelName.hashCode();
+        return -Math.abs(hash);
     }
 
     /**

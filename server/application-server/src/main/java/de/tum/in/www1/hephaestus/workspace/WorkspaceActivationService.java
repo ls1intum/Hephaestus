@@ -1,10 +1,7 @@
 package de.tum.in.www1.hephaestus.workspace;
 
-import de.tum.in.www1.hephaestus.core.LoggingUtils;
-import de.tum.in.www1.hephaestus.gitprovider.issuetype.github.GitHubIssueTypeSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.organization.Organization;
 import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationService;
-import de.tum.in.www1.hephaestus.gitprovider.subissue.github.GitHubSubIssueSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.sync.GitHubDataSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.sync.NatsConsumerService;
 import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContext;
@@ -38,19 +35,16 @@ public class WorkspaceActivationService {
     private final boolean isNatsEnabled;
     private final boolean runMonitoringOnStartup;
 
-    // Core repositories
+    // Core repository
     private final WorkspaceRepository workspaceRepository;
-    private final RepositoryToMonitorRepository repositoryToMonitorRepository;
 
     // Services
     private final NatsConsumerService natsConsumerService;
     private final WorkspaceScopeFilter workspaceScopeFilter;
     private final OrganizationService organizationService;
 
-    // Lazy-loaded dependencies (to break circular references)
+    // Lazy-loaded to break circular reference with GitHubDataSyncService
     private final ObjectProvider<GitHubDataSyncService> gitHubDataSyncServiceProvider;
-    private final ObjectProvider<GitHubIssueTypeSyncService> issueTypeSyncServiceProvider;
-    private final ObjectProvider<GitHubSubIssueSyncService> subIssueSyncServiceProvider;
 
     // Infrastructure
     private final AsyncTaskExecutor monitoringExecutor;
@@ -59,41 +53,25 @@ public class WorkspaceActivationService {
         @Value("${nats.enabled}") boolean isNatsEnabled,
         @Value("${monitoring.run-on-startup}") boolean runMonitoringOnStartup,
         WorkspaceRepository workspaceRepository,
-        RepositoryToMonitorRepository repositoryToMonitorRepository,
         NatsConsumerService natsConsumerService,
         WorkspaceScopeFilter workspaceScopeFilter,
         OrganizationService organizationService,
         ObjectProvider<GitHubDataSyncService> gitHubDataSyncServiceProvider,
-        ObjectProvider<GitHubIssueTypeSyncService> issueTypeSyncServiceProvider,
-        ObjectProvider<GitHubSubIssueSyncService> subIssueSyncServiceProvider,
         @Qualifier("monitoringExecutor") AsyncTaskExecutor monitoringExecutor
     ) {
         this.isNatsEnabled = isNatsEnabled;
         this.runMonitoringOnStartup = runMonitoringOnStartup;
         this.workspaceRepository = workspaceRepository;
-        this.repositoryToMonitorRepository = repositoryToMonitorRepository;
         this.natsConsumerService = natsConsumerService;
         this.workspaceScopeFilter = workspaceScopeFilter;
         this.organizationService = organizationService;
         this.gitHubDataSyncServiceProvider = gitHubDataSyncServiceProvider;
-        this.issueTypeSyncServiceProvider = issueTypeSyncServiceProvider;
-        this.subIssueSyncServiceProvider = subIssueSyncServiceProvider;
         this.monitoringExecutor = monitoringExecutor;
     }
 
     /** Lazy accessor for GitHubDataSyncService to break circular dependency. */
     private GitHubDataSyncService getGitHubDataSyncService() {
         return gitHubDataSyncServiceProvider.getObject();
-    }
-
-    /** Lazy accessor for GitHubIssueTypeSyncService. */
-    private GitHubIssueTypeSyncService getIssueTypeSyncService() {
-        return issueTypeSyncServiceProvider.getObject();
-    }
-
-    /** Lazy accessor for GitHubSubIssueSyncService. */
-    private GitHubSubIssueSyncService getSubIssueSyncService() {
-        return subIssueSyncServiceProvider.getObject();
     }
 
     /**
@@ -159,24 +137,13 @@ public class WorkspaceActivationService {
      *
      * @param workspace                    the workspace to activate
      * @param organizationConsumersStarted set to track which organization consumers have been started
+     *                                     (currently unused but kept for future multi-org support)
      */
     public void activateWorkspace(Workspace workspace, Set<String> organizationConsumersStarted) {
         if (!workspaceScopeFilter.isWorkspaceAllowed(workspace)) {
             logger.info("Workspace id={} skipped: workspace scope filters active.", workspace.getId());
             return;
         }
-
-        // Load fresh RepositoryToMonitor entities from database to ensure sync
-        // timestamps
-        // are up-to-date. This is critical for respecting cooldown periods across
-        // restarts.
-        List<RepositoryToMonitor> repositoriesToMonitor = repositoryToMonitorRepository.findByWorkspaceId(
-            workspace.getId()
-        );
-        var eligibleRepositories = repositoriesToMonitor
-            .stream()
-            .filter(workspaceScopeFilter::isRepositoryAllowed)
-            .toList();
 
         if (runMonitoringOnStartup) {
             logger.info("Running monitoring on startup for workspace id={}", workspace.getId());
@@ -186,45 +153,11 @@ public class WorkspaceActivationService {
             WorkspaceContext workspaceContext = WorkspaceContext.fromWorkspace(workspace, Set.of());
             WorkspaceContextHolder.setContext(workspaceContext);
             try {
-                // Sync repositories SEQUENTIALLY within each workspace.
-                // This avoids race conditions for shared entities (Organization, Users)
-                // and respects GitHub API rate limits per installation/PAT.
-                // Workspaces themselves run in parallel using virtual threads.
-                for (var repo : eligibleRepositories) {
-                    try {
-                        getGitHubDataSyncService().syncSyncTarget(SyncTargetFactory.create(workspace, repo));
-                    } catch (Exception ex) {
-                        logger.error(
-                            "Error syncing repository {}: {}",
-                            repo.getNameWithOwner(),
-                            LoggingUtils.sanitizeForLog(ex.getMessage()),
-                            ex
-                        );
-                    }
-                }
-
-                // TODO: User and team sync via GraphQL not yet implemented
-                // Users and teams sync sequentially after all repos
-                logger.info(
-                    "All repositories synced for workspace id={} (user/team sync pending GraphQL migration)",
-                    workspace.getId()
-                );
-
-                // Sync issue types via GraphQL (organization-level data)
-                try {
-                    logger.info("Teams synced, now syncing issue types for workspace id={}", workspace.getId());
-                    getIssueTypeSyncService().syncIssueTypesForWorkspace(workspace.getId());
-                } catch (Exception ex) {
-                    logger.error("Error during syncIssueTypes: {}", LoggingUtils.sanitizeForLog(ex.getMessage()), ex);
-                }
-
-                // Sync sub-issue relationships via GraphQL
-                try {
-                    logger.info("Issue types synced, now syncing sub-issues for workspace id={}", workspace.getId());
-                    getSubIssueSyncService().syncSubIssuesForWorkspace(workspace.getId());
-                } catch (Exception ex) {
-                    logger.error("Error during syncSubIssues: {}", LoggingUtils.sanitizeForLog(ex.getMessage()), ex);
-                }
+                // Use the central sync orchestrator which handles:
+                // 1. Organization and teams sync (via GraphQL)
+                // 2. Per-repository syncs (labels, milestones, issues, PRs, comments)
+                // 3. Workspace-level relationships (issue dependencies, sub-issues)
+                getGitHubDataSyncService().syncAllRepositories(workspace.getId());
 
                 logger.info("Finished running monitoring on startup for workspace id={}", workspace.getId());
             } finally {
