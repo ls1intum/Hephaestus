@@ -145,13 +145,13 @@ erDiagram
         INTEGER sub_issues_completed
         INTEGER sub_issues_percent_completed
         VARCHAR(128) issue_type_id FK
-        VARCHAR(255) base_ref_name
-        VARCHAR(40) base_ref_oid
-        VARCHAR(255) head_ref_name
-        VARCHAR(40) head_ref_oid
         VARCHAR(255) merge_state_status
         BOOLEAN mergeable
         VARCHAR(255) review_decision
+        VARCHAR(255) head_ref_name
+        VARCHAR(40) head_ref_oid
+        VARCHAR(255) base_ref_name
+        VARCHAR(40) base_ref_oid
     }
 
     IssueAssignee {
