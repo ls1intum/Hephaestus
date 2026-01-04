@@ -6,7 +6,7 @@
  * - Adds a ts-nocheck pragma to silence circular/self-reference type errors.
  * - Cleans unused imports from drizzle-orm/pg-core; sorts remaining names alphabetically.
  * - Drops identity minValue/maxValue metadata to avoid precision-loss noise.
- * - Removes unused `sql` import from drizzle-orm if not referenced.
+ * - Removes unused `sql` import from drizzle-orm if not used (keeps it for CHECK constraints).
  * - Removes Liquibase changelog tables from the schema.
  * - Sorts table exports alphabetically to ensure deterministic output.
  * - Deletes relations.ts (we don't use Drizzle relational queries).
@@ -82,13 +82,17 @@ content = content
 content = content.replace(/\.default\('\)\.notNull\(\)/g, ".default('').notNull()");
 content = content.replace(/\.default\('\)/g, ".default('')");
 
-// Always remove `import { sql } from "drizzle-orm"` in generated schema; drizzle rarely uses it and it trips linters
-content = content.replace(/\n?import\s*\{\s*sql\s*\}\s*from\s*"drizzle-orm"\s*;?\s*\n?/g, "\n");
-content = content.replace(/\n?import\s*\{\s*sql\s*\}\s*from\s*'drizzle-orm'\s*;?\s*\n?/g, "\n");
-content = content.replace(
-	/^\s*import\s*\{\s*sql\s*\}\s*from\s*["']drizzle-orm["']\s*;?\s*$(?:\r?\n)?/gm,
-	"",
-);
+// Remove `import { sql } from "drizzle-orm"` only if sql template literal is not used in schema
+// (e.g., CHECK constraints use sql`...` syntax and need the import)
+const sqlTemplateUsageRegex = /\bsql`/;
+if (!sqlTemplateUsageRegex.test(content)) {
+	content = content.replace(/\n?import\s*\{\s*sql\s*\}\s*from\s*"drizzle-orm"\s*;?\s*\n?/g, "\n");
+	content = content.replace(/\n?import\s*\{\s*sql\s*\}\s*from\s*'drizzle-orm'\s*;?\s*\n?/g, "\n");
+	content = content.replace(
+		/^\s*import\s*\{\s*sql\s*\}\s*from\s*["']drizzle-orm["']\s*;?\s*$(?:\r?\n)?/gm,
+		"",
+	);
+}
 
 // Fix drizzle-kit introspect bug: it incorrectly assigns operator classes from the SECOND column
 // to the FIRST column in composite indexes. For example:
