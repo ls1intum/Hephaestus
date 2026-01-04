@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.leaderboard;
 
+import de.tum.in.www1.hephaestus.core.LoggingUtils;
 import de.tum.in.www1.hephaestus.workspace.Workspace;
 import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContextResolver;
@@ -64,7 +65,11 @@ public class LeaderboardController {
         ) @RequestParam LeaderboardSortType sort,
         @RequestParam LeaderboardMode mode
     ) {
-        logger.info("Generating {} leaderboard for workspace {}", mode, workspaceContext.slug());
+        logger.info(
+            "Generating {} leaderboard for workspace {}",
+            mode,
+            LoggingUtils.sanitizeForLog(workspaceContext.slug())
+        );
         Workspace workspace = workspaceResolver.requireWorkspace(workspaceContext);
         return ResponseEntity.ok(leaderboardService.createLeaderboard(workspace, after, before, team, sort, mode));
     }
@@ -84,7 +89,11 @@ public class LeaderboardController {
         @RequestParam String login,
         @RequestBody LeaderboardEntryDTO entry
     ) {
-        logger.info("Calculating league stats for user {} in workspace {}", login, workspaceContext.slug());
+        logger.info(
+            "Calculating league stats for user {} in workspace {}",
+            LoggingUtils.sanitizeForLog(login),
+            LoggingUtils.sanitizeForLog(workspaceContext.slug())
+        );
         Workspace workspace = workspaceResolver.requireWorkspace(workspaceContext);
         return ResponseEntity.ok(leaderboardService.getUserLeagueStats(workspace, login, entry));
     }
