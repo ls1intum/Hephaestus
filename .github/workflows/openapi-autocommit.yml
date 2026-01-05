@@ -13,7 +13,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           ref: ${{ github.event.pull_request.head.ref }}
           token: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
@@ -79,7 +79,7 @@ jobs:
 
       - name: Push changes
         if: ${{ always() && contains(github.event.pull_request.labels.*.name, 'autocommit-openapi') && steps.check_changes.outputs.no_changes_detected != 'true' }}
-        uses: ad-m/github-push-action@v0.8.0
+        uses: ad-m/github-push-action@d91a481090679876dfc4178fef17f286781251df # v0.8.0
         with:
           github_token: ${{ secrets.GH_PAT }}
           branch: ${{ github.event.pull_request.head.ref }}

@@ -93,7 +93,7 @@ jobs:
 
       - name: Checkout repository
         if: steps.should_run.outputs.run == 'true'
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           # Database checks need full history for git diff on schema/migrations
           # Other quality checks only need HEAD for faster checkout
@@ -101,7 +101,7 @@ jobs:
 
       - name: Setup Node.js
         if: steps.should_run.outputs.run == 'true'
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version-file: ".node-version"
           cache: "npm"
