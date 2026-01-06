@@ -38,7 +38,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class LeaderboardXpQueryService {
 
-    private static final Logger logger = LoggerFactory.getLogger(LeaderboardXpQueryService.class);
+    private static final Logger log = LoggerFactory.getLogger(LeaderboardXpQueryService.class);
 
     private final ActivityEventRepository activityEventRepository;
     private final UserRepository userRepository;
@@ -105,7 +105,7 @@ public class LeaderboardXpQueryService {
         Instant until,
         Set<Long> teamIds
     ) {
-        logger.debug(
+        log.debug(
             "Fetching leaderboard data: workspaceId={}, since={}, until={}, teamIds={}",
             workspaceId,
             since,
@@ -127,7 +127,7 @@ public class LeaderboardXpQueryService {
         }
 
         if (xpData.isEmpty()) {
-            logger.debug("No activity events found for leaderboard");
+            log.debug("No activity events found for leaderboard");
             return Map.of();
         }
 
@@ -155,7 +155,7 @@ public class LeaderboardXpQueryService {
             Long actorId = xp.getActorId();
             User user = usersById.get(actorId);
             if (user == null) {
-                logger.warn("User not found for actor ID: {}", actorId);
+                log.warn("User not found for actor ID: {}", actorId);
                 continue;
             }
 
@@ -211,7 +211,7 @@ public class LeaderboardXpQueryService {
             .stream()
             .collect(toMap(Map.Entry::getKey, e -> e.getValue().build()));
 
-        logger.debug("Built leaderboard data for {} users", result.size());
+        log.debug("Built leaderboard data for {} users", result.size());
         return result;
     }
 }

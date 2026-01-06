@@ -29,7 +29,7 @@ import org.springframework.web.servlet.resource.NoResourceFoundException;
 @Order(Ordered.LOWEST_PRECEDENCE)
 public class GlobalControllerAdvice {
 
-    private static final Logger logger = LoggerFactory.getLogger(GlobalControllerAdvice.class);
+    private static final Logger log = LoggerFactory.getLogger(GlobalControllerAdvice.class);
 
     // ========================================================================
     // STANDARD EXCEPTIONS
@@ -37,31 +37,31 @@ public class GlobalControllerAdvice {
 
     @ExceptionHandler(EntityNotFoundException.class)
     ProblemDetail handleNotFound(EntityNotFoundException exception) {
-        logger.debug("Entity not found: {}", exception.getMessage());
+        log.debug("Entity not found: {}", exception.getMessage());
         return problem(HttpStatus.NOT_FOUND, "Resource not found", exception.getMessage());
     }
 
     @ExceptionHandler(NoResourceFoundException.class)
     ProblemDetail handleNoResourceFound(NoResourceFoundException exception) {
-        logger.debug("No resource found: {}", exception.getMessage());
+        log.debug("No resource found: {}", exception.getMessage());
         return problem(HttpStatus.NOT_FOUND, "Resource not found", exception.getMessage());
     }
 
     @ExceptionHandler(AccessForbiddenException.class)
     ProblemDetail handleForbidden(AccessForbiddenException exception) {
-        logger.warn("Access forbidden: {}", exception.getMessage());
+        log.warn("Access forbidden: {}", exception.getMessage());
         return problem(HttpStatus.FORBIDDEN, "Access denied", exception.getMessage());
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
     ProblemDetail handleBadRequest(IllegalArgumentException exception) {
-        logger.debug("Bad request: {}", exception.getMessage());
+        log.debug("Bad request: {}", exception.getMessage());
         return problem(HttpStatus.BAD_REQUEST, "Invalid request", exception.getMessage());
     }
 
     @ExceptionHandler(IllegalStateException.class)
     ProblemDetail handleIllegalState(IllegalStateException exception) {
-        logger.warn("Illegal state: {}", exception.getMessage());
+        log.warn("Illegal state: {}", exception.getMessage());
         return problem(HttpStatus.CONFLICT, "Invalid state", exception.getMessage());
     }
 
@@ -119,7 +119,7 @@ public class GlobalControllerAdvice {
     @ExceptionHandler(Exception.class)
     ProblemDetail handleGeneric(Exception exception) {
         // Log the full exception for debugging, but don't expose details to client
-        logger.error("Unhandled exception: {}", exception.getMessage(), exception);
+        log.error("Unhandled exception: {}", exception.getMessage(), exception);
         return problem(
             HttpStatus.INTERNAL_SERVER_ERROR,
             "Internal server error",

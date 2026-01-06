@@ -39,7 +39,7 @@ import org.springframework.stereotype.Component;
 @Converter
 public class EncryptedStringConverter implements AttributeConverter<String, String> {
 
-    private static final Logger logger = LoggerFactory.getLogger(EncryptedStringConverter.class);
+    private static final Logger log = LoggerFactory.getLogger(EncryptedStringConverter.class);
 
     private static final String ALGORITHM = "AES/GCM/NoPadding";
     private static final int GCM_IV_LENGTH = 12;
@@ -56,7 +56,7 @@ public class EncryptedStringConverter implements AttributeConverter<String, Stri
     public EncryptedStringConverter() {
         this.secretKey = null;
         this.enabled = false;
-        logger.debug("EncryptedStringConverter instantiated without Spring context - encryption disabled");
+        log.debug("EncryptedStringConverter instantiated without Spring context - encryption disabled");
     }
 
     public EncryptedStringConverter(
@@ -69,7 +69,7 @@ public class EncryptedStringConverter implements AttributeConverter<String, Stri
                     "Encryption key is required in production! Set hephaestus.security.encryption-key"
                 );
             }
-            logger.warn(
+            log.warn(
                 "Encryption key not configured - sensitive data will NOT be encrypted at rest. " +
                     "Set hephaestus.security.encryption-key in production!"
             );
@@ -82,7 +82,7 @@ public class EncryptedStringConverter implements AttributeConverter<String, Stri
         } else {
             this.secretKey = new SecretKeySpec(encryptionKey.getBytes(StandardCharsets.UTF_8), "AES");
             this.enabled = true;
-            logger.info("Encryption enabled for sensitive database fields");
+            log.info("Encryption enabled for sensitive database fields");
         }
     }
 
@@ -108,7 +108,7 @@ public class EncryptedStringConverter implements AttributeConverter<String, Stri
 
             return PREFIX + Base64.getEncoder().encodeToString(combined);
         } catch (Exception e) {
-            logger.error("Failed to encrypt value", e);
+            log.error("Failed to encrypt value", e);
             throw new EncryptionException("Encryption failed", e);
         }
     }
@@ -121,7 +121,7 @@ public class EncryptedStringConverter implements AttributeConverter<String, Stri
 
         // Handle unencrypted legacy data
         if (!dbData.startsWith(PREFIX)) {
-            logger.debug("Found unencrypted value in database - returning as-is");
+            log.debug("Found unencrypted value in database - returning as-is");
             return dbData;
         }
 
@@ -141,7 +141,7 @@ public class EncryptedStringConverter implements AttributeConverter<String, Stri
             byte[] plainText = cipher.doFinal(cipherText);
             return new String(plainText, StandardCharsets.UTF_8);
         } catch (Exception e) {
-            logger.error("Failed to decrypt value", e);
+            log.error("Failed to decrypt value", e);
             throw new EncryptionException("Decryption failed", e);
         }
     }

@@ -56,7 +56,7 @@ import org.springframework.stereotype.Component;
 @Component
 public class GitHubGraphQlClientProvider {
 
-    private static final Logger logger = LoggerFactory.getLogger(GitHubGraphQlClientProvider.class);
+    private static final Logger log = LoggerFactory.getLogger(GitHubGraphQlClientProvider.class);
 
     private final HttpGraphQlClient baseClient;
     private final InstallationTokenProvider tokenProvider;
@@ -126,7 +126,7 @@ public class GitHubGraphQlClientProvider {
         try {
             circuitBreaker.acquirePermission();
         } catch (CallNotPermittedException e) {
-            logger.warn("GitHub GraphQL circuit breaker is OPEN - rejecting call");
+            log.warn("GitHub GraphQL circuit breaker is OPEN - rejecting call");
             throw new CircuitBreakerOpenException("GitHub GraphQL API circuit breaker is open", e);
         }
     }

@@ -33,7 +33,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class GitHubLabelSyncService {
 
-    private static final Logger logger = LoggerFactory.getLogger(GitHubLabelSyncService.class);
+    private static final Logger log = LoggerFactory.getLogger(GitHubLabelSyncService.class);
     private static final String GET_LABELS_DOCUMENT = "GetRepositoryLabels";
 
     private final RepositoryRepository repositoryRepository;
@@ -64,14 +64,14 @@ public class GitHubLabelSyncService {
     public int syncLabelsForRepository(Long workspaceId, Long repositoryId) {
         Repository repository = repositoryRepository.findById(repositoryId).orElse(null);
         if (repository == null) {
-            logger.warn("Repository {} not found, cannot sync labels", repositoryId);
+            log.warn("Repository {} not found, cannot sync labels", repositoryId);
             return 0;
         }
 
         String safeNameWithOwner = sanitizeForLog(repository.getNameWithOwner());
         Optional<RepositoryOwnerAndName> parsedName = GitHubRepositoryNameParser.parse(repository.getNameWithOwner());
         if (parsedName.isEmpty()) {
-            logger.warn("Invalid repository name format: {}", safeNameWithOwner);
+            log.warn("Invalid repository name format: {}", safeNameWithOwner);
             return 0;
         }
         String owner = parsedName.get().owner();
@@ -118,7 +118,7 @@ public class GitHubLabelSyncService {
             // Remove stale labels (labels in DB that no longer exist on GitHub)
             int removedCount = removeStaleLabels(repositoryId, syncedNodeIds);
 
-            logger.info(
+            log.info(
                 "Synced {} labels for repository {} (removed {} stale)",
                 totalSynced,
                 safeNameWithOwner,
@@ -126,7 +126,7 @@ public class GitHubLabelSyncService {
             );
             return totalSynced;
         } catch (Exception e) {
-            logger.error("Error syncing labels for repository {}: {}", safeNameWithOwner, e.getMessage(), e);
+            log.error("Error syncing labels for repository {}: {}", safeNameWithOwner, e.getMessage(), e);
             return 0;
         }
     }
@@ -147,7 +147,7 @@ public class GitHubLabelSyncService {
             if (!syncedNames.contains(existingLabel.getName())) {
                 labelRepository.delete(existingLabel);
                 removedCount++;
-                logger.debug("Removed stale label: {}", existingLabel.getName());
+                log.debug("Removed stale label: {}", existingLabel.getName());
             }
         }
 

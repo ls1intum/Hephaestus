@@ -30,7 +30,7 @@ import org.springframework.stereotype.Service;
 @WorkspaceAgnostic("System-level Slack integration - callers provide workspace context via channel IDs")
 public class SlackMessageService {
 
-    private static final Logger logger = LoggerFactory.getLogger(SlackMessageService.class);
+    private static final Logger log = LoggerFactory.getLogger(SlackMessageService.class);
 
     private final App slackApp;
 
@@ -49,7 +49,7 @@ public class SlackMessageService {
                 .usersList(r -> r)
                 .getMembers();
         } catch (IOException | SlackApiException e) {
-            logger.error("Failed to get all members from Slack: " + e.getMessage());
+            log.error("Failed to get all members from Slack: " + e.getMessage());
             return new ArrayList<>();
         }
     }
@@ -73,7 +73,7 @@ public class SlackMessageService {
         ChatPostMessageResponse response = slackApp.client().chatPostMessage(request);
 
         if (!response.isOk()) {
-            logger.error("Failed to send message to Slack channel: " + response.getError());
+            log.error("Failed to send message to Slack channel: " + response.getError());
         }
     }
 
@@ -82,7 +82,7 @@ public class SlackMessageService {
      * Does not guarantee that the app has the necessary permissions to send messages.
      */
     public boolean initTest() {
-        logger.info("Testing Slack app initialization...");
+        log.info("Testing Slack app initialization...");
         AuthTestResponse response;
         try {
             response = slackApp.client().authTest(r -> r);
@@ -92,10 +92,10 @@ public class SlackMessageService {
             response.setError(e.getMessage());
         }
         if (response.isOk()) {
-            logger.info("Slack app is successfully initialized.");
+            log.info("Slack app is successfully initialized.");
             return true;
         } else {
-            logger.error("Failed to initialize Slack app: " + response.getError());
+            log.error("Failed to initialize Slack app: " + response.getError());
             return false;
         }
     }

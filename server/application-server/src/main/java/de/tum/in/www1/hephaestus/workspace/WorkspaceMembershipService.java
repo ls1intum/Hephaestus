@@ -34,7 +34,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class WorkspaceMembershipService {
 
-    private static final Logger logger = LoggerFactory.getLogger(WorkspaceMembershipService.class);
+    private static final Logger log = LoggerFactory.getLogger(WorkspaceMembershipService.class);
 
     private final WorkspaceMembershipRepository workspaceMembershipRepository;
     private final WorkspaceRepository workspaceRepository;
@@ -127,16 +127,13 @@ public class WorkspaceMembershipService {
             return;
         }
         if (workspaceId == null) {
-            logger.debug(
-                "Skipping league point update for user {} because no workspace is configured.",
-                user.getLogin()
-            );
+            log.debug("Skipping league point update for user {} because no workspace is configured.", user.getLogin());
             return;
         }
 
         Workspace workspace = workspaceRepository.findById(workspaceId).orElse(null);
         if (workspace == null) {
-            logger.debug(
+            log.debug(
                 "Skipping league point update for user {} because workspace {} not found.",
                 user.getLogin(),
                 workspaceId
@@ -154,7 +151,7 @@ public class WorkspaceMembershipService {
     @Transactional
     public void resetLeaguePoints(Long workspaceId, int points) {
         if (workspaceId == null) {
-            logger.debug("Skipping league point reset because no workspace is configured.");
+            log.debug("Skipping league point reset because no workspace is configured.");
             return;
         }
 
@@ -286,7 +283,7 @@ public class WorkspaceMembershipService {
             // Update existing membership
             WorkspaceMembership membership = membershipOpt.get();
             membership.setRole(role);
-            logger.info("Updated role for user {} in workspace {} to {}", userId, workspaceId, role);
+            log.info("Updated role for user {} in workspace {} to {}", userId, workspaceId, role);
             return workspaceMembershipRepository.save(membership);
         } else {
             // Create new membership
@@ -297,7 +294,7 @@ public class WorkspaceMembershipService {
 
             WorkspaceMembership membership = createMembershipInternal(workspace, user, role);
             membership.setLeaguePoints(POINTS_DEFAULT);
-            logger.info("Created new membership for user {} in workspace {} with role {}", userId, workspaceId, role);
+            log.info("Created new membership for user {} in workspace {} with role {}", userId, workspaceId, role);
             return workspaceMembershipRepository.save(membership);
         }
     }
@@ -315,7 +312,7 @@ public class WorkspaceMembershipService {
             .orElseThrow(() -> new IllegalArgumentException("Workspace membership not found"));
 
         workspaceMembershipRepository.delete(membership);
-        logger.info("Removed user {} from workspace {}", userId, workspaceId);
+        log.info("Removed user {} from workspace {}", userId, workspaceId);
     }
 
     private WorkspaceMembership createMembershipInternal(Workspace workspace, User user) {

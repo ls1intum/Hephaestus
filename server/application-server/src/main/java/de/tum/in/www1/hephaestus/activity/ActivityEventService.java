@@ -58,7 +58,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class ActivityEventService {
 
-    private static final Logger logger = LoggerFactory.getLogger(ActivityEventService.class);
+    private static final Logger log = LoggerFactory.getLogger(ActivityEventService.class);
 
     /**
      * Current schema version for activity events.
@@ -171,7 +171,7 @@ public class ActivityEventService {
     @Observed(name = "activity.record", contextualName = "record-activity-event")
     @Retryable(
         retryFor = TransientDataAccessException.class,
-        maxAttempts = 3,
+        maxAttempts = MAX_RETRY_ATTEMPTS,
         backoff = @Backoff(delay = 100, multiplier = 2, maxDelay = 1000),
         listeners = "activityRetryListener"
     )
@@ -234,7 +234,7 @@ public class ActivityEventService {
         Workspace workspace = workspaceRepository.findById(workspaceId).orElse(null);
         if (workspace == null) {
             eventsFailedCounter.increment();
-            logger.warn(
+            log.warn(
                 "Failed to record event: workspace not found. workspaceId={}, eventType={}, targetId={}",
                 workspaceId,
                 eventType,
@@ -247,7 +247,7 @@ public class ActivityEventService {
         double maxXp = xpProperties.getMaxXpPerEvent();
         double clampedXp = Math.max(0.0, Math.min(xp, maxXp));
         if (clampedXp != xp) {
-            logger.debug("Clamped XP from {} to {} for event type {}", xp, clampedXp, eventType);
+            log.debug("Clamped XP from {} to {} for event type {}", xp, clampedXp, eventType);
         }
 
         // Round to 2 decimal places for consistent precision (HALF_UP rounding)
@@ -262,7 +262,7 @@ public class ActivityEventService {
         // By checking first, we avoid the constraint violation entirely.
         if (eventRepository.existsByWorkspaceIdAndEventKey(workspaceId, eventKey)) {
             eventsDuplicateCounter.increment();
-            logger.debug("Duplicate skipped (pre-check): {}", eventKey);
+            log.debug("Duplicate skipped (pre-check): {}", eventKey);
             return false;
         }
 
@@ -295,7 +295,7 @@ public class ActivityEventService {
             cacheManager.evictWorkspace(workspaceId);
 
             // Structured logging with trace context
-            logger.info(
+            log.info(
                 "activity.event.recorded eventType={} targetId={} xp={} workspaceId={} actorId={}",
                 eventType,
                 targetId,
@@ -306,7 +306,7 @@ public class ActivityEventService {
             return true;
         } catch (DataIntegrityViolationException e) {
             eventsDuplicateCounter.increment();
-            logger.debug("Duplicate skipped: {}", eventKey);
+            log.debug("Duplicate skipped: {}", eventKey);
             return false;
         }
     }
@@ -328,7 +328,7 @@ public class ActivityEventService {
             return event;
         }
 
-        logger.debug(
+        log.debug(
             "Migrated event {} from schema v{} to v{}",
             event.getEventKey(),
             event.getSchemaVersion(),
@@ -439,7 +439,7 @@ public class ActivityEventService {
             var ignored3 = MDC.putCloseable("eventType", eventType.name())
         ) {
             // Log with full context for immediate alerting
-            logger.error(
+            log.error(
                 "DEAD_LETTER: Failed to record activity event after {} retries. " +
                     "eventKey={}, workspaceId={}, eventType={}, targetType={}, targetId={}, " +
                     "xp={}, source={}, actorId={}, repositoryId={}, errorType={}, error={}",
@@ -520,7 +520,7 @@ public class ActivityEventService {
             deadLetterRepository.save(deadLetter);
             deadLettersPersistedCounter.increment();
 
-            logger.info(
+            log.info(
                 "Dead letter persisted for later retry. deadLetterId={}, eventType={}, targetId={}",
                 deadLetter.getId(),
                 eventType,
@@ -529,7 +529,7 @@ public class ActivityEventService {
         } catch (Exception persistError) {
             // Dead letter persistence failed - log but don't throw
             // The original failure is already logged, this is defense-in-depth
-            logger.error(
+            log.error(
                 "CRITICAL: Failed to persist dead letter. Event data may be lost. " +
                     "workspaceId={}, eventType={}, targetId={}, persistError={}",
                 workspaceId,

@@ -30,7 +30,7 @@ import org.springframework.web.reactive.function.client.WebClient;
 @Service
 public class GitHubInstallationRepositoryEnumerationService {
 
-    private static final Logger logger = LoggerFactory.getLogger(GitHubInstallationRepositoryEnumerationService.class);
+    private static final Logger log = LoggerFactory.getLogger(GitHubInstallationRepositoryEnumerationService.class);
     private static final int MAX_BUFFER_SIZE = 16 * 1024 * 1024; // 16MB for large repo lists
 
     private final GitHubAppTokenService gitHubAppTokenService;
@@ -57,10 +57,7 @@ public class GitHubInstallationRepositoryEnumerationService {
      */
     public List<InstallationRepositorySnapshot> enumerate(long installationId) {
         if (!gitHubAppTokenService.isConfigured()) {
-            logger.warn(
-                "GitHub App credentials missing; cannot enumerate installation {} repositories.",
-                installationId
-            );
+            log.warn("GitHub App credentials missing; cannot enumerate installation {} repositories.", installationId);
             return List.of();
         }
 
@@ -76,18 +73,18 @@ public class GitHubInstallationRepositoryEnumerationService {
                 .block();
 
             if (response == null || response.repositories() == null) {
-                logger.warn("Empty response from GitHub API for installation {}", installationId);
+                log.warn("Empty response from GitHub API for installation {}", installationId);
                 return List.of();
             }
 
             return response.repositories().stream().map(this::toSnapshot).collect(Collectors.toList());
         } catch (Exception e) {
-            logger.warn(
+            log.warn(
                 "Failed to enumerate installation {} repositories via GitHub API: {}",
                 installationId,
                 e.getMessage()
             );
-            logger.debug("GitHub installation enumeration failure", e);
+            log.debug("GitHub installation enumeration failure", e);
             return List.of();
         }
     }

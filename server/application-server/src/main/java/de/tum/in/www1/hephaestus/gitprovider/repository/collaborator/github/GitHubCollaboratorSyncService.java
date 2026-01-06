@@ -35,7 +35,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class GitHubCollaboratorSyncService {
 
-    private static final Logger logger = LoggerFactory.getLogger(GitHubCollaboratorSyncService.class);
+    private static final Logger log = LoggerFactory.getLogger(GitHubCollaboratorSyncService.class);
     private static final String GET_COLLABORATORS_DOCUMENT = "GetRepositoryCollaborators";
 
     private final RepositoryRepository repositoryRepository;
@@ -66,14 +66,14 @@ public class GitHubCollaboratorSyncService {
     public int syncCollaboratorsForRepository(Long workspaceId, Long repositoryId) {
         Repository repository = repositoryRepository.findById(repositoryId).orElse(null);
         if (repository == null) {
-            logger.warn("Repository {} not found, cannot sync collaborators", repositoryId);
+            log.warn("Repository {} not found, cannot sync collaborators", repositoryId);
             return 0;
         }
 
         String safeNameWithOwner = sanitizeForLog(repository.getNameWithOwner());
         Optional<RepositoryOwnerAndName> parsedName = GitHubRepositoryNameParser.parse(repository.getNameWithOwner());
         if (parsedName.isEmpty()) {
-            logger.warn("Invalid repository name format: {}", safeNameWithOwner);
+            log.warn("Invalid repository name format: {}", safeNameWithOwner);
             return 0;
         }
         String owner = parsedName.get().owner();
@@ -132,7 +132,7 @@ public class GitHubCollaboratorSyncService {
             // Remove stale collaborators (collaborators in DB that no longer exist on GitHub)
             int removedCount = removeStaleCollaborators(repositoryId, syncedUserIds);
 
-            logger.info(
+            log.info(
                 "Synced {} collaborators for repository {} (removed {} stale)",
                 totalSynced,
                 safeNameWithOwner,
@@ -140,7 +140,7 @@ public class GitHubCollaboratorSyncService {
             );
             return totalSynced;
         } catch (Exception e) {
-            logger.error("Error syncing collaborators for repository {}: {}", safeNameWithOwner, e.getMessage(), e);
+            log.error("Error syncing collaborators for repository {}: {}", safeNameWithOwner, e.getMessage(), e);
             return 0;
         }
     }
@@ -201,7 +201,7 @@ public class GitHubCollaboratorSyncService {
             if (!syncedUserIds.contains(existing.getUser().getId())) {
                 collaboratorRepository.delete(existing);
                 removedCount++;
-                logger.debug(
+                log.debug(
                     "Removed stale collaborator: {} from repository {}",
                     existing.getUser().getLogin(),
                     repositoryId

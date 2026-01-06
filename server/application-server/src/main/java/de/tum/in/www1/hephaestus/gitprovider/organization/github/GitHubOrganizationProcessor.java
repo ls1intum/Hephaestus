@@ -26,7 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class GitHubOrganizationProcessor {
 
-    private static final Logger logger = LoggerFactory.getLogger(GitHubOrganizationProcessor.class);
+    private static final Logger log = LoggerFactory.getLogger(GitHubOrganizationProcessor.class);
 
     private final OrganizationRepository organizationRepository;
 
@@ -44,7 +44,7 @@ public class GitHubOrganizationProcessor {
     @Transactional
     public Organization process(GitHubOrganizationEventDTO.GitHubOrganizationDTO dto) {
         if (dto == null || dto.id() == null) {
-            logger.warn("Organization DTO is null or missing ID, skipping");
+            log.warn("Organization DTO is null or missing ID, skipping");
             return null;
         }
 
@@ -71,7 +71,7 @@ public class GitHubOrganizationProcessor {
         }
 
         Organization saved = organizationRepository.save(organization);
-        logger.debug(
+        log.debug(
             "Processed organization {} ({}): {}",
             saved.getLogin(),
             saved.getGithubId(),
@@ -99,7 +99,7 @@ public class GitHubOrganizationProcessor {
                 String oldLogin = org.getLogin();
                 org.setLogin(newLogin);
                 Organization saved = organizationRepository.save(org);
-                logger.info("Renamed organization {} -> {} ({})", oldLogin, newLogin, githubId);
+                log.info("Renamed organization {} -> {} ({})", oldLogin, newLogin, githubId);
                 return saved;
             })
             .orElse(null);
@@ -120,7 +120,7 @@ public class GitHubOrganizationProcessor {
             .findByGithubId(githubId)
             .ifPresent(org -> {
                 organizationRepository.delete(org);
-                logger.info("Deleted organization {} ({})", sanitizeForLog(org.getLogin()), githubId);
+                log.info("Deleted organization {} ({})", sanitizeForLog(org.getLogin()), githubId);
             });
     }
 }

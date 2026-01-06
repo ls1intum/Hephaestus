@@ -34,7 +34,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class GitHubMilestoneSyncService {
 
-    private static final Logger logger = LoggerFactory.getLogger(GitHubMilestoneSyncService.class);
+    private static final Logger log = LoggerFactory.getLogger(GitHubMilestoneSyncService.class);
     private static final String GET_MILESTONES_DOCUMENT = "GetRepositoryMilestones";
 
     private final MilestoneRepository milestoneRepository;
@@ -65,14 +65,14 @@ public class GitHubMilestoneSyncService {
     public int syncMilestonesForRepository(Long workspaceId, Long repositoryId) {
         Repository repository = repositoryRepository.findById(repositoryId).orElse(null);
         if (repository == null) {
-            logger.warn("Repository {} not found, cannot sync milestones", repositoryId);
+            log.warn("Repository {} not found, cannot sync milestones", repositoryId);
             return 0;
         }
 
         String safeNameWithOwner = sanitizeForLog(repository.getNameWithOwner());
         Optional<RepositoryOwnerAndName> parsedName = GitHubRepositoryNameParser.parse(repository.getNameWithOwner());
         if (parsedName.isEmpty()) {
-            logger.warn("Invalid repository name format: {}", safeNameWithOwner);
+            log.warn("Invalid repository name format: {}", safeNameWithOwner);
             return 0;
         }
         String owner = parsedName.get().owner();
@@ -119,10 +119,10 @@ public class GitHubMilestoneSyncService {
             // Remove milestones that no longer exist
             removeDeletedMilestones(repository.getId(), syncedNumbers, context);
 
-            logger.info("Synced {} milestones for repository {}", totalSynced, safeNameWithOwner);
+            log.info("Synced {} milestones for repository {}", totalSynced, safeNameWithOwner);
             return totalSynced;
         } catch (Exception e) {
-            logger.error("Error syncing milestones for repository {}: {}", safeNameWithOwner, e.getMessage(), e);
+            log.error("Error syncing milestones for repository {}: {}", safeNameWithOwner, e.getMessage(), e);
             return 0;
         }
     }
@@ -137,7 +137,7 @@ public class GitHubMilestoneSyncService {
             }
         }
         if (removed > 0) {
-            logger.info("Deleted {} stale milestones for repositoryId={}", removed, repositoryId);
+            log.info("Deleted {} stale milestones for repositoryId={}", removed, repositoryId);
         }
     }
 

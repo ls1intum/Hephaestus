@@ -24,7 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 @WorkspaceAgnostic("System-wide debugging and recovery - dead letters span all workspaces")
 public class DeadLetterEventService {
 
-    private static final Logger logger = LoggerFactory.getLogger(DeadLetterEventService.class);
+    private static final Logger log = LoggerFactory.getLogger(DeadLetterEventService.class);
 
     private final DeadLetterEventRepository deadLetterRepository;
     private final ActivityEventService activityEventService;
@@ -62,7 +62,7 @@ public class DeadLetterEventService {
     @Transactional
     public void discard(UUID id, String reason) {
         DeadLetterEvent event = findById(id);
-        logger.info("Discarding dead letter {} with reason: {}", id, reason);
+        log.info("Discarding dead letter {} with reason: {}", id, reason);
         event.markDiscarded(reason);
         deadLetterRepository.save(event);
     }
@@ -85,7 +85,7 @@ public class DeadLetterEventService {
             return new RetryResult(false, "Dead letter is not in PENDING status");
         }
 
-        logger.info("Retrying dead letter {}", id);
+        log.info("Retrying dead letter {}", id);
 
         try {
             boolean success = activityEventService.record(
@@ -104,7 +104,7 @@ public class DeadLetterEventService {
             if (success) {
                 event.markResolved("Retry successful");
                 deadLetterRepository.save(event);
-                logger.info("Dead letter {} successfully retried", id);
+                log.info("Dead letter {} successfully retried", id);
                 return new RetryResult(true, "Event successfully recorded");
             } else {
                 // Duplicate means it was already recorded - treat as success
@@ -116,7 +116,7 @@ public class DeadLetterEventService {
             // Increment retry count on failure
             int newCount = event.incrementRetryCount();
             deadLetterRepository.save(event);
-            logger.error("Failed to retry dead letter {}: {} (attempt {})", id, e.getMessage(), newCount);
+            log.error("Failed to retry dead letter {}: {} (attempt {})", id, e.getMessage(), newCount);
             return new RetryResult(false, "Retry failed: " + e.getMessage());
         }
     }

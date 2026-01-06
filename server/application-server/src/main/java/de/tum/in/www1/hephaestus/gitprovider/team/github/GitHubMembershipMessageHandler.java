@@ -23,7 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Component
 public class GitHubMembershipMessageHandler extends GitHubMessageHandler<GitHubMembershipEventDTO> {
 
-    private static final Logger logger = LoggerFactory.getLogger(GitHubMembershipMessageHandler.class);
+    private static final Logger log = LoggerFactory.getLogger(GitHubMembershipMessageHandler.class);
 
     private final GitHubUserProcessor userProcessor;
     private final TeamRepository teamRepository;
@@ -58,11 +58,11 @@ public class GitHubMembershipMessageHandler extends GitHubMessageHandler<GitHubM
         var teamDto = event.team();
 
         if (memberDto == null || teamDto == null) {
-            logger.warn("Received membership event with missing data");
+            log.warn("Received membership event with missing data");
             return;
         }
 
-        logger.info(
+        log.info(
             "Received membership event: action={}, member={}, team={}, org={}",
             event.action(),
             memberDto.login(),
@@ -73,7 +73,7 @@ public class GitHubMembershipMessageHandler extends GitHubMessageHandler<GitHubM
         // Ensure user exists via processor
         User user = userProcessor.ensureExists(memberDto);
         if (user == null) {
-            logger.warn("Could not create/find user {} for membership event", memberDto.login());
+            log.warn("Could not create/find user {} for membership event", memberDto.login());
             return;
         }
 
@@ -81,7 +81,7 @@ public class GitHubMembershipMessageHandler extends GitHubMessageHandler<GitHubM
         Team team = teamRepository.findById(teamDto.id()).orElse(null);
         if (team == null) {
             // Team should be created by team webhook, just log
-            logger.warn("Team {} not found for membership event", teamDto.id());
+            log.warn("Team {} not found for membership event", teamDto.id());
             return;
         }
 
@@ -89,14 +89,14 @@ public class GitHubMembershipMessageHandler extends GitHubMessageHandler<GitHubM
         switch (event.actionType()) {
             case GitHubEventAction.Membership.ADDED -> handleMemberAdded(team, user);
             case GitHubEventAction.Membership.REMOVED -> handleMemberRemoved(team, user);
-            default -> logger.debug("Unhandled membership action: {}", event.action());
+            default -> log.debug("Unhandled membership action: {}", event.action());
         }
     }
 
     private void handleMemberAdded(Team team, User user) {
         // Check if membership already exists
         if (teamMembershipRepository.existsByTeam_IdAndUser_Id(team.getId(), user.getId())) {
-            logger.debug(
+            log.debug(
                 "Membership already exists for user {} in team {}",
                 sanitizeForLog(user.getLogin()),
                 sanitizeForLog(team.getName())
@@ -107,7 +107,7 @@ public class GitHubMembershipMessageHandler extends GitHubMessageHandler<GitHubM
         // Create and persist the membership
         TeamMembership membership = new TeamMembership(team, user, TeamMembership.Role.MEMBER);
         teamMembershipRepository.save(membership);
-        logger.info(
+        log.info(
             "Created membership for user {} in team {}",
             sanitizeForLog(user.getLogin()),
             sanitizeForLog(team.getName())
@@ -117,7 +117,7 @@ public class GitHubMembershipMessageHandler extends GitHubMessageHandler<GitHubM
     private void handleMemberRemoved(Team team, User user) {
         // Delete the membership if it exists
         if (!teamMembershipRepository.existsByTeam_IdAndUser_Id(team.getId(), user.getId())) {
-            logger.debug(
+            log.debug(
                 "No membership found to remove for user {} in team {}",
                 sanitizeForLog(user.getLogin()),
                 sanitizeForLog(team.getName())
@@ -126,7 +126,7 @@ public class GitHubMembershipMessageHandler extends GitHubMessageHandler<GitHubM
         }
 
         teamMembershipRepository.deleteByTeam_IdAndUser_Id(team.getId(), user.getId());
-        logger.info(
+        log.info(
             "Removed membership for user {} from team {}",
             sanitizeForLog(user.getLogin()),
             sanitizeForLog(team.getName())

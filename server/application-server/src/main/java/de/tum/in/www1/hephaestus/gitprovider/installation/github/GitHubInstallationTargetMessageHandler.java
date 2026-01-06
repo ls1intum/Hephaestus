@@ -17,7 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Component
 public class GitHubInstallationTargetMessageHandler extends GitHubMessageHandler<GitHubInstallationTargetEventDTO> {
 
-    private static final Logger logger = LoggerFactory.getLogger(GitHubInstallationTargetMessageHandler.class);
+    private static final Logger log = LoggerFactory.getLogger(GitHubInstallationTargetMessageHandler.class);
 
     private final WorkspaceProvisioningListener provisioningListener;
     private final OrganizationService organizationService;
@@ -53,7 +53,7 @@ public class GitHubInstallationTargetMessageHandler extends GitHubMessageHandler
         var account = event.account();
 
         if (installation == null || account == null) {
-            logger.warn("installation_target payload missing installation/account block");
+            log.warn("installation_target payload missing installation/account block");
             return;
         }
 
@@ -61,7 +61,7 @@ public class GitHubInstallationTargetMessageHandler extends GitHubMessageHandler
         String newLogin = account.login();
 
         if (newLogin == null || newLogin.isBlank()) {
-            logger.warn("installation_target event {} ignored because login is empty", installationId);
+            log.warn("installation_target event {} ignored because login is empty", installationId);
             return;
         }
 
@@ -73,7 +73,7 @@ public class GitHubInstallationTargetMessageHandler extends GitHubMessageHandler
         provisioningListener.onAccountRenamed(installationId, previousLogin, newLogin);
         upsertOrganization(event, installationId, newLogin);
 
-        logger.info(
+        log.info(
             "Handled installation_target rename for installation {}: {} -> {}",
             installationId,
             previousLogin,
@@ -88,7 +88,7 @@ public class GitHubInstallationTargetMessageHandler extends GitHubMessageHandler
 
         var account = event.account();
         if (account == null || account.id() == null) {
-            logger.warn("installation_target event {} missing account details for organization upsert", installationId);
+            log.warn("installation_target event {} missing account details for organization upsert", installationId);
             return;
         }
 

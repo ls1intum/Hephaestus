@@ -40,7 +40,7 @@ import org.springframework.transaction.annotation.Transactional;
 @WorkspaceAgnostic("Manages workspace-repository mapping configuration")
 public class WorkspaceRepositoryMonitorService {
 
-    private static final Logger logger = LoggerFactory.getLogger(WorkspaceRepositoryMonitorService.class);
+    private static final Logger log = LoggerFactory.getLogger(WorkspaceRepositoryMonitorService.class);
 
     // Configuration
     private final boolean isNatsEnabled;
@@ -90,7 +90,7 @@ public class WorkspaceRepositoryMonitorService {
     @Transactional(readOnly = true)
     public List<String> getMonitoredRepositories(String slug) {
         Workspace workspace = requireWorkspace(slug);
-        logger.info(
+        log.info(
             "Getting repositories to monitor for workspace id={} (slug={})",
             workspace.getId(),
             LoggingUtils.sanitizeForLog(slug)
@@ -115,7 +115,7 @@ public class WorkspaceRepositoryMonitorService {
             throw new RepositoryManagementNotAllowedException(slug);
         }
 
-        logger.info(
+        log.info(
             "Adding repository to monitor: {} for workspace id={}",
             LoggingUtils.sanitizeForLog(nameWithOwner),
             workspace.getId()
@@ -127,7 +127,7 @@ public class WorkspaceRepositoryMonitorService {
                 .stream()
                 .anyMatch(r -> r.getNameWithOwner().equals(nameWithOwner))
         ) {
-            logger.info("Repository is already being monitored");
+            log.info("Repository is already being monitored");
             throw new RepositoryAlreadyMonitoredException(nameWithOwner);
         }
 
@@ -136,7 +136,7 @@ public class WorkspaceRepositoryMonitorService {
         // Validate that repository exists
         var repository = fetchRepositoryOrThrow(workspaceId, nameWithOwner);
         if (repository.isEmpty()) {
-            logger.info("Repository does not exist");
+            log.info("Repository does not exist");
             throw new EntityNotFoundException("Repository", nameWithOwner);
         }
 
@@ -181,7 +181,7 @@ public class WorkspaceRepositoryMonitorService {
             throw new RepositoryManagementNotAllowedException(slug);
         }
 
-        logger.info(
+        log.info(
             "Removing repository from monitor: {} for workspace id={}",
             LoggingUtils.sanitizeForLog(nameWithOwner),
             workspace.getId()
@@ -195,7 +195,7 @@ public class WorkspaceRepositoryMonitorService {
             .orElse(null);
 
         if (repositoryToMonitor == null) {
-            logger.info("Repository is not being monitored");
+            log.info("Repository is not being monitored");
             throw new EntityNotFoundException("Repository", nameWithOwner);
         }
 
@@ -342,7 +342,7 @@ public class WorkspaceRepositoryMonitorService {
 
         var snapshots = installationRepositoryEnumerator.enumerate(installationId);
         if (snapshots.isEmpty()) {
-            logger.warn(
+            log.warn(
                 "Installation {} (workspace={}) configured for ALL repositories but enumeration returned no data; monitors might be stale.",
                 installationId,
                 workspace.getWorkspaceSlug()
@@ -419,13 +419,13 @@ public class WorkspaceRepositoryMonitorService {
             natsConsumerService.updateWorkspaceConsumer(workspace.getId());
         }
         if (deferSync) {
-            logger.debug("Repository {} persisted with deferred sync.", monitor.getNameWithOwner());
+            log.debug("Repository {} persisted with deferred sync.", monitor.getNameWithOwner());
             return;
         }
         if (repositoryAllowed) {
             getGitHubDataSyncService().syncSyncTargetAsync(SyncTargetFactory.create(workspace, monitor));
         } else {
-            logger.debug("Repository {} persisted but monitoring disabled by filters.", monitor.getNameWithOwner());
+            log.debug("Repository {} persisted but monitoring disabled by filters.", monitor.getNameWithOwner());
         }
     }
 
@@ -514,7 +514,7 @@ public class WorkspaceRepositoryMonitorService {
             repo.setPushedAt(Instant.now()); // Placeholder, will be updated by sync
 
             repositoryRepository.save(repo);
-            logger.debug("Created repository {} from installation snapshot", snapshot.nameWithOwner());
+            log.debug("Created repository {} from installation snapshot", snapshot.nameWithOwner());
         }
     }
 

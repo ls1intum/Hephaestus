@@ -29,7 +29,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class GitHubRepositorySyncService {
 
-    private static final Logger logger = LoggerFactory.getLogger(GitHubRepositorySyncService.class);
+    private static final Logger log = LoggerFactory.getLogger(GitHubRepositorySyncService.class);
 
     private static final String REPOSITORY_QUERY = """
         query GetRepository($owner: String!, $name: String!) {
@@ -99,7 +99,7 @@ public class GitHubRepositorySyncService {
         String safeNameWithOwner = sanitizeForLog(nameWithOwner);
         Optional<RepositoryOwnerAndName> parsedName = GitHubRepositoryNameParser.parse(nameWithOwner);
         if (parsedName.isEmpty()) {
-            logger.warn("Invalid repository name format: {}", safeNameWithOwner);
+            log.warn("Invalid repository name format: {}", safeNameWithOwner);
             return Optional.empty();
         }
         String repoOwner = parsedName.get().owner();
@@ -115,7 +115,7 @@ public class GitHubRepositorySyncService {
                 .block(GRAPHQL_TIMEOUT);
 
             if (response == null || !response.isValid()) {
-                logger.warn(
+                log.warn(
                     "Failed to fetch repository {}: {}",
                     safeNameWithOwner,
                     response != null ? response.getErrors() : "null response"
@@ -128,7 +128,7 @@ public class GitHubRepositorySyncService {
                 .field("repository")
                 .toEntity(de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.Repository.class);
             if (repoData == null) {
-                logger.warn("Repository {} not found on GitHub", safeNameWithOwner);
+                log.warn("Repository {} not found on GitHub", safeNameWithOwner);
                 return Optional.empty();
             }
 
@@ -139,7 +139,7 @@ public class GitHubRepositorySyncService {
             // Create or update repository using typed accessors
             Long githubDatabaseId = repoData.getDatabaseId() != null ? repoData.getDatabaseId().longValue() : null;
             if (githubDatabaseId == null) {
-                logger.warn("Repository {} missing databaseId", safeNameWithOwner);
+                log.warn("Repository {} missing databaseId", safeNameWithOwner);
                 return Optional.empty();
             }
 
@@ -181,11 +181,11 @@ public class GitHubRepositorySyncService {
             }
 
             repository = repositoryRepository.save(repository);
-            logger.debug("Synced repository: {}", safeNameWithOwner);
+            log.debug("Synced repository: {}", safeNameWithOwner);
 
             return Optional.of(repository);
         } catch (Exception e) {
-            logger.error("Error syncing repository {}: {}", safeNameWithOwner, e.getMessage(), e);
+            log.error("Error syncing repository {}: {}", safeNameWithOwner, e.getMessage(), e);
             return Optional.empty();
         }
     }

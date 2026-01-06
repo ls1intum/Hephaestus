@@ -51,7 +51,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class GitHubSubIssueSyncService {
 
-    private static final Logger logger = LoggerFactory.getLogger(GitHubSubIssueSyncService.class);
+    private static final Logger log = LoggerFactory.getLogger(GitHubSubIssueSyncService.class);
 
     /** Document name for graphql-documents/GetSubIssuesForRepository.graphql */
     private static final String GET_SUB_ISSUES_DOCUMENT = "GetSubIssuesForRepository";
@@ -93,7 +93,7 @@ public class GitHubSubIssueSyncService {
         boolean isLink,
         @Nullable SubIssuesSummaryDTO parentSummary
     ) {
-        logger.info(
+        log.info(
             "Processing sub-issue event: subIssue={}, parentIssue={}, isLink={}",
             subIssueId,
             parentIssueId,
@@ -102,7 +102,7 @@ public class GitHubSubIssueSyncService {
 
         Optional<Issue> subIssueOpt = issueRepository.findById(subIssueId);
         if (subIssueOpt.isEmpty()) {
-            logger.debug("Sub-issue {} not found in database, skipping", subIssueId);
+            log.debug("Sub-issue {} not found in database, skipping", subIssueId);
             return;
         }
 
@@ -123,7 +123,7 @@ public class GitHubSubIssueSyncService {
     private void linkSubIssueToParent(Issue subIssue, long parentIssueId, @Nullable SubIssuesSummaryDTO parentSummary) {
         Optional<Issue> parentOpt = issueRepository.findById(parentIssueId);
         if (parentOpt.isEmpty()) {
-            logger.debug("Parent issue {} not found in database, skipping link", parentIssueId);
+            log.debug("Parent issue {} not found in database, skipping link", parentIssueId);
             return;
         }
 
@@ -133,7 +133,7 @@ public class GitHubSubIssueSyncService {
 
         updateParentSummary(parentIssue, parentSummary);
 
-        logger.info("Linked sub-issue #{} to parent #{}", subIssue.getNumber(), parentIssue.getNumber());
+        log.info("Linked sub-issue #{} to parent #{}", subIssue.getNumber(), parentIssue.getNumber());
     }
 
     private void unlinkSubIssueFromParent(
@@ -143,7 +143,7 @@ public class GitHubSubIssueSyncService {
     ) {
         Issue currentParent = subIssue.getParentIssue();
         if (currentParent != null) {
-            logger.info("Unlinking sub-issue #{} from parent #{}", subIssue.getNumber(), currentParent.getNumber());
+            log.info("Unlinking sub-issue #{} from parent #{}", subIssue.getNumber(), currentParent.getNumber());
         }
 
         subIssue.setParentIssue(null);
@@ -164,7 +164,7 @@ public class GitHubSubIssueSyncService {
         parentIssue.setSubIssuesPercentCompleted(summary.percentCompleted());
         issueRepository.save(parentIssue);
 
-        logger.debug("Updated parent #{} summary: {}", parentIssue.getNumber(), summary);
+        log.debug("Updated parent #{} summary: {}", parentIssue.getNumber(), summary);
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -197,7 +197,7 @@ public class GitHubSubIssueSyncService {
 
         // Check cooldown
         if (!metadata.needsSubIssuesSync(syncCooldownInMinutes)) {
-            logger.debug(
+            log.debug(
                 "Skipping sub-issues sync for workspace '{}' due to cooldown (last sync: {})",
                 metadata.displayName(),
                 metadata.subIssuesSyncedAt()
@@ -207,7 +207,7 @@ public class GitHubSubIssueSyncService {
 
         List<Repository> repositories = repositoryRepository.findActiveByWorkspaceId(workspaceId);
         if (repositories.isEmpty()) {
-            logger.debug("No repositories found for workspace {}", workspaceId);
+            log.debug("No repositories found for workspace {}", workspaceId);
             // Still update timestamp to prevent repeated empty checks
             updateSyncTimestamp(workspaceId);
             return 0;
@@ -215,7 +215,7 @@ public class GitHubSubIssueSyncService {
 
         HttpGraphQlClient client = graphQlClientProvider.forWorkspace(workspaceId);
 
-        logger.info(
+        log.info(
             "Starting sub-issue sync for workspace '{}' with {} repositories",
             metadata.displayName(),
             repositories.size()
@@ -229,7 +229,7 @@ public class GitHubSubIssueSyncService {
                 totalLinked += syncSubIssuesForRepository(client, repo);
             } catch (Exception e) {
                 failedRepos++;
-                logger.error(
+                log.error(
                     "Error syncing sub-issues for repository {}: {}",
                     sanitizeForLog(repo.getNameWithOwner()),
                     e.getMessage()
@@ -242,7 +242,7 @@ public class GitHubSubIssueSyncService {
             updateSyncTimestamp(workspaceId);
         }
 
-        logger.info(
+        log.info(
             "Completed sub-issue sync for workspace '{}': {} relationships synced ({} repos failed)",
             metadata.displayName(),
             totalLinked,
@@ -264,7 +264,7 @@ public class GitHubSubIssueSyncService {
     private int syncSubIssuesForRepository(HttpGraphQlClient client, Repository repository) {
         Optional<RepositoryOwnerAndName> parsedName = GitHubRepositoryNameParser.parse(repository.getNameWithOwner());
         if (parsedName.isEmpty()) {
-            logger.warn("Invalid repository name format: {}", sanitizeForLog(repository.getNameWithOwner()));
+            log.warn("Invalid repository name format: {}", sanitizeForLog(repository.getNameWithOwner()));
             return 0;
         }
         String owner = parsedName.get().owner();
@@ -287,7 +287,7 @@ public class GitHubSubIssueSyncService {
                     .block(GRAPHQL_TIMEOUT);
 
                 if (issueConnection == null) {
-                    logger.warn(
+                    log.warn(
                         "No response from GraphQL for repository {}",
                         sanitizeForLog(repository.getNameWithOwner())
                     );
@@ -300,7 +300,7 @@ public class GitHubSubIssueSyncService {
                 // Process each page in its own transaction
                 linkedCount += processIssueNodesInTransaction(issueConnection, repository);
             } catch (Exception e) {
-                logger.error(
+                log.error(
                     "Error syncing sub-issues for repository {}: {}",
                     sanitizeForLog(repository.getNameWithOwner()),
                     e.getMessage()
@@ -357,7 +357,7 @@ public class GitHubSubIssueSyncService {
                 issue.setParentIssue(parent);
                 issueRepository.save(issue);
 
-                logger.debug(
+                log.debug(
                     "Linked issue #{} to parent #{} in {}",
                     issue.getNumber(),
                     parent.getNumber(),
@@ -387,7 +387,7 @@ public class GitHubSubIssueSyncService {
                 issue.setSubIssuesPercentCompleted(summary.getPercentCompleted());
                 issueRepository.save(issue);
 
-                logger.debug(
+                log.debug(
                     "Updated issue #{} summary: {}/{} sub-issues",
                     issue.getNumber(),
                     summary.getCompleted(),

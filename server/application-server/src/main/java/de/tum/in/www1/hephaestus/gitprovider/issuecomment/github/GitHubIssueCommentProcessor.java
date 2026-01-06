@@ -36,7 +36,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class GitHubIssueCommentProcessor {
 
-    private static final Logger logger = LoggerFactory.getLogger(GitHubIssueCommentProcessor.class);
+    private static final Logger log = LoggerFactory.getLogger(GitHubIssueCommentProcessor.class);
 
     private final IssueCommentRepository commentRepository;
     private final IssueRepository issueRepository;
@@ -67,13 +67,13 @@ public class GitHubIssueCommentProcessor {
     @Transactional
     public IssueComment process(GitHubCommentDTO dto, Long issueId, ProcessingContext context) {
         if (dto == null || dto.id() == null) {
-            logger.warn("Comment DTO is null or missing ID, skipping");
+            log.warn("Comment DTO is null or missing ID, skipping");
             return null;
         }
 
         Issue issue = issueRepository.findById(issueId).orElse(null);
         if (issue == null) {
-            logger.warn("Issue not found for comment: issueId={}", issueId);
+            log.warn("Issue not found for comment: issueId={}", issueId);
             return null;
         }
 
@@ -138,7 +138,7 @@ public class GitHubIssueCommentProcessor {
                     EventContext.from(context)
                 )
             );
-            logger.debug("Created comment {} for issue {}", saved.getId(), issueId);
+            log.debug("Created comment {} for issue {}", saved.getId(), issueId);
         } else if (!changedFields.isEmpty()) {
             eventPublisher.publishEvent(
                 new DomainEvent.CommentUpdated(
@@ -148,7 +148,7 @@ public class GitHubIssueCommentProcessor {
                     EventContext.from(context)
                 )
             );
-            logger.debug("Updated comment {} with changes: {}", saved.getId(), changedFields);
+            log.debug("Updated comment {} with changes: {}", saved.getId(), changedFields);
         }
 
         return saved;
@@ -175,7 +175,7 @@ public class GitHubIssueCommentProcessor {
                 eventPublisher.publishEvent(
                     new DomainEvent.CommentDeleted(commentId, issueId, EventContext.from(context))
                 );
-                logger.info("Deleted comment {}", commentId);
+                log.info("Deleted comment {}", commentId);
             });
     }
 }

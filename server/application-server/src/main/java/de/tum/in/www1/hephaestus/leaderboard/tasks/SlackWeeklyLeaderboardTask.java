@@ -41,7 +41,7 @@ import org.springframework.stereotype.Component;
 @ConditionalOnProperty(prefix = "hephaestus.leaderboard.notification", name = "enabled", havingValue = "true")
 public class SlackWeeklyLeaderboardTask implements Runnable {
 
-    private static final Logger logger = LoggerFactory.getLogger(SlackWeeklyLeaderboardTask.class);
+    private static final Logger log = LoggerFactory.getLogger(SlackWeeklyLeaderboardTask.class);
 
     private final String team;
     private final String channelId;
@@ -108,7 +108,7 @@ public class SlackWeeklyLeaderboardTask implements Runnable {
             LeaderboardMode.INDIVIDUAL
         );
         var top3 = leaderboard.subList(0, Math.min(3, leaderboard.size()));
-        logger.debug(
+        log.debug(
             "Top 3 Users of the last week for workspace {}: {}",
             workspace.getWorkspaceSlug(),
             top3
@@ -169,13 +169,13 @@ public class SlackWeeklyLeaderboardTask implements Runnable {
     @Override
     public void run() {
         if (slackMessageService == null) {
-            logger.warn("SlackMessageService not available; skipping message send.");
+            log.warn("SlackMessageService not available; skipping message send.");
             return;
         }
 
         List<Workspace> workspaces = workspaceRepository.findAll();
         if (workspaces.isEmpty()) {
-            logger.info("No workspaces configured for Slack notifications; skipping message.");
+            log.info("No workspaces configured for Slack notifications; skipping message.");
             return;
         }
 
@@ -194,7 +194,7 @@ public class SlackWeeklyLeaderboardTask implements Runnable {
         for (Workspace workspace : workspaces) {
             var topReviewers = getTop3SlackReviewers(workspace, after, before, Optional.ofNullable(team));
             if (topReviewers.isEmpty()) {
-                logger.info(
+                log.info(
                     "Skipping Slack notification for workspace {} because no reviewers qualified.",
                     workspace.getWorkspaceSlug()
                 );
@@ -205,7 +205,7 @@ public class SlackWeeklyLeaderboardTask implements Runnable {
             try {
                 slackMessageService.sendMessage(channelId, blocks, "Weekly review highlights");
             } catch (IOException | SlackApiException e) {
-                logger.error(
+                log.error(
                     "Failed to send scheduled message for workspace {}: {}",
                     workspace.getWorkspaceSlug(),
                     e.getMessage()

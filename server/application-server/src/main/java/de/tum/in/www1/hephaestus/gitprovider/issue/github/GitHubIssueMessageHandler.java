@@ -18,7 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Component
 public class GitHubIssueMessageHandler extends GitHubMessageHandler<GitHubIssueEventDTO> {
 
-    private static final Logger logger = LoggerFactory.getLogger(GitHubIssueMessageHandler.class);
+    private static final Logger log = LoggerFactory.getLogger(GitHubIssueMessageHandler.class);
 
     private final ProcessingContextFactory contextFactory;
     private final GitHubIssueProcessor issueProcessor;
@@ -44,11 +44,11 @@ public class GitHubIssueMessageHandler extends GitHubMessageHandler<GitHubIssueE
         GitHubIssueDTO issueDto = event.issue();
 
         if (issueDto == null) {
-            logger.warn("Received issue event with missing issue data");
+            log.warn("Received issue event with missing issue data");
             return;
         }
 
-        logger.info(
+        log.info(
             "Received issue event: action={}, issue=#{}, repo={}",
             event.action(),
             issueDto.number(),
@@ -100,7 +100,7 @@ public class GitHubIssueMessageHandler extends GitHubMessageHandler<GitHubIssueE
             }
             case GitHubEventAction.Issue.UNTYPED -> issueProcessor.processUntyped(issueDto, context);
             default -> {
-                logger.debug("Unhandled issue action: {}", event.action());
+                log.debug("Unhandled issue action: {}", event.action());
                 issueProcessor.process(issueDto, context);
             }
         }

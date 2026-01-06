@@ -47,7 +47,7 @@ import reactor.util.retry.Retry;
 @Configuration
 public class GitHubGraphQlConfig {
 
-    private static final Logger logger = LoggerFactory.getLogger(GitHubGraphQlConfig.class);
+    private static final Logger log = LoggerFactory.getLogger(GitHubGraphQlConfig.class);
 
     private static final String GITHUB_GRAPHQL_URL = "https://api.github.com/graphql";
     private static final int MAX_BUFFER_SIZE = 16 * 1024 * 1024; // 16MB
@@ -140,22 +140,22 @@ public class GitHubGraphQlConfig {
 
             // Warn when usage exceeds 80%
             if (usagePercent > 80) {
-                logger.warn(
+                log.warn(
                     "GitHub GraphQL rate limit: {}/{} remaining ({}% used), resets at epoch {}",
                     remaining,
                     limit,
                     String.format("%.1f", usagePercent),
                     reset
                 );
-            } else if (logger.isDebugEnabled()) {
-                logger.debug("GitHub GraphQL rate limit: {}/{} remaining, {} used", remaining, limit, used);
+            } else if (log.isDebugEnabled()) {
+                log.debug("GitHub GraphQL rate limit: {}/{} remaining, {} used", remaining, limit, used);
             }
         }
 
         // Special handling for 429 Too Many Requests
         if (response.statusCode().value() == 429) {
             String retryAfter = headers.getFirst(HEADER_RETRY_AFTER);
-            logger.error("GitHub rate limit exceeded! Retry-After: {} seconds", retryAfter);
+            log.error("GitHub rate limit exceeded! Retry-After: {} seconds", retryAfter);
         }
     }
 
@@ -198,7 +198,7 @@ public class GitHubGraphQlConfig {
                         .filter(throwable -> throwable instanceof RetryableException)
                         .doBeforeRetry(signal -> {
                             RetryableException ex = (RetryableException) signal.failure();
-                            logger.warn(
+                            log.warn(
                                 "GitHub GraphQL request failed with status {}, retry attempt {} of {}",
                                 ex.getStatusCode(),
                                 signal.totalRetries() + 1,
@@ -207,7 +207,7 @@ public class GitHubGraphQlConfig {
                         })
                         .onRetryExhaustedThrow((spec, signal) -> {
                             RetryableException ex = (RetryableException) signal.failure();
-                            logger.error(
+                            log.error(
                                 "GitHub GraphQL request failed after {} retries with status {}",
                                 MAX_RETRIES,
                                 ex.getStatusCode()

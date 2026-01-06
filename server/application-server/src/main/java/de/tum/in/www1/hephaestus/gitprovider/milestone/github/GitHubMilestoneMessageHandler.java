@@ -18,7 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Component
 public class GitHubMilestoneMessageHandler extends GitHubMessageHandler<GitHubMilestoneEventDTO> {
 
-    private static final Logger logger = LoggerFactory.getLogger(GitHubMilestoneMessageHandler.class);
+    private static final Logger log = LoggerFactory.getLogger(GitHubMilestoneMessageHandler.class);
 
     private final ProcessingContextFactory contextFactory;
     private final GitHubMilestoneProcessor milestoneProcessor;
@@ -44,11 +44,11 @@ public class GitHubMilestoneMessageHandler extends GitHubMessageHandler<GitHubMi
         GitHubMilestoneDTO milestoneDto = event.milestone();
 
         if (milestoneDto == null) {
-            logger.warn("Received milestone event with missing data");
+            log.warn("Received milestone event with missing data");
             return;
         }
 
-        logger.info(
+        log.info(
             "Received milestone event: action={}, milestone={}, repo={}",
             event.action(),
             milestoneDto.title(),

@@ -16,7 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Component
 public class GitHubTeamMessageHandler extends GitHubMessageHandler<GitHubTeamEventDTO> {
 
-    private static final Logger logger = LoggerFactory.getLogger(GitHubTeamMessageHandler.class);
+    private static final Logger log = LoggerFactory.getLogger(GitHubTeamMessageHandler.class);
 
     private final GitHubTeamProcessor teamProcessor;
 
@@ -41,11 +41,11 @@ public class GitHubTeamMessageHandler extends GitHubMessageHandler<GitHubTeamEve
         var teamDto = event.team();
 
         if (teamDto == null) {
-            logger.warn("Received team event with missing data");
+            log.warn("Received team event with missing data");
             return;
         }
 
-        logger.info(
+        log.info(
             "Received team event: action={}, team={}, org={}",
             event.action(),
             teamDto.name(),
@@ -63,7 +63,7 @@ public class GitHubTeamMessageHandler extends GitHubMessageHandler<GitHubTeamEve
                 orgLogin,
                 context
             );
-            default -> logger.debug("Unhandled team action: {}", event.action());
+            default -> log.debug("Unhandled team action: {}", event.action());
         }
     }
 }

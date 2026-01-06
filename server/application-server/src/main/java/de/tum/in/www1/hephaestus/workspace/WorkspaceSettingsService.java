@@ -26,7 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class WorkspaceSettingsService {
 
-    private static final Logger logger = LoggerFactory.getLogger(WorkspaceSettingsService.class);
+    private static final Logger log = LoggerFactory.getLogger(WorkspaceSettingsService.class);
     private static final Pattern SLACK_CHANNEL_ID_PATTERN = Pattern.compile("^[CGD][A-Z0-9]{8,}$");
 
     private final WorkspaceRepository workspaceRepository;
@@ -55,7 +55,7 @@ public class WorkspaceSettingsService {
             workspace.setLeaderboardScheduleTime(time);
         }
 
-        logger.info("Updated schedule for workspace {}: day={}, time={}", workspaceId, day, time);
+        log.info("Updated schedule for workspace {}: day={}, time={}", workspaceId, day, time);
         return workspaceRepository.save(workspace);
     }
 
@@ -85,7 +85,7 @@ public class WorkspaceSettingsService {
             workspace.setLeaderboardNotificationChannelId(channelId);
         }
 
-        logger.info("Updated notifications for workspace {}: enabled={}", workspaceId, enabled);
+        log.info("Updated notifications for workspace {}: enabled={}", workspaceId, enabled);
         return workspaceRepository.save(workspace);
     }
 
@@ -100,7 +100,7 @@ public class WorkspaceSettingsService {
     public Workspace updateToken(Long workspaceId, String token) {
         Workspace workspace = requireWorkspace(workspaceId);
         workspace.setPersonalAccessToken(token);
-        logger.info("Updated PAT for workspace {}", workspaceId);
+        log.info("Updated PAT for workspace {}", workspaceId);
         return workspaceRepository.save(workspace);
     }
 
@@ -117,7 +117,7 @@ public class WorkspaceSettingsService {
         Workspace workspace = requireWorkspace(workspaceId);
         workspace.setSlackToken(slackToken);
         workspace.setSlackSigningSecret(slackSigningSecret);
-        logger.info("Updated Slack credentials for workspace {}", workspaceId);
+        log.info("Updated Slack credentials for workspace {}", workspaceId);
         return workspaceRepository.save(workspace);
     }
 
@@ -132,7 +132,7 @@ public class WorkspaceSettingsService {
     public Workspace updatePublicVisibility(Long workspaceId, Boolean isPubliclyViewable) {
         Workspace workspace = requireWorkspace(workspaceId);
         workspace.setIsPubliclyViewable(isPubliclyViewable);
-        logger.info("Updated visibility for workspace {}: public={}", workspaceId, isPubliclyViewable);
+        log.info("Updated visibility for workspace {}: public={}", workspaceId, isPubliclyViewable);
         return workspaceRepository.save(workspace);
     }
 

@@ -21,7 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class GitHubInstallationRepositoriesMessageHandler
     extends GitHubMessageHandler<GitHubInstallationRepositoriesEventDTO> {
 
-    private static final Logger logger = LoggerFactory.getLogger(GitHubInstallationRepositoriesMessageHandler.class);
+    private static final Logger log = LoggerFactory.getLogger(GitHubInstallationRepositoriesMessageHandler.class);
 
     private final WorkspaceProvisioningListener provisioningListener;
 
@@ -49,7 +49,7 @@ public class GitHubInstallationRepositoriesMessageHandler
         var installation = event.installation();
 
         if (installation == null) {
-            logger.warn("Received installation_repositories event with missing data");
+            log.warn("Received installation_repositories event with missing data");
             return;
         }
 
@@ -58,7 +58,7 @@ public class GitHubInstallationRepositoriesMessageHandler
             ? event.repositoriesRemoved()
             : List.of();
 
-        logger.info(
+        log.info(
             "Received installation_repositories event: action={}, installation={}, added={}, removed={}",
             event.action(),
             installation.id(),
@@ -71,18 +71,14 @@ public class GitHubInstallationRepositoriesMessageHandler
         // Notify workspace module via SPI for added repositories
         if (!added.isEmpty()) {
             List<String> addedNames = added.stream().map(GitHubRepositoryRefDTO::fullName).toList();
-            logger.info("Adding {} repositories to monitor for installation {}", addedNames.size(), installationId);
+            log.info("Adding {} repositories to monitor for installation {}", addedNames.size(), installationId);
             provisioningListener.onRepositoriesAdded(installationId, addedNames);
         }
 
         // Notify workspace module via SPI for removed repositories
         if (!removed.isEmpty()) {
             List<String> removedNames = removed.stream().map(GitHubRepositoryRefDTO::fullName).toList();
-            logger.info(
-                "Removing {} repositories from monitor for installation {}",
-                removedNames.size(),
-                installationId
-            );
+            log.info("Removing {} repositories from monitor for installation {}", removedNames.size(), installationId);
             provisioningListener.onRepositoriesRemoved(installationId, removedNames);
         }
     }

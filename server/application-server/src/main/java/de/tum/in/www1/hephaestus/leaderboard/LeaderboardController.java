@@ -37,7 +37,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 @Validated
 public class LeaderboardController {
 
-    private static final Logger logger = LoggerFactory.getLogger(LeaderboardController.class);
+    private static final Logger log = LoggerFactory.getLogger(LeaderboardController.class);
 
     private final LeaderboardService leaderboardService;
     private final WorkspaceContextResolver workspaceResolver;
@@ -70,7 +70,7 @@ public class LeaderboardController {
         ) @RequestParam LeaderboardSortType sort,
         @RequestParam LeaderboardMode mode
     ) {
-        logger.info(
+        log.info(
             "Generating {} leaderboard for workspace {}",
             mode,
             LoggingUtils.sanitizeForLog(workspaceContext.slug())
@@ -100,7 +100,7 @@ public class LeaderboardController {
         @PathVariable String login,
         @RequestBody LeaderboardEntryDTO entry
     ) {
-        logger.info(
+        log.info(
             "Calculating league stats for user {} in workspace {}",
             LoggingUtils.sanitizeForLog(login),
             LoggingUtils.sanitizeForLog(workspaceContext.slug())

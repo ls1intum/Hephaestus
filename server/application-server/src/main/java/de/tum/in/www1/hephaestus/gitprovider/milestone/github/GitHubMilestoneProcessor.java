@@ -32,7 +32,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class GitHubMilestoneProcessor {
 
-    private static final Logger logger = LoggerFactory.getLogger(GitHubMilestoneProcessor.class);
+    private static final Logger log = LoggerFactory.getLogger(GitHubMilestoneProcessor.class);
 
     private final MilestoneRepository milestoneRepository;
     private final UserRepository userRepository;
@@ -69,7 +69,7 @@ public class GitHubMilestoneProcessor {
         ProcessingContext context
     ) {
         if (dto == null) {
-            logger.warn("Milestone DTO is null, skipping");
+            log.warn("Milestone DTO is null, skipping");
             return null;
         }
 
@@ -80,7 +80,7 @@ public class GitHubMilestoneProcessor {
         } else if (dto.number() > 0) {
             existingOpt = milestoneRepository.findByNumberAndRepositoryId(dto.number(), repository.getId());
         } else {
-            logger.warn("Milestone DTO is missing both id and number, skipping");
+            log.warn("Milestone DTO is missing both id and number, skipping");
             return null;
         }
         boolean isNew = existingOpt.isEmpty();
@@ -146,7 +146,7 @@ public class GitHubMilestoneProcessor {
             );
         }
 
-        logger.debug("Processed milestone {} ({}): {}", saved.getTitle(), saved.getId(), isNew ? "created" : "updated");
+        log.debug("Processed milestone {} ({}): {}", saved.getTitle(), saved.getId(), isNew ? "created" : "updated");
         return saved;
     }
 
@@ -188,7 +188,7 @@ public class GitHubMilestoneProcessor {
                 eventPublisher.publishEvent(
                     new DomainEvent.MilestoneDeleted(milestoneId, milestone.getTitle(), context.workspaceId(), repoId)
                 );
-                logger.debug("Deleted milestone {} ({})", milestone.getTitle(), milestoneId);
+                log.debug("Deleted milestone {} ({})", milestone.getTitle(), milestoneId);
             });
     }
 

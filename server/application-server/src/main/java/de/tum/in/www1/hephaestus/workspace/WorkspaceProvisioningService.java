@@ -25,7 +25,7 @@ import org.springframework.web.reactive.function.client.WebClient;
 @Service
 public class WorkspaceProvisioningService {
 
-    private static final Logger logger = LoggerFactory.getLogger(WorkspaceProvisioningService.class);
+    private static final Logger log = LoggerFactory.getLogger(WorkspaceProvisioningService.class);
 
     private final WorkspaceProperties workspaceProperties;
     private final WorkspaceRepository workspaceRepository;
@@ -74,14 +74,12 @@ public class WorkspaceProvisioningService {
     @Transactional
     public void bootstrapDefaultPatWorkspace() {
         if (!workspaceProperties.isInitDefault()) {
-            logger.debug("Skipping default PAT workspace bootstrap because bootstrap is disabled.");
+            log.debug("Skipping default PAT workspace bootstrap because bootstrap is disabled.");
             return;
         }
 
         if (workspaceRepository.count() > 0) {
-            logger.debug(
-                "Skipping PAT workspace creation because workspaces already exist. Ensuring admin membership."
-            );
+            log.debug("Skipping PAT workspace creation because workspaces already exist. Ensuring admin membership.");
             ensureDefaultAdminMembershipIfPresent();
             return;
         }
@@ -122,7 +120,7 @@ public class WorkspaceProvisioningService {
         workspace.setGithubRepositorySelection(RepositorySelection.SELECTED);
 
         Workspace savedWorkspace = workspaceRepository.save(workspace);
-        logger.info(
+        log.info(
             "Created default PAT workspace '{}' (id={}) for development convenience.",
             savedWorkspace.getAccountLogin(),
             savedWorkspace.getId()
@@ -139,11 +137,11 @@ public class WorkspaceProvisioningService {
                 monitor.setWorkspace(savedWorkspace);
                 repositoryToMonitorRepository.save(monitor);
                 savedWorkspace.getRepositoriesToMonitor().add(monitor);
-                logger.info("Queued repository for monitoring: {}", nameWithOwner);
+                log.info("Queued repository for monitoring: {}", nameWithOwner);
             });
 
         workspaceRepository.save(savedWorkspace);
-        logger.info("PAT workspace provisioning complete. Repositories will be synced by startup monitoring.");
+        log.info("PAT workspace provisioning complete. Repositories will be synced by startup monitoring.");
 
         ensureAdminMembership(savedWorkspace);
     }
@@ -170,7 +168,7 @@ public class WorkspaceProvisioningService {
                     .findByWorkspace_IdAndUser_Id(workspace.getId(), adminUser.getId())
                     .isPresent();
                 if (alreadyMember) {
-                    logger.debug(
+                    log.debug(
                         "Default admin already member of workspace {} (id={})",
                         workspace.getWorkspaceSlug(),
                         workspace.getId()
@@ -179,9 +177,9 @@ public class WorkspaceProvisioningService {
                 }
                 try {
                     workspaceMembershipService.createMembership(workspace, adminUser.getId(), WorkspaceRole.ADMIN);
-                    logger.info("Added default admin user to workspace {} as ADMIN", workspace.getWorkspaceSlug());
+                    log.info("Added default admin user to workspace {} as ADMIN", workspace.getWorkspaceSlug());
                 } catch (IllegalArgumentException ex) {
-                    logger.debug(
+                    log.debug(
                         "Could not add default admin to workspace {}: {}",
                         workspace.getWorkspaceSlug(),
                         ex.getMessage()
@@ -197,7 +195,7 @@ public class WorkspaceProvisioningService {
     @Transactional
     public void ensureGitHubAppInstallations() {
         if (!gitHubAppTokenService.isConfigured()) {
-            logger.info(
+            log.info(
                 "Skipping GitHub App installation processing because credentials are not configured (appId={}).",
                 gitHubAppTokenService.getConfiguredAppId()
             );
@@ -217,12 +215,12 @@ public class WorkspaceProvisioningService {
                 .block();
 
             if (appInfo == null) {
-                logger.warn("Failed to retrieve GitHub App info");
+                log.warn("Failed to retrieve GitHub App info");
                 return;
             }
 
             String ownerLogin = appInfo.owner() != null ? appInfo.owner().login() : "unknown";
-            logger.info(
+            log.info(
                 "Authenticated as GitHub App '{}' (slug={}, id={}, owner={}).",
                 appInfo.name(),
                 appInfo.slug(),
@@ -241,7 +239,7 @@ public class WorkspaceProvisioningService {
                 .block();
 
             if (installations == null || installations.isEmpty()) {
-                logger.warn(
+                log.warn(
                     "No installations returned for GitHub App '{}' (id={}). Confirm the app is installed.",
                     appInfo.slug(),
                     appInfo.id()
@@ -249,11 +247,11 @@ public class WorkspaceProvisioningService {
                 return;
             }
 
-            logger.info("Ensuring {} GitHub App installation(s) are reflected as workspaces.", installations.size());
+            log.info("Ensuring {} GitHub App installation(s) are reflected as workspaces.", installations.size());
 
             for (InstallationDto installation : installations) {
                 String accountLogin = installation.account() != null ? installation.account().login() : "<unknown>";
-                logger.info(
+                log.info(
                     "Processing GitHub App installation={} account={} selection={}",
                     installation.id(),
                     accountLogin,
@@ -262,20 +260,20 @@ public class WorkspaceProvisioningService {
                 synchronizeInstallation(installation);
             }
         } catch (Exception e) {
-            logger.warn("GitHub App reconciliation failed: {}", e.getMessage(), e);
+            log.warn("GitHub App reconciliation failed: {}", e.getMessage(), e);
         }
     }
 
     private void synchronizeInstallation(InstallationDto installation) {
         if (installation.account() == null) {
-            logger.warn("Skipping installation {} because no account information is available.", installation.id());
+            log.warn("Skipping installation {} because no account information is available.", installation.id());
             return;
         }
 
         String login = installation.account().login();
 
         if (workspaceScopeFilter.isActive() && !workspaceScopeFilter.isOrganizationAllowed(login)) {
-            logger.info(
+            log.info(
                 "Skipping installation {} for '{}' - not in allowed-organizations filter",
                 installation.id(),
                 login
@@ -285,7 +283,7 @@ public class WorkspaceProvisioningService {
 
         String accountType = installation.account().type();
         if (!"Organization".equalsIgnoreCase(accountType)) {
-            logger.info(
+            log.info(
                 "Skipping installation {} because owner type '{}' is not supported.",
                 installation.id(),
                 accountType
@@ -296,7 +294,7 @@ public class WorkspaceProvisioningService {
         long installationId = installation.id();
         RepositorySelection selection = convertRepositorySelection(installation.repositorySelection());
 
-        logger.info("Ensuring installation={} for org={} (selection={}).", installationId, login, selection);
+        log.info("Ensuring installation={} for org={} (selection={}).", installationId, login, selection);
 
         var account = installation.account();
         WorkspaceProvisioningListener.AccountType wsAccountType = "Organization".equalsIgnoreCase(accountType)
@@ -313,7 +311,7 @@ public class WorkspaceProvisioningService {
         );
 
         if (workspace == null) {
-            logger.warn(
+            log.warn(
                 "Workspace creation skipped for installation={} and org={}. User may not exist in database.",
                 installationId,
                 login
@@ -323,7 +321,7 @@ public class WorkspaceProvisioningService {
 
         workspace = workspaceService.updateAccountLogin(workspace.getId(), login);
 
-        logger.info("Organization sync for workspace {} will be handled via webhooks", workspace.getWorkspaceSlug());
+        log.info("Organization sync for workspace {} will be handled via webhooks", workspace.getWorkspaceSlug());
 
         workspaceRepositoryMonitorService.ensureAllInstallationRepositoriesCovered(installationId, true);
     }
@@ -352,7 +350,7 @@ public class WorkspaceProvisioningService {
                 newUser.setLogin(accountLogin);
                 newUser.setName(accountLogin);
                 newUser = userRepository.save(newUser);
-                logger.info("Created minimal user '{}' for PAT workspace bootstrap", accountLogin);
+                log.info("Created minimal user '{}' for PAT workspace bootstrap", accountLogin);
                 return newUser.getId();
             });
     }

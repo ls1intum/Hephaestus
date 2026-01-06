@@ -13,7 +13,7 @@ import org.springframework.stereotype.Service;
 @Service
 public class MailService {
 
-    private static final Logger logger = LoggerFactory.getLogger(MailService.class);
+    private static final Logger log = LoggerFactory.getLogger(MailService.class);
 
     private final JavaMailSender javaMailSender;
 
@@ -36,7 +36,7 @@ public class MailService {
     }
 
     public void sendBadPracticesDetectedInPullRequestEmail(BadPracticeNotificationData notificationData) {
-        logger.info("Sending bad practice detected email to user: {}", notificationData.userLogin());
+        log.info("Sending bad practice detected email to user: {}", notificationData.userLogin());
         String email;
 
         if (notificationData.userEmail() != null && !notificationData.userEmail().isBlank()) {
@@ -51,7 +51,7 @@ public class MailService {
 
                 email = keyCloakUser.getEmail();
             } catch (Exception e) {
-                logger.error("Failed to find user in Keycloak: {}", notificationData.userLogin(), e);
+                log.error("Failed to find user in Keycloak: {}", notificationData.userLogin(), e);
                 return;
             }
         }
@@ -63,7 +63,7 @@ public class MailService {
             notificationData.pullRequestNumber();
 
         if (notificationData.workspaceSlug() == null || notificationData.workspaceSlug().isBlank()) {
-            logger.warn(
+            log.warn(
                 "Skipping email send because workspace slug is missing for PR {}",
                 notificationData.pullRequestNumber()
             );

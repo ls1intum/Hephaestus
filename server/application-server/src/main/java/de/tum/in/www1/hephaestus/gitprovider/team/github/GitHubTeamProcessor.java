@@ -20,7 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class GitHubTeamProcessor {
 
-    private static final Logger logger = LoggerFactory.getLogger(GitHubTeamProcessor.class);
+    private static final Logger log = LoggerFactory.getLogger(GitHubTeamProcessor.class);
 
     private final TeamRepository teamRepository;
     private final ApplicationEventPublisher eventPublisher;
@@ -41,7 +41,7 @@ public class GitHubTeamProcessor {
     @Transactional
     public Team process(GitHubTeamEventDTO.GitHubTeamDTO dto, String orgLogin, ProcessingContext context) {
         if (dto == null || dto.id() == null) {
-            logger.warn("Team DTO is null or missing ID, skipping");
+            log.warn("Team DTO is null or missing ID, skipping");
             return null;
         }
 
@@ -90,7 +90,7 @@ public class GitHubTeamProcessor {
             }
         }
 
-        logger.debug("Processed team {} ({}): {}", saved.getName(), saved.getId(), isNew ? "created" : "updated");
+        log.debug("Processed team {} ({}): {}", saved.getName(), saved.getId(), isNew ? "created" : "updated");
         return saved;
     }
 
@@ -118,7 +118,7 @@ public class GitHubTeamProcessor {
                         new DomainEvent.TeamDeleted(teamId, teamName, EventContext.from(context))
                     );
                 }
-                logger.info("Deleted team {} ({})", teamName, teamId);
+                log.info("Deleted team {} ({})", teamName, teamId);
             });
     }
 

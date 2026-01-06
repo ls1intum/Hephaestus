@@ -20,7 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Component
 public class GitHubInstallationMessageHandler extends GitHubMessageHandler<GitHubInstallationEventDTO> {
 
-    private static final Logger logger = LoggerFactory.getLogger(GitHubInstallationMessageHandler.class);
+    private static final Logger log = LoggerFactory.getLogger(GitHubInstallationMessageHandler.class);
 
     private final WorkspaceProvisioningListener provisioningListener;
     private final OrganizationService organizationService;
@@ -51,7 +51,7 @@ public class GitHubInstallationMessageHandler extends GitHubMessageHandler<GitHu
         var installation = event.installation();
 
         if (installation == null) {
-            logger.warn("Received installation event with missing data");
+            log.warn("Received installation event with missing data");
             return;
         }
 
@@ -59,7 +59,7 @@ public class GitHubInstallationMessageHandler extends GitHubMessageHandler<GitHu
         String accountLogin = account != null ? account.login() : null;
         Long installationId = installation.id();
 
-        logger.info(
+        log.info(
             "Received installation event: action={}, installation={}, account={}",
             event.action(),
             installationId,
@@ -70,7 +70,7 @@ public class GitHubInstallationMessageHandler extends GitHubMessageHandler<GitHu
 
         // Handle deletion early - no workspace provisioning needed
         if (action == GitHubEventAction.Installation.DELETED) {
-            logger.info("App uninstalled from account: {}", accountLogin);
+            log.info("App uninstalled from account: {}", accountLogin);
             provisioningListener.onInstallationDeleted(installationId);
             return;
         }
@@ -102,7 +102,7 @@ public class GitHubInstallationMessageHandler extends GitHubMessageHandler<GitHu
         switch (action) {
             case SUSPEND -> provisioningListener.onInstallationSuspended(installationId);
             case UNSUSPEND, CREATED -> provisioningListener.onInstallationActivated(installationId);
-            default -> logger.debug("Unhandled installation action: {}", event.action());
+            default -> log.debug("Unhandled installation action: {}", event.action());
         }
     }
 }

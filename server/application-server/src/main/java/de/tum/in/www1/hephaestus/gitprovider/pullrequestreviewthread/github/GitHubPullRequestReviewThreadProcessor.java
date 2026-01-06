@@ -19,7 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class GitHubPullRequestReviewThreadProcessor {
 
-    private static final Logger logger = LoggerFactory.getLogger(GitHubPullRequestReviewThreadProcessor.class);
+    private static final Logger log = LoggerFactory.getLogger(GitHubPullRequestReviewThreadProcessor.class);
 
     private final PullRequestReviewThreadRepository threadRepository;
     private final ApplicationEventPublisher eventPublisher;
@@ -43,7 +43,7 @@ public class GitHubPullRequestReviewThreadProcessor {
     @Transactional
     public boolean resolve(Long threadId, ProcessingContext context) {
         if (threadId == null) {
-            logger.warn("Cannot resolve thread: threadId is null");
+            log.warn("Cannot resolve thread: threadId is null");
             return false;
         }
 
@@ -61,11 +61,11 @@ public class GitHubPullRequestReviewThreadProcessor {
                         )
                     );
                 }
-                logger.info("Thread {} resolved", threadId);
+                log.info("Thread {} resolved", threadId);
                 return true;
             })
             .orElseGet(() -> {
-                logger.debug("Thread {} not found for resolve action, may not have been synced yet", threadId);
+                log.debug("Thread {} not found for resolve action, may not have been synced yet", threadId);
                 return false;
             });
     }
@@ -81,7 +81,7 @@ public class GitHubPullRequestReviewThreadProcessor {
     @Transactional
     public boolean unresolve(Long threadId, ProcessingContext context) {
         if (threadId == null) {
-            logger.warn("Cannot unresolve thread: threadId is null");
+            log.warn("Cannot unresolve thread: threadId is null");
             return false;
         }
 
@@ -100,11 +100,11 @@ public class GitHubPullRequestReviewThreadProcessor {
                         )
                     );
                 }
-                logger.info("Thread {} unresolved", threadId);
+                log.info("Thread {} unresolved", threadId);
                 return true;
             })
             .orElseGet(() -> {
-                logger.debug("Thread {} not found for unresolve action, may not have been synced yet", threadId);
+                log.debug("Thread {} not found for unresolve action, may not have been synced yet", threadId);
                 return false;
             });
     }

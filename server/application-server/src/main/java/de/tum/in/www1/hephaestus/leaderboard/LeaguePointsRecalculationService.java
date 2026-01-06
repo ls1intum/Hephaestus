@@ -31,7 +31,7 @@ import org.springframework.stereotype.Service;
 @Service
 public class LeaguePointsRecalculationService implements LeaguePointsRecalculator {
 
-    private static final Logger logger = LoggerFactory.getLogger(LeaguePointsRecalculationService.class);
+    private static final Logger log = LoggerFactory.getLogger(LeaguePointsRecalculationService.class);
 
     private final WorkspaceMembershipRepository workspaceMembershipRepository;
     private final WorkspaceMembershipService workspaceMembershipService;
@@ -59,18 +59,18 @@ public class LeaguePointsRecalculationService implements LeaguePointsRecalculato
     @Override
     public void recalculate(Workspace workspace) {
         if (workspace == null || workspace.getId() == null) {
-            logger.warn("Skipping league recalculation because workspace is missing or not persisted");
+            log.warn("Skipping league recalculation because workspace is missing or not persisted");
             return;
         }
 
         Long workspaceId = workspace.getId();
-        logger.info("Recalculating league points per member for workspace id={}", workspaceId);
+        log.info("Recalculating league points per member for workspace id={}", workspaceId);
 
         workspaceMembershipService.resetLeaguePoints(workspaceId, POINTS_DEFAULT);
 
         List<WorkspaceMembership> memberships = workspaceMembershipRepository.findAllWithUserByWorkspaceId(workspaceId);
         if (memberships.isEmpty()) {
-            logger.info("Workspace id={} has no memberships; nothing to recalculate", workspaceId);
+            log.info("Workspace id={} has no memberships; nothing to recalculate", workspaceId);
             return;
         }
 
@@ -97,7 +97,7 @@ public class LeaguePointsRecalculationService implements LeaguePointsRecalculato
         });
 
         if (memberUsersById.isEmpty()) {
-            logger.info("Workspace id={} has no eligible members for recalculation", workspaceId);
+            log.info("Workspace id={} has no eligible members for recalculation", workspaceId);
             return;
         }
 
@@ -109,7 +109,7 @@ public class LeaguePointsRecalculationService implements LeaguePointsRecalculato
             .orElse(null);
 
         if (earliestContribution == null) {
-            logger.info("Workspace id={} has no contributions; league points remain at default", workspaceId);
+            log.info("Workspace id={} has no contributions; league points remain at default", workspaceId);
             return;
         }
 
@@ -150,7 +150,7 @@ public class LeaguePointsRecalculationService implements LeaguePointsRecalculato
             windowStart = windowEnd;
         }
 
-        logger.info("Finished recalculating league points for workspace id={}", workspaceId);
+        log.info("Finished recalculating league points for workspace id={}", workspaceId);
     }
 
     private void updateMemberPointsForEntry(

@@ -26,7 +26,7 @@ import org.springframework.stereotype.Service;
 @Service
 public class LeaguePointsService {
 
-    private static final Logger logger = LoggerFactory.getLogger(LeaguePointsService.class);
+    private static final Logger log = LoggerFactory.getLogger(LeaguePointsService.class);
 
     /**
      * Calculates updated league points for a user based on their leaderboard entry.
@@ -48,7 +48,7 @@ public class LeaguePointsService {
         int pointChange = (int) (kFactor * (performanceBonus + placementBonus - decay));
         int newPoints = Math.max(1, effectivePoints + pointChange);
 
-        logger.debug(
+        log.debug(
             "Points calculation for user {}: old={}, k={}, decay={}, performance={}, placement={}, change={}, new={}",
             user.getLogin(),
             effectivePoints,

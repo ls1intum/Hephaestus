@@ -30,7 +30,7 @@ import org.springframework.web.reactive.function.client.WebClientResponseExcepti
 @WorkspaceAgnostic("Fetches Hephaestus project contributors - meta info, not tenant data")
 public class ContributorService {
 
-    private static final Logger logger = LoggerFactory.getLogger(ContributorService.class);
+    private static final Logger log = LoggerFactory.getLogger(ContributorService.class);
     private static final String GITHUB_API_BASE = "https://api.github.com";
 
     private final WebClient webClient;
@@ -56,10 +56,10 @@ public class ContributorService {
      */
     @Cacheable(value = "contributors", key = "'global'")
     public List<ContributorDTO> getGlobalContributors() {
-        logger.info("Fetching global contributors from GitHub.");
+        log.info("Fetching global contributors from GitHub.");
 
         if (githubAuthToken == null || githubAuthToken.isBlank()) {
-            logger.warn("Contributor endpoint requires github.meta.auth-token to be configured.");
+            log.warn("Contributor endpoint requires github.meta.auth-token to be configured.");
             return new ArrayList<>();
         }
 
@@ -68,7 +68,7 @@ public class ContributorService {
             collectContributorsForRepository("ls1intum", "Hephaestus", uniqueContributors);
             return sortContributors(uniqueContributors);
         } catch (WebClientResponseException e) {
-            logger.error("HTTP error fetching global contributors: {} - {}", e.getStatusCode(), e.getMessage(), e);
+            log.error("HTTP error fetching global contributors: {} - {}", e.getStatusCode(), e.getMessage(), e);
             return new ArrayList<>();
         }
     }
@@ -94,7 +94,7 @@ public class ContributorService {
                 }
             }
         } catch (WebClientResponseException e) {
-            logger.warn(
+            log.warn(
                 "HTTP error fetching contributors for repository {}/{}: {} - {}",
                 owner,
                 repo,
@@ -119,7 +119,7 @@ public class ContributorService {
         try {
             String login = contributor.login();
             if (login != null && EXCLUDED_LOGINS.contains(login.toLowerCase())) {
-                logger.debug("Skipping excluded contributor: {}", login);
+                log.debug("Skipping excluded contributor: {}", login);
                 return;
             }
 
@@ -128,7 +128,7 @@ public class ContributorService {
             ContributorDTO dto = contributor.toContributorDTO(fullName);
             accumulator.putIfAbsent(dto.id(), dto);
         } catch (IllegalArgumentException e) {
-            logger.error("Error converting contributor to DTO: {}", e.getMessage(), e);
+            log.error("Error converting contributor to DTO: {}", e.getMessage(), e);
         }
     }
 
@@ -146,12 +146,7 @@ public class ContributorService {
                 .block();
             return user != null ? user.name() : null;
         } catch (WebClientResponseException e) {
-            logger.debug(
-                "HTTP error fetching full name for user {}: {} - {}",
-                login,
-                e.getStatusCode(),
-                e.getMessage()
-            );
+            log.debug("HTTP error fetching full name for user {}: {} - {}", login, e.getStatusCode(), e.getMessage());
             return null;
         }
     }

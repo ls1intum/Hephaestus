@@ -12,7 +12,7 @@ import org.springframework.core.env.Environment;
 @Configuration
 public class SentryConfiguration {
 
-    private static final Logger logger = LoggerFactory.getLogger(SentryConfiguration.class);
+    private static final Logger log = LoggerFactory.getLogger(SentryConfiguration.class);
 
     private final Environment environment;
 
@@ -36,12 +36,12 @@ public class SentryConfiguration {
     @PostConstruct
     public void init() {
         if (environment.matchesProfiles("specs")) {
-            logger.info("Sentry is disabled in specs profile");
+            log.info("Sentry is disabled in specs profile");
             return;
         }
 
         if (sentryDsn.isEmpty() || sentryDsn.get().isEmpty()) {
-            logger.info("Sentry is disabled: Provide a DSN to enable Sentry.");
+            log.info("Sentry is disabled: Provide a DSN to enable Sentry.");
             return;
         }
 
@@ -56,9 +56,9 @@ public class SentryConfiguration {
                 options.setTracesSampleRate(getTracesSampleRate());
             });
 
-            logger.info("Sentry configuration was successful");
+            log.info("Sentry configuration was successful");
         } catch (Exception ex) {
-            logger.error("Sentry configuration was not successful due to exception!", ex);
+            log.error("Sentry configuration was not successful due to exception!", ex);
         }
     }
 

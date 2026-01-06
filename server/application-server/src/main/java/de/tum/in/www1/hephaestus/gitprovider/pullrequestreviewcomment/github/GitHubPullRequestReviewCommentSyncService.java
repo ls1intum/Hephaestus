@@ -50,7 +50,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class GitHubPullRequestReviewCommentSyncService {
 
-    private static final Logger logger = LoggerFactory.getLogger(GitHubPullRequestReviewCommentSyncService.class);
+    private static final Logger log = LoggerFactory.getLogger(GitHubPullRequestReviewCommentSyncService.class);
     private static final String GET_PR_REVIEW_COMMENTS_DOCUMENT = "GetPullRequestReviewComments";
     private static final String GET_THREAD_COMMENTS_DOCUMENT = "GetThreadComments";
 
@@ -89,7 +89,7 @@ public class GitHubPullRequestReviewCommentSyncService {
     public int syncCommentsForRepository(Long workspaceId, Long repositoryId) {
         Repository repository = repositoryRepository.findById(repositoryId).orElse(null);
         if (repository == null) {
-            logger.warn("Repository {} not found, cannot sync review comments", repositoryId);
+            log.warn("Repository {} not found, cannot sync review comments", repositoryId);
             return 0;
         }
 
@@ -105,14 +105,14 @@ public class GitHubPullRequestReviewCommentSyncService {
         }
 
         if (prCount.get() == 0) {
-            logger.info(
+            log.info(
                 "No pull requests found for repository {}, skipping review comment sync",
                 repository.getNameWithOwner()
             );
             return 0;
         }
 
-        logger.info(
+        log.info(
             "Synced {} review comments for {} pull requests in repository {}",
             totalSynced.get(),
             prCount.get(),
@@ -131,20 +131,20 @@ public class GitHubPullRequestReviewCommentSyncService {
     @Transactional
     public int syncCommentsForPullRequest(Long workspaceId, PullRequest pullRequest) {
         if (pullRequest == null) {
-            logger.warn("Pull request is null, cannot sync review comments");
+            log.warn("Pull request is null, cannot sync review comments");
             return 0;
         }
 
         Repository repository = pullRequest.getRepository();
         if (repository == null) {
-            logger.warn("Pull request {} has no repository, cannot sync review comments", pullRequest.getId());
+            log.warn("Pull request {} has no repository, cannot sync review comments", pullRequest.getId());
             return 0;
         }
 
         String safeNameWithOwner = sanitizeForLog(repository.getNameWithOwner());
         Optional<RepositoryOwnerAndName> parsedName = GitHubRepositoryNameParser.parse(repository.getNameWithOwner());
         if (parsedName.isEmpty()) {
-            logger.warn("Invalid repository name format: {}", safeNameWithOwner);
+            log.warn("Invalid repository name format: {}", safeNameWithOwner);
             return 0;
         }
         String owner = parsedName.get().owner();
@@ -184,7 +184,7 @@ public class GitHubPullRequestReviewCommentSyncService {
                 cursor = pageInfo != null ? pageInfo.getEndCursor() : null;
             }
 
-            logger.debug(
+            log.debug(
                 "Synced {} review comments for PR #{} in repository {}",
                 totalSynced,
                 pullRequest.getNumber(),
@@ -192,7 +192,7 @@ public class GitHubPullRequestReviewCommentSyncService {
             );
             return totalSynced;
         } catch (Exception e) {
-            logger.error(
+            log.error(
                 "Error syncing review comments for PR #{} in repository {}: {}",
                 pullRequest.getNumber(),
                 repository.getNameWithOwner(),
@@ -239,7 +239,7 @@ public class GitHubPullRequestReviewCommentSyncService {
         var firstComment = graphQlComments.get(0);
         Long threadId = extractDatabaseId(firstComment);
         if (threadId == null) {
-            logger.warn("First comment in thread has no databaseId, skipping thread: nodeId={}", graphQlThread.getId());
+            log.warn("First comment in thread has no databaseId, skipping thread: nodeId={}", graphQlThread.getId());
             return 0;
         }
 
@@ -272,7 +272,7 @@ public class GitHubPullRequestReviewCommentSyncService {
         String startCursor
     ) {
         if (currentClient == null) {
-            logger.warn(
+            log.warn(
                 "No client available for nested pagination, skipping remaining comments for thread {}",
                 graphQlThread.getId()
             );
@@ -304,7 +304,7 @@ public class GitHubPullRequestReviewCommentSyncService {
                     .block(GRAPHQL_TIMEOUT);
 
                 if (response == null || !response.isValid()) {
-                    logger.warn(
+                    log.warn(
                         "Invalid GraphQL response fetching comments for thread {}: {}",
                         threadId,
                         response != null ? response.getErrors() : "null"
@@ -327,7 +327,7 @@ public class GitHubPullRequestReviewCommentSyncService {
                 hasMore = pageInfo != null && Boolean.TRUE.equals(pageInfo.getHasNextPage());
                 cursor = pageInfo != null ? pageInfo.getEndCursor() : null;
             } catch (Exception e) {
-                logger.error("Error fetching additional comments for thread {}: {}", threadId, e.getMessage(), e);
+                log.error("Error fetching additional comments for thread {}: {}", threadId, e.getMessage(), e);
                 break;
             }
         }
@@ -336,7 +336,7 @@ public class GitHubPullRequestReviewCommentSyncService {
         existingComments.setNodes(allComments);
 
         if (fetchedPages > 0) {
-            logger.debug(
+            log.debug(
                 "Fetched {} additional pages of comments for thread {} (total: {} comments)",
                 fetchedPages,
                 threadId,
@@ -421,7 +421,7 @@ public class GitHubPullRequestReviewCommentSyncService {
 
         Long databaseId = extractDatabaseId(graphQlComment);
         if (databaseId == null) {
-            logger.warn("Comment has no databaseId, skipping: nodeId={}", graphQlComment.getId());
+            log.warn("Comment has no databaseId, skipping: nodeId={}", graphQlComment.getId());
             return null;
         }
 

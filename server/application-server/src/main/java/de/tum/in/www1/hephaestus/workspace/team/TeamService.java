@@ -27,7 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class TeamService {
 
-    private static final Logger logger = LoggerFactory.getLogger(TeamService.class);
+    private static final Logger log = LoggerFactory.getLogger(TeamService.class);
 
     private final TeamRepository teamRepository;
     private final TeamInfoDTOConverter converter;
@@ -72,7 +72,7 @@ public class TeamService {
      */
     @Transactional
     public boolean updateTeamVisibility(Workspace workspace, Long teamId, Boolean hidden) {
-        logger.info(
+        log.info(
             "Updating team {} visibility to hidden={} in workspace {}",
             teamId,
             hidden,
@@ -107,7 +107,7 @@ public class TeamService {
         Long repositoryId,
         Boolean hiddenFromContributions
     ) {
-        logger.info(
+        log.info(
             "Updating repository {} visibility for team {} to hiddenFromContributions={} in workspace {}",
             repositoryId,
             teamId,

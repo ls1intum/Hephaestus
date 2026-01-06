@@ -47,7 +47,7 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class ResilienceConfig {
 
-    private static final Logger logger = LoggerFactory.getLogger(ResilienceConfig.class);
+    private static final Logger log = LoggerFactory.getLogger(ResilienceConfig.class);
 
     /**
      * Name of the circuit breaker for GitHub GraphQL API calls.
@@ -105,7 +105,7 @@ public class ResilienceConfig {
         registerEventListeners(graphQlBreaker);
         registerEventListeners(restBreaker);
 
-        logger.info(
+        log.info(
             "Initialized circuit breakers: {} (GraphQL), {} (REST)",
             GITHUB_GRAPHQL_CIRCUIT_BREAKER,
             GITHUB_REST_CIRCUIT_BREAKER
@@ -118,7 +118,7 @@ public class ResilienceConfig {
         circuitBreaker
             .getEventPublisher()
             .onStateTransition(event ->
-                logger.warn(
+                log.warn(
                     "Circuit breaker '{}' state transition: {} -> {}",
                     event.getCircuitBreakerName(),
                     event.getStateTransition().getFromState(),
@@ -126,7 +126,7 @@ public class ResilienceConfig {
                 )
             )
             .onError(event ->
-                logger.debug(
+                log.debug(
                     "Circuit breaker '{}' recorded error: {} - {}",
                     event.getCircuitBreakerName(),
                     event.getThrowable().getClass().getSimpleName(),
@@ -134,14 +134,14 @@ public class ResilienceConfig {
                 )
             )
             .onSuccess(event ->
-                logger.trace(
+                log.trace(
                     "Circuit breaker '{}' recorded success, duration: {}ms",
                     event.getCircuitBreakerName(),
                     event.getElapsedDuration().toMillis()
                 )
             )
             .onCallNotPermitted(event ->
-                logger.warn("Circuit breaker '{}' rejected call - circuit is OPEN", event.getCircuitBreakerName())
+                log.warn("Circuit breaker '{}' rejected call - circuit is OPEN", event.getCircuitBreakerName())
             );
     }
 
@@ -206,7 +206,7 @@ public class ResilienceConfig {
         RateLimiter apiRateLimiter = registry.rateLimiter(API_RATE_LIMITER);
         registerRateLimiterEventListeners(apiRateLimiter);
 
-        logger.info(
+        log.info(
             "Initialized rate limiter '{}': {} requests per {}",
             API_RATE_LIMITER,
             config.getLimitForPeriod(),
@@ -219,9 +219,9 @@ public class ResilienceConfig {
     private void registerRateLimiterEventListeners(RateLimiter rateLimiter) {
         rateLimiter
             .getEventPublisher()
-            .onSuccess(event -> logger.trace("Rate limiter '{}' permitted request", event.getRateLimiterName()))
+            .onSuccess(event -> log.trace("Rate limiter '{}' permitted request", event.getRateLimiterName()))
             .onFailure(event ->
-                logger.warn("Rate limiter '{}' rejected request - rate limit exceeded", event.getRateLimiterName())
+                log.warn("Rate limiter '{}' rejected request - rate limit exceeded", event.getRateLimiterName())
             );
     }
 

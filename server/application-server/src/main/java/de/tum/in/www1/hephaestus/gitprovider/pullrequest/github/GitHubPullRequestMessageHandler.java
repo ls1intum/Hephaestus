@@ -18,7 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Component
 public class GitHubPullRequestMessageHandler extends GitHubMessageHandler<GitHubPullRequestEventDTO> {
 
-    private static final Logger logger = LoggerFactory.getLogger(GitHubPullRequestMessageHandler.class);
+    private static final Logger log = LoggerFactory.getLogger(GitHubPullRequestMessageHandler.class);
 
     private final ProcessingContextFactory contextFactory;
     private final GitHubPullRequestProcessor prProcessor;
@@ -44,11 +44,11 @@ public class GitHubPullRequestMessageHandler extends GitHubMessageHandler<GitHub
         GitHubPullRequestDTO prDto = event.pullRequest();
 
         if (prDto == null) {
-            logger.warn("Received pull_request event with missing PR data");
+            log.warn("Received pull_request event with missing PR data");
             return;
         }
 
-        logger.info(
+        log.info(
             "Received pull_request event: action={}, pr=#{}, repo={}",
             event.action(),
             prDto.number(),
@@ -105,7 +105,7 @@ public class GitHubPullRequestMessageHandler extends GitHubMessageHandler<GitHub
                 }
             }
             default -> {
-                logger.debug("Unhandled pull_request action: {}", event.action());
+                log.debug("Unhandled pull_request action: {}", event.action());
                 prProcessor.process(prDto, context);
             }
         }

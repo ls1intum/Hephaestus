@@ -29,7 +29,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class WorkspaceActivationService {
 
-    private static final Logger logger = LoggerFactory.getLogger(WorkspaceActivationService.class);
+    private static final Logger log = LoggerFactory.getLogger(WorkspaceActivationService.class);
 
     // Configuration
     private final boolean isNatsEnabled;
@@ -82,7 +82,7 @@ public class WorkspaceActivationService {
     public void activateAllWorkspaces() {
         List<Workspace> workspaces = workspaceRepository.findAll();
         if (workspaces.isEmpty()) {
-            logger.info("No workspaces found on startup; waiting for GitHub App backfill or manual provisioning.");
+            log.info("No workspaces found on startup; waiting for GitHub App backfill or manual provisioning.");
             return;
         }
 
@@ -110,7 +110,7 @@ public class WorkspaceActivationService {
         // Wait for all workspace activations to complete (non-blocking to main thread
         // but ensures all are started before the method returns)
         CompletableFuture.allOf(activationFutures.toArray(CompletableFuture[]::new)).exceptionally(ex -> {
-            logger.error("Error during workspace activation: {}", ex.getMessage(), ex);
+            log.error("Error during workspace activation: {}", ex.getMessage(), ex);
             return null;
         });
     }
@@ -123,7 +123,7 @@ public class WorkspaceActivationService {
             workspace.getGitProviderMode() == Workspace.GitProviderMode.PAT_ORG &&
             isBlank(workspace.getPersonalAccessToken())
         ) {
-            logger.info(
+            log.info(
                 "Workspace id={} remains idle: PAT mode without personal access token. Configure a token or migrate to the GitHub App.",
                 workspace.getId()
             );
@@ -141,12 +141,12 @@ public class WorkspaceActivationService {
      */
     public void activateWorkspace(Workspace workspace, Set<String> organizationConsumersStarted) {
         if (!workspaceScopeFilter.isWorkspaceAllowed(workspace)) {
-            logger.info("Workspace id={} skipped: workspace scope filters active.", workspace.getId());
+            log.info("Workspace id={} skipped: workspace scope filters active.", workspace.getId());
             return;
         }
 
         if (runMonitoringOnStartup) {
-            logger.info("Running monitoring on startup for workspace id={}", workspace.getId());
+            log.info("Running monitoring on startup for workspace id={}", workspace.getId());
 
             // Set workspace context for the sync operations (enables proper logging via
             // MDC)
@@ -159,7 +159,7 @@ public class WorkspaceActivationService {
                 // 3. Workspace-level relationships (issue dependencies, sub-issues)
                 getGitHubDataSyncService().syncAllRepositories(workspace.getId());
 
-                logger.info("Finished running monitoring on startup for workspace id={}", workspace.getId());
+                log.info("Finished running monitoring on startup for workspace id={}", workspace.getId());
             } finally {
                 // Clear context after sync operations complete
                 WorkspaceContextHolder.clearContext();

@@ -52,7 +52,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class GitHubIssueDependencySyncService {
 
-    private static final Logger logger = LoggerFactory.getLogger(GitHubIssueDependencySyncService.class);
+    private static final Logger log = LoggerFactory.getLogger(GitHubIssueDependencySyncService.class);
 
     /** Document name for graphql-documents/GetIssueDependencies.graphql */
     private static final String GET_DEPENDENCIES_DOCUMENT = "GetIssueDependencies";
@@ -92,7 +92,7 @@ public class GitHubIssueDependencySyncService {
      */
     @Transactional
     public void processIssueDependencyEvent(long blockedIssueId, long blockingIssueId, boolean isBlock) {
-        logger.info(
+        log.info(
             "Processing issue dependency event: blockedIssue={}, blockingIssue={}, isBlock={}",
             blockedIssueId,
             blockingIssueId,
@@ -101,13 +101,13 @@ public class GitHubIssueDependencySyncService {
 
         Optional<Issue> blockedIssueOpt = issueRepository.findById(blockedIssueId);
         if (blockedIssueOpt.isEmpty()) {
-            logger.debug("Blocked issue {} not found in database, skipping", blockedIssueId);
+            log.debug("Blocked issue {} not found in database, skipping", blockedIssueId);
             return;
         }
 
         Optional<Issue> blockingIssueOpt = issueRepository.findById(blockingIssueId);
         if (blockingIssueOpt.isEmpty()) {
-            logger.debug("Blocking issue {} not found in database, skipping", blockingIssueId);
+            log.debug("Blocking issue {} not found in database, skipping", blockingIssueId);
             return;
         }
 
@@ -146,7 +146,7 @@ public class GitHubIssueDependencySyncService {
 
         WorkspaceSyncMetadata metadata = metadataOpt.get();
         if (!metadata.needsIssueDependenciesSync(syncCooldownInMinutes)) {
-            logger.debug(
+            log.debug(
                 "Skipping issue dependencies sync for workspace '{}' due to cooldown (last sync: {})",
                 metadata.displayName(),
                 metadata.issueDependenciesSyncedAt()
@@ -156,7 +156,7 @@ public class GitHubIssueDependencySyncService {
 
         List<Repository> repositories = repositoryRepository.findActiveByWorkspaceId(workspaceId);
         if (repositories.isEmpty()) {
-            logger.debug("No repositories found for workspace {}", workspaceId);
+            log.debug("No repositories found for workspace {}", workspaceId);
             // Still update timestamp to prevent repeated empty checks
             updateSyncTimestamp(workspaceId);
             return 0;
@@ -172,11 +172,7 @@ public class GitHubIssueDependencySyncService {
                 totalSynced += synced;
             } catch (Exception e) {
                 failedRepos++;
-                logger.error(
-                    "Error syncing dependencies for repository {}: {}",
-                    repo.getNameWithOwner(),
-                    e.getMessage()
-                );
+                log.error("Error syncing dependencies for repository {}: {}", repo.getNameWithOwner(), e.getMessage());
             }
         }
 
@@ -185,7 +181,7 @@ public class GitHubIssueDependencySyncService {
             updateSyncTimestamp(workspaceId);
         }
 
-        logger.info(
+        log.info(
             "Synced {} issue dependency relationships for workspace {} ({} repos failed)",
             totalSynced,
             metadata.displayName(),
@@ -214,7 +210,7 @@ public class GitHubIssueDependencySyncService {
         String safeNameWithOwner = sanitizeForLog(repo.getNameWithOwner());
         Optional<RepositoryOwnerAndName> parsedName = GitHubRepositoryNameParser.parse(repo.getNameWithOwner());
         if (parsedName.isEmpty()) {
-            logger.warn("Invalid repository name format: {}", safeNameWithOwner);
+            log.warn("Invalid repository name format: {}", safeNameWithOwner);
             return 0;
         }
         String owner = parsedName.get().owner();
@@ -236,7 +232,7 @@ public class GitHubIssueDependencySyncService {
                 .block(GRAPHQL_TIMEOUT);
 
             if (issueConnection == null || issueConnection.getNodes() == null) {
-                logger.warn("No response from GraphQL for repository {}", safeNameWithOwner);
+                log.warn("No response from GraphQL for repository {}", safeNameWithOwner);
                 break;
             }
 
@@ -351,7 +347,7 @@ public class GitHubIssueDependencySyncService {
 
     private void addBlockingRelationship(Issue blockedIssue, Issue blockingIssue) {
         if (blockedIssue.getBlockedBy().contains(blockingIssue)) {
-            logger.debug(
+            log.debug(
                 "Issue #{} is already blocked by #{}, skipping",
                 blockedIssue.getNumber(),
                 blockingIssue.getNumber()
@@ -362,7 +358,7 @@ public class GitHubIssueDependencySyncService {
         blockedIssue.getBlockedBy().add(blockingIssue);
         issueRepository.save(blockedIssue);
 
-        logger.info(
+        log.info(
             "Added blocking relationship: #{} is now blocked by #{}",
             blockedIssue.getNumber(),
             blockingIssue.getNumber()
@@ -374,13 +370,13 @@ public class GitHubIssueDependencySyncService {
 
         if (removed) {
             issueRepository.save(blockedIssue);
-            logger.info(
+            log.info(
                 "Removed blocking relationship: #{} is no longer blocked by #{}",
                 blockedIssue.getNumber(),
                 blockingIssue.getNumber()
             );
         } else {
-            logger.debug(
+            log.debug(
                 "Issue #{} was not blocked by #{}, nothing to remove",
                 blockedIssue.getNumber(),
                 blockingIssue.getNumber()

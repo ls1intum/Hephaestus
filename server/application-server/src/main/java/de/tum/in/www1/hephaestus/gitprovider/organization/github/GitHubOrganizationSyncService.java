@@ -37,7 +37,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class GitHubOrganizationSyncService {
 
-    private static final Logger logger = LoggerFactory.getLogger(GitHubOrganizationSyncService.class);
+    private static final Logger log = LoggerFactory.getLogger(GitHubOrganizationSyncService.class);
     private static final String GET_ORGANIZATION_DOCUMENT = "GetOrganization";
     private static final String GET_ORGANIZATION_MEMBERS_DOCUMENT = "GetOrganizationMembers";
 
@@ -72,7 +72,7 @@ public class GitHubOrganizationSyncService {
     @Transactional
     public Organization syncOrganization(Long workspaceId, String organizationLogin) {
         if (organizationLogin == null || organizationLogin.isBlank()) {
-            logger.warn("Organization login is null or blank, cannot sync");
+            log.warn("Organization login is null or blank, cannot sync");
             return null;
         }
 
@@ -87,7 +87,7 @@ public class GitHubOrganizationSyncService {
                 .block(GRAPHQL_TIMEOUT);
 
             if (graphQlOrg == null) {
-                logger.warn("Organization not found via GraphQL: {}", organizationLogin);
+                log.warn("Organization not found via GraphQL: {}", organizationLogin);
                 return null;
             }
 
@@ -98,7 +98,7 @@ public class GitHubOrganizationSyncService {
             if (organization != null) {
                 // Sync organization memberships with full pagination
                 int membersSynced = syncOrganizationMemberships(client, organization, graphQlOrg);
-                logger.info(
+                log.info(
                     "Synced organization {} ({}) with {} members",
                     organization.getLogin(),
                     organization.getGithubId(),
@@ -108,7 +108,7 @@ public class GitHubOrganizationSyncService {
 
             return organization;
         } catch (Exception e) {
-            logger.error("Error syncing organization {}: {}", organizationLogin, e.getMessage(), e);
+            log.error("Error syncing organization {}: {}", organizationLogin, e.getMessage(), e);
             return null;
         }
     }
@@ -132,7 +132,7 @@ public class GitHubOrganizationSyncService {
     ) {
         var membersConnection = graphQlOrg.getMembersWithRole();
         if (membersConnection == null || membersConnection.getEdges() == null) {
-            logger.debug("No members found for organization {}", sanitizeForLog(organization.getLogin()));
+            log.debug("No members found for organization {}", sanitizeForLog(organization.getLogin()));
             return 0;
         }
 
@@ -161,7 +161,7 @@ public class GitHubOrganizationSyncService {
             cursor = pageInfo != null ? pageInfo.getEndCursor() : null;
         }
 
-        logger.debug(
+        log.debug(
             "Fetched {} total members for organization {} (totalCount={})",
             allMembers.size(),
             organization.getLogin(),
@@ -194,7 +194,7 @@ public class GitHubOrganizationSyncService {
                 // Upsert membership
                 organizationMembershipRepository.upsertMembership(organization.getId(), user.getId(), role);
                 memberCount++;
-                logger.debug(
+                log.debug(
                     "Synced membership for user {} in organization {} with role {}",
                     user.getLogin(),
                     organization.getLogin(),
@@ -223,7 +223,7 @@ public class GitHubOrganizationSyncService {
 
         if (!staleUserIds.isEmpty()) {
             organizationMembershipRepository.deleteByOrganizationIdAndUserIdIn(organization.getId(), staleUserIds);
-            logger.debug(
+            log.debug(
                 "Removed {} stale memberships from organization {}",
                 staleUserIds.size(),
                 organization.getLogin()
@@ -269,8 +269,10 @@ public class GitHubOrganizationSyncService {
 
         String avatarUrl = graphQlUser.getAvatarUrl() != null ? graphQlUser.getAvatarUrl().toString() : null;
 
+        // Follow same pattern as GitHubUserDTO.fromUser(): null for 'id', databaseId for 'databaseId'
+        // The 'id' field is only populated from REST webhook responses, not GraphQL
         return new GitHubUserDTO(
-            databaseId,
+            null,
             databaseId,
             graphQlUser.getLogin(),
             avatarUrl,

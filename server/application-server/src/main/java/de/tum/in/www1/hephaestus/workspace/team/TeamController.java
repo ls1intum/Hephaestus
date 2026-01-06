@@ -29,7 +29,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 @Tag(name = "Teams", description = "Team management within workspace")
 public class TeamController {
 
-    private static final Logger logger = LoggerFactory.getLogger(TeamController.class);
+    private static final Logger log = LoggerFactory.getLogger(TeamController.class);
 
     private final TeamService teamService;
     private final WorkspaceContextResolver workspaceResolver;
@@ -48,7 +48,7 @@ public class TeamController {
     @GetMapping
     @Operation(summary = "List teams", description = "Returns all teams in the workspace organization")
     public ResponseEntity<List<TeamInfoDTO>> getAllTeams(WorkspaceContext workspaceContext) {
-        logger.info("Listing teams for workspace {}", workspaceContext.slug());
+        log.info("Listing teams for workspace {}", workspaceContext.slug());
         Workspace workspace = workspaceResolver.requireWorkspace(workspaceContext);
         List<TeamInfoDTO> teams = teamService.getAllTeams(workspace);
         return ResponseEntity.ok(teams);
@@ -73,7 +73,7 @@ public class TeamController {
         @RequestBody(required = false) Boolean hidden,
         @RequestParam(name = "hidden", required = false) Boolean hiddenParam
     ) {
-        logger.info("Updating team {} visibility in workspace {}", id, workspaceContext.slug());
+        log.info("Updating team {} visibility in workspace {}", id, workspaceContext.slug());
         Workspace workspace = workspaceResolver.requireWorkspace(workspaceContext);
 
         // Accept hidden flag from body (preferred) or from query parameter as fallback
@@ -92,7 +92,7 @@ public class TeamController {
         @RequestBody(required = false) Boolean hiddenFromContributions,
         @RequestParam(name = "hiddenFromContributions", required = false) Boolean hiddenFromContributionsParam
     ) {
-        logger.info(
+        log.info(
             "Updating repository {} visibility for team {} in workspace {}",
             repositoryId,
             teamId,

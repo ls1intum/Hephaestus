@@ -33,7 +33,7 @@ import org.springframework.web.bind.annotation.RestController;
 @PreAuthorize("isAuthenticated()")
 public class AccountController {
 
-    private static final Logger logger = LoggerFactory.getLogger(AccountController.class);
+    private static final Logger log = LoggerFactory.getLogger(AccountController.class);
 
     private final AccountService accountService;
     private final Keycloak keycloak;
@@ -60,27 +60,27 @@ public class AccountController {
     public ResponseEntity<Void> deleteUser(@AuthenticationPrincipal JwtAuthenticationToken auth) {
         JwtAuthenticationToken token = resolveAuthentication(auth);
         if (token == null) {
-            logger.error("No authentication token found");
+            log.error("No authentication token found");
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
 
         String keycloakUserId = token.getToken().getClaimAsString(StandardClaimNames.SUB);
         var gitUser = userRepository.getCurrentUser();
         if (gitUser.isEmpty()) {
-            logger.warn("Could not resolve Git provider user for Keycloak subject {}", keycloakUserId);
+            log.warn("Could not resolve Git provider user for Keycloak subject {}", keycloakUserId);
         }
 
         try {
             accountService.deleteUserTrackingData(gitUser, keycloakUserId);
         } catch (PosthogClientException exception) {
-            logger.error("Failed to remove analytics data before deleting user {}", keycloakUserId, exception);
+            log.error("Failed to remove analytics data before deleting user {}", keycloakUserId, exception);
             return ResponseEntity.status(HttpStatus.BAD_GATEWAY).build();
         }
 
-        logger.info("Deleting user {}", keycloakUserId);
+        log.info("Deleting user {}", keycloakUserId);
         var response = keycloak.realm(realm).users().delete(keycloakUserId);
         if (response.getStatus() != 204) {
-            logger.error("Failed to delete user account: {}", response.getStatusInfo().getReasonPhrase());
+            log.error("Failed to delete user account: {}", response.getStatusInfo().getReasonPhrase());
             return ResponseEntity.status(HttpStatus.BAD_GATEWAY).build();
         }
         return ResponseEntity.noContent().build();
@@ -120,7 +120,7 @@ public class AccountController {
         if (token != null) {
             keycloakUserId = token.getToken().getClaimAsString(StandardClaimNames.SUB);
         } else {
-            logger.warn("Updating user settings without an authenticated principal");
+            log.warn("Updating user settings without an authenticated principal");
             boolean switchingOffResearch =
                 Boolean.FALSE.equals(userSettings.participateInResearch()) && user.get().isParticipateInResearch();
             if (switchingOffResearch) {

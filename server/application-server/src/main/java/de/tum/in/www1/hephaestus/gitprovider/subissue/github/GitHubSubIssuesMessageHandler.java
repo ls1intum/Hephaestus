@@ -18,7 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Component
 public class GitHubSubIssuesMessageHandler extends GitHubMessageHandler<GitHubSubIssuesEventDTO> {
 
-    private static final Logger logger = LoggerFactory.getLogger(GitHubSubIssuesMessageHandler.class);
+    private static final Logger log = LoggerFactory.getLogger(GitHubSubIssuesMessageHandler.class);
 
     private final ProcessingContextFactory contextFactory;
     private final GitHubIssueProcessor issueProcessor;
@@ -48,11 +48,11 @@ public class GitHubSubIssuesMessageHandler extends GitHubMessageHandler<GitHubSu
         var parentIssueDto = event.parentIssue();
 
         if (subIssueDto == null || parentIssueDto == null) {
-            logger.warn("Received sub_issues event with missing data");
+            log.warn("Received sub_issues event with missing data");
             return;
         }
 
-        logger.info(
+        log.info(
             "Received sub_issues event: action={}, parent=#{}, sub=#{}, repo={}",
             event.action(),
             parentIssueDto.number(),
@@ -79,7 +79,7 @@ public class GitHubSubIssuesMessageHandler extends GitHubMessageHandler<GitHubSu
         } else if (action.isRemoved()) {
             subIssueSyncService.processSubIssueEvent(subIssueId, parentIssueId, false);
         } else {
-            logger.debug("Unhandled sub_issues action: {}", event.action());
+            log.debug("Unhandled sub_issues action: {}", event.action());
         }
     }
 }

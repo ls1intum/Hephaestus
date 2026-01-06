@@ -22,7 +22,7 @@ import org.springframework.stereotype.Component;
 @Component
 public class LeaguePointsUpdateTask implements Runnable {
 
-    private static final Logger logger = LoggerFactory.getLogger(LeaguePointsUpdateTask.class);
+    private static final Logger log = LoggerFactory.getLogger(LeaguePointsUpdateTask.class);
 
     private final String scheduledDay;
     private final String scheduledTime;
@@ -56,17 +56,17 @@ public class LeaguePointsUpdateTask implements Runnable {
         List<Workspace> workspaces = workspaceRepository.findAll();
 
         if (workspaces.isEmpty()) {
-            logger.debug("Skipping league points update because no workspaces are configured.");
+            log.debug("Skipping league points update because no workspaces are configured.");
             return;
         }
 
-        logger.info("Starting scheduled league points update for {} workspace(s).", workspaces.size());
+        log.info("Starting scheduled league points update for {} workspace(s).", workspaces.size());
 
         for (Workspace workspace : workspaces) {
             try {
                 updateLeaguePointsForWorkspace(workspace);
             } catch (Exception e) {
-                logger.error(
+                log.error(
                     "Failed to update league points for workspace '{}' (id={}): {}",
                     workspace.getWorkspaceSlug(),
                     workspace.getId(),
@@ -76,7 +76,7 @@ public class LeaguePointsUpdateTask implements Runnable {
             }
         }
 
-        logger.info("Completed scheduled league points update for {} workspace(s).", workspaces.size());
+        log.info("Completed scheduled league points update for {} workspace(s).", workspaces.size());
     }
 
     /**
@@ -86,17 +86,17 @@ public class LeaguePointsUpdateTask implements Runnable {
      */
     private void updateLeaguePointsForWorkspace(Workspace workspace) {
         if (workspace == null || workspace.getId() == null) {
-            logger.warn("Skipping league points update because workspace context is missing an id");
+            log.warn("Skipping league points update because workspace context is missing an id");
             return;
         }
 
         Long workspaceId = workspace.getId();
-        logger.debug("Updating league points for workspace id={}.", workspaceId);
+        log.debug("Updating league points for workspace id={}.", workspaceId);
 
         List<LeaderboardEntryDTO> leaderboard = getLatestLeaderboard(workspace);
         leaderboard.forEach(updateLeaderboardEntry(workspaceId));
 
-        logger.debug("Updated league points for {} users in workspace id={}.", leaderboard.size(), workspaceId);
+        log.debug("Updated league points for {} users in workspace id={}.", leaderboard.size(), workspaceId);
     }
 
     /**

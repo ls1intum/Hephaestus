@@ -18,7 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Component
 public class GitHubLabelMessageHandler extends GitHubMessageHandler<GitHubLabelEventDTO> {
 
-    private static final Logger logger = LoggerFactory.getLogger(GitHubLabelMessageHandler.class);
+    private static final Logger log = LoggerFactory.getLogger(GitHubLabelMessageHandler.class);
 
     private final ProcessingContextFactory contextFactory;
     private final GitHubLabelProcessor labelProcessor;
@@ -44,11 +44,11 @@ public class GitHubLabelMessageHandler extends GitHubMessageHandler<GitHubLabelE
         GitHubLabelDTO labelDto = event.label();
 
         if (labelDto == null) {
-            logger.warn("Received label event with missing data");
+            log.warn("Received label event with missing data");
             return;
         }
 
-        logger.info(
+        log.info(
             "Received label event: action={}, label={}, repo={}",
             event.action(),
             labelDto.name(),

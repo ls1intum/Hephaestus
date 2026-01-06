@@ -16,11 +16,11 @@ import org.slf4j.LoggerFactory;
  */
 public class NatsErrorListener implements ErrorListener {
 
-    private static final Logger logger = LoggerFactory.getLogger(NatsErrorListener.class);
+    private static final Logger log = LoggerFactory.getLogger(NatsErrorListener.class);
 
     @Override
     public void errorOccurred(Connection conn, String error) {
-        logger.error("nats.error serverPort={} message={}", getServerPort(conn), error);
+        log.error("nats.error serverPort={} message={}", getServerPort(conn), error);
     }
 
     @Override
@@ -31,7 +31,7 @@ public class NatsErrorListener implements ErrorListener {
         long lastConsumerSequence
     ) {
         String consumerName = sub != null ? sub.getConsumerName() : "unknown";
-        logger.warn(
+        log.warn(
             "nats.heartbeat_alarm consumer={} streamSeq={} consumerSeq={}",
             consumerName,
             lastStreamSequence,
@@ -42,7 +42,7 @@ public class NatsErrorListener implements ErrorListener {
     @Override
     public void slowConsumerDetected(Connection conn, Consumer consumer) {
         String consumerName = consumer != null ? consumer.toString() : "unknown";
-        logger.warn("nats.slow_consumer_detected consumer={}", consumerName);
+        log.warn("nats.slow_consumer_detected consumer={}", consumerName);
     }
 
     private String getServerPort(Connection conn) {

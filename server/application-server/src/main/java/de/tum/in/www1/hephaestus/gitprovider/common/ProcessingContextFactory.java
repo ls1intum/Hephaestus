@@ -24,7 +24,7 @@ import org.springframework.stereotype.Service;
 @Service
 public class ProcessingContextFactory {
 
-    private static final Logger logger = LoggerFactory.getLogger(ProcessingContextFactory.class);
+    private static final Logger log = LoggerFactory.getLogger(ProcessingContextFactory.class);
 
     private final RepositoryRepository repositoryRepository;
     private final WorkspaceIdResolver workspaceIdResolver;
@@ -42,7 +42,7 @@ public class ProcessingContextFactory {
      */
     public Optional<ProcessingContext> forWebhookEvent(GitHubWebhookEvent event) {
         if (event.repository() == null || event.repository().fullName() == null) {
-            logger.warn("Webhook event missing repository data");
+            log.warn("Webhook event missing repository data");
             return Optional.empty();
         }
 
@@ -50,7 +50,7 @@ public class ProcessingContextFactory {
         Repository repository = repositoryRepository.findByNameWithOwner(repoFullName).orElse(null);
 
         if (repository == null) {
-            logger.warn("Repository {} not found for webhook event, skipping", repoFullName);
+            log.warn("Repository {} not found for webhook event, skipping", repoFullName);
             return Optional.empty();
         }
 

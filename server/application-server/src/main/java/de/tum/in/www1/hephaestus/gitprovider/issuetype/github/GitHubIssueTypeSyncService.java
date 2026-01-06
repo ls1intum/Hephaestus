@@ -29,7 +29,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class GitHubIssueTypeSyncService {
 
-    private static final Logger logger = LoggerFactory.getLogger(GitHubIssueTypeSyncService.class);
+    private static final Logger log = LoggerFactory.getLogger(GitHubIssueTypeSyncService.class);
     private static final String GET_ISSUE_TYPES_DOCUMENT = "GetOrganizationIssueTypes";
 
     private final IssueTypeRepository issueTypeRepository;
@@ -62,30 +62,30 @@ public class GitHubIssueTypeSyncService {
     public int syncIssueTypesForWorkspace(Long workspaceId) {
         Optional<WorkspaceSyncMetadata> metadataOpt = syncTargetProvider.getWorkspaceSyncMetadata(workspaceId);
         if (metadataOpt.isEmpty()) {
-            logger.warn("Workspace {} not found, cannot sync issue types", workspaceId);
+            log.warn("Workspace {} not found, cannot sync issue types", workspaceId);
             return 0;
         }
 
         WorkspaceSyncMetadata metadata = metadataOpt.get();
         String orgLogin = metadata.organizationLogin();
         if (orgLogin == null) {
-            logger.debug("Workspace {} has no organization, skipping issue type sync", workspaceId);
+            log.debug("Workspace {} has no organization, skipping issue type sync", workspaceId);
             return 0;
         }
 
         if (!metadata.needsIssueTypesSync(syncCooldownInMinutes)) {
-            logger.debug("Skipping issue type sync for workspace {} - cooldown active", workspaceId);
+            log.debug("Skipping issue type sync for workspace {} - cooldown active", workspaceId);
             return -1;
         }
 
         // Load organization from gitprovider's repository
         Organization organization = organizationRepository.findById(metadata.organizationId()).orElse(null);
         if (organization == null) {
-            logger.warn("Organization {} not found in database", orgLogin);
+            log.warn("Organization {} not found in database", orgLogin);
             return 0;
         }
 
-        logger.info("Syncing issue types for organization {}", orgLogin);
+        log.info("Syncing issue types for organization {}", orgLogin);
 
         HttpGraphQlClient client = graphQlClientProvider.forWorkspace(workspaceId);
 
@@ -128,10 +128,10 @@ public class GitHubIssueTypeSyncService {
                 Instant.now()
             );
 
-            logger.info("Synced {} issue types for organization {}", totalSynced, orgLogin);
+            log.info("Synced {} issue types for organization {}", totalSynced, orgLogin);
             return totalSynced;
         } catch (Exception e) {
-            logger.error("Error syncing issue types for organization {}: {}", orgLogin, e.getMessage(), e);
+            log.error("Error syncing issue types for organization {}: {}", orgLogin, e.getMessage(), e);
             return 0;
         }
     }
@@ -144,7 +144,7 @@ public class GitHubIssueTypeSyncService {
         for (IssueType existingType : existingTypes) {
             if (!syncedIds.contains(existingType.getId())) {
                 issueTypeRepository.delete(existingType);
-                logger.debug("Removed deleted issue type: {}", existingType.getName());
+                log.debug("Removed deleted issue type: {}", existingType.getName());
             }
         }
     }
@@ -209,7 +209,7 @@ public class GitHubIssueTypeSyncService {
         try {
             return IssueType.Color.valueOf(graphQlColor.name());
         } catch (IllegalArgumentException e) {
-            logger.warn("Unknown issue type color '{}', using GRAY as fallback", graphQlColor);
+            log.warn("Unknown issue type color '{}', using GRAY as fallback", graphQlColor);
             return IssueType.Color.GRAY;
         }
     }
@@ -221,7 +221,7 @@ public class GitHubIssueTypeSyncService {
         try {
             return IssueType.Color.valueOf(colorString.toUpperCase());
         } catch (IllegalArgumentException e) {
-            logger.warn("Unknown issue type color '{}', using GRAY as fallback", colorString);
+            log.warn("Unknown issue type color '{}', using GRAY as fallback", colorString);
             return IssueType.Color.GRAY;
         }
     }

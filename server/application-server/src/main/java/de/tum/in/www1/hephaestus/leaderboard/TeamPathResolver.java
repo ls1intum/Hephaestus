@@ -20,7 +20,7 @@ import org.springframework.stereotype.Component;
 @Component
 public class TeamPathResolver {
 
-    private static final Logger logger = LoggerFactory.getLogger(TeamPathResolver.class);
+    private static final Logger log = LoggerFactory.getLogger(TeamPathResolver.class);
 
     private final TeamRepository teamRepository;
 
@@ -164,7 +164,7 @@ public class TeamPathResolver {
                     return Optional.of(candidate);
                 }
             }
-            logger.warn(
+            log.warn(
                 "Ambiguous team path '{}' resolved to multiple workspace candidates; picking first.",
                 sanitizeForLog(path)
             );

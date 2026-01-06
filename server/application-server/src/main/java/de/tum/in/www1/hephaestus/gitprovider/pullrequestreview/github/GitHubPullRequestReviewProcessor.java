@@ -23,7 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class GitHubPullRequestReviewProcessor {
 
-    private static final Logger logger = LoggerFactory.getLogger(GitHubPullRequestReviewProcessor.class);
+    private static final Logger log = LoggerFactory.getLogger(GitHubPullRequestReviewProcessor.class);
 
     private final PullRequestReviewRepository reviewRepository;
     private final PullRequestRepository prRepository;
@@ -58,7 +58,7 @@ public class GitHubPullRequestReviewProcessor {
     ) {
         PullRequest pr = prRepository.findById(prId).orElse(null);
         if (pr == null) {
-            logger.warn("PR not found for review: prId={}", prId);
+            log.warn("PR not found for review: prId={}", prId);
             return null;
         }
 
@@ -83,7 +83,7 @@ public class GitHubPullRequestReviewProcessor {
                         )
                     );
                 }
-                logger.info("Review {} dismissed", reviewId);
+                log.info("Review {} dismissed", reviewId);
             });
     }
 
@@ -107,7 +107,7 @@ public class GitHubPullRequestReviewProcessor {
                 )
             );
         }
-        logger.debug("Updated review {}", dto.id());
+        log.debug("Updated review {}", dto.id());
         return saved;
     }
 
@@ -135,7 +135,7 @@ public class GitHubPullRequestReviewProcessor {
                 new DomainEvent.ReviewSubmitted(EventPayload.ReviewData.from(saved), EventContext.from(context))
             );
         }
-        logger.debug("Created review {}", dto.id());
+        log.debug("Created review {}", dto.id());
         return saved;
     }
 

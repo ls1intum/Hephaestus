@@ -55,7 +55,7 @@ import org.springframework.transaction.annotation.Transactional;
 @WorkspaceAgnostic("Manages workspaces themselves - the tenant root, not data within workspaces")
 public class WorkspaceService {
 
-    private static final Logger logger = LoggerFactory.getLogger(WorkspaceService.class);
+    private static final Logger log = LoggerFactory.getLogger(WorkspaceService.class);
 
     private static final boolean DEFAULT_PUBLIC_VISIBILITY = false;
 
@@ -113,14 +113,14 @@ public class WorkspaceService {
     private Optional<Workspace> resolveFallbackWorkspace(String context) {
         List<Workspace> all = workspaceRepository.findAll();
         if (all.size() == 1) {
-            logger.info(
+            log.info(
                 "Falling back to the only configured workspace id={} for {}.",
                 all.getFirst().getId(),
                 LoggingUtils.sanitizeForLog(context)
             );
             return Optional.of(all.getFirst());
         }
-        logger.warn(
+        log.warn(
             "Unable to resolve workspace for {}. Available workspace count={}",
             LoggingUtils.sanitizeForLog(context),
             all.size()
@@ -196,7 +196,7 @@ public class WorkspaceService {
 
     public List<UserTeamsDTO> getUsersWithTeams(String slug) {
         Workspace workspace = requireWorkspace(slug);
-        logger.info(
+        log.info(
             "Getting users with teams for workspace id={} (slug={})",
             workspace.getId(),
             LoggingUtils.sanitizeForLog(slug)
@@ -211,7 +211,7 @@ public class WorkspaceService {
 
     public Optional<TeamInfoDTO> addLabelToTeam(String slug, Long teamId, Long repositoryId, String label) {
         Workspace workspace = requireWorkspace(slug);
-        logger.info(
+        log.info(
             "Adding label '{}' of repository with ID: {} to team with ID: {} (workspace id={})",
             LoggingUtils.sanitizeForLog(label),
             repositoryId,
@@ -245,7 +245,7 @@ public class WorkspaceService {
 
     public Optional<TeamInfoDTO> removeLabelFromTeam(String slug, Long teamId, Long labelId) {
         Workspace workspace = requireWorkspace(slug);
-        logger.info(
+        log.info(
             "Removing label with ID: {} from team with ID: {} (workspace id={})",
             labelId,
             teamId,
@@ -255,18 +255,18 @@ public class WorkspaceService {
         // removeLabel()
         Optional<Team> optionalTeam = teamRepository.findWithCollectionsById(teamId);
         if (optionalTeam.isEmpty()) {
-            logger.warn("Team not found with ID: {}", teamId);
+            log.warn("Team not found with ID: {}", teamId);
             return Optional.empty();
         }
         Team team = optionalTeam.get();
         Optional<Label> labelEntity = labelRepository.findById(labelId);
         if (labelEntity.isEmpty()) {
-            logger.warn("Label not found with ID: {}", labelId);
+            log.warn("Label not found with ID: {}", labelId);
             return Optional.empty();
         }
         Label labelObj = labelEntity.get();
         int labelCountBefore = team.getLabels().size();
-        logger.info(
+        log.info(
             "Team {} has {} labels before removal. Looking for label id={}, name={}",
             team.getName(),
             labelCountBefore,
@@ -275,7 +275,7 @@ public class WorkspaceService {
         );
         boolean removed = team.getLabels().remove(labelObj);
         int labelCountAfter = team.getLabels().size();
-        logger.info(
+        log.info(
             "Label removal result: removed={}, labelCountBefore={}, labelCountAfter={}",
             removed,
             labelCountBefore,
@@ -300,7 +300,7 @@ public class WorkspaceService {
     @Transactional
     public void resetAndRecalculateLeagues(String slug) {
         Workspace workspace = requireWorkspace(slug);
-        logger.info(
+        log.info(
             "Resetting and recalculating league points for workspace id={}, slug={}",
             workspace.getId(),
             workspace.getWorkspaceSlug()
@@ -314,16 +314,16 @@ public class WorkspaceService {
     }
 
     private void resetAndRecalculateLeaguesInternal(Long workspaceId) {
-        logger.info("Resetting and recalculating league points for workspace id={}", workspaceId);
+        log.info("Resetting and recalculating league points for workspace id={}", workspaceId);
 
         if (workspaceId == null) {
-            logger.warn("Skipping league recalculation because no workspace is configured.");
+            log.warn("Skipping league recalculation because no workspace is configured.");
             return;
         }
 
         Workspace workspace = workspaceRepository.findById(workspaceId).orElse(null);
         if (workspace == null) {
-            logger.warn("Workspace {} no longer exists; skipping recalculation", workspaceId);
+            log.warn("Workspace {} no longer exists; skipping recalculation", workspaceId);
             return;
         }
 
@@ -415,7 +415,7 @@ public class WorkspaceService {
         String currentSlug = workspace.getWorkspaceSlug();
 
         if (currentSlug.equals(newSlug)) {
-            logger.info(
+            log.info(
                 "Workspace id={} rename to '{}' is no-op (already current slug)",
                 workspaceId,
                 LoggingUtils.sanitizeForLog(newSlug)
@@ -436,7 +436,7 @@ public class WorkspaceService {
         workspace.setWorkspaceSlug(newSlug);
         Workspace saved = workspaceRepository.save(workspace);
 
-        logger.info(
+        log.info(
             "Workspace id={} renamed from '{}' to '{}' (permanent redirect created)",
             workspaceId,
             LoggingUtils.sanitizeForLog(currentSlug),

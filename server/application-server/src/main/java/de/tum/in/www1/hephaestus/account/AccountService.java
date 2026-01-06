@@ -25,7 +25,7 @@ import org.springframework.web.server.ResponseStatusException;
 @WorkspaceAgnostic("User-scoped account operations - not workspace-specific")
 public class AccountService {
 
-    private static final Logger logger = LoggerFactory.getLogger(AccountService.class);
+    private static final Logger log = LoggerFactory.getLogger(AccountService.class);
 
     private final UserRepository userRepository;
     private final PosthogClient posthogClient;
@@ -36,13 +36,13 @@ public class AccountService {
     }
 
     public UserSettingsDTO getUserSettings(User user) {
-        logger.debug("Getting user settings for user: {}", user.getLogin());
+        log.debug("Getting user settings for user: {}", user.getLogin());
         return new UserSettingsDTO(user.isNotificationsEnabled(), user.isParticipateInResearch());
     }
 
     @Transactional
     public UserSettingsDTO updateUserSettings(User user, UserSettingsDTO userSettings, String keycloakUserId) {
-        logger.info("Updating user settings for user: {}", user.getLogin());
+        log.info("Updating user settings for user: {}", user.getLogin());
 
         user.setNotificationsEnabled(
             Objects.requireNonNull(userSettings.receiveNotifications(), "receiveNotifications must not be null")
@@ -64,7 +64,7 @@ public class AccountService {
             try {
                 boolean anyDeleted = deletePosthogIdentities(user, keycloakUserId);
                 if (!anyDeleted) {
-                    logger.warn("No PostHog person matched the provided identifiers for user {}", user.getLogin());
+                    log.warn("No PostHog person matched the provided identifiers for user {}", user.getLogin());
                 }
             } catch (PosthogClientException exception) {
                 throw new ResponseStatusException(
@@ -86,7 +86,7 @@ public class AccountService {
         try {
             boolean anyDeleted = deletePosthogIdentities(user.orElse(null), keycloakUserId);
             if (!anyDeleted) {
-                logger.warn(
+                log.warn(
                     "No PostHog person matched the provided identifiers for user {} during account deletion",
                     user.map(User::getLogin).orElse("unknown")
                 );

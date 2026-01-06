@@ -38,7 +38,7 @@ import org.springframework.stereotype.Component;
 @WorkspaceAgnostic("System-wide integrity audit - verifies event hashes across all workspaces")
 public class ActivityIntegrityScheduler implements HealthIndicator {
 
-    private static final Logger logger = LoggerFactory.getLogger(ActivityIntegrityScheduler.class);
+    private static final Logger log = LoggerFactory.getLogger(ActivityIntegrityScheduler.class);
     private static final long MAX_ALLOWED_SILENCE_MILLIS = 2 * 60 * 60 * 1000; // 2 hours
 
     private final ActivityEventRepository eventRepository;
@@ -97,11 +97,11 @@ public class ActivityIntegrityScheduler implements HealthIndicator {
     @Scheduled(cron = "${hephaestus.activity.integrity.cron:0 0 * * * *}")
     public void verifyEventIntegrity() {
         if (!enabled) {
-            logger.debug("Integrity verification disabled");
+            log.debug("Integrity verification disabled");
             return;
         }
 
-        logger.info("activity.integrity.started sampleSize={}", sampleSize);
+        log.info("activity.integrity.started sampleSize={}", sampleSize);
         Instant startTime = Instant.now();
 
         Timer.Sample timerSample = Timer.start();
@@ -109,7 +109,7 @@ public class ActivityIntegrityScheduler implements HealthIndicator {
             List<ActivityEvent> sample = eventRepository.findRandomSample(sampleSize);
 
             if (sample.isEmpty()) {
-                logger.debug("No events to verify");
+                log.debug("No events to verify");
                 lastRunTimestamp.set(Instant.now());
                 lastVerifiedCount.set(0);
                 lastCorruptedCount.set(0);
@@ -130,7 +130,7 @@ public class ActivityIntegrityScheduler implements HealthIndicator {
             if (!corrupted.isEmpty()) {
                 corruptedEventsCounter.increment(corrupted.size());
                 for (ActivityEvent event : corrupted) {
-                    logger.error(
+                    log.error(
                         "INTEGRITY_VIOLATION eventId={} eventKey={} eventType={} targetId={}",
                         event.getId(),
                         event.getEventKey(),
@@ -138,14 +138,14 @@ public class ActivityIntegrityScheduler implements HealthIndicator {
                         event.getTargetId()
                     );
                 }
-                logger.error(
+                log.error(
                     "activity.integrity.failed corruptedCount={} sampledCount={} corruptionRate={}",
                     corrupted.size(),
                     sample.size(),
                     String.format("%.2f%%", (corrupted.size() * 100.0) / sample.size())
                 );
             } else {
-                logger.info(
+                log.info(
                     "activity.integrity.passed verifiedCount={} durationMs={}",
                     verifiedCount,
                     java.time.Duration.between(startTime, Instant.now()).toMillis()

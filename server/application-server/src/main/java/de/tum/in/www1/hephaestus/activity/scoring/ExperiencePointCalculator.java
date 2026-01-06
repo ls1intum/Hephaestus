@@ -36,7 +36,7 @@ import org.springframework.stereotype.Component;
 @Component
 public class ExperiencePointCalculator implements ExperiencePointStrategy {
 
-    private static final Logger logger = LoggerFactory.getLogger(ExperiencePointCalculator.class);
+    private static final Logger log = LoggerFactory.getLogger(ExperiencePointCalculator.class);
 
     private final PullRequestRepository pullRequestRepository;
     private final Set<String> selfReviewAuthorLogins;
@@ -276,7 +276,7 @@ public class ExperiencePointCalculator implements ExperiencePointStrategy {
     public double calculateIssueCommentExperiencePoints(IssueComment issueComment) {
         Issue issue = issueComment.getIssue();
         if (issue == null) {
-            logger.warn("Issue comment has no associated issue");
+            log.warn("Issue comment has no associated issue");
             return 0;
         }
 
@@ -286,7 +286,7 @@ public class ExperiencePointCalculator implements ExperiencePointStrategy {
             pullRequest = (PullRequest) issue;
         } else {
             if (issue.getRepository() == null) {
-                logger.warn("Issue has no repository, cannot find associated pull request");
+                log.warn("Issue has no repository, cannot find associated pull request");
                 return 0;
             }
             var optionalPullRequest = pullRequestRepository.findByRepositoryIdAndNumber(
@@ -294,7 +294,7 @@ public class ExperiencePointCalculator implements ExperiencePointStrategy {
                 issue.getNumber()
             );
             if (optionalPullRequest.isEmpty()) {
-                logger.error("Issue comment is not associated with a pull request.");
+                log.error("Issue comment is not associated with a pull request.");
                 return 0;
             }
             pullRequest = optionalPullRequest.get();

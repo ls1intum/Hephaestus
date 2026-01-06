@@ -28,7 +28,7 @@ import org.springframework.stereotype.Component;
 @Component
 public class BadPracticeDetectorScheduler {
 
-    private static final Logger logger = LoggerFactory.getLogger(BadPracticeDetectorScheduler.class);
+    private static final Logger log = LoggerFactory.getLogger(BadPracticeDetectorScheduler.class);
 
     private static final String READY_TO_REVIEW = "ready to review";
     private static final String READY_FOR_REVIEW = "ready for review";
@@ -127,7 +127,7 @@ public class BadPracticeDetectorScheduler {
         }
 
         if (!userRoleChecker.isHealthy()) {
-            logger.debug(
+            log.debug(
                 "Skipping role check for PR {} because the role checker is marked unhealthy",
                 pullRequest.getId()
             );
@@ -135,10 +135,10 @@ public class BadPracticeDetectorScheduler {
         }
 
         if (userRoleChecker.hasAutomaticDetectionRole(assignee.getLogin())) {
-            logger.info("User {} has the run_automatic_detection role. Scheduling detection.", assignee.getLogin());
+            log.info("User {} has the run_automatic_detection role. Scheduling detection.", assignee.getLogin());
             scheduleDetectionAtTime(pullRequest, scheduledTime, sendBadPracticeDetectionEmail);
         } else {
-            logger.info(
+            log.info(
                 "User {} does not have the run_automatic_detection role. Skipping detection.",
                 assignee.getLogin()
             );
@@ -150,7 +150,7 @@ public class BadPracticeDetectorScheduler {
         Instant scheduledTime,
         boolean sendBadPracticeDetectionEmail
     ) {
-        logger.info(
+        log.info(
             "Scheduling bad practice detection for pull request: {} at time {}",
             pullRequest.getId(),
             scheduledTime
@@ -165,7 +165,7 @@ public class BadPracticeDetectorScheduler {
             List<ScheduledFuture<?>> tasksToRemove = new ArrayList<>();
             scheduledTasksList.forEach(task -> {
                 if (!task.isDone() && !task.isCancelled()) {
-                    logger.info("Cancelling previous task for pull request: {}", pullRequest.getId());
+                    log.info("Cancelling previous task for pull request: {}", pullRequest.getId());
                     task.cancel(false);
                 } else {
                     tasksToRemove.add(task);
@@ -218,7 +218,7 @@ public class BadPracticeDetectorScheduler {
 
     @Scheduled(cron = "0 0 */12 * * *")
     public void checkScheduledTasks() {
-        logger.info("Running scheduled tasks check to remove completed tasks");
+        log.info("Running scheduled tasks check to remove completed tasks");
         List<Long> toRemovePullrequestIds = new ArrayList<>();
         scheduledTasks.forEach((pullRequestId, scheduledTasksList) -> {
             scheduledTasksList.removeIf(task -> task.isDone() || task.isCancelled());

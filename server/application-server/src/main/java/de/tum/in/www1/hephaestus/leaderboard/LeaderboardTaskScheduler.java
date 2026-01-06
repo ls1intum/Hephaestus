@@ -27,7 +27,7 @@ import org.springframework.stereotype.Component;
 @Component
 public class LeaderboardTaskScheduler {
 
-    private static final Logger logger = LoggerFactory.getLogger(LeaderboardTaskScheduler.class);
+    private static final Logger log = LoggerFactory.getLogger(LeaderboardTaskScheduler.class);
 
     private final boolean runScheduledMessage;
     private final String scheduledDay;
@@ -66,7 +66,7 @@ public class LeaderboardTaskScheduler {
         );
 
         if (!CronExpression.isValidExpression(cron)) {
-            logger.error("Invalid cron expression: " + cron);
+            log.error("Invalid cron expression: " + cron);
             return;
         }
 
@@ -79,39 +79,39 @@ public class LeaderboardTaskScheduler {
      */
     private void scheduleSlackMessage(String cron) {
         if (!runScheduledMessage) {
-            logger.info("Leaderboard notifications disabled; Slack message not scheduled.");
+            log.info("Leaderboard notifications disabled; Slack message not scheduled.");
             return;
         }
 
         if (slackWeeklyLeaderboardTask == null) {
-            logger.warn("SlackWeeklyLeaderboardTask bean not available; skipping Slack scheduling.");
+            log.warn("SlackWeeklyLeaderboardTask bean not available; skipping Slack scheduling.");
             return;
         }
 
         if (!slackWeeklyLeaderboardTask.testSlackConnection()) {
-            logger.error("Failed to schedule Slack message");
+            log.error("Failed to schedule Slack message");
             return;
         }
 
-        logger.info("Scheduling Slack message to run with {}", cron);
+        log.info("Scheduling Slack message to run with {}", cron);
         scheduleSafely(slackWeeklyLeaderboardTask, new CronTrigger(cron), "Slack weekly leaderboard message");
     }
 
     private void scheduleLeaguePointsUpdate(String cron) {
-        logger.info("Scheduling league points update to run with {}", cron);
+        log.info("Scheduling league points update to run with {}", cron);
         scheduleSafely(leaguePointsUpdateTask, new CronTrigger(cron), "league points update");
     }
 
     private void scheduleSafely(Runnable task, CronTrigger trigger, String description) {
         if (isSchedulerShuttingDown()) {
-            logger.info("Skipping {} scheduling because task scheduler is shutting down.", description);
+            log.info("Skipping {} scheduling because task scheduler is shutting down.", description);
             return;
         }
 
         try {
             taskScheduler.schedule(task, trigger);
         } catch (TaskRejectedException ex) {
-            logger.warn("Task scheduler rejected {} scheduling: {}", description, ex.getMessage());
+            log.warn("Task scheduler rejected {} scheduling: {}", description, ex.getMessage());
         }
     }
 

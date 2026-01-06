@@ -23,7 +23,7 @@ import org.springframework.web.client.RestTemplate;
 @WorkspaceAgnostic("Cache management - scheduled eviction is infrastructure maintenance")
 public class PullRequestTemplateGetter {
 
-    private static final Logger logger = LoggerFactory.getLogger(PullRequestTemplateGetter.class);
+    private static final Logger log = LoggerFactory.getLogger(PullRequestTemplateGetter.class);
 
     private static final String TEMPLATE_URL =
         "https://raw.githubusercontent.com/%s/main/.github/PULL_REQUEST_TEMPLATE.md";
@@ -36,7 +36,7 @@ public class PullRequestTemplateGetter {
         try {
             return restTemplate.getForObject(url, String.class);
         } catch (Exception e) {
-            logger.warn("Error getting pull request template: {}", e.getMessage());
+            log.warn("Error getting pull request template: {}", e.getMessage());
             return "";
         }
     }

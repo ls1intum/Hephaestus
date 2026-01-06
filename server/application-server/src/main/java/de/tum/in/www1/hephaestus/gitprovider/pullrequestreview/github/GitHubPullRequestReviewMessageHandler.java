@@ -18,7 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Component
 public class GitHubPullRequestReviewMessageHandler extends GitHubMessageHandler<GitHubPullRequestReviewEventDTO> {
 
-    private static final Logger logger = LoggerFactory.getLogger(GitHubPullRequestReviewMessageHandler.class);
+    private static final Logger log = LoggerFactory.getLogger(GitHubPullRequestReviewMessageHandler.class);
 
     private final ProcessingContextFactory contextFactory;
     private final GitHubPullRequestProcessor prProcessor;
@@ -48,11 +48,11 @@ public class GitHubPullRequestReviewMessageHandler extends GitHubMessageHandler<
         var prDto = event.pullRequest();
 
         if (reviewDto == null || prDto == null) {
-            logger.warn("Received pull_request_review event with missing data");
+            log.warn("Received pull_request_review event with missing data");
             return;
         }
 
-        logger.info(
+        log.info(
             "Received pull_request_review event: action={}, pr=#{}, review={}, repo={}",
             event.action(),
             prDto.number(),

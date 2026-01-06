@@ -36,7 +36,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class GitHubLabelProcessor {
 
-    private static final Logger logger = LoggerFactory.getLogger(GitHubLabelProcessor.class);
+    private static final Logger log = LoggerFactory.getLogger(GitHubLabelProcessor.class);
 
     private final LabelRepository labelRepository;
     private final ApplicationEventPublisher eventPublisher;
@@ -62,7 +62,7 @@ public class GitHubLabelProcessor {
     @Transactional
     public Label process(GitHubLabelDTO dto, Repository repository, ProcessingContext context) {
         if (dto == null || dto.name() == null) {
-            logger.warn("Label DTO is null or missing name, skipping");
+            log.warn("Label DTO is null or missing name, skipping");
             return null;
         }
 
@@ -106,7 +106,7 @@ public class GitHubLabelProcessor {
             );
         }
 
-        logger.debug("Processed label {} ({}): {}", saved.getName(), saved.getId(), isNew ? "created" : "updated");
+        log.debug("Processed label {} ({}): {}", saved.getName(), saved.getId(), isNew ? "created" : "updated");
         return saved;
     }
 
@@ -148,7 +148,7 @@ public class GitHubLabelProcessor {
                 eventPublisher.publishEvent(
                     new DomainEvent.LabelDeleted(labelId, label.getName(), context.workspaceId(), repoId)
                 );
-                logger.debug("Deleted label {} ({})", label.getName(), labelId);
+                log.debug("Deleted label {} ({})", label.getName(), labelId);
             });
     }
 }

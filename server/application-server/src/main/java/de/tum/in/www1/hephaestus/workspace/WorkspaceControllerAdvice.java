@@ -37,7 +37,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 @Order(Ordered.HIGHEST_PRECEDENCE)
 public class WorkspaceControllerAdvice {
 
-    private static final Logger logger = LoggerFactory.getLogger(WorkspaceControllerAdvice.class);
+    private static final Logger log = LoggerFactory.getLogger(WorkspaceControllerAdvice.class);
 
     @ExceptionHandler(EntityNotFoundException.class)
     ProblemDetail handleNotFound(EntityNotFoundException exception) {
@@ -116,7 +116,7 @@ public class WorkspaceControllerAdvice {
 
     @ExceptionHandler(IllegalStateException.class)
     ProblemDetail handleIllegalState(IllegalStateException exception) {
-        logger.error("Unexpected workspace state", exception);
+        log.error("Unexpected workspace state", exception);
         return problem(
             HttpStatus.INTERNAL_SERVER_ERROR,
             "Workspace operation failed",

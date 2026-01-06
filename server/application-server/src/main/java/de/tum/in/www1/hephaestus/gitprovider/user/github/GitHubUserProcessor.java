@@ -28,7 +28,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class GitHubUserProcessor {
 
-    private static final Logger logger = LoggerFactory.getLogger(GitHubUserProcessor.class);
+    private static final Logger log = LoggerFactory.getLogger(GitHubUserProcessor.class);
 
     private final UserRepository userRepository;
 
@@ -53,7 +53,7 @@ public class GitHubUserProcessor {
         }
         Long userId = dto.getDatabaseId();
         if (userId == null) {
-            logger.debug("User DTO has no database ID, skipping");
+            log.debug("User DTO has no database ID, skipping");
             return null;
         }
         return userRepository
@@ -71,7 +71,7 @@ public class GitHubUserProcessor {
                 // Sync profile fields from DTO
                 syncProfileFieldsToUser(user, dto);
                 User saved = userRepository.save(user);
-                logger.debug("Created user {} ({})", sanitizeForLog(saved.getLogin()), saved.getId());
+                log.debug("Created user {} ({})", sanitizeForLog(saved.getLogin()), saved.getId());
                 return saved;
             });
     }
@@ -113,11 +113,7 @@ public class GitHubUserProcessor {
         }
 
         if (changed) {
-            logger.debug(
-                "Updated profile fields for user {} ({})",
-                sanitizeForLog(existing.getLogin()),
-                existing.getId()
-            );
+            log.debug("Updated profile fields for user {} ({})", sanitizeForLog(existing.getLogin()), existing.getId());
             return userRepository.save(existing);
         }
         return existing;

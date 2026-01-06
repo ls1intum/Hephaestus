@@ -76,6 +76,7 @@ public class PullRequestBadPractice {
      */
     @NonNull
     @Enumerated(EnumType.STRING)
+    @Column(length = 32)
     private PullRequestBadPracticeState state;
 
     /**
@@ -86,6 +87,7 @@ public class PullRequestBadPractice {
      * @see PullRequestBadPracticeState#USER_RESOLUTION_STATES valid user states
      */
     @Enumerated(EnumType.STRING)
+    @Column(name = "user_state", length = 32)
     private PullRequestBadPracticeState userState;
 
     /** Timestamp when this bad practice was first detected. */
@@ -96,6 +98,7 @@ public class PullRequestBadPractice {
 
     /** PR lifecycle state at the time of detection (for analytics). */
     @Enumerated(EnumType.STRING)
+    @Column(name = "detection_pullrequest_lifecycle_state", length = 32)
     private PullRequestLifecycleState detectionPullrequestLifecycleState;
 
     /** Trace ID for LLM observability (links to Langfuse traces). */

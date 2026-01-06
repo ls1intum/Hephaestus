@@ -27,7 +27,7 @@ import org.springframework.stereotype.Component;
 @Component
 public class LeaderboardCacheManager {
 
-    private static final Logger logger = LoggerFactory.getLogger(LeaderboardCacheManager.class);
+    private static final Logger log = LoggerFactory.getLogger(LeaderboardCacheManager.class);
     private static final String CACHE_NAME = "leaderboardXp";
     private static final int MAX_TRACKED_WORKSPACES = 10000;
     private static final int MAX_KEYS_PER_WORKSPACE = 1000;
@@ -82,13 +82,13 @@ public class LeaderboardCacheManager {
     public void registerKey(Long workspaceId, String cacheKey) {
         // Prevent unbounded growth - memory safety
         if (keysByWorkspace.size() >= MAX_TRACKED_WORKSPACES && !keysByWorkspace.containsKey(workspaceId)) {
-            logger.warn("leaderboard.cache.workspace_limit_reached maxWorkspaces={}", MAX_TRACKED_WORKSPACES);
+            log.warn("leaderboard.cache.workspace_limit_reached maxWorkspaces={}", MAX_TRACKED_WORKSPACES);
             return;
         }
 
         Set<String> keys = keysByWorkspace.computeIfAbsent(workspaceId, k -> ConcurrentHashMap.newKeySet());
         if (keys.size() >= MAX_KEYS_PER_WORKSPACE) {
-            logger.warn(
+            log.warn(
                 "leaderboard.cache.key_limit_reached workspaceId={} maxKeys={}",
                 workspaceId,
                 MAX_KEYS_PER_WORKSPACE
@@ -111,13 +111,13 @@ public class LeaderboardCacheManager {
     public void evictWorkspace(Long workspaceId) {
         Cache cache = cacheManager.getCache(CACHE_NAME);
         if (cache == null) {
-            logger.debug("Cache '{}' not found, skipping eviction", CACHE_NAME);
+            log.debug("Cache '{}' not found, skipping eviction", CACHE_NAME);
             return;
         }
 
         Set<String> keys = keysByWorkspace.remove(workspaceId);
         if (keys == null || keys.isEmpty()) {
-            logger.debug("No cached keys for workspace {}", workspaceId);
+            log.debug("No cached keys for workspace {}", workspaceId);
             return;
         }
 
@@ -128,7 +128,7 @@ public class LeaderboardCacheManager {
         }
         cacheEvictionsCounter.increment();
         cacheKeyEvictedCounter.increment(evictedCount);
-        logger.info("leaderboard.cache.evicted workspaceId={} keysEvicted={}", workspaceId, evictedCount);
+        log.info("leaderboard.cache.evicted workspaceId={} keysEvicted={}", workspaceId, evictedCount);
     }
 
     /**
@@ -141,7 +141,7 @@ public class LeaderboardCacheManager {
             cache.clear();
             keysByWorkspace.clear();
             cacheEvictAllCounter.increment();
-            logger.info("leaderboard.cache.evict_all keysCleared={}", totalKeys);
+            log.info("leaderboard.cache.evict_all keysCleared={}", totalKeys);
         }
     }
 

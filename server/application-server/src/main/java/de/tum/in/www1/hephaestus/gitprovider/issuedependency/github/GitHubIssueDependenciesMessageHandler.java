@@ -18,7 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Component
 public class GitHubIssueDependenciesMessageHandler extends GitHubMessageHandler<GitHubIssueDependenciesEventDTO> {
 
-    private static final Logger logger = LoggerFactory.getLogger(GitHubIssueDependenciesMessageHandler.class);
+    private static final Logger log = LoggerFactory.getLogger(GitHubIssueDependenciesMessageHandler.class);
 
     private final ProcessingContextFactory contextFactory;
     private final GitHubIssueProcessor issueProcessor;
@@ -48,11 +48,11 @@ public class GitHubIssueDependenciesMessageHandler extends GitHubMessageHandler<
         var blockingIssueDto = event.blockingIssue();
 
         if (blockedIssueDto == null || blockingIssueDto == null) {
-            logger.warn("Received issue_dependencies event with missing data");
+            log.warn("Received issue_dependencies event with missing data");
             return;
         }
 
-        logger.info(
+        log.info(
             "Received issue_dependencies event: action={}, blocked=#{}, blocking=#{}, repo={}",
             event.action(),
             blockedIssueDto.number(),
@@ -84,7 +84,7 @@ public class GitHubIssueDependenciesMessageHandler extends GitHubMessageHandler<
                 blockingIssueId,
                 false
             );
-            default -> logger.debug("Unhandled issue_dependencies action: {}", event.action());
+            default -> log.debug("Unhandled issue_dependencies action: {}", event.action());
         }
     }
 }

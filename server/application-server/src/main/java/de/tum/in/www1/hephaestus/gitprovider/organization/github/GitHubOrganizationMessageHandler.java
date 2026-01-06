@@ -19,7 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Component
 public class GitHubOrganizationMessageHandler extends GitHubMessageHandler<GitHubOrganizationEventDTO> {
 
-    private static final Logger logger = LoggerFactory.getLogger(GitHubOrganizationMessageHandler.class);
+    private static final Logger log = LoggerFactory.getLogger(GitHubOrganizationMessageHandler.class);
 
     private final GitHubOrganizationProcessor organizationProcessor;
     private final GitHubUserProcessor userProcessor;
@@ -53,11 +53,11 @@ public class GitHubOrganizationMessageHandler extends GitHubMessageHandler<GitHu
         var orgDto = event.organization();
 
         if (orgDto == null) {
-            logger.warn("Received organization event with missing data");
+            log.warn("Received organization event with missing data");
             return;
         }
 
-        logger.info("Received organization event: action={}, org={}", event.action(), orgDto.login());
+        log.info("Received organization event: action={}, org={}", event.action(), orgDto.login());
 
         switch (event.actionType()) {
             case GitHubEventAction.Organization.MEMBER_ADDED -> {
@@ -68,14 +68,14 @@ public class GitHubOrganizationMessageHandler extends GitHubMessageHandler<GitHu
                         ? event.membership().role().toUpperCase()
                         : "MEMBER";
                     membershipRepository.upsertMembership(orgDto.id(), user.getId(), role);
-                    logger.info("Member added to org {}: {} with role {}", orgDto.login(), userDto.login(), role);
+                    log.info("Member added to org {}: {} with role {}", orgDto.login(), userDto.login(), role);
                 }
             }
             case GitHubEventAction.Organization.MEMBER_REMOVED -> {
                 if (event.membership() != null && event.membership().user() != null) {
                     var userDto = event.membership().user();
                     membershipRepository.deleteByOrganizationIdAndUserIdIn(orgDto.id(), List.of(userDto.id()));
-                    logger.info("Member removed from org {}: {}", orgDto.login(), userDto.login());
+                    log.info("Member removed from org {}: {}", orgDto.login(), userDto.login());
                 }
             }
             case GitHubEventAction.Organization.RENAMED -> organizationProcessor.rename(orgDto.id(), orgDto.login());

@@ -33,7 +33,7 @@ import org.springframework.web.client.RestClientException;
 @Component
 public class PullRequestBadPracticeDetector {
 
-    private static final Logger logger = LoggerFactory.getLogger(PullRequestBadPracticeDetector.class);
+    private static final Logger log = LoggerFactory.getLogger(PullRequestBadPracticeDetector.class);
 
     private static final String READY_TO_REVIEW = "ready to review";
     private static final String READY_FOR_REVIEW = "ready for review";
@@ -68,7 +68,7 @@ public class PullRequestBadPracticeDetector {
      */
     @Transactional
     public DetectionResult detectForUser(Long workspaceId, String login) {
-        logger.info("Detecting bad practices for user {} in workspace {}", login, workspaceId);
+        log.info("Detecting bad practices for user {} in workspace {}", login, workspaceId);
 
         List<PullRequest> pullRequests = pullRequestRepository.findAssignedByLoginAndStates(
             login,
@@ -96,12 +96,12 @@ public class PullRequestBadPracticeDetector {
      */
     @Transactional
     public DetectionResult detectAndSyncBadPractices(Long pullRequestId) {
-        logger.debug("Looking up pull request by ID: {}", pullRequestId);
+        log.debug("Looking up pull request by ID: {}", pullRequestId);
         return pullRequestRepository
             .findById(pullRequestId)
             .map(this::detectAndSyncBadPractices)
             .orElseGet(() -> {
-                logger.warn("Pull request with ID {} not found", pullRequestId);
+                log.warn("Pull request with ID {} not found", pullRequestId);
                 return DetectionResult.ERROR_NO_UPDATE_ON_PULLREQUEST;
             });
     }
@@ -115,7 +115,7 @@ public class PullRequestBadPracticeDetector {
      */
     @Transactional
     public DetectionResult detectAndSyncBadPractices(PullRequest pullRequest) {
-        logger.info("Detecting bad practices for pull request: {}", pullRequest.getId());
+        log.info("Detecting bad practices for pull request: {}", pullRequest.getId());
 
         // Check if detection is needed based on last detection time from BadPracticeDetection
         BadPracticeDetection lastDetection = badPracticeDetectionRepository.findMostRecentByPullRequestId(
@@ -127,7 +127,7 @@ public class PullRequestBadPracticeDetector {
             lastDetection.getDetectionTime() != null &&
             pullRequest.getUpdatedAt().isBefore(lastDetection.getDetectionTime())
         ) {
-            logger.info("Pull request has not been updated since last detection. Skipping detection.");
+            log.info("Pull request has not been updated since last detection. Skipping detection.");
             return DetectionResult.ERROR_NO_UPDATE_ON_PULLREQUEST;
         }
 
@@ -188,7 +188,7 @@ public class PullRequestBadPracticeDetector {
         try {
             detectorResponse = detectorApi.detectBadPractices(detectorRequest);
         } catch (RestClientException e) {
-            logger.error(
+            log.error(
                 "Failed to detect bad practices for pull request {} (PR #{} in {}): {}",
                 pullRequest.getId(),
                 pullRequest.getNumber(),
@@ -219,7 +219,7 @@ public class PullRequestBadPracticeDetector {
             )
             .toList();
 
-        logger.info("Detected {} bad practices for pull request: {}", detectedBadPractices.size(), pullRequest.getId());
+        log.info("Detected {} bad practices for pull request: {}", detectedBadPractices.size(), pullRequest.getId());
 
         BadPracticeDetection badPracticeDetection = new BadPracticeDetection();
         badPracticeDetection.setPullRequest(pullRequest);
@@ -308,7 +308,7 @@ public class PullRequestBadPracticeDetector {
      */
     @SuppressWarnings("unused") // Used by Resilience4j via reflection
     private BadPracticeDetection fallbackDetection(PullRequest pullRequest, Throwable throwable) {
-        logger.warn(
+        log.warn(
             "Circuit breaker triggered for PR {} ({}): {}",
             pullRequest.getId(),
             pullRequest.getRepository().getNameWithOwner(),

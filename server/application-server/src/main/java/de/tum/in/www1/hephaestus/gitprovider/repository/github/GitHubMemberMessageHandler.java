@@ -24,7 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Component
 public class GitHubMemberMessageHandler extends GitHubMessageHandler<GitHubMemberEventDTO> {
 
-    private static final Logger logger = LoggerFactory.getLogger(GitHubMemberMessageHandler.class);
+    private static final Logger log = LoggerFactory.getLogger(GitHubMemberMessageHandler.class);
 
     private final ProcessingContextFactory contextFactory;
     private final GitHubUserProcessor userProcessor;
@@ -53,11 +53,11 @@ public class GitHubMemberMessageHandler extends GitHubMessageHandler<GitHubMembe
         var memberDto = event.member();
 
         if (memberDto == null) {
-            logger.warn("Received member event with missing data");
+            log.warn("Received member event with missing data");
             return;
         }
 
-        logger.info(
+        log.info(
             "Received member event: action={}, member={}, repo={}",
             event.action(),
             memberDto.login(),
@@ -72,7 +72,7 @@ public class GitHubMemberMessageHandler extends GitHubMessageHandler<GitHubMembe
         // Ensure user exists via processor
         User user = userProcessor.ensureExists(memberDto);
         if (user == null) {
-            logger.warn("Could not create or find user for member: {}", memberDto.login());
+            log.warn("Could not create or find user for member: {}", memberDto.login());
             return;
         }
 
@@ -81,7 +81,7 @@ public class GitHubMemberMessageHandler extends GitHubMessageHandler<GitHubMembe
         switch (event.actionType()) {
             case GitHubEventAction.Member.ADDED -> handleCollaboratorAdded(repository, user, event);
             case GitHubEventAction.Member.REMOVED -> handleCollaboratorRemoved(repository, user);
-            default -> logger.debug("Unhandled member action: {}", event.action());
+            default -> log.debug("Unhandled member action: {}", event.action());
         }
     }
 
@@ -100,7 +100,7 @@ public class GitHubMemberMessageHandler extends GitHubMessageHandler<GitHubMembe
             RepositoryCollaborator collaborator = existingCollaborator.get();
             collaborator.updatePermission(permission);
             collaboratorRepository.save(collaborator);
-            logger.info(
+            log.info(
                 "Updated collaborator permission for {} in {}: {}",
                 user.getLogin(),
                 repository.getNameWithOwner(),
@@ -110,7 +110,7 @@ public class GitHubMemberMessageHandler extends GitHubMessageHandler<GitHubMembe
             // Create new collaborator
             RepositoryCollaborator collaborator = new RepositoryCollaborator(repository, user, permission);
             collaboratorRepository.save(collaborator);
-            logger.info(
+            log.info(
                 "Added collaborator {} to {} with permission {}",
                 sanitizeForLog(user.getLogin()),
                 sanitizeForLog(repository.getNameWithOwner()),
@@ -124,13 +124,13 @@ public class GitHubMemberMessageHandler extends GitHubMessageHandler<GitHubMembe
 
         if (existingCollaborator.isPresent()) {
             collaboratorRepository.delete(existingCollaborator.get());
-            logger.info(
+            log.info(
                 "Removed collaborator {} from {}",
                 sanitizeForLog(user.getLogin()),
                 sanitizeForLog(repository.getNameWithOwner())
             );
         } else {
-            logger.debug(
+            log.debug(
                 "Collaborator {} not found in {} - may have been already removed",
                 sanitizeForLog(user.getLogin()),
                 sanitizeForLog(repository.getNameWithOwner())

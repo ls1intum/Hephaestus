@@ -26,7 +26,7 @@ import org.springframework.transaction.event.TransactionalEventListener;
 @Component
 public class BadPracticeEventListener {
 
-    private static final Logger logger = LoggerFactory.getLogger(BadPracticeEventListener.class);
+    private static final Logger log = LoggerFactory.getLogger(BadPracticeEventListener.class);
 
     private final BadPracticeDetectorScheduler badPracticeDetectorScheduler;
     private final PullRequestRepository pullRequestRepository;
@@ -47,7 +47,7 @@ public class BadPracticeEventListener {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onPullRequestCreated(DomainEvent.PullRequestCreated event) {
         EventPayload.PullRequestData pr = event.pullRequest();
-        logger.info(
+        log.info(
             "PR #{} created in {} - scheduling bad practice detection with 1-hour delay",
             pr.number(),
             pr.repository().nameWithOwner()
@@ -63,7 +63,7 @@ public class BadPracticeEventListener {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onPullRequestUpdated(DomainEvent.PullRequestUpdated event) {
         EventPayload.PullRequestData pr = event.pullRequest();
-        logger.info(
+        log.info(
             "PR #{} updated in {} - rescheduling bad practice detection with 1-hour delay",
             pr.number(),
             pr.repository().nameWithOwner()
@@ -80,7 +80,7 @@ public class BadPracticeEventListener {
     public void onPullRequestLabeled(DomainEvent.PullRequestLabeled event) {
         EventPayload.PullRequestData pr = event.pullRequest();
         String labelName = event.label() != null ? event.label().name() : "";
-        logger.info(
+        log.info(
             "PR #{} labeled with '{}' in {} - checking for ready label detection",
             pr.number(),
             labelName,
@@ -97,7 +97,7 @@ public class BadPracticeEventListener {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onPullRequestReady(DomainEvent.PullRequestReady event) {
         EventPayload.PullRequestData pr = event.pullRequest();
-        logger.info(
+        log.info(
             "PR #{} marked ready for review in {} - scheduling bad practice detection with 1-hour delay",
             pr.number(),
             pr.repository().nameWithOwner()
@@ -113,7 +113,7 @@ public class BadPracticeEventListener {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onPullRequestSynchronized(DomainEvent.PullRequestSynchronized event) {
         EventPayload.PullRequestData pr = event.pullRequest();
-        logger.info(
+        log.info(
             "PR #{} synchronized in {} - rescheduling bad practice detection with 1-hour delay",
             pr.number(),
             pr.repository().nameWithOwner()
@@ -129,7 +129,7 @@ public class BadPracticeEventListener {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onPullRequestReopened(DomainEvent.PullRequestReopened event) {
         EventPayload.PullRequestData pr = event.pullRequest();
-        logger.info(
+        log.info(
             "PR #{} reopened in {} - scheduling bad practice detection with 1-hour delay",
             pr.number(),
             pr.repository().nameWithOwner()
@@ -145,7 +145,7 @@ public class BadPracticeEventListener {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onPullRequestClosed(DomainEvent.PullRequestClosed event) {
         EventPayload.PullRequestData pr = event.pullRequest();
-        logger.info(
+        log.info(
             "PR #{} closed in {} - triggering immediate bad practice detection (no email)",
             pr.number(),
             pr.repository().nameWithOwner()
@@ -161,21 +161,12 @@ public class BadPracticeEventListener {
         try {
             PullRequest pullRequest = pullRequestRepository.findByIdWithAssignees(pullRequestId).orElse(null);
             if (pullRequest == null) {
-                logger.warn(
-                    "PR #{} (id={}) not found in database, skipping detection",
-                    pullRequestNumber,
-                    pullRequestId
-                );
+                log.warn("PR #{} (id={}) not found in database, skipping detection", pullRequestNumber, pullRequestId);
                 return;
             }
             badPracticeDetectorScheduler.detectBadPracticeForPrWhenOpenedOrReadyForReviewEvent(pullRequest);
         } catch (Exception e) {
-            logger.error(
-                "Error scheduling bad practice detection for PR #{}: {}",
-                pullRequestNumber,
-                e.getMessage(),
-                e
-            );
+            log.error("Error scheduling bad practice detection for PR #{}: {}", pullRequestNumber, e.getMessage(), e);
         }
     }
 
@@ -187,22 +178,13 @@ public class BadPracticeEventListener {
         try {
             PullRequest pullRequest = pullRequestRepository.findByIdWithAssignees(pullRequestId).orElse(null);
             if (pullRequest == null) {
-                logger.warn(
-                    "PR #{} (id={}) not found in database, skipping detection",
-                    pullRequestNumber,
-                    pullRequestId
-                );
+                log.warn("PR #{} (id={}) not found in database, skipping detection", pullRequestNumber, pullRequestId);
                 return;
             }
             // Use the scheduler method that checks exact label names and runs immediately
             badPracticeDetectorScheduler.detectBadPracticeForPrIfReadyLabel(pullRequest, labelName);
         } catch (Exception e) {
-            logger.error(
-                "Error triggering bad practice detection for PR #{}: {}",
-                pullRequestNumber,
-                e.getMessage(),
-                e
-            );
+            log.error("Error triggering bad practice detection for PR #{}: {}", pullRequestNumber, e.getMessage(), e);
         }
     }
 
@@ -213,16 +195,12 @@ public class BadPracticeEventListener {
         try {
             PullRequest pullRequest = pullRequestRepository.findByIdWithAssignees(pullRequestId).orElse(null);
             if (pullRequest == null) {
-                logger.warn(
-                    "PR #{} (id={}) not found in database, skipping detection",
-                    pullRequestNumber,
-                    pullRequestId
-                );
+                log.warn("PR #{} (id={}) not found in database, skipping detection", pullRequestNumber, pullRequestId);
                 return;
             }
             badPracticeDetectorScheduler.detectBadPracticeForPrIfClosedEvent(pullRequest);
         } catch (Exception e) {
-            logger.error(
+            log.error(
                 "Error triggering bad practice detection for closed PR #{}: {}",
                 pullRequestNumber,
                 e.getMessage(),

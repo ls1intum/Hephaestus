@@ -39,7 +39,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional
 public class BadPracticeFeedbackService {
 
-    private static final Logger logger = LoggerFactory.getLogger(BadPracticeFeedbackService.class);
+    private static final Logger log = LoggerFactory.getLogger(BadPracticeFeedbackService.class);
 
     private final PullRequestBadPracticeRepository pullRequestBadPracticeRepository;
     private final BadPracticeFeedbackRepository badPracticeFeedbackRepository;
@@ -82,7 +82,7 @@ public class BadPracticeFeedbackService {
         PullRequestBadPractice badPractice,
         PullRequestBadPracticeState state
     ) {
-        logger.info(
+        log.info(
             "Resolving bad practice {} from {} to {} in workspace {}",
             badPractice.getId(),
             badPractice.getUserState(),
@@ -105,7 +105,7 @@ public class BadPracticeFeedbackService {
         PullRequestBadPractice badPractice,
         BadPracticeFeedbackDTO feedback
     ) {
-        logger.info(
+        log.info(
             "Recording feedback for bad practice {} in workspace {}",
             badPractice.getId(),
             workspace.getWorkspaceSlug()
@@ -136,11 +136,11 @@ public class BadPracticeFeedbackService {
     @Transactional(readOnly = true) // No DB writes, just reading for async context
     public void sendFeedbackToLangfuse(PullRequestBadPractice badPractice, BadPracticeFeedbackDTO feedback) {
         if (langfuseClient == null) {
-            logger.debug("Langfuse client not configured, skipping feedback submission");
+            log.debug("Langfuse client not configured, skipping feedback submission");
             return;
         }
 
-        logger.info("Sending feedback to Langfuse for bad practice: {}", badPractice.getId());
+        log.info("Sending feedback to Langfuse for bad practice: {}", badPractice.getId());
         try {
             CreateScoreRequest request = CreateScoreRequest.builder()
                 .traceId(badPractice.getDetectionTraceId())
@@ -152,10 +152,10 @@ public class BadPracticeFeedbackService {
                 .build();
 
             CreateScoreResponse response = langfuseClient.score().create(request);
-            logger.info("Feedback sent to Langfuse successfully (id={})", response.getId());
+            log.info("Feedback sent to Langfuse successfully (id={})", response.getId());
         } catch (RuntimeException e) {
             // Log with context but don't propagate - Langfuse is optional observability
-            logger.error(
+            log.error(
                 "Failed to send feedback to Langfuse for bad practice {}: {}",
                 badPractice.getId(),
                 e.getMessage()

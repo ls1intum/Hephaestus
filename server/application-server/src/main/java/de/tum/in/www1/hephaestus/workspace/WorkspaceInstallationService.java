@@ -23,7 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class WorkspaceInstallationService {
 
-    private static final Logger logger = LoggerFactory.getLogger(WorkspaceInstallationService.class);
+    private static final Logger log = LoggerFactory.getLogger(WorkspaceInstallationService.class);
 
     private final boolean isNatsEnabled;
 
@@ -130,7 +130,7 @@ public class WorkspaceInstallationService {
                 boolean hasPatToken = !isBlank(existingByLogin.getPersonalAccessToken());
 
                 if (isPatWorkspace && hasPatToken) {
-                    logger.info(
+                    log.info(
                         "Workspace id={} for {} is a PAT workspace with a stored token; skipping GitHub App installation {} linking. " +
                             "If you want to use the GitHub App instead, delete the PAT workspace first or set " +
                             "hephaestus.workspace.init-default=false.",
@@ -142,14 +142,14 @@ public class WorkspaceInstallationService {
                 }
 
                 if (isPatWorkspace) {
-                    logger.info(
+                    log.info(
                         "Promoting PAT workspace id={} for {} to GitHub App installation {} because no PAT token is stored.",
                         existingByLogin.getId(),
                         LoggingUtils.sanitizeForLog(accountLogin),
                         installationId
                     );
                 } else {
-                    logger.info(
+                    log.info(
                         "Linking existing workspace id={} login={} to installation {}.",
                         existingByLogin.getId(),
                         LoggingUtils.sanitizeForLog(accountLogin),
@@ -179,7 +179,7 @@ public class WorkspaceInstallationService {
             if (ownerUserId == null) {
                 // Cannot sync the owner user - likely an old/deleted installation
                 // Log and return null to skip workspace creation
-                logger.warn(
+                log.warn(
                     "Skipping workspace creation for installation {}: cannot sync owner user '{}' and user does not exist locally.",
                     installationId,
                     LoggingUtils.sanitizeForLog(accountLogin)
@@ -204,7 +204,7 @@ public class WorkspaceInstallationService {
             // hijack that workspace. Instead, callers must surface the allocated slug to
             // the user.
             workspace = createWorkspace(availableSlug, accountLogin, accountLogin, wsAccountType, ownerUserId);
-            logger.info(
+            log.info(
                 "Created new workspace '{}' for installation {} with owner userId={} (requested slug='{}').",
                 LoggingUtils.sanitizeForLog(workspace.getWorkspaceSlug()),
                 installationId,
@@ -308,7 +308,7 @@ public class WorkspaceInstallationService {
     @Transactional
     public void handleAccountRename(long installationId, String previousLogin, String newLogin) {
         if (isBlank(newLogin)) {
-            logger.warn("Ignoring installation_target event for {} without target login", installationId);
+            log.warn("Ignoring installation_target event for {} without target login", installationId);
             return;
         }
 
@@ -325,7 +325,7 @@ public class WorkspaceInstallationService {
                     renameTrackedRepositories(oldLogin, newLogin);
                     rotateOrganizationConsumer(workspace, oldLogin, newLogin);
                 },
-                () -> logger.warn("installation_target event for unknown installation {}", installationId)
+                () -> log.warn("installation_target event for unknown installation {}", installationId)
             );
     }
 
@@ -465,7 +465,7 @@ public class WorkspaceInstallationService {
         // First check if user already exists
         var existingUser = userRepository.findByLogin(accountLogin);
         if (existingUser.isPresent()) {
-            logger.info(
+            log.info(
                 "Found existing user '{}' (id={}) for workspace ownership.",
                 LoggingUtils.sanitizeForLog(accountLogin),
                 existingUser.get().getId()
@@ -488,7 +488,7 @@ public class WorkspaceInstallationService {
             );
 
             User saved = userRepository.save(user);
-            logger.info(
+            log.info(
                 "Created user '{}' (id={}, type={}) for workspace ownership from installation {}.",
                 LoggingUtils.sanitizeForLog(accountLogin),
                 saved.getId(),
@@ -498,7 +498,7 @@ public class WorkspaceInstallationService {
             return saved.getId();
         }
 
-        logger.warn(
+        log.warn(
             "Cannot create user '{}' for installation {}: missing account ID from webhook.",
             LoggingUtils.sanitizeForLog(accountLogin),
             installationId

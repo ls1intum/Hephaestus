@@ -15,7 +15,7 @@ import org.springframework.stereotype.Component;
 @Profile("!specs & !test")
 public class WorkspaceStartupListener {
 
-    private static final Logger logger = LoggerFactory.getLogger(WorkspaceStartupListener.class);
+    private static final Logger log = LoggerFactory.getLogger(WorkspaceStartupListener.class);
 
     private final WorkspaceProvisioningService provisioningService;
     private final WorkspaceActivationService workspaceActivationService;
@@ -30,7 +30,7 @@ public class WorkspaceStartupListener {
 
     @EventListener(ApplicationReadyEvent.class)
     public void onApplicationReady() {
-        logger.info("Starting workspace provisioning.");
+        log.info("Starting workspace provisioning.");
         provisioningService.bootstrapDefaultPatWorkspace();
         provisioningService.ensureGitHubAppInstallations();
         workspaceActivationService.activateAllWorkspaces();

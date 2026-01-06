@@ -33,12 +33,12 @@ public interface PullRequestBadPracticeRepository extends JpaRepository<PullRequ
         """
         SELECT prbp
         FROM PullRequestBadPractice prbp
-        WHERE prbp.pullrequest.id = :pullRequestId
+        WHERE prbp.pullRequest.id = :pullRequestId
           AND prbp.detectionTime = (
             SELECT MAX(prbp2.detectionTime)
             FROM PullRequestBadPractice prbp2
             WHERE prbp2.title = prbp.title
-              AND prbp2.pullrequest.id = prbp.pullrequest.id)
+              AND prbp2.pullRequest.id = prbp.pullRequest.id)
         """
     )
     List<PullRequestBadPractice> findByPullRequestId(@Param("pullRequestId") long pullRequestId);

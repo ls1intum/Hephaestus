@@ -20,7 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class WorkspaceLifecycleService {
 
-    private static final Logger logger = LoggerFactory.getLogger(WorkspaceLifecycleService.class);
+    private static final Logger log = LoggerFactory.getLogger(WorkspaceLifecycleService.class);
 
     private final WorkspaceRepository workspaceRepository;
 
@@ -46,7 +46,7 @@ public class WorkspaceLifecycleService {
         if (workspace.getStatus() != WorkspaceStatus.SUSPENDED) {
             workspace.setStatus(WorkspaceStatus.SUSPENDED);
             workspace = workspaceRepository.save(workspace);
-            logger.info("Workspace '{}' has been suspended.", LoggingUtils.sanitizeForLog(workspaceSlug));
+            log.info("Workspace '{}' has been suspended.", LoggingUtils.sanitizeForLog(workspaceSlug));
             // TODO: Stop NATS consumers and signal schedulers
         }
 
@@ -79,7 +79,7 @@ public class WorkspaceLifecycleService {
         if (workspace.getStatus() != WorkspaceStatus.ACTIVE) {
             workspace.setStatus(WorkspaceStatus.ACTIVE);
             workspace = workspaceRepository.save(workspace);
-            logger.info("Workspace '{}' has been resumed.", LoggingUtils.sanitizeForLog(workspaceSlug));
+            log.info("Workspace '{}' has been resumed.", LoggingUtils.sanitizeForLog(workspaceSlug));
             // TODO: Restart NATS consumers and re-enable schedulers
         }
 
@@ -104,7 +104,7 @@ public class WorkspaceLifecycleService {
             .orElseThrow(() -> new EntityNotFoundException("Workspace", workspaceSlug));
 
         if (workspace.getStatus() == WorkspaceStatus.PURGED) {
-            logger.info("Workspace '{}' is already purged. Skipping.", LoggingUtils.sanitizeForLog(workspaceSlug));
+            log.info("Workspace '{}' is already purged. Skipping.", LoggingUtils.sanitizeForLog(workspaceSlug));
             return workspace;
         }
 
@@ -112,7 +112,7 @@ public class WorkspaceLifecycleService {
 
         workspace.setStatus(WorkspaceStatus.PURGED);
         workspace = workspaceRepository.save(workspace);
-        logger.info("Workspace '{}' has been purged (soft deleted).", LoggingUtils.sanitizeForLog(workspaceSlug));
+        log.info("Workspace '{}' has been purged (soft deleted).", LoggingUtils.sanitizeForLog(workspaceSlug));
         return workspace;
     }
 

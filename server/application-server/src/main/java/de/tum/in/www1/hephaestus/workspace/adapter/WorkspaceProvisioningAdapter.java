@@ -14,7 +14,7 @@ import org.springframework.stereotype.Component;
 @Component
 public class WorkspaceProvisioningAdapter implements WorkspaceProvisioningListener {
 
-    private static final Logger logger = LoggerFactory.getLogger(WorkspaceProvisioningAdapter.class);
+    private static final Logger log = LoggerFactory.getLogger(WorkspaceProvisioningAdapter.class);
 
     private final WorkspaceInstallationService workspaceInstallationService;
     private final WorkspaceRepositoryMonitorService repositoryMonitorService;
@@ -33,7 +33,7 @@ public class WorkspaceProvisioningAdapter implements WorkspaceProvisioningListen
     @Override
     public void onInstallationCreated(InstallationData installation) {
         if (installation == null) {
-            logger.warn("Received null installation data, skipping workspace provisioning");
+            log.warn("Received null installation data, skipping workspace provisioning");
             return;
         }
 
@@ -48,7 +48,7 @@ public class WorkspaceProvisioningAdapter implements WorkspaceProvisioningListen
         );
 
         if (workspace == null) {
-            logger.info(
+            log.info(
                 "Skipping installation event for {}: workspace could not be ensured",
                 installation.installationId()
             );
@@ -58,7 +58,7 @@ public class WorkspaceProvisioningAdapter implements WorkspaceProvisioningListen
     @Override
     public void onInstallationDeleted(Long installationId) {
         if (installationId == null) {
-            logger.warn("Received null installation ID for deletion, skipping");
+            log.warn("Received null installation ID for deletion, skipping");
             return;
         }
 
@@ -74,13 +74,13 @@ public class WorkspaceProvisioningAdapter implements WorkspaceProvisioningListen
         // 4. Mark workspace as PURGED (not SUSPENDED - deleted is permanent)
         workspaceInstallationService.updateWorkspaceStatus(installationId, Workspace.WorkspaceStatus.PURGED);
 
-        logger.info("Completed cleanup for deleted installation {}", installationId);
+        log.info("Completed cleanup for deleted installation {}", installationId);
     }
 
     @Override
     public void onRepositoriesAdded(Long installationId, List<String> repositoryNames) {
         if (installationId == null || repositoryNames == null || repositoryNames.isEmpty()) {
-            logger.debug(
+            log.debug(
                 "Skipping onRepositoriesAdded: installationId={}, repositoryNames={}",
                 installationId,
                 repositoryNames
@@ -90,13 +90,13 @@ public class WorkspaceProvisioningAdapter implements WorkspaceProvisioningListen
 
         // Repository additions are typically handled by repository-specific event handlers
         // This hook allows for future expansion where workspace-level actions are needed
-        logger.debug("Repositories added to installation {}: {}", installationId, repositoryNames);
+        log.debug("Repositories added to installation {}: {}", installationId, repositoryNames);
     }
 
     @Override
     public void onRepositoriesRemoved(Long installationId, List<String> repositoryNames) {
         if (installationId == null || repositoryNames == null || repositoryNames.isEmpty()) {
-            logger.debug(
+            log.debug(
                 "Skipping onRepositoriesRemoved: installationId={}, repositoryNames={}",
                 installationId,
                 repositoryNames
@@ -106,13 +106,13 @@ public class WorkspaceProvisioningAdapter implements WorkspaceProvisioningListen
 
         // Repository removals are typically handled by repository-specific event handlers
         // This hook allows for future expansion where workspace-level actions are needed
-        logger.debug("Repositories removed from installation {}: {}", installationId, repositoryNames);
+        log.debug("Repositories removed from installation {}: {}", installationId, repositoryNames);
     }
 
     @Override
     public void onAccountRenamed(Long installationId, String oldLogin, String newLogin) {
         if (installationId == null || newLogin == null || newLogin.isBlank()) {
-            logger.warn(
+            log.warn(
                 "Invalid account rename data: installationId={}, oldLogin={}, newLogin={}",
                 installationId,
                 oldLogin,
@@ -127,35 +127,35 @@ public class WorkspaceProvisioningAdapter implements WorkspaceProvisioningListen
     @Override
     public void onInstallationSuspended(Long installationId) {
         if (installationId == null) {
-            logger.warn("Received null installation ID for suspension, skipping");
+            log.warn("Received null installation ID for suspension, skipping");
             return;
         }
 
         workspaceInstallationService.updateWorkspaceStatus(installationId, Workspace.WorkspaceStatus.SUSPENDED);
-        logger.debug("Installation {} suspended", installationId);
+        log.debug("Installation {} suspended", installationId);
     }
 
     @Override
     public void onInstallationActivated(Long installationId) {
         if (installationId == null) {
-            logger.warn("Received null installation ID for activation, skipping");
+            log.warn("Received null installation ID for activation, skipping");
             return;
         }
 
         workspaceInstallationService.updateWorkspaceStatus(installationId, Workspace.WorkspaceStatus.ACTIVE);
-        logger.debug("Installation {} activated", installationId);
+        log.debug("Installation {} activated", installationId);
     }
 
     @Override
     public void onRepositorySelectionChanged(Long installationId, String selection) {
         if (installationId == null) {
-            logger.warn("Received null installation ID for repository selection change, skipping");
+            log.warn("Received null installation ID for repository selection change, skipping");
             return;
         }
 
         RepositorySelection repoSelection = parseRepositorySelection(selection);
         workspaceInstallationService.updateRepositorySelection(installationId, repoSelection);
-        logger.debug("Updated repository selection for installation {} to {}", installationId, repoSelection);
+        log.debug("Updated repository selection for installation {} to {}", installationId, repoSelection);
     }
 
     private RepositorySelection parseRepositorySelection(String selection) {

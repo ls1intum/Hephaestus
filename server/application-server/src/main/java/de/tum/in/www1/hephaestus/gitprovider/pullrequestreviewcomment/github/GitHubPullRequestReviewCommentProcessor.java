@@ -27,7 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class GitHubPullRequestReviewCommentProcessor {
 
-    private static final Logger logger = LoggerFactory.getLogger(GitHubPullRequestReviewCommentProcessor.class);
+    private static final Logger log = LoggerFactory.getLogger(GitHubPullRequestReviewCommentProcessor.class);
 
     private final PullRequestReviewCommentRepository commentRepository;
     private final PullRequestRepository prRepository;
@@ -70,13 +70,13 @@ public class GitHubPullRequestReviewCommentProcessor {
         ProcessingContext context
     ) {
         if (commentRepository.existsById(dto.id())) {
-            logger.debug("Comment {} already exists, skipping", dto.id());
+            log.debug("Comment {} already exists, skipping", dto.id());
             return null;
         }
 
         PullRequest pr = prRepository.findById(prId).orElse(null);
         if (pr == null) {
-            logger.warn("PR not found for comment: prId={}", prId);
+            log.warn("PR not found for comment: prId={}", prId);
             return null;
         }
 
@@ -93,7 +93,7 @@ public class GitHubPullRequestReviewCommentProcessor {
                 )
             );
         }
-        logger.debug("Created comment {} in thread {}", dto.id(), thread.getId());
+        log.debug("Created comment {} in thread {}", dto.id(), thread.getId());
         return saved;
     }
 
@@ -119,11 +119,11 @@ public class GitHubPullRequestReviewCommentProcessor {
                         )
                     );
                 }
-                logger.debug("Updated comment {}", dto.id());
+                log.debug("Updated comment {}", dto.id());
                 return saved;
             })
             .orElseGet(() -> {
-                logger.warn("Comment {} not found for edit", dto.id());
+                log.warn("Comment {} not found for edit", dto.id());
                 return null;
             });
     }
@@ -136,7 +136,7 @@ public class GitHubPullRequestReviewCommentProcessor {
                 new DomainEvent.ReviewCommentDeleted(commentId, prId, EventContext.from(context))
             );
         }
-        logger.debug("Deleted comment {}", commentId);
+        log.debug("Deleted comment {}", commentId);
     }
 
     private PullRequestReviewComment createComment(

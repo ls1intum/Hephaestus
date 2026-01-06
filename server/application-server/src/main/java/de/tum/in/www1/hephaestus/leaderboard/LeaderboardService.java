@@ -42,7 +42,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class LeaderboardService {
 
-    private static final Logger logger = LoggerFactory.getLogger(LeaderboardService.class);
+    private static final Logger log = LoggerFactory.getLogger(LeaderboardService.class);
 
     private final UserRepository userRepository;
     private final PullRequestReviewRepository pullRequestReviewRepository;
@@ -109,11 +109,11 @@ public class LeaderboardService {
         Map<Long, List<Team>> teamHierarchy
     ) {
         if (workspace == null || workspace.getId() == null) {
-            logger.warn("Skipping leaderboard dataset creation because workspace id is missing.");
+            log.warn("Skipping leaderboard dataset creation because workspace id is missing.");
             return Collections.emptyList();
         }
 
-        logger.info(
+        log.info(
             "Creating leaderboard dataset with timeframe: {} - {} and team: {} for workspace {}",
             after,
             before,
@@ -162,7 +162,7 @@ public class LeaderboardService {
         }
 
         if (activityData.isEmpty()) {
-            logger.info("No team members found for leaderboard");
+            log.info("No team members found for leaderboard");
             return Collections.emptyList();
         }
 
@@ -287,7 +287,7 @@ public class LeaderboardService {
         Instant before,
         LeaderboardSortType sort
     ) {
-        logger.info(
+        log.info(
             "Creating team leaderboard dataset with timeframe: {} - {} in workspace {}",
             after,
             before,
@@ -300,7 +300,7 @@ public class LeaderboardService {
             : teamRepository.findAllByOrganizationIgnoreCaseAndHiddenFalse(workspace.getAccountLogin());
 
         if (targetTeams.isEmpty()) {
-            logger.info("No teams found for team leaderboard in workspace {}", workspace.getWorkspaceSlug());
+            log.info("No teams found for team leaderboard in workspace {}", workspace.getWorkspaceSlug());
             return Collections.emptyList();
         }
 

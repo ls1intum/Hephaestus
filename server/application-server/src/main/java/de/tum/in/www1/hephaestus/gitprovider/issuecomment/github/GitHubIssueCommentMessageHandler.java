@@ -18,7 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Component
 public class GitHubIssueCommentMessageHandler extends GitHubMessageHandler<GitHubIssueCommentEventDTO> {
 
-    private static final Logger logger = LoggerFactory.getLogger(GitHubIssueCommentMessageHandler.class);
+    private static final Logger log = LoggerFactory.getLogger(GitHubIssueCommentMessageHandler.class);
 
     private final ProcessingContextFactory contextFactory;
     private final GitHubIssueProcessor issueProcessor;
@@ -48,11 +48,11 @@ public class GitHubIssueCommentMessageHandler extends GitHubMessageHandler<GitHu
         var issueDto = event.issue();
 
         if (commentDto == null || issueDto == null) {
-            logger.warn("Received issue_comment event with missing data");
+            log.warn("Received issue_comment event with missing data");
             return;
         }
 
-        logger.info(
+        log.info(
             "Received issue_comment event: action={}, issue=#{}, comment={}, repo={}",
             event.action(),
             issueDto.number(),

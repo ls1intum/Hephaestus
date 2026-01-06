@@ -27,7 +27,7 @@ import org.springframework.stereotype.Component;
 @Component("activityRetryListener")
 public class ActivityRetryListener implements RetryListener {
 
-    private static final Logger logger = LoggerFactory.getLogger(ActivityRetryListener.class);
+    private static final Logger log = LoggerFactory.getLogger(ActivityRetryListener.class);
 
     private final Counter retryAttemptsCounter;
 
@@ -48,7 +48,7 @@ public class ActivityRetryListener implements RetryListener {
 
         retryAttemptsCounter.increment();
 
-        logger.warn(
+        log.warn(
             "activity.event.retry_attempt attempt={} errorType={} errorMessage={}",
             retryCount,
             errorType,
@@ -66,13 +66,13 @@ public class ActivityRetryListener implements RetryListener {
         boolean exhausted = throwable != null;
 
         if (exhausted) {
-            logger.error(
+            log.error(
                 "activity.event.retry_exhausted totalAttempts={} finalError={}",
                 totalAttempts,
                 throwable.getClass().getSimpleName()
             );
         } else if (totalAttempts > 0) {
-            logger.info("activity.event.retry_succeeded afterAttempts={}", totalAttempts);
+            log.info("activity.event.retry_succeeded afterAttempts={}", totalAttempts);
         }
     }
 }

@@ -19,7 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class GitHubPullRequestReviewThreadMessageHandler
     extends GitHubMessageHandler<GitHubPullRequestReviewThreadEventDTO> {
 
-    private static final Logger logger = LoggerFactory.getLogger(GitHubPullRequestReviewThreadMessageHandler.class);
+    private static final Logger log = LoggerFactory.getLogger(GitHubPullRequestReviewThreadMessageHandler.class);
 
     private final ProcessingContextFactory contextFactory;
     private final GitHubPullRequestProcessor prProcessor;
@@ -49,11 +49,11 @@ public class GitHubPullRequestReviewThreadMessageHandler
         var prDto = event.pullRequest();
 
         if (threadDto == null || prDto == null) {
-            logger.warn("Received pull_request_review_thread event with missing data");
+            log.warn("Received pull_request_review_thread event with missing data");
             return;
         }
 
-        logger.info(
+        log.info(
             "Received pull_request_review_thread event: action={}, pr=#{}, thread={}, repo={}",
             event.action(),
             prDto.number(),
@@ -76,7 +76,7 @@ public class GitHubPullRequestReviewThreadMessageHandler
                 threadDto.id(),
                 context
             );
-            default -> logger.debug("Unhandled thread action: {}", event.action());
+            default -> log.debug("Unhandled thread action: {}", event.action());
         }
     }
 }

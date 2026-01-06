@@ -25,7 +25,7 @@ import org.springframework.stereotype.Component;
 @Component
 public abstract class GitHubMessageHandler<T> implements MessageHandler {
 
-    private static final Logger logger = LoggerFactory.getLogger(GitHubMessageHandler.class);
+    private static final Logger log = LoggerFactory.getLogger(GitHubMessageHandler.class);
 
     private final Class<T> payloadType;
     private final NatsMessageDeserializer deserializer;
@@ -41,7 +41,7 @@ public abstract class GitHubMessageHandler<T> implements MessageHandler {
         String subject = msg.getSubject();
         String safeSubject = sanitizeForLog(subject);
         if (!subject.endsWith(eventType)) {
-            logger.error("Received message on unexpected subject: {}, expected to end with {}", safeSubject, eventType);
+            log.error("Received message on unexpected subject: {}, expected to end with {}", safeSubject, eventType);
             return;
         }
 
@@ -49,9 +49,9 @@ public abstract class GitHubMessageHandler<T> implements MessageHandler {
             T eventPayload = deserializer.deserialize(msg, payloadType);
             handleEvent(eventPayload);
         } catch (IOException e) {
-            logger.error("Failed to parse payload for subject {}: {}", safeSubject, e.getMessage(), e);
+            log.error("Failed to parse payload for subject {}: {}", safeSubject, e.getMessage(), e);
         } catch (Exception e) {
-            logger.error("Unexpected error while handling message for subject {}: {}", safeSubject, e.getMessage(), e);
+            log.error("Unexpected error while handling message for subject {}: {}", safeSubject, e.getMessage(), e);
         }
     }
 

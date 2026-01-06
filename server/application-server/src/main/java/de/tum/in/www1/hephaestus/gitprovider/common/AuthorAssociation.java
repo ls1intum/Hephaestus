@@ -17,7 +17,7 @@ public enum AuthorAssociation {
     NONE,
     OWNER;
 
-    private static final Logger logger = LoggerFactory.getLogger(AuthorAssociation.class);
+    private static final Logger log = LoggerFactory.getLogger(AuthorAssociation.class);
 
     /**
      * Parse an author association from a string value.
@@ -33,7 +33,7 @@ public enum AuthorAssociation {
         try {
             return valueOf(value.toUpperCase().replace("-", "_"));
         } catch (IllegalArgumentException e) {
-            logger.debug("Unknown author association: {}, defaulting to NONE", value);
+            log.debug("Unknown author association: {}, defaulting to NONE", value);
             return NONE;
         }
     }

@@ -52,7 +52,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class UserProfileService {
 
-    private static final Logger logger = LoggerFactory.getLogger(UserProfileService.class);
+    private static final Logger log = LoggerFactory.getLogger(UserProfileService.class);
     private static final Duration DEFAULT_ACTIVITY_WINDOW = Duration.ofDays(7);
 
     private final UserRepository userRepository;
@@ -100,7 +100,7 @@ public class UserProfileService {
         String safeWorkspace = workspaceId == null ? "null" : LoggingUtils.sanitizeForLog(workspaceId.toString());
         String safeAfter = LoggingUtils.sanitizeForLog(timeRange.after().toString());
         String safeBefore = LoggingUtils.sanitizeForLog(timeRange.before().toString());
-        logger.debug(
+        log.debug(
             "Getting user profile for login: {} in workspace: {} with timeframe {} - {}",
             safeLogin,
             safeWorkspace,
@@ -149,7 +149,7 @@ public class UserProfileService {
         Instant resolvedAfter = after == null ? resolvedBefore.minus(DEFAULT_ACTIVITY_WINDOW) : after;
 
         if (resolvedAfter.isAfter(resolvedBefore)) {
-            logger.debug(
+            log.debug(
                 "Clamping activity window for user {} because after > before",
                 LoggingUtils.sanitizeForLog(login)
             );

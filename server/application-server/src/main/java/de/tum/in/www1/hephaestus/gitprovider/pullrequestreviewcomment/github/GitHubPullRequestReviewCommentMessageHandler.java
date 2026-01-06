@@ -19,7 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class GitHubPullRequestReviewCommentMessageHandler
     extends GitHubMessageHandler<GitHubPullRequestReviewCommentEventDTO> {
 
-    private static final Logger logger = LoggerFactory.getLogger(GitHubPullRequestReviewCommentMessageHandler.class);
+    private static final Logger log = LoggerFactory.getLogger(GitHubPullRequestReviewCommentMessageHandler.class);
 
     private final ProcessingContextFactory contextFactory;
     private final GitHubPullRequestProcessor prProcessor;
@@ -49,11 +49,11 @@ public class GitHubPullRequestReviewCommentMessageHandler
         var prDto = event.pullRequest();
 
         if (commentDto == null || prDto == null) {
-            logger.warn("Received pull_request_review_comment event with missing data");
+            log.warn("Received pull_request_review_comment event with missing data");
             return;
         }
 
-        logger.info(
+        log.info(
             "Received pull_request_review_comment event: action={}, pr=#{}, comment={}, repo={}",
             event.action(),
             prDto.number(),
@@ -88,7 +88,7 @@ public class GitHubPullRequestReviewCommentMessageHandler
                 prId,
                 context
             );
-            default -> logger.debug("Unhandled comment action: {}", event.action());
+            default -> log.debug("Unhandled comment action: {}", event.action());
         }
     }
 }

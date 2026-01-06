@@ -23,7 +23,7 @@ import org.springframework.stereotype.Component;
 @Component
 public class KeycloakUserRoleChecker implements UserRoleChecker {
 
-    private static final Logger logger = LoggerFactory.getLogger(KeycloakUserRoleChecker.class);
+    private static final Logger log = LoggerFactory.getLogger(KeycloakUserRoleChecker.class);
     private static final String AUTOMATIC_DETECTION_ROLE = "run_automatic_detection";
 
     private final Keycloak keycloak;
@@ -38,7 +38,7 @@ public class KeycloakUserRoleChecker implements UserRoleChecker {
     @Override
     public boolean hasAutomaticDetectionRole(@NonNull String username) {
         if (!healthy.get()) {
-            logger.debug("Skipping role check for user {} because Keycloak is marked unhealthy", username);
+            log.debug("Skipping role check for user {} because Keycloak is marked unhealthy", username);
             return false;
         }
 
@@ -46,7 +46,7 @@ public class KeycloakUserRoleChecker implements UserRoleChecker {
             List<UserRepresentation> users = keycloak.realm(realm).users().searchByUsername(username, true);
 
             if (users.isEmpty()) {
-                logger.debug("User {} not found in Keycloak", username);
+                log.debug("User {} not found in Keycloak", username);
                 return false;
             }
 
@@ -62,15 +62,15 @@ public class KeycloakUserRoleChecker implements UserRoleChecker {
             boolean hasRole = roles.stream().anyMatch(role -> AUTOMATIC_DETECTION_ROLE.equals(role.getName()));
 
             if (hasRole) {
-                logger.debug("User {} has the {} role", username, AUTOMATIC_DETECTION_ROLE);
+                log.debug("User {} has the {} role", username, AUTOMATIC_DETECTION_ROLE);
             } else {
-                logger.debug("User {} does not have the {} role", username, AUTOMATIC_DETECTION_ROLE);
+                log.debug("User {} does not have the {} role", username, AUTOMATIC_DETECTION_ROLE);
             }
 
             return hasRole;
         } catch (ProcessingException | NotAuthorizedException e) {
             if (healthy.compareAndSet(true, false)) {
-                logger.info(
+                log.info(
                     "Disabling Keycloak role checks after error: {}. " +
                         "Configure KEYCLOAK credentials or restart to re-enable.",
                     e.getMessage()
@@ -78,7 +78,7 @@ public class KeycloakUserRoleChecker implements UserRoleChecker {
             }
             return false;
         } catch (Exception e) {
-            logger.error("Error checking user role for {}: {}", username, e.toString());
+            log.error("Error checking user role for {}: {}", username, e.toString());
             return false;
         }
     }

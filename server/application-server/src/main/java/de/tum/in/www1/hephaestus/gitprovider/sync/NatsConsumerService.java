@@ -534,16 +534,10 @@ public class NatsConsumerService {
                 log.info("Connected to NATS server.");
             } catch (IOException e) {
                 log.error("Failed to connect to NATS server: {}", e.getMessage(), e);
-                throw new NatsConnectionException(
-                    "Failed to establish NATS connection",
-                    e
-                );
+                throw new NatsConnectionException("Failed to establish NATS connection", e);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
-                throw new NatsConnectionException(
-                    "Connection attempt interrupted",
-                    e
-                );
+                throw new NatsConnectionException("Connection attempt interrupted", e);
             }
         }
     }

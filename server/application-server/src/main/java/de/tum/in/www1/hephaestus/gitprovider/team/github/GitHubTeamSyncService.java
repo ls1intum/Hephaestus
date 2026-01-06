@@ -50,7 +50,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class GitHubTeamSyncService {
 
-    private static final Logger logger = LoggerFactory.getLogger(GitHubTeamSyncService.class);
+    private static final Logger log = LoggerFactory.getLogger(GitHubTeamSyncService.class);
     private static final String GET_ORGANIZATION_TEAMS_DOCUMENT = "GetOrganizationTeams";
     private static final String GET_TEAM_MEMBERS_DOCUMENT = "GetTeamMembers";
     private static final String GET_TEAM_REPOSITORIES_DOCUMENT = "GetTeamRepositories";
@@ -91,7 +91,7 @@ public class GitHubTeamSyncService {
     @Transactional
     public int syncTeamsForOrganization(Long workspaceId, String organizationLogin) {
         if (organizationLogin == null || organizationLogin.isBlank()) {
-            logger.warn("Organization login is null or blank, cannot sync teams");
+            log.warn("Organization login is null or blank, cannot sync teams");
             return 0;
         }
 
@@ -135,10 +135,10 @@ public class GitHubTeamSyncService {
             // Remove teams that no longer exist in the organization
             removeDeletedTeams(organizationLogin, syncedTeamIds);
 
-            logger.info("Synced {} teams for organization {}", totalSynced, organizationLogin);
+            log.info("Synced {} teams for organization {}", totalSynced, organizationLogin);
             return totalSynced;
         } catch (Exception e) {
-            logger.error("Error syncing teams for organization {}: {}", organizationLogin, e.getMessage(), e);
+            log.error("Error syncing teams for organization {}: {}", organizationLogin, e.getMessage(), e);
             return 0;
         }
     }
@@ -199,7 +199,7 @@ public class GitHubTeamSyncService {
         var membersPageInfo = membersConnection.getPageInfo();
 
         if (membersPageInfo != null && Boolean.TRUE.equals(membersPageInfo.getHasNextPage())) {
-            logger.debug(
+            log.debug(
                 "Team {} has more than 100 members (totalCount={}), fetching additional pages",
                 team.getName(),
                 membersConnection.getTotalCount()
@@ -245,7 +245,7 @@ public class GitHubTeamSyncService {
                 if (existingMembership != null) {
                     // Update role if changed
                     if (existingMembership.getRole() != role) {
-                        logger.info(
+                        log.info(
                             "Updating role for user {} in team {} from {} to {}",
                             sanitizeForLog(user.getLogin()),
                             sanitizeForLog(team.getName()),
@@ -259,7 +259,7 @@ public class GitHubTeamSyncService {
                     // Create new membership
                     TeamMembership membership = new TeamMembership(team, user, role);
                     teamMembershipRepository.save(membership);
-                    logger.debug(
+                    log.debug(
                         "Created membership for user {} in team {} with role {}",
                         sanitizeForLog(user.getLogin()),
                         sanitizeForLog(team.getName()),
@@ -300,7 +300,7 @@ public class GitHubTeamSyncService {
         var reposPageInfo = reposConnection.getPageInfo();
 
         if (reposPageInfo != null && Boolean.TRUE.equals(reposPageInfo.getHasNextPage())) {
-            logger.debug(
+            log.debug(
                 "Team {} has more than 100 repositories (totalCount={}), fetching additional pages",
                 team.getName(),
                 reposConnection.getTotalCount()
@@ -344,7 +344,7 @@ public class GitHubTeamSyncService {
         }
 
         team.clearAndAddRepoPermissions(freshPermissions);
-        logger.debug(
+        log.debug(
             "Synced {} repository permissions for team {}",
             freshPermissions.size(),
             sanitizeForLog(team.getName())
@@ -474,7 +474,7 @@ public class GitHubTeamSyncService {
         }
 
         if (removed > 0) {
-            logger.debug("Removed {} stale memberships from team {}", removed, team.getName());
+            log.debug("Removed {} stale memberships from team {}", removed, team.getName());
         }
     }
 
@@ -496,7 +496,7 @@ public class GitHubTeamSyncService {
         }
 
         if (removed > 0) {
-            logger.info("Deleted {} stale teams for organization {}", removed, organizationLogin);
+            log.info("Deleted {} stale teams for organization {}", removed, organizationLogin);
         }
     }
 

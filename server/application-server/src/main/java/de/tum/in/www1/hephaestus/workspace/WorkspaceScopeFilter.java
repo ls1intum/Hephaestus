@@ -29,7 +29,7 @@ import org.springframework.stereotype.Component;
 @Component
 public class WorkspaceScopeFilter {
 
-    private static final Logger logger = LoggerFactory.getLogger(WorkspaceScopeFilter.class);
+    private static final Logger log = LoggerFactory.getLogger(WorkspaceScopeFilter.class);
 
     private final Set<String> allowedOrganizations;
     private final Set<String> allowedRepositories;
@@ -42,13 +42,13 @@ public class WorkspaceScopeFilter {
     @PostConstruct
     void logConfiguration() {
         if (isActive()) {
-            logger.info(
+            log.info(
                 "Workspace scope filter ACTIVE: allowed-organizations={}, allowed-repositories={}",
                 allowedOrganizations,
                 allowedRepositories
             );
         } else {
-            logger.info("Workspace scope filter INACTIVE: all workspaces and repositories will be synced.");
+            log.info("Workspace scope filter INACTIVE: all workspaces and repositories will be synced.");
         }
     }
 
