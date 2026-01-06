@@ -109,4 +109,16 @@
         <renameColumn tableName="pullrequestbadpractice" oldColumnName="detection_pullrequest_lifecycle_state_new" newColumnName="detection_pullrequest_lifecycle_state"/>
     </changeSet>
 
+    <!-- Step 6: Explicitly set column types to match Hibernate entity expectations -->
+    <changeSet id="1767800000000-6-fix-column-types" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="pullrequestbadpractice" columnName="state"/>
+        </preConditions>
+        <comment>Ensure enum columns have correct varchar(32) type to match Hibernate entity @Column(length=32)</comment>
+        
+        <modifyDataType tableName="pullrequestbadpractice" columnName="state" newDataType="varchar(32)"/>
+        <modifyDataType tableName="pullrequestbadpractice" columnName="user_state" newDataType="varchar(32)"/>
+        <modifyDataType tableName="pullrequestbadpractice" columnName="detection_pullrequest_lifecycle_state" newDataType="varchar(32)"/>
+    </changeSet>
+
 </databaseChangeLog>
