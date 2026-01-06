@@ -46,7 +46,7 @@ export const activityEvent = pgTable(
 		schemaVersion: integer("schema_version").default(1).notNull(),
 		triggerContext: varchar("trigger_context", { length: 64 }),
 		contentHash: varchar("content_hash", { length: 64 }),
-		formulaVersion: integer("formula_version").notNull(),
+		formulaVersion: integer("formula_version").default(1).notNull(),
 	},
 	(table) => [
 		index("idx_activity_event_actor_occurred").using(
@@ -410,13 +410,13 @@ export const issue = pgTable(
 		subIssuesCompleted: integer("sub_issues_completed"),
 		subIssuesPercentCompleted: integer("sub_issues_percent_completed"),
 		issueTypeId: varchar("issue_type_id", { length: 128 }),
-		baseRefName: varchar("base_ref_name", { length: 255 }),
-		baseRefOid: varchar("base_ref_oid", { length: 40 }),
-		headRefName: varchar("head_ref_name", { length: 255 }),
-		headRefOid: varchar("head_ref_oid", { length: 40 }),
 		mergeStateStatus: varchar("merge_state_status", { length: 255 }),
 		mergeable: boolean(),
 		reviewDecision: varchar("review_decision", { length: 255 }),
+		headRefName: varchar("head_ref_name", { length: 255 }),
+		headRefOid: varchar("head_ref_oid", { length: 40 }),
+		baseRefName: varchar("base_ref_name", { length: 255 }),
+		baseRefOid: varchar("base_ref_oid", { length: 40 }),
 	},
 	(table) => [
 		index("idx_issue_author_id").using("btree", table.authorId.asc().nullsLast()),
@@ -456,11 +456,11 @@ export const issue = pgTable(
 		}).onDelete("set null"),
 		check(
 			"issue_merge_state_status_check",
-			sql`(merge_state_status)::text = ANY ((ARRAY['BEHIND'::character varying, 'BLOCKED'::character varying, 'CLEAN'::character varying, 'DIRTY'::character varying, 'HAS_HOOKS'::character varying, 'UNKNOWN'::character varying, 'UNSTABLE'::character varying])::text[])`,
+			sql`(merge_state_status)::text = ANY (ARRAY['BEHIND'::text, 'BLOCKED'::text, 'CLEAN'::text, 'DIRTY'::text, 'HAS_HOOKS'::text, 'UNKNOWN'::text, 'UNSTABLE'::text])`,
 		),
 		check(
 			"issue_review_decision_check",
-			sql`(review_decision)::text = ANY ((ARRAY['APPROVED'::character varying, 'CHANGES_REQUESTED'::character varying, 'REVIEW_REQUIRED'::character varying])::text[])`,
+			sql`(review_decision)::text = ANY (ARRAY['APPROVED'::text, 'CHANGES_REQUESTED'::text, 'REVIEW_REQUIRED'::text])`,
 		),
 	],
 );
