@@ -5,13 +5,51 @@ import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReview
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.PullRequestReviewComment;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewthread.PullRequestReviewThread;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
-import jakarta.persistence.*;
+import jakarta.persistence.CascadeType;
+import jakarta.persistence.Column;
+import jakarta.persistence.DiscriminatorValue;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.JoinTable;
+import jakarta.persistence.ManyToMany;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.Set;
-import lombok.*;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+import lombok.ToString;
 import org.springframework.lang.Nullable;
 
+/**
+ * Represents a pull request from a Git provider (e.g., GitHub).
+ * <p>
+ * Extends {@link Issue} using SINGLE_TABLE inheritance (discriminator: "PULL_REQUEST").
+ * All PR-specific fields are nullable at the database level since Issues don't populate them.
+ * <p>
+ * <b>PR-specific Relationships:</b>
+ * <ul>
+ *   <li>{@link #mergedBy} – User who merged the PR (null if open/closed without merge)</li>
+ *   <li>{@link #requestedReviewers} – Users requested to review (may not have reviewed yet)</li>
+ *   <li>{@link #reviews} – Actual code review submissions</li>
+ *   <li>{@link #reviewComments} – Line-level comments on the diff</li>
+ *   <li>{@link #reviewThreads} – Threaded conversations on specific code ranges</li>
+ * </ul>
+ * <p>
+ * <b>Branch Information:</b>
+ * <ul>
+ *   <li>{@link #headRefName}/{@link #headRefOid} – Source branch name and commit SHA</li>
+ *   <li>{@link #baseRefName}/{@link #baseRefOid} – Target branch name and commit SHA</li>
+ * </ul>
+ *
+ * @see Issue
+ * @see PullRequestReview
+ */
 @Entity
 @DiscriminatorValue(value = "PULL_REQUEST")
 @Getter
@@ -81,7 +119,7 @@ public class PullRequest extends Issue {
     @Column(length = 40)
     private String baseRefOid;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "merged_by_id")
     @ToString.Exclude
     private User mergedBy;

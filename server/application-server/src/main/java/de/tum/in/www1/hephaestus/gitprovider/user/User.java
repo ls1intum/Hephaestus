@@ -23,8 +23,27 @@ import lombok.Setter;
 import lombok.ToString;
 import org.springframework.lang.NonNull;
 
+/**
+ * Represents a Git provider user (GitHub user, bot, or organization).
+ * <p>
+ * Users are the actors in the git provider domain—they author issues, PRs, comments,
+ * and reviews. This entity serves as a denormalized cache of user data from the Git
+ * provider API, identified by the provider's database ID.
+ * <p>
+ * <b>Relationship Summary:</b>
+ * <ul>
+ *   <li>{@link #createdIssues} – Issues/PRs authored by this user</li>
+ *   <li>{@link #assignedIssues} – Issues/PRs assigned to this user</li>
+ *   <li>{@link #teamMemberships} – Teams this user belongs to</li>
+ *   <li>{@link #repositoryCollaborations} – Repositories with direct access</li>
+ *   <li>{@link #reviews}, {@link #reviewComments} – Code review activity</li>
+ * </ul>
+ *
+ * @see de.tum.in.www1.hephaestus.gitprovider.team.membership.TeamMembership
+ * @see de.tum.in.www1.hephaestus.gitprovider.repository.collaborator.RepositoryCollaborator
+ */
 @Entity
-@Table(name = "user", schema = "public")
+@Table(name = "\"user\"")
 @Getter
 @Setter
 @NoArgsConstructor
@@ -89,10 +108,8 @@ public class User extends BaseGitServiceEntity {
     // Note: WorkspaceMembership is accessed via WorkspaceMembershipRepository, not via User entity.
     // The relationship is unidirectional from WorkspaceMembership → User to maintain module separation.
 
-    @NonNull
     private boolean notificationsEnabled = true;
 
-    @NonNull
     private boolean participateInResearch = true;
 
     public enum Type {

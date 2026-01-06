@@ -4,6 +4,7 @@ import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandlerRegistry;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.NatsSubscriptionProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.NatsSubscriptionProvider.NatsSubscriptionInfo;
+import de.tum.in.www1.hephaestus.gitprovider.sync.exception.NatsConnectionException;
 import io.nats.client.Connection;
 import io.nats.client.ConsumerContext;
 import io.nats.client.ErrorListener;
@@ -44,24 +45,57 @@ import org.springframework.stereotype.Service;
 
 /**
  * NATS consumer service that manages one consumer per workspace.
- * <p>
- * Architecture:
- * - Each workspace gets exactly ONE NATS consumer
- * - Consumer subscribes to all repositories in the workspace using wildcard subjects
- * - Messages are processed SEQUENTIALLY within each workspace (avoids race conditions)
- * - Workspaces process in PARALLEL using virtual threads (scales to 100s of workspaces)
- * - Installation-level events are handled by a single global consumer
- * <p>
- * This design ensures:
- * - No concurrent insert conflicts for shared entities (Organization, Users)
- * - Rate limit friendly (sequential processing per workspace/installation)
- * - Scales horizontally with number of workspaces
+ *
+ * <h2>Architecture</h2>
+ * <ul>
+ *   <li>Each workspace gets exactly ONE NATS consumer</li>
+ *   <li>Consumer subscribes to all repositories in the workspace using wildcard subjects</li>
+ *   <li>Messages are processed SEQUENTIALLY within each workspace (avoids race conditions)</li>
+ *   <li>Workspaces process in PARALLEL using virtual threads (scales to 100s of workspaces)</li>
+ *   <li>Installation-level events are handled by a single global consumer</li>
+ * </ul>
+ *
+ * <h2>Thread Safety</h2>
+ * This class is thread-safe. Key synchronization mechanisms:
+ * <ul>
+ *   <li>{@code shuttingDown} - AtomicBoolean for shutdown coordination</li>
+ *   <li>{@code workspaceConsumers} - ConcurrentHashMap for consumer registry</li>
+ *   <li>{@code pendingWorkspaceSetup} - ConcurrentHashMap.newKeySet() prevents duplicate setup</li>
+ *   <li>{@code connectionLock} - Guards NATS connection creation/access</li>
+ *   <li>{@code installationConsumer} - volatile for safe publication</li>
+ * </ul>
+ *
+ * <h2>Lifecycle</h2>
+ * <ol>
+ *   <li>{@code init()} - Called on ApplicationReadyEvent, establishes NATS connection</li>
+ *   <li>{@code startConsumingWorkspace()} - Creates consumer for a workspace (idempotent)</li>
+ *   <li>{@code stopConsumingWorkspace()} - Removes consumer for a workspace</li>
+ *   <li>{@code shutdown()} - Called on @PreDestroy, graceful cleanup of all resources</li>
+ * </ol>
+ *
+ * <h2>Configuration</h2>
+ * All configuration is read from {@code nats.*} properties in application.yml:
+ * <ul>
+ *   <li>{@code nats.enabled} - Master switch for NATS integration</li>
+ *   <li>{@code nats.server} - NATS server URL (required when enabled)</li>
+ *   <li>{@code nats.timeframe} - Days of history to replay on consumer creation</li>
+ *   <li>{@code nats.durable-consumer-name} - Base name for durable consumers</li>
+ *   <li>{@code nats.consumer.ack-wait-minutes} - Message acknowledgment timeout (default: 5)</li>
+ *   <li>{@code nats.consumer.max-ack-pending} - Max unacked messages per consumer (default: 500)</li>
+ *   <li>{@code nats.consumer.reconnect-delay-seconds} - Delay between reconnect attempts (default: 2)</li>
+ *   <li>{@code nats.consumer.request-timeout-seconds} - JetStream API timeout (default: 60)</li>
+ * </ul>
+ *
+ * @see WorkspaceNatsConsumer
  */
 @Order(1)
 @Service
 public class NatsConsumerService {
 
-    private static final Logger logger = LoggerFactory.getLogger(NatsConsumerService.class);
+    private static final Logger log = LoggerFactory.getLogger(NatsConsumerService.class);
+
+    /** Lock for NATS connection creation to prevent race conditions. */
+    private final Object connectionLock = new Object();
 
     private final AtomicBoolean shuttingDown = new AtomicBoolean(false);
 
@@ -118,7 +152,7 @@ public class NatsConsumerService {
     @EventListener(ApplicationReadyEvent.class)
     public void init() {
         if (!isNatsEnabled) {
-            logger.info("NATS is disabled. Skipping initialization.");
+            log.info("NATS is disabled. Skipping initialization.");
             return;
         }
 
@@ -139,13 +173,13 @@ public class NatsConsumerService {
             try {
                 natsConnection = Nats.connect(options);
                 setupInstallationConsumer();
-                logger.info("NATS connection and installation consumer setup successful");
+                log.info("NATS connection and installation consumer setup successful");
                 return;
             } catch (InterruptedException interrupted) {
                 Thread.currentThread().interrupt();
                 return;
             } catch (IOException e) {
-                logger.error("NATS connection error: {}", e.getMessage(), e);
+                log.error("NATS connection error: {}", e.getMessage(), e);
                 backoffBeforeRetry();
             }
         }
@@ -158,9 +192,9 @@ public class NatsConsumerService {
             .server(natsServer)
             .connectionListener((conn, type) -> {
                 if (conn != null && conn.getServerInfo() != null) {
-                    logger.info("NATS connection event - Server: {}, {}", conn.getServerInfo().getPort(), type);
+                    log.info("NATS connection event - Server: {}, {}", conn.getServerInfo().getPort(), type);
                 } else {
-                    logger.info("NATS connection event - {}", type);
+                    log.info("NATS connection event - {}", type);
                 }
             })
             .errorListener(new JetStreamErrorListener())
@@ -184,13 +218,13 @@ public class NatsConsumerService {
 
         // Check if consumer already exists
         if (workspaceConsumers.containsKey(workspaceId)) {
-            logger.debug("Consumer already exists for workspace id={}", workspaceId);
+            log.debug("Consumer already exists for workspace id={}", workspaceId);
             return;
         }
 
         // Use atomic add to prevent concurrent setup attempts
         if (!pendingWorkspaceSetup.add(workspaceId)) {
-            logger.debug("Consumer setup already in progress for workspace id={}", workspaceId);
+            log.debug("Consumer setup already in progress for workspace id={}", workspaceId);
             return;
         }
 
@@ -199,7 +233,7 @@ public class NatsConsumerService {
                 ensureNatsConnectionEstablished();
                 setupWorkspaceConsumer(workspaceId);
             } catch (Exception e) {
-                logger.error("Failed to start consumer for workspace id={}: {}", workspaceId, e.getMessage(), e);
+                log.error("Failed to start consumer for workspace id={}: {}", workspaceId, e.getMessage(), e);
             } finally {
                 pendingWorkspaceSetup.remove(workspaceId);
             }
@@ -223,7 +257,7 @@ public class NatsConsumerService {
         if (existing == null) {
             // No consumer yet - don't start one here. Consumer will be started
             // during workspace activation which happens after provisioning completes.
-            logger.debug(
+            log.debug(
                 "No existing consumer for workspace id={}, skipping update (consumer will be started during activation)",
                 workspaceId
             );
@@ -234,9 +268,9 @@ public class NatsConsumerService {
             try {
                 String[] newSubjects = buildWorkspaceSubjects(workspaceId);
                 existing.updateSubjects(newSubjects);
-                logger.info("Updated consumer subjects for workspace id={}", workspaceId);
+                log.info("Updated consumer subjects for workspace id={}", workspaceId);
             } catch (Exception e) {
-                logger.error("Failed to update consumer for workspace id={}: {}", workspaceId, e.getMessage(), e);
+                log.error("Failed to update consumer for workspace id={}: {}", workspaceId, e.getMessage(), e);
             }
         });
     }
@@ -253,7 +287,7 @@ public class NatsConsumerService {
         WorkspaceConsumer consumer = workspaceConsumers.remove(workspaceId);
 
         if (consumer == null) {
-            logger.debug("No consumer found for workspace id={}", workspaceId);
+            log.debug("No consumer found for workspace id={}", workspaceId);
             return;
         }
 
@@ -261,9 +295,9 @@ public class NatsConsumerService {
             try {
                 consumer.stop();
                 cleanupConsumer(consumer.consumerName);
-                logger.info("Stopped consumer for workspace id={}", workspaceId);
+                log.info("Stopped consumer for workspace id={}", workspaceId);
             } catch (Exception e) {
-                logger.error("Error stopping consumer for workspace id={}: {}", workspaceId, e.getMessage(), e);
+                log.error("Error stopping consumer for workspace id={}: {}", workspaceId, e.getMessage(), e);
             }
         });
     }
@@ -276,7 +310,7 @@ public class NatsConsumerService {
         String[] subjects = buildWorkspaceSubjects(workspaceId);
 
         if (subjects.length == 0) {
-            logger.info("No subjects to consume for workspace id={} - skipping consumer setup", workspaceId);
+            log.info("No subjects to consume for workspace id={} - skipping consumer setup", workspaceId);
             return;
         }
 
@@ -300,7 +334,7 @@ public class NatsConsumerService {
             workspaceConsumer.start();
 
             workspaceConsumers.put(workspaceId, workspaceConsumer);
-            logger.info("Started consumer for workspace id={} with {} subjects", workspaceId, subjects.length);
+            log.info("Started consumer for workspace id={} with {} subjects", workspaceId, subjects.length);
         } catch (JetStreamApiException e) {
             throw new IOException("Failed to setup consumer for workspace " + workspaceId, e);
         }
@@ -319,7 +353,7 @@ public class NatsConsumerService {
 
             installationConsumer = new WorkspaceConsumer(null, consumerName, consumerContext, streamContext, subjects);
             installationConsumer.start();
-            logger.info("Started installation consumer with {} subjects", subjects.length);
+            log.info("Started installation consumer with {} subjects", subjects.length);
         } catch (JetStreamApiException e) {
             throw new IOException("Failed to setup installation consumer", e);
         }
@@ -338,7 +372,7 @@ public class NatsConsumerService {
                 var newSubjects = new HashSet<>(Arrays.asList(subjects));
 
                 if (!existingSubjects.equals(newSubjects)) {
-                    logger.info(
+                    log.info(
                         "Updating durable consumer {} subjects: {} -> {}",
                         consumerName,
                         existingSubjects.size(),
@@ -348,16 +382,16 @@ public class NatsConsumerService {
                         ConsumerConfiguration.builder(config).filterSubjects(subjects).build()
                     );
                 }
-                logger.debug("Durable consumer {} already exists with correct subjects", consumerName);
+                log.debug("Durable consumer {} already exists with correct subjects", consumerName);
                 return consumerContext;
             }
         } catch (JetStreamApiException e) {
             // Consumer doesn't exist - fall through to create it
-            logger.debug("Consumer {} not found, will create new one", consumerName);
+            log.debug("Consumer {} not found, will create new one", consumerName);
         }
 
         // Create new consumer (ephemeral if no durable name, durable otherwise)
-        logger.info(
+        log.info(
             "Creating {} consumer{} with {} subjects, startTime=now-{}days",
             isDurable ? "durable" : "ephemeral",
             isDurable ? " " + consumerName : "",
@@ -382,7 +416,7 @@ public class NatsConsumerService {
     private String[] buildWorkspaceSubjects(Long workspaceId) {
         var subscriptionInfoOpt = subscriptionProvider.getSubscriptionInfo(workspaceId);
         if (subscriptionInfoOpt.isEmpty()) {
-            logger.warn("No subscription info found for workspace id={}", workspaceId);
+            log.warn("No subscription info found for workspace id={}", workspaceId);
             return new String[0];
         }
 
@@ -459,7 +493,7 @@ public class NatsConsumerService {
             GitHubMessageHandler<?> eventHandler = handlerRegistry.getHandler(eventKey);
 
             if (eventHandler == null) {
-                logger.warn("No handler found for event type: {}", eventKey);
+                log.warn("No handler found for event type: {}", eventKey);
                 msg.ack();
                 return;
             }
@@ -468,22 +502,46 @@ public class NatsConsumerService {
             msg.ack();
         } catch (Exception e) {
             if (!shuttingDown.get()) {
-                logger.error("Error processing message: {}", e.getMessage(), e);
+                log.error("Error processing message: {}", e.getMessage(), e);
             }
             msg.nak();
         }
     }
 
+    /**
+     * Ensures a NATS connection is established, creating one if necessary.
+     * <p>
+     * Thread-safe: Uses double-checked locking with {@code connectionLock} to
+     * prevent multiple threads from racing to create connections.
+     *
+     * @throws NatsConnectionException if connection cannot be established
+     */
     private void ensureNatsConnectionEstablished() {
-        if (natsConnection == null || natsConnection.getStatus() != Connection.Status.CONNECTED) {
-            logger.info("NATS connection is not connected. Attempting to connect...");
+        // Fast path: connection already exists and is healthy
+        if (natsConnection != null && natsConnection.getStatus() == Connection.Status.CONNECTED) {
+            return;
+        }
+
+        // Slow path: acquire lock and double-check
+        synchronized (connectionLock) {
+            if (natsConnection != null && natsConnection.getStatus() == Connection.Status.CONNECTED) {
+                return;
+            }
+
+            log.info("NATS connection is not connected. Attempting to connect...");
             try {
                 natsConnection = Nats.connect(buildNatsOptions());
-                logger.info("Connected to NATS server.");
-            } catch (IOException | InterruptedException e) {
-                logger.error("Failed to connect to NATS server: {}", e.getMessage(), e);
-                throw new de.tum.in.www1.hephaestus.gitprovider.sync.exception.NatsConnectionException(
+                log.info("Connected to NATS server.");
+            } catch (IOException e) {
+                log.error("Failed to connect to NATS server: {}", e.getMessage(), e);
+                throw new NatsConnectionException(
                     "Failed to establish NATS connection",
+                    e
+                );
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new NatsConnectionException(
+                    "Connection attempt interrupted",
                     e
                 );
             }
@@ -498,7 +556,7 @@ public class NatsConsumerService {
         try {
             natsConnection.jetStreamManagement().deleteConsumer("github", consumerName);
         } catch (Exception e) {
-            logger.debug("Failed to delete consumer {}: {}", consumerName, e.getMessage());
+            log.debug("Failed to delete consumer {}: {}", consumerName, e.getMessage());
         }
     }
 
@@ -516,16 +574,16 @@ public class NatsConsumerService {
             return;
         }
 
-        logger.info("Initiating NATS consumer graceful shutdown...");
+        log.info("Initiating NATS consumer graceful shutdown...");
         shuttingDown.set(true);
 
         // Stop all workspace consumers
         for (var entry : workspaceConsumers.entrySet()) {
             try {
                 entry.getValue().stop();
-                logger.debug("Stopped consumer for workspace id={}", entry.getKey());
+                log.debug("Stopped consumer for workspace id={}", entry.getKey());
             } catch (Exception e) {
-                logger.debug("Error stopping workspace consumer: {}", e.getMessage());
+                log.debug("Error stopping workspace consumer: {}", e.getMessage());
             }
         }
         workspaceConsumers.clear();
@@ -535,7 +593,7 @@ public class NatsConsumerService {
             try {
                 installationConsumer.stop();
             } catch (Exception e) {
-                logger.debug("Error stopping installation consumer: {}", e.getMessage());
+                log.debug("Error stopping installation consumer: {}", e.getMessage());
             }
             installationConsumer = null;
         }
@@ -555,23 +613,23 @@ public class NatsConsumerService {
         if (natsConnection != null) {
             try {
                 natsConnection.close();
-                logger.info("NATS connection closed.");
+                log.info("NATS connection closed.");
             } catch (Exception e) {
-                logger.debug("Error closing NATS connection: {}", e.getMessage());
+                log.debug("Error closing NATS connection: {}", e.getMessage());
             }
             natsConnection = null;
         }
 
-        logger.info("NATS consumer shutdown complete.");
+        log.info("NATS consumer shutdown complete.");
     }
 
     private static class JetStreamErrorListener implements ErrorListener {
 
-        private static final Logger logger = LoggerFactory.getLogger(JetStreamErrorListener.class);
+        private static final Logger log = LoggerFactory.getLogger(JetStreamErrorListener.class);
 
         @Override
         public void errorOccurred(Connection conn, String error) {
-            logger.error("NATS error: {}", error);
+            log.error("NATS error: {}", error);
         }
 
         @Override
@@ -582,7 +640,7 @@ public class NatsConsumerService {
             long lastConsumerSequence
         ) {
             String consumerName = sub != null ? sub.getConsumerName() : "unknown";
-            logger.warn(
+            log.warn(
                 "NATS heartbeat alarm for consumer {} (streamSeq={}, consumerSeq={})",
                 consumerName,
                 lastStreamSequence,
@@ -592,8 +650,14 @@ public class NatsConsumerService {
     }
 
     /**
-     * Represents a NATS consumer for a single workspace.
-     * Processes messages SEQUENTIALLY to avoid race conditions.
+     * Internal NATS consumer for a single workspace.
+     * <p>
+     * This is an inner class (not static) so it can access {@link #handleMessage(Message)}
+     * from the enclosing service. For a reusable standalone implementation, see
+     * {@link WorkspaceNatsConsumer} which accepts a message handler as a parameter.
+     * <p>
+     * <b>Thread Safety:</b> Same guarantees as {@link WorkspaceNatsConsumer} - uses
+     * AtomicBoolean, BlockingQueue, and synchronized lifecycle methods.
      */
     private class WorkspaceConsumer {
 
@@ -651,7 +715,7 @@ public class NatsConsumerService {
                 try {
                     subscription.close();
                 } catch (Exception e) {
-                    logger.debug("Error closing subscription: {}", e.getMessage());
+                    log.debug("Error closing subscription: {}", e.getMessage());
                 }
                 subscription = null;
             }
@@ -669,7 +733,7 @@ public class NatsConsumerService {
                     msg.nak();
                 } catch (Exception e) {
                     // Expected during shutdown when connection is already closed
-                    logger.trace("Ignored NAK error during shutdown: {}", e.getMessage());
+                    log.trace("Ignored NAK error during shutdown: {}", e.getMessage());
                 }
             }
         }
@@ -692,7 +756,7 @@ public class NatsConsumerService {
                 try {
                     subscription.close();
                 } catch (Exception e) {
-                    logger.warn("Error closing subscription during subject update: {}", e.getMessage());
+                    log.warn("Error closing subscription during subject update: {}", e.getMessage());
                 }
             }
             subscription = context.consume(this::enqueueMessage);
@@ -719,7 +783,7 @@ public class NatsConsumerService {
          */
         private void processMessagesSequentially() {
             String label = workspaceId != null ? "workspace-" + workspaceId : "installation";
-            logger.debug("Started sequential message processor for {}", label);
+            log.debug("Started sequential message processor for {}", label);
 
             while (running.get() && !Thread.currentThread().isInterrupted()) {
                 try {
@@ -732,11 +796,11 @@ public class NatsConsumerService {
                     Thread.currentThread().interrupt();
                     break;
                 } catch (Exception e) {
-                    logger.error("Error in message processor for {}: {}", label, e.getMessage(), e);
+                    log.error("Error in message processor for {}: {}", label, e.getMessage(), e);
                 }
             }
 
-            logger.debug("Stopped sequential message processor for {}", label);
+            log.debug("Stopped sequential message processor for {}", label);
         }
     }
 }

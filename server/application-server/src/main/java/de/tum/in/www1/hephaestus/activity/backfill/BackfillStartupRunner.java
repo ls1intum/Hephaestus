@@ -17,29 +17,45 @@ import org.springframework.stereotype.Component;
  * property. When enabled, it runs after the application context is fully initialized and triggers
  * backfill for all workspaces that are not in PURGED status.
  *
- * <h3>Usage</h3>
- * <p>Add to your application-local.yml:
+ * <h3>Configuration</h3>
+ * <p>Add to your application-local.yml to enable automatic backfill on startup:
  * <pre>{@code
  * hephaestus:
  *   activity:
  *     backfill-on-startup: true
  * }</pre>
  *
- * <h3>Idempotency</h3>
- * <p>All backfill operations are idempotent - running them multiple times will not create
- * duplicate events due to unique constraints on event keys.
+ * <h3>Behavior</h3>
+ * <ul>
+ *   <li><strong>Scope</strong>: Processes all non-PURGED workspaces sequentially</li>
+ *   <li><strong>Idempotency</strong>: Safe to run multiple times - duplicate events are
+ *       automatically skipped via unique constraints</li>
+ *   <li><strong>Error Handling</strong>: Workspace failures are logged but do not abort
+ *       the overall backfill - subsequent workspaces continue processing</li>
+ *   <li><strong>Progress</strong>: Logs estimate before and progress after each workspace</li>
+ * </ul>
  *
- * <p><strong>DEPRECATION NOTICE:</strong> This component is temporary and will be removed
- * once all production environments have been migrated. It exists solely to backfill
- * historical activity events during the transition from the old XP calculation system
- * to the new activity event ledger.
+ * <h3>Error Recovery</h3>
+ * <p>If a workspace fails:
+ * <ol>
+ *   <li>Error is logged with workspace ID and exception details</li>
+ *   <li>Processing continues to next workspace</li>
+ *   <li>Re-running the application will retry failed workspaces</li>
+ *   <li>Successfully backfilled events are preserved (idempotent)</li>
+ * </ol>
  *
- * <p>Target removal: After all workspaces have been backfilled in production.
+ * <h3>Monitoring</h3>
+ * <p>Watch for these log patterns:
+ * <ul>
+ *   <li>{@code "Starting backfill for workspace"} - Workspace processing begins</li>
+ *   <li>{@code "Completed backfill for workspace"} - Successful completion with stats</li>
+ *   <li>{@code "Failed to backfill workspace"} - Error occurred (check exception)</li>
+ *   <li>{@code "Activity event backfill on startup complete"} - All workspaces done</li>
+ * </ul>
  *
- * @see ActivityEventBackfillService
- * @deprecated Temporary migration component - remove after production migration is complete
+ * @see ActivityEventBackfillService The underlying backfill implementation
+ * @see BackfillProgress Progress tracking for monitoring
  */
-@Deprecated(forRemoval = true)
 @Component
 @ConditionalOnProperty(name = "hephaestus.activity.backfill-on-startup", havingValue = "true")
 public class BackfillStartupRunner implements ApplicationRunner {
@@ -101,6 +117,6 @@ public class BackfillStartupRunner implements ApplicationRunner {
             }
         }
 
-        log.info("=== Activity event backfill on startup complete ===");
+        log.info("=== Activity event backfill on startup complete ({} workspaces processed) ===", workspaces.size());
     }
 }

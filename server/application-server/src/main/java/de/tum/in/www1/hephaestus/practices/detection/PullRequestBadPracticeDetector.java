@@ -252,7 +252,7 @@ public class PullRequestBadPracticeDetector {
 
         pullRequestBadPractice.setTitle(badPractice.getTitle());
         pullRequestBadPractice.setDescription(badPractice.getDescription());
-        pullRequestBadPractice.setPullrequest(pullRequest);
+        pullRequestBadPractice.setPullRequest(pullRequest);
         pullRequestBadPractice.setState(PullRequestBadPracticeState.fromBadPracticeStatus(badPractice.getStatus()));
         pullRequestBadPractice.setDetectionTime(Instant.now());
         pullRequestBadPractice.setLastUpdateTime(Instant.now());

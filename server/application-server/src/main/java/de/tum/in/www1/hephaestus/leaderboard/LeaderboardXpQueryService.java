@@ -1,7 +1,9 @@
 package de.tum.in.www1.hephaestus.leaderboard;
 
 import static java.util.function.Function.identity;
-import static java.util.stream.Collectors.*;
+import static java.util.stream.Collectors.joining;
+import static java.util.stream.Collectors.toMap;
+import static java.util.stream.Collectors.toSet;
 
 import de.tum.in.www1.hephaestus.activity.ActivityBreakdownProjection;
 import de.tum.in.www1.hephaestus.activity.ActivityEventRepository;
@@ -10,7 +12,10 @@ import de.tum.in.www1.hephaestus.activity.scoring.XpPrecision;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import java.time.Instant;
-import java.util.*;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.cache.annotation.Cacheable;
@@ -197,7 +202,7 @@ public class LeaderboardXpQueryService {
         for (Map.Entry<Long, LeaderboardUserXp.Builder> entry : builders.entrySet()) {
             Long actorId = entry.getKey();
             int prCount = distinctPrCountsByUser.getOrDefault(actorId, 0L).intValue();
-            entry.getValue().setReviewedPrCount(prCount);
+            entry.getValue().withReviewedPrCount(prCount);
         }
 
         // 8. Build immutable results

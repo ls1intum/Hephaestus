@@ -27,6 +27,27 @@ import lombok.Setter;
 import lombok.ToString;
 import org.springframework.lang.NonNull;
 
+/**
+ * Represents a Git repository from a provider (e.g., GitHub).
+ * <p>
+ * Repositories are the organizational unit containing issues, pull requests, labels,
+ * and milestones. They may belong to an {@link Organization} or be user-owned.
+ * <p>
+ * <b>Relationship Summary:</b>
+ * <ul>
+ *   <li>{@link #organization} – Parent organization (null for user-owned repos)</li>
+ *   <li>{@link #issues} – All issues and PRs in this repository</li>
+ *   <li>{@link #labels} – Labels available for categorization</li>
+ *   <li>{@link #milestones} – Milestones for release planning</li>
+ *   <li>{@link #collaborators} – Users with direct repository access</li>
+ *   <li>{@link #teamRepoPermissions} – Team-level access permissions</li>
+ * </ul>
+ * <p>
+ * <b>Sync Targets:</b> Repositories become sync targets when added to a workspace.
+ * The sync engine uses the {@code nameWithOwner} field to identify repositories.
+ *
+ * @see de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider.SyncTarget
+ */
 @Entity
 @Table(name = "repository")
 @Getter
@@ -71,6 +92,7 @@ public class Repository extends BaseGitServiceEntity {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "organization_id", foreignKey = @ForeignKey(name = "fk_repository_organization"))
+    @ToString.Exclude
     private Organization organization;
 
     @OneToMany(mappedBy = "repository", cascade = CascadeType.REMOVE, orphanRemoval = true)

@@ -152,7 +152,7 @@ public class PracticesService {
     public void resolveBadPractice(Workspace workspace, Long badPracticeId, PullRequestBadPracticeState state) {
         User currentUser = requireCurrentUser();
         PullRequestBadPractice badPractice = requireBadPracticeInWorkspace(badPracticeId, workspace);
-        requireAssignee(badPractice.getPullrequest(), currentUser);
+        requireAssignee(badPractice.getPullRequest(), currentUser);
         requireValidResolveState(state);
 
         badPractice.setUserState(state);
@@ -173,7 +173,7 @@ public class PracticesService {
     public PullRequestBadPractice getBadPracticeForFeedback(Workspace workspace, Long badPracticeId) {
         User currentUser = requireCurrentUser();
         PullRequestBadPractice badPractice = requireBadPracticeInWorkspace(badPracticeId, workspace);
-        requireAssignee(badPractice.getPullrequest(), currentUser);
+        requireAssignee(badPractice.getPullRequest(), currentUser);
         return badPractice;
     }
 
@@ -247,7 +247,7 @@ public class PracticesService {
         PullRequestBadPractice bp = badPracticeRepository
             .findById(badPracticeId)
             .orElseThrow(() -> new EntityNotFoundException("BadPractice", badPracticeId));
-        if (!belongsToWorkspace(bp.getPullrequest(), workspace)) {
+        if (!belongsToWorkspace(bp.getPullRequest(), workspace)) {
             throw new EntityNotFoundException("BadPractice", badPracticeId);
         }
         return bp;

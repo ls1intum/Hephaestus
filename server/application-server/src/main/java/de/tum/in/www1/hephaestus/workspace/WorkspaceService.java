@@ -24,25 +24,32 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Central service for workspace management operations.
- * <p>
- * This service focuses on:
+ *
+ * <h2>Responsibilities</h2>
  * <ul>
- *   <li>Workspace creation and slug management</li>
- *   <li>Team/label management</li>
- *   <li>Settings delegation to WorkspaceSettingsService</li>
- *   <li>League points recalculation</li>
- * </ul>
- * <p>
- * For other workspace operations, use the specialized services:
- * <ul>
- *   <li>{@link WorkspaceQueryService} - read-only queries</li>
- *   <li>{@link WorkspaceInstallationService} - installation handling</li>
- *   <li>{@link WorkspaceRepositoryMonitorService} - repository monitoring</li>
- *   <li>{@link WorkspaceActivationService} - activation/startup</li>
+ *   <li><b>Workspace creation:</b> Creates workspaces with owner membership</li>
+ *   <li><b>Slug management:</b> Renames with redirect history via {@link WorkspaceSlugService}</li>
+ *   <li><b>Team/label management:</b> Associates labels with teams for contribution filtering</li>
+ *   <li><b>Settings delegation:</b> Forwards to {@link WorkspaceSettingsService}</li>
+ *   <li><b>League points:</b> Triggers recalculation via {@link LeaguePointsRecalculator}</li>
  * </ul>
  *
- * <p>Workspace-agnostic: This service manages workspaces themselves (the tenant root),
- * not data within workspaces. Methods take workspace slug/context as parameters.
+ * <h2>Related Services</h2>
+ * For other workspace operations, use the specialized services:
+ * <ul>
+ *   <li>{@link WorkspaceQueryService} – Read-only queries and lookups</li>
+ *   <li>{@link WorkspaceLifecycleService} – Status transitions (suspend/resume/purge)</li>
+ *   <li>{@link WorkspaceInstallationService} – GitHub App installation handling</li>
+ *   <li>{@link WorkspaceRepositoryMonitorService} – Repository monitoring configuration</li>
+ *   <li>{@link WorkspaceActivationService} – Activation/startup orchestration</li>
+ * </ul>
+ *
+ * <h2>Multi-Tenancy Note</h2>
+ * This service is workspace-agnostic: it manages workspaces themselves (the tenant root),
+ * not data within workspaces. Methods take workspace slug or {@link WorkspaceContext} as parameters.
+ *
+ * @see Workspace
+ * @see WorkspaceContext
  */
 @Service
 @WorkspaceAgnostic("Manages workspaces themselves - the tenant root, not data within workspaces")

@@ -3,6 +3,7 @@ package de.tum.in.www1.hephaestus.leaderboard;
 import static de.tum.in.www1.hephaestus.shared.LeaguePointsConstants.POINTS_DEFAULT;
 import static java.util.function.Function.identity;
 
+import de.tum.in.www1.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestInfoDTO;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReview;
@@ -15,13 +16,22 @@ import de.tum.in.www1.hephaestus.gitprovider.user.UserInfoDTO;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.workspace.Workspace;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceMembershipService;
-import jakarta.transaction.Transactional;
 import java.time.Instant;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Service for building leaderboard data.
@@ -60,7 +70,7 @@ public class LeaderboardService {
         this.workspaceMembershipService = workspaceMembershipService;
     }
 
-    @Transactional
+    @Transactional(readOnly = true)
     public List<LeaderboardEntryDTO> createLeaderboard(
         Workspace workspace,
         Instant after,
@@ -350,11 +360,9 @@ public class LeaderboardService {
         return result;
     }
 
-    @Transactional
+    @Transactional(readOnly = true)
     public LeagueChangeDTO getUserLeagueStats(Workspace workspace, String login, LeaderboardEntryDTO entry) {
-        User user = userRepository
-            .findByLogin(login)
-            .orElseThrow(() -> new IllegalArgumentException("User not found with login: " + login));
+        User user = userRepository.findByLogin(login).orElseThrow(() -> new EntityNotFoundException("User", login));
 
         if (workspace == null || workspace.getId() == null) {
             throw new IllegalStateException("Workspace context is required to compute league stats");

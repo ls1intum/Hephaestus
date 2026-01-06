@@ -16,23 +16,35 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Service for managing bad practice feedback and resolution.
- * Handles user feedback on detected bad practices and integrates with Langfuse
- * for LLM observability when tracing is enabled.
+ *
+ * <h2>Responsibilities</h2>
+ * <ul>
+ *   <li>Recording user resolutions (FIXED, WONT_FIX, WRONG) for detected bad practices</li>
+ *   <li>Storing detailed feedback explanations for analysis</li>
+ *   <li>Forwarding feedback to Langfuse for LLM observability and model improvement</li>
+ * </ul>
+ *
+ * <h2>Langfuse Integration</h2>
+ * <p>When tracing is enabled, feedback is sent asynchronously to Langfuse using the
+ * trace ID captured during detection. This creates a feedback loop for improving
+ * the AI detection model.
+ *
+ * @see PullRequestBadPractice#getDetectionTraceId() Trace ID for Langfuse correlation
  */
 @Service
+@Transactional
 public class BadPracticeFeedbackService {
 
     private static final Logger logger = LoggerFactory.getLogger(BadPracticeFeedbackService.class);
 
     private final PullRequestBadPracticeRepository pullRequestBadPracticeRepository;
     private final BadPracticeFeedbackRepository badPracticeFeedbackRepository;
+    private final LangfuseClient langfuseClient;
     private final boolean tracingEnabled;
-    private final String tracingHost;
-    private final String tracingPublicKey;
-    private final String tracingSecretKey;
 
     public BadPracticeFeedbackService(
         PullRequestBadPracticeRepository pullRequestBadPracticeRepository,
@@ -45,17 +57,25 @@ public class BadPracticeFeedbackService {
         this.pullRequestBadPracticeRepository = pullRequestBadPracticeRepository;
         this.badPracticeFeedbackRepository = badPracticeFeedbackRepository;
         this.tracingEnabled = tracingEnabled;
-        this.tracingHost = tracingHost;
-        this.tracingPublicKey = tracingPublicKey;
-        this.tracingSecretKey = tracingSecretKey;
+
+        // Initialize Langfuse client once if tracing is enabled (connection reuse)
+        if (tracingEnabled && !tracingHost.isBlank() && !tracingPublicKey.isBlank()) {
+            this.langfuseClient = LangfuseClient.builder()
+                .url(tracingHost)
+                .credentials(tracingPublicKey, tracingSecretKey)
+                .build();
+        } else {
+            this.langfuseClient = null;
+        }
     }
 
     /**
      * Resolves a bad practice by updating its user state.
      *
-     * @param workspace the workspace context
+     * @param workspace   the workspace context
      * @param badPractice the bad practice to resolve
-     * @param state the new state (FIXED, WONT_FIX, or WRONG)
+     * @param state       the new state (must be a valid user resolution state)
+     * @see PullRequestBadPracticeState#USER_RESOLUTION_STATES valid states
      */
     public void resolveBadPractice(
         Workspace workspace,
@@ -63,8 +83,9 @@ public class BadPracticeFeedbackService {
         PullRequestBadPracticeState state
     ) {
         logger.info(
-            "Resolving bad practice {} with state {} in workspace {}",
+            "Resolving bad practice {} from {} to {} in workspace {}",
             badPractice.getId(),
+            badPractice.getUserState(),
             state,
             workspace.getWorkspaceSlug()
         );
@@ -75,9 +96,9 @@ public class BadPracticeFeedbackService {
     /**
      * Records user feedback for a bad practice and optionally sends it to Langfuse.
      *
-     * @param workspace the workspace context
+     * @param workspace   the workspace context
      * @param badPractice the bad practice receiving feedback
-     * @param feedback the feedback details
+     * @param feedback    the feedback details (type and explanation)
      */
     public void provideFeedback(
         Workspace workspace,
@@ -85,7 +106,7 @@ public class BadPracticeFeedbackService {
         BadPracticeFeedbackDTO feedback
     ) {
         logger.info(
-            "Providing feedback for bad practice {} in workspace {}",
+            "Recording feedback for bad practice {} in workspace {}",
             badPractice.getId(),
             workspace.getWorkspaceSlug()
         );
@@ -104,17 +125,23 @@ public class BadPracticeFeedbackService {
 
     /**
      * Sends feedback to Langfuse asynchronously for LLM observability.
-     * This method is public to allow Spring's @Async proxy to work correctly.
+     *
+     * <p>This method is public to allow Spring's @Async proxy to work correctly.
+     * Failures are logged but not propagated to avoid disrupting the main feedback flow.
+     *
+     * @param badPractice the bad practice with detection trace ID
+     * @param feedback    the user's feedback
      */
     @Async
+    @Transactional(readOnly = true) // No DB writes, just reading for async context
     public void sendFeedbackToLangfuse(PullRequestBadPractice badPractice, BadPracticeFeedbackDTO feedback) {
+        if (langfuseClient == null) {
+            logger.debug("Langfuse client not configured, skipping feedback submission");
+            return;
+        }
+
         logger.info("Sending feedback to Langfuse for bad practice: {}", badPractice.getId());
         try {
-            LangfuseClient client = LangfuseClient.builder()
-                .url(tracingHost)
-                .credentials(tracingPublicKey, tracingSecretKey)
-                .build();
-
             CreateScoreRequest request = CreateScoreRequest.builder()
                 .traceId(badPractice.getDetectionTraceId())
                 .name("user_feedback")
@@ -124,10 +151,15 @@ public class BadPracticeFeedbackService {
                 )
                 .build();
 
-            CreateScoreResponse response = client.score().create(request);
-            logger.info("Feedback sent to Langfuse: {}", response.toString());
-        } catch (Exception e) {
-            logger.error("Failed to send feedback to Langfuse: {}", e.getMessage());
+            CreateScoreResponse response = langfuseClient.score().create(request);
+            logger.info("Feedback sent to Langfuse successfully (id={})", response.getId());
+        } catch (RuntimeException e) {
+            // Log with context but don't propagate - Langfuse is optional observability
+            logger.error(
+                "Failed to send feedback to Langfuse for bad practice {}: {}",
+                badPractice.getId(),
+                e.getMessage()
+            );
         }
     }
 }

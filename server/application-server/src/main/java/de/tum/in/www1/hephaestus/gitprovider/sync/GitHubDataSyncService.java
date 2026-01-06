@@ -31,9 +31,27 @@ import org.springframework.stereotype.Service;
 
 /**
  * GraphQL-based data synchronization service.
- * <p>
+ *
+ * <h2>Purpose</h2>
  * Orchestrates synchronization of all GitHub data using typed GraphQL models.
  * Uses the {@link SyncTargetProvider} SPI to decouple from workspace entities.
+ *
+ * <h2>Thread Safety</h2>
+ * This class is thread-safe. All methods can be called from multiple threads:
+ * <ul>
+ *   <li>{@code syncSyncTargetAsync()} submits work to the virtual thread executor</li>
+ *   <li>{@code syncSyncTarget()} is safe for concurrent calls (each operates on independent data)</li>
+ *   <li>{@code syncAllRepositories()} synchronizes on workspace level (one call per workspace)</li>
+ * </ul>
+ * Note: Underlying sync services must also be thread-safe.
+ *
+ * <h2>Configuration</h2>
+ * <ul>
+ *   <li>{@code monitoring.sync-cooldown-in-minutes} - Minimum interval between syncs for the same target</li>
+ * </ul>
+ *
+ * @see SyncTargetProvider
+ * @see GitHubDataSyncScheduler
  */
 @Service
 public class GitHubDataSyncService {

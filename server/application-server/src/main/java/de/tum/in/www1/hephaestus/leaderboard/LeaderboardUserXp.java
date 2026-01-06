@@ -1,26 +1,30 @@
 package de.tum.in.www1.hephaestus.leaderboard;
 
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
+import org.springframework.lang.NonNull;
 
 /**
  * Immutable leaderboard XP data for a single user.
  *
- * <p>Contains aggregated XP totals and activity breakdown statistics.
- * Use {@link Builder} for incremental construction from activity projections.
+ * <p>Contains aggregated XP totals and activity breakdown statistics
+ * computed from the activity event ledger.
  *
- * @param user the user entity
- * @param totalScore total XP score for the timeframe
- * @param eventCount number of activity events
- * @param approvals number of review approvals
- * @param changeRequests number of change requests
- * @param comments number of review comments
- * @param unknowns number of reviews with unknown state
- * @param issueComments number of issue comments
- * @param codeComments number of inline code comments
- * @param reviewedPrCount number of DISTINCT pull requests reviewed (set from query)
+ * <p>Use {@link Builder} for incremental construction when hydrating
+ * data from multiple database projections.
+ *
+ * @param user the user entity (never null)
+ * @param totalScore total XP score for the timeframe (rounded from BigDecimal)
+ * @param eventCount number of activity events recorded
+ * @param approvals number of REVIEW_APPROVED events
+ * @param changeRequests number of REVIEW_CHANGES_REQUESTED events
+ * @param comments number of REVIEW_COMMENTED events
+ * @param unknowns number of REVIEW_UNKNOWN events
+ * @param issueComments number of COMMENT_CREATED events
+ * @param codeComments number of REVIEW_COMMENT_CREATED events
+ * @param reviewedPrCount number of DISTINCT pull requests reviewed (from separate query)
  */
 public record LeaderboardUserXp(
-    User user,
+    @NonNull User user,
     int totalScore,
     int eventCount,
     int approvals,
@@ -32,8 +36,12 @@ public record LeaderboardUserXp(
     int reviewedPrCount
 ) {
     /**
-     * Number of unique pull requests reviewed.
-     * This is set from a distinct PR count query, not derived from event counts.
+     * Returns the count of unique pull requests reviewed.
+     *
+     * <p>This value is set from a distinct PR count query, not derived from
+     * summing event counts (since one PR can have multiple review events).
+     *
+     * @return number of distinct PRs reviewed in the timeframe
      */
     public int reviewedPullRequestCount() {
         return reviewedPrCount;
@@ -94,7 +102,7 @@ public record LeaderboardUserXp(
             return this;
         }
 
-        public Builder setReviewedPrCount(int count) {
+        public Builder withReviewedPrCount(int count) {
             this.reviewedPrCount = count;
             return this;
         }
