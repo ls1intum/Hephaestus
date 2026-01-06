@@ -157,8 +157,20 @@ public class GitHubPullRequestReviewCommentSyncService {
             int totalSynced = 0;
             String cursor = null;
             boolean hasNextPage = true;
+            int pageCount = 0;
 
             while (hasNextPage) {
+                if (pageCount >= MAX_PAGINATION_PAGES) {
+                    log.warn(
+                        "Reached maximum pagination limit ({}) for PR #{} in repository {}, stopping",
+                        MAX_PAGINATION_PAGES,
+                        pullRequest.getNumber(),
+                        repository.getNameWithOwner()
+                    );
+                    break;
+                }
+                pageCount++;
+
                 PullRequestReviewThreadConnection response = client
                     .documentName(GET_PR_REVIEW_COMMENTS_DOCUMENT)
                     .variable("owner", owner)

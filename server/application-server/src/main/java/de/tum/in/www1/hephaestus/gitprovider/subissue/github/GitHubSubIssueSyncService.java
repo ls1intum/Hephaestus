@@ -273,7 +273,19 @@ public class GitHubSubIssueSyncService {
         boolean hasNextPage = true;
         int linkedCount = 0;
 
+        int pageCount = 0;
+
         while (hasNextPage) {
+            if (pageCount >= MAX_PAGINATION_PAGES) {
+                log.warn(
+                    "Reached maximum pagination limit ({}) for repository {}, stopping",
+                    MAX_PAGINATION_PAGES,
+                    sanitizeForLog(repository.getNameWithOwner())
+                );
+                break;
+            }
+            pageCount++;
+
             try {
                 // GraphQL call OUTSIDE of @Transactional to avoid blocking DB connection
                 IssueConnection issueConnection = client

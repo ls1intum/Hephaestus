@@ -218,8 +218,19 @@ public class GitHubIssueDependencySyncService {
         String after = null;
         boolean hasNextPage = true;
         int totalSynced = 0;
+        int pageCount = 0;
 
         while (hasNextPage) {
+            if (pageCount >= MAX_PAGINATION_PAGES) {
+                log.warn(
+                    "Reached maximum pagination limit ({}) for repository {}, stopping",
+                    MAX_PAGINATION_PAGES,
+                    safeNameWithOwner
+                );
+                break;
+            }
+            pageCount++;
+
             // GraphQL call OUTSIDE of @Transactional to avoid blocking DB connection
             IssueConnection issueConnection = client
                 .documentName(GET_DEPENDENCIES_DOCUMENT)

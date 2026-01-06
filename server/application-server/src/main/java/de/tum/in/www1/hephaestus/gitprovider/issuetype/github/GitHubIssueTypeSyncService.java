@@ -94,8 +94,19 @@ public class GitHubIssueTypeSyncService {
             int totalSynced = 0;
             String cursor = null;
             boolean hasNextPage = true;
+            int pageCount = 0;
 
             while (hasNextPage) {
+                if (pageCount >= MAX_PAGINATION_PAGES) {
+                    log.warn(
+                        "Reached maximum pagination limit ({}) for organization {}, stopping",
+                        MAX_PAGINATION_PAGES,
+                        orgLogin
+                    );
+                    break;
+                }
+                pageCount++;
+
                 IssueTypeConnection response = client
                     .documentName(GET_ISSUE_TYPES_DOCUMENT)
                     .variable("login", orgLogin)

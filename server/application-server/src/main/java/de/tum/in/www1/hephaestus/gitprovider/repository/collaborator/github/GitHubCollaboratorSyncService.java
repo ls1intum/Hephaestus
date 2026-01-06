@@ -1,8 +1,7 @@
 package de.tum.in.www1.hephaestus.gitprovider.repository.collaborator.github;
 
 import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
-import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.GRAPHQL_TIMEOUT;
-import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.LARGE_PAGE_SIZE;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.*;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser;
@@ -86,8 +85,19 @@ public class GitHubCollaboratorSyncService {
             String cursor = null;
             boolean hasNextPage = true;
             Set<Long> syncedUserIds = new HashSet<>();
+            int pageCount = 0;
 
             while (hasNextPage) {
+                if (pageCount >= MAX_PAGINATION_PAGES) {
+                    log.warn(
+                        "Reached maximum pagination limit ({}) for repository {}, stopping",
+                        MAX_PAGINATION_PAGES,
+                        safeNameWithOwner
+                    );
+                    break;
+                }
+                pageCount++;
+
                 RepositoryCollaboratorConnection response = client
                     .documentName(GET_COLLABORATORS_DOCUMENT)
                     .variable("owner", owner)

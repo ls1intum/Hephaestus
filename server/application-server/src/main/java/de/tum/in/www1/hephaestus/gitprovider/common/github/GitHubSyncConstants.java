@@ -48,6 +48,16 @@ public final class GitHubSyncConstants {
     public static final int LARGE_PAGE_SIZE = 100;
 
     /**
+     * Maximum number of pages to fetch in pagination loops.
+     * <p>
+     * Acts as a defensive upper bound to prevent infinite loops if the API
+     * incorrectly reports hasNextPage=true forever or returns the same cursor.
+     * With 100 items per page, this allows up to 100,000 items before stopping.
+     * If this limit is reached, a warning is logged and the loop exits gracefully.
+     */
+    public static final int MAX_PAGINATION_PAGES = 1000;
+
+    /**
      * Default timeout for GraphQL operations.
      * <p>
      * Used when blocking on reactive GraphQL client responses.

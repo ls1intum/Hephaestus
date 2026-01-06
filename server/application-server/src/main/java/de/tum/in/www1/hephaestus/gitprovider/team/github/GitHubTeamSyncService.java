@@ -102,8 +102,19 @@ public class GitHubTeamSyncService {
             int totalSynced = 0;
             String cursor = null;
             boolean hasNextPage = true;
+            int pageCount = 0;
 
             while (hasNextPage) {
+                if (pageCount >= MAX_PAGINATION_PAGES) {
+                    log.warn(
+                        "Reached maximum pagination limit ({}) for organization {}, stopping",
+                        MAX_PAGINATION_PAGES,
+                        organizationLogin
+                    );
+                    break;
+                }
+                pageCount++;
+
                 TeamConnection response = client
                     .documentName(GET_ORGANIZATION_TEAMS_DOCUMENT)
                     .variable("login", organizationLogin)
@@ -385,8 +396,19 @@ public class GitHubTeamSyncService {
         List<TeamMemberEdge> allMemberEdges = new ArrayList<>();
         String cursor = startCursor;
         boolean hasNextPage = true;
+        int pageCount = 0;
 
         while (hasNextPage) {
+            if (pageCount >= MAX_PAGINATION_PAGES) {
+                log.warn(
+                    "Reached maximum pagination limit ({}) for team {} members, stopping",
+                    MAX_PAGINATION_PAGES,
+                    teamSlug
+                );
+                break;
+            }
+            pageCount++;
+
             TeamMemberConnection response = client
                 .documentName(GET_TEAM_MEMBERS_DOCUMENT)
                 .variable("orgLogin", organizationLogin)
@@ -429,8 +451,19 @@ public class GitHubTeamSyncService {
         List<TeamRepositoryEdge> allEdges = new ArrayList<>();
         String cursor = startCursor;
         boolean hasNextPage = true;
+        int pageCount = 0;
 
         while (hasNextPage) {
+            if (pageCount >= MAX_PAGINATION_PAGES) {
+                log.warn(
+                    "Reached maximum pagination limit ({}) for team {} repositories, stopping",
+                    MAX_PAGINATION_PAGES,
+                    teamSlug
+                );
+                break;
+            }
+            pageCount++;
+
             TeamRepositoryConnection response = client
                 .documentName(GET_TEAM_REPOSITORIES_DOCUMENT)
                 .variable("orgLogin", organizationLogin)
