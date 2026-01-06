@@ -145,13 +145,13 @@ erDiagram
         INTEGER sub_issues_completed
         INTEGER sub_issues_percent_completed
         VARCHAR(128) issue_type_id FK
+        VARCHAR(255) base_ref_name
+        VARCHAR(40) base_ref_oid
+        VARCHAR(255) head_ref_name
+        VARCHAR(40) head_ref_oid
         VARCHAR(255) merge_state_status
         BOOLEAN mergeable
         VARCHAR(255) review_decision
-        VARCHAR(255) head_ref_name
-        VARCHAR(40) head_ref_oid
-        VARCHAR(255) base_ref_name
-        VARCHAR(40) base_ref_oid
     }
 
     IssueAssignee {
@@ -299,14 +299,14 @@ erDiagram
         BIGINT id PK
         VARCHAR(255) title
         BIGINT pullrequest_id FK
-        SMALLINT state
         TIMESTAMPTZ detection_time
         TIMESTAMPTZ last_update_time
-        SMALLINT user_state
-        SMALLINT detection_pullrequest_lifecycle_state
         VARCHAR(255) detection_trace_id
         BIGINT bad_practice_detection_id FK
         TEXT description
+        VARCHAR(32) state
+        VARCHAR(32) user_state
+        VARCHAR(32) detection_pullrequest_lifecycle_state
     }
 
     Repository {
