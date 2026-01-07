@@ -9,10 +9,10 @@ import org.springframework.data.jpa.repository.JpaRepository;
  * Repository for pull request review thread entities.
  *
  * <p>Workspace-agnostic: Threads are scoped through their pull request which has
- * workspace context through {@code pullRequest.repository.organization.workspaceId}.
+ * workspace context through the Workspace.organization relationship.
  * All queries filter by thread ID which inherently carries workspace scope.
  */
-@WorkspaceAgnostic("Scoped through pullRequest.repository.organization.workspaceId")
+@WorkspaceAgnostic("Scoped through Workspace.organization relationship")
 public interface PullRequestReviewThreadRepository extends JpaRepository<PullRequestReviewThread, Long> {
     @EntityGraph(attributePaths = "comments")
     Optional<PullRequestReviewThread> findWithCommentsById(Long id);

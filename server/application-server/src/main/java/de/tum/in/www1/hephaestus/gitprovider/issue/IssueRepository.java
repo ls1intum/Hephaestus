@@ -14,10 +14,10 @@ import org.springframework.data.repository.query.Param;
  * Repository for issue entities.
  *
  * <p>Workspace-agnostic: Issues are scoped through their repository which has
- * workspace context through {@code repository.organization.workspaceId}.
+ * workspace context through the Workspace.organization relationship.
  * All queries filter by repository ID which inherently carries workspace scope.
  */
-@WorkspaceAgnostic("Scoped through repository.organization.workspaceId")
+@WorkspaceAgnostic("Scoped through Workspace.organization relationship")
 public interface IssueRepository extends JpaRepository<Issue, Long> {
     /**
      * Finds all issues belonging to a repository.

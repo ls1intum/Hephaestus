@@ -12,9 +12,9 @@ import org.springframework.data.repository.query.Param;
  * Repository for organization membership records.
  *
  * <p>Workspace-agnostic: All queries filter by Organization ID which has
- * workspace context through {@code organization.workspaceId}. Used during sync operations.
+ * workspace context through the Workspace.organization relationship. Used during sync operations.
  */
-@WorkspaceAgnostic("Queries filter by Organization ID which has workspace through its workspaceId field")
+@WorkspaceAgnostic("Queries filter by Organization ID which has workspace through Workspace.organization")
 public interface OrganizationMembershipRepository
     extends JpaRepository<OrganizationMembership, OrganizationMembershipId> {
     @Query("SELECT m.userId FROM OrganizationMembership m WHERE m.organizationId = :orgId")

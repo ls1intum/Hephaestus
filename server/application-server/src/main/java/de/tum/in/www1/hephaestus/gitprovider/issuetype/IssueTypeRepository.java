@@ -25,7 +25,8 @@ public interface IssueTypeRepository extends JpaRepository<IssueType, String> {
         """
         SELECT it
         FROM IssueType it
-        WHERE it.organization.workspaceId = :workspaceId
+        JOIN Workspace w ON w.organization = it.organization
+        WHERE w.id = :workspaceId
         AND it.isEnabled = true
         ORDER BY it.name ASC
         """

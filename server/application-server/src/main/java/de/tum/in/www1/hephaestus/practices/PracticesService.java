@@ -254,12 +254,15 @@ public class PracticesService {
     }
 
     private boolean belongsToWorkspace(PullRequest pullRequest, Workspace workspace) {
-        return (
-            pullRequest != null &&
-            pullRequest.getRepository() != null &&
-            pullRequest.getRepository().getOrganization() != null &&
-            pullRequest.getRepository().getOrganization().getWorkspaceId() != null &&
-            pullRequest.getRepository().getOrganization().getWorkspaceId().equals(workspace.getId())
-        );
+        if (pullRequest == null || pullRequest.getRepository() == null) {
+            return false;
+        }
+        var prOrg = pullRequest.getRepository().getOrganization();
+        var wsOrg = workspace.getOrganization();
+        // If both have organizations, compare by ID; otherwise check if PR org is null (allowed for user workspaces)
+        if (prOrg != null && wsOrg != null) {
+            return prOrg.getId().equals(wsOrg.getId());
+        }
+        return prOrg == null && wsOrg == null;
     }
 }

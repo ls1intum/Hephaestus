@@ -45,7 +45,7 @@ class DataIsolationArchitectureTest extends HephaestusArchitectureTest {
         "RepositoryToMonitor", // has Workspace field
         "WorkspaceMembership", // has Workspace field
         "ChatThread", // has Workspace field
-        // Through repository.organization.workspaceId
+        // Through repository -> Workspace.organization (JOIN)
         "PullRequest",
         "Issue",
         "PullRequestReview",
@@ -54,7 +54,7 @@ class DataIsolationArchitectureTest extends HephaestusArchitectureTest {
         "IssueComment",
         "Label",
         "Milestone",
-        // Through organization.workspaceId
+        // Through Workspace.organization (JOIN)
         "Repository",
         "Team",
         "TeamMembership",
@@ -66,8 +66,8 @@ class DataIsolationArchitectureTest extends HephaestusArchitectureTest {
         "ChatMessage", // through ChatThread.workspace
         "ChatMessagePart", // through ChatMessage.thread.workspace
         "ChatMessageVote", // through ChatMessage (via messageId) -> ChatThread.workspace
-        // Through organization.workspaceId (ID-based relationship)
-        "OrganizationMembership" // organizationId -> Organization.workspaceId
+        // Through Workspace.organization (ID-based relationship via JOIN)
+        "OrganizationMembership" // organizationId -> Workspace.organization
     );
 
     /**
@@ -378,7 +378,7 @@ class DataIsolationArchitectureTest extends HephaestusArchitectureTest {
                         hasQueryWithWorkspaceFilter =
                             q.value().contains("workspaceId") ||
                             q.value().contains("workspace.id") ||
-                            q.value().contains(".organization.workspaceId");
+                            q.value().contains("JOIN Workspace");
                     }
 
                     if (!isWorkspaceScoped && !hasWorkspaceParam && !hasQueryWithWorkspaceFilter) {

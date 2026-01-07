@@ -77,9 +77,9 @@ public interface PullRequestRepository extends JpaRepository<PullRequest, Long> 
 
     /**
      * Finds a PR by repository ID and number for sync operations.
-     * Repository ID inherently has workspace through organization.workspaceId.
+     * Repository ID inherently has workspace through Workspace.organization.
      */
-    @WorkspaceAgnostic("Sync operation - Repository ID has workspace through organization")
+    @WorkspaceAgnostic("Sync operation - Repository ID has workspace through Workspace.organization")
     @Query(
         """
         SELECT p
@@ -98,9 +98,9 @@ public interface PullRequestRepository extends JpaRepository<PullRequest, Long> 
 
     /**
      * Finds all synced PR numbers for a repository during sync operations.
-     * Repository ID inherently has workspace through organization.workspaceId.
+     * Repository ID inherently has workspace through Workspace.organization.
      */
-    @WorkspaceAgnostic("Sync operation - Repository ID has workspace through organization")
+    @WorkspaceAgnostic("Sync operation - Repository ID has workspace through Workspace.organization")
     @Query(
         """
         SELECT p.number
@@ -132,17 +132,17 @@ public interface PullRequestRepository extends JpaRepository<PullRequest, Long> 
 
     /**
      * Finds all pull requests belonging to a repository.
-     * Repository ID inherently has workspace through organization.workspaceId.
+     * Repository ID inherently has workspace through Workspace.organization.
      *
      * @param repositoryId the repository ID
      * @return list of pull requests for the repository
      */
-    @WorkspaceAgnostic("Sync operation - Repository ID has workspace through organization")
+    @WorkspaceAgnostic("Sync operation - Repository ID has workspace through Workspace.organization")
     List<PullRequest> findAllByRepository_Id(Long repositoryId);
 
     /**
      * Streams all pull requests belonging to a repository.
-     * Repository ID inherently has workspace through organization.workspaceId.
+     * Repository ID inherently has workspace through Workspace.organization.
      * <p>
      * Must be used within a try-with-resources block to ensure the stream is closed
      * and the database connection is released. The calling method must be annotated
@@ -151,7 +151,7 @@ public interface PullRequestRepository extends JpaRepository<PullRequest, Long> 
      * @param repositoryId the repository ID
      * @return stream of pull requests for the repository
      */
-    @WorkspaceAgnostic("Sync operation - Repository ID has workspace through organization")
+    @WorkspaceAgnostic("Sync operation - Repository ID has workspace through Workspace.organization")
     @QueryHints(@QueryHint(name = org.hibernate.jpa.HibernateHints.HINT_FETCH_SIZE, value = "50"))
     Stream<PullRequest> streamAllByRepository_Id(Long repositoryId);
 
@@ -166,7 +166,7 @@ public interface PullRequestRepository extends JpaRepository<PullRequest, Long> 
      * @param repositoryId the repository ID
      * @return list of pull requests with reviews and comments for the repository
      */
-    @WorkspaceAgnostic("Backfill operation - Repository ID has workspace through organization")
+    @WorkspaceAgnostic("Backfill operation - Repository ID has workspace through Workspace.organization")
     @Query(
         """
         SELECT DISTINCT p
@@ -187,7 +187,7 @@ public interface PullRequestRepository extends JpaRepository<PullRequest, Long> 
      * @param repositoryId the repository ID
      * @return list of pull requests with review comments for the repository
      */
-    @WorkspaceAgnostic("Backfill operation - Repository ID has workspace through organization")
+    @WorkspaceAgnostic("Backfill operation - Repository ID has workspace through Workspace.organization")
     @Query(
         """
         SELECT DISTINCT p

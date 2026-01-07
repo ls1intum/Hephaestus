@@ -11,10 +11,10 @@ import org.springframework.data.repository.query.Param;
  * Repository for repository collaborator records.
  *
  * <p>Workspace-agnostic: Collaborators are scoped through their repository which has
- * workspace context through {@code repository.organization.workspaceId}.
+ * workspace context through the Workspace.organization relationship.
  * All queries filter by repository ID which inherently carries workspace scope.
  */
-@WorkspaceAgnostic("Scoped through repository.organization.workspaceId")
+@WorkspaceAgnostic("Scoped through Workspace.organization relationship")
 public interface RepositoryCollaboratorRepository
     extends JpaRepository<RepositoryCollaborator, RepositoryCollaborator.Id> {
     @Query("SELECT c FROM RepositoryCollaborator c WHERE c.repository.id = :repositoryId AND c.user.id = :userId")

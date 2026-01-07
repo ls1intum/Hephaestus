@@ -12,16 +12,16 @@ import org.springframework.stereotype.Repository;
  * Repository for bad practice detection records.
  *
  * <p>Workspace-agnostic: All queries filter by PullRequest ID which has
- * workspace context through {@code pullRequest.repository.organization.workspaceId}.
+ * workspace context through the Workspace.organization relationship.
  */
 @Repository
-@WorkspaceAgnostic("Queries filter by PullRequest ID which has workspace through repository.organization")
+@WorkspaceAgnostic("Queries filter by PullRequest ID which has workspace through repository")
 public interface BadPracticeDetectionRepository extends JpaRepository<BadPracticeDetection, Long> {
     /**
      * Finds the most recent detection for a given pull request.
      *
      * <p>Workspace-agnostic: PullRequest ID inherently has workspace through
-     * repository.organization.workspaceId chain.
+     * the repository relationship.
      *
      * @param pullRequestId the pull request ID
      * @return the most recent detection, or null if none exists

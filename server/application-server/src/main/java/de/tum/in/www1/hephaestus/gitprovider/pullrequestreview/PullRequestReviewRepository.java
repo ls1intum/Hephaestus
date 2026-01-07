@@ -143,13 +143,13 @@ public interface PullRequestReviewRepository extends JpaRepository<PullRequestRe
     /**
      * Find all reviews for a specific pull request by a specific author.
      * Used for calculating per-PR XP (aggregating all reviews together for harmonic mean).
-     * PullRequest ID inherently has workspace through repository.organization.workspaceId.
+     * PullRequest ID inherently has workspace through repository.
      *
      * @param pullRequestId the pull request ID
      * @param authorId the author ID
      * @return list of reviews by this author on this PR
      */
-    @WorkspaceAgnostic("PullRequest ID has workspace through repository.organization")
+    @WorkspaceAgnostic("PullRequest ID has workspace through repository")
     @Query(
         value = """
         SELECT prr

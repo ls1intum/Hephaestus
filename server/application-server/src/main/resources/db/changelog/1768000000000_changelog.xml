@@ -1,0 +1,32 @@
+<?xml version="1.1" encoding="UTF-8" standalone="no"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                   http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+    =======================================================================================
+    Domain Isolation: Remove workspaceId from Organization
+    =======================================================================================
+
+    The gitprovider module should be workspace-agnostic. The Organization entity had a
+    workspaceId field that violated this domain isolation principle.
+
+    The workspace-to-organization relationship is properly owned by the Workspace entity
+    via its organization_id foreign key (see Workspace.organization field). Queries that
+    need to find organizations by workspace should JOIN through Workspace instead of
+    relying on a denormalized workspaceId field on Organization.
+
+    This migration removes the redundant workspace_id column from the organization table.
+    =======================================================================================
+    -->
+
+    <changeSet id="1768000000000-drop-organization-workspace-id" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="organization" columnName="workspace_id"/>
+        </preConditions>
+        <comment>Remove workspace_id from organization table to enforce domain isolation - gitprovider should not know about workspaces</comment>
+        <dropColumn tableName="organization" columnName="workspace_id"/>
+    </changeSet>
+
+</databaseChangeLog>

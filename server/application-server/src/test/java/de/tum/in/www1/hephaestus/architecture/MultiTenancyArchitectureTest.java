@@ -140,8 +140,7 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
                         queryValue.contains("workspaceId") ||
                         queryValue.contains("workspace.id") ||
                         queryValue.contains("workspace_id") ||
-                        queryValue.contains(".organization.workspaceId") ||
-                        queryValue.contains("repository.organization.workspaceId");
+                        queryValue.contains("JOIN Workspace");
 
                     if (!hasWorkspaceFilter) {
                         events.add(
@@ -237,7 +236,7 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
                             return (
                                 q.value().contains("workspaceId") ||
                                 q.value().contains("workspace.id") ||
-                                q.value().contains(".organization.workspaceId")
+                                q.value().contains("JOIN Workspace")
                             );
                         });
 

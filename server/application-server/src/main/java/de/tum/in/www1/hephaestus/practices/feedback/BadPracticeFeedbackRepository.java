@@ -9,8 +9,8 @@ import org.springframework.stereotype.Repository;
  * Repository for bad practice feedback records.
  *
  * <p>Workspace-agnostic: Feedback is scoped through PullRequestBadPractice which has
- * workspace context through {@code pullRequest.repository.organization.workspaceId}.
+ * workspace context through the Workspace.organization relationship.
  */
 @Repository
-@WorkspaceAgnostic("Feedback scoped through PullRequestBadPractice.pullRequest.repository.organization")
+@WorkspaceAgnostic("Feedback scoped through Workspace.organization relationship")
 public interface BadPracticeFeedbackRepository extends JpaRepository<BadPracticeFeedback, Long> {}

@@ -40,7 +40,4 @@ public class Organization extends BaseGitServiceEntity {
 
     @Column(name = "installation_id")
     private Long installationId;
-
-    @Column(name = "workspace_id")
-    private Long workspaceId;
 }
