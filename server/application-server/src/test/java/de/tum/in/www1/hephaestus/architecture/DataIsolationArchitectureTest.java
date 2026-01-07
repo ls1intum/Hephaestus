@@ -75,6 +75,7 @@ class DataIsolationArchitectureTest extends HephaestusArchitectureTest {
      */
     private static final Set<String> GLOBAL_ENTITIES = Set.of(
         "User", // Users can belong to multiple workspaces
+        "UserPreferences", // Belongs to User which is global
         "Organization", // Synced from GitHub, workspace is set separately
         "Workspace", // Is the tenant root
         "WorkspaceSlugHistory", // Tracks workspace slug changes
