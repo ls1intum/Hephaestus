@@ -1,6 +1,5 @@
 package de.tum.in.www1.hephaestus.gitprovider.pullrequestreview;
 
-import de.tum.in.www1.hephaestus.core.WorkspaceAgnostic;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
@@ -149,7 +148,6 @@ public interface PullRequestReviewRepository extends JpaRepository<PullRequestRe
      * @param authorId the author ID
      * @return list of reviews by this author on this PR
      */
-    @WorkspaceAgnostic("PullRequest ID has workspace through repository")
     @Query(
         value = """
         SELECT prr

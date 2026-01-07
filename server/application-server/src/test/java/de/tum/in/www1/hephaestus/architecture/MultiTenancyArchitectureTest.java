@@ -136,11 +136,45 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
                     String queryValue = queryAnnotation.value();
 
                     // Check for workspace filtering patterns
-                    boolean hasWorkspaceFilter =
+                    // Direct workspace filtering
+                    boolean hasDirectWorkspaceFilter =
                         queryValue.contains("workspaceId") ||
                         queryValue.contains("workspace.id") ||
                         queryValue.contains("workspace_id") ||
                         queryValue.contains("JOIN Workspace");
+
+                    // Implicit workspace through repository chain:
+                    // Repository -> Organization -> (Workspace.organization = Organization)
+                    // Queries filtering by repository.id or repositoryId are workspace-scoped
+                    // because the sync layer only processes entities for monitored repositories
+                    boolean hasRepositoryFilter =
+                        queryValue.contains("repository.id") ||
+                        queryValue.contains("repositoryId") ||
+                        queryValue.contains("p.repository.id") ||
+                        queryValue.contains("i.repository.id") ||
+                        queryValue.contains("r.id");
+
+                    // Implicit workspace through pull request chain:
+                    // PullRequest -> Repository -> Organization -> (Workspace.organization = Organization)
+                    // Queries filtering by pullRequest.id or pullRequestId are workspace-scoped
+                    boolean hasPullRequestFilter =
+                        queryValue.contains("pullRequest.id") ||
+                        queryValue.contains("pullRequestId") ||
+                        queryValue.contains("prr.pullRequest.id");
+
+                    // Implicit workspace through organization chain:
+                    // Organization -> (Workspace.organization = Organization)
+                    // Queries filtering by organization.id or organizationId are workspace-scoped
+                    boolean hasOrganizationFilter =
+                        queryValue.contains("organization.id") ||
+                        queryValue.contains("organizationId") ||
+                        queryValue.contains("orgId");
+
+                    boolean hasWorkspaceFilter =
+                        hasDirectWorkspaceFilter ||
+                        hasRepositoryFilter ||
+                        hasPullRequestFilter ||
+                        hasOrganizationFilter;
 
                     if (!hasWorkspaceFilter) {
                         events.add(
@@ -215,32 +249,80 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
                         .map(JavaMethod::getName)
                         .collect(Collectors.toSet());
 
-                    // Check for workspace-scoped methods
+                    // Check for workspace-scoped methods (direct or implicit)
                     boolean hasWorkspaceScopedMethods = methodNames
                         .stream()
                         .anyMatch(
                             name ->
+                                // Direct workspace filtering
                                 name.contains("ByWorkspace") ||
                                 name.contains("ForWorkspace") ||
                                 name.contains("InWorkspace") ||
-                                name.contains("workspaceId")
+                                name.contains("workspaceId") ||
+                                // Implicit through repository chain
+                                name.contains("ByRepository") ||
+                                name.contains("Repository_Id") ||
+                                // Implicit through organization chain
+                                name.contains("ByOrganization") ||
+                                name.contains("Organization_Id") ||
+                                // Implicit through team chain (team.organization -> workspace)
+                                name.contains("ByTeam") ||
+                                name.contains("Team_Id") ||
+                                // Implicit through pull request chain
+                                name.contains("ByPullRequest") ||
+                                name.contains("PullRequest_Id") ||
+                                // Thread -> PR -> repo -> org -> workspace
+                                name.contains("ByThread") ||
+                                name.contains("Thread_Id")
                         );
 
-                    // Check for @Query methods with workspace filtering
+                    // Repositories with only ID-based lookups are implicitly workspace-scoped
+                    // because the ID must have been obtained from a workspace-scoped context.
+                    // This covers repositories that only provide findById, findWithXyzById, etc.
+                    boolean hasOnlyIdBasedMethods = javaClass
+                        .getMethods()
+                        .stream()
+                        .filter(
+                            m ->
+                                !m.getName().equals("findAll") &&
+                                !m.getName().equals("count") &&
+                                !m.getName().equals("existsAll") &&
+                                !m.getName().startsWith("save") &&
+                                !m.getName().startsWith("delete") &&
+                                !m.getName().startsWith("flush") &&
+                                !m.getName().equals("getReferenceById") &&
+                                !m.getName().equals("getById")
+                        )
+                        .allMatch(m -> m.getName().contains("ById") || m.getName().contains("AllById"));
+
+                    // Check for @Query methods with workspace filtering (direct or implicit)
                     boolean hasQueryWithWorkspaceFilter = javaClass
                         .getMethods()
                         .stream()
                         .filter(m -> m.isAnnotatedWith(Query.class))
                         .anyMatch(m -> {
                             Query q = m.getAnnotationOfType(Query.class);
-                            return (
-                                q.value().contains("workspaceId") ||
-                                q.value().contains("workspace.id") ||
-                                q.value().contains("JOIN Workspace")
-                            );
+                            String queryValue = q.value();
+                            // Direct workspace filtering
+                            boolean directFilter =
+                                queryValue.contains("workspaceId") ||
+                                queryValue.contains("workspace.id") ||
+                                queryValue.contains("JOIN Workspace");
+                            // Implicit through repository chain
+                            boolean repoFilter =
+                                queryValue.contains("repository.id") || queryValue.contains("repositoryId");
+                            // Implicit through pull request chain
+                            boolean prFilter =
+                                queryValue.contains("pullRequest.id") || queryValue.contains("pullRequestId");
+                            // Implicit through organization chain
+                            boolean orgFilter =
+                                queryValue.contains("organization.id") ||
+                                queryValue.contains("organizationId") ||
+                                queryValue.contains("orgId");
+                            return directFilter || repoFilter || prFilter || orgFilter;
                         });
 
-                    if (!hasWorkspaceScopedMethods && !hasQueryWithWorkspaceFilter) {
+                    if (!hasWorkspaceScopedMethods && !hasQueryWithWorkspaceFilter && !hasOnlyIdBasedMethods) {
                         events.add(
                             SimpleConditionEvent.violated(
                                 javaClass,

@@ -16,6 +16,11 @@ public interface RepositoryRepository extends JpaRepository<Repository, Long> {
     @WorkspaceAgnostic("Sync operation - lookup by external GitHub identifier")
     Optional<Repository> findByNameWithOwner(String nameWithOwner);
 
+    /**
+     * Finds all repositories with the given prefix (owner/).
+     * Used during installation operations for org login renames.
+     */
+    @WorkspaceAgnostic("Installation operation - used during org login rename")
     List<Repository> findByNameWithOwnerStartingWithIgnoreCase(String prefix);
 
     @Query(

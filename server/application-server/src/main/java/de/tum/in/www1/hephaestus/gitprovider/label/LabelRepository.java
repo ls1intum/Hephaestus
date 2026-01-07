@@ -1,6 +1,5 @@
 package de.tum.in.www1.hephaestus.gitprovider.label;
 
-import de.tum.in.www1.hephaestus.core.WorkspaceAgnostic;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -8,8 +7,13 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+/**
+ * Repository for label entities.
+ *
+ * <p>All queries filter by repository ID which inherently carries workspace scope
+ * through the Repository -> Organization -> Workspace.organization chain.
+ */
 @Repository
-@WorkspaceAgnostic("Sync operation - Repository ID has workspace through organization")
 public interface LabelRepository extends JpaRepository<Label, Long> {
     @Query(
         """

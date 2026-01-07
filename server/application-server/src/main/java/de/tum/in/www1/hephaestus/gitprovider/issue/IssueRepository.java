@@ -1,6 +1,5 @@
 package de.tum.in.www1.hephaestus.gitprovider.issue;
 
-import de.tum.in.www1.hephaestus.core.WorkspaceAgnostic;
 import jakarta.persistence.QueryHint;
 import java.util.List;
 import java.util.Set;
@@ -13,11 +12,9 @@ import org.springframework.data.repository.query.Param;
 /**
  * Repository for issue entities.
  *
- * <p>Workspace-agnostic: Issues are scoped through their repository which has
- * workspace context through the Workspace.organization relationship.
- * All queries filter by repository ID which inherently carries workspace scope.
+ * <p>All queries filter by repository ID which inherently carries workspace scope
+ * through the Repository -> Organization -> Workspace.organization chain.
  */
-@WorkspaceAgnostic("Scoped through Workspace.organization relationship")
 public interface IssueRepository extends JpaRepository<Issue, Long> {
     /**
      * Finds all issues belonging to a repository.

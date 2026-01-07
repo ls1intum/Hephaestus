@@ -1,6 +1,5 @@
 package de.tum.in.www1.hephaestus.gitprovider.team.membership;
 
-import de.tum.in.www1.hephaestus.core.WorkspaceAgnostic;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
@@ -8,12 +7,10 @@ import org.springframework.stereotype.Repository;
 /**
  * Repository for team membership records.
  *
- * <p>Workspace-agnostic: Memberships are scoped through their team which has
- * organization context containing {@code workspaceId}. All queries filter by
- * team ID which inherently carries workspace scope.
+ * <p>Memberships are scoped through their team which carries workspace context through
+ * the Team.organization -> Workspace.organization relationship.
  */
 @Repository
-@WorkspaceAgnostic("Scoped through team.organization which contains workspaceId")
 public interface TeamMembershipRepository extends JpaRepository<TeamMembership, TeamMembership.Id> {
     /**
      * Find a membership by team and user IDs.
