@@ -387,6 +387,11 @@ erDiagram
         VARCHAR(255) login
         VARCHAR(255) name
         VARCHAR(255) type
+    }
+
+    UserPreference {
+        BIGINT id PK
+        BIGINT user_id FK,UK "NOT NULL"
         BOOLEAN notifications_enabled "NOT NULL"
         BOOLEAN participate_in_research "NOT NULL"
     }
@@ -445,6 +450,7 @@ erDiagram
     ChatMessage ||--|| ChatMessagePart : has
     ChatMessage ||--|| ChatThread : references
     PullRequestReviewComment ||--|| PullRequestReviewThread : reviewed
+    User ||--|| UserPreference : has
     Organization ||--|| Workspace : has
     User ||--|| WorkspaceMembership : belongs_to
     Workspace ||--|| WorkspaceMembership : belongs_to

@@ -1115,9 +1115,32 @@ export const user = pgTable("user", {
 	login: varchar({ length: 255 }),
 	name: varchar({ length: 255 }),
 	type: varchar({ length: 255 }),
-	notificationsEnabled: boolean("notifications_enabled").default(true).notNull(),
-	participateInResearch: boolean("participate_in_research").default(true).notNull(),
 });
+
+export const userPreferences = pgTable(
+	"user_preferences",
+	{
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		id: bigint({ mode: "number" }).primaryKey().generatedByDefaultAsIdentity({
+			name: "user_preferences_id_seq",
+			startWith: 1,
+			increment: 1,
+			cache: 1,
+		}),
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		userId: bigint("user_id", { mode: "number" }).notNull(),
+		notificationsEnabled: boolean("notifications_enabled").default(true).notNull(),
+		participateInResearch: boolean("participate_in_research").default(true).notNull(),
+	},
+	(table) => [
+		foreignKey({
+			columns: [table.userId],
+			foreignColumns: [user.id],
+			name: "fk_user_preferences_user",
+		}).onDelete("cascade"),
+		unique("uk_user_preferences_user_id").on(table.userId),
+	],
+);
 
 export const workspace = pgTable(
 	"workspace",
