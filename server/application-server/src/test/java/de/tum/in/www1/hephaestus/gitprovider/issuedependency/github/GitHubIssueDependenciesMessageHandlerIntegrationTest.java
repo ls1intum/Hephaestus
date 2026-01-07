@@ -30,12 +30,22 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Integration tests for GitHubIssueDependenciesMessageHandler.
  * <p>
+ * GitHub's {@code issue_dependencies} webhook event is officially supported and documented at:
+ * <a href="https://docs.github.com/en/webhooks/webhook-events-and-payloads#issue_dependencies">
+ * GitHub Webhook Events - issue_dependencies</a>
+ * <p>
+ * These events fire when issue blocking/blocked-by relationships are added or removed.
+ * To receive them, a GitHub App must have at least read-level access for the "Issues"
+ * repository permission.
+ * <p>
  * Tests the full webhook handling flow for issue dependency events using JSON
  * fixtures parsed directly into DTOs. Verifies:
- * - Correct routing of webhook actions (added/removed)
- * - Issue creation when blocked/blocking issues don't exist yet
- * - Dependency relationship persistence (blocked_by/blocking)
- * - Edge cases in event handling
+ * <ul>
+ *   <li>Correct routing of webhook actions (added/removed)</li>
+ *   <li>Issue creation when blocked/blocking issues don't exist yet</li>
+ *   <li>Dependency relationship persistence (blocked_by/blocking)</li>
+ *   <li>Edge cases in event handling</li>
+ * </ul>
  */
 @DisplayName("GitHub Issue Dependencies Message Handler")
 @Transactional

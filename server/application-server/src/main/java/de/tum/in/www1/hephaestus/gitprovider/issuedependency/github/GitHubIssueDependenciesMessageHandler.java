@@ -14,7 +14,16 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Handles GitHub issue_dependencies webhook events.
+ * Handles GitHub {@code issue_dependencies} webhook events.
+ * <p>
+ * GitHub sends these events when issue blocking/blocked-by relationships change.
+ * Actions include {@code added} and {@code removed}. To receive these events, a GitHub App
+ * must have at least read-level access for the "Issues" repository permission.
+ * <p>
+ * Documentation: https://docs.github.com/en/webhooks/webhook-events-and-payloads#issue_dependencies
+ *
+ * @see <a href="https://docs.github.com/en/webhooks/webhook-events-and-payloads#issue_dependencies">
+ *      GitHub Webhook Events - issue_dependencies</a>
  */
 @Component
 public class GitHubIssueDependenciesMessageHandler extends GitHubMessageHandler<GitHubIssueDependenciesEventDTO> {
