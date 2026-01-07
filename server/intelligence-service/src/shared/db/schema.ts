@@ -699,6 +699,7 @@ export const pullrequestbadpractice = pgTable(
 		title: varchar({ length: 255 }),
 		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
 		pullrequestId: bigint("pullrequest_id", { mode: "number" }),
+		state: varchar({ length: 32 }).default(0),
 		detectionTime: timestamp("detection_time", {
 			precision: 6,
 			withTimezone: true,
@@ -709,15 +710,14 @@ export const pullrequestbadpractice = pgTable(
 			withTimezone: true,
 			mode: "string",
 		}),
-		detectionTraceId: varchar("detection_trace_id", { length: 255 }),
-		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
-		badPracticeDetectionId: bigint("bad_practice_detection_id", { mode: "number" }),
-		description: text(),
-		state: varchar({ length: 32 }),
 		userState: varchar("user_state", { length: 32 }),
 		detectionPullrequestLifecycleState: varchar("detection_pullrequest_lifecycle_state", {
 			length: 32,
 		}),
+		detectionTraceId: varchar("detection_trace_id", { length: 255 }),
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		badPracticeDetectionId: bigint("bad_practice_detection_id", { mode: "number" }),
+		description: text(),
 	},
 	(table) => [
 		foreignKey({

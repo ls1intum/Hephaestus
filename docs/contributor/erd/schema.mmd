@@ -298,14 +298,14 @@ erDiagram
         BIGINT id PK
         VARCHAR(255) title
         BIGINT pullrequest_id FK
+        VARCHAR(32) state
         TIMESTAMPTZ detection_time
         TIMESTAMPTZ last_update_time
+        VARCHAR(32) user_state
+        VARCHAR(32) detection_pullrequest_lifecycle_state
         VARCHAR(255) detection_trace_id
         BIGINT bad_practice_detection_id FK
         TEXT description
-        VARCHAR(32) state
-        VARCHAR(32) user_state
-        VARCHAR(32) detection_pullrequest_lifecycle_state
     }
 
     Repository {
