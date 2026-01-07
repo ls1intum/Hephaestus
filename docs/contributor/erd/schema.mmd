@@ -224,7 +224,6 @@ erDiagram
         BIGINT installation_id
         VARCHAR(255) login UK "NOT NULL"
         VARCHAR(255) name
-        BIGINT workspace_id
     }
 
     OrganizationMembership {
@@ -418,9 +417,9 @@ erDiagram
         TIMESTAMPTZ updated_at
         TIMESTAMPTZ members_synced_at
         TIMESTAMPTZ teams_synced_at
-        TIMESTAMP sub_issues_synced_at
-        TIMESTAMP issue_types_synced_at
-        TIMESTAMP issue_dependencies_synced_at
+        TIMESTAMPTZ sub_issues_synced_at
+        TIMESTAMPTZ issue_types_synced_at
+        TIMESTAMPTZ issue_dependencies_synced_at
     }
 
     WorkspaceMembership {

@@ -332,13 +332,13 @@
             </not>
         </preConditions>
         <addColumn tableName="workspace">
-            <column name="sub_issues_synced_at" type="TIMESTAMP(6) WITH TIME ZONE">
+            <column name="sub_issues_synced_at" type="timestamp">
                 <constraints nullable="true"/>
             </column>
-            <column name="issue_types_synced_at" type="TIMESTAMP(6) WITH TIME ZONE">
+            <column name="issue_types_synced_at" type="timestamp">
                 <constraints nullable="true"/>
             </column>
-            <column name="issue_dependencies_synced_at" type="TIMESTAMP(6) WITH TIME ZONE">
+            <column name="issue_dependencies_synced_at" type="timestamp">
                 <constraints nullable="true"/>
             </column>
         </addColumn>

@@ -661,8 +661,6 @@ export const organization = pgTable(
 		installationId: bigint("installation_id", { mode: "number" }),
 		login: varchar({ length: 255 }).notNull(),
 		name: varchar({ length: 255 }),
-		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
-		workspaceId: bigint("workspace_id", { mode: "number" }),
 	},
 	(table) => [
 		unique("uq_organization_github_id").on(table.githubId),
@@ -1173,9 +1171,12 @@ export const workspace = pgTable(
 			withTimezone: true,
 			mode: "string",
 		}),
-		subIssuesSyncedAt: timestamp("sub_issues_synced_at", { mode: "string" }),
-		issueTypesSyncedAt: timestamp("issue_types_synced_at", { mode: "string" }),
-		issueDependenciesSyncedAt: timestamp("issue_dependencies_synced_at", { mode: "string" }),
+		subIssuesSyncedAt: timestamp("sub_issues_synced_at", { withTimezone: true, mode: "string" }),
+		issueTypesSyncedAt: timestamp("issue_types_synced_at", { withTimezone: true, mode: "string" }),
+		issueDependenciesSyncedAt: timestamp("issue_dependencies_synced_at", {
+			withTimezone: true,
+			mode: "string",
+		}),
 	},
 	(table) => [
 		foreignKey({

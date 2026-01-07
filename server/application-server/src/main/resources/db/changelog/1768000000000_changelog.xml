@@ -29,4 +29,25 @@
         <dropColumn tableName="organization" columnName="workspace_id"/>
     </changeSet>
 
+    <!--
+    =======================================================================================
+    Standardize Timestamp Types to TIMESTAMPTZ
+    =======================================================================================
+
+    Sync timestamp columns were incorrectly created with TIMESTAMP (without timezone).
+    All temporal fields in Hephaestus should use TIMESTAMP WITH TIME ZONE for consistency.
+    This migration alters the column types to match the standard.
+    =======================================================================================
+    -->
+
+    <changeSet id="1768000000000-fix-workspace-sync-timestamp-types" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="workspace" columnName="sub_issues_synced_at"/>
+        </preConditions>
+        <comment>Convert sync timestamp columns from TIMESTAMP to TIMESTAMPTZ for consistency</comment>
+        <modifyDataType tableName="workspace" columnName="sub_issues_synced_at" newDataType="TIMESTAMP WITH TIME ZONE"/>
+        <modifyDataType tableName="workspace" columnName="issue_types_synced_at" newDataType="TIMESTAMP WITH TIME ZONE"/>
+        <modifyDataType tableName="workspace" columnName="issue_dependencies_synced_at" newDataType="TIMESTAMP WITH TIME ZONE"/>
+    </changeSet>
+
 </databaseChangeLog>
