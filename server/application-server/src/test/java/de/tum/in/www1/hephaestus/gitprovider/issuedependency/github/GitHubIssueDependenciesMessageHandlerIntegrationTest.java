@@ -3,6 +3,7 @@ package de.tum.in.www1.hephaestus.gitprovider.issuedependency.github;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventType;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler.GitHubMessageDomain;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.issue.IssueRepository;
@@ -83,7 +84,7 @@ class GitHubIssueDependenciesMessageHandlerIntegrationTest extends BaseIntegrati
         @Test
         @DisplayName("Should return 'issue_dependencies' as event key")
         void shouldReturnCorrectEventKey() {
-            assertThat(handler.getEventKey()).isEqualTo("issue_dependencies");
+            assertThat(handler.getEventType()).isEqualTo(GitHubEventType.ISSUE_DEPENDENCIES);
         }
 
         @Test

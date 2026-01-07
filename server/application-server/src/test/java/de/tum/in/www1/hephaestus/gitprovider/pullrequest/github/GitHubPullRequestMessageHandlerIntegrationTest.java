@@ -5,6 +5,7 @@ import static org.mockito.Mockito.*;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.tum.in.www1.hephaestus.gitprovider.common.events.DomainEvent;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventType;
 import de.tum.in.www1.hephaestus.gitprovider.label.Label;
 import de.tum.in.www1.hephaestus.gitprovider.label.LabelRepository;
 import de.tum.in.www1.hephaestus.gitprovider.milestone.MilestoneRepository;
@@ -123,13 +124,13 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
     // ==================== Event Key Tests ====================
 
     @Nested
-    @DisplayName("Event Key")
-    class EventKey {
+    @DisplayName("Event Type")
+    class EventType {
 
         @Test
-        @DisplayName("Should return 'pull_request' as event key")
-        void shouldReturnCorrectEventKey() {
-            assertThat(handler.getEventKey()).isEqualTo("pull_request");
+        @DisplayName("Should return PULL_REQUEST as event type")
+        void shouldReturnCorrectEventType() {
+            assertThat(handler.getEventType()).isEqualTo(GitHubEventType.PULL_REQUEST);
         }
     }
 

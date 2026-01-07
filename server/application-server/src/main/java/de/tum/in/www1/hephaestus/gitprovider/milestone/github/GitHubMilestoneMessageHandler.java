@@ -4,6 +4,7 @@ import de.tum.in.www1.hephaestus.gitprovider.common.NatsMessageDeserializer;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContextFactory;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventAction;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventType;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
 import de.tum.in.www1.hephaestus.gitprovider.milestone.github.dto.GitHubMilestoneDTO;
 import de.tum.in.www1.hephaestus.gitprovider.milestone.github.dto.GitHubMilestoneEventDTO;
@@ -34,8 +35,8 @@ public class GitHubMilestoneMessageHandler extends GitHubMessageHandler<GitHubMi
     }
 
     @Override
-    protected String getEventKey() {
-        return "milestone";
+    public GitHubEventType getEventType() {
+        return GitHubEventType.MILESTONE;
     }
 
     @Override

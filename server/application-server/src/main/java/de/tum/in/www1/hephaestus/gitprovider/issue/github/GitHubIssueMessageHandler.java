@@ -4,6 +4,7 @@ import de.tum.in.www1.hephaestus.gitprovider.common.NatsMessageDeserializer;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContextFactory;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventAction;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventType;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
 import de.tum.in.www1.hephaestus.gitprovider.issue.github.dto.GitHubIssueDTO;
 import de.tum.in.www1.hephaestus.gitprovider.issue.github.dto.GitHubIssueEventDTO;
@@ -34,8 +35,8 @@ public class GitHubIssueMessageHandler extends GitHubMessageHandler<GitHubIssueE
     }
 
     @Override
-    protected String getEventKey() {
-        return "issues";
+    public GitHubEventType getEventType() {
+        return GitHubEventType.ISSUES;
     }
 
     @Override

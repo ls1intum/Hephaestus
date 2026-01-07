@@ -3,6 +3,7 @@ package de.tum.in.www1.hephaestus.gitprovider.organization.github;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventType;
 import de.tum.in.www1.hephaestus.gitprovider.organization.Organization;
 import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationRepository;
 import de.tum.in.www1.hephaestus.gitprovider.organization.github.dto.GitHubOrganizationEventDTO;
@@ -81,7 +82,7 @@ class GitHubOrganizationMessageHandlerIntegrationTest extends BaseIntegrationTes
     @Test
     @DisplayName("Should return correct event key")
     void shouldReturnCorrectEventKey() {
-        assertThat(handler.getEventKey()).isEqualTo("organization");
+        assertThat(handler.getEventType()).isEqualTo(GitHubEventType.ORGANIZATION);
     }
 
     @Test

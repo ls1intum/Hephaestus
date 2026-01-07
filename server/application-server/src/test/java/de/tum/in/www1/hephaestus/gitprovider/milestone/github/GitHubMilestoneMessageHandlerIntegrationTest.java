@@ -3,6 +3,7 @@ package de.tum.in.www1.hephaestus.gitprovider.milestone.github;
 import static org.assertj.core.api.Assertions.*;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventType;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.issue.IssueRepository;
 import de.tum.in.www1.hephaestus.gitprovider.milestone.Milestone;
@@ -117,7 +118,7 @@ class GitHubMilestoneMessageHandlerIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("Should return correct event key")
     void shouldReturnCorrectEventKey() {
-        assertThat(handler.getEventKey()).isEqualTo("milestone");
+        assertThat(handler.getEventType()).isEqualTo(GitHubEventType.MILESTONE);
     }
 
     @Test

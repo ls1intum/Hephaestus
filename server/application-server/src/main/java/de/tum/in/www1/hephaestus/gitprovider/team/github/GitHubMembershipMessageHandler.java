@@ -4,6 +4,7 @@ import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.NatsMessageDeserializer;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventAction;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventType;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
 import de.tum.in.www1.hephaestus.gitprovider.team.Team;
 import de.tum.in.www1.hephaestus.gitprovider.team.TeamRepository;
@@ -42,8 +43,8 @@ public class GitHubMembershipMessageHandler extends GitHubMessageHandler<GitHubM
     }
 
     @Override
-    protected String getEventKey() {
-        return "membership";
+    public GitHubEventType getEventType() {
+        return GitHubEventType.MEMBERSHIP;
     }
 
     @Override

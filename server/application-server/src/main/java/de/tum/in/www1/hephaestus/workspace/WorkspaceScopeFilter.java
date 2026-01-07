@@ -3,6 +3,7 @@ package de.tum.in.www1.hephaestus.workspace;
 import de.tum.in.www1.hephaestus.monitoring.MonitoringFilterProperties;
 import jakarta.annotation.PostConstruct;
 import java.util.Collections;
+import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -103,7 +104,7 @@ public class WorkspaceScopeFilter {
         return !(allowedOrganizations.isEmpty() && allowedRepositories.isEmpty());
     }
 
-    private Set<String> normalizeSet(java.util.List<String> values) {
+    private Set<String> normalizeSet(List<String> values) {
         if (values == null || values.isEmpty()) {
             return Collections.emptySet();
         }

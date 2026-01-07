@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.*;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.tum.in.www1.hephaestus.gitprovider.common.events.DomainEvent;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventType;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.issue.IssueRepository;
 import de.tum.in.www1.hephaestus.gitprovider.issue.github.dto.GitHubIssueEventDTO;
@@ -102,13 +103,13 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
     // ==================== Event Key Tests ====================
 
     @Nested
-    @DisplayName("Event Key")
-    class EventKey {
+    @DisplayName("Event Type")
+    class EventType {
 
         @Test
-        @DisplayName("Should return 'issues' as event key")
-        void shouldReturnCorrectEventKey() {
-            assertThat(handler.getEventKey()).isEqualTo("issues");
+        @DisplayName("Should return ISSUES as event type")
+        void shouldReturnCorrectEventType() {
+            assertThat(handler.getEventType()).isEqualTo(GitHubEventType.ISSUES);
         }
     }
 

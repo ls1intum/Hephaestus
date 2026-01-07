@@ -3,6 +3,7 @@ package de.tum.in.www1.hephaestus.activity;
 import de.tum.in.www1.hephaestus.core.WorkspaceAgnostic;
 import java.time.Instant;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -107,7 +108,7 @@ public interface DeadLetterEventRepository extends JpaRepository<DeadLetterEvent
         """
     )
     int deleteByStatusInAndResolvedAtBefore(
-        @Param("statuses") java.util.Set<DeadLetterEvent.Status> statuses,
+        @Param("statuses") Set<DeadLetterEvent.Status> statuses,
         @Param("cutoff") Instant cutoff
     );
 
@@ -119,7 +120,7 @@ public interface DeadLetterEventRepository extends JpaRepository<DeadLetterEvent
      */
     default int deleteResolvedBefore(Instant cutoff) {
         return deleteByStatusInAndResolvedAtBefore(
-            java.util.Set.of(DeadLetterEvent.Status.RESOLVED, DeadLetterEvent.Status.DISCARDED),
+            Set.of(DeadLetterEvent.Status.RESOLVED, DeadLetterEvent.Status.DISCARDED),
             cutoff
         );
     }

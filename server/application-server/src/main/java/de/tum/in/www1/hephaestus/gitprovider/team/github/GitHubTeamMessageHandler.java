@@ -3,6 +3,7 @@ package de.tum.in.www1.hephaestus.gitprovider.team.github;
 import de.tum.in.www1.hephaestus.gitprovider.common.NatsMessageDeserializer;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventAction;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventType;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
 import de.tum.in.www1.hephaestus.gitprovider.team.github.dto.GitHubTeamEventDTO;
 import org.slf4j.Logger;
@@ -26,8 +27,8 @@ public class GitHubTeamMessageHandler extends GitHubMessageHandler<GitHubTeamEve
     }
 
     @Override
-    protected String getEventKey() {
-        return "team";
+    public GitHubEventType getEventType() {
+        return GitHubEventType.TEAM;
     }
 
     @Override

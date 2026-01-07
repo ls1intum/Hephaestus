@@ -277,17 +277,42 @@ public class WorkspaceRepositoryMonitorService {
     }
 
     /**
+     * Remove all repository monitors tied to an installation and optionally delete the repositories.
+     *
+     * @param installationId     the GitHub App installation ID
+     * @param deleteRepositories if true, also delete the Repository entities from the database
+     */
+    @Transactional
+    public Optional<Workspace> removeAllRepositoriesFromMonitor(long installationId, boolean deleteRepositories) {
+        var workspaceOpt = workspaceRepository.findByInstallationId(installationId);
+        workspaceOpt.ifPresent(workspace -> {
+            List<RepositoryToMonitor> monitors = repositoryToMonitorRepository.findByWorkspaceId(workspace.getId());
+            for (RepositoryToMonitor monitor : monitors) {
+                String nameWithOwner = monitor.getNameWithOwner();
+                deleteRepositoryMonitor(workspace, monitor);
+
+                // Delete the actual Repository entity if requested
+                if (deleteRepositories && nameWithOwner != null) {
+                    repositoryRepository
+                        .findByNameWithOwner(nameWithOwner)
+                        .ifPresent(repository -> {
+                            repository.getLabels().forEach(Label::removeAllTeams);
+                            repositoryRepository.delete(repository);
+                            log.debug("Deleted repository {} during installation cleanup", nameWithOwner);
+                        });
+                }
+            }
+        });
+        return workspaceOpt;
+    }
+
+    /**
      * Remove all repository monitors tied to an installation.
+     * Does not delete the Repository entities.
      */
     @Transactional
     public Optional<Workspace> removeAllRepositoriesFromMonitor(long installationId) {
-        var workspaceOpt = workspaceRepository.findByInstallationId(installationId);
-        workspaceOpt.ifPresent(workspace -> {
-            repositoryToMonitorRepository
-                .findByWorkspaceId(workspace.getId())
-                .forEach(monitor -> deleteRepositoryMonitor(workspace, monitor));
-        });
-        return workspaceOpt;
+        return removeAllRepositoriesFromMonitor(installationId, false);
     }
 
     // ========================================================================

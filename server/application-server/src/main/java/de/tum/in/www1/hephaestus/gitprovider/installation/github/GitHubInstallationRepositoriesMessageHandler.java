@@ -1,6 +1,7 @@
 package de.tum.in.www1.hephaestus.gitprovider.installation.github;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.NatsMessageDeserializer;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventType;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.WorkspaceProvisioningListener;
 import de.tum.in.www1.hephaestus.gitprovider.installation.github.dto.GitHubInstallationRepositoriesEventDTO;
@@ -34,8 +35,8 @@ public class GitHubInstallationRepositoriesMessageHandler
     }
 
     @Override
-    protected String getEventKey() {
-        return "installation_repositories";
+    public GitHubEventType getEventType() {
+        return GitHubEventType.INSTALLATION_REPOSITORIES;
     }
 
     @Override

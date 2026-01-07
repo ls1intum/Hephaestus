@@ -6,11 +6,15 @@ import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import io.github.resilience4j.ratelimiter.RateLimiter;
 import io.github.resilience4j.ratelimiter.RateLimiterConfig;
 import io.github.resilience4j.ratelimiter.RateLimiterRegistry;
+import java.io.IOException;
 import java.time.Duration;
+import java.util.concurrent.TimeoutException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.web.reactive.function.client.WebClientRequestException;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 
 /**
  * Resilience4j configuration for circuit breaker and rate limiter patterns.
@@ -86,10 +90,10 @@ public class ResilienceConfig {
             .automaticTransitionFromOpenToHalfOpenEnabled(true)
             // Record these exceptions as failures
             .recordExceptions(
-                java.io.IOException.class,
-                java.util.concurrent.TimeoutException.class,
-                org.springframework.web.reactive.function.client.WebClientRequestException.class,
-                org.springframework.web.reactive.function.client.WebClientResponseException.class
+                IOException.class,
+                TimeoutException.class,
+                WebClientRequestException.class,
+                WebClientResponseException.class
             )
             // Don't record these as failures (they're client errors, not service failures)
             .ignoreExceptions(IllegalArgumentException.class, IllegalStateException.class)

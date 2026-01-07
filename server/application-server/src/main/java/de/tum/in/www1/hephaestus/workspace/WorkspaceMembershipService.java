@@ -17,6 +17,8 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -371,10 +373,7 @@ public class WorkspaceMembershipService {
      * @return Page of workspace memberships
      */
     @Transactional(readOnly = true)
-    public org.springframework.data.domain.Page<WorkspaceMembership> listMembers(
-        Long workspaceId,
-        org.springframework.data.domain.Pageable pageable
-    ) {
+    public Page<WorkspaceMembership> listMembers(Long workspaceId, Pageable pageable) {
         return workspaceMembershipRepository.findAllByWorkspace_Id(workspaceId, pageable);
     }
 

@@ -346,14 +346,41 @@ public class WorkspaceProvisioningService {
             .findByLogin(accountLogin)
             .map(User::getId)
             .orElseGet(() -> {
+                // Fetch user info from GitHub to get the database ID
+                GitHubUserResponse userInfo = webClient
+                    .get()
+                    .uri("/users/{login}", accountLogin)
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + patToken)
+                    .retrieve()
+                    .bodyToMono(GitHubUserResponse.class)
+                    .block();
+
+                if (userInfo == null || userInfo.id() == null) {
+                    throw new IllegalStateException(
+                        "Failed to fetch GitHub user info for login '" + accountLogin + "'"
+                    );
+                }
+
                 User newUser = new User();
-                newUser.setLogin(accountLogin);
-                newUser.setName(accountLogin);
+                newUser.setId(userInfo.id());
+                newUser.setLogin(userInfo.login() != null ? userInfo.login() : accountLogin);
+                newUser.setName(userInfo.name() != null ? userInfo.name() : accountLogin);
+                newUser.setAvatarUrl(userInfo.avatarUrl() != null ? userInfo.avatarUrl() : "");
+                newUser.setHtmlUrl(userInfo.htmlUrl() != null ? userInfo.htmlUrl() : "");
+                newUser.setType(User.Type.USER);
                 newUser = userRepository.save(newUser);
-                log.info("Created minimal user '{}' for PAT workspace bootstrap", accountLogin);
+                log.info("Created user '{}' (id={}) for PAT workspace bootstrap", newUser.getLogin(), newUser.getId());
                 return newUser.getId();
             });
     }
+
+    private record GitHubUserResponse(
+        Long id,
+        String login,
+        String name,
+        @JsonProperty("avatar_url") String avatarUrl,
+        @JsonProperty("html_url") String htmlUrl
+    ) {}
 
     // ============ DTOs for GitHub REST API ============
 

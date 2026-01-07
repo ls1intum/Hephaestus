@@ -4,6 +4,7 @@ import de.tum.in.www1.hephaestus.gitprovider.common.NatsMessageDeserializer;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContextFactory;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventAction;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventType;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
 import de.tum.in.www1.hephaestus.gitprovider.label.github.dto.GitHubLabelDTO;
 import de.tum.in.www1.hephaestus.gitprovider.label.github.dto.GitHubLabelEventDTO;
@@ -34,8 +35,8 @@ public class GitHubLabelMessageHandler extends GitHubMessageHandler<GitHubLabelE
     }
 
     @Override
-    protected String getEventKey() {
-        return "label";
+    public GitHubEventType getEventType() {
+        return GitHubEventType.LABEL;
     }
 
     @Override

@@ -2,6 +2,7 @@ package de.tum.in.www1.hephaestus.gitprovider.installation.github;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.NatsMessageDeserializer;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventAction;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventType;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.WorkspaceProvisioningListener;
 import de.tum.in.www1.hephaestus.gitprovider.installation.github.dto.GitHubInstallationTargetEventDTO;
@@ -33,8 +34,8 @@ public class GitHubInstallationTargetMessageHandler extends GitHubMessageHandler
     }
 
     @Override
-    protected String getEventKey() {
-        return "installation_target";
+    public GitHubEventType getEventType() {
+        return GitHubEventType.INSTALLATION_TARGET;
     }
 
     @Override

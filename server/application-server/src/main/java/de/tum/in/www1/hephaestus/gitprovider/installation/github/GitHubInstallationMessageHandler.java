@@ -2,13 +2,16 @@ package de.tum.in.www1.hephaestus.gitprovider.installation.github;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.NatsMessageDeserializer;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventAction;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventType;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.WorkspaceProvisioningListener;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.WorkspaceProvisioningListener.AccountType;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.WorkspaceProvisioningListener.InstallationData;
 import de.tum.in.www1.hephaestus.gitprovider.installation.github.dto.GitHubInstallationEventDTO;
 import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationService;
+import de.tum.in.www1.hephaestus.gitprovider.repository.github.dto.GitHubRepositoryRefDTO;
 import java.util.Collections;
+import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -36,8 +39,8 @@ public class GitHubInstallationMessageHandler extends GitHubMessageHandler<GitHu
     }
 
     @Override
-    protected String getEventKey() {
-        return "installation";
+    public GitHubEventType getEventType() {
+        return GitHubEventType.INSTALLATION;
     }
 
     @Override
@@ -81,13 +84,19 @@ public class GitHubInstallationMessageHandler extends GitHubMessageHandler<GitHu
         Long accountId = account != null ? account.id() : null;
         AccountType accountType = account != null ? AccountType.fromGitHubType(account.type()) : AccountType.USER;
 
+        // Extract repository names from the installation event payload
+        // These are provided for "created" events with "selected" repository selection
+        List<String> repositoryNames = event.repositories() != null
+            ? event.repositories().stream().map(GitHubRepositoryRefDTO::fullName).toList()
+            : Collections.emptyList();
+
         InstallationData installationData = new InstallationData(
             installationId,
             accountId,
             accountLogin,
             accountType,
             avatarUrl,
-            Collections.emptyList() // Repository names are handled separately via repository events
+            repositoryNames
         );
 
         provisioningListener.onInstallationCreated(installationData);

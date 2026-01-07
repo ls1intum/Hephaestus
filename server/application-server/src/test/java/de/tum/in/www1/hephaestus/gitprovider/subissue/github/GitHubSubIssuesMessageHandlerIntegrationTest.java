@@ -3,6 +3,7 @@ package de.tum.in.www1.hephaestus.gitprovider.subissue.github;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventType;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.issue.IssueRepository;
 import de.tum.in.www1.hephaestus.gitprovider.organization.Organization;
@@ -112,7 +113,7 @@ class GitHubSubIssuesMessageHandlerIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("Should return correct event key")
     void shouldReturnCorrectEventKey() {
-        assertThat(handler.getEventKey()).isEqualTo("sub_issues");
+        assertThat(handler.getEventType()).isEqualTo(GitHubEventType.SUB_ISSUES);
     }
 
     @Test

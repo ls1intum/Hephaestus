@@ -2,6 +2,7 @@ package de.tum.in.www1.hephaestus.gitprovider.organization.github;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.NatsMessageDeserializer;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventAction;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventType;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
 import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationMembershipRepository;
 import de.tum.in.www1.hephaestus.gitprovider.organization.github.dto.GitHubOrganizationEventDTO;
@@ -38,8 +39,8 @@ public class GitHubOrganizationMessageHandler extends GitHubMessageHandler<GitHu
     }
 
     @Override
-    protected String getEventKey() {
-        return "organization";
+    public GitHubEventType getEventType() {
+        return GitHubEventType.ORGANIZATION;
     }
 
     @Override

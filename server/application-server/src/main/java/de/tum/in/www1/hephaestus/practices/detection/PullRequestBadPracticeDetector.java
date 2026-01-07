@@ -18,6 +18,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -72,7 +73,7 @@ public class PullRequestBadPracticeDetector {
 
         List<PullRequest> pullRequests = pullRequestRepository.findAssignedByLoginAndStates(
             login,
-            java.util.Set.of(de.tum.in.www1.hephaestus.gitprovider.issue.Issue.State.OPEN),
+            Set.of(Issue.State.OPEN),
             workspaceId
         );
 

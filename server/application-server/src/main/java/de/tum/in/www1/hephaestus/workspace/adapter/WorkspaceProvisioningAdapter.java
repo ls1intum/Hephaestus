@@ -52,6 +52,23 @@ public class WorkspaceProvisioningAdapter implements WorkspaceProvisioningListen
                 "Skipping installation event for {}: workspace could not be ensured",
                 installation.installationId()
             );
+            return;
+        }
+
+        // Add initial repositories from the installation event
+        // These are provided for "created" events with "selected" repository selection
+        if (installation.repositoryNames() != null && !installation.repositoryNames().isEmpty()) {
+            log.info(
+                "Adding {} initial repositories for installation {}",
+                installation.repositoryNames().size(),
+                installation.installationId()
+            );
+            for (String nameWithOwner : installation.repositoryNames()) {
+                repositoryMonitorService.ensureRepositoryMonitorForInstallation(
+                    installation.installationId(),
+                    nameWithOwner
+                );
+            }
         }
     }
 
@@ -65,8 +82,9 @@ public class WorkspaceProvisioningAdapter implements WorkspaceProvisioningListen
         // 1. Stop NATS consumer for the workspace first (before removing monitors)
         workspaceInstallationService.stopNatsForInstallation(installationId);
 
-        // 2. Remove all repository monitors for this installation
-        repositoryMonitorService.removeAllRepositoriesFromMonitor(installationId);
+        // 2. Remove all repository monitors AND delete repositories for this installation
+        // When installation is deleted, we clean up all associated data
+        repositoryMonitorService.removeAllRepositoriesFromMonitor(installationId, true);
 
         // 3. Detach organization from installation (set installationId to null)
         organizationService.detachInstallation(installationId);
@@ -88,8 +106,10 @@ public class WorkspaceProvisioningAdapter implements WorkspaceProvisioningListen
             return;
         }
 
-        // Repository additions are typically handled by repository-specific event handlers
-        // This hook allows for future expansion where workspace-level actions are needed
+        log.info("Adding {} repositories to monitor for installation {}", repositoryNames.size(), installationId);
+        for (String nameWithOwner : repositoryNames) {
+            repositoryMonitorService.ensureRepositoryMonitorForInstallation(installationId, nameWithOwner);
+        }
         log.debug("Repositories added to installation {}: {}", installationId, repositoryNames);
     }
 
@@ -104,8 +124,10 @@ public class WorkspaceProvisioningAdapter implements WorkspaceProvisioningListen
             return;
         }
 
-        // Repository removals are typically handled by repository-specific event handlers
-        // This hook allows for future expansion where workspace-level actions are needed
+        log.info("Removing {} repositories from monitor for installation {}", repositoryNames.size(), installationId);
+        for (String nameWithOwner : repositoryNames) {
+            repositoryMonitorService.removeRepositoryMonitorForInstallation(installationId, nameWithOwner);
+        }
         log.debug("Repositories removed from installation {}: {}", installationId, repositoryNames);
     }
 

@@ -3,6 +3,7 @@ package de.tum.in.www1.hephaestus.gitprovider.label.github;
 import static org.assertj.core.api.Assertions.*;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventType;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.issue.IssueRepository;
 import de.tum.in.www1.hephaestus.gitprovider.label.Label;
@@ -114,9 +115,9 @@ class GitHubLabelMessageHandlerIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("Should return correct event key")
-    void shouldReturnCorrectEventKey() {
-        assertThat(handler.getEventKey()).isEqualTo("label");
+    @DisplayName("Should return correct event type")
+    void shouldReturnCorrectEventType() {
+        assertThat(handler.getEventType()).isEqualTo(GitHubEventType.LABEL);
     }
 
     @Test

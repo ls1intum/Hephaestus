@@ -3,6 +3,7 @@ package de.tum.in.www1.hephaestus.gitprovider.installation.github;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventType;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler.GitHubMessageDomain;
 import de.tum.in.www1.hephaestus.gitprovider.installation.github.dto.GitHubInstallationTargetEventDTO;
 import de.tum.in.www1.hephaestus.gitprovider.organization.Organization;
@@ -76,7 +77,7 @@ class GitHubInstallationTargetMessageHandlerIntegrationTest extends BaseIntegrat
     @Test
     @DisplayName("Should return correct event key")
     void shouldReturnCorrectEventKey() {
-        assertThat(handler.getEventKey()).isEqualTo("installation_target");
+        assertThat(handler.getEventType()).isEqualTo(GitHubEventType.INSTALLATION_TARGET);
     }
 
     @Test

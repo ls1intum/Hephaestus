@@ -10,6 +10,7 @@ import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.github.dto.GitHubUserDTO;
+import java.util.Optional;
 import org.springframework.lang.Nullable;
 
 /**
@@ -96,7 +97,7 @@ public abstract class BaseGitHubProcessor {
         }
 
         // Try ID-based lookup first (webhooks provide ID), then name-based (GraphQL doesn't)
-        java.util.Optional<Label> existingOpt;
+        Optional<Label> existingOpt;
         if (dto.id() != null) {
             existingOpt = labelRepository.findById(dto.id());
         } else {

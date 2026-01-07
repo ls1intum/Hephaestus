@@ -3,6 +3,7 @@ package de.tum.in.www1.hephaestus.gitprovider.issuecomment.github;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventType;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.issue.IssueRepository;
 import de.tum.in.www1.hephaestus.gitprovider.issuecomment.IssueCommentRepository;
@@ -117,7 +118,7 @@ class GitHubIssueCommentMessageHandlerIntegrationTest extends BaseIntegrationTes
     @Test
     @DisplayName("Should return correct event key")
     void shouldReturnCorrectEventKey() {
-        assertThat(handler.getEventKey()).isEqualTo("issue_comment");
+        assertThat(handler.getEventType()).isEqualTo(GitHubEventType.ISSUE_COMMENT);
     }
 
     @Test

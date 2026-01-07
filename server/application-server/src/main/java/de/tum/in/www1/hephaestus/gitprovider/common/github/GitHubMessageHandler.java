@@ -37,11 +37,12 @@ public abstract class GitHubMessageHandler<T> implements MessageHandler {
 
     @Override
     public void onMessage(Message msg) {
-        String eventType = getEventKey();
+        GitHubEventType eventType = getEventType();
+        String eventKey = eventType.getValue();
         String subject = msg.getSubject();
         String safeSubject = sanitizeForLog(subject);
-        if (!subject.endsWith(eventType)) {
-            log.error("Received message on unexpected subject: {}, expected to end with {}", safeSubject, eventType);
+        if (!subject.endsWith(eventKey)) {
+            log.error("Received message on unexpected subject: {}, expected to end with {}", safeSubject, eventKey);
             return;
         }
 
@@ -63,23 +64,12 @@ public abstract class GitHubMessageHandler<T> implements MessageHandler {
     protected abstract void handleEvent(T eventPayload);
 
     /**
-     * Returns the event routing key for NATS subscription.
-     * This is typically the GitHub event name in lowercase (e.g., "issues",
-     * "pull_request").
-     *
-     * @return The event key string.
-     */
-    protected abstract String getEventKey();
-
-    /**
      * Returns the event type for this handler.
-     * This is a type-safe alternative to {@link #getEventKey()}.
+     * Used for NATS subscription routing.
      *
-     * @return The GitHub event type enum value, or null if not recognized.
+     * @return The GitHub event type enum value.
      */
-    public GitHubEventType getEventType() {
-        return GitHubEventType.fromString(getEventKey());
-    }
+    public abstract GitHubEventType getEventType();
 
     /**
      * Domain classification for handler routing. Defaults to REPOSITORY.

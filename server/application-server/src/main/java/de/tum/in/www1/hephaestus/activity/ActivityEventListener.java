@@ -340,7 +340,6 @@ public class ActivityEventListener {
             return;
         }
         // Fetch the full IssueComment entity to calculate complexity-weighted XP
-        // using the harmonic mean formula from the old scoring system
         IssueComment issueComment = issueCommentRepository.findById(commentData.id()).orElse(null);
         double xp;
         if (issueComment != null) {
