@@ -332,13 +332,13 @@
             </not>
         </preConditions>
         <addColumn tableName="workspace">
-            <column name="sub_issues_synced_at" type="timestamp">
+            <column name="sub_issues_synced_at" type="TIMESTAMP(6) WITH TIME ZONE">
                 <constraints nullable="true"/>
             </column>
-            <column name="issue_types_synced_at" type="timestamp">
+            <column name="issue_types_synced_at" type="TIMESTAMP(6) WITH TIME ZONE">
                 <constraints nullable="true"/>
             </column>
-            <column name="issue_dependencies_synced_at" type="timestamp">
+            <column name="issue_dependencies_synced_at" type="TIMESTAMP(6) WITH TIME ZONE">
                 <constraints nullable="true"/>
             </column>
         </addColumn>
@@ -1167,6 +1167,124 @@
                 ALTER TABLE issue DROP CONSTRAINT IF EXISTS issue_review_decision_check;
             </sql>
         </rollback>
+    </changeSet>
+
+    <!-- ==================== SECTION 25: PullRequestBadPractice Enum Migration ==================== -->
+    <!--
+    Migrate pullrequestbadpractice enum columns from ordinal (smallint) to string (varchar).
+    
+    This migration converts the enum columns to use EnumType.STRING storage for better
+    maintainability and debugging. The ordinal values are mapped to their enum names.
+    -->
+
+    <!-- Step 1: Add temporary varchar columns -->
+    <changeSet id="1767900000000-14-add-temp-columns" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <tableExists tableName="pullrequestbadpractice"/>
+            <columnExists tableName="pullrequestbadpractice" columnName="state"/>
+        </preConditions>
+        <comment>Add temporary varchar columns for enum string values</comment>
+        
+        <addColumn tableName="pullrequestbadpractice">
+            <column name="state_new" type="VARCHAR(32)"/>
+        </addColumn>
+        <addColumn tableName="pullrequestbadpractice">
+            <column name="user_state_new" type="VARCHAR(32)"/>
+        </addColumn>
+        <addColumn tableName="pullrequestbadpractice">
+            <column name="detection_pullrequest_lifecycle_state_new" type="VARCHAR(32)"/>
+        </addColumn>
+    </changeSet>
+
+    <!-- Step 2: Migrate state column (PullRequestBadPracticeState enum) -->
+    <changeSet id="1767900000000-15-migrate-state" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="pullrequestbadpractice" columnName="state_new"/>
+        </preConditions>
+        <comment>Migrate state ordinals to enum names</comment>
+        <sql>
+            UPDATE pullrequestbadpractice SET state_new = CASE state
+                WHEN 0 THEN 'GOOD_PRACTICE'
+                WHEN 1 THEN 'MINOR_ISSUE'
+                WHEN 2 THEN 'NORMAL_ISSUE'
+                WHEN 3 THEN 'CRITICAL_ISSUE'
+                WHEN 4 THEN 'FIXED'
+                WHEN 5 THEN 'WONT_FIX'
+                WHEN 6 THEN 'WRONG'
+                ELSE 'NORMAL_ISSUE'
+            END
+            WHERE state IS NOT NULL;
+        </sql>
+    </changeSet>
+
+    <!-- Step 3: Migrate user_state column (PullRequestBadPracticeState enum) -->
+    <changeSet id="1767900000000-16-migrate-user-state" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="pullrequestbadpractice" columnName="user_state_new"/>
+        </preConditions>
+        <comment>Migrate user_state ordinals to enum names</comment>
+        <sql>
+            UPDATE pullrequestbadpractice SET user_state_new = CASE user_state
+                WHEN 0 THEN 'GOOD_PRACTICE'
+                WHEN 1 THEN 'MINOR_ISSUE'
+                WHEN 2 THEN 'NORMAL_ISSUE'
+                WHEN 3 THEN 'CRITICAL_ISSUE'
+                WHEN 4 THEN 'FIXED'
+                WHEN 5 THEN 'WONT_FIX'
+                WHEN 6 THEN 'WRONG'
+                ELSE NULL
+            END
+            WHERE user_state IS NOT NULL;
+        </sql>
+    </changeSet>
+
+    <!-- Step 4: Migrate detection_pullrequest_lifecycle_state column (PullRequestLifecycleState enum) -->
+    <changeSet id="1767900000000-17-migrate-lifecycle-state" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="pullrequestbadpractice" columnName="detection_pullrequest_lifecycle_state_new"/>
+        </preConditions>
+        <comment>Migrate detection_pullrequest_lifecycle_state ordinals to enum names</comment>
+        <sql>
+            UPDATE pullrequestbadpractice SET detection_pullrequest_lifecycle_state_new = CASE detection_pullrequest_lifecycle_state
+                WHEN 0 THEN 'DRAFT'
+                WHEN 1 THEN 'OPEN'
+                WHEN 2 THEN 'READY_FOR_REVIEW'
+                WHEN 3 THEN 'READY_TO_MERGE'
+                WHEN 4 THEN 'MERGED'
+                WHEN 5 THEN 'CLOSED'
+                ELSE NULL
+            END
+            WHERE detection_pullrequest_lifecycle_state IS NOT NULL;
+        </sql>
+    </changeSet>
+
+    <!-- Step 5: Drop old columns and rename new ones -->
+    <changeSet id="1767900000000-18-swap-columns" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="pullrequestbadpractice" columnName="state_new"/>
+        </preConditions>
+        <comment>Replace old smallint columns with new varchar columns</comment>
+        
+        <dropColumn tableName="pullrequestbadpractice" columnName="state"/>
+        <renameColumn tableName="pullrequestbadpractice" oldColumnName="state_new" newColumnName="state"/>
+        
+        <dropColumn tableName="pullrequestbadpractice" columnName="user_state"/>
+        <renameColumn tableName="pullrequestbadpractice" oldColumnName="user_state_new" newColumnName="user_state"/>
+        
+        <dropColumn tableName="pullrequestbadpractice" columnName="detection_pullrequest_lifecycle_state"/>
+        <renameColumn tableName="pullrequestbadpractice" oldColumnName="detection_pullrequest_lifecycle_state_new" newColumnName="detection_pullrequest_lifecycle_state"/>
+    </changeSet>
+
+    <!-- Step 6: Explicitly set column types to match Hibernate entity expectations -->
+    <changeSet id="1767900000000-19-fix-column-types" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="pullrequestbadpractice" columnName="state"/>
+        </preConditions>
+        <comment>Ensure enum columns have correct varchar(32) type to match Hibernate entity @Column(length=32)</comment>
+        
+        <modifyDataType tableName="pullrequestbadpractice" columnName="state" newDataType="varchar(32)"/>
+        <modifyDataType tableName="pullrequestbadpractice" columnName="user_state" newDataType="varchar(32)"/>
+        <modifyDataType tableName="pullrequestbadpractice" columnName="detection_pullrequest_lifecycle_state" newDataType="varchar(32)"/>
     </changeSet>
 
 </databaseChangeLog>
