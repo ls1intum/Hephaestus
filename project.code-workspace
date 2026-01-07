@@ -26,19 +26,39 @@
 		}
 	],
 	"settings": {
-		"java.compile.nullAnalysis.mode": "automatic",
+		"java.compile.nullAnalysis.mode": "disabled",
 		"java.configuration.updateBuildConfiguration": "automatic",
 		"java.completion.importOrder": [
 			"#"
 		],
 		"java.debug.settings.onBuildFailureProceed": true,
+		"java.settings.url": ".vscode/java-settings.prefs",
+		"java.project.sourcePaths": [
+			"src/main/java",
+			"src/test/java"
+		],
 		"scm.defaultViewMode": "tree",
 		"diffEditor.renderSideBySide": false,
 		"github.copilot.chat.summarizeAgentConversationHistory.enabled": false,
 		"github.copilot.chat.languageContext.fix.typescript.enabled": true,
 		"github.copilot.chat.languageContext.inline.typescript.enabled": true,
 		"github.copilot.chat.languageContext.typescript.enabled": true,
-		"chat.agent.maxRequests": 1000
+		"chat.agent.maxRequests": 1000,
+		"files.associations": {
+			"*.graphql": "graphql",
+			"*.graphqls": "graphql"
+		},
+		"[graphql]": {
+			"editor.formatOnSave": true,
+			"editor.tabSize": 2
+		},
+		"yaml.validate": true,
+		"yaml.schemas": {
+			"https://json.schemastore.org/liquibase-3.2.json": "**/db/changelog/*.yaml"
+		},
+		"spring-boot.ls.problem.application-yaml.YAML_SHOULD_ESCAPE": "IGNORE",
+		"spring-boot.ls.problem.application-yaml.YAML_SYNTAX_ERROR": "IGNORE",
+		"spring-boot.ls.problem.application-yaml.YAML_UNKNOWN_PROPERTY": "IGNORE"
 	},
 	"extensions": {
 		"recommendations": [
@@ -53,7 +73,9 @@
 			"davidanson.vscode-markdownlint",
 			"streetsidesoftware.code-spell-checker",
 			"njpwerner.autodocstring",
-			"formulahendry.auto-rename-tag"
+			"formulahendry.auto-rename-tag",
+			"GraphQL.vscode-graphql",
+			"GraphQL.vscode-graphql-syntax"
 		]
-	},
+	}
 }

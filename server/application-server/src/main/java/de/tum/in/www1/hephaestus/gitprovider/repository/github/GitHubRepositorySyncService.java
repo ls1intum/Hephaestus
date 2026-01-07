@@ -1,273 +1,264 @@
 package de.tum.in.www1.hephaestus.gitprovider.repository.github;
 
-import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubClientExecutor;
+import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.*;
+
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser.RepositoryOwnerAndName;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.RepositoryOwner;
+import de.tum.in.www1.hephaestus.gitprovider.organization.Organization;
 import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationRepository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
-import de.tum.in.www1.hephaestus.workspace.WorkspaceService;
-import java.io.IOException;
-import java.time.Instant;
-import java.util.Collection;
-import java.util.List;
 import java.util.Optional;
-import java.util.Set;
-import org.kohsuke.github.GHFileNotFoundException;
-import org.kohsuke.github.GHRepository;
-import org.kohsuke.github.HttpException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Lazy;
+import org.springframework.graphql.client.ClientGraphQlResponse;
+import org.springframework.graphql.client.HttpGraphQlClient;
+import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * Service for syncing GitHub repository metadata via GraphQL API.
+ * <p>
+ * This service fetches repository information from GitHub and creates/updates
+ * the corresponding Repository entity in the database.
+ */
 @Service
 public class GitHubRepositorySyncService {
 
-    private GitHubRepositorySyncService self;
+    private static final Logger log = LoggerFactory.getLogger(GitHubRepositorySyncService.class);
 
-    private static final Logger logger = LoggerFactory.getLogger(GitHubRepositorySyncService.class);
-
-    @Autowired
-    private GitHubClientExecutor gitHubClientExecutor;
-
-    @Autowired
-    private RepositoryRepository repositoryRepository;
-
-    @Autowired
-    private OrganizationRepository organizationRepository;
-
-    @Autowired
-    private GitHubRepositoryConverter repositoryConverter;
-
-    @Lazy
-    @Autowired
-    private WorkspaceService workspaceService;
-
-    /**
-     * Syncs all repositories owned by a specific GitHub user or organization.
-     *
-     * @param owner The GitHub username (login) of the repository owner.
-     */
-    //TODO: Consider deleting this method -> not used in the application
-    public void syncAllRepositoriesOfOwner(Long workspaceId, String owner) {
-        try {
-            gitHubClientExecutor.execute(workspaceId, gh -> {
-                var builder = gh.searchRepositories().user(owner);
-                var iterator = builder.list().withPageSize(100).iterator();
-                while (iterator.hasNext()) {
-                    var ghRepositories = iterator.nextPage();
-                    ghRepositories.forEach(this::processRepository);
+    private static final String REPOSITORY_QUERY = """
+        query GetRepository($owner: String!, $name: String!) {
+            repository(owner: $owner, name: $name) {
+                id
+                databaseId
+                name
+                nameWithOwner
+                description
+                url
+                visibility
+                isArchived
+                isDisabled
+                isFork
+                isPrivate
+                pushedAt
+                defaultBranchRef {
+                    name
                 }
-                return null;
-            });
-        } catch (IOException e) {
-            logger.error(
-                "Failed to obtain GitHub client or list repositories for owner {}: {}",
-                owner,
-                e.getMessage(),
-                e
-            );
-        }
-    }
-
-    /**
-     * Syncs a list of repositories specified by their full names (e.g.,
-     * "owner/repo").
-     *
-     * @param nameWithOwners A list of repository full names in the format
-     *                       "owner/repo".
-     * @return A list of successfully fetched GitHub repositories.
-     */
-    //TODO: Consider deleting this method -> not used in the application
-    public List<GHRepository> syncAllRepositories(Set<String> nameWithOwners) {
-        return workspaceService
-            .listAllWorkspaces()
-            .stream()
-            .flatMap(ws ->
-                nameWithOwners
-                    .stream()
-                    .map(nameWithOwner -> syncRepository(ws.getId(), nameWithOwner))
-                    .filter(Optional::isPresent)
-                    .map(Optional::get)
-            )
-            .toList();
-    }
-
-    /**
-     * Syncs a single GitHub repository by its full name (e.g., "owner/repo").
-     *
-     * @param nameWithOwner The full name of the repository in the format
-     *                      "owner/repo".
-     * @return An optional containing the fetched GitHub repository, or an empty
-     *         optional if the repository could not be fetched.
-     */
-    public Optional<GHRepository> syncRepository(Long workspaceId, String nameWithOwner) {
-        try {
-            return gitHubClientExecutor.execute(workspaceId, gh -> {
-                try {
-                    var repository = gh.getRepository(nameWithOwner);
-                    self.processRepository(repository);
-                    return Optional.of(repository);
-                } catch (GHFileNotFoundException notFound) {
-                    throw new RepositorySyncException(
-                        nameWithOwner,
-                        RepositorySyncException.Reason.NOT_FOUND,
-                        notFound
-                    );
+                owner {
+                    __typename
+                    ... on Organization {
+                        id
+                        databaseId
+                        login
+                        name
+                        description
+                        url
+                        avatarUrl
+                    }
+                    ... on User {
+                        id
+                        databaseId
+                        login
+                        name
+                        url
+                        avatarUrl
+                    }
                 }
-            });
-        } catch (RepositorySyncException exception) {
-            throw exception;
-        } catch (HttpException httpException) {
-            if (httpException.getResponseCode() == 403) {
-                throw new RepositorySyncException(
-                    nameWithOwner,
-                    RepositorySyncException.Reason.FORBIDDEN,
-                    httpException
-                );
             }
-            logger.error(
-                "HTTP {} while fetching repository {}: {}",
-                httpException.getResponseCode(),
-                nameWithOwner,
-                httpException.getMessage()
-            );
-            return Optional.empty();
-        } catch (IOException e) {
-            logger.error("Failed to fetch repository {}: {}", nameWithOwner, e.getMessage());
-            return Optional.empty();
         }
+        """;
+
+    private final GitHubGraphQlClientProvider graphQlClientProvider;
+    private final RepositoryRepository repositoryRepository;
+    private final OrganizationRepository organizationRepository;
+
+    public GitHubRepositorySyncService(
+        GitHubGraphQlClientProvider graphQlClientProvider,
+        RepositoryRepository repositoryRepository,
+        OrganizationRepository organizationRepository
+    ) {
+        this.graphQlClientProvider = graphQlClientProvider;
+        this.repositoryRepository = repositoryRepository;
+        this.organizationRepository = organizationRepository;
     }
 
     /**
-     * Processes a single GitHub repository by updating or creating it in the local
-     * repository.
-     * <p>
-     * @param ghRepository The GitHub repository data to process.
-     * @return The updated or newly created Repository entity, or {@code null} if an
-     *         error occurred during update.
+     * Syncs a single repository from GitHub.
+     *
+     * @param workspaceId the workspace ID for authentication
+     * @param nameWithOwner the full repository name (owner/repo)
+     * @return the synced Repository entity, or empty if not found
      */
     @Transactional
-    public Repository processRepository(GHRepository ghRepository) {
-        var existing = repositoryRepository.findById(ghRepository.getId()).orElse(null);
-
-        if (existing != null) {
-            var updated = updateRepositoryIfStale(ghRepository, existing);
-            return updated != null ? repositoryRepository.save(updated) : existing;
+    public Optional<Repository> syncRepository(Long workspaceId, String nameWithOwner) {
+        String safeNameWithOwner = sanitizeForLog(nameWithOwner);
+        Optional<RepositoryOwnerAndName> parsedName = GitHubRepositoryNameParser.parse(nameWithOwner);
+        if (parsedName.isEmpty()) {
+            log.warn("Invalid repository name format: {}", safeNameWithOwner);
+            return Optional.empty();
         }
+        String repoOwner = parsedName.get().owner();
+        String repoName = parsedName.get().name();
 
-        var newRepository = repositoryConverter.convert(ghRepository);
-        if (newRepository == null) {
+        try {
+            HttpGraphQlClient client = graphQlClientProvider.forWorkspace(workspaceId);
+            ClientGraphQlResponse response = client
+                .document(REPOSITORY_QUERY)
+                .variable("owner", repoOwner)
+                .variable("name", repoName)
+                .execute()
+                .block(GRAPHQL_TIMEOUT);
+
+            if (response == null || !response.isValid()) {
+                log.warn(
+                    "Failed to fetch repository {}: {}",
+                    safeNameWithOwner,
+                    response != null ? response.getErrors() : "null response"
+                );
+                return Optional.empty();
+            }
+
+            // Use typed GraphQL model for type-safe parsing
+            var repoData = response
+                .field("repository")
+                .toEntity(de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.Repository.class);
+            if (repoData == null) {
+                log.warn("Repository {} not found on GitHub", safeNameWithOwner);
+                return Optional.empty();
+            }
+
+            // Ensure organization exists
+            RepositoryOwner owner = repoData.getOwner();
+            Organization organization = ensureOrganization(owner);
+
+            // Create or update repository using typed accessors
+            Long githubDatabaseId = repoData.getDatabaseId() != null ? repoData.getDatabaseId().longValue() : null;
+            if (githubDatabaseId == null) {
+                log.warn("Repository {} missing databaseId", safeNameWithOwner);
+                return Optional.empty();
+            }
+
+            Repository repository = repositoryRepository.findById(githubDatabaseId).orElseGet(Repository::new);
+
+            repository.setId(githubDatabaseId);
+            repository.setName(repoData.getName());
+            repository.setNameWithOwner(repoData.getNameWithOwner());
+            repository.setDescription(repoData.getDescription());
+            repository.setHtmlUrl(repoData.getUrl() != null ? repoData.getUrl().toString() : null);
+            repository.setOrganization(organization);
+
+            // Set private status
+            repository.setPrivate(repoData.getIsPrivate());
+
+            // Set archived status
+            repository.setArchived(repoData.getIsArchived());
+
+            // Set disabled status
+            repository.setDisabled(repoData.getIsDisabled());
+
+            // Set pushed at timestamp
+            if (repoData.getPushedAt() != null) {
+                repository.setPushedAt(repoData.getPushedAt().toInstant());
+            }
+
+            // Set default branch
+            if (repoData.getDefaultBranchRef() != null) {
+                repository.setDefaultBranch(repoData.getDefaultBranchRef().getName());
+            } else {
+                repository.setDefaultBranch("main");
+            }
+
+            // Set visibility
+            if (repoData.getVisibility() != null) {
+                repository.setVisibility(Repository.Visibility.valueOf(repoData.getVisibility().name()));
+            } else {
+                repository.setVisibility(Repository.Visibility.PRIVATE);
+            }
+
+            repository = repositoryRepository.save(repository);
+            log.debug("Synced repository: {}", safeNameWithOwner);
+
+            return Optional.of(repository);
+        } catch (Exception e) {
+            log.error("Error syncing repository {}: {}", safeNameWithOwner, e.getMessage(), e);
+            return Optional.empty();
+        }
+    }
+
+    /**
+     * Ensures the organization exists, creating it if necessary.
+     * Uses typed RepositoryOwner model for type-safe access.
+     */
+    @Nullable
+    private Organization ensureOrganization(RepositoryOwner owner) {
+        if (owner == null) {
             return null;
         }
 
-        return repositoryRepository.save(newRepository);
-    }
-
-    private Repository updateRepositoryIfStale(GHRepository ghRepository, Repository repository) {
-        try {
-            if (repository.getUpdatedAt() == null || repository.getUpdatedAt().isBefore(ghRepository.getUpdatedAt())) {
-                return repositoryConverter.update(ghRepository, repository);
+        // RepositoryOwner can be Organization or User
+        // Only handle Organization type for organization linking
+        if (owner instanceof de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.Organization graphQlOrg) {
+            Integer dbId = graphQlOrg.getDatabaseId();
+            if (dbId == null) {
+                return null;
             }
-            // Even if not stale, ensure organization link is set (backward compatibility for
-            // repositories created before organization linking was added)
-            if (repository.getOrganization() == null) {
-                return repositoryConverter.update(ghRepository, repository);
+
+            Long databaseId = dbId.longValue();
+            String login = graphQlOrg.getLogin();
+            String name = graphQlOrg.getName();
+            String url = graphQlOrg.getUrl() != null ? graphQlOrg.getUrl().toString() : null;
+            String avatarUrl = graphQlOrg.getAvatarUrl() != null ? graphQlOrg.getAvatarUrl().toString() : null;
+
+            Organization organization = organizationRepository
+                .findByGithubId(databaseId)
+                .orElseGet(() -> {
+                    Organization org = new Organization();
+                    org.setId(databaseId);
+                    org.setGithubId(databaseId);
+                    return org;
+                });
+
+            organization.setLogin(login);
+            organization.setName(name != null ? name : login);
+            organization.setHtmlUrl(url);
+            organization.setAvatarUrl(avatarUrl);
+
+            return organizationRepository.save(organization);
+        } else if (owner instanceof de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.User graphQlUser) {
+            // User repositories - create a "virtual" organization from the user
+            Integer dbId = graphQlUser.getDatabaseId();
+            if (dbId == null) {
+                return null;
             }
-            return repository;
-        } catch (IOException e) {
-            logger.error("Failed to update repository {}: {}", ghRepository.getId(), e.getMessage());
-            return repository;
-        }
-    }
 
-    @Autowired
-    @Lazy
-    public void setSelf(GitHubRepositorySyncService self) {
-        this.self = self;
-    }
+            Long databaseId = dbId.longValue();
+            String login = graphQlUser.getLogin();
+            String name = graphQlUser.getName();
+            String url = graphQlUser.getUrl() != null ? graphQlUser.getUrl().toString() : null;
+            String avatarUrl = graphQlUser.getAvatarUrl() != null ? graphQlUser.getAvatarUrl().toString() : null;
 
-    /**
-     * Upserts a repository entity from minimal installation webhook data.
-     *
-     * @param id            GitHub repository ID
-     * @param nameWithOwner Full name (owner/repo)
-     * @param name          Repository name
-     * @param isPrivate     Whether the repository is private
-     * @return persisted Repository entity
-     */
-    @Transactional
-    public Repository upsertFromInstallationPayload(long id, String nameWithOwner, String name, boolean isPrivate) {
-        var now = Instant.now();
-        var repository = repositoryRepository
-            .findById(id)
-            .orElseGet(() -> {
-                var r = new Repository();
-                r.setId(id);
-                r.setCreatedAt(now);
-                return r;
-            });
+            Organization organization = organizationRepository
+                .findByGithubId(databaseId)
+                .orElseGet(() -> {
+                    Organization org = new Organization();
+                    org.setId(databaseId);
+                    org.setGithubId(databaseId);
+                    return org;
+                });
 
-        repository.setUpdatedAt(now);
-        repository.setName(name);
-        repository.setNameWithOwner(nameWithOwner);
-        repository.setPrivate(isPrivate);
-        repository.setHtmlUrl("https://github.com/" + nameWithOwner);
-        // Fields not present in installation payload – set safe defaults
-        if (repository.getPushedAt() == null) {
-            repository.setPushedAt(now);
-        }
-        repository.setArchived(false);
-        repository.setDisabled(false);
-        repository.setVisibility(isPrivate ? Repository.Visibility.PRIVATE : Repository.Visibility.PUBLIC);
-        if (repository.getDefaultBranch() == null) {
-            repository.setDefaultBranch("main");
-        }
-        repository.setHasIssues(true);
-        repository.setHasProjects(false);
-        repository.setHasWiki(false);
+            organization.setLogin(login);
+            organization.setName(name != null ? name : login);
+            organization.setHtmlUrl(url);
+            organization.setAvatarUrl(avatarUrl);
 
-        // Link to organization if available (extracted from nameWithOwner)
-        if (repository.getOrganization() == null && nameWithOwner != null && nameWithOwner.contains("/")) {
-            String ownerLogin = nameWithOwner.split("/")[0];
-            organizationRepository.findByLoginIgnoreCase(ownerLogin).ifPresent(repository::setOrganization);
+            return organizationRepository.save(organization);
         }
 
-        return repositoryRepository.save(repository);
-    }
-
-    /**
-     * Deletes repositories by id, ensuring team join cleanup before removal.
-     *
-     * @param ids repository ids to delete; no-op if null or empty
-     */
-    @Transactional
-    public void deleteRepositoriesByIds(Collection<Long> ids) {
-        if (ids == null || ids.isEmpty()) {
-            return;
-        }
-        var repos = repositoryRepository.findAllById(ids);
-        repositoryRepository.deleteAll(repos);
-    }
-
-    /**
-     * Deletes all repositories whose nameWithOwner starts with the given owner prefix.
-     * Useful for cleaning up repositories when an installation is deleted and GitHub
-     * doesn't provide the repository list in the webhook payload.
-     *
-     * @param ownerPrefix owner prefix including trailing slash, e.g., "org-name/"
-     */
-    @Transactional
-    public void deleteRepositoriesByOwnerPrefix(String ownerPrefix) {
-        if (ownerPrefix == null || ownerPrefix.isBlank()) {
-            return;
-        }
-        var repos = repositoryRepository.findByNameWithOwnerStartingWithIgnoreCase(ownerPrefix);
-        if (repos.isEmpty()) {
-            return;
-        }
-        logger.info("Deleting {} repositories with owner prefix '{}'", repos.size(), ownerPrefix);
-        repositoryRepository.deleteAll(repos);
+        return null;
     }
 }

@@ -47,7 +47,7 @@ import org.springframework.context.annotation.Configuration;
 )
 public class OpenAPIConfiguration {
 
-    private static final Logger logger = LoggerFactory.getLogger(OpenAPIConfiguration.class);
+    private static final Logger log = LoggerFactory.getLogger(OpenAPIConfiguration.class);
     private static final String INTELLIGENCE_SERVICE_SPEC = "../intelligence-service/openapi.yaml";
     private static final String WORKSPACE_PATH_PREFIX = "/workspaces/{workspaceSlug}";
 
@@ -69,7 +69,7 @@ public class OpenAPIConfiguration {
     private void processApplicationServerSchemas(OpenAPI openApi) {
         var components = openApi.getComponents();
         if (components == null || components.getSchemas() == null) {
-            logger.warn("No schemas found in application-server spec");
+            log.warn("No schemas found in application-server spec");
             return;
         }
 
@@ -109,18 +109,18 @@ public class OpenAPIConfiguration {
     private void importIntelligenceServiceSpec(OpenAPI openApi) {
         File specFile = new File(INTELLIGENCE_SERVICE_SPEC);
         if (!specFile.exists()) {
-            logger.warn("Intelligence service spec not found at: {}", specFile.getAbsolutePath());
+            log.warn("Intelligence service spec not found at: {}", specFile.getAbsolutePath());
             return;
         }
 
         OpenAPI intelligenceSpec = new OpenAPIV3Parser().read(specFile.getAbsolutePath());
         if (intelligenceSpec == null) {
-            logger.error("Failed to parse intelligence service spec");
+            log.error("Failed to parse intelligence service spec");
             return;
         }
 
         if (intelligenceSpec.getComponents() == null || intelligenceSpec.getComponents().getSchemas() == null) {
-            logger.warn("No schemas found in intelligence-service spec");
+            log.warn("No schemas found in intelligence-service spec");
             return;
         }
 
@@ -176,8 +176,8 @@ public class OpenAPIConfiguration {
             }
         }
 
-        logger.info("Imported {} schemas from intelligence-service", schemasToImport.size());
-        logger.info("Imported {} paths from intelligence-service", importedPaths);
+        log.info("Imported {} schemas from intelligence-service", schemasToImport.size());
+        log.info("Imported {} paths from intelligence-service", importedPaths);
     }
 
     /**

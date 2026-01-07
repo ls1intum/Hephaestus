@@ -1,0 +1,72 @@
+# GraphQL query for fetching paginated comments for a specific review thread
+# Used to handle nested pagination when a thread has more than 100 comments
+# Uses fullDatabaseId for comments (BigInt) since databaseId (Int) can overflow.
+# User/Bot still use databaseId as fullDatabaseId is not available on Actor types.
+# Note: Uses node(id:) approach as GitHub's GraphQL API doesn't expose reviewThread(id:) on pullRequest
+
+query GetThreadComments($threadId: ID!, $first: Int!, $after: String) {
+    rateLimit {
+        cost
+        remaining
+        resetAt
+    }
+    node(id: $threadId) {
+        ... on PullRequestReviewThread {
+            id
+            comments(first: $first, after: $after) {
+                totalCount
+                pageInfo {
+                    hasNextPage
+                    endCursor
+                }
+                nodes {
+                    id
+                    fullDatabaseId
+                    body
+                    path
+                    line
+                    originalLine
+                    startLine
+                    originalStartLine
+                    diffHunk
+                    createdAt
+                    updatedAt
+                    state
+                    authorAssociation
+
+                    # Comment author - supports both User and Bot types
+                    author {
+                        ... on User {
+                            __typename
+                            id
+                            databaseId
+                            login
+                            avatarUrl
+                            name
+                            email
+                        }
+                        ... on Bot {
+                            __typename
+                            id
+                            databaseId
+                            login
+                            avatarUrl
+                        }
+                    }
+
+                    # Reply to (for threading)
+                    replyTo {
+                        id
+                        fullDatabaseId
+                    }
+
+                    # Associated review
+                    pullRequestReview {
+                        id
+                        fullDatabaseId
+                    }
+                }
+            }
+        }
+    }
+}

@@ -21,6 +21,9 @@ abstract class AbstractWorkspaceIntegrationTest extends BaseIntegrationTest {
     protected WorkspaceService workspaceService;
 
     @Autowired
+    protected WorkspaceInstallationService workspaceInstallationService;
+
+    @Autowired
     protected WorkspaceMembershipService workspaceMembershipService;
 
     @Autowired

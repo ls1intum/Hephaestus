@@ -3,7 +3,6 @@ package de.tum.in.www1.hephaestus.config;
 import io.nats.client.Connection;
 import io.nats.client.Nats;
 import io.nats.client.Options;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
@@ -14,11 +13,14 @@ import org.springframework.core.env.Environment;
 @ConditionalOnProperty(name = "nats.enabled", havingValue = "true")
 public class NatsConfig {
 
-    @Value("${nats.server}")
-    private String natsServer;
+    private final String natsServer;
 
-    @Autowired
-    private Environment environment;
+    private final Environment environment;
+
+    public NatsConfig(@Value("${nats.server}") String natsServer, Environment environment) {
+        this.natsServer = natsServer;
+        this.environment = environment;
+    }
 
     @Bean
     public Connection natsConnection() throws Exception {

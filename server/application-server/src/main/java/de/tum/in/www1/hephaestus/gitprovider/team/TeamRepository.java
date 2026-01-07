@@ -6,6 +6,12 @@ import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+/**
+ * Repository for team entities.
+ *
+ * <p>Teams are scoped through their organization field which carries workspace context
+ * through the Team.organization -> Workspace.organization relationship.
+ */
 @Repository
 public interface TeamRepository extends JpaRepository<Team, Long> {
     List<Team> findAllByName(String name);

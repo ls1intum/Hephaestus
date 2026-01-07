@@ -10,17 +10,22 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class KeycloakConfig {
 
-    @Value("${keycloak.url}")
-    private String authServerUrl;
+    private final String authServerUrl;
+    private final String realm;
+    private final String clientId;
+    private final String clientSecret;
 
-    @Value("${keycloak.realm}")
-    private String realm;
-
-    @Value("${keycloak.client-id}")
-    private String clientId;
-
-    @Value("${keycloak.client-secret}")
-    private String clientSecret;
+    public KeycloakConfig(
+        @Value("${keycloak.url}") String authServerUrl,
+        @Value("${keycloak.realm}") String realm,
+        @Value("${keycloak.client-id}") String clientId,
+        @Value("${keycloak.client-secret}") String clientSecret
+    ) {
+        this.authServerUrl = authServerUrl;
+        this.realm = realm;
+        this.clientId = clientId;
+        this.clientSecret = clientSecret;
+    }
 
     @Bean
     public Keycloak keycloakClient() {

@@ -5,10 +5,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import de.tum.in.www1.hephaestus.gitprovider.milestone.Milestone;
 import de.tum.in.www1.hephaestus.gitprovider.milestone.MilestoneRepository;
 import de.tum.in.www1.hephaestus.gitprovider.milestone.github.GitHubMilestoneSyncService;
+import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.github.GitHubRepositorySyncService;
-import java.io.IOException;
 import org.junit.jupiter.api.Test;
-import org.kohsuke.github.GHIssueState;
 import org.springframework.beans.factory.annotation.Autowired;
 
 class GitHubLiveMilestoneSyncIntegrationTest extends AbstractGitHubLiveSyncIntegrationTest {
@@ -22,52 +21,54 @@ class GitHubLiveMilestoneSyncIntegrationTest extends AbstractGitHubLiveSyncInteg
     @Autowired
     private MilestoneRepository milestoneRepository;
 
+    @Autowired
+    private RepositoryRepository repositoryRepository;
+
     @Test
     void syncsMilestonesAndReflectsUpdates() throws Exception {
         var repository = createEphemeralRepository("milestone-sync");
-        var milestone = createRepositoryMilestone(repository, "IT milestone", "Focused milestone sync coverage");
+        var milestone = createRepositoryMilestone(
+            repository.fullName(),
+            "IT milestone",
+            "Focused milestone sync coverage"
+        );
 
-        repositorySyncService.syncRepository(workspace.getId(), repository.getFullName()).orElseThrow();
+        repositorySyncService.syncRepository(workspace.getId(), repository.fullName()).orElseThrow();
+        var localRepo = repositoryRepository.findByNameWithOwner(repository.fullName()).orElseThrow();
 
-        milestoneSyncService.syncMilestonesOfRepository(repository);
+        milestoneSyncService.syncMilestonesForRepository(workspace.getId(), localRepo.getId());
 
         var storedMilestone = milestoneRepository
             .findAll()
             .stream()
-            .filter(candidate -> candidate.getRepository().getId().equals(repository.getId()))
+            .filter(candidate -> candidate.getRepository().getId().equals(localRepo.getId()))
             .findFirst()
             .orElseThrow();
-        assertThat(storedMilestone.getTitle()).isEqualTo(milestone.getTitle());
+        assertThat(storedMilestone.getTitle()).isEqualTo(milestone.title());
         assertThat(storedMilestone.getState()).isEqualTo(Milestone.State.OPEN);
 
-        milestone.close();
+        // Close milestone via REST API
+        fixtureService.closeMilestone(repository.fullName(), milestone.number());
 
-        milestoneSyncService.syncMilestonesOfRepository(repository);
+        milestoneSyncService.syncMilestonesForRepository(workspace.getId(), localRepo.getId());
 
         var updatedMilestone = milestoneRepository
             .findAll()
             .stream()
-            .filter(candidate -> candidate.getRepository().getId().equals(repository.getId()))
+            .filter(candidate -> candidate.getRepository().getId().equals(localRepo.getId()))
             .findFirst()
             .orElseThrow();
         assertThat(updatedMilestone.getState()).isEqualTo(Milestone.State.CLOSED);
 
-        milestone.delete();
+        // Delete milestone via REST API
+        fixtureService.deleteMilestone(repository.fullName(), milestone.number());
         awaitCondition("milestone removed remotely", () -> {
-            try {
-                return repository
-                    .listMilestones(GHIssueState.ALL)
-                    .withPageSize(30)
-                    .toList()
-                    .stream()
-                    .noneMatch(candidate -> candidate.getId() == milestone.getId());
-            } catch (IOException listingError) {
-                return false;
-            }
+            var milestones = fixtureService.listMilestones(repository.fullName(), "all");
+            return milestones.stream().noneMatch(m -> m.number() == milestone.number());
         });
 
-        milestoneSyncService.syncMilestonesOfRepository(repository);
+        milestoneSyncService.syncMilestonesForRepository(workspace.getId(), localRepo.getId());
 
-        assertThat(milestoneRepository.findAllByRepository_Id(repository.getId())).isEmpty();
+        assertThat(milestoneRepository.findAllByRepository_Id(localRepo.getId())).isEmpty();
     }
 }

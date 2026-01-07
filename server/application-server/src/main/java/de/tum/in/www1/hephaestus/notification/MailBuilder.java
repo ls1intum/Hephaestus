@@ -21,6 +21,10 @@ public class MailBuilder {
 
     private final User primaryRecipient;
 
+    private final String recipientLogin;
+
+    private final boolean notificationsEnabled;
+
     private final String email;
 
     @Getter
@@ -32,10 +36,50 @@ public class MailBuilder {
     @Getter
     private final Map<String, Object> variables;
 
-    public MailBuilder(MailConfig config, User primaryRecipient, String email, String subject, String template) {
+    /**
+     * Constructor that accepts a User entity and notifications enabled flag.
+     * The notifications enabled flag should be retrieved from UserPreferences, not User directly.
+     *
+     * @param config mail configuration
+     * @param primaryRecipient the recipient user (may be null)
+     * @param notificationsEnabled whether notifications are enabled for this user (from UserPreferences)
+     * @param email recipient email address
+     * @param subject email subject
+     * @param template email template name
+     */
+    public MailBuilder(
+        MailConfig config,
+        User primaryRecipient,
+        boolean notificationsEnabled,
+        String email,
+        String subject,
+        String template
+    ) {
         this.config = config;
 
         this.primaryRecipient = primaryRecipient;
+        this.recipientLogin = primaryRecipient != null ? primaryRecipient.getLogin() : null;
+        this.notificationsEnabled = notificationsEnabled;
+        this.email = email;
+
+        this.subject = subject;
+        this.template = template;
+
+        this.variables = new HashMap<>();
+        this.variables.put("config", config);
+    }
+
+    /**
+     * Constructor that accepts a login string instead of a User entity.
+     * Used to break circular dependencies between modules.
+     * Notifications are enabled by default when using this constructor.
+     */
+    public MailBuilder(MailConfig config, String recipientLogin, String email, String subject, String template) {
+        this.config = config;
+
+        this.primaryRecipient = null;
+        this.recipientLogin = recipientLogin;
+        this.notificationsEnabled = true; // Default to enabled for DTO-based calls
         this.email = email;
 
         this.subject = subject;
@@ -51,12 +95,12 @@ public class MailBuilder {
     }
 
     public void send(JavaMailSender mailSender) {
-        if (primaryRecipient == null || email == null) {
+        if (recipientLogin == null || email == null) {
             log.warn("No primary recipient specified");
             return;
         }
 
-        if (!primaryRecipient.isNotificationsEnabled()) {
+        if (!notificationsEnabled) {
             log.warn("Primary recipient has notifications disabled");
             return;
         }
@@ -70,7 +114,12 @@ public class MailBuilder {
 
             Context templateContext = new Context();
             templateContext.setVariables(this.variables);
-            templateContext.setVariable("recipient", UserInfoDTO.fromUser(primaryRecipient));
+            if (primaryRecipient != null) {
+                templateContext.setVariable("recipient", UserInfoDTO.fromUser(primaryRecipient));
+            } else {
+                // For DTO-based calls, just set the login as a simple variable
+                templateContext.setVariable("recipientLogin", recipientLogin);
+            }
 
             message.setSubject(subject);
 

@@ -7,6 +7,12 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+/**
+ * Repository for organization membership records.
+ *
+ * <p>All queries filter by Organization ID which inherently carries workspace scope
+ * through the Organization -> Workspace.organization relationship.
+ */
 public interface OrganizationMembershipRepository
     extends JpaRepository<OrganizationMembership, OrganizationMembershipId> {
     @Query("SELECT m.userId FROM OrganizationMembership m WHERE m.organizationId = :orgId")

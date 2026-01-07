@@ -19,7 +19,7 @@ import org.springframework.web.client.RestClientException;
 @Component
 public class PosthogClient {
 
-    private static final Logger logger = LoggerFactory.getLogger(PosthogClient.class);
+    private static final Logger log = LoggerFactory.getLogger(PosthogClient.class);
 
     private final RestClient restClient;
     private final boolean enabled;
@@ -33,7 +33,7 @@ public class PosthogClient {
     ) {
         boolean hasCredentials = StringUtils.hasText(projectId) && StringUtils.hasText(personalApiKey);
         if (enabled && !hasCredentials) {
-            logger.error("PostHog enabled without credentials");
+            log.error("PostHog enabled without credentials");
             throw new PosthogClientException("PostHog configuration requires project ID and personal API key");
         }
         this.enabled = enabled && hasCredentials;
@@ -45,12 +45,12 @@ public class PosthogClient {
                 .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + personalApiKey)
                 .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                 .build();
-            logger.info("PostHog client activated for project {} using host {}", projectId, resolvedHost);
+            log.info("PostHog client activated for project {} using host {}", projectId, resolvedHost);
         } else {
             if (enabled) {
-                logger.warn("PostHog integration disabled because credentials are missing");
+                log.warn("PostHog integration disabled because credentials are missing");
             } else {
-                logger.debug("PostHog integration disabled via configuration flag");
+                log.debug("PostHog integration disabled via configuration flag");
             }
             this.restClient = null;
         }
@@ -58,13 +58,13 @@ public class PosthogClient {
 
     public boolean deletePersonData(String distinctId) {
         if (!enabled) {
-            logger.debug("Skip PostHog deletion because client is disabled");
+            log.debug("Skip PostHog deletion because client is disabled");
             return false;
         }
         if (!StringUtils.hasText(distinctId)) {
             throw new PosthogClientException("distinctId must not be empty");
         }
-        logger.info("Requesting PostHog person deletion for distinctId {}", distinctId);
+        log.info("Requesting PostHog person deletion for distinctId {}", distinctId);
         try {
             JsonNode response = restClient
                 .get()
@@ -78,13 +78,13 @@ public class PosthogClient {
                 .body(JsonNode.class);
 
             if (response == null || !response.has("results") || !response.get("results").isArray()) {
-                logger.debug("No PostHog person found for distinctId {}", distinctId);
+                log.debug("No PostHog person found for distinctId {}", distinctId);
                 return false;
             }
 
             Iterator<JsonNode> iterator = response.get("results").elements();
             if (!iterator.hasNext()) {
-                logger.info("PostHog returned an empty result set for distinctId {}", distinctId);
+                log.info("PostHog returned an empty result set for distinctId {}", distinctId);
                 return false;
             }
 
@@ -100,7 +100,7 @@ public class PosthogClient {
             }
 
             if (personIds.isEmpty()) {
-                logger.info("PostHog did not return a valid person identifier for distinctId {}", distinctId);
+                log.info("PostHog did not return a valid person identifier for distinctId {}", distinctId);
                 return false;
             }
 
@@ -115,17 +115,17 @@ public class PosthogClient {
                     )
                     .retrieve()
                     .toBodilessEntity();
-                logger.info("Requested PostHog deletion for person {}", personId);
+                log.info("Requested PostHog deletion for person {}", personId);
             }
 
-            logger.info(
+            log.info(
                 "Completed PostHog deletion request for distinctId {} ({} person(s))",
                 distinctId,
                 personIds.size()
             );
             return true;
         } catch (RestClientException exception) {
-            logger.warn("Failed to delete PostHog data for distinctId {}", distinctId, exception);
+            log.warn("Failed to delete PostHog data for distinctId {}", distinctId, exception);
             throw new PosthogClientException("Failed to delete PostHog data", exception);
         }
     }
@@ -160,7 +160,7 @@ public class PosthogClient {
                 if (uri.getPort() != -1) {
                     normalized += ":" + uri.getPort();
                 }
-                logger.info("Normalized PostHog ingestion host {} to API host {}", candidate, normalized);
+                log.info("Normalized PostHog ingestion host {} to API host {}", candidate, normalized);
                 return normalized;
             }
             return candidate;

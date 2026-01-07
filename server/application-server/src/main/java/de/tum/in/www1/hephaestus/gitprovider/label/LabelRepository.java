@@ -7,6 +7,12 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+/**
+ * Repository for label entities.
+ *
+ * <p>All queries filter by repository ID which inherently carries workspace scope
+ * through the Repository -> Organization -> Workspace.organization chain.
+ */
 @Repository
 public interface LabelRepository extends JpaRepository<Label, Long> {
     @Query(

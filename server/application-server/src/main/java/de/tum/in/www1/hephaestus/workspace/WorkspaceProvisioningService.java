@@ -1,92 +1,85 @@
 package de.tum.in.www1.hephaestus.workspace;
 
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.GITHUB_API_BASE_URL;
+
+import com.fasterxml.jackson.annotation.JsonProperty;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.app.GitHubAppTokenService;
-import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationSyncService;
+import de.tum.in.www1.hephaestus.gitprovider.common.spi.WorkspaceProvisioningListener;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
-import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserSyncService;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceMembership.WorkspaceRole;
-import java.io.IOException;
 import java.util.List;
-import org.kohsuke.github.GHApp;
-import org.kohsuke.github.GHAppInstallation;
-import org.kohsuke.github.GHRepositorySelection;
-import org.kohsuke.github.GHUser;
-import org.kohsuke.github.GitHub;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.reactive.function.client.WebClient;
 
 /**
- * Central orchestrator for keeping workspace records in sync with external provisioning sources.
+ * Central orchestrator for keeping workspace records in sync with external
+ * provisioning sources.
  * <p>
- * Responsibilities:
- * <ul>
- *   <li>Bootstrapping PAT-backed workspaces defined via configuration.</li>
- *   <li>Ensuring GitHub App installations are mirrored into local workspaces.</li>
- *   <li>Seeding repositories for installations where Hephaestus monitors selected repos.</li>
- * </ul>
- *
- * <p>PAT workspaces remain the default for local development and coexist alongside GitHub App installations.
- * Once administrative workspace CRUD exists we can revisit how many default PAT entries we bootstrap, but for
- * now this service guarantees at least one workspace for development convenience.
+ * Uses GitHub REST API directly for workspace provisioning.
  */
 @Service
 public class WorkspaceProvisioningService {
 
-    private static final Logger logger = LoggerFactory.getLogger(WorkspaceProvisioningService.class);
+    private static final Logger log = LoggerFactory.getLogger(WorkspaceProvisioningService.class);
 
     private final WorkspaceProperties workspaceProperties;
     private final WorkspaceRepository workspaceRepository;
     private final RepositoryToMonitorRepository repositoryToMonitorRepository;
     private final WorkspaceService workspaceService;
+    private final WorkspaceInstallationService workspaceInstallationService;
+    private final WorkspaceRepositoryMonitorService workspaceRepositoryMonitorService;
     private final GitHubAppTokenService gitHubAppTokenService;
-    private final GitHubUserSyncService gitHubUserSyncService;
     private final UserRepository userRepository;
-    private final OrganizationSyncService organizationSyncService;
     private final WorkspaceMembershipRepository workspaceMembershipRepository;
     private final WorkspaceMembershipService workspaceMembershipService;
+    private final WorkspaceScopeFilter workspaceScopeFilter;
+    private final WebClient webClient;
 
     public WorkspaceProvisioningService(
         WorkspaceProperties workspaceProperties,
         WorkspaceRepository workspaceRepository,
         RepositoryToMonitorRepository repositoryToMonitorRepository,
         WorkspaceService workspaceService,
+        WorkspaceInstallationService workspaceInstallationService,
+        WorkspaceRepositoryMonitorService workspaceRepositoryMonitorService,
         GitHubAppTokenService gitHubAppTokenService,
-        GitHubUserSyncService gitHubUserSyncService,
         UserRepository userRepository,
-        OrganizationSyncService organizationSyncService,
         WorkspaceMembershipRepository workspaceMembershipRepository,
-        WorkspaceMembershipService workspaceMembershipService
+        WorkspaceMembershipService workspaceMembershipService,
+        WorkspaceScopeFilter workspaceScopeFilter
     ) {
         this.workspaceProperties = workspaceProperties;
         this.workspaceRepository = workspaceRepository;
         this.repositoryToMonitorRepository = repositoryToMonitorRepository;
         this.workspaceService = workspaceService;
+        this.workspaceInstallationService = workspaceInstallationService;
+        this.workspaceRepositoryMonitorService = workspaceRepositoryMonitorService;
         this.gitHubAppTokenService = gitHubAppTokenService;
-        this.gitHubUserSyncService = gitHubUserSyncService;
         this.userRepository = userRepository;
-        this.organizationSyncService = organizationSyncService;
         this.workspaceMembershipRepository = workspaceMembershipRepository;
         this.workspaceMembershipService = workspaceMembershipService;
+        this.workspaceScopeFilter = workspaceScopeFilter;
+        this.webClient = WebClient.builder()
+            .baseUrl(GITHUB_API_BASE_URL)
+            .defaultHeader(HttpHeaders.ACCEPT, "application/vnd.github+json")
+            .defaultHeader("X-GitHub-Api-Version", "2022-11-28")
+            .build();
     }
 
-    /**
-     * Bootstrap the configured PAT-backed workspace when none exist yet.
-     * Pulls account, token, and repository selection from {@link WorkspaceProperties}.
-     */
     @Transactional
     public void bootstrapDefaultPatWorkspace() {
         if (!workspaceProperties.isInitDefault()) {
-            logger.debug("Skipping default PAT workspace bootstrap because bootstrap is disabled.");
+            log.debug("Skipping default PAT workspace bootstrap because bootstrap is disabled.");
             return;
         }
 
         if (workspaceRepository.count() > 0) {
-            logger.debug(
-                "Skipping PAT workspace creation because workspaces already exist. Ensuring admin membership."
-            );
+            log.debug("Skipping PAT workspace creation because workspaces already exist. Ensuring admin membership.");
             ensureDefaultAdminMembershipIfPresent();
             return;
         }
@@ -124,11 +117,10 @@ public class WorkspaceProvisioningService {
 
         workspace.setGitProviderMode(Workspace.GitProviderMode.PAT_ORG);
         workspace.setPersonalAccessToken(config.getToken());
-        // PAT workspaces always use SELECTED - you explicitly list the repos to monitor
-        workspace.setGithubRepositorySelection(GHRepositorySelection.SELECTED);
+        workspace.setGithubRepositorySelection(RepositorySelection.SELECTED);
 
         Workspace savedWorkspace = workspaceRepository.save(workspace);
-        logger.info(
+        log.info(
             "Created default PAT workspace '{}' (id={}) for development convenience.",
             savedWorkspace.getAccountLogin(),
             savedWorkspace.getId()
@@ -145,11 +137,11 @@ public class WorkspaceProvisioningService {
                 monitor.setWorkspace(savedWorkspace);
                 repositoryToMonitorRepository.save(monitor);
                 savedWorkspace.getRepositoriesToMonitor().add(monitor);
-                logger.info("Queued repository for monitoring: {}", nameWithOwner);
+                log.info("Queued repository for monitoring: {}", nameWithOwner);
             });
 
         workspaceRepository.save(savedWorkspace);
-        logger.info("PAT workspace provisioning complete. Repositories will be synced by startup monitoring.");
+        log.info("PAT workspace provisioning complete. Repositories will be synced by startup monitoring.");
 
         ensureAdminMembership(savedWorkspace);
     }
@@ -176,7 +168,7 @@ public class WorkspaceProvisioningService {
                     .findByWorkspace_IdAndUser_Id(workspace.getId(), adminUser.getId())
                     .isPresent();
                 if (alreadyMember) {
-                    logger.debug(
+                    log.debug(
                         "Default admin already member of workspace {} (id={})",
                         workspace.getWorkspaceSlug(),
                         workspace.getId()
@@ -185,9 +177,9 @@ public class WorkspaceProvisioningService {
                 }
                 try {
                     workspaceMembershipService.createMembership(workspace, adminUser.getId(), WorkspaceRole.ADMIN);
-                    logger.info("Added default admin user to workspace {} as ADMIN", workspace.getWorkspaceSlug());
+                    log.info("Added default admin user to workspace {} as ADMIN", workspace.getWorkspaceSlug());
                 } catch (IllegalArgumentException ex) {
-                    logger.debug(
+                    log.debug(
                         "Could not add default admin to workspace {}: {}",
                         workspace.getWorkspaceSlug(),
                         ex.getMessage()
@@ -197,142 +189,210 @@ public class WorkspaceProvisioningService {
     }
 
     /**
-     * Mirror each GitHub App installation into a local workspace, including organization metadata and members.
+     * Mirror each GitHub App installation into a local workspace.
+     * Uses GitHub REST API directly.
      */
     @Transactional
     public void ensureGitHubAppInstallations() {
         if (!gitHubAppTokenService.isConfigured()) {
-            logger.info(
+            log.info(
                 "Skipping GitHub App installation processing because credentials are not configured (appId={}).",
                 gitHubAppTokenService.getConfiguredAppId()
             );
             return;
         }
 
-        // TODO: Document a helper for migrating a PAT workspace to an installation-backed workspace inside the
-        // future admin tooling. Manual step for now: set installation_id, switch git_provider_mode to
-        // GITHUB_APP_INSTALLATION, and clear personal_access_token before running provisioning again.
-
         try {
-            GitHub asApp = gitHubAppTokenService.clientAsApp();
-            GHApp app = asApp.getApp();
-            GHUser owner = app.getOwner();
-            String ownerLogin = owner != null ? owner.getLogin() : "unknown";
+            String appJwt = gitHubAppTokenService.generateAppJWT();
 
-            logger.info(
+            // Get app info
+            AppInfoResponse appInfo = webClient
+                .get()
+                .uri("/app")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + appJwt)
+                .retrieve()
+                .bodyToMono(AppInfoResponse.class)
+                .block();
+
+            if (appInfo == null) {
+                log.warn("Failed to retrieve GitHub App info");
+                return;
+            }
+
+            String ownerLogin = appInfo.owner() != null ? appInfo.owner().login() : "unknown";
+            log.info(
                 "Authenticated as GitHub App '{}' (slug={}, id={}, owner={}).",
-                app.getName(),
-                app.getSlug(),
-                app.getId(),
+                appInfo.name(),
+                appInfo.slug(),
+                appInfo.id(),
                 ownerLogin
             );
 
-            List<GHAppInstallation> installations = app.listInstallations().toList();
-            logger.info("Ensuring {} GitHub App installation(s) are reflected as workspaces.", installations.size());
+            // List installations
+            List<InstallationDto> installations = webClient
+                .get()
+                .uri("/app/installations")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + appJwt)
+                .retrieve()
+                .bodyToFlux(InstallationDto.class)
+                .collectList()
+                .block();
 
-            if (installations.isEmpty()) {
-                logger.warn(
-                    "No installations returned for GitHub App '{}' (id={}). Confirm the app is installed on the organization.",
-                    app.getSlug(),
-                    app.getId()
+            if (installations == null || installations.isEmpty()) {
+                log.warn(
+                    "No installations returned for GitHub App '{}' (id={}). Confirm the app is installed.",
+                    appInfo.slug(),
+                    appInfo.id()
                 );
+                return;
             }
 
-            for (GHAppInstallation installation : installations) {
-                GHUser account = installation.getAccount();
-                String accountLogin = account != null ? account.getLogin() : "<unknown>";
-                logger.info(
+            log.info("Ensuring {} GitHub App installation(s) are reflected as workspaces.", installations.size());
+
+            for (InstallationDto installation : installations) {
+                String accountLogin = installation.account() != null ? installation.account().login() : "<unknown>";
+                log.info(
                     "Processing GitHub App installation={} account={} selection={}",
-                    installation.getId(),
+                    installation.id(),
                     accountLogin,
-                    installation.getRepositorySelection()
+                    installation.repositorySelection()
                 );
                 synchronizeInstallation(installation);
             }
-        } catch (IOException e) {
-            logger.warn("GitHub App reconciliation failed: {}", e.getMessage(), e);
+        } catch (Exception e) {
+            log.warn("GitHub App reconciliation failed: {}", e.getMessage(), e);
         }
     }
 
-    private void synchronizeInstallation(GHAppInstallation installation) {
-        GHUser account = installation.getAccount();
-        if (account == null) {
-            logger.warn("Skipping installation {} because no account information is available.", installation.getId());
+    private void synchronizeInstallation(InstallationDto installation) {
+        if (installation.account() == null) {
+            log.warn("Skipping installation {} because no account information is available.", installation.id());
             return;
         }
 
-        String accountType;
-        try {
-            accountType = account.getType();
-        } catch (IOException e) {
-            logger.warn(
-                "Skipping installation {} because owner type could not be determined: {}",
-                installation.getId(),
-                e.getMessage()
+        String login = installation.account().login();
+
+        if (workspaceScopeFilter.isActive() && !workspaceScopeFilter.isOrganizationAllowed(login)) {
+            log.info(
+                "Skipping installation {} for '{}' - not in allowed-organizations filter",
+                installation.id(),
+                login
             );
             return;
         }
 
+        String accountType = installation.account().type();
         if (!"Organization".equalsIgnoreCase(accountType)) {
-            logger.info(
+            log.info(
                 "Skipping installation {} because owner type '{}' is not supported.",
-                installation.getId(),
+                installation.id(),
                 accountType
             );
             return;
         }
 
-        long installationId = installation.getId();
-        String login = account.getLogin();
-        GHRepositorySelection selection = installation.getRepositorySelection();
+        long installationId = installation.id();
+        RepositorySelection selection = convertRepositorySelection(installation.repositorySelection());
 
-        logger.info("Ensuring installation={} for org={} (selection={}).", installationId, login, selection);
+        log.info("Ensuring installation={} for org={} (selection={}).", installationId, login, selection);
 
-        Workspace workspace = workspaceService.ensureForInstallation(installationId, login, selection);
+        var account = installation.account();
+        WorkspaceProvisioningListener.AccountType wsAccountType = "Organization".equalsIgnoreCase(accountType)
+            ? WorkspaceProvisioningListener.AccountType.ORGANIZATION
+            : WorkspaceProvisioningListener.AccountType.USER;
+
+        Workspace workspace = workspaceInstallationService.createOrUpdateFromInstallation(
+            installationId,
+            account.id(),
+            login,
+            wsAccountType,
+            account.avatarUrl(),
+            selection
+        );
+
+        if (workspace == null) {
+            log.warn(
+                "Workspace creation skipped for installation={} and org={}. User may not exist in database.",
+                installationId,
+                login
+            );
+            return;
+        }
+
         workspace = workspaceService.updateAccountLogin(workspace.getId(), login);
 
-        organizationSyncService.syncOrganization(workspace);
-        organizationSyncService.syncMembers(workspace);
+        log.info("Organization sync for workspace {} will be handled via webhooks", workspace.getWorkspaceSlug());
 
-        // Enumerate and seed repository monitors for the installation.
-        // Use deferSync=true since activation will sync all repos in bulk.
-        // This works for both ALL and SELECTED modes - the GitHub API returns
-        // only the repositories the installation has access to.
-        workspaceService.ensureAllInstallationRepositoriesCovered(installationId, true);
+        workspaceRepositoryMonitorService.ensureAllInstallationRepositoriesCovered(installationId, true);
     }
 
     private boolean isBlank(String value) {
         return value == null || value.isBlank();
     }
 
-    /**
-     * Syncs a GitHub user using PAT and returns their user ID for ownership assignment.
-     * Falls back to checking existing users if GitHub sync fails.
-     */
-    private Long syncGitHubUserForPAT(String patToken, String accountLogin) {
-        try {
-            GitHub github = new org.kohsuke.github.GitHubBuilder().withOAuthToken(patToken).build();
-
-            User user = gitHubUserSyncService.syncUser(github, accountLogin);
-
-            if (user != null && user.getId() != null) {
-                logger.info("Synced GitHub user '{}' (id={}) as PAT workspace owner.", accountLogin, user.getId());
-                return user.getId();
-            }
-        } catch (IOException e) {
-            logger.warn("Failed to sync GitHub user '{}' for PAT workspace: {}", accountLogin, e.getMessage());
+    private RepositorySelection convertRepositorySelection(String selection) {
+        if (selection == null) {
+            return null;
         }
+        return switch (selection.toLowerCase()) {
+            case "all" -> RepositorySelection.ALL;
+            case "selected" -> RepositorySelection.SELECTED;
+            default -> null;
+        };
+    }
 
+    private Long syncGitHubUserForPAT(String patToken, String accountLogin) {
         return userRepository
             .findByLogin(accountLogin)
             .map(User::getId)
-            .orElseThrow(() ->
-                new IllegalStateException(
-                    "Cannot assign owner for PAT workspace: GitHub user '" +
-                        accountLogin +
-                        "' could not be synced and does not exist locally. " +
-                        "Ensure the user exists in the system before creating the workspace."
-                )
-            );
+            .orElseGet(() -> {
+                // Fetch user info from GitHub to get the database ID
+                GitHubUserResponse userInfo = webClient
+                    .get()
+                    .uri("/users/{login}", accountLogin)
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + patToken)
+                    .retrieve()
+                    .bodyToMono(GitHubUserResponse.class)
+                    .block();
+
+                if (userInfo == null || userInfo.id() == null) {
+                    throw new IllegalStateException(
+                        "Failed to fetch GitHub user info for login '" + accountLogin + "'"
+                    );
+                }
+
+                User newUser = new User();
+                newUser.setId(userInfo.id());
+                newUser.setLogin(userInfo.login() != null ? userInfo.login() : accountLogin);
+                newUser.setName(userInfo.name() != null ? userInfo.name() : accountLogin);
+                newUser.setAvatarUrl(userInfo.avatarUrl() != null ? userInfo.avatarUrl() : "");
+                newUser.setHtmlUrl(userInfo.htmlUrl() != null ? userInfo.htmlUrl() : "");
+                newUser.setType(User.Type.USER);
+                newUser = userRepository.save(newUser);
+                log.info("Created user '{}' (id={}) for PAT workspace bootstrap", newUser.getLogin(), newUser.getId());
+                return newUser.getId();
+            });
     }
+
+    private record GitHubUserResponse(
+        Long id,
+        String login,
+        String name,
+        @JsonProperty("avatar_url") String avatarUrl,
+        @JsonProperty("html_url") String htmlUrl
+    ) {}
+
+    // ============ DTOs for GitHub REST API ============
+
+    private record AppInfoResponse(long id, String name, String slug, OwnerDto owner) {}
+
+    private record OwnerDto(String login) {}
+
+    private record InstallationDto(
+        long id,
+        AccountDto account,
+        @JsonProperty("repository_selection") String repositorySelection
+    ) {}
+
+    private record AccountDto(Long id, String login, String type, @JsonProperty("avatar_url") String avatarUrl) {}
 }

@@ -1,57 +1,70 @@
 package de.tum.in.www1.hephaestus.gitprovider.label.github;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.NatsMessageDeserializer;
+import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
+import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContextFactory;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventAction;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventType;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
-import de.tum.in.www1.hephaestus.gitprovider.label.LabelRepository;
-import de.tum.in.www1.hephaestus.gitprovider.repository.github.GitHubRepositorySyncService;
-import org.kohsuke.github.GHEvent;
-import org.kohsuke.github.GHEventPayload;
+import de.tum.in.www1.hephaestus.gitprovider.label.github.dto.GitHubLabelDTO;
+import de.tum.in.www1.hephaestus.gitprovider.label.github.dto.GitHubLabelEventDTO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * Handles GitHub label webhook events.
+ */
 @Component
-public class GitHubLabelMessageHandler extends GitHubMessageHandler<GHEventPayload.Label> {
+public class GitHubLabelMessageHandler extends GitHubMessageHandler<GitHubLabelEventDTO> {
 
-    private static final Logger logger = LoggerFactory.getLogger(GitHubLabelMessageHandler.class);
+    private static final Logger log = LoggerFactory.getLogger(GitHubLabelMessageHandler.class);
 
-    private final LabelRepository labelRepository;
-    private final GitHubLabelSyncService labelSyncService;
-    private final GitHubRepositorySyncService repositorySyncService;
+    private final ProcessingContextFactory contextFactory;
+    private final GitHubLabelProcessor labelProcessor;
 
     GitHubLabelMessageHandler(
-        LabelRepository labelRepository,
-        GitHubLabelSyncService labelSyncService,
-        GitHubRepositorySyncService repositorySyncService
+        ProcessingContextFactory contextFactory,
+        GitHubLabelProcessor labelProcessor,
+        NatsMessageDeserializer deserializer
     ) {
-        super(GHEventPayload.Label.class);
-        this.labelRepository = labelRepository;
-        this.labelSyncService = labelSyncService;
-        this.repositorySyncService = repositorySyncService;
+        super(GitHubLabelEventDTO.class, deserializer);
+        this.contextFactory = contextFactory;
+        this.labelProcessor = labelProcessor;
     }
 
     @Override
-    protected void handleEvent(GHEventPayload.Label eventPayload) {
-        var action = eventPayload.getAction();
-        var repository = eventPayload.getRepository();
-        var label = eventPayload.getLabel();
-        logger.info(
-            "Received label event for repository: {}, action: {}, labelId: {}",
-            repository.getFullName(),
-            action,
-            label.getId()
+    public GitHubEventType getEventType() {
+        return GitHubEventType.LABEL;
+    }
+
+    @Override
+    @Transactional
+    protected void handleEvent(GitHubLabelEventDTO event) {
+        GitHubLabelDTO labelDto = event.label();
+
+        if (labelDto == null) {
+            log.warn("Received label event with missing data");
+            return;
+        }
+
+        log.info(
+            "Received label event: action={}, label={}, repo={}",
+            event.action(),
+            labelDto.name(),
+            event.repository() != null ? event.repository().fullName() : "unknown"
         );
 
-        repositorySyncService.processRepository(repository);
-
-        if (action.equals("deleted")) {
-            labelRepository.deleteById(label.getId());
-        } else {
-            labelSyncService.processLabel(label);
+        ProcessingContext context = contextFactory.forWebhookEvent(event).orElse(null);
+        if (context == null) {
+            return;
         }
-    }
 
-    @Override
-    protected GHEvent getHandlerEvent() {
-        return GHEvent.LABEL;
+        if (event.actionType() == GitHubEventAction.Label.DELETED) {
+            labelProcessor.delete(labelDto.id(), context);
+        } else {
+            labelProcessor.process(labelDto, context.repository(), context);
+        }
     }
 }

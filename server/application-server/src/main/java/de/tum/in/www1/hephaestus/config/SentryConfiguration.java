@@ -5,7 +5,6 @@ import jakarta.annotation.PostConstruct;
 import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.Environment;
@@ -13,16 +12,23 @@ import org.springframework.core.env.Environment;
 @Configuration
 public class SentryConfiguration {
 
-    private static final Logger logger = LoggerFactory.getLogger(SentryConfiguration.class);
+    private static final Logger log = LoggerFactory.getLogger(SentryConfiguration.class);
 
-    @Autowired
-    private Environment environment;
+    private final Environment environment;
 
-    @Value("${spring.application.version}")
-    private String hephaestusVersion;
+    private final String hephaestusVersion;
 
-    @Value("${sentry.dsn}")
-    private Optional<String> sentryDsn;
+    private final Optional<String> sentryDsn;
+
+    public SentryConfiguration(
+        Environment environment,
+        @Value("${spring.application.version}") String hephaestusVersion,
+        @Value("${sentry.dsn}") Optional<String> sentryDsn
+    ) {
+        this.environment = environment;
+        this.hephaestusVersion = hephaestusVersion;
+        this.sentryDsn = sentryDsn;
+    }
 
     /**
      * Init sentry with the correct environment and version
@@ -30,12 +36,12 @@ public class SentryConfiguration {
     @PostConstruct
     public void init() {
         if (environment.matchesProfiles("specs")) {
-            logger.info("Sentry is disabled in specs profile");
+            log.info("Sentry is disabled in specs profile");
             return;
         }
 
         if (sentryDsn.isEmpty() || sentryDsn.get().isEmpty()) {
-            logger.info("Sentry is disabled: Provide a DSN to enable Sentry.");
+            log.info("Sentry is disabled: Provide a DSN to enable Sentry.");
             return;
         }
 
@@ -50,9 +56,9 @@ public class SentryConfiguration {
                 options.setTracesSampleRate(getTracesSampleRate());
             });
 
-            logger.info("Sentry configuration was successful");
+            log.info("Sentry configuration was successful");
         } catch (Exception ex) {
-            logger.error("Sentry configuration was not successful due to exception!", ex);
+            log.error("Sentry configuration was not successful due to exception!", ex);
         }
     }
 

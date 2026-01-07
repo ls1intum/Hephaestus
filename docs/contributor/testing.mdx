@@ -193,5 +193,5 @@ The run takes roughly two minutes and prints the GitHub artefacts it provisions.
 ### Troubleshooting
 
 - **Skipping because of missing credentials** – check the console output; the base test class verifies that the App id, private key, PAT, and installation id are all present before executing.
-- **Hub4j rate-limit failures** – the suite creates several entities per run. Prefer a dedicated sandbox organisation so you do not clash with production automation limits.
+- **GitHub API rate-limit failures** – the suite creates several entities per run. Prefer a dedicated sandbox organisation so you do not clash with production automation limits.
 - **Longer runtimes** – each suite bootstraps a Testcontainers PostgreSQL instance and provisions GitHub resources. Expect higher runtimes than the pure Testcontainers integration tests; avoid running them on every PR and instead use them before releases or when touching the GitHub sync layer.

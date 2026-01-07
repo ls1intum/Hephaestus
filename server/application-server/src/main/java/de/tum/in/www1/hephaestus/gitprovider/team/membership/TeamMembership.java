@@ -68,19 +68,3 @@ public class TeamMembership {
         private Long userId;
     }
 }
-/*
- * Webhook coverage (membership event → team members):
- * Supported (webhook, no extra fetch):
- * - membership.member.login/id/avatar_url ⇒ persisted in User and associated via this join entity.
- * - membership.team.id/name/html_url/privacy ⇒ persisted in Team and referenced here.
- * - membership.action added/removed ⇒ inserts or deletes TeamMembership rows (role defaults to MEMBER; webhook omits role).
- * Ignored although hub4j exposes:
- * - payload.scope (always "team") and payload.organization.login ⇒ redundant with Team.organization.
- * - member.site_admin/type ⇒ not required for role resolution.
- * Desired but missing in hub4j/github-api 2.0-rc.5 (available via REST/GraphQL):
- * - REST membership.member_role / GraphQL TeamMemberRole (maintainer vs member distinction).
- * - REST membership.state / GraphQL TeamMemberEdge.state (pending vs active).
- * Requires extra fetch (out-of-scope for now):
- * - GET /orgs/{org}/teams/{team_slug}/memberships/{username} for inviter, last_modified_at, SSO metadata.
- * - GET /orgs/{org}/outside_collaborators to reconcile outside contributor access.
- */

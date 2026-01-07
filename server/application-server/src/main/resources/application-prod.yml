@@ -1,74 +1,77 @@
 spring:
-  datasource:
-    url: jdbc:${DATABASE_URL}
-    username: ${DATABASE_USERNAME}
-    password: ${DATABASE_PASSWORD}
-  jpa:
-    hibernate:
-      ddl-auto: none
+    datasource:
+        url: jdbc:${DATABASE_URL}
+        username: ${DATABASE_USERNAME}
+        password: ${DATABASE_PASSWORD}
+    jpa:
+        hibernate:
+            ddl-auto: none
 
-  security:
-    oauth2:
-      resourceserver:
-        jwt:
-          # Public URL for issuer validation (must match token's iss claim)
-          issuer-uri: ${KEYCLOAK_URL}/realms/${KEYCLOAK_REALM}
+    security:
+        oauth2:
+            resourceserver:
+                jwt:
+                    # Public URL for issuer validation (must match token's iss claim)
+                    issuer-uri: ${KEYCLOAK_URL}/realms/${KEYCLOAK_REALM}
 
-  mail:
-    host: ${POSTFIX_HOST:localhost}
-    port: ${POSTFIX_PORT:25}
-    username: ${POSTFIX_USERNAME:}
-    password: ${POSTFIX_PASSWORD:}
-    properties:
-      mail:
-        transport:
-          protocol: smtp
-        smtp:
-          starttls:
-            enable: true
-        debug: false
+    mail:
+        host: ${POSTFIX_HOST:localhost}
+        port: ${POSTFIX_PORT:25}
+        username: ${POSTFIX_USERNAME:}
+        password: ${POSTFIX_PASSWORD:}
+        properties:
+            mail:
+                transport:
+                    protocol: smtp
+                smtp:
+                    starttls:
+                        enable: true
+                debug: false
 
 hephaestus:
     host-url: ${APPLICATION_HOST_URL}
+
+    activity:
+        backfill-on-startup: ${HEPHAESTUS_ACTIVITY_BACKFILL_ON_STARTUP:false}
 
     webapp:
         url: ${APPLICATION_HOST_URL}
 
     leaderboard:
-      schedule:
-        day: ${LEADERBOARD_SCHEDULE_DAY:2}
-        time: ${LEADERBOARD_SCHEDULE_TIME:9}
-      notification:
-        enabled: ${LEADERBOARD_NOTIFICATION_ENABLED:true}
-        team: ${LEADERBOARD_NOTIFICATION_TEAM:all}
-        channel-id: ${LEADERBOARD_NOTIFICATION_CHANNEL_ID:G6TCVL6HL}
-    
+        schedule:
+            day: ${LEADERBOARD_SCHEDULE_DAY:2}
+            time: ${LEADERBOARD_SCHEDULE_TIME:9}
+        notification:
+            enabled: ${LEADERBOARD_NOTIFICATION_ENABLED:true}
+            team: ${LEADERBOARD_NOTIFICATION_TEAM:all}
+            channel-id: ${LEADERBOARD_NOTIFICATION_CHANNEL_ID:G6TCVL6HL}
+
     workspace:
-      init-default: false
+        init-default: false
 
     intelligence-service:
         url: ${INTELLIGENCE_SERVICE_URL}
 
     mail:
-      enabled: ${MAIL_ENABLED:true}
-      sender: ${MAIL_SENDER:hephaestus@aet.cit.tum.de}
+        enabled: ${MAIL_ENABLED:true}
+        sender: ${MAIL_SENDER:hephaestus@aet.cit.tum.de}
 
     detection:
-      run-automatic-detection-for-all: ${RUN_AUTOMATIC_DETECTION_FOR_ALL:false}
-      tracing:
-        enabled: true
-        # The host of the langfuse server
-        host: ${LANGFUSE_BASE_URL}
-        # The public key of the langfuse server
-        public-key: ${LANGFUSE_PUBLIC_KEY}
-        # The secret key of the langfuse server
-        secret-key: ${LANGFUSE_SECRET_KEY}
+        run-automatic-detection-for-all: ${RUN_AUTOMATIC_DETECTION_FOR_ALL:false}
+        tracing:
+            enabled: true
+            # The host of the langfuse server
+            host: ${LANGFUSE_BASE_URL}
+            # The public key of the langfuse server
+            public-key: ${LANGFUSE_PUBLIC_KEY}
+            # The secret key of the langfuse server
+            secret-key: ${LANGFUSE_SECRET_KEY}
 
     posthog:
-      enabled: ${POSTHOG_ENABLED:false}
-      api-host: ${POSTHOG_API_HOST:https://app.posthog.com}
-      project-id: ${POSTHOG_PROJECT_ID:}
-      personal-api-key: ${POSTHOG_PERSONAL_API_KEY:}
+        enabled: ${POSTHOG_ENABLED:false}
+        api-host: ${POSTHOG_API_HOST:https://app.posthog.com}
+        project-id: ${POSTHOG_PROJECT_ID:}
+        personal-api-key: ${POSTHOG_PERSONAL_API_KEY:}
 
 keycloak:
     url: ${KEYCLOAK_URL}
@@ -113,7 +116,7 @@ slack:
     signing-secret: ${SLACK_SIGNING_SECRET}
 
 sentry:
-  dsn: ${SENTRY_DSN}
+    dsn: ${SENTRY_DSN}
 
 logging:
     level:

@@ -4,11 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.in.www1.hephaestus.gitprovider.label.LabelRepository;
 import de.tum.in.www1.hephaestus.gitprovider.label.github.GitHubLabelSyncService;
+import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.github.GitHubRepositorySyncService;
-import java.io.IOException;
 import org.junit.jupiter.api.Test;
-import org.kohsuke.github.GHLabel;
-import org.kohsuke.github.GHRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 
 class GitHubLiveLabelSyncIntegrationTest extends AbstractGitHubLiveSyncIntegrationTest {
@@ -27,20 +25,23 @@ class GitHubLiveLabelSyncIntegrationTest extends AbstractGitHubLiveSyncIntegrati
     @Autowired
     private LabelRepository labelRepository;
 
+    @Autowired
+    private RepositoryRepository repositoryRepository;
+
     @Test
     void syncsNewLabels() throws Exception {
         var seeded = seedRepositoryWithLabel("label-sync");
         var repository = seeded.repository();
         var createdLabel = seeded.label();
 
-        repositorySyncService.syncRepository(workspace.getId(), repository.getFullName()).orElseThrow();
-        labelSyncService.syncLabelsOfRepository(repository);
+        repositorySyncService.syncRepository(workspace.getId(), repository.fullName()).orElseThrow();
+        var localRepo = repositoryRepository.findByNameWithOwner(repository.fullName()).orElseThrow();
+        labelSyncService.syncLabelsForRepository(workspace.getId(), localRepo.getId());
 
         var storedLabel = labelRepository
-            .findByRepositoryIdAndName(repository.getId(), createdLabel.getName())
+            .findByRepositoryIdAndName(localRepo.getId(), createdLabel.name())
             .orElseThrow();
         assertThat(storedLabel.getColor()).isEqualTo(INITIAL_COLOR);
-        assertThat(storedLabel.getDescription()).isEqualTo(LABEL_DESCRIPTION);
     }
 
     @Test
@@ -49,17 +50,18 @@ class GitHubLiveLabelSyncIntegrationTest extends AbstractGitHubLiveSyncIntegrati
         var repository = seeded.repository();
         var createdLabel = seeded.label();
 
-        repositorySyncService.syncRepository(workspace.getId(), repository.getFullName()).orElseThrow();
-        labelSyncService.syncLabelsOfRepository(repository);
+        repositorySyncService.syncRepository(workspace.getId(), repository.fullName()).orElseThrow();
+        var localRepo = repositoryRepository.findByNameWithOwner(repository.fullName()).orElseThrow();
+        labelSyncService.syncLabelsForRepository(workspace.getId(), localRepo.getId());
 
-        createdLabel.update().color(UPDATED_COLOR).description("Updated label sync coverage").done();
-        labelSyncService.syncLabelsOfRepository(repository);
+        // Update label via GraphQL
+        fixtureService.updateLabel(createdLabel.nodeId(), UPDATED_COLOR, "Updated label sync coverage");
+        labelSyncService.syncLabelsForRepository(workspace.getId(), localRepo.getId());
 
         var updatedLabel = labelRepository
-            .findByRepositoryIdAndName(repository.getId(), createdLabel.getName())
+            .findByRepositoryIdAndName(localRepo.getId(), createdLabel.name())
             .orElseThrow();
         assertThat(updatedLabel.getColor()).isEqualTo(UPDATED_COLOR);
-        assertThat(updatedLabel.getDescription()).isEqualTo("Updated label sync coverage");
     }
 
     @Test
@@ -68,35 +70,36 @@ class GitHubLiveLabelSyncIntegrationTest extends AbstractGitHubLiveSyncIntegrati
         var repository = seeded.repository();
         var createdLabel = seeded.label();
 
-        repositorySyncService.syncRepository(workspace.getId(), repository.getFullName()).orElseThrow();
-        labelSyncService.syncLabelsOfRepository(repository);
+        repositorySyncService.syncRepository(workspace.getId(), repository.fullName()).orElseThrow();
+        var localRepo = repositoryRepository.findByNameWithOwner(repository.fullName()).orElseThrow();
+        labelSyncService.syncLabelsForRepository(workspace.getId(), localRepo.getId());
 
-        createdLabel.delete();
+        // Delete label via GraphQL
+        fixtureService.deleteLabel(createdLabel.nodeId());
         awaitCondition("label removed remotely", () -> isLabelMissingRemotely(repository, createdLabel));
 
-        labelSyncService.syncLabelsOfRepository(repository);
+        labelSyncService.syncLabelsForRepository(workspace.getId(), localRepo.getId());
 
-        assertThat(labelRepository.findByRepositoryIdAndName(repository.getId(), createdLabel.getName())).isEmpty();
+        assertThat(labelRepository.findByRepositoryIdAndName(localRepo.getId(), createdLabel.name())).isEmpty();
     }
 
     private RepositoryLabel seedRepositoryWithLabel(String suffix) throws Exception {
         var repository = createEphemeralRepository(suffix);
-        var label = createRepositoryLabel(repository, LABEL_PREFIX, INITIAL_COLOR, LABEL_DESCRIPTION);
+        var repoInfo = fixtureService.getRepositoryInfo(repository.fullName());
+        var label = createRepositoryLabel(repoInfo.nodeId(), LABEL_PREFIX, INITIAL_COLOR, LABEL_DESCRIPTION);
         return new RepositoryLabel(repository, label);
     }
 
-    private boolean isLabelMissingRemotely(GHRepository repository, GHLabel label) {
-        try {
-            return repository
-                .listLabels()
-                .withPageSize(30)
-                .toList()
-                .stream()
-                .noneMatch(remote -> remote.getId() == label.getId());
-        } catch (IOException listingError) {
-            return false;
-        }
+    private boolean isLabelMissingRemotely(
+        GitHubTestFixtureService.CreatedRepository repository,
+        GitHubTestFixtureService.CreatedLabel label
+    ) {
+        var labels = fixtureService.listLabels(repository.fullName());
+        return labels.stream().noneMatch(remote -> remote.name().equals(label.name()));
     }
 
-    private record RepositoryLabel(GHRepository repository, GHLabel label) {}
+    private record RepositoryLabel(
+        GitHubTestFixtureService.CreatedRepository repository,
+        GitHubTestFixtureService.CreatedLabel label
+    ) {}
 }

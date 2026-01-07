@@ -30,14 +30,14 @@
     </scm>
     <properties>
         <java.version>21</java.version>
-        <app.profiles>local,dev</app.profiles>
+        <app.profiles>local</app.profiles>
 
         <!-- Test Configuration -->
         <maven.test.failure.ignore>false</maven.test.failure.ignore>
         <maven.test.skip>false</maven.test.skip>
         <hephaestus.surefire.timeout>180</hephaestus.surefire.timeout>
         
-        <!-- Tag filtering: exclude live tests by default, include only specific test types -->
+        <!-- Tag filtering: unit tests by default, exclude live tests -->
         <surefire.excludedGroups>live</surefire.excludedGroups>
         <surefire.includedGroups>unit</surefire.includedGroups>
         <failsafe.excludedGroups>live</failsafe.excludedGroups>
@@ -47,6 +47,7 @@
         <skipCoverage>true</skipCoverage>
         <jacoco.line.coverage.minimum>0.00</jacoco.line.coverage.minimum>
         <jacoco.branch.coverage.minimum>0.00</jacoco.branch.coverage.minimum>
+
 
         <!-- Encoding -->
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -59,6 +60,11 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+        <!-- Caffeine cache with TTL support and Micrometer metrics integration -->
+        <dependency>
+            <groupId>com.github.ben-manes.caffeine</groupId>
+            <artifactId>caffeine</artifactId>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -120,6 +126,11 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-thymeleaf</artifactId>
+        </dependency>
+        <!-- Spring Retry for transient failure handling in activity event recording -->
+        <dependency>
+            <groupId>org.springframework.retry</groupId>
+            <artifactId>spring-retry</artifactId>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -217,22 +228,6 @@
             <version>0.15.0</version>
         </dependency>
         <dependency>
-            <groupId>org.kohsuke</groupId>
-            <artifactId>github-api</artifactId>
-            <version>2.0-rc.5</version>
-        </dependency>
-        <!-- Byte Buddy for runtime patching of github-api methods -->
-        <dependency>
-            <groupId>net.bytebuddy</groupId>
-            <artifactId>byte-buddy</artifactId>
-            <version>1.17.5</version>
-        </dependency>
-        <dependency>
-            <groupId>net.bytebuddy</groupId>
-            <artifactId>byte-buddy-agent</artifactId>
-            <version>1.17.5</version>
-        </dependency>
-        <dependency>
             <groupId>io.hypersistence</groupId>
             <artifactId>hypersistence-utils-hibernate-63</artifactId>
             <version>3.9.2</version>
@@ -301,7 +296,7 @@
         <dependency>
             <groupId>com.squareup.okhttp3</groupId>
             <artifactId>logging-interceptor</artifactId>
-            <version>5.0.0-alpha.14</version>
+            <version>4.12.0</version>
         </dependency>
         <dependency>
             <groupId>com.google.code.gson</groupId>
@@ -341,12 +336,33 @@
         <dependency>
             <groupId>io.sentry</groupId>
             <artifactId>sentry-spring-boot-starter-jakarta</artifactId>
-            <version>8.2.0</version>
+            <version>8.29.0</version>
         </dependency>
         <dependency>
             <groupId>com.langfuse</groupId>
             <artifactId>langfuse-java</artifactId>
             <version>0.0.6</version>
+        </dependency>
+        <!-- Spring GraphQL Client for GitHub GraphQL API -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-graphql</artifactId>
+        </dependency>
+        <!-- GraphQL Codegen Runtime (base classes for generated code) -->
+        <dependency>
+            <groupId>io.github.kobylynskyi</groupId>
+            <artifactId>graphql-java-codegen</artifactId>
+            <version>5.10.0</version>
+        </dependency>
+        <!-- Resilience4j for Circuit Breaker pattern on external API calls -->
+        <dependency>
+            <groupId>io.github.resilience4j</groupId>
+            <artifactId>resilience4j-spring-boot3</artifactId>
+            <version>2.2.0</version>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-aop</artifactId>
         </dependency>
     </dependencies>
     <dependencyManagement>
@@ -369,6 +385,11 @@
                 <configuration>
                     <source>${java.version}</source>
                     <target>${java.version}</target>
+                    <!-- Suppress warnings for generated code using deprecated GitHub API values -->
+                    <compilerArgs>
+                        <arg>-Xlint:all,-deprecation</arg>
+                    </compilerArgs>
+                    <showWarnings>false</showWarnings>
                     <annotationProcessorPaths>
                         <path>
                             <groupId>com.github.therapi</groupId>
@@ -381,6 +402,156 @@
                         </path>
                     </annotationProcessorPaths>
                 </configuration>
+            </plugin>
+            <!-- Build Helper to add generated sources to IDE -->
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>build-helper-maven-plugin</artifactId>
+                <version>3.6.0</version>
+                <executions>
+                    <execution>
+                        <id>add-graphql-source</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>add-source</goal>
+                        </goals>
+                        <configuration>
+                            <sources>
+                                <source>${project.build.directory}/generated-sources/graphql</source>
+                            </sources>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <!-- GraphQL Code Generator for GitHub API Client -->
+            <!-- Generates type-safe Java classes from GitHub GraphQL schema -->
+            <!-- Run manually: mvn graphql-codegen:generate -->
+            <!-- Runs automatically during generate-sources phase -->
+            <plugin>
+                <groupId>io.github.kobylynskyi</groupId>
+                <artifactId>graphql-codegen-maven-plugin</artifactId>
+                <version>5.10.0</version>
+                <executions>
+                    <execution>
+                        <id>generate-github-graphql-client</id>
+                        <goals>
+                            <goal>generate</goal>
+                        </goals>
+                        <configuration>
+                            <!-- Schema location -->
+                            <graphqlSchemas>
+                                <rootDir>${project.basedir}/src/main/resources/graphql/github</rootDir>
+                            </graphqlSchemas>
+                            
+                            <!-- Output configuration -->
+                            <outputDir>${project.build.directory}/generated-sources/graphql</outputDir>
+                            <packageName>de.tum.in.www1.hephaestus.gitprovider.graphql.github</packageName>
+                            <apiPackageName>de.tum.in.www1.hephaestus.gitprovider.graphql.github.api</apiPackageName>
+                            <modelPackageName>de.tum.in.www1.hephaestus.gitprovider.graphql.github.model</modelPackageName>
+                            
+                            <!-- Client-side code generation (for consuming GitHub API) -->
+                            <generateClient>true</generateClient>
+                            <generateApis>false</generateApis>
+                            <generateDataFetchingEnvironmentArgumentInApis>false</generateDataFetchingEnvironmentArgumentInApis>
+                            
+                            <!-- Model generation options -->
+                            <generateBuilder>true</generateBuilder>
+                            <generateEqualsAndHashCode>true</generateEqualsAndHashCode>
+                            <generateToString>true</generateToString>
+                            <generateParameterizedFieldsResolvers>false</generateParameterizedFieldsResolvers>
+                            <generateModelsForRootTypes>false</generateModelsForRootTypes>
+                            <generateAllMethodInProjection>true</generateAllMethodInProjection>
+                            
+                            <!-- Skip Relay types that reference missing Query root type -->
+                            <fieldsWithoutResolvers>
+                                <fieldWithoutResolver>node</fieldWithoutResolver>
+                                <fieldWithoutResolver>nodes</fieldWithoutResolver>
+                                <fieldWithoutResolver>relay</fieldWithoutResolver>
+                            </fieldsWithoutResolvers>
+                            
+                            <!-- Java config -->
+                            <generatedLanguage>JAVA</generatedLanguage>
+                            <!-- Use @Generated annotation with @SuppressWarnings to silence IDE warnings on generated code -->
+                            <addGeneratedAnnotation>true</addGeneratedAnnotation>
+                            <generatedAnnotation>jakarta.annotation.Generated</generatedAnnotation>
+                            <modelValidationAnnotation>@jakarta.annotation.Generated("graphql-codegen")</modelValidationAnnotation>
+                            
+                            <!-- GitHub-specific scalar mappings -->
+                            <customTypesMapping>
+                                <DateTime>java.time.OffsetDateTime</DateTime>
+                                <Date>java.time.LocalDate</Date>
+                                <URI>java.net.URI</URI>
+                                <HTML>java.lang.String</HTML>
+                                <GitObjectID>java.lang.String</GitObjectID>
+                                <GitSSHRemote>java.lang.String</GitSSHRemote>
+                                <GitTimestamp>java.time.OffsetDateTime</GitTimestamp>
+                                <PreciseDateTime>java.time.OffsetDateTime</PreciseDateTime>
+                                <X509Certificate>java.lang.String</X509Certificate>
+                                <Base64String>java.lang.String</Base64String>
+                                <BigInt>java.math.BigInteger</BigInt>
+                            </customTypesMapping>
+                            
+                            <!-- Naming conventions -->
+                            <modelNameSuffix></modelNameSuffix>
+                            <requestSuffix>Request</requestSuffix>
+                            <responseSuffix>Response</responseSuffix>
+                            <responseProjectionSuffix>ResponseProjection</responseProjectionSuffix>
+                            
+                            <!-- Use custom template for ResponseProjection to add @SuppressWarnings("unused") -->
+                            <!-- This suppresses false positive warnings for the projectionDepthOnFields field -->
+                            <!-- which is used internally by the all$() method -->
+                            <customTemplatesRoot>${project.basedir}/src/main/resources/graphql/templates</customTemplatesRoot>
+                            <customTemplates>
+                                <RESPONSE_PROJECTION>response_projection.ftl</RESPONSE_PROJECTION>
+                            </customTemplates>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <!-- Delete Relay files that depend on missing Query root type -->
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>3.4.1</version>
+                <executions>
+                    <execution>
+                        <id>delete-relay-classes</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>exec</goal>
+                        </goals>
+                        <configuration>
+                            <executable>rm</executable>
+                            <arguments>
+                                <argument>-f</argument>
+                                <argument>${project.build.directory}/generated-sources/graphql/de/tum/in/www1/hephaestus/gitprovider/graphql/github/model/RelayQueryRequest.java</argument>
+                                <argument>${project.build.directory}/generated-sources/graphql/de/tum/in/www1/hephaestus/gitprovider/graphql/github/model/RelayQueryResponse.java</argument>
+                            </arguments>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>add-suppress-warnings-to-deprecated-classes</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>exec</goal>
+                        </goals>
+                        <configuration>
+                            <!-- Add @SuppressWarnings("deprecation") to classes using deprecated GitHub API fields -->
+                            <executable>bash</executable>
+                            <arguments>
+                                <argument>-c</argument>
+                                <argument>
+                                    for f in ProjectPendingCardsParametrizedInput IssueProjectCardsParametrizedInput PullRequestProjectCardsParametrizedInput ProjectColumnCardsParametrizedInput; do
+                                        file="${project.build.directory}/generated-sources/graphql/de/tum/in/www1/hephaestus/gitprovider/graphql/github/model/$f.java"
+                                        if [ -f "$file" ]; then
+                                            sed -i '' 's/^public class /@SuppressWarnings("deprecation")\npublic class /' "$file" 2>/dev/null || sed -i 's/^public class /@SuppressWarnings("deprecation")\npublic class /' "$file"
+                                        fi
+                                    done
+                                </argument>
+                            </arguments>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
             <!-- JaCoCo Maven Plugin for Code Coverage -->
             <plugin>
@@ -436,7 +607,7 @@
                 <artifactId>maven-surefire-plugin</artifactId>
                 <configuration>
                     <!-- Memory and JVM settings - @{argLine} is replaced by JaCoCo -->
-                    <argLine>@{argLine} -Xmx1024m -Dspring.profiles.active=test -Dfile.encoding=UTF-8
+                    <argLine>@{argLine} -Xmx2048m -Dspring.profiles.active=test -Dfile.encoding=UTF-8
                         -XX:+EnableDynamicAgentLoading
                     </argLine>
                     <!-- Test output -->
@@ -620,6 +791,32 @@
                 <!-- Override defaults to run ONLY live tests -->
                 <surefire.excludedGroups></surefire.excludedGroups>
                 <surefire.includedGroups>live</surefire.includedGroups>
+                <failsafe.excludedGroups></failsafe.excludedGroups>
+                <failsafe.includedGroups></failsafe.includedGroups>
+            </properties>
+        </profile>
+        
+        <!--
+            Architecture Tests Profile
+            
+            Runs ONLY architecture tests that verify structural constraints using ArchUnit.
+            These tests scan all compiled classes and can be memory-intensive.
+            
+            Usage:
+              ./mvnw test -Parchitecture-tests
+            
+            These tests verify:
+            - Module boundaries (gitprovider isolation, SPI patterns)
+            - SOLID principles (SRP, DIP, ISP)
+            - Spring best practices (layered architecture, security)
+            - Code quality (complexity limits, naming conventions)
+        -->
+        <profile>
+            <id>architecture-tests</id>
+            <properties>
+                <!-- Override defaults to run ONLY architecture tests -->
+                <surefire.excludedGroups></surefire.excludedGroups>
+                <surefire.includedGroups>architecture</surefire.includedGroups>
                 <failsafe.excludedGroups></failsafe.excludedGroups>
                 <failsafe.includedGroups></failsafe.includedGroups>
             </properties>

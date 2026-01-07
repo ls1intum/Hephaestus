@@ -15,24 +15,24 @@ import org.springframework.stereotype.Component;
 @Profile("!specs & !test")
 public class WorkspaceStartupListener {
 
-    private static final Logger logger = LoggerFactory.getLogger(WorkspaceStartupListener.class);
+    private static final Logger log = LoggerFactory.getLogger(WorkspaceStartupListener.class);
 
     private final WorkspaceProvisioningService provisioningService;
-    private final WorkspaceService workspaceService;
+    private final WorkspaceActivationService workspaceActivationService;
 
     public WorkspaceStartupListener(
         WorkspaceProvisioningService provisioningService,
-        WorkspaceService workspaceService
+        WorkspaceActivationService workspaceActivationService
     ) {
         this.provisioningService = provisioningService;
-        this.workspaceService = workspaceService;
+        this.workspaceActivationService = workspaceActivationService;
     }
 
     @EventListener(ApplicationReadyEvent.class)
     public void onApplicationReady() {
-        logger.info("Starting workspace provisioning.");
+        log.info("Starting workspace provisioning.");
         provisioningService.bootstrapDefaultPatWorkspace();
         provisioningService.ensureGitHubAppInstallations();
-        workspaceService.activateAllWorkspaces();
+        workspaceActivationService.activateAllWorkspaces();
     }
 }

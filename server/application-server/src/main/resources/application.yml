@@ -30,6 +30,10 @@ spring:
             hibernate:
                 integrator_provider: de.tum.in.www1.hephaestus.ClassImportIntegratorIntegratorProvider
                 format_sql: "true"
+                jdbc:
+                    batch_size: 50
+                order_inserts: true
+                order_updates: true
 
     liquibase:
         change-log: classpath:db/master.xml
@@ -67,6 +71,12 @@ spring:
     mustache:
         check-template-location: false
 
+    # GraphQL client configuration for GitHub API operations
+    # Operations are colocated with the schema at graphql/github/operations/
+    graphql:
+        client:
+            document-locations: classpath:graphql/github/operations/
+
 springdoc:
     default-produces-media-type: application/json
     writer-with-order-by-keys: true
@@ -81,9 +91,22 @@ logging:
 hephaestus:
     host-url: https://hephaestus.ase.cit.tum.de/
 
+    # ═══════════════════════════════════════════════════════════════════════════
+    # ACTIVITY EVENT BACKFILL
+    # ═══════════════════════════════════════════════════════════════════════════
+    # One-time migration to backfill activity events from historical data.
+    # Enable this ONCE when deploying to a new environment, then disable.
+    # The backfill is idempotent - running multiple times will not create duplicates.
+    activity:
+        backfill-on-startup: ${HEPHAESTUS_ACTIVITY_BACKFILL_ON_STARTUP:false}
+
+    cors:
+        allowed-origins:
+            - ${CLIENT_HOST:http://localhost:4200}
+
     webapp:
         url: ${CLIENT_HOST:http://localhost:4200}
-    
+
     leaderboard:
         schedule:
             day: 2
@@ -95,7 +118,7 @@ hephaestus:
         # PR authors whose assignee-reviewers don't earn points (e.g., AI bots)
         self-review-author-logins:
             - Copilot
-    
+
     # ═══════════════════════════════════════════════════════════════════════════
     # WORKSPACE CONFIGURATION
     # ═══════════════════════════════════════════════════════════════════════════
@@ -133,7 +156,7 @@ hephaestus:
             repositories-to-monitor:
                 - ls1intum/Hephaestus
                 - ls1intum/Artemis
-    
+
     intelligence-service:
         url: http://localhost:8000
 
@@ -141,6 +164,9 @@ hephaestus:
         contributors:
             # Eviction rate in milliseconds (1 hour)
             evict-rate: 3600000
+        leaderboard-xp:
+            # Eviction rate in milliseconds (60 seconds - leaderboard data is moderately hot)
+            evict-rate: 60000
     mail:
         enabled: ${MAIL_ENABLED:false}
         sender: ${MAIL_SENDER:hephaestus@gmail.com} # use gmail email address for local testing
@@ -161,8 +187,6 @@ hephaestus:
         api-host: ${POSTHOG_API_HOST:https://app.posthog.com}
         project-id: ${POSTHOG_PROJECT_ID:}
         personal-api-key: ${POSTHOG_PERSONAL_API_KEY:}
-
-
 
 keycloak:
     url: http://localhost:8081
@@ -258,3 +282,29 @@ slack:
 
 sentry:
     dsn: ""
+
+# ═══════════════════════════════════════════════════════════════════════════
+# RESILIENCE4J CIRCUIT BREAKER
+# ═══════════════════════════════════════════════════════════════════════════
+# Protects against cascading failures when GitHub API is unavailable
+# See ResilienceConfig.java for default values; these can be overridden here
+resilience4j:
+    circuitbreaker:
+        configs:
+            default:
+                slidingWindowSize: 10
+                failureRateThreshold: 50
+                waitDurationInOpenState: 30s
+                permittedNumberOfCallsInHalfOpenState: 3
+                minimumNumberOfCalls: 5
+                slowCallDurationThreshold: 10s
+                slowCallRateThreshold: 80
+        instances:
+            githubGraphQl:
+                baseConfig: default
+            githubRest:
+                baseConfig: default
+            intelligence-service:
+                baseConfig: default
+                slowCallDurationThreshold: 30s
+                waitDurationInOpenState: 60s

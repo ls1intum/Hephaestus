@@ -46,6 +46,7 @@ import org.hibernate.validator.constraints.*;
 })
 @JsonTypeName("ThreadDetail_messages_inner")
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
+@SuppressWarnings("all")
 public class ThreadDetailMessagesInner {
   public static final String JSON_PROPERTY_ID = "id";
   private UUID id;

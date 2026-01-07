@@ -63,27 +63,42 @@ public abstract class BaseGitHubLiveIntegrationTest extends BaseIntegrationTest 
         long appId = environment.getProperty("github.app.id", Long.class, 0L);
         var privateKey = environment.getProperty("github.app.privateKey", "");
         var privateKeyLocation = environment.getProperty("github.app.privateKeyLocation", "");
-        var authToken = environment.getProperty("github.meta.auth-token", "");
+        // Note: auth-token (PAT) is optional - only used as fallback for certain
+        // operations
         var installationId = environment.getProperty("integration-tests.github.installation-id", "");
-        boolean missingKeyMaterial = privateKey.isBlank();
-        if (missingKeyMaterial && !privateKeyLocation.isBlank()) {
+
+        // Check key material - need to compute this in a way that produces an
+        // effectively final result
+        boolean hasKeyMaterial;
+        if (!privateKey.isBlank()) {
+            hasKeyMaterial = true;
+        } else if (!privateKeyLocation.isBlank()) {
             var resource = resourceLoader.getResource(privateKeyLocation);
             try (var input = resource.exists() ? resource.getInputStream() : null) {
-                missingKeyMaterial = input == null || input.read() == -1;
+                hasKeyMaterial = input != null && input.read() != -1;
             } catch (Exception ignored) {
-                missingKeyMaterial = true;
+                hasKeyMaterial = false;
             }
+        } else {
+            hasKeyMaterial = false;
         }
-        boolean missingToken = authToken.isBlank();
+
         boolean missingInstallation = installationId.isBlank();
         boolean missingAppId = appId <= 0;
+        boolean missingKeyMaterial = !hasKeyMaterial;
 
+        // Note: auth-token is optional - it's only used as fallback for certain
+        // operations that the installation token can't perform (e.g., creating repos in
+        // some orgs)
         Assumptions.assumeFalse(
-            missingAppId || missingKeyMaterial || missingToken || missingInstallation,
+            missingAppId || missingKeyMaterial || missingInstallation,
             () ->
-                "GitHub integration credentials missing. Copy the example file to " +
-                "application-github-integration-local.yml (kept out of VCS) or provide " +
-                "environment overrides."
+                "GitHub integration credentials missing. Missing: " +
+                (missingAppId ? "appId " : "") +
+                (missingKeyMaterial ? "privateKey " : "") +
+                (missingInstallation ? "installationId " : "") +
+                ". Copy application-live-local.example.yml to application-live-local.yml " +
+                "or provide environment overrides."
         );
     }
 
