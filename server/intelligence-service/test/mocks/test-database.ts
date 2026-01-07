@@ -74,9 +74,10 @@ export async function createTestFixtures(): Promise<TestFixtures> {
 	`);
 
 	// Insert user - include all NOT NULL columns
+	// Note: notifications_enabled and participate_in_research moved to user_preferences table
 	await db.execute(sql`
-		INSERT INTO "user" (id, created_at, updated_at, login, name, type, notifications_enabled, participate_in_research)
-		VALUES (${userId}, NOW(), NOW(), ${`test-user-${id}`}, 'Test User', 'USER', true, true)
+		INSERT INTO "user" (id, created_at, updated_at, login, name, type)
+		VALUES (${userId}, NOW(), NOW(), ${`test-user-${id}`}, 'Test User', 'USER')
 		ON CONFLICT (id) DO NOTHING
 	`);
 
