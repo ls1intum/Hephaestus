@@ -108,9 +108,9 @@ public class User extends BaseGitServiceEntity {
     // Note: WorkspaceMembership is accessed via WorkspaceMembershipRepository, not via User entity.
     // The relationship is unidirectional from WorkspaceMembership → User to maintain module separation.
 
-    private boolean notificationsEnabled = true;
-
-    private boolean participateInResearch = true;
+    // Note: User preferences (notificationsEnabled, participateInResearch) are stored in
+    // UserPreferences entity in the account module to maintain domain isolation.
+    // The gitprovider module should only contain data from the Git provider.
 
     public enum Type {
         USER,

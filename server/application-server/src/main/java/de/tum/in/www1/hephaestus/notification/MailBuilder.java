@@ -36,12 +36,30 @@ public class MailBuilder {
     @Getter
     private final Map<String, Object> variables;
 
-    public MailBuilder(MailConfig config, User primaryRecipient, String email, String subject, String template) {
+    /**
+     * Constructor that accepts a User entity and notifications enabled flag.
+     * The notifications enabled flag should be retrieved from UserPreferences, not User directly.
+     *
+     * @param config mail configuration
+     * @param primaryRecipient the recipient user (may be null)
+     * @param notificationsEnabled whether notifications are enabled for this user (from UserPreferences)
+     * @param email recipient email address
+     * @param subject email subject
+     * @param template email template name
+     */
+    public MailBuilder(
+        MailConfig config,
+        User primaryRecipient,
+        boolean notificationsEnabled,
+        String email,
+        String subject,
+        String template
+    ) {
         this.config = config;
 
         this.primaryRecipient = primaryRecipient;
         this.recipientLogin = primaryRecipient != null ? primaryRecipient.getLogin() : null;
-        this.notificationsEnabled = primaryRecipient != null && primaryRecipient.isNotificationsEnabled();
+        this.notificationsEnabled = notificationsEnabled;
         this.email = email;
 
         this.subject = subject;

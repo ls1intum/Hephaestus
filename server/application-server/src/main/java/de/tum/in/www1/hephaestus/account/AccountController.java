@@ -121,8 +121,9 @@ public class AccountController {
             keycloakUserId = token.getToken().getClaimAsString(StandardClaimNames.SUB);
         } else {
             log.warn("Updating user settings without an authenticated principal");
+            UserPreferences preferences = accountService.getOrCreatePreferences(user.get());
             boolean switchingOffResearch =
-                Boolean.FALSE.equals(userSettings.participateInResearch()) && user.get().isParticipateInResearch();
+                Boolean.FALSE.equals(userSettings.participateInResearch()) && preferences.isParticipateInResearch();
             if (switchingOffResearch) {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
             }

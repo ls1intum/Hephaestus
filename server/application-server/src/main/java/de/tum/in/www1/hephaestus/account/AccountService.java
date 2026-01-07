@@ -2,7 +2,6 @@ package de.tum.in.www1.hephaestus.account;
 
 import de.tum.in.www1.hephaestus.core.WorkspaceAgnostic;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
-import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.integrations.posthog.PosthogClient;
 import de.tum.in.www1.hephaestus.integrations.posthog.PosthogClientException;
 import java.util.LinkedHashSet;
@@ -27,34 +26,55 @@ public class AccountService {
 
     private static final Logger log = LoggerFactory.getLogger(AccountService.class);
 
-    private final UserRepository userRepository;
+    private final UserPreferencesRepository userPreferencesRepository;
     private final PosthogClient posthogClient;
 
-    public AccountService(UserRepository userRepository, PosthogClient posthogClient) {
-        this.userRepository = userRepository;
+    public AccountService(UserPreferencesRepository userPreferencesRepository, PosthogClient posthogClient) {
+        this.userPreferencesRepository = userPreferencesRepository;
         this.posthogClient = posthogClient;
+    }
+
+    /**
+     * Get or create user preferences for the given user.
+     * Creates default preferences if they don't exist yet.
+     *
+     * @param user the user to get preferences for
+     * @return the user's preferences
+     */
+    @Transactional
+    public UserPreferences getOrCreatePreferences(User user) {
+        return userPreferencesRepository
+            .findByUserId(user.getId())
+            .orElseGet(() -> {
+                log.debug("Creating default preferences for user: {}", user.getLogin());
+                UserPreferences preferences = new UserPreferences(user);
+                return userPreferencesRepository.save(preferences);
+            });
     }
 
     public UserSettingsDTO getUserSettings(User user) {
         log.debug("Getting user settings for user: {}", user.getLogin());
-        return new UserSettingsDTO(user.isNotificationsEnabled(), user.isParticipateInResearch());
+        UserPreferences preferences = getOrCreatePreferences(user);
+        return new UserSettingsDTO(preferences.isNotificationsEnabled(), preferences.isParticipateInResearch());
     }
 
     @Transactional
     public UserSettingsDTO updateUserSettings(User user, UserSettingsDTO userSettings, String keycloakUserId) {
         log.info("Updating user settings for user: {}", user.getLogin());
 
-        user.setNotificationsEnabled(
+        UserPreferences preferences = getOrCreatePreferences(user);
+
+        preferences.setNotificationsEnabled(
             Objects.requireNonNull(userSettings.receiveNotifications(), "receiveNotifications must not be null")
         );
 
-        boolean previousParticipation = user.isParticipateInResearch();
+        boolean previousParticipation = preferences.isParticipateInResearch();
         boolean participatesInResearch = Objects.requireNonNull(
             userSettings.participateInResearch(),
             "participateInResearch must not be null"
         );
-        user.setParticipateInResearch(participatesInResearch);
-        userRepository.save(user);
+        preferences.setParticipateInResearch(participatesInResearch);
+        userPreferencesRepository.save(preferences);
 
         // If user is opting out of research, delete their analytics data
         if (previousParticipation && !participatesInResearch) {
@@ -75,7 +95,7 @@ public class AccountService {
             }
         }
 
-        return new UserSettingsDTO(user.isNotificationsEnabled(), user.isParticipateInResearch());
+        return new UserSettingsDTO(preferences.isNotificationsEnabled(), preferences.isParticipateInResearch());
     }
 
     /**
