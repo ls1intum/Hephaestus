@@ -10,23 +10,24 @@
  * <pre>
  * gitprovider/
  * ├── common/                    # Shared infrastructure
- * │   ├── spi/                   # Service Provider Interfaces for module isolation
  * │   ├── events/                # Domain events for reactive features
- * │   └── github/                # GitHub-specific utilities (GraphQL client, parsers)
+ * │   ├── exception/             # Exceptions definitions for gitprovider
+ * │   ├── github/                # GitHub-specific utilities (GraphQL client, parsers)
+ * │   └── spi/                   # Service Provider Interfaces for module isolation
  * │
- * ├── {domain}/                  # Provider-agnostic domain modules
- * │   ├── {Entity}.java          # JPA entity (e.g., PullRequest, Issue)
- * │   ├── {Entity}Repository.java # Spring Data repository
- * │   ├── {Entity}InfoDTO.java   # API response DTO
- * │   └── github/                # GitHub-specific implementation
- * │       ├── dto/               # GitHub webhook/GraphQL DTOs
- * │       ├── GitHub{Entity}Processor.java    # Entity processing logic
- * │       ├── GitHub{Entity}SyncService.java  # GraphQL sync service
- * │       └── GitHub{Entity}MessageHandler.java # Webhook handler
+ * ├── {domain}/                    # Provider-agnostic domain modules
+ * │   ├── {Entity}.java            # JPA entity (e.g., PullRequest, Issue)
+ * │   ├── {Entity}Repository.java  # Spring Data repository
+ * │   ├── {Entity}InfoDTO.java     # API response DTO
+ * │   └── github/                  # GitHub-specific implementation
+ * │       ├── dto/                 # GitHub webhook/GraphQL DTOs
+ * │       ├── GitHub{Entity}MessageHandler.java  # Webhook handler
+ * │       ├── GitHub{Entity}Processor.java       # Entity processing logic
+ * │       └── GitHub{Entity}SyncService.java     # GraphQL sync service
  * │
- * └── sync/                      # Orchestration layer
- *     ├── GitHubDataSyncService.java    # Coordinates full workspace sync
+ * └── sync/                             # Orchestration layer
  *     ├── GitHubDataSyncScheduler.java  # Scheduled sync jobs
+ *     ├── GitHubDataSyncService.java    # Coordinates full workspace sync
  *     └── NatsConsumerService.java      # Webhook event consumption
  * </pre>
  *
@@ -44,7 +45,7 @@
  * </ul>
  *
  * <h2>Adding GitLab Support</h2>
- *
+ * <p>
  * To add GitLab support:
  * <ol>
  *   <li>Create {@code gitlab/} subdirectories in each domain module</li>
@@ -53,7 +54,7 @@
  *   <li>Add GitLab GraphQL client in {@code common/gitlab/}</li>
  *   <li>Implement GitLab message handlers for webhook events</li>
  * </ol>
- *
+ * <p>
  * The domain entities, repositories, and SPI interfaces remain unchanged.
  *
  * <h2>Security Considerations</h2>
