@@ -23,6 +23,7 @@ import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.github.dto.GitHubUserDTO;
+import java.time.Instant;
 import java.util.HashSet;
 import java.util.Objects;
 import java.util.Optional;
@@ -96,6 +97,8 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
 
         if (isNew) {
             issue = createIssue(dto, repository);
+            // Mark sync timestamp
+            issue.setLastSyncAt(Instant.now());
             issue = issueRepository.save(issue);
             eventPublisher.publishEvent(
                 new DomainEvent.IssueCreated(EventPayload.IssueData.from(issue), EventContext.from(context))
@@ -104,6 +107,8 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
         } else {
             issue = existingOpt.get();
             Set<String> changedFields = updateIssue(dto, issue, repository);
+            // Mark sync timestamp
+            issue.setLastSyncAt(Instant.now());
             issue = issueRepository.save(issue);
 
             if (!changedFields.isEmpty()) {
@@ -423,6 +428,7 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
         }
         return switch (stateReason.toUpperCase()) {
             case "COMPLETED" -> Issue.StateReason.COMPLETED;
+            case "DUPLICATE" -> Issue.StateReason.DUPLICATE;
             case "REOPENED" -> Issue.StateReason.REOPENED;
             case "NOT_PLANNED" -> Issue.StateReason.NOT_PLANNED;
             default -> Issue.StateReason.UNKNOWN;

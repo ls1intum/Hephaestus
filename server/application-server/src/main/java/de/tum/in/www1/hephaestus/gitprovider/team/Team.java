@@ -1,7 +1,6 @@
 package de.tum.in.www1.hephaestus.gitprovider.team;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.BaseGitServiceEntity;
-import de.tum.in.www1.hephaestus.gitprovider.label.Label;
 import de.tum.in.www1.hephaestus.gitprovider.team.membership.TeamMembership;
 import de.tum.in.www1.hephaestus.gitprovider.team.permission.TeamRepositoryPermission;
 import jakarta.persistence.CascadeType;
@@ -9,9 +8,6 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.JoinTable;
-import jakarta.persistence.ManyToMany;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import java.time.Instant;
@@ -41,17 +37,21 @@ public class Team extends BaseGitServiceEntity {
 
     private String organization;
 
-    @Column(columnDefinition = "TEXT")
+    @Column(length = 512)
     private String htmlUrl;
 
     private Long parentId;
 
-    private Instant lastSyncedAt;
-
     /**
-     * Hephaestus field. Controls whether the team is hidden in the overview.
+     * Timestamp of the last successful sync for this team from the Git provider.
+     * <p>
+     * This is ETL infrastructure used by the sync engine to track when this team
+     * was last synchronized via GraphQL. Used to implement sync cooldown logic
+     * and detect stale data.
+     *
+     * @see de.tum.in.www1.hephaestus.gitprovider.team.github.GitHubTeamSyncService
      */
-    private boolean hidden = false;
+    private Instant lastSyncAt;
 
     @OneToMany(mappedBy = "team", cascade = CascadeType.ALL, orphanRemoval = true)
     @ToString.Exclude
@@ -60,20 +60,6 @@ public class Team extends BaseGitServiceEntity {
     @OneToMany(mappedBy = "team", cascade = CascadeType.ALL, orphanRemoval = true)
     @ToString.Exclude
     private Set<TeamMembership> memberships = new HashSet<>();
-
-    /**
-     * Hephaestus-managed labels assigned to this team (admin-managed only).
-     *
-     * Used for filtering team-specific contributions.
-     */
-    @ManyToMany
-    @JoinTable(
-        name = "team_labels",
-        joinColumns = @JoinColumn(name = "team_id"),
-        inverseJoinColumns = @JoinColumn(name = "label_id")
-    )
-    @ToString.Exclude
-    private Set<Label> labels = new HashSet<>();
 
     public void addMembership(TeamMembership membership) {
         memberships.add(membership);
@@ -95,19 +81,16 @@ public class Team extends BaseGitServiceEntity {
         fresh.forEach(this::addRepoPermission);
     }
 
-    public void addLabel(Label label) {
-        labels.add(label);
-    }
-
-    public void removeLabel(Label label) {
-        labels.remove(label);
-    }
-
+    /**
+     * Team privacy level. Maps directly to GitHub GraphQL TeamPrivacy enum.
+     *
+     * @see <a href="https://docs.github.com/en/graphql/reference/enums#teamprivacy">GitHub TeamPrivacy</a>
+     */
     public enum Privacy {
         /** Only organization members can view or request access. */
         SECRET,
-        /** Visible to all members of the organization. */
-        CLOSED,
+        /** Visible to all members of the organization (GitHub calls this VISIBLE). */
+        VISIBLE,
     }
     // Ignored GitHub properties:
     // - nodeId

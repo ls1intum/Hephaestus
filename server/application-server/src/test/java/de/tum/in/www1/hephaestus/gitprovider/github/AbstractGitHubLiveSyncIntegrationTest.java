@@ -11,6 +11,9 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -44,6 +47,10 @@ public abstract class AbstractGitHubLiveSyncIntegrationTest extends BaseGitHubLi
     protected final List<String> repositoriesToDelete = new ArrayList<>();
     protected final List<TeamToDelete> teamsToDelete = new ArrayList<>();
 
+    // Class-level tracking for @AfterAll safety net cleanup
+    private final Set<String> allRepositoriesCreated = ConcurrentHashMap.newKeySet();
+    private final Set<TeamToDelete> allTeamsCreated = ConcurrentHashMap.newKeySet();
+
     protected GitHubTestFixtureService fixtureService;
     protected Workspace workspace;
 
@@ -69,11 +76,46 @@ public abstract class AbstractGitHubLiveSyncIntegrationTest extends BaseGitHubLi
     void tearDownGitHubArtifacts() {
         for (String fullName : repositoriesToDelete) {
             fixtureService.deleteRepository(fullName);
+            allRepositoriesCreated.remove(fullName); // Remove from safety net if successfully deleted
         }
         for (TeamToDelete team : teamsToDelete) {
             fixtureService.deleteTeam(team.orgLogin(), team.teamSlug());
+            allTeamsCreated.remove(team); // Remove from safety net if successfully deleted
         }
         workspace = null;
+    }
+
+    /**
+     * Safety net cleanup that runs after all tests in the class.
+     * This catches any artifacts that weren't cleaned up by @AfterEach
+     * (e.g., due to test failures, exceptions, or deletion failures).
+     */
+    @AfterAll
+    void cleanupOrphanedArtifacts() {
+        if (fixtureService == null) {
+            return; // Fixture service was never initialized (tests skipped)
+        }
+
+        if (!allRepositoriesCreated.isEmpty()) {
+            logger.warn(
+                "Safety net cleanup: {} repositories were not cleaned up by @AfterEach",
+                allRepositoriesCreated.size()
+            );
+            for (String fullName : allRepositoriesCreated) {
+                logger.info("Safety net: Deleting orphaned repository {}", fullName);
+                fixtureService.deleteRepository(fullName);
+            }
+            allRepositoriesCreated.clear();
+        }
+
+        if (!allTeamsCreated.isEmpty()) {
+            logger.warn("Safety net cleanup: {} teams were not cleaned up by @AfterEach", allTeamsCreated.size());
+            for (TeamToDelete team : allTeamsCreated) {
+                logger.info("Safety net: Deleting orphaned team {}/{}", team.orgLogin(), team.teamSlug());
+                fixtureService.deleteTeam(team.orgLogin(), team.teamSlug());
+            }
+            allTeamsCreated.clear();
+        }
     }
 
     protected Workspace createWorkspace() {
@@ -109,6 +151,7 @@ public abstract class AbstractGitHubLiveSyncIntegrationTest extends BaseGitHubLi
             true
         );
         repositoriesToDelete.add(repository.fullName());
+        allRepositoriesCreated.add(repository.fullName()); // Track in safety net
         return repository;
     }
 
@@ -158,7 +201,9 @@ public abstract class AbstractGitHubLiveSyncIntegrationTest extends BaseGitHubLi
     ) {
         String teamName = "it-team-" + nextEphemeralSlug("team");
         GitHubTestFixtureService.CreatedTeam team = fixtureService.createTeam(githubOrganization(), teamName);
-        teamsToDelete.add(new TeamToDelete(githubOrganization(), team.slug()));
+        TeamToDelete teamToDelete = new TeamToDelete(githubOrganization(), team.slug());
+        teamsToDelete.add(teamToDelete);
+        allTeamsCreated.add(teamToDelete); // Track in safety net
 
         // Add repository to team
         fixtureService.addRepositoryToTeam(githubOrganization(), team.slug(), repository.fullName(), permission);

@@ -128,11 +128,13 @@ public class GitHubTeamProcessor {
 
     private Team.Privacy mapPrivacy(String privacy) {
         if (privacy == null) {
-            return Team.Privacy.CLOSED;
+            return Team.Privacy.VISIBLE;
         }
         return switch (privacy.toLowerCase()) {
             case "secret" -> Team.Privacy.SECRET;
-            default -> Team.Privacy.CLOSED;
+            // "visible" from GraphQL, "closed" from REST API - both map to VISIBLE
+            case "visible", "closed" -> Team.Privacy.VISIBLE;
+            default -> Team.Privacy.VISIBLE;
         };
     }
 }

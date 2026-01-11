@@ -33,7 +33,8 @@ public class BadPracticeDetection {
     private List<PullRequestBadPractice> badPractices;
 
     @NonNull
-    private Instant detectionTime;
+    @Column(name = "detected_at")
+    private Instant detectedAt;
 
     private String traceId;
 }

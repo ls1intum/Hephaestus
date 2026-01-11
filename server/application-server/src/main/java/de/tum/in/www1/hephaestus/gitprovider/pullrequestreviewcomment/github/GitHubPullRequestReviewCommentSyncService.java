@@ -21,6 +21,7 @@ import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewthread.PullRequest
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewthread.PullRequestReviewThreadRepository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
+import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserProcessor;
 import de.tum.in.www1.hephaestus.gitprovider.user.github.dto.GitHubUserDTO;
 import java.math.BigInteger;
 import java.util.ArrayList;
@@ -59,6 +60,7 @@ public class GitHubPullRequestReviewCommentSyncService {
     private final PullRequestReviewThreadRepository threadRepository;
     private final GitHubGraphQlClientProvider graphQlClientProvider;
     private final GitHubPullRequestReviewCommentProcessor commentProcessor;
+    private final GitHubUserProcessor userProcessor;
     // Store client reference for nested pagination
     private HttpGraphQlClient currentClient;
 
@@ -67,13 +69,15 @@ public class GitHubPullRequestReviewCommentSyncService {
         PullRequestRepository pullRequestRepository,
         PullRequestReviewThreadRepository threadRepository,
         GitHubGraphQlClientProvider graphQlClientProvider,
-        GitHubPullRequestReviewCommentProcessor commentProcessor
+        GitHubPullRequestReviewCommentProcessor commentProcessor,
+        GitHubUserProcessor userProcessor
     ) {
         this.repositoryRepository = repositoryRepository;
         this.pullRequestRepository = pullRequestRepository;
         this.threadRepository = threadRepository;
         this.graphQlClientProvider = graphQlClientProvider;
         this.commentProcessor = commentProcessor;
+        this.userProcessor = userProcessor;
     }
 
     /**
@@ -306,6 +310,15 @@ public class GitHubPullRequestReviewCommentSyncService {
         int fetchedPages = 0;
 
         while (hasMore) {
+            if (fetchedPages >= MAX_PAGINATION_PAGES) {
+                log.warn(
+                    "Reached maximum pagination limit ({}) for thread {} comments, stopping",
+                    MAX_PAGINATION_PAGES,
+                    threadId
+                );
+                break;
+            }
+
             try {
                 ClientGraphQlResponse response = currentClient
                     .documentName(GET_THREAD_COMMENTS_DOCUMENT)
@@ -380,15 +393,42 @@ public class GitHubPullRequestReviewCommentSyncService {
                 thread.setOutdated(graphQlThread.getIsOutdated());
                 thread.setCollapsed(graphQlThread.getIsCollapsed());
 
-                // Map resolved state
+                // Map resolved state and resolvedBy user
                 if (graphQlThread.getIsResolved()) {
                     thread.setState(PullRequestReviewThread.State.RESOLVED);
+                    // Set resolvedBy user if available
+                    User graphQlResolvedBy = graphQlThread.getResolvedBy();
+                    if (graphQlResolvedBy != null) {
+                        GitHubUserDTO resolvedByDto = convertGraphQlUserToDto(graphQlResolvedBy);
+                        de.tum.in.www1.hephaestus.gitprovider.user.User resolvedBy = userProcessor.ensureExists(
+                            resolvedByDto
+                        );
+                        thread.setResolvedBy(resolvedBy);
+                    }
                 } else {
                     thread.setState(PullRequestReviewThread.State.UNRESOLVED);
                 }
 
                 return threadRepository.save(thread);
             });
+    }
+
+    /**
+     * Converts a GraphQL User to a GitHubUserDTO.
+     */
+    private GitHubUserDTO convertGraphQlUserToDto(User graphQlUser) {
+        if (graphQlUser == null) {
+            return null;
+        }
+        return new GitHubUserDTO(
+            null, // nodeId
+            graphQlUser.getDatabaseId() != null ? graphQlUser.getDatabaseId().longValue() : null,
+            graphQlUser.getLogin(),
+            graphQlUser.getAvatarUrl() != null ? graphQlUser.getAvatarUrl().toString() : null,
+            null, // htmlUrl
+            graphQlUser.getName(),
+            graphQlUser.getEmail()
+        );
     }
 
     /**

@@ -8,17 +8,14 @@ import de.tum.in.www1.hephaestus.activity.ActivityEventRepository;
 import de.tum.in.www1.hephaestus.activity.ActivityTargetType;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.issuecomment.IssueComment;
-import de.tum.in.www1.hephaestus.gitprovider.issuecomment.IssueCommentRepository;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
-import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReview;
-import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReviewRepository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
-import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.profile.dto.ProfileDTO;
 import de.tum.in.www1.hephaestus.profile.dto.ProfileReviewActivityDTO;
+import de.tum.in.www1.hephaestus.workspace.WorkspaceContributionActivityService;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceMembershipService;
 import java.time.Instant;
 import java.util.List;
@@ -54,16 +51,16 @@ class UserProfileServiceTest {
     private UserRepository userRepository;
 
     @Mock
-    private RepositoryRepository repositoryRepository;
+    private ProfileRepositoryQueryRepository profileRepositoryQueryRepository;
 
     @Mock
-    private PullRequestRepository pullRequestRepository;
+    private ProfilePullRequestQueryRepository profilePullRequestQueryRepository;
 
     @Mock
-    private PullRequestReviewRepository pullRequestReviewRepository;
+    private ProfileReviewQueryRepository profileReviewQueryRepository;
 
     @Mock
-    private IssueCommentRepository issueCommentRepository;
+    private ProfileCommentQueryRepository profileCommentQueryRepository;
 
     @Mock
     private ActivityEventRepository activityEventRepository;
@@ -74,19 +71,23 @@ class UserProfileServiceTest {
     @Mock
     private WorkspaceMembershipService workspaceMembershipService;
 
+    @Mock
+    private WorkspaceContributionActivityService workspaceContributionActivityService;
+
     private UserProfileService service;
 
     @BeforeEach
     void setUp() {
         service = new UserProfileService(
             userRepository,
-            repositoryRepository,
-            pullRequestRepository,
-            pullRequestReviewRepository,
-            issueCommentRepository,
+            profileRepositoryQueryRepository,
+            profilePullRequestQueryRepository,
+            profileReviewQueryRepository,
+            profileCommentQueryRepository,
             activityEventRepository,
             reviewActivityAssembler,
-            workspaceMembershipService
+            workspaceMembershipService,
+            workspaceContributionActivityService
         );
     }
 
@@ -105,7 +106,7 @@ class UserProfileServiceTest {
 
             when(userRepository.findByLogin(USER_LOGIN)).thenReturn(Optional.of(user));
             when(
-                pullRequestReviewRepository.findAllByAuthorLoginInTimeframe(
+                profileReviewQueryRepository.findAllByAuthorLoginInTimeframe(
                     eq(USER_LOGIN),
                     any(),
                     any(),
@@ -113,7 +114,7 @@ class UserProfileServiceTest {
                 )
             ).thenReturn(List.of(review));
             when(
-                issueCommentRepository.findAllByAuthorLoginInTimeframe(
+                profileCommentQueryRepository.findAllByAuthorLoginInTimeframe(
                     eq(USER_LOGIN),
                     any(),
                     any(),
@@ -121,8 +122,8 @@ class UserProfileServiceTest {
                     eq(WORKSPACE_ID)
                 )
             ).thenReturn(List.of());
-            when(pullRequestRepository.findAssignedByLoginAndStates(any(), any(), any())).thenReturn(List.of());
-            when(repositoryRepository.findContributedByLogin(any(), any())).thenReturn(List.of());
+            when(profilePullRequestQueryRepository.findAssignedByLoginAndStates(any(), any(), any())).thenReturn(List.of());
+            when(profileRepositoryQueryRepository.findContributedByLogin(any(), any())).thenReturn(List.of());
 
             // XP from activity_event ledger
             ActivityEventRepository.TargetXpProjection xpProjection = createXpProjection(400L, 15.0);
@@ -165,7 +166,7 @@ class UserProfileServiceTest {
 
             when(userRepository.findByLogin(USER_LOGIN)).thenReturn(Optional.of(user));
             when(
-                pullRequestReviewRepository.findAllByAuthorLoginInTimeframe(
+                profileReviewQueryRepository.findAllByAuthorLoginInTimeframe(
                     eq(USER_LOGIN),
                     any(),
                     any(),
@@ -173,7 +174,7 @@ class UserProfileServiceTest {
                 )
             ).thenReturn(List.of(review));
             when(
-                issueCommentRepository.findAllByAuthorLoginInTimeframe(
+                profileCommentQueryRepository.findAllByAuthorLoginInTimeframe(
                     eq(USER_LOGIN),
                     any(),
                     any(),
@@ -181,8 +182,8 @@ class UserProfileServiceTest {
                     eq(WORKSPACE_ID)
                 )
             ).thenReturn(List.of());
-            when(pullRequestRepository.findAssignedByLoginAndStates(any(), any(), any())).thenReturn(List.of());
-            when(repositoryRepository.findContributedByLogin(any(), any())).thenReturn(List.of());
+            when(profilePullRequestQueryRepository.findAssignedByLoginAndStates(any(), any(), any())).thenReturn(List.of());
+            when(profileRepositoryQueryRepository.findContributedByLogin(any(), any())).thenReturn(List.of());
 
             // No XP in ledger (historical review before activity_event existed)
             when(activityEventRepository.findXpByTargetIdsAndTypes(any(), any(), any())).thenReturn(List.of());
@@ -210,7 +211,7 @@ class UserProfileServiceTest {
 
             when(userRepository.findByLogin(USER_LOGIN)).thenReturn(Optional.of(user));
             when(
-                pullRequestReviewRepository.findAllByAuthorLoginInTimeframe(
+                profileReviewQueryRepository.findAllByAuthorLoginInTimeframe(
                     eq(USER_LOGIN),
                     any(),
                     any(),
@@ -218,7 +219,7 @@ class UserProfileServiceTest {
                 )
             ).thenReturn(List.of(review1, review2));
             when(
-                issueCommentRepository.findAllByAuthorLoginInTimeframe(
+                profileCommentQueryRepository.findAllByAuthorLoginInTimeframe(
                     eq(USER_LOGIN),
                     any(),
                     any(),
@@ -226,8 +227,8 @@ class UserProfileServiceTest {
                     eq(WORKSPACE_ID)
                 )
             ).thenReturn(List.of(comment));
-            when(pullRequestRepository.findAssignedByLoginAndStates(any(), any(), any())).thenReturn(List.of());
-            when(repositoryRepository.findContributedByLogin(any(), any())).thenReturn(List.of());
+            when(profilePullRequestQueryRepository.findAssignedByLoginAndStates(any(), any(), any())).thenReturn(List.of());
+            when(profileRepositoryQueryRepository.findContributedByLogin(any(), any())).thenReturn(List.of());
 
             // XP from activity_event ledger (batch query for all 3 items)
             when(

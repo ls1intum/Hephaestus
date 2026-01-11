@@ -1,6 +1,7 @@
 package de.tum.in.www1.hephaestus.contributors;
 
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -30,6 +31,7 @@ public class ContributorController {
      */
     @GetMapping
     @Operation(summary = "List global contributors", description = "Returns all contributors across all workspaces")
+    @SecurityRequirements
     public ResponseEntity<List<ContributorDTO>> listGlobalContributors() {
         return ResponseEntity.ok(contributorService.getGlobalContributors());
     }

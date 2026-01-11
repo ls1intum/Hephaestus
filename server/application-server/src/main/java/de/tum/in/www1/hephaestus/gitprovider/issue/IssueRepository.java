@@ -48,17 +48,6 @@ public interface IssueRepository extends JpaRepository<Issue, Long> {
     )
     Set<Integer> findAllSyncedIssueNumbers(@Param("repositoryId") long repositoryId);
 
-    @Query(
-        """
-        SELECT i.number
-        FROM Issue i
-        WHERE Type(i) = Issue
-        AND i.repository.id = :repositoryId
-        AND i.hasPullRequest = TRUE
-        """
-    )
-    Set<Integer> findAllIssueNumbersWithPullRequest(@Param("repositoryId") long repositoryId);
-
     /**
      * Finds all issues belonging to a repository with comments eagerly fetched.
      * Used by backfill operations to avoid LazyInitializationException when accessing

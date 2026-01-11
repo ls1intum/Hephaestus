@@ -54,6 +54,22 @@ public interface SyncTargetProvider extends WorkspaceSyncMetadataProvider, Backf
     List<SyncTarget> getSyncTargetsForWorkspace(Long workspaceId);
 
     /**
+     * Gets repository nameWithOwner values for a workspace's active sync targets.
+     *
+     * <p>This provides a lightweight alternative to fetching full Repository entities
+     * when only the repository identifier is needed (e.g., for GraphQL queries).
+     *
+     * @param workspaceId the workspace ID (must not be null)
+     * @return list of repository nameWithOwner strings, never null (may be empty)
+     */
+    default List<String> getRepositoryNamesForWorkspace(Long workspaceId) {
+        return getSyncTargetsForWorkspace(workspaceId)
+            .stream()
+            .map(SyncTarget::repositoryNameWithOwner)
+            .toList();
+    }
+
+    /**
      * Updates the sync timestamp for a repository-level sync operation.
      *
      * @param workspaceId             the workspace ID (must not be null)

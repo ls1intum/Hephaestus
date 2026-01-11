@@ -414,7 +414,7 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
             // Given
             Long labelId = 9568029313L;
             String labelName = "bug";
-            GitHubLabelDTO labelDto = new GitHubLabelDTO(labelId, "LA_node", labelName, "Bug label", "d73a4a");
+            GitHubLabelDTO labelDto = new GitHubLabelDTO(labelId, "LA_node", labelName, "Bug label", "d73a4a", null, null);
 
             GitHubPullRequestDTO dto = new GitHubPullRequestDTO(
                 FIXTURE_PR_ID,
@@ -886,7 +886,7 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
             eventListener.clear();
 
             Long labelId = 9568029313L;
-            GitHubLabelDTO labelDto = new GitHubLabelDTO(labelId, "LA_node", "enhancement", "Enhancement", "0e8a16");
+            GitHubLabelDTO labelDto = new GitHubLabelDTO(labelId, "LA_node", "enhancement", "Enhancement", "0e8a16", null, null);
 
             GitHubPullRequestDTO labeledDto = new GitHubPullRequestDTO(
                 FIXTURE_PR_ID,
@@ -939,7 +939,7 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
         void shouldPublishUnlabeledEvent() {
             // Given - create PR with label first
             Long labelId = 9568029313L;
-            GitHubLabelDTO labelDto = new GitHubLabelDTO(labelId, "LA_node", "enhancement", "Enhancement", "0e8a16");
+            GitHubLabelDTO labelDto = new GitHubLabelDTO(labelId, "LA_node", "enhancement", "Enhancement", "0e8a16", null, null);
 
             GitHubPullRequestDTO withLabelDto = new GitHubPullRequestDTO(
                 FIXTURE_PR_ID,

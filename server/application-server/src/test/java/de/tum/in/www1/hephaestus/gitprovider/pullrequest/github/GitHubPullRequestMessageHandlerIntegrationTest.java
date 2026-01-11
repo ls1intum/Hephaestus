@@ -51,6 +51,21 @@ import org.springframework.transaction.annotation.Transactional;
  * - Event publishing through the handler → processor chain
  * - PR-specific state transitions (draft, merged)
  * - Edge cases in event handling
+ * <p>
+ * <b>Fixture Values (pull_request.opened.json - PR #26):</b>
+ * <ul>
+ *   <li>ID: 2969820636</li>
+ *   <li>Number: 26</li>
+ *   <li>Title: "Fixture: pull request events"</li>
+ *   <li>Body: "Testing webhook payloads for pull_request actions."</li>
+ *   <li>State: open, Draft: false, Merged: false</li>
+ *   <li>HTML URL: "https://github.com/HephaestusTest/TestRepository/pull/26"</li>
+ *   <li>Created/Updated: 2025-11-01T23:07:44Z</li>
+ *   <li>Head ref: fixtures/pr-events, SHA: 3d1674023df8f9ef83febb8fb8d9ffa3a8119d6a</li>
+ *   <li>Base ref: main, SHA: a76020c0f7e2afac4475770bb83cf4fe06ab5da1</li>
+ *   <li>Commits: 1, Additions: 1, Deletions: 0, Changed files: 1</li>
+ *   <li>Author: FelixTJDietrich (ID: 5898705)</li>
+ * </ul>
  */
 @DisplayName("GitHub Pull Request Message Handler")
 @Transactional
@@ -66,6 +81,25 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
     private static final Long PR_26_ID = 2969820636L;
     private static final int PR_26_NUMBER = 26;
 
+    // Exact fixture values from pull_request.opened.json for correctness verification
+    private static final String FIXTURE_PR_TITLE = "Fixture: pull request events";
+    private static final String FIXTURE_PR_BODY = "Testing webhook payloads for pull_request actions.";
+    private static final String FIXTURE_PR_HTML_URL = "https://github.com/HephaestusTest/TestRepository/pull/26";
+    private static final Instant FIXTURE_PR_CREATED_AT = Instant.parse("2025-11-01T23:07:44Z");
+    private static final Instant FIXTURE_PR_UPDATED_AT = Instant.parse("2025-11-01T23:07:44Z");
+
+    // Branch reference fixture values
+    private static final String FIXTURE_HEAD_REF_NAME = "fixtures/pr-events";
+    private static final String FIXTURE_HEAD_REF_OID = "3d1674023df8f9ef83febb8fb8d9ffa3a8119d6a";
+    private static final String FIXTURE_BASE_REF_NAME = "main";
+    private static final String FIXTURE_BASE_REF_OID = "a76020c0f7e2afac4475770bb83cf4fe06ab5da1";
+
+    // Code change statistics from fixture
+    private static final int FIXTURE_COMMITS = 1;
+    private static final int FIXTURE_ADDITIONS = 1;
+    private static final int FIXTURE_DELETIONS = 0;
+    private static final int FIXTURE_CHANGED_FILES = 1;
+
     // Label ID from labeled fixture
     private static final Long FIXTURE_LABEL_ID = 9568029313L;
     private static final String FIXTURE_LABEL_NAME = "fixtures";
@@ -74,9 +108,11 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
     private static final Long FIXTURE_MILESTONE_ID = 14028563L;
     private static final String FIXTURE_MILESTONE_TITLE = "Webhook Fixtures";
 
-    // Author ID from fixtures
+    // Author fixture values
     private static final Long FIXTURE_AUTHOR_ID = 5898705L;
     private static final String FIXTURE_AUTHOR_LOGIN = "FelixTJDietrich";
+    private static final String FIXTURE_AUTHOR_AVATAR_URL = "https://avatars.githubusercontent.com/u/5898705?v=4";
+    private static final String FIXTURE_AUTHOR_HTML_URL = "https://github.com/FelixTJDietrich";
 
     @Autowired
     private GitHubPullRequestMessageHandler handler;
@@ -141,7 +177,7 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
     class BasicLifecycleEvents {
 
         @Test
-        @DisplayName("Should persist pull request on 'opened' event")
+        @DisplayName("Should persist pull request with all schema fields on 'opened' event")
         void shouldPersistPullRequestOnOpenedEvent() throws Exception {
             // Given
             GitHubPullRequestEventDTO event = loadPayload("pull_request.opened");
@@ -149,21 +185,63 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
             // When
             handler.handleEvent(event);
 
-            // Then
-            PullRequest pr = pullRequestRepository.findById(event.pullRequest().getDatabaseId()).orElse(null);
-            assertThat(pr).isNotNull();
-            assertThat(pr.getTitle()).isEqualTo("Fixture: pull request events");
-            assertThat(pr.getState()).isEqualTo(PullRequest.State.OPEN);
+            // Then - verify ALL persisted fields against hardcoded fixture values
+            PullRequest pr = pullRequestRepository.findById(PR_26_ID).orElseThrow();
+
+            // Core identification fields (inherited from Issue)
+            assertThat(pr.getId()).isEqualTo(PR_26_ID);
             assertThat(pr.getNumber()).isEqualTo(PR_26_NUMBER);
-            assertThat(pr.getRepository().getId()).isEqualTo(FIXTURE_REPO_ID);
+
+            // Content fields
+            assertThat(pr.getTitle()).isEqualTo(FIXTURE_PR_TITLE);
+            assertThat(pr.getBody()).isEqualTo(FIXTURE_PR_BODY);
+
+            // State fields (Issue + PR-specific)
+            assertThat(pr.getState()).isEqualTo(PullRequest.State.OPEN);
+            assertThat(pr.isLocked()).isFalse();
+            assertThat(pr.getClosedAt()).isNull();
             assertThat(pr.isDraft()).isFalse();
             assertThat(pr.isMerged()).isFalse();
+            assertThat(pr.getMergedAt()).isNull();
 
-            // Verify author was created
+            // URL fields
+            assertThat(pr.getHtmlUrl()).isEqualTo(FIXTURE_PR_HTML_URL);
+
+            // Timestamp fields (critical for sync correctness)
+            assertThat(pr.getCreatedAt()).isEqualTo(FIXTURE_PR_CREATED_AT);
+            assertThat(pr.getUpdatedAt()).isEqualTo(FIXTURE_PR_UPDATED_AT);
+
+            // Branch reference fields (PR-specific, critical for context)
+            assertThat(pr.getHeadRefName()).isEqualTo(FIXTURE_HEAD_REF_NAME);
+            assertThat(pr.getHeadRefOid()).isEqualTo(FIXTURE_HEAD_REF_OID);
+            assertThat(pr.getBaseRefName()).isEqualTo(FIXTURE_BASE_REF_NAME);
+            assertThat(pr.getBaseRefOid()).isEqualTo(FIXTURE_BASE_REF_OID);
+
+            // Code change statistics (PR-specific)
+            assertThat(pr.getCommits()).isEqualTo(FIXTURE_COMMITS);
+            assertThat(pr.getAdditions()).isEqualTo(FIXTURE_ADDITIONS);
+            assertThat(pr.getDeletions()).isEqualTo(FIXTURE_DELETIONS);
+            assertThat(pr.getChangedFiles()).isEqualTo(FIXTURE_CHANGED_FILES);
+
+            // Repository association (foreign key)
+            assertThat(pr.getRepository()).isNotNull();
+            assertThat(pr.getRepository().getId()).isEqualTo(FIXTURE_REPO_ID);
+
+            // Author association (foreign key) - verify exact fixture values
             assertThat(pr.getAuthor()).isNotNull();
+            assertThat(pr.getAuthor().getId()).isEqualTo(FIXTURE_AUTHOR_ID);
             assertThat(pr.getAuthor().getLogin()).isEqualTo(FIXTURE_AUTHOR_LOGIN);
+            assertThat(pr.getAuthor().getAvatarUrl()).isEqualTo(FIXTURE_AUTHOR_AVATAR_URL);
+            assertThat(pr.getAuthor().getHtmlUrl()).isEqualTo(FIXTURE_AUTHOR_HTML_URL);
 
-            // Verify Created event was published
+            // Null/empty associations (not present in opened fixture)
+            assertThat(pr.getMilestone()).isNull();
+            assertThat(pr.getAssignees()).isEmpty();
+            assertThat(pr.getLabels()).isEmpty();
+            assertThat(pr.getMergedBy()).isNull();
+            assertThat(pr.getRequestedReviewers()).isEmpty();
+
+            // Domain event published
             assertThat(eventListener.getCreatedEvents()).hasSize(1);
         }
 
@@ -558,19 +636,20 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
         }
 
         @Test
-        @DisplayName("Should create all related entities (author) from opened event")
+        @DisplayName("Should create author entity with correct field values from opened event")
         void shouldCreateAllRelatedEntitiesFromOpenedEvent() throws Exception {
-            // Given
-            GitHubPullRequestEventDTO event = loadPayload("pull_request.opened");
-
-            // Verify no users exist
+            // Given - no users exist
             assertThat(userRepository.count()).isZero();
 
             // When
-            handler.handleEvent(event);
+            handler.handleEvent(loadPayload("pull_request.opened"));
 
-            // Then - author was created
-            assertThat(userRepository.findById(FIXTURE_AUTHOR_ID)).isPresent();
+            // Then - author created with exact fixture values
+            var author = userRepository.findById(FIXTURE_AUTHOR_ID).orElseThrow();
+            assertThat(author.getLogin()).isEqualTo(FIXTURE_AUTHOR_LOGIN);
+            assertThat(author.getAvatarUrl()).isEqualTo(FIXTURE_AUTHOR_AVATAR_URL);
+            assertThat(author.getHtmlUrl()).isEqualTo(FIXTURE_AUTHOR_HTML_URL);
+            assertThat(author.getType()).isEqualTo(User.Type.USER);
         }
 
         @Test
@@ -659,23 +738,55 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
     class DTOParsing {
 
         @Test
-        @DisplayName("Should parse all opened event fields correctly")
+        @DisplayName("Should parse all opened event fields with exact fixture values")
         void shouldParseAllOpenedEventFieldsCorrectly() throws Exception {
             // Given
             String payload = loadPayloadRaw("pull_request.opened");
             GitHubPullRequestEventDTO event = objectMapper.readValue(payload, GitHubPullRequestEventDTO.class);
 
-            // Then
+            // Event-level fields
             assertThat(event.action()).isEqualTo("opened");
             assertThat(event.number()).isEqualTo(PR_26_NUMBER);
-            assertThat(event.pullRequest()).isNotNull();
-            assertThat(event.pullRequest().number()).isEqualTo(PR_26_NUMBER);
-            assertThat(event.pullRequest().title()).isEqualTo("Fixture: pull request events");
-            assertThat(event.pullRequest().state()).isEqualTo("open");
-            assertThat(event.pullRequest().isDraft()).isFalse();
-            assertThat(event.pullRequest().isMerged()).isFalse();
-            assertThat(event.pullRequest().author()).isNotNull();
-            assertThat(event.pullRequest().author().login()).isEqualTo(FIXTURE_AUTHOR_LOGIN);
+
+            // PR identification
+            var pr = event.pullRequest();
+            assertThat(pr).isNotNull();
+            assertThat(pr.getDatabaseId()).isEqualTo(PR_26_ID);
+            assertThat(pr.number()).isEqualTo(PR_26_NUMBER);
+
+            // PR content
+            assertThat(pr.title()).isEqualTo(FIXTURE_PR_TITLE);
+            assertThat(pr.body()).isEqualTo(FIXTURE_PR_BODY);
+            assertThat(pr.htmlUrl()).isEqualTo(FIXTURE_PR_HTML_URL);
+
+            // PR state
+            assertThat(pr.state()).isEqualTo("open");
+            assertThat(pr.isDraft()).isFalse();
+            assertThat(pr.isMerged()).isFalse();
+            assertThat(pr.locked()).isFalse();
+
+            // Timestamps
+            assertThat(pr.createdAt()).isEqualTo(FIXTURE_PR_CREATED_AT);
+            assertThat(pr.updatedAt()).isEqualTo(FIXTURE_PR_UPDATED_AT);
+
+            // Branch refs
+            assertThat(pr.head()).isNotNull();
+            assertThat(pr.head().ref()).isEqualTo(FIXTURE_HEAD_REF_NAME);
+            assertThat(pr.head().sha()).isEqualTo(FIXTURE_HEAD_REF_OID);
+            assertThat(pr.base()).isNotNull();
+            assertThat(pr.base().ref()).isEqualTo(FIXTURE_BASE_REF_NAME);
+            assertThat(pr.base().sha()).isEqualTo(FIXTURE_BASE_REF_OID);
+
+            // Code stats
+            assertThat(pr.commits()).isEqualTo(FIXTURE_COMMITS);
+            assertThat(pr.additions()).isEqualTo(FIXTURE_ADDITIONS);
+            assertThat(pr.deletions()).isEqualTo(FIXTURE_DELETIONS);
+            assertThat(pr.changedFiles()).isEqualTo(FIXTURE_CHANGED_FILES);
+
+            // Author
+            assertThat(pr.author()).isNotNull();
+            assertThat(pr.author().id()).isEqualTo(FIXTURE_AUTHOR_ID);
+            assertThat(pr.author().login()).isEqualTo(FIXTURE_AUTHOR_LOGIN);
         }
 
         @Test

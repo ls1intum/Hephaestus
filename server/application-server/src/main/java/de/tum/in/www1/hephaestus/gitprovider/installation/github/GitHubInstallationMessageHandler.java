@@ -102,9 +102,9 @@ public class GitHubInstallationMessageHandler extends GitHubMessageHandler<GitHu
         provisioningListener.onInstallationCreated(installationData);
         provisioningListener.onRepositorySelectionChanged(installationId, repositorySelection);
 
-        // Link organization to installation if applicable
+        // Ensure organization identity is up-to-date if applicable
         if (account != null && "Organization".equalsIgnoreCase(account.type())) {
-            organizationService.upsertIdentityAndAttachInstallation(account.id(), accountLogin, installationId);
+            organizationService.upsertIdentity(account.id(), accountLogin);
         }
 
         // Handle status changes

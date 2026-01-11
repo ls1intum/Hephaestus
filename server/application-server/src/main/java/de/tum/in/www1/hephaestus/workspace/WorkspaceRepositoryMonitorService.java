@@ -4,7 +4,6 @@ import de.tum.in.www1.hephaestus.core.LoggingUtils;
 import de.tum.in.www1.hephaestus.core.WorkspaceAgnostic;
 import de.tum.in.www1.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.in.www1.hephaestus.gitprovider.installation.github.GitHubInstallationRepositoryEnumerationService;
-import de.tum.in.www1.hephaestus.gitprovider.label.Label;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.gitprovider.sync.GitHubDataSyncService;
@@ -131,10 +130,8 @@ public class WorkspaceRepositoryMonitorService {
             throw new RepositoryAlreadyMonitoredException(nameWithOwner);
         }
 
-        var workspaceId = workspace.getId();
-
-        // Validate that repository exists
-        var repository = fetchRepositoryOrThrow(workspaceId, nameWithOwner);
+        // Validate that repository exists in the database
+        var repository = findRepository(nameWithOwner);
         if (repository.isEmpty()) {
             log.info("Repository does not exist");
             throw new EntityNotFoundException("Repository", nameWithOwner);
@@ -201,14 +198,8 @@ public class WorkspaceRepositoryMonitorService {
 
         deleteRepositoryMonitor(workspace, repositoryToMonitor);
 
-        // Delete repository if present
-        var repository = repositoryRepository.findByNameWithOwner(nameWithOwner);
-        if (repository.isEmpty()) {
-            return;
-        }
-
-        repository.get().getLabels().forEach(Label::removeAllTeams);
-        repositoryRepository.delete(repository.get());
+        // Only delete repository if no other workspace is monitoring it
+        deleteRepositoryIfOrphaned(nameWithOwner);
     }
 
     public void removeRepositoryFromMonitor(WorkspaceContext workspaceContext, String nameWithOwner)
@@ -277,10 +268,10 @@ public class WorkspaceRepositoryMonitorService {
     }
 
     /**
-     * Remove all repository monitors tied to an installation and optionally delete the repositories.
+     * Remove all repository monitors tied to an installation and optionally delete orphaned repositories.
      *
      * @param installationId     the GitHub App installation ID
-     * @param deleteRepositories if true, also delete the Repository entities from the database
+     * @param deleteRepositories if true, also delete Repository entities that are no longer monitored by any workspace
      */
     @Transactional
     public Optional<Workspace> removeAllRepositoriesFromMonitor(long installationId, boolean deleteRepositories) {
@@ -291,15 +282,9 @@ public class WorkspaceRepositoryMonitorService {
                 String nameWithOwner = monitor.getNameWithOwner();
                 deleteRepositoryMonitor(workspace, monitor);
 
-                // Delete the actual Repository entity if requested
+                // Delete the Repository entity only if no other workspace is monitoring it
                 if (deleteRepositories && nameWithOwner != null) {
-                    repositoryRepository
-                        .findByNameWithOwner(nameWithOwner)
-                        .ifPresent(repository -> {
-                            repository.getLabels().forEach(Label::removeAllTeams);
-                            repositoryRepository.delete(repository);
-                            log.debug("Deleted repository {} during installation cleanup", nameWithOwner);
-                        });
+                    deleteRepositoryIfOrphaned(nameWithOwner);
                 }
             }
         });
@@ -392,7 +377,7 @@ public class WorkspaceRepositoryMonitorService {
 
         snapshots.forEach(snapshot -> {
             // Create or update Repository entity from installation payload
-            ensureRepositoryFromSnapshot(snapshot, workspace);
+            ensureRepositoryFromSnapshot(snapshot);
             ensureRepositoryMonitorForInstallation(installationId, snapshot.nameWithOwner(), deferSync);
         });
 
@@ -409,17 +394,47 @@ public class WorkspaceRepositoryMonitorService {
     // ========================================================================
 
     /**
-     * Checks if a repository exists (placeholder until GraphQL repository sync is available).
-     * TODO: Implement proper repository validation via GraphQL API.
+     * Finds a repository by its full name if it exists in the database.
+     * Repositories are global entities (gitprovider is workspace-agnostic),
+     * so this lookup is intentionally not scoped to a workspace.
      */
-    private Optional<Repository> fetchRepositoryOrThrow(Long workspaceId, String nameWithOwner) {
-        // For now, check if repository exists in database
-        // Full validation will be implemented when GraphQL repository sync is available
+    private Optional<Repository> findRepository(String nameWithOwner) {
         return repositoryRepository.findByNameWithOwner(nameWithOwner);
     }
 
     private boolean shouldUseNats(Workspace workspace) {
         return isNatsEnabled && workspace != null;
+    }
+
+    /**
+     * Deletes a repository only if no workspace is monitoring it.
+     * This preserves repositories that are shared across multiple workspaces.
+     *
+     * @param nameWithOwner the repository full name (e.g., "owner/repo")
+     */
+    private void deleteRepositoryIfOrphaned(String nameWithOwner) {
+        if (isBlank(nameWithOwner)) {
+            return;
+        }
+
+        // Check if any workspace is still monitoring this repository
+        long monitorCount = repositoryToMonitorRepository.countByNameWithOwner(nameWithOwner);
+        if (monitorCount > 0) {
+            log.debug(
+                "Repository {} is still monitored by {} workspace(s), skipping deletion",
+                nameWithOwner,
+                monitorCount
+            );
+            return;
+        }
+
+        // No workspace is monitoring this repository, safe to delete
+        repositoryRepository
+            .findByNameWithOwner(nameWithOwner)
+            .ifPresent(repository -> {
+                repositoryRepository.delete(repository);
+                log.debug("Deleted orphaned repository {}", nameWithOwner);
+            });
     }
 
     private void persistRepositoryMonitor(Workspace workspace, RepositoryToMonitor monitor) {
@@ -497,12 +512,13 @@ public class WorkspaceRepositoryMonitorService {
      * Creates or updates a Repository entity from an installation repository snapshot.
      * This ensures the repository exists in the database with basic metadata from the installation payload.
      *
-     * @param snapshot  the installation repository snapshot
-     * @param workspace the workspace this repository belongs to
+     * <p>Note: Repositories are global entities (gitprovider is workspace-agnostic).
+     * The workspace-repository association is managed through RepositoryToMonitor.
+     *
+     * @param snapshot the installation repository snapshot
      */
     private void ensureRepositoryFromSnapshot(
-        GitHubInstallationRepositoryEnumerationService.InstallationRepositorySnapshot snapshot,
-        Workspace workspace
+        GitHubInstallationRepositoryEnumerationService.InstallationRepositorySnapshot snapshot
     ) {
         if (snapshot == null || isBlank(snapshot.nameWithOwner())) {
             return;

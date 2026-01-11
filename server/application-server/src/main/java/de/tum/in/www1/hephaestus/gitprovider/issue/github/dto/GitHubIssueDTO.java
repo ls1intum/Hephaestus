@@ -10,10 +10,11 @@ import de.tum.in.www1.hephaestus.gitprovider.label.github.dto.GitHubLabelDTO;
 import de.tum.in.www1.hephaestus.gitprovider.milestone.github.dto.GitHubMilestoneDTO;
 import de.tum.in.www1.hephaestus.gitprovider.repository.github.dto.GitHubRepositoryRefDTO;
 import de.tum.in.www1.hephaestus.gitprovider.user.github.dto.GitHubUserDTO;
+import static de.tum.in.www1.hephaestus.gitprovider.common.DateTimeUtils.toInstant;
+import static de.tum.in.www1.hephaestus.gitprovider.common.DateTimeUtils.uriToString;
+
 import java.math.BigInteger;
-import java.net.URI;
 import java.time.Instant;
-import java.time.OffsetDateTime;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
@@ -101,16 +102,6 @@ public record GitHubIssueDTO(
             return null;
         }
         return value.longValueExact();
-    }
-
-    @Nullable
-    private static Instant toInstant(@Nullable OffsetDateTime dateTime) {
-        return dateTime != null ? dateTime.toInstant() : null;
-    }
-
-    @Nullable
-    private static String uriToString(@Nullable URI uri) {
-        return uri != null ? uri.toString() : null;
     }
 
     private static String convertState(@Nullable IssueState state) {

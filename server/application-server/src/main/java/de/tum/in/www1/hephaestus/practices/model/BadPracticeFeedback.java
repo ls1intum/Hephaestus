@@ -26,5 +26,6 @@ public class BadPracticeFeedback {
     @Column(columnDefinition = "TEXT")
     private String explanation;
 
-    private Instant creationTime;
+    @Column(name = "created_at")
+    private Instant createdAt;
 }

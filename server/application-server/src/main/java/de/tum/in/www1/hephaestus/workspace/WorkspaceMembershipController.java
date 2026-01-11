@@ -13,6 +13,7 @@ import de.tum.in.www1.hephaestus.workspace.dto.AssignRoleRequestDTO;
 import de.tum.in.www1.hephaestus.workspace.dto.WorkspaceMembershipDTO;
 import de.tum.in.www1.hephaestus.workspace.exception.InsufficientWorkspacePermissionsException;
 import de.tum.in.www1.hephaestus.workspace.exception.LastOwnerRemovalException;
+import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import jakarta.validation.Valid;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -42,6 +43,7 @@ public class WorkspaceMembershipController {
      * @return the current user's membership details
      */
     @GetMapping("/me")
+    @SecurityRequirements
     public ResponseEntity<WorkspaceMembershipDTO> getCurrentUserMembership(WorkspaceContext context) {
         User currentUser = requireCurrentUser();
         WorkspaceMembership membership = workspaceMembershipService.getMembership(context.id(), currentUser.getId());
@@ -58,6 +60,7 @@ public class WorkspaceMembershipController {
      * @return List of workspace memberships
      */
     @GetMapping
+    @SecurityRequirements
     public ResponseEntity<List<WorkspaceMembershipDTO>> listMembers(
         WorkspaceContext context,
         @RequestParam(defaultValue = "0") int page,
@@ -83,6 +86,7 @@ public class WorkspaceMembershipController {
      * @return Workspace membership details
      */
     @GetMapping("/{userId}")
+    @SecurityRequirements
     public ResponseEntity<WorkspaceMembershipDTO> getMember(WorkspaceContext context, @PathVariable Long userId) {
         WorkspaceMembership membership = requireMembership(context.id(), userId);
         return ResponseEntity.ok(WorkspaceMembershipDTO.from(membership));

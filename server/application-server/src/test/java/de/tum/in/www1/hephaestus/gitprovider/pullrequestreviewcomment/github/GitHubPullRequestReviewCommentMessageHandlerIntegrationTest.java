@@ -149,7 +149,6 @@ class GitHubPullRequestReviewCommentMessageHandlerIntegrationTest extends BaseIn
                 assertThat(comment.getThread().getId()).isNotNull();
                 // Verify required fields are populated
                 assertThat(comment.getCommitId()).isNotEmpty();
-                assertThat(comment.getSide()).isNotNull();
             });
     }
 

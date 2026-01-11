@@ -202,17 +202,15 @@ class GitHubPullRequestReviewThreadMessageHandlerIntegrationTest extends BaseInt
 
         // When - directly call repository method (simulating proper thread ID resolution)
         thread.setState(PullRequestReviewThread.State.RESOLVED);
-        thread.setResolvedAt(Instant.now());
         threadRepository.save(thread);
 
         // Then - thread should be resolved
+        // Note: GitHub only provides isResolved (boolean), not a timestamp.
+        // The state enum (RESOLVED/UNRESOLVED) is sufficient.
         assertThat(threadRepository.findById(threadId))
             .isPresent()
             .get()
-            .satisfies(t -> {
-                assertThat(t.getState()).isEqualTo(PullRequestReviewThread.State.RESOLVED);
-                assertThat(t.getResolvedAt()).isNotNull();
-            });
+            .satisfies(t -> assertThat(t.getState()).isEqualTo(PullRequestReviewThread.State.RESOLVED));
     }
 
     private GitHubPullRequestReviewThreadEventDTO loadPayload(String filename) throws IOException {

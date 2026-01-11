@@ -705,6 +705,27 @@
                     <outputDir>.</outputDir>
                 </configuration>
             </plugin>
+            <!-- PMD for static code analysis - detects unused fields, variables, and other code quality issues -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-pmd-plugin</artifactId>
+                <version>3.28.0</version>
+                <configuration>
+                    <rulesets>
+                        <ruleset>${project.basedir}/pmd-ruleset.xml</ruleset>
+                    </rulesets>
+                    <targetJdk>${java.version}</targetJdk>
+                    <includeTests>false</includeTests>
+                    <linkXRef>false</linkXRef>
+                    <printFailingErrors>true</printFailingErrors>
+                    <failOnViolation>false</failOnViolation>
+                    <!-- Exclude generated code -->
+                    <excludeRoots>
+                        <excludeRoot>${project.build.directory}/generated-sources/graphql</excludeRoot>
+                    </excludeRoots>
+                </configuration>
+            </plugin>
+
             <plugin>
                 <groupId>org.liquibase</groupId>
                 <artifactId>liquibase-maven-plugin</artifactId>

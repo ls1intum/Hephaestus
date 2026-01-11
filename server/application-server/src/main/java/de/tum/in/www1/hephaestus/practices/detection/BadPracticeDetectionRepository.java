@@ -32,8 +32,8 @@ public interface BadPracticeDetectionRepository extends JpaRepository<BadPractic
         SELECT bpd
         FROM BadPracticeDetection bpd
         WHERE bpd.pullRequest.id = :pullRequestId
-          AND bpd.detectionTime = (
-            SELECT MAX(bpd2.detectionTime)
+          AND bpd.detectedAt = (
+            SELECT MAX(bpd2.detectedAt)
             FROM BadPracticeDetection bpd2
             WHERE bpd2.pullRequest.id = bpd.pullRequest.id
           )

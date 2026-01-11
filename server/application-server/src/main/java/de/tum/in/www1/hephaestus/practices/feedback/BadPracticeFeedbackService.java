@@ -115,7 +115,7 @@ public class BadPracticeFeedbackService {
         badPracticeFeedback.setPullRequestBadPractice(badPractice);
         badPracticeFeedback.setExplanation(feedback.explanation());
         badPracticeFeedback.setType(feedback.type());
-        badPracticeFeedback.setCreationTime(Instant.now());
+        badPracticeFeedback.setCreatedAt(Instant.now());
         badPracticeFeedbackRepository.save(badPracticeFeedback);
 
         if (tracingEnabled && badPractice.getDetectionTraceId() != null) {

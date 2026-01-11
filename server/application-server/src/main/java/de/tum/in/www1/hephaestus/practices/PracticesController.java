@@ -15,6 +15,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -54,6 +55,7 @@ public class PracticesController {
         description = "Bad practices returned",
         content = @Content(schema = @Schema(implementation = UserPracticesDTO.class))
     )
+    @SecurityRequirements
     public ResponseEntity<UserPracticesDTO> getBadPracticesForUser(
         WorkspaceContext workspaceContext,
         @PathVariable String login
@@ -73,6 +75,7 @@ public class PracticesController {
         description = "Bad practices returned",
         content = @Content(schema = @Schema(implementation = PullRequestWithBadPracticesDTO.class))
     )
+    @SecurityRequirements
     public ResponseEntity<PullRequestWithBadPracticesDTO> getBadPracticesForPullRequest(
         WorkspaceContext workspaceContext,
         @PathVariable Long pullRequestId
@@ -95,6 +98,7 @@ public class PracticesController {
         description = "Bad practice returned",
         content = @Content(schema = @Schema(implementation = PullRequestBadPracticeDTO.class))
     )
+    @SecurityRequirements
     public ResponseEntity<PullRequestBadPracticeDTO> getBadPractice(
         WorkspaceContext workspaceContext,
         @PathVariable Long id

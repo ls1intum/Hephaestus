@@ -1,7 +1,6 @@
 package de.tum.in.www1.hephaestus.gitprovider.user;
 
 import de.tum.in.www1.hephaestus.SecurityUtils;
-import de.tum.in.www1.hephaestus.core.WorkspaceAgnostic;
 import de.tum.in.www1.hephaestus.core.exception.EntityNotFoundException;
 import java.util.Collection;
 import java.util.List;
@@ -11,7 +10,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-@WorkspaceAgnostic("Users can belong to multiple workspaces - scoping happens via memberships")
 public interface UserRepository extends JpaRepository<User, Long> {
     @Query(
         """
@@ -94,38 +92,6 @@ public interface UserRepository extends JpaRepository<User, Long> {
         return findAllByTeamIds(List.of(teamId));
     }
 
-    @Query(
-        """
-            SELECT DISTINCT pr.author
-            FROM PullRequest pr
-            JOIN TeamRepositoryPermission trp ON trp.repository = pr.repository
-            JOIN Team t ON trp.team = t
-            WHERE t.id IN :teamIds
-            AND trp.hiddenFromContributions = false
-            AND (
-                NOT EXISTS (
-                    SELECT l
-                    FROM t.labels l
-                    WHERE l.repository = pr.repository
-                )
-                OR
-                EXISTS (
-                    SELECT l
-                    FROM t.labels l
-                    WHERE l.repository = pr.repository
-                    AND l MEMBER OF pr.labels
-                )
-            )
-        """
-    )
-    Set<User> findAllContributingToTeams(@Param("teamIds") Collection<Long> teamIds);
-
-    default Set<User> findAllContributingToTeam(Long teamId) {
-        if (teamId == null) {
-            return Set.of();
-        }
-        return findAllContributingToTeams(List.of(teamId));
-    }
 
     /**
      * @return existing user object by current user login

@@ -8,6 +8,8 @@ import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventType;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.github.GitHubPullRequestProcessor;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewthread.github.dto.GitHubPullRequestReviewThreadEventDTO;
+import de.tum.in.www1.hephaestus.gitprovider.user.User;
+import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserProcessor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -25,17 +27,20 @@ public class GitHubPullRequestReviewThreadMessageHandler
     private final ProcessingContextFactory contextFactory;
     private final GitHubPullRequestProcessor prProcessor;
     private final GitHubPullRequestReviewThreadProcessor threadProcessor;
+    private final GitHubUserProcessor userProcessor;
 
     GitHubPullRequestReviewThreadMessageHandler(
         ProcessingContextFactory contextFactory,
         GitHubPullRequestProcessor prProcessor,
         GitHubPullRequestReviewThreadProcessor threadProcessor,
+        GitHubUserProcessor userProcessor,
         NatsMessageDeserializer deserializer
     ) {
         super(GitHubPullRequestReviewThreadEventDTO.class, deserializer);
         this.contextFactory = contextFactory;
         this.prProcessor = prProcessor;
         this.threadProcessor = threadProcessor;
+        this.userProcessor = userProcessor;
     }
 
     @Override
@@ -72,7 +77,11 @@ public class GitHubPullRequestReviewThreadMessageHandler
 
         // Delegate thread state changes to processor
         switch (event.actionType()) {
-            case GitHubEventAction.PullRequestReviewThread.RESOLVED -> threadProcessor.resolve(threadDto.id(), context);
+            case GitHubEventAction.PullRequestReviewThread.RESOLVED -> {
+                // Ensure the sender (who resolved the thread) exists
+                User resolvedBy = userProcessor.ensureExists(event.sender());
+                threadProcessor.resolve(threadDto.id(), resolvedBy, context);
+            }
             case GitHubEventAction.PullRequestReviewThread.UNRESOLVED -> threadProcessor.unresolve(
                 threadDto.id(),
                 context

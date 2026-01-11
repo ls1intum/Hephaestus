@@ -145,6 +145,8 @@ public class GitHubPullRequestReviewProcessor {
             case "APPROVED" -> PullRequestReview.State.APPROVED;
             case "CHANGES_REQUESTED" -> PullRequestReview.State.CHANGES_REQUESTED;
             case "COMMENTED" -> PullRequestReview.State.COMMENTED;
+            case "PENDING" -> PullRequestReview.State.PENDING;
+            case "DISMISSED" -> PullRequestReview.State.DISMISSED;
             default -> PullRequestReview.State.UNKNOWN;
         };
     }

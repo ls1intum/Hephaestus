@@ -1,9 +1,12 @@
 package de.tum.in.www1.hephaestus;
 
 import io.swagger.v3.oas.annotations.OpenAPIDefinition;
+import io.swagger.v3.oas.annotations.enums.SecuritySchemeType;
 import io.swagger.v3.oas.annotations.info.Contact;
 import io.swagger.v3.oas.annotations.info.Info;
 import io.swagger.v3.oas.annotations.info.License;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.security.SecurityScheme;
 import io.swagger.v3.oas.annotations.servers.Server;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.PathItem;
@@ -43,7 +46,15 @@ import org.springframework.context.annotation.Configuration;
         contact = @Contact(name = "Felix T.J. Dietrich", email = "felixtj.dietrich@tum.de"),
         license = @License(name = "MIT License", url = "https://github.com/ls1intum/Hephaestus/blob/develop/LICENSE")
     ),
-    servers = { @Server(url = "/", description = "Default Server URL") }
+    servers = { @Server(url = "/", description = "Default Server URL") },
+    security = { @SecurityRequirement(name = "bearerAuth") }
+)
+@SecurityScheme(
+    name = "bearerAuth",
+    type = SecuritySchemeType.HTTP,
+    scheme = "bearer",
+    bearerFormat = "JWT",
+    description = "JWT authentication via Keycloak. Obtain a token from your Keycloak instance."
 )
 public class OpenAPIConfiguration {
 

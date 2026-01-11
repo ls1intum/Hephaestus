@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.practices.model;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import org.springframework.lang.NonNull;
 
 /**
@@ -10,11 +11,14 @@ import org.springframework.lang.NonNull;
  * @param description detailed explanation and remediation guidance
  * @param state       the effective state (user override takes precedence over detection)
  */
+@Schema(description = "A detected bad practice in a pull request")
 public record PullRequestBadPracticeDTO(
-    @NonNull Long id,
-    @NonNull String title,
-    @NonNull String description,
-    @NonNull PullRequestBadPracticeState state
+    @NonNull @Schema(description = "Unique identifier of the bad practice") Long id,
+    @NonNull @Schema(description = "Short description of the bad practice") String title,
+    @NonNull @Schema(description = "Detailed explanation and remediation guidance") String description,
+    @NonNull
+    @Schema(description = "Current state of the bad practice (DETECTED, RESOLVED, DISMISSED, etc.)")
+    PullRequestBadPracticeState state
 ) {
     /**
      * Creates a DTO from the entity, using the effective state (user override if set).

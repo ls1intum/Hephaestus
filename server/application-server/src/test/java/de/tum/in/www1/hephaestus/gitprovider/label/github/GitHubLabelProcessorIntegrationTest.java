@@ -131,7 +131,9 @@ class GitHubLabelProcessorIntegrationTest extends BaseIntegrationTest {
                 "LA_node123",
                 "new-feature",
                 "A new feature label",
-                "00ff00"
+                "00ff00",
+                null,
+                null
             );
 
             // When
@@ -180,7 +182,9 @@ class GitHubLabelProcessorIntegrationTest extends BaseIntegrationTest {
                 "LA_node456",
                 "updated-name",
                 "Updated description",
-                "ff0000"
+                "ff0000",
+                null,
+                null
             );
 
             // When
@@ -222,7 +226,9 @@ class GitHubLabelProcessorIntegrationTest extends BaseIntegrationTest {
                 "LA_node",
                 "graphql-synced-label",
                 "desc",
-                "000000"
+                "000000",
+                null,
+                null
             );
 
             // When
@@ -255,7 +261,9 @@ class GitHubLabelProcessorIntegrationTest extends BaseIntegrationTest {
                 "LA_node",
                 "existing-label", // same name
                 "new description",
-                "222222"
+                "222222",
+                null,
+                null
             );
 
             // When
@@ -279,7 +287,9 @@ class GitHubLabelProcessorIntegrationTest extends BaseIntegrationTest {
                 "LA_node789",
                 "no-desc-label",
                 null, // null description
-                "abcdef"
+                "abcdef",
+                null,
+                null
             );
 
             // When
@@ -300,7 +310,9 @@ class GitHubLabelProcessorIntegrationTest extends BaseIntegrationTest {
                 "LA_idem",
                 "idempotent-label",
                 "Same every time",
-                "112233"
+                "112233",
+                null,
+                null
             );
 
             // When - process twice

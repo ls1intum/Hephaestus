@@ -239,10 +239,7 @@ function LeaderboardContainer() {
 	// Query for league points change data if we have a current user entry
 	const leagueStatsQuery = useQuery({
 		...getUserLeagueStatsOptions({
-			path: { workspaceSlug: slug },
-			query: {
-				login: username || "",
-			},
+			path: { workspaceSlug: slug, login: username || "" },
 			body: currentUserEntry || {
 				rank: 0,
 				score: 0,

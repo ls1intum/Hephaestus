@@ -161,7 +161,6 @@ public class GitHubPullRequestReviewCommentProcessor {
             dto.originalCommitId() != null ? dto.originalCommitId() : dto.commitId() != null ? dto.commitId() : ""
         );
         comment.setAuthorAssociation(mapAuthorAssociation(dto.authorAssociation()));
-        comment.setSide(mapSide(dto.side()));
         comment.setLine(dto.line() != null ? dto.line() : 0);
         comment.setOriginalLine(dto.originalLine() != null ? dto.originalLine() : comment.getLine());
 
@@ -171,9 +170,6 @@ public class GitHubPullRequestReviewCommentProcessor {
         }
         if (dto.originalStartLine() != null) {
             comment.setOriginalStartLine(dto.originalStartLine());
-        }
-        if (dto.startSide() != null) {
-            comment.setStartSide(mapSide(dto.startSide()));
         }
 
         // Link to review if present

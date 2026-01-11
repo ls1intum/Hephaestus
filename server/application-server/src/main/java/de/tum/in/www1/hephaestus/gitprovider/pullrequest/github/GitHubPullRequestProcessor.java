@@ -253,7 +253,6 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
         pr.setCommits(dto.commits());
         pr.setCommentsCount(dto.commentsCount());
         pr.setRepository(repository);
-        pr.setHasPullRequest(true); // It is a PR
 
         // GraphQL-only fields
         pr.setReviewDecision(dto.reviewDecision());

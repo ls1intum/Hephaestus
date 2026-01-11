@@ -4,10 +4,10 @@ import static de.tum.in.www1.hephaestus.shared.LeaguePointsConstants.POINTS_DEFA
 import static java.util.function.Function.identity;
 
 import de.tum.in.www1.hephaestus.core.exception.EntityNotFoundException;
+import de.tum.in.www1.hephaestus.gitprovider.label.Label;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestInfoDTO;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReview;
-import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReviewRepository;
 import de.tum.in.www1.hephaestus.gitprovider.team.Team;
 import de.tum.in.www1.hephaestus.gitprovider.team.TeamInfoDTO;
 import de.tum.in.www1.hephaestus.gitprovider.team.TeamRepository;
@@ -16,6 +16,7 @@ import de.tum.in.www1.hephaestus.gitprovider.user.UserInfoDTO;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.workspace.Workspace;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceMembershipService;
+import de.tum.in.www1.hephaestus.workspace.settings.WorkspaceTeamSettingsService;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -45,29 +46,32 @@ public class LeaderboardService {
     private static final Logger log = LoggerFactory.getLogger(LeaderboardService.class);
 
     private final UserRepository userRepository;
-    private final PullRequestReviewRepository pullRequestReviewRepository;
+    private final LeaderboardReviewQueryRepository leaderboardReviewQueryRepository;
     private final LeaderboardXpQueryService leaderboardXpQueryService;
     private final TeamRepository teamRepository;
     private final TeamPathResolver teamPathResolver;
     private final LeaguePointsService leaguePointsService;
     private final WorkspaceMembershipService workspaceMembershipService;
+    private final WorkspaceTeamSettingsService workspaceTeamSettingsService;
 
     public LeaderboardService(
         UserRepository userRepository,
-        PullRequestReviewRepository pullRequestReviewRepository,
+        LeaderboardReviewQueryRepository leaderboardReviewQueryRepository,
         LeaderboardXpQueryService leaderboardXpQueryService,
         TeamRepository teamRepository,
         TeamPathResolver teamPathResolver,
         LeaguePointsService leaguePointsService,
-        WorkspaceMembershipService workspaceMembershipService
+        WorkspaceMembershipService workspaceMembershipService,
+        WorkspaceTeamSettingsService workspaceTeamSettingsService
     ) {
         this.userRepository = userRepository;
-        this.pullRequestReviewRepository = pullRequestReviewRepository;
+        this.leaderboardReviewQueryRepository = leaderboardReviewQueryRepository;
         this.leaderboardXpQueryService = leaderboardXpQueryService;
         this.teamRepository = teamRepository;
         this.teamPathResolver = teamPathResolver;
         this.leaguePointsService = leaguePointsService;
         this.workspaceMembershipService = workspaceMembershipService;
+        this.workspaceTeamSettingsService = workspaceTeamSettingsService;
     }
 
     @Transactional(readOnly = true)
@@ -173,9 +177,9 @@ public class LeaderboardService {
 
         List<PullRequestReview> reviews;
         if (team.isPresent() && !teamIds.isEmpty()) {
-            reviews = pullRequestReviewRepository.findAllInTimeframeOfTeams(after, before, teamIds, workspaceId);
+            reviews = leaderboardReviewQueryRepository.findAllInTimeframeOfTeams(after, before, teamIds, workspaceId);
         } else {
-            reviews = pullRequestReviewRepository.findAllInTimeframe(after, before, workspaceId);
+            reviews = leaderboardReviewQueryRepository.findAllInTimeframe(after, before, workspaceId);
         }
 
         Map<Long, List<PullRequestReview>> reviewsByUserId = reviews
@@ -295,9 +299,15 @@ public class LeaderboardService {
         );
 
         Map<Long, List<Team>> teamHierarchy = teamPathResolver.buildHierarchy(workspace);
+        // Use workspace-scoped hidden settings instead of deprecated Team.hidden field
+        Set<Long> hiddenTeamIds = workspaceTeamSettingsService.getHiddenTeamIds(workspace.getId());
         List<Team> targetTeams = workspace.getAccountLogin() == null
             ? List.of()
-            : teamRepository.findAllByOrganizationIgnoreCaseAndHiddenFalse(workspace.getAccountLogin());
+            : teamRepository
+                  .findAllByOrganizationIgnoreCase(workspace.getAccountLogin())
+                  .stream()
+                  .filter(team -> team.getId() != null && !hiddenTeamIds.contains(team.getId()))
+                  .toList();
 
         if (targetTeams.isEmpty()) {
             log.info("No teams found for team leaderboard in workspace {}", workspace.getWorkspaceSlug());
@@ -338,15 +348,33 @@ public class LeaderboardService {
             .toList();
 
         List<LeaderboardEntryDTO> result = new ArrayList<>();
+        Long workspaceId = workspace.getId();
         for (int i = 0; i < sorted.size(); i++) {
             Team teamEntity = sorted.get(i).getKey();
             TeamStats stats = sorted.get(i).getValue();
             int score = sort == LeaderboardSortType.SCORE ? stats.score() : stats.leaguePoints();
+
+            // Get workspace-scoped settings for this team
+            boolean isHiddenInWorkspace = hiddenTeamIds.contains(teamEntity.getId());
+            Set<Label> workspaceLabels = workspaceTeamSettingsService.getTeamLabelFilters(
+                workspaceId,
+                teamEntity.getId()
+            );
+            Set<Long> hiddenRepoIds = workspaceTeamSettingsService.getHiddenRepositoryIdsByTeams(
+                workspaceId,
+                Set.of(teamEntity.getId())
+            );
+
             LeaderboardEntryDTO entry = new LeaderboardEntryDTO(
                 i + 1,
                 score,
                 null,
-                TeamInfoDTO.fromTeam(teamEntity),
+                TeamInfoDTO.fromTeamWithWorkspaceSettings(
+                    teamEntity,
+                    isHiddenInWorkspace,
+                    workspaceLabels,
+                    hiddenRepoIds
+                ),
                 stats.reviewedPullRequests(),
                 stats.numberOfReviewedPRs(),
                 stats.numberOfApprovals(),

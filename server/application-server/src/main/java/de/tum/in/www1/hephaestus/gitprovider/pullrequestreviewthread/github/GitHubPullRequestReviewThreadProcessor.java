@@ -6,7 +6,7 @@ import de.tum.in.www1.hephaestus.gitprovider.common.events.EventContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.events.EventPayload;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewthread.PullRequestReviewThread;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewthread.PullRequestReviewThreadRepository;
-import java.time.Instant;
+import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
@@ -37,11 +37,19 @@ public class GitHubPullRequestReviewThreadProcessor {
      */
     @Transactional
     public boolean resolve(Long threadId) {
-        return resolve(threadId, null);
+        return resolve(threadId, null, null);
+    }
+
+    /**
+     * Resolve with resolvedBy user but without emitting events (for sync operations).
+     */
+    @Transactional
+    public boolean resolve(Long threadId, User resolvedBy) {
+        return resolve(threadId, resolvedBy, null);
     }
 
     @Transactional
-    public boolean resolve(Long threadId, ProcessingContext context) {
+    public boolean resolve(Long threadId, User resolvedBy, ProcessingContext context) {
         if (threadId == null) {
             log.warn("Cannot resolve thread: threadId is null");
             return false;
@@ -51,7 +59,9 @@ public class GitHubPullRequestReviewThreadProcessor {
             .findById(threadId)
             .map(thread -> {
                 thread.setState(PullRequestReviewThread.State.RESOLVED);
-                thread.setResolvedAt(Instant.now());
+                if (resolvedBy != null) {
+                    thread.setResolvedBy(resolvedBy);
+                }
                 thread = threadRepository.save(thread);
                 if (context != null) {
                     eventPublisher.publishEvent(
@@ -61,7 +71,7 @@ public class GitHubPullRequestReviewThreadProcessor {
                         )
                     );
                 }
-                log.info("Thread {} resolved", threadId);
+                log.info("Thread {} resolved{}", threadId, resolvedBy != null ? " by " + resolvedBy.getLogin() : "");
                 return true;
             })
             .orElseGet(() -> {
@@ -89,7 +99,6 @@ public class GitHubPullRequestReviewThreadProcessor {
             .findById(threadId)
             .map(thread -> {
                 thread.setState(PullRequestReviewThread.State.UNRESOLVED);
-                thread.setResolvedAt(null);
                 thread.setResolvedBy(null);
                 thread = threadRepository.save(thread);
                 if (context != null) {

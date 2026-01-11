@@ -44,6 +44,12 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
         AND e.actor IS NOT NULL
         AND e.occurredAt >= :since
         AND e.occurredAt < :until
+        AND (e.repository IS NULL OR NOT EXISTS (
+            SELECT 1 FROM WorkspaceTeamRepositorySettings wtrs
+            WHERE wtrs.repository = e.repository
+            AND wtrs.workspace.id = :workspaceId
+            AND wtrs.hiddenFromContributions = true
+        ))
         GROUP BY e.actor.id
         """
     )
@@ -74,6 +80,13 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
         AND tm.team.id IN :teamIds
         AND e.occurredAt >= :since
         AND e.occurredAt < :until
+        AND (e.repository IS NULL OR NOT EXISTS (
+            SELECT 1 FROM WorkspaceTeamRepositorySettings wtrs
+            WHERE wtrs.repository = e.repository
+            AND wtrs.workspace.id = :workspaceId
+            AND wtrs.team.id IN :teamIds
+            AND wtrs.hiddenFromContributions = true
+        ))
         GROUP BY e.actor.id
         """
     )
@@ -104,6 +117,12 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
         AND e.actor.id IN :actorIds
         AND e.occurredAt >= :since
         AND e.occurredAt < :until
+        AND (e.repository IS NULL OR NOT EXISTS (
+            SELECT 1 FROM WorkspaceTeamRepositorySettings wtrs
+            WHERE wtrs.repository = e.repository
+            AND wtrs.workspace.id = :workspaceId
+            AND wtrs.hiddenFromContributions = true
+        ))
         GROUP BY e.actor.id, e.eventType
         """
     )
@@ -142,6 +161,12 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
         )
         AND e.occurredAt >= :since
         AND e.occurredAt < :until
+        AND (e.repository IS NULL OR NOT EXISTS (
+            SELECT 1 FROM WorkspaceTeamRepositorySettings wtrs
+            WHERE wtrs.repository = e.repository
+            AND wtrs.workspace.id = :workspaceId
+            AND wtrs.hiddenFromContributions = true
+        ))
         GROUP BY e.actor.id
         """
     )

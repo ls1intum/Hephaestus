@@ -105,13 +105,13 @@ public class WorkspaceSlugService {
         String hash = shortHash(seedInput, 10);
         String suffix = "-" + hash;
 
-        String candidate = buildCandidate(normalized, suffix, 0);
+        String candidate = buildCandidate(normalized, suffix);
         if (candidate != null) {
             return candidate;
         }
 
         for (int attempt = 1; attempt <= 50; attempt++) {
-            candidate = buildCandidate(normalized, suffix + "-" + attempt, attempt);
+            candidate = buildCandidate(normalized, suffix + "-" + attempt);
             if (candidate != null) {
                 return candidate;
             }
@@ -166,7 +166,7 @@ public class WorkspaceSlugService {
         );
     }
 
-    private String buildCandidate(String baseSlug, String suffix, int attempt) {
+    private String buildCandidate(String baseSlug, String suffix) {
         int maxBaseLen = Math.max(SLUG_MIN_LENGTH, SLUG_MAX_LENGTH - suffix.length());
         String base = baseSlug.length() > maxBaseLen ? baseSlug.substring(0, maxBaseLen) : baseSlug;
         String candidate = normalize(base + suffix);

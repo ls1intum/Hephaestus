@@ -4,6 +4,7 @@ import de.tum.in.www1.hephaestus.gitprovider.common.NatsMessageDeserializer;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventAction;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventType;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
+import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationMemberRole;
 import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationMembershipRepository;
 import de.tum.in.www1.hephaestus.gitprovider.organization.github.dto.GitHubOrganizationEventDTO;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
@@ -65,9 +66,7 @@ public class GitHubOrganizationMessageHandler extends GitHubMessageHandler<GitHu
                 if (event.membership() != null && event.membership().user() != null) {
                     var userDto = event.membership().user();
                     User user = userProcessor.ensureExists(userDto);
-                    String role = event.membership().role() != null
-                        ? event.membership().role().toUpperCase()
-                        : "MEMBER";
+                    OrganizationMemberRole role = parseRole(event.membership().role());
                     membershipRepository.upsertMembership(orgDto.id(), user.getId(), role);
                     log.info("Member added to org {}: {} with role {}", orgDto.login(), userDto.login(), role);
                 }
@@ -83,5 +82,21 @@ public class GitHubOrganizationMessageHandler extends GitHubMessageHandler<GitHu
             case GitHubEventAction.Organization.DELETED -> organizationProcessor.delete(orgDto.id());
             default -> organizationProcessor.process(orgDto);
         }
+    }
+
+    /**
+     * Parses a role string from webhook events to the OrganizationMemberRole enum.
+     *
+     * @param roleString the role string from the webhook (e.g., "admin", "member")
+     * @return the corresponding OrganizationMemberRole, defaulting to MEMBER if unknown
+     */
+    private OrganizationMemberRole parseRole(String roleString) {
+        if (roleString == null) {
+            return OrganizationMemberRole.MEMBER;
+        }
+        return switch (roleString.toUpperCase()) {
+            case "ADMIN" -> OrganizationMemberRole.ADMIN;
+            default -> OrganizationMemberRole.MEMBER;
+        };
     }
 }

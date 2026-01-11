@@ -12,7 +12,11 @@ info:
 servers:
 - description: Default Server URL
   url: /
+security:
+- bearerAuth: []
 tags:
+- description: Administrative operations for failed activity events
+  name: Dead Letter Admin
 - description: Global contributor information
   name: Contributors
 - description: |-
@@ -20,12 +24,12 @@ tags:
      These routes stay under the classic /workspaces base path while slugged routes
      live in {@link WorkspaceController WorkspaceController} via <code>@WorkspaceScopedController</code>.
   name: workspace-registry-controller
+- description: Workspace-scoped team settings management
+  name: Team Settings
 - description: Team management within workspace
   name: Teams
-- description: |-
-    Controller for activity-related operations within a workspace context.
-     All endpoints require workspace membership via {@link WorkspaceScopedController WorkspaceScopedController}.
-  name: activity-controller
+- description: Bad practice detection and resolution
+  name: Code Practices
 - description: User profile and activity data
   name: Profile
 - description: |-
@@ -37,6 +41,126 @@ tags:
 - description: "User account management (settings, deletion)"
   name: Account
 paths:
+  /api/admin/dead-letters/pending:
+    get:
+      description: "Returns all pending dead letters, ordered by creation time (oldest\
+        \ first)"
+      operationId: getPending
+      parameters:
+      - in: query
+        name: limit
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 100
+          maximum: 1000
+          minimum: 1
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DeadLetterSummary"
+          description: List of pending dead letters
+      summary: List pending dead letters
+      tags:
+      - Dead Letter Admin
+  /api/admin/dead-letters/stats:
+    get:
+      description: Returns counts of dead letters by status and event type
+      operationId: getStats
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeadLetterStats"
+          description: Statistics
+      summary: Get dead letter statistics
+      tags:
+      - Dead Letter Admin
+  /api/admin/dead-letters/{id}:
+    get:
+      description: Returns full details of a dead letter event for investigation
+      operationId: getById
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeadLetterDetail"
+          description: Dead letter details
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeadLetterDetail"
+          description: Dead letter not found
+      summary: Get dead letter details
+      tags:
+      - Dead Letter Admin
+  /api/admin/dead-letters/{id}/discard:
+    post:
+      description: Marks a dead letter as discarded (will not be retried)
+      operationId: discard
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DiscardReason"
+        required: true
+      responses:
+        "200":
+          description: Dead letter discarded
+        "404":
+          description: Dead letter not found
+      summary: Discard a dead letter
+      tags:
+      - Dead Letter Admin
+  /api/admin/dead-letters/{id}/retry:
+    post:
+      description: Attempts to re-record the failed activity event
+      operationId: retry
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RetryResult"
+          description: Retry result
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RetryResult"
+          description: Dead letter not found
+      summary: Retry a dead letter
+      tags:
+      - Dead Letter Admin
   /contributors:
     get:
       description: Returns all contributors across all workspaces
@@ -50,6 +174,7 @@ paths:
                 items:
                   $ref: "#/components/schemas/Contributor"
           description: list of contributors sorted by contribution count
+      security: []
       summary: List global contributors
       tags:
       - Contributors
@@ -166,140 +291,10 @@ paths:
               schema:
                 $ref: "#/components/schemas/Workspace"
           description: Workspace returned
+      security: []
       summary: Fetch a workspace by slug
       tags:
       - workspace
-  /workspaces/{workspaceSlug}/activity/badpractice/{badPracticeId}/feedback:
-    post:
-      operationId: provideFeedbackForBadPractice
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      - in: path
-        name: badPracticeId
-        required: true
-        schema:
-          type: integer
-          format: int64
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/BadPracticeFeedback"
-        required: true
-      responses:
-        "200":
-          description: OK
-      tags:
-      - activity
-  /workspaces/{workspaceSlug}/activity/badpractice/{badPracticeId}/resolve:
-    post:
-      operationId: resolveBadPractice
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      - in: path
-        name: badPracticeId
-        required: true
-        schema:
-          type: integer
-          format: int64
-      - in: query
-        name: state
-        required: true
-        schema:
-          type: string
-          enum:
-          - GOOD_PRACTICE
-          - FIXED
-          - CRITICAL_ISSUE
-          - NORMAL_ISSUE
-          - MINOR_ISSUE
-          - WONT_FIX
-          - WRONG
-      responses:
-        "200":
-          description: OK
-      tags:
-      - activity
-  /workspaces/{workspaceSlug}/activity/pullrequest/{pullRequestId}/badpractices:
-    post:
-      operationId: detectBadPracticesForPullRequest
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      - in: path
-        name: pullRequestId
-        required: true
-        schema:
-          type: integer
-          format: int64
-      responses:
-        "200":
-          description: OK
-      tags:
-      - activity
-  /workspaces/{workspaceSlug}/activity/user/{login}/badpractices:
-    post:
-      operationId: detectBadPracticesByUser
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      - in: path
-        name: login
-        required: true
-        schema:
-          type: string
-      responses:
-        "200":
-          description: OK
-      tags:
-      - activity
-  /workspaces/{workspaceSlug}/activity/{login}:
-    get:
-      operationId: getActivityByUser
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      - in: path
-        name: login
-        required: true
-        schema:
-          type: string
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Activity"
-          description: OK
-      tags:
-      - activity
   /workspaces/{workspaceSlug}/leaderboard:
     get:
       description: Creates a ranked contributor list for the specified time range
@@ -361,11 +356,14 @@ paths:
                 items:
                   $ref: "#/components/schemas/LeaderboardEntry"
           description: ranked list of leaderboard entries
+      security: []
       summary: Generate leaderboard
       tags:
       - Leaderboard
+  /workspaces/{workspaceSlug}/leaderboard/users/{login}/league-stats:
     post:
-      description: Calculates league changes for a specific user
+      description: Computes projected league point changes for a specific user based
+        on their leaderboard entry
       operationId: getUserLeagueStats
       parameters:
       - description: Workspace slug
@@ -376,7 +374,7 @@ paths:
           type: string
           pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
       - description: the user's GitHub login
-        in: query
+        in: path
         name: login
         required: true
         schema:
@@ -394,8 +392,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/LeagueChange"
-          description: league change statistics including promotion/demotion info
-      summary: Get user league stats
+          description: league change statistics including projected point delta
+      summary: Calculate user league stats
       tags:
       - Leaderboard
   /workspaces/{workspaceSlug}/league/reset:
@@ -454,6 +452,7 @@ paths:
                 items:
                   $ref: "#/components/schemas/WorkspaceMembership"
           description: List of workspace memberships
+      security: []
       summary: List all members of the workspace with pagination.
       tags:
       - workspace-membership
@@ -507,6 +506,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/WorkspaceMembership"
           description: the current user's membership details
+      security: []
       summary: Get the current user's membership in this workspace.
       tags:
       - workspace-membership
@@ -565,6 +565,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/WorkspaceMembership"
           description: Workspace membership details
+      security: []
       summary: Get a specific member's details.
       tags:
       - workspace-membership
@@ -1286,6 +1287,230 @@ paths:
       summary: Update leaderboard notification preferences
       tags:
       - workspace
+  /workspaces/{workspaceSlug}/practices/badpractice/{id}:
+    get:
+      description: Retrieves details of a specific bad practice by ID
+      operationId: getBadPractice
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PullRequestBadPractice"
+          description: Bad practice returned
+      security: []
+      summary: Get a specific bad practice
+      tags:
+      - Code Practices
+  /workspaces/{workspaceSlug}/practices/badpractice/{id}/feedback:
+    post:
+      description: Submits user feedback for a detected bad practice
+      operationId: provideFeedback
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BadPracticeFeedback"
+        required: true
+      responses:
+        "200":
+          description: Feedback submitted successfully
+        "403":
+          description: User is not an assignee of the pull request
+      summary: Provide feedback for a bad practice
+      tags:
+      - Code Practices
+  /workspaces/{workspaceSlug}/practices/badpractice/{id}/resolve:
+    post:
+      description: "Updates the state of a bad practice to FIXED, WONT_FIX, or WRONG"
+      operationId: resolve
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+          format: int64
+      - in: query
+        name: state
+        required: true
+        schema:
+          type: string
+          enum:
+          - GOOD_PRACTICE
+          - MINOR_ISSUE
+          - NORMAL_ISSUE
+          - CRITICAL_ISSUE
+          - FIXED
+          - WONT_FIX
+          - WRONG
+      responses:
+        "200":
+          description: Bad practice resolved successfully
+      summary: Resolve a bad practice
+      tags:
+      - Code Practices
+  /workspaces/{workspaceSlug}/practices/pullrequest/{pullRequestId}:
+    get:
+      description: Retrieves all detected bad practices for a specific pull request
+      operationId: getBadPracticesForPullRequest
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: pullRequestId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PullRequestWithBadPractices"
+          description: Bad practices returned
+      security: []
+      summary: Get bad practices for a pull request
+      tags:
+      - Code Practices
+  /workspaces/{workspaceSlug}/practices/pullrequest/{pullRequestId}/detect:
+    post:
+      description: Triggers bad practice detection for a specific pull request
+      operationId: detectForPullRequest
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: pullRequestId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DetectionResult"
+          description: Detection completed successfully
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DetectionResult"
+          description: Detection failed due to no updates on pull request
+      summary: Detect bad practices for a pull request
+      tags:
+      - Code Practices
+  /workspaces/{workspaceSlug}/practices/user/{login}:
+    get:
+      description: Retrieves all detected bad practices for pull requests assigned
+        to the user
+      operationId: getBadPracticesForUser
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: login
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserPractices"
+          description: Bad practices returned
+      security: []
+      summary: Get bad practices for a user
+      tags:
+      - Code Practices
+  /workspaces/{workspaceSlug}/practices/user/{login}/detect:
+    post:
+      description: Triggers bad practice detection for all pull requests of the specified
+        user
+      operationId: detectForUser
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: login
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DetectionResult"
+          description: Detection completed successfully
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DetectionResult"
+          description: Detection failed due to no updates on pull requests
+      summary: Detect bad practices for a user
+      tags:
+      - Code Practices
   /workspaces/{workspaceSlug}/profile/{login}:
     get:
       description: "Returns user profile with workspace-scoped activity data including\
@@ -1322,9 +1547,10 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/UserProfile"
+                $ref: "#/components/schemas/Profile"
           description: "user profile with open PRs, review activity, league points,\
             \ etc."
+      security: []
       summary: Get user profile
       tags:
       - Profile
@@ -1375,6 +1601,7 @@ paths:
                 items:
                   type: string
           description: Repository list
+      security: []
       summary: List repositories monitored by a workspace
       tags:
       - workspace
@@ -1560,6 +1787,7 @@ paths:
                 items:
                   $ref: "#/components/schemas/TeamInfo"
           description: list of teams with their members and permissions
+      security: []
       summary: List teams
       tags:
       - Teams
@@ -1709,6 +1937,263 @@ paths:
       summary: Add a repository label to a team
       tags:
       - workspace
+  /workspaces/{workspaceSlug}/teams/{teamId}/settings:
+    get:
+      description: Returns the visibility settings for a team in the workspace
+      operationId: getTeamSettings
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - description: the team ID
+        in: path
+        name: teamId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkspaceTeamSettings"
+          description: Team settings returned
+      security: []
+      summary: Get team settings
+      tags:
+      - Team Settings
+    patch:
+      description: Updates the visibility settings for a team in the workspace
+      operationId: updateTeamSettings
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - description: the team ID
+        in: path
+        name: teamId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateTeamSettingsRequest"
+        description: the update request containing the hidden flag
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkspaceTeamSettings"
+          description: Team settings updated
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkspaceTeamSettings"
+          description: Team not found in workspace
+      summary: Update team settings
+      tags:
+      - Team Settings
+  /workspaces/{workspaceSlug}/teams/{teamId}/settings/label-filters:
+    get:
+      description: Returns all labels configured as filters for a team in the workspace
+      operationId: getLabelFilters
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - description: the team ID
+        in: path
+        name: teamId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LabelInfo"
+          description: Label filters returned
+      security: []
+      summary: Get team label filters
+      tags:
+      - Team Settings
+  /workspaces/{workspaceSlug}/teams/{teamId}/settings/label-filters/{labelId}:
+    delete:
+      description: Removes a label filter from a team in the workspace
+      operationId: removeLabelFilter
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - description: the team ID
+        in: path
+        name: teamId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      - description: the label ID to remove as filter
+        in: path
+        name: labelId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "204":
+          description: Label filter removed
+        "404":
+          description: Label filter not found
+      summary: Remove label filter
+      tags:
+      - Team Settings
+    post:
+      description: Adds a label as a filter for a team in the workspace
+      operationId: addLabelFilter
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - description: the team ID
+        in: path
+        name: teamId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      - description: the label ID to add as filter
+        in: path
+        name: labelId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "201":
+          description: Label filter added
+        "404":
+          description: Team or label not found
+      summary: Add label filter
+      tags:
+      - Team Settings
+  /workspaces/{workspaceSlug}/teams/{teamId}/settings/repositories/{repositoryId}:
+    get:
+      description: Returns the contribution visibility settings for a repository in
+        a team
+      operationId: getRepositorySettings
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - description: the team ID
+        in: path
+        name: teamId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      - description: the repository ID
+        in: path
+        name: repositoryId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkspaceTeamRepositorySettings"
+          description: Repository settings returned
+      security: []
+      summary: Get repository settings
+      tags:
+      - Team Settings
+    patch:
+      description: Updates the contribution visibility settings for a repository in
+        a team
+      operationId: updateRepositorySettings
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - description: the team ID
+        in: path
+        name: teamId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      - description: the repository ID
+        in: path
+        name: repositoryId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateRepositorySettingsRequest"
+        description: the update request containing the hiddenFromContributions flag
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkspaceTeamRepositorySettings"
+          description: Repository settings updated
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkspaceTeamRepositorySettings"
+          description: Team or repository not found
+      summary: Update repository settings
+      tags:
+      - Team Settings
   /workspaces/{workspaceSlug}/token:
     patch:
       operationId: updateToken
@@ -1756,26 +2241,19 @@ paths:
                 items:
                   $ref: "#/components/schemas/UserTeams"
           description: OK
+      security: []
       summary: List workspace users and the teams they belong to
       tags:
       - workspace
 components:
   schemas:
-    Activity:
-      type: object
-      properties:
-        pullRequests:
-          type: array
-          items:
-            $ref: "#/components/schemas/PullRequestWithBadPractices"
-      required:
-      - pullRequests
     AssignRoleRequest:
       type: object
-      description: DTO for assigning or updating a role for a workspace member.
+      description: Request to assign or update a user's role in a workspace
       properties:
         role:
           type: string
+          description: "New role to assign (OWNER, ADMIN, MEMBER)"
           enum:
           - OWNER
           - ADMIN
@@ -1783,16 +2261,26 @@ components:
         userId:
           type: integer
           format: int64
+          description: User ID of the member to update
       required:
       - role
       - userId
     BadPracticeFeedback:
       type: object
+      description: User feedback on a detected bad practice
       properties:
         explanation:
           type: string
+          description: User's explanation for the feedback
+          maxLength: 2000
+          minLength: 0
         type:
           type: string
+          description: "Type of feedback (e.g., 'false_positive', 'not_applicable')"
+          example: false_positive
+          maxLength: 64
+          minLength: 0
+          pattern: "^[a-zA-Z0-9_-]+$"
       required:
       - explanation
       - type
@@ -1846,24 +2334,29 @@ components:
       - title
     Contributor:
       type: object
-      description: |-
-        Data transfer object representing a GitHub contributor.
-         Used to display contributor information on the public about page.
+      description: Information about a contributor to the Hephaestus project
       properties:
         avatarUrl:
           type: string
+          description: URL to the contributor's avatar image
         contributions:
           type: integer
           format: int32
+          description: Number of contributions to the project
+          example: 42
         htmlUrl:
           type: string
+          description: URL to the contributor's GitHub profile
         id:
           type: integer
           format: int64
+          description: GitHub user ID
         login:
           type: string
+          description: GitHub username
         name:
           type: string
+          description: Display name of the contributor
       required:
       - avatarUrl
       - htmlUrl
@@ -1889,22 +2382,30 @@ components:
       - title
     CreateWorkspaceRequest:
       type: object
-      description: DTO for creating a new workspace.
+      description: Request to create a new workspace
       properties:
         accountLogin:
           type: string
+          description: GitHub account login to associate with this workspace
+          example: my-org
         accountType:
           type: string
+          description: Type of GitHub account (USER or ORGANIZATION)
           enum:
           - ORG
           - USER
         displayName:
           type: string
+          description: Human-readable name of the workspace
+          example: My Workspace
         ownerUserId:
           type: integer
           format: int64
+          description: User ID of the workspace owner
         workspaceSlug:
           type: string
+          description: URL-friendly identifier for the workspace
+          example: my-workspace
           pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
       required:
       - accountLogin
@@ -1912,6 +2413,133 @@ components:
       - displayName
       - ownerUserId
       - workspaceSlug
+    DeadLetterDetail:
+      type: object
+      properties:
+        createdAt:
+          type: string
+          format: date-time
+        errorMessage:
+          type: string
+        errorType:
+          type: string
+        eventType:
+          type: string
+          enum:
+          - pull_request.opened
+          - pull_request.merged
+          - pull_request.closed
+          - pull_request.reopened
+          - pull_request.ready
+          - review.approved
+          - review.changes_requested
+          - review.commented
+          - review.unknown
+          - review.dismissed
+          - review.edited
+          - comment.created
+          - review_comment.created
+          - issue.created
+          - issue.closed
+        id:
+          type: string
+          format: uuid
+        resolvedAt:
+          type: string
+          format: date-time
+        retryCount:
+          type: integer
+          format: int32
+        sourceSystem:
+          type: string
+        status:
+          type: string
+          enum:
+          - PENDING
+          - RESOLVED
+          - DISCARDED
+        targetId:
+          type: integer
+          format: int64
+        targetType:
+          type: string
+        workspaceId:
+          type: integer
+          format: int64
+        xp:
+          type: number
+          format: double
+    DeadLetterStats:
+      type: object
+      properties:
+        byEventType:
+          type: object
+          additionalProperties:
+            type: integer
+            format: int64
+        discarded:
+          type: integer
+          format: int64
+        pending:
+          type: integer
+          format: int64
+        resolved:
+          type: integer
+          format: int64
+    DeadLetterSummary:
+      type: object
+      properties:
+        createdAt:
+          type: string
+          format: date-time
+        errorType:
+          type: string
+        eventType:
+          type: string
+          enum:
+          - pull_request.opened
+          - pull_request.merged
+          - pull_request.closed
+          - pull_request.reopened
+          - pull_request.ready
+          - review.approved
+          - review.changes_requested
+          - review.commented
+          - review.unknown
+          - review.dismissed
+          - review.edited
+          - comment.created
+          - review_comment.created
+          - issue.created
+          - issue.closed
+        id:
+          type: string
+          format: uuid
+        retryCount:
+          type: integer
+          format: int32
+        targetId:
+          type: integer
+          format: int64
+    DetectionResult:
+      type: object
+      description: Response for detection operations
+      properties:
+        result:
+          type: string
+          enum:
+          - BAD_PRACTICES_DETECTED
+          - NO_BAD_PRACTICES_DETECTED
+          - ERROR_NO_UPDATE_ON_PULLREQUEST
+    DiscardReason:
+      type: object
+      properties:
+        reason:
+          type: string
+          maxLength: 500
+          minLength: 0
+      required:
+      - reason
     Document:
       type: object
       x-hephaestus: a1
@@ -1979,55 +2607,81 @@ components:
       - error
     LabelInfo:
       type: object
+      description: Information about a label from a repository
       properties:
         color:
           type: string
+          description: "Hex color code of the label (without #)"
+          example: d73a4a
         id:
           type: integer
           format: int64
+          description: Unique identifier of the label
         name:
           type: string
+          description: Name of the label
         repository:
           $ref: "#/components/schemas/RepositoryInfo"
+          description: Repository the label belongs to
       required:
       - color
       - id
       - name
     LeaderboardEntry:
       type: object
+      description: A ranked entry in the leaderboard (individual or team)
       properties:
         numberOfApprovals:
           type: integer
           format: int32
+          description: Count of review approvals
+          example: 3
         numberOfChangeRequests:
           type: integer
           format: int32
+          description: Count of change requests submitted
+          example: 1
         numberOfCodeComments:
           type: integer
           format: int32
+          description: Count of inline code review comments
+          example: 7
         numberOfComments:
           type: integer
           format: int32
+          description: Count of review and issue comments
+          example: 10
         numberOfReviewedPRs:
           type: integer
           format: int32
+          description: Count of distinct PRs reviewed
+          example: 5
         numberOfUnknowns:
           type: integer
           format: int32
+          description: Count of reviews with unknown/unrecognized state
+          example: 0
         rank:
           type: integer
           format: int32
+          description: Position in the leaderboard (1-based)
+          example: 1
         reviewedPullRequests:
           type: array
+          description: Sample of reviewed PRs for display
           items:
             $ref: "#/components/schemas/PullRequestInfo"
         score:
           type: integer
           format: int32
+          description: Total XP score for the timeframe
+          example: 150
         team:
           $ref: "#/components/schemas/TeamInfo"
+          description: "Team info (populated in TEAM mode, null in INDIVIDUAL mode)"
         user:
           $ref: "#/components/schemas/UserInfo"
+          description: "User info (populated in INDIVIDUAL mode, null in TEAM mode)"
       required:
       - numberOfApprovals
       - numberOfChangeRequests
@@ -2049,26 +2703,112 @@ components:
       required:
       - leaguePointsChange
       - login
-    PullRequestBadPractice:
+    Profile:
       type: object
+      description: Complete user profile including contribution history and activity
       properties:
-        description:
+        contributedRepositories:
+          type: array
+          description: Repositories the user has contributed to
+          items:
+            $ref: "#/components/schemas/RepositoryInfo"
+        firstContribution:
           type: string
+          format: date-time
+          description: Timestamp of the user's first contribution
+        openPullRequests:
+          type: array
+          description: Currently open pull requests authored by the user
+          items:
+            $ref: "#/components/schemas/PullRequestInfo"
+        reviewActivity:
+          type: array
+          description: Recent review activity with XP scores
+          items:
+            $ref: "#/components/schemas/ProfileReviewActivity"
+        userInfo:
+          $ref: "#/components/schemas/UserInfo"
+          description: Basic information about the user
+      required:
+      - contributedRepositories
+      - userInfo
+    ProfileReviewActivity:
+      type: object
+      description: A review activity entry with XP score for profile display
+      properties:
+        author:
+          $ref: "#/components/schemas/UserInfo"
+          description: Author of the review
+        codeComments:
+          type: integer
+          format: int32
+          description: Number of inline code comments in the review
+          example: 3
+        htmlUrl:
+          type: string
+          description: URL to the review on the git provider
         id:
           type: integer
           format: int64
+          description: Unique identifier of the review
+        isDismissed:
+          type: boolean
+          description: Whether the review was dismissed
+        pullRequest:
+          $ref: "#/components/schemas/PullRequestBaseInfo"
+          description: Pull request that was reviewed
+        score:
+          type: integer
+          format: int32
+          description: XP score earned for this review
+          example: 25
         state:
           type: string
+          description: "State of the review (APPROVED, CHANGES_REQUESTED, COMMENTED,\
+            \ etc.)"
+          enum:
+          - COMMENTED
+          - APPROVED
+          - CHANGES_REQUESTED
+          - PENDING
+          - DISMISSED
+          - UNKNOWN
+        submittedAt:
+          type: string
+          format: date-time
+          description: Timestamp when the review was submitted
+      required:
+      - codeComments
+      - htmlUrl
+      - id
+      - isDismissed
+      - state
+    PullRequestBadPractice:
+      type: object
+      description: A detected bad practice in a pull request
+      properties:
+        description:
+          type: string
+          description: Detailed explanation and remediation guidance
+        id:
+          type: integer
+          format: int64
+          description: Unique identifier of the bad practice
+        state:
+          type: string
+          description: "Current state of the bad practice (DETECTED, RESOLVED, DISMISSED,\
+            \ etc.)"
           enum:
           - GOOD_PRACTICE
-          - FIXED
-          - CRITICAL_ISSUE
-          - NORMAL_ISSUE
           - MINOR_ISSUE
+          - NORMAL_ISSUE
+          - CRITICAL_ISSUE
+          - FIXED
           - WONT_FIX
           - WRONG
         title:
           type: string
+          description: Short description of the bad practice
       required:
       - description
       - id
@@ -2076,28 +2816,38 @@ components:
       - title
     PullRequestBaseInfo:
       type: object
+      description: Basic information about a pull request
       properties:
         htmlUrl:
           type: string
+          description: URL to the pull request on the git provider
         id:
           type: integer
           format: int64
+          description: Unique identifier of the pull request
         isDraft:
           type: boolean
+          description: Whether the pull request is in draft mode
         isMerged:
           type: boolean
+          description: Whether the pull request has been merged
         number:
           type: integer
           format: int32
+          description: Pull request number within the repository
+          example: 42
         repository:
           $ref: "#/components/schemas/RepositoryInfo"
+          description: Repository the pull request belongs to
         state:
           type: string
+          description: "Current state of the pull request (OPEN, CLOSED)"
           enum:
           - OPEN
           - CLOSED
         title:
           type: string
+          description: Title of the pull request
       required:
       - htmlUrl
       - id
@@ -2108,59 +2858,82 @@ components:
       - title
     PullRequestInfo:
       type: object
+      description: Detailed information about a pull request
       properties:
         additions:
           type: integer
           format: int32
+          description: Number of lines added
+          example: 150
         assignees:
           type: array
+          description: Users assigned to the pull request
           items:
             $ref: "#/components/schemas/UserInfo"
         author:
           $ref: "#/components/schemas/UserInfo"
+          description: Author of the pull request
         closedAt:
           type: string
           format: date-time
+          description: Timestamp when the pull request was closed
         commentsCount:
           type: integer
           format: int32
+          description: Number of comments on the pull request
+          example: 5
         createdAt:
           type: string
           format: date-time
+          description: Timestamp when the pull request was created
         deletions:
           type: integer
           format: int32
+          description: Number of lines deleted
+          example: 50
         htmlUrl:
           type: string
+          description: URL to the pull request on the git provider
         id:
           type: integer
           format: int64
+          description: Unique identifier of the pull request
         isDraft:
           type: boolean
+          description: Whether the pull request is in draft mode
         isMerged:
           type: boolean
+          description: Whether the pull request has been merged
         labels:
           type: array
+          description: Labels applied to the pull request
           items:
             $ref: "#/components/schemas/LabelInfo"
         mergedAt:
           type: string
           format: date-time
+          description: Timestamp when the pull request was merged
         number:
           type: integer
           format: int32
+          description: Pull request number within the repository
+          example: 42
         repository:
           $ref: "#/components/schemas/RepositoryInfo"
+          description: Repository the pull request belongs to
         state:
           type: string
+          description: "Current state of the pull request (OPEN, CLOSED)"
           enum:
           - OPEN
           - CLOSED
         title:
           type: string
+          description: Title of the pull request
         updatedAt:
           type: string
           format: date-time
+          description: Timestamp when the pull request was last updated
       required:
       - additions
       - commentsCount
@@ -2172,93 +2945,76 @@ components:
       - number
       - state
       - title
-    PullRequestReviewInfo:
-      type: object
-      properties:
-        author:
-          $ref: "#/components/schemas/UserInfo"
-        codeComments:
-          type: integer
-          format: int32
-        htmlUrl:
-          type: string
-        id:
-          type: integer
-          format: int64
-        isDismissed:
-          type: boolean
-        pullRequest:
-          $ref: "#/components/schemas/PullRequestBaseInfo"
-        score:
-          type: integer
-          format: int32
-        state:
-          type: string
-          enum:
-          - COMMENTED
-          - APPROVED
-          - CHANGES_REQUESTED
-          - UNKNOWN
-        submittedAt:
-          type: string
-          format: date-time
-      required:
-      - codeComments
-      - htmlUrl
-      - id
-      - isDismissed
-      - score
-      - state
     PullRequestWithBadPractices:
       type: object
+      description: Pull request with associated bad practice detection results
       properties:
         additions:
           type: integer
           format: int32
+          description: Number of lines added
+          example: 150
         badPracticeSummary:
           type: string
+          description: AI-generated summary of detected bad practices
         badPractices:
           type: array
+          description: Currently active bad practices
           items:
             $ref: "#/components/schemas/PullRequestBadPractice"
         createdAt:
           type: string
           format: date-time
+          description: Timestamp when the pull request was created
         deletions:
           type: integer
           format: int32
+          description: Number of lines deleted
+          example: 50
         htmlUrl:
           type: string
+          description: URL to the pull request on the git provider
         id:
           type: integer
           format: int64
+          description: Unique identifier of the pull request
         isDraft:
           type: boolean
+          description: Whether the pull request is in draft mode
         isMerged:
           type: boolean
+          description: Whether the pull request has been merged
         labels:
           type: array
+          description: Labels applied to the pull request
           items:
             $ref: "#/components/schemas/LabelInfo"
         number:
           type: integer
           format: int32
+          description: Pull request number within the repository
+          example: 42
         oldBadPractices:
           type: array
+          description: Previously resolved or dismissed bad practices
           items:
             $ref: "#/components/schemas/PullRequestBadPractice"
         repository:
           $ref: "#/components/schemas/RepositoryInfo"
+          description: Repository the pull request belongs to
         state:
           type: string
+          description: "Current state of the pull request (OPEN, CLOSED)"
           enum:
           - OPEN
           - CLOSED
         title:
           type: string
+          description: Title of the pull request
         updatedAt:
           type: string
           format: date-time
+          description: Timestamp when the pull request was last updated
       required:
       - additions
       - badPracticeSummary
@@ -2278,38 +3034,57 @@ components:
       - updatedAt
     RenameWorkspaceSlugRequest:
       type: object
+      description: Request to rename a workspace's URL slug
       properties:
         newSlug:
           type: string
+          description: New URL-friendly identifier for the workspace
+          example: new-workspace-slug
           pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
       required:
       - newSlug
     RepositoryInfo:
       type: object
+      description: Information about a git repository
       properties:
         description:
           type: string
+          description: Description of the repository
         hiddenFromContributions:
           type: boolean
+          description: Whether contributions from this repository are hidden from
+            leaderboard calculations
         htmlUrl:
           type: string
+          description: URL to the repository on the git provider
         id:
           type: integer
           format: int64
+          description: Unique identifier of the repository
         labels:
           type: array
+          description: Labels defined in the repository
           items:
             $ref: "#/components/schemas/LabelInfo"
         name:
           type: string
+          description: Name of the repository
         nameWithOwner:
           type: string
+          description: "Full name including owner (e.g., 'owner/repo')"
       required:
       - hiddenFromContributions
       - htmlUrl
       - id
       - name
       - nameWithOwner
+    RetryResult:
+      type: object
+      properties:
+        message:
+          type: string
+        success:
+          type: boolean
     StreamPart:
       type: object
       additionalProperties: {}
@@ -2321,44 +3096,59 @@ components:
       - type
     TeamInfo:
       type: object
+      description: "Detailed information about a team including members, repositories,\
+        \ and labels"
       properties:
         description:
           type: string
+          description: Description of the team
         hidden:
           type: boolean
+          description: Whether the team is hidden from leaderboard display
         htmlUrl:
           type: string
+          description: URL to the team's page on the git provider
         id:
           type: integer
           format: int64
+          description: Unique identifier of the team
         labels:
           type: array
+          description: Labels configured as filters for this team
           items:
             $ref: "#/components/schemas/LabelInfo"
         members:
           type: array
+          description: Members of the team (excluding bots)
           items:
             $ref: "#/components/schemas/UserInfo"
         membershipCount:
           type: integer
           format: int32
+          description: Total count of team memberships
         name:
           type: string
+          description: Name of the team
         organization:
           type: string
+          description: Organization the team belongs to
         parentId:
           type: integer
           format: int64
+          description: "ID of the parent team, if this is a sub-team"
         privacy:
           type: string
+          description: Privacy level of the team (SECRET or VISIBLE)
           enum:
           - SECRET
-          - CLOSED
+          - VISIBLE
         repoPermissionCount:
           type: integer
           format: int32
+          description: Count of repository permissions
         repositories:
           type: array
+          description: Repositories the team has access to
           items:
             $ref: "#/components/schemas/RepositoryInfo"
       required:
@@ -2372,32 +3162,37 @@ components:
       - repositories
     TeamSummary:
       type: object
-      description: |-
-        A lightweight DTO for team data that only contains basic information.
-         This is used in contexts where full team details (repositories, labels, members) are not needed,
-         avoiding expensive JOINs and lazy loading issues.
+      description: Lightweight summary of a team without member/repository details
       properties:
         description:
           type: string
+          description: Description of the team
         hidden:
           type: boolean
+          description: Whether the team is hidden from leaderboard display
         htmlUrl:
           type: string
+          description: URL to the team's page on the git provider
         id:
           type: integer
           format: int64
+          description: Unique identifier of the team
         name:
           type: string
+          description: Name of the team
         organization:
           type: string
+          description: Organization the team belongs to
         parentId:
           type: integer
           format: int64
+          description: "ID of the parent team, if this is a sub-team"
         privacy:
           type: string
+          description: Privacy level of the team (SECRET or VISIBLE)
           enum:
           - SECRET
-          - CLOSED
+          - VISIBLE
       required:
       - hidden
       - id
@@ -2457,62 +3252,89 @@ components:
       required:
       - id
       - messages
+    UpdateRepositorySettingsRequest:
+      type: object
+      description: Request to update repository contribution visibility settings in
+        a workspace
+      properties:
+        hiddenFromContributions:
+          type: boolean
+          description: Whether contributions from this repository should be hidden
+            from leaderboard calculations
+      required:
+      - hiddenFromContributions
+    UpdateTeamSettingsRequest:
+      type: object
+      description: Request to update team visibility settings in a workspace
+      properties:
+        hidden:
+          type: boolean
+          description: Whether the team should be hidden from the leaderboard
+      required:
+      - hidden
     UpdateWorkspaceNotificationsRequest:
       type: object
-      description: DTO for updating workspace leaderboard notification preferences.
+      description: Request to update leaderboard notification settings
       properties:
         channelId:
           type: string
+          description: Slack channel ID for notifications
+          example: C01234567AB
           pattern: "^[CGD][A-Z0-9]{8,}$"
         enabled:
           type: boolean
+          description: Whether leaderboard notifications are enabled
         team:
           type: string
+          description: Team name for filtering leaderboard notifications
     UpdateWorkspacePublicVisibilityRequest:
       type: object
-      description: DTO for updating workspace public visibility.
+      description: Request to update workspace public visibility setting
       properties:
         isPubliclyViewable:
           type: boolean
+          description: Whether the workspace should be publicly viewable without authentication
       required:
       - isPubliclyViewable
     UpdateWorkspaceScheduleRequest:
       type: object
-      description: |-
-        DTO for updating workspace leaderboard schedule configuration.
-         Day: 1=Monday, 2=Tuesday, ..., 7=Sunday
-         Time: Format "HH:mm" (24-hour format)
+      description: Request to update the leaderboard notification schedule
       properties:
         day:
           type: integer
           format: int32
+          description: "Day of week (1=Monday, 7=Sunday)"
+          example: 1
           maximum: 7
           minimum: 1
         time:
           type: string
+          description: Time in 24-hour format (HH:mm)
+          example: 09:00
           pattern: "^([01]\\d|2[0-3]):[0-5]\\d$"
       required:
       - day
       - time
     UpdateWorkspaceSlackCredentialsRequest:
       type: object
-      description: |-
-        Request DTO for updating Slack credentials (token and signing secret) for a workspace.
-         These credentials are used for Slack API integration and webhook signature verification.
+      description: Request to update Slack integration credentials
       properties:
         slackSigningSecret:
           type: string
+          description: Slack Signing Secret for webhook verification
         slackToken:
           type: string
+          description: Slack Bot User OAuth Token for API access
       required:
       - slackSigningSecret
       - slackToken
     UpdateWorkspaceStatusRequest:
       type: object
-      description: DTO for updating a workspace lifecycle status.
+      description: Request to update the workspace lifecycle status
       properties:
         status:
           type: string
+          description: "New lifecycle status (PENDING, ACTIVE, ARCHIVED)"
           enum:
           - ACTIVE
           - SUSPENDED
@@ -2521,68 +3343,67 @@ components:
       - status
     UpdateWorkspaceTokenRequest:
       type: object
-      description: DTO for updating workspace Personal Access Token (PAT).
+      description: Request to update the workspace's GitHub Personal Access Token
       properties:
         personalAccessToken:
           type: string
+          description: GitHub Personal Access Token for API access
       required:
       - personalAccessToken
     UserInfo:
       type: object
+      description: Information about a user from the git provider
       properties:
         avatarUrl:
           type: string
+          description: URL to the user's avatar image
         email:
           type: string
+          description: "Email address of the user, if public"
         htmlUrl:
           type: string
+          description: URL to the user's profile on the git provider
         id:
           type: integer
           format: int64
+          description: Unique identifier of the user
         leaguePoints:
           type: integer
           format: int32
+          description: League points earned by the user in the current workspace
+          example: 150
         login:
           type: string
+          description: Login/username of the user
         name:
           type: string
+          description: Display name of the user
       required:
       - avatarUrl
       - htmlUrl
       - id
       - login
       - name
-    UserProfile:
+    UserPractices:
       type: object
+      description: Response for user bad practices listing
       properties:
-        contributedRepositories:
-          type: array
-          items:
-            $ref: "#/components/schemas/RepositoryInfo"
-        firstContribution:
+        login:
           type: string
-          format: date-time
-        openPullRequests:
+        pullRequests:
           type: array
           items:
-            $ref: "#/components/schemas/PullRequestInfo"
-        reviewActivity:
-          type: array
-          items:
-            $ref: "#/components/schemas/PullRequestReviewInfo"
-        userInfo:
-          $ref: "#/components/schemas/UserInfo"
-      required:
-      - contributedRepositories
-      - firstContribution
-      - userInfo
+            $ref: "#/components/schemas/PullRequestWithBadPractices"
     UserSettings:
       type: object
+      description: User preferences and settings
       properties:
         participateInResearch:
           type: boolean
+          description: Whether the user consents to participate in research studies
         receiveNotifications:
           type: boolean
+          description: Whether the user wants to receive notifications
       required:
       - participateInResearch
       - receiveNotifications
@@ -2621,49 +3442,72 @@ components:
       - isUpvoted
     Workspace:
       type: object
+      description: Complete workspace information including configuration and settings
       properties:
         accountLogin:
           type: string
+          description: GitHub account login associated with this workspace
         createdAt:
           type: string
           format: date-time
+          description: Timestamp when the workspace was created
         displayName:
           type: string
+          description: Human-readable name of the workspace
         gitProviderMode:
           type: string
+          description: Git provider mode (INSTALLATION or PAT)
         hasSlackSigningSecret:
           type: boolean
+          description: Whether Slack signing secret is configured
         hasSlackToken:
           type: boolean
+          description: Whether Slack token is configured
         id:
           type: integer
           format: int64
+          description: Unique identifier of the workspace
         installationId:
           type: integer
           format: int64
+          description: "GitHub App installation ID, if linked"
         installationLinkedAt:
           type: string
           format: date-time
+          description: Timestamp when the GitHub App installation was linked
         isPubliclyViewable:
           type: boolean
+          description: Whether the workspace is publicly viewable without authentication
         leaderboardNotificationChannelId:
           type: string
+          description: Slack channel ID for leaderboard notifications
         leaderboardNotificationEnabled:
           type: boolean
+          description: Whether leaderboard notifications are enabled
         leaderboardNotificationTeam:
           type: string
+          description: Team name for leaderboard notifications
         leaderboardScheduleDay:
           type: integer
           format: int32
+          description: "Day of week for leaderboard notifications (1=Monday, 7=Sunday)"
+          example: 1
         leaderboardScheduleTime:
           type: string
+          description: Time for leaderboard notifications in HH:mm format
+          example: 09:00
         status:
           type: string
+          description: "Current lifecycle status of the workspace (PENDING, ACTIVE,\
+            \ ARCHIVED)"
         updatedAt:
           type: string
           format: date-time
+          description: Timestamp when the workspace was last updated
         workspaceSlug:
           type: string
+          description: URL-friendly identifier for the workspace
+          example: my-workspace
       required:
       - accountLogin
       - createdAt
@@ -2677,21 +3521,30 @@ components:
       - workspaceSlug
     WorkspaceListItem:
       type: object
+      description: Summary information about a workspace for list views
       properties:
         accountLogin:
           type: string
+          description: GitHub account login associated with this workspace
         createdAt:
           type: string
           format: date-time
+          description: Timestamp when the workspace was created
         displayName:
           type: string
+          description: Human-readable name of the workspace
         id:
           type: integer
           format: int64
+          description: Unique identifier of the workspace
         status:
           type: string
+          description: "Current lifecycle status of the workspace (PENDING, ACTIVE,\
+            \ ARCHIVED)"
         workspaceSlug:
           type: string
+          description: URL-friendly identifier for the workspace
+          example: my-workspace
       required:
       - accountLogin
       - createdAt
@@ -2701,16 +3554,20 @@ components:
       - workspaceSlug
     WorkspaceMembership:
       type: object
-      description: DTO representing a workspace membership with user information.
+      description: A user's membership in a workspace
       properties:
         createdAt:
           type: string
           format: date-time
+          description: Timestamp when the membership was created
         leaguePoints:
           type: integer
           format: int32
+          description: League points earned by the user in this workspace
+          example: 150
         role:
           type: string
+          description: "Role of the user in this workspace (OWNER, ADMIN, MEMBER)"
           enum:
           - OWNER
           - ADMIN
@@ -2718,7 +3575,62 @@ components:
         userId:
           type: integer
           format: int64
+          description: Unique identifier of the user
         userLogin:
           type: string
+          description: Login/username of the user
         userName:
           type: string
+          description: Display name of the user
+    WorkspaceTeamRepositorySettings:
+      type: object
+      description: Repository contribution visibility settings for a specific team
+        within a workspace
+      properties:
+        hiddenFromContributions:
+          type: boolean
+          description: Whether contributions from this repository are hidden from
+            leaderboard calculations
+        repositoryId:
+          type: integer
+          format: int64
+          description: The repository ID these settings apply to
+        teamId:
+          type: integer
+          format: int64
+          description: The team ID these settings apply to
+        workspaceId:
+          type: integer
+          format: int64
+          description: The workspace ID these settings belong to
+      required:
+      - hiddenFromContributions
+      - repositoryId
+      - teamId
+      - workspaceId
+    WorkspaceTeamSettings:
+      type: object
+      description: Team visibility settings for a specific workspace
+      properties:
+        hidden:
+          type: boolean
+          description: Whether the team is hidden in the leaderboard for this workspace
+        teamId:
+          type: integer
+          format: int64
+          description: The team ID these settings apply to
+        workspaceId:
+          type: integer
+          format: int64
+          description: The workspace ID these settings belong to
+      required:
+      - hidden
+      - teamId
+      - workspaceId
+  securitySchemes:
+    bearerAuth:
+      bearerFormat: JWT
+      description: JWT authentication via Keycloak. Obtain a token from your Keycloak
+        instance.
+      scheme: bearer
+      type: http

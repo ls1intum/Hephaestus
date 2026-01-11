@@ -71,4 +71,5 @@ public final class GitHubSyncConstants {
      * with nested thread structures.
      */
     public static final Duration EXTENDED_GRAPHQL_TIMEOUT = Duration.ofSeconds(60);
+
 }

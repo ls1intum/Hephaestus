@@ -180,6 +180,9 @@ public class GitHubIssueTypeSyncService {
         issueType.setEnabled(Boolean.TRUE.equals(graphQlType.getIsEnabled()));
         issueType.setOrganization(organization);
 
+        // Mark sync timestamp
+        issueType.setLastSyncAt(Instant.now());
+
         issueTypeRepository.save(issueType);
     }
 

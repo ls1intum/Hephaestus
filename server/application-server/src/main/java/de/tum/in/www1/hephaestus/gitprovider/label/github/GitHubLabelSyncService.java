@@ -170,12 +170,6 @@ public class GitHubLabelSyncService {
      * The processor handles this by using name-based lookup as fallback.
      */
     private GitHubLabelDTO convertToDTO(de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.Label graphQlLabel) {
-        return new GitHubLabelDTO(
-            null, // id - GraphQL doesn't expose databaseId for labels
-            graphQlLabel.getId(), // nodeId
-            graphQlLabel.getName(),
-            graphQlLabel.getDescription(),
-            graphQlLabel.getColor()
-        );
+        return GitHubLabelDTO.fromLabel(graphQlLabel);
     }
 }

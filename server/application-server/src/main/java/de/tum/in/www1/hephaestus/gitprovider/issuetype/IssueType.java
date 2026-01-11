@@ -10,6 +10,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import java.time.Instant;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -60,6 +61,15 @@ public class IssueType {
     @JoinColumn(name = "organization_id", nullable = false)
     @ToString.Exclude
     private Organization organization;
+
+    /**
+     * Timestamp of the last successful sync for this issue type from the Git provider.
+     * <p>
+     * This is ETL infrastructure used by the sync engine to track when this issue type
+     * was last synchronized via GraphQL. Used to implement sync cooldown logic
+     * and detect stale data.
+     */
+    private Instant lastSyncAt;
 
     /**
      * Issue type colors as defined in GitHub's IssueTypeColor enum.

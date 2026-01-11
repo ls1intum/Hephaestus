@@ -6,18 +6,15 @@ import de.tum.in.www1.hephaestus.activity.scoring.XpPrecision;
 import de.tum.in.www1.hephaestus.core.LoggingUtils;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.issuecomment.IssueComment;
-import de.tum.in.www1.hephaestus.gitprovider.issuecomment.IssueCommentRepository;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestInfoDTO;
-import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReview;
-import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReviewRepository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryInfoDTO;
-import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserInfoDTO;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.profile.dto.ProfileDTO;
 import de.tum.in.www1.hephaestus.profile.dto.ProfileReviewActivityDTO;
+import de.tum.in.www1.hephaestus.workspace.WorkspaceContributionActivityService;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceMembershipService;
 import java.time.Duration;
 import java.time.Instant;
@@ -56,32 +53,35 @@ public class UserProfileService {
     private static final Duration DEFAULT_ACTIVITY_WINDOW = Duration.ofDays(7);
 
     private final UserRepository userRepository;
-    private final RepositoryRepository repositoryRepository;
-    private final PullRequestRepository pullRequestRepository;
-    private final PullRequestReviewRepository pullRequestReviewRepository;
-    private final IssueCommentRepository issueCommentRepository;
+    private final ProfileRepositoryQueryRepository profileRepositoryQueryRepository;
+    private final ProfilePullRequestQueryRepository profilePullRequestQueryRepository;
+    private final ProfileReviewQueryRepository profileReviewQueryRepository;
+    private final ProfileCommentQueryRepository profileCommentQueryRepository;
     private final ActivityEventRepository activityEventRepository;
     private final ProfileReviewActivityAssembler reviewActivityAssembler;
     private final WorkspaceMembershipService workspaceMembershipService;
+    private final WorkspaceContributionActivityService workspaceContributionActivityService;
 
     public UserProfileService(
         UserRepository userRepository,
-        RepositoryRepository repositoryRepository,
-        PullRequestRepository pullRequestRepository,
-        PullRequestReviewRepository pullRequestReviewRepository,
-        IssueCommentRepository issueCommentRepository,
+        ProfileRepositoryQueryRepository profileRepositoryQueryRepository,
+        ProfilePullRequestQueryRepository profilePullRequestQueryRepository,
+        ProfileReviewQueryRepository profileReviewQueryRepository,
+        ProfileCommentQueryRepository profileCommentQueryRepository,
         ActivityEventRepository activityEventRepository,
         ProfileReviewActivityAssembler reviewActivityAssembler,
-        WorkspaceMembershipService workspaceMembershipService
+        WorkspaceMembershipService workspaceMembershipService,
+        WorkspaceContributionActivityService workspaceContributionActivityService
     ) {
         this.userRepository = userRepository;
-        this.repositoryRepository = repositoryRepository;
-        this.pullRequestRepository = pullRequestRepository;
-        this.pullRequestReviewRepository = pullRequestReviewRepository;
-        this.issueCommentRepository = issueCommentRepository;
+        this.profileRepositoryQueryRepository = profileRepositoryQueryRepository;
+        this.profilePullRequestQueryRepository = profilePullRequestQueryRepository;
+        this.profileReviewQueryRepository = profileReviewQueryRepository;
+        this.profileCommentQueryRepository = profileCommentQueryRepository;
         this.activityEventRepository = activityEventRepository;
         this.reviewActivityAssembler = reviewActivityAssembler;
         this.workspaceMembershipService = workspaceMembershipService;
+        this.workspaceContributionActivityService = workspaceContributionActivityService;
     }
 
     /**
@@ -117,11 +117,15 @@ public class UserProfileService {
 
         int leaguePoints = workspaceMembershipService.getCurrentLeaguePoints(workspaceId, userEntity);
         UserInfoDTO user = UserInfoDTO.fromUser(userEntity, leaguePoints);
-        var firstContribution = pullRequestRepository.firstContributionByAuthorLogin(login).orElse(null);
+
+        // First contribution is workspace-scoped to only show activity in monitored repositories
+        var firstContribution = workspaceId == null
+            ? null
+            : workspaceContributionActivityService.findFirstContributionInstant(workspaceId, userEntity.getId()).orElse(null);
 
         List<PullRequestInfoDTO> openPullRequests = workspaceId == null
             ? List.of()
-            : pullRequestRepository
+            : profilePullRequestQueryRepository
                   .findAssignedByLoginAndStates(login, Set.of(Issue.State.OPEN), workspaceId)
                   .stream()
                   .map(PullRequestInfoDTO::fromPullRequest)
@@ -129,7 +133,7 @@ public class UserProfileService {
 
         List<RepositoryInfoDTO> contributedRepositories = workspaceId == null
             ? List.of()
-            : repositoryRepository
+            : profileRepositoryQueryRepository
                   .findContributedByLogin(login, workspaceId)
                   .stream()
                   .map(RepositoryInfoDTO::fromRepository)
@@ -168,14 +172,14 @@ public class UserProfileService {
         }
 
         // 1. Fetch reviews and comments from git provider (pure ETL data)
-        List<PullRequestReview> reviews = pullRequestReviewRepository.findAllByAuthorLoginInTimeframe(
+        List<PullRequestReview> reviews = profileReviewQueryRepository.findAllByAuthorLoginInTimeframe(
             login,
             timeRange.after(),
             timeRange.before(),
             workspaceId
         );
 
-        List<IssueComment> comments = issueCommentRepository.findAllByAuthorLoginInTimeframe(
+        List<IssueComment> comments = profileCommentQueryRepository.findAllByAuthorLoginInTimeframe(
             login,
             timeRange.after(),
             timeRange.before(),

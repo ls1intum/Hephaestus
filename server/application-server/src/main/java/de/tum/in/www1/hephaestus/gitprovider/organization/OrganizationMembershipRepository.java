@@ -21,8 +21,8 @@ public interface OrganizationMembershipRepository
     @Modifying
     @Query(
         value = """
-        INSERT INTO organization_membership (organization_id, user_id, role, joined_at)
-        VALUES (:orgId, :userId, :role, now())
+        INSERT INTO organization_membership (organization_id, user_id, role)
+        VALUES (:orgId, :userId, :#{#role.name()})
         ON CONFLICT (organization_id, user_id)
         DO UPDATE SET role = EXCLUDED.role
         """,
@@ -31,7 +31,7 @@ public interface OrganizationMembershipRepository
     void upsertMembership(
         @Param("orgId") Long organizationId,
         @Param("userId") Long userId,
-        @Param("role") String role
+        @Param("role") OrganizationMemberRole role
     );
 
     @Modifying

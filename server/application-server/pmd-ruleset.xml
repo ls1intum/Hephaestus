@@ -1,0 +1,71 @@
+<?xml version="1.0"?>
+<ruleset name="Hephaestus PMD Rules"
+         xmlns="http://pmd.sourceforge.net/ruleset/2.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://pmd.sourceforge.net/ruleset/2.0.0 https://pmd.sourceforge.io/ruleset_2_0_0.xsd">
+
+    <description>
+        PMD ruleset for Hephaestus following industry best practices.
+        Run with: ./mvnw pmd:check or npm run lint:java
+
+        Based on PMD Best Practices and Maven PMD Plugin defaults.
+        See: https://pmd.github.io/pmd/pmd_rules_java_bestpractices.html
+    </description>
+
+    <!-- Exclude generated code -->
+    <exclude-pattern>.*/intelligenceservice/.*</exclude-pattern>
+    <exclude-pattern>.*/target/.*</exclude-pattern>
+
+    <!-- ====================================================================
+         BEST PRACTICES - High-value rules for code quality
+         ==================================================================== -->
+
+    <!-- Unused code detection -->
+    <rule ref="category/java/bestpractices.xml/UnusedPrivateField"/>
+    <rule ref="category/java/bestpractices.xml/UnusedLocalVariable"/>
+    <rule ref="category/java/bestpractices.xml/UnusedPrivateMethod"/>
+
+    <!-- Avoid common mistakes -->
+    <rule ref="category/java/bestpractices.xml/AvoidReassigningParameters"/>
+    <rule ref="category/java/bestpractices.xml/DefaultLabelNotLastInSwitchStmt"/>
+    <rule ref="category/java/bestpractices.xml/MissingOverride"/>
+    <rule ref="category/java/bestpractices.xml/PreserveStackTrace"/>
+    <rule ref="category/java/bestpractices.xml/SwitchStmtsShouldHaveDefault"/>
+    <rule ref="category/java/bestpractices.xml/UseCollectionIsEmpty"/>
+
+    <!-- ====================================================================
+         ERROR PRONE - Catch potential bugs early
+         ==================================================================== -->
+
+    <rule ref="category/java/errorprone.xml/AvoidDecimalLiteralsInBigDecimalConstructor"/>
+    <rule ref="category/java/errorprone.xml/AvoidMultipleUnaryOperators"/>
+    <rule ref="category/java/errorprone.xml/BrokenNullCheck"/>
+    <rule ref="category/java/errorprone.xml/CheckSkipResult"/>
+    <rule ref="category/java/errorprone.xml/ClassCastExceptionWithToArray"/>
+    <rule ref="category/java/errorprone.xml/DontUseFloatTypeForLoopIndices"/>
+    <rule ref="category/java/errorprone.xml/JumbledIncrementer"/>
+    <rule ref="category/java/errorprone.xml/MisplacedNullCheck"/>
+    <rule ref="category/java/errorprone.xml/OverrideBothEqualsAndHashcode"/>
+    <rule ref="category/java/errorprone.xml/ReturnFromFinallyBlock"/>
+    <rule ref="category/java/errorprone.xml/UnconditionalIfStatement"/>
+    <rule ref="category/java/errorprone.xml/UnnecessaryConversionTemporary"/>
+    <rule ref="category/java/errorprone.xml/UselessOperationOnImmutable"/>
+
+    <!-- ====================================================================
+         DESIGN - Encourage maintainable code
+         ==================================================================== -->
+
+    <rule ref="category/java/design.xml/SimplifyBooleanReturns"/>
+    <rule ref="category/java/design.xml/UselessOverridingMethod"/>
+
+    <!-- ====================================================================
+         CODE STYLE - Keep code clean
+         ==================================================================== -->
+
+    <rule ref="category/java/codestyle.xml/UnnecessaryImport"/>
+    <rule ref="category/java/codestyle.xml/ExtendsObject"/>
+    <rule ref="category/java/codestyle.xml/UnnecessaryReturn"/>
+    <!-- PMD 7: EmptyControlStatement replaces EmptyIfStmt, EmptyWhileStmt, etc. -->
+    <rule ref="category/java/codestyle.xml/EmptyControlStatement"/>
+
+</ruleset>

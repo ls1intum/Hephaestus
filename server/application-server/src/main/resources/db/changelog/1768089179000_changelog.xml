@@ -1,0 +1,1764 @@
+<?xml version="1.1" encoding="UTF-8" standalone="no"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                   http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+    =======================================================================================
+    Consolidated GitProvider ETL Refactoring Migration
+    =======================================================================================
+
+    This changelog consolidates all schema changes for the hub4j removal refactoring,
+    activity event ledger implementation, workspace team settings, and ETL consistency fixes.
+
+    Table of Contents:
+    ==================
+    SECTION  1: Documentation Changesets (TRIAGE permission level)
+    SECTION  2: Drop Legacy Tables (contribution_event)
+    SECTION  3: Activity Event Ledger (event sourcing for leaderboard/mentor)
+    SECTION  4: Issue Types (issue_type table)
+    SECTION  5: Sub-Issues Hierarchy (parent_issue_id, sub-issue counts)
+    SECTION  6: Issue Dependencies (issue_blocking table)
+    SECTION  7: Workspace Sync Timestamps
+    SECTION  8: Drop Unused User Columns
+    SECTION  9: Drop Unused Organization Columns
+    SECTION 10: Drop Unused Repository Columns
+    SECTION 11: Drop Unused Issue Columns
+    SECTION 12: Drop Deprecated PR Review Comment Columns
+    SECTION 13: Column Type Fixes
+    SECTION 14: Performance Indexes
+    SECTION 15: Dead Letter Event Storage
+    SECTION 16: Pull Request GraphQL Fields
+    SECTION 17: Cleanup Deprecated Issue Columns (bad_practice_summary, last_detection_time)
+    SECTION 18: Issue Enum CHECK Constraints (merge_state_status, review_decision)
+    SECTION 19: PullRequestBadPractice Enum Migration (ordinal to string)
+    SECTION 20: User Preferences Extraction (user_preferences table)
+    SECTION 21: Workspace Team Settings Tables
+    SECTION 22: ETL Consistency Fixes
+    SECTION 23: Drop Legacy Columns After Migration
+    SECTION 24: Add last_sync_at to Sync-Enabled Entities
+    SECTION 25: Fix Timestamp Type Consistency
+    SECTION 26: Add Missing Foreign Key Constraints
+    SECTION 27: URL Column Length Standardization (html_url -> VARCHAR(512))
+    SECTION 28: Rename pullrequestbadpractice Table
+    SECTION 29: Timestamp Column Naming Standardization (*_time -> *_at)
+    SECTION 30: Drop PullRequestReviewThread.resolved_at (GitHub only provides boolean)
+    SECTION 31: Add Label createdAt/updatedAt (created_at, updated_at columns)
+    SECTION 32: Drop Redundant Issue Columns (has_pull_request, organization_membership.joined_at)
+
+    Original files consolidated:
+    - 1767500000000_changelog.xml (GraphQL sync migration)
+    - 1768000000000_workspace_team_settings.xml
+    - 1768500000000_etl_consistency_fixes.xml
+    - 1768200000000_drop_has_pull_request.xml
+    - 1768300000000_drop_organization_membership_joined_at.xml
+
+    See: docs/contributor/database-migration.mdx
+    =======================================================================================
+    -->
+
+    <!-- ==================== SECTION 1: Documentation Changesets ==================== -->
+
+    <changeSet id="1767287604000-1-add-triage-permission-doc" author="hephaestus">
+        <comment>
+            Added TRIAGE permission level to TeamRepositoryPermission.PermissionLevel enum.
+            No schema migration needed - the permission column is VARCHAR(32).
+            Previously, GitHub TRIAGE permissions were incorrectly mapped to READ.
+            After this change, they are correctly stored as TRIAGE.
+        </comment>
+        <empty/>
+    </changeSet>
+
+    <!-- ==================== SECTION 2: Drop Legacy Tables ==================== -->
+
+    <changeSet id="1767300000000-drop-contribution-event" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <tableExists tableName="contribution_event"/>
+        </preConditions>
+        <dropTable tableName="contribution_event"/>
+    </changeSet>
+
+    <!-- ==================== SECTION 3: Activity Event Ledger ==================== -->
+    <!--
+    MINIMAL Activity Event Ledger - The Stripe/Square Approach
+
+    One table. 11 columns. 4 indexes. That's it.
+
+    Supports:
+    - Leaderboard: COUNT(*) GROUP BY actor_id, event_type
+    - Mentor context: WHERE actor_id = ? ORDER BY occurred_at DESC
+    - Email attribution: WHERE correlation_id = ? for notification->click chains
+    - DX Core 4 metrics: Speed, Effectiveness, Quality, Impact
+    -->
+
+    <changeSet id="1767300000000-create-activity-event" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <tableExists tableName="activity_event"/>
+            </not>
+        </preConditions>
+        <createTable tableName="activity_event">
+            <column name="id" type="UUID">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="event_key" type="VARCHAR(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="event_type" type="VARCHAR(64)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="occurred_at" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="false"/>
+            </column>
+            <column name="actor_id" type="BIGINT">
+                <constraints nullable="true"/>
+            </column>
+            <column name="workspace_id" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="repository_id" type="BIGINT">
+                <constraints nullable="true"/>
+            </column>
+            <column name="target_type" type="VARCHAR(32)">
+                <constraints nullable="true"/>
+            </column>
+            <column name="target_id" type="BIGINT">
+                <constraints nullable="true"/>
+            </column>
+            <column name="source_system" type="VARCHAR(32)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="correlation_id" type="UUID">
+                <constraints nullable="true"/>
+            </column>
+            <column name="xp" type="DOUBLE PRECISION" defaultValueNumeric="0.0">
+                <constraints nullable="false"/>
+            </column>
+            <column name="payload" type="JSONB">
+                <constraints nullable="true"/>
+            </column>
+            <column name="ingested_at" type="TIMESTAMP WITH TIME ZONE" defaultValueComputed="NOW()">
+                <constraints nullable="false"/>
+            </column>
+            <!-- Added in enhancement section - include here for single-pass table creation -->
+            <column name="schema_version" type="INTEGER" defaultValueNumeric="1">
+                <constraints nullable="false"/>
+            </column>
+            <column name="trigger_context" type="VARCHAR(64)">
+                <constraints nullable="true"/>
+            </column>
+            <column name="content_hash" type="VARCHAR(64)">
+                <constraints nullable="true"/>
+            </column>
+            <column name="formula_version" type="INTEGER" defaultValueNumeric="1">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+
+        <addUniqueConstraint
+            tableName="activity_event"
+            columnNames="workspace_id, event_key"
+            constraintName="uk_activity_event_workspace_key"/>
+
+        <!-- Core indexes -->
+        <createIndex tableName="activity_event" indexName="idx_activity_event_workspace_time">
+            <column name="workspace_id"/>
+            <column name="occurred_at"/>
+        </createIndex>
+        <createIndex tableName="activity_event" indexName="idx_activity_event_actor_time">
+            <column name="actor_id"/>
+            <column name="occurred_at"/>
+        </createIndex>
+        <createIndex tableName="activity_event" indexName="idx_activity_event_type_time">
+            <column name="event_type"/>
+            <column name="occurred_at"/>
+        </createIndex>
+        <createIndex tableName="activity_event" indexName="idx_activity_event_correlation">
+            <column name="correlation_id"/>
+        </createIndex>
+        <createIndex tableName="activity_event" indexName="idx_activity_event_leaderboard">
+            <column name="workspace_id"/>
+            <column name="actor_id"/>
+            <column name="occurred_at"/>
+        </createIndex>
+        <createIndex tableName="activity_event" indexName="idx_activity_event_target">
+            <column name="target_id"/>
+            <column name="target_type"/>
+        </createIndex>
+        <createIndex tableName="activity_event" indexName="idx_activity_event_trigger_context">
+            <column name="trigger_context"/>
+        </createIndex>
+
+        <!-- Performance indexes with descending order -->
+        <createIndex tableName="activity_event" indexName="idx_activity_event_workspace_occurred">
+            <column name="workspace_id"/>
+            <column name="occurred_at" descending="true"/>
+        </createIndex>
+        <createIndex tableName="activity_event" indexName="idx_activity_event_actor_occurred">
+            <column name="actor_id"/>
+            <column name="occurred_at" descending="true"/>
+        </createIndex>
+        <createIndex tableName="activity_event" indexName="idx_activity_event_workspace_actor_occurred">
+            <column name="workspace_id"/>
+            <column name="actor_id"/>
+            <column name="occurred_at" descending="true"/>
+        </createIndex>
+        <!-- Covering index for leaderboard SUM(xp) GROUP BY actor_id queries -->
+        <createIndex tableName="activity_event" indexName="idx_activity_event_leaderboard_covering">
+            <column name="workspace_id"/>
+            <column name="occurred_at" descending="true"/>
+            <column name="actor_id"/>
+            <column name="xp"/>
+        </createIndex>
+
+        <!-- Foreign keys with SET NULL on delete for ledger immutability -->
+        <addForeignKeyConstraint
+            baseTableName="activity_event"
+            baseColumnNames="workspace_id"
+            referencedTableName="workspace"
+            referencedColumnNames="id"
+            constraintName="fk_activity_event_workspace"/>
+        <addForeignKeyConstraint
+            baseTableName="activity_event"
+            baseColumnNames="actor_id"
+            referencedTableName="user"
+            referencedColumnNames="id"
+            constraintName="fk_activity_event_actor"
+            onDelete="SET NULL"/>
+        <addForeignKeyConstraint
+            baseTableName="activity_event"
+            baseColumnNames="repository_id"
+            referencedTableName="repository"
+            referencedColumnNames="id"
+            constraintName="fk_activity_event_repository"
+            onDelete="SET NULL"/>
+    </changeSet>
+
+    <!-- XP non-negative constraint -->
+    <changeSet id="1767600000000-1-check-xp-non-negative" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <tableExists tableName="activity_event"/>
+            <columnExists tableName="activity_event" columnName="xp"/>
+        </preConditions>
+        <sql>
+            ALTER TABLE activity_event
+            ADD CONSTRAINT chk_activity_event_xp_non_negative
+            CHECK (xp >= 0);
+        </sql>
+        <rollback>
+            <sql>
+                ALTER TABLE activity_event
+                DROP CONSTRAINT IF EXISTS chk_activity_event_xp_non_negative;
+            </sql>
+        </rollback>
+        <comment>Ensure XP values are non-negative at database level</comment>
+    </changeSet>
+
+    <!-- ==================== SECTION 4: Issue Types ==================== -->
+
+    <changeSet id="1767300000000-create-issue-type-table" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <tableExists tableName="issue_type"/>
+            </not>
+        </preConditions>
+        <createTable tableName="issue_type">
+            <column name="id" type="varchar(128)">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="name" type="varchar(128)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="description" type="text">
+                <constraints nullable="true"/>
+            </column>
+            <column name="color" type="varchar(20)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="is_enabled" type="boolean" defaultValueBoolean="true">
+                <constraints nullable="false"/>
+            </column>
+            <column name="organization_id" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+
+        <addForeignKeyConstraint
+            baseTableName="issue_type"
+            baseColumnNames="organization_id"
+            referencedTableName="organization"
+            referencedColumnNames="id"
+            constraintName="fk_issue_type_organization"
+            onDelete="CASCADE"/>
+
+        <createIndex tableName="issue_type" indexName="idx_issue_type_organization_id">
+            <column name="organization_id"/>
+        </createIndex>
+    </changeSet>
+
+    <!-- ==================== SECTION 5: Sub-Issues Hierarchy ==================== -->
+
+    <changeSet id="1767300000000-add-sub-issue-hierarchy" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <columnExists tableName="issue" columnName="parent_issue_id"/>
+            </not>
+        </preConditions>
+        <addColumn tableName="issue">
+            <column name="parent_issue_id" type="bigint">
+                <constraints nullable="true"/>
+            </column>
+        </addColumn>
+
+        <addForeignKeyConstraint
+            baseTableName="issue"
+            baseColumnNames="parent_issue_id"
+            referencedTableName="issue"
+            referencedColumnNames="id"
+            constraintName="fk_issue_parent_issue"
+            onDelete="SET NULL"/>
+
+        <createIndex tableName="issue" indexName="idx_issue_parent_issue_id">
+            <column name="parent_issue_id"/>
+        </createIndex>
+    </changeSet>
+
+    <changeSet id="1767300000000-add-sub-issue-summary" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <columnExists tableName="issue" columnName="sub_issues_total"/>
+            </not>
+        </preConditions>
+        <addColumn tableName="issue">
+            <column name="sub_issues_total" type="integer">
+                <constraints nullable="true"/>
+            </column>
+            <column name="sub_issues_completed" type="integer">
+                <constraints nullable="true"/>
+            </column>
+            <column name="sub_issues_percent_completed" type="integer">
+                <constraints nullable="true"/>
+            </column>
+        </addColumn>
+    </changeSet>
+
+    <changeSet id="1767300000000-add-issue-type-to-issue" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <columnExists tableName="issue" columnName="issue_type_id"/>
+            </not>
+        </preConditions>
+        <addColumn tableName="issue">
+            <column name="issue_type_id" type="varchar(128)">
+                <constraints nullable="true"/>
+            </column>
+        </addColumn>
+
+        <addForeignKeyConstraint
+            baseTableName="issue"
+            baseColumnNames="issue_type_id"
+            referencedTableName="issue_type"
+            referencedColumnNames="id"
+            constraintName="fk_issue_issue_type"
+            onDelete="SET NULL"/>
+
+        <createIndex tableName="issue" indexName="idx_issue_issue_type_id">
+            <column name="issue_type_id"/>
+        </createIndex>
+    </changeSet>
+
+    <!-- ==================== SECTION 6: Issue Dependencies ==================== -->
+
+    <changeSet id="1767300000000-create-issue-blocking-table" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <tableExists tableName="issue_blocking"/>
+            </not>
+        </preConditions>
+        <createTable tableName="issue_blocking">
+            <column name="blocked_issue_id" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+            <column name="blocking_issue_id" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+
+        <addPrimaryKey tableName="issue_blocking"
+            columnNames="blocked_issue_id, blocking_issue_id"
+            constraintName="pk_issue_blocking"/>
+
+        <addForeignKeyConstraint
+            baseTableName="issue_blocking"
+            baseColumnNames="blocked_issue_id"
+            referencedTableName="issue"
+            referencedColumnNames="id"
+            constraintName="fk_issue_blocking_blocked"
+            onDelete="CASCADE"/>
+
+        <addForeignKeyConstraint
+            baseTableName="issue_blocking"
+            baseColumnNames="blocking_issue_id"
+            referencedTableName="issue"
+            referencedColumnNames="id"
+            constraintName="fk_issue_blocking_blocking"
+            onDelete="CASCADE"/>
+
+        <createIndex tableName="issue_blocking" indexName="idx_issue_blocking_blocked_id">
+            <column name="blocked_issue_id"/>
+        </createIndex>
+        <createIndex tableName="issue_blocking" indexName="idx_issue_blocking_blocking_id">
+            <column name="blocking_issue_id"/>
+        </createIndex>
+    </changeSet>
+
+    <!-- ==================== SECTION 7: Workspace Sync Timestamps ==================== -->
+
+    <changeSet id="1767300000000-add-workspace-sync-timestamps" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <columnExists tableName="workspace" columnName="sub_issues_synced_at"/>
+            </not>
+        </preConditions>
+        <addColumn tableName="workspace">
+            <column name="sub_issues_synced_at" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="true"/>
+            </column>
+            <column name="issue_types_synced_at" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="true"/>
+            </column>
+            <column name="issue_dependencies_synced_at" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="true"/>
+            </column>
+        </addColumn>
+    </changeSet>
+
+    <!-- ==================== SECTION 8: Drop Unused User Columns ==================== -->
+
+    <changeSet id="1767300000000-drop-user-followers" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="user" columnName="followers"/>
+        </preConditions>
+        <dropColumn tableName="user" columnName="followers"/>
+    </changeSet>
+
+    <changeSet id="1767300000000-drop-user-following" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="user" columnName="following"/>
+        </preConditions>
+        <dropColumn tableName="user" columnName="following"/>
+    </changeSet>
+
+    <changeSet id="1767300000000-drop-user-blog" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="user" columnName="blog"/>
+        </preConditions>
+        <dropColumn tableName="user" columnName="blog"/>
+    </changeSet>
+
+    <changeSet id="1767300000000-drop-user-company" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="user" columnName="company"/>
+        </preConditions>
+        <dropColumn tableName="user" columnName="company"/>
+    </changeSet>
+
+    <changeSet id="1767300000000-drop-user-description" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="user" columnName="description"/>
+        </preConditions>
+        <dropColumn tableName="user" columnName="description"/>
+    </changeSet>
+
+    <changeSet id="1767300000000-drop-user-location" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="user" columnName="location"/>
+        </preConditions>
+        <dropColumn tableName="user" columnName="location"/>
+    </changeSet>
+
+    <changeSet id="1767300000000-drop-user-league-points" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="user" columnName="league_points"/>
+        </preConditions>
+        <dropColumn tableName="user" columnName="league_points"/>
+    </changeSet>
+
+    <changeSet id="1767300000000-drop-hephaestus-user-league-points" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="hephaestus_user" columnName="league_points"/>
+        </preConditions>
+        <dropColumn tableName="hephaestus_user" columnName="league_points"/>
+    </changeSet>
+
+    <!-- ==================== SECTION 9: Drop Unused Organization Columns ==================== -->
+
+    <changeSet id="1767300000000-drop-org-installation-id" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="organization" columnName="installation_id"/>
+        </preConditions>
+        <comment>Drop installation_id from organization - installations are now tracked at workspace level</comment>
+        <dropColumn tableName="organization" columnName="installation_id"/>
+    </changeSet>
+
+    <!-- ==================== SECTION 10: Drop Unused Repository Columns ==================== -->
+
+    <changeSet id="1767300000000-drop-repo-has-issues" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="repository" columnName="has_issues"/>
+        </preConditions>
+        <dropColumn tableName="repository" columnName="has_issues"/>
+    </changeSet>
+
+    <changeSet id="1767300000000-drop-repo-has-projects" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="repository" columnName="has_projects"/>
+        </preConditions>
+        <dropColumn tableName="repository" columnName="has_projects"/>
+    </changeSet>
+
+    <changeSet id="1767300000000-drop-repo-has-wiki" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="repository" columnName="has_wiki"/>
+        </preConditions>
+        <dropColumn tableName="repository" columnName="has_wiki"/>
+    </changeSet>
+
+    <changeSet id="1767300000000-drop-repo-homepage" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="repository" columnName="homepage"/>
+        </preConditions>
+        <dropColumn tableName="repository" columnName="homepage"/>
+    </changeSet>
+
+    <changeSet id="1767300000000-drop-repo-stargazers-count" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="repository" columnName="stargazers_count"/>
+        </preConditions>
+        <dropColumn tableName="repository" columnName="stargazers_count"/>
+    </changeSet>
+
+    <changeSet id="1767300000000-drop-repo-watchers-count" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="repository" columnName="watchers_count"/>
+        </preConditions>
+        <dropColumn tableName="repository" columnName="watchers_count"/>
+    </changeSet>
+
+    <!-- ==================== SECTION 11: Drop Unused Issue Columns ==================== -->
+
+    <changeSet id="1767300000000-drop-issue-is-mergeable" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="issue" columnName="is_mergeable"/>
+        </preConditions>
+        <dropColumn tableName="issue" columnName="is_mergeable"/>
+    </changeSet>
+
+    <changeSet id="1767300000000-drop-issue-maintainer-can-modify" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="issue" columnName="maintainer_can_modify"/>
+        </preConditions>
+        <dropColumn tableName="issue" columnName="maintainer_can_modify"/>
+    </changeSet>
+
+    <changeSet id="1767300000000-drop-issue-merge-commit-sha" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="issue" columnName="merge_commit_sha"/>
+        </preConditions>
+        <dropColumn tableName="issue" columnName="merge_commit_sha"/>
+    </changeSet>
+
+    <changeSet id="1767300000000-drop-issue-mergeable-state" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="issue" columnName="mergeable_state"/>
+        </preConditions>
+        <dropColumn tableName="issue" columnName="mergeable_state"/>
+    </changeSet>
+
+    <!-- ==================== SECTION 12: Drop Deprecated PR Review Comment Columns ==================== -->
+
+    <changeSet id="1767300000000-drop-pr-review-comment-position" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="pull_request_review_comment" columnName="position"/>
+        </preConditions>
+        <dropColumn tableName="pull_request_review_comment" columnName="position"/>
+    </changeSet>
+
+    <changeSet id="1767300000000-drop-pr-review-comment-original-position" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="pull_request_review_comment" columnName="original_position"/>
+        </preConditions>
+        <dropColumn tableName="pull_request_review_comment" columnName="original_position"/>
+    </changeSet>
+
+    <!-- ==================== SECTION 13: Column Type Fixes ==================== -->
+
+    <changeSet id="1767300000000-fix-nodeid-column-length" author="hephaestus">
+        <modifyDataType tableName="pull_request_review_thread"
+            columnName="node_id"
+            newDataType="varchar(128)"/>
+    </changeSet>
+
+    <changeSet id="1767300000000-fix-repository-description-type" author="hephaestus">
+        <sql>ALTER TABLE repository ALTER COLUMN description TYPE TEXT;</sql>
+    </changeSet>
+
+    <!-- ==================== SECTION 14: Performance Indexes ==================== -->
+
+    <changeSet id="1767300000000-idx-issue-repository-id" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <not><indexExists indexName="idx_issue_repository_id"/></not>
+        </preConditions>
+        <createIndex tableName="issue" indexName="idx_issue_repository_id">
+            <column name="repository_id"/>
+        </createIndex>
+    </changeSet>
+
+    <changeSet id="1767300000000-idx-issue-author-id" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <not><indexExists indexName="idx_issue_author_id"/></not>
+        </preConditions>
+        <createIndex tableName="issue" indexName="idx_issue_author_id">
+            <column name="author_id"/>
+        </createIndex>
+    </changeSet>
+
+    <changeSet id="1767300000000-idx-issue-state" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <not><indexExists indexName="idx_issue_state"/></not>
+        </preConditions>
+        <createIndex tableName="issue" indexName="idx_issue_state">
+            <column name="state"/>
+        </createIndex>
+    </changeSet>
+
+    <changeSet id="1767300000000-idx-pr-review-author-id" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <not><indexExists indexName="idx_pr_review_author_id"/></not>
+        </preConditions>
+        <createIndex tableName="pull_request_review" indexName="idx_pr_review_author_id">
+            <column name="author_id"/>
+        </createIndex>
+    </changeSet>
+
+    <changeSet id="1767300000000-idx-pr-review-submitted-at" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <not><indexExists indexName="idx_pr_review_submitted_at"/></not>
+        </preConditions>
+        <createIndex tableName="pull_request_review" indexName="idx_pr_review_submitted_at">
+            <column name="submitted_at"/>
+        </createIndex>
+    </changeSet>
+
+    <changeSet id="1767300000000-idx-pr-review-pull-request-id" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <not><indexExists indexName="idx_pr_review_pull_request_id"/></not>
+        </preConditions>
+        <createIndex tableName="pull_request_review" indexName="idx_pr_review_pull_request_id">
+            <column name="pull_request_id"/>
+        </createIndex>
+    </changeSet>
+
+    <changeSet id="1767300000000-idx-issue-comment-author-id" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <not><indexExists indexName="idx_issue_comment_author_id"/></not>
+        </preConditions>
+        <createIndex tableName="issue_comment" indexName="idx_issue_comment_author_id">
+            <column name="author_id"/>
+        </createIndex>
+    </changeSet>
+
+    <changeSet id="1767300000000-idx-issue-comment-created-at" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <not><indexExists indexName="idx_issue_comment_created_at"/></not>
+        </preConditions>
+        <createIndex tableName="issue_comment" indexName="idx_issue_comment_created_at">
+            <column name="created_at"/>
+        </createIndex>
+    </changeSet>
+
+    <changeSet id="1767300000000-idx-repository-name-with-owner" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <not><indexExists indexName="idx_repository_name_with_owner"/></not>
+        </preConditions>
+        <createIndex tableName="repository" indexName="idx_repository_name_with_owner">
+            <column name="name_with_owner"/>
+        </createIndex>
+    </changeSet>
+
+    <changeSet id="1767300000000-idx-repository-organization-id" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <not><indexExists indexName="idx_repository_organization_id"/></not>
+        </preConditions>
+        <createIndex tableName="repository" indexName="idx_repository_organization_id">
+            <column name="organization_id"/>
+        </createIndex>
+    </changeSet>
+
+    <changeSet id="1767300000000-idx-workspace-membership-user-id" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <not><indexExists indexName="idx_workspace_membership_user_id"/></not>
+        </preConditions>
+        <createIndex tableName="workspace_membership" indexName="idx_workspace_membership_user_id">
+            <column name="user_id"/>
+        </createIndex>
+    </changeSet>
+
+    <!-- ==================== SECTION 15: Dead Letter Event Storage ==================== -->
+
+    <changeSet id="1767700000000-1-create-dead-letter-event-table" author="hephaestus">
+        <createTable tableName="dead_letter_event">
+            <column name="id" type="UUID">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="workspace_id" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="event_type" type="VARCHAR(64)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="occurred_at" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="false"/>
+            </column>
+            <column name="actor_id" type="BIGINT"/>
+            <column name="repository_id" type="BIGINT"/>
+            <column name="target_type" type="VARCHAR(32)"/>
+            <column name="target_id" type="BIGINT"/>
+            <column name="xp" type="DOUBLE PRECISION">
+                <constraints nullable="false"/>
+            </column>
+            <column name="source_system" type="VARCHAR(32)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="payload" type="JSONB"/>
+            <column name="error_message" type="VARCHAR(2000)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="error_type" type="VARCHAR(256)"/>
+            <column name="stack_trace" type="TEXT"/>
+            <column name="retry_count" type="INTEGER" defaultValue="0">
+                <constraints nullable="false"/>
+            </column>
+            <column name="status" type="VARCHAR(16)" defaultValue="PENDING">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="resolved_at" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="resolution_notes" type="VARCHAR(1000)"/>
+        </createTable>
+        <comment>Create dead_letter_event table for persisting failed activity events</comment>
+    </changeSet>
+
+    <changeSet id="1767700000000-2-dead-letter-status-created-index" author="hephaestus">
+        <createIndex tableName="dead_letter_event" indexName="idx_dead_letter_status_created">
+            <column name="status"/>
+            <column name="created_at"/>
+        </createIndex>
+        <comment>Index for finding pending dead letters for retry</comment>
+    </changeSet>
+
+    <changeSet id="1767700000000-3-dead-letter-workspace-created-index" author="hephaestus">
+        <createIndex tableName="dead_letter_event" indexName="idx_dead_letter_workspace_created">
+            <column name="workspace_id"/>
+            <column name="created_at" descending="true"/>
+        </createIndex>
+        <comment>Index for workspace-specific dead letter queries</comment>
+    </changeSet>
+
+    <changeSet id="1767700000000-4-dead-letter-event-type-index" author="hephaestus">
+        <createIndex tableName="dead_letter_event" indexName="idx_dead_letter_event_type">
+            <column name="event_type"/>
+            <column name="created_at" descending="true"/>
+        </createIndex>
+        <comment>Index for analyzing failure patterns by event type</comment>
+    </changeSet>
+
+    <changeSet id="1767700000000-5-dead-letter-status-check" author="hephaestus">
+        <sql>
+            ALTER TABLE dead_letter_event
+            ADD CONSTRAINT chk_dead_letter_status
+            CHECK (status IN ('PENDING', 'RESOLVED', 'DISCARDED'));
+        </sql>
+        <rollback>
+            <sql>
+                ALTER TABLE dead_letter_event
+                DROP CONSTRAINT IF EXISTS chk_dead_letter_status;
+            </sql>
+        </rollback>
+        <comment>Ensure status is one of the allowed values</comment>
+    </changeSet>
+
+    <!-- ==================== SECTION 16: Pull Request GraphQL Fields ==================== -->
+
+    <changeSet id="1767900000000-1" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <columnExists tableName="issue" columnName="merge_state_status"/>
+            </not>
+        </preConditions>
+        <comment>Add merge_state_status for GraphQL MergeStateStatus enum</comment>
+        <addColumn tableName="issue">
+            <column name="merge_state_status" type="VARCHAR(255)"/>
+        </addColumn>
+    </changeSet>
+
+    <changeSet id="1767900000000-2" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <columnExists tableName="issue" columnName="mergeable"/>
+            </not>
+        </preConditions>
+        <comment>Add mergeable boolean for GraphQL mergeable field</comment>
+        <addColumn tableName="issue">
+            <column name="mergeable" type="BOOLEAN"/>
+        </addColumn>
+    </changeSet>
+
+    <changeSet id="1767900000000-3" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <columnExists tableName="issue" columnName="review_decision"/>
+            </not>
+        </preConditions>
+        <comment>Add review_decision for GraphQL PullRequestReviewDecision enum</comment>
+        <addColumn tableName="issue">
+            <column name="review_decision" type="VARCHAR(255)"/>
+        </addColumn>
+    </changeSet>
+
+    <changeSet id="1767900000000-4" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <columnExists tableName="issue" columnName="head_ref_name"/>
+            </not>
+        </preConditions>
+        <comment>Add head/base ref names and OIDs for PR branch information</comment>
+        <addColumn tableName="issue">
+            <column name="head_ref_name" type="VARCHAR(255)"/>
+        </addColumn>
+    </changeSet>
+
+    <changeSet id="1767900000000-5" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <columnExists tableName="issue" columnName="head_ref_oid"/>
+            </not>
+        </preConditions>
+        <addColumn tableName="issue">
+            <column name="head_ref_oid" type="VARCHAR(40)"/>
+        </addColumn>
+    </changeSet>
+
+    <changeSet id="1767900000000-6" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <columnExists tableName="issue" columnName="base_ref_name"/>
+            </not>
+        </preConditions>
+        <addColumn tableName="issue">
+            <column name="base_ref_name" type="VARCHAR(255)"/>
+        </addColumn>
+    </changeSet>
+
+    <changeSet id="1767900000000-7" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <columnExists tableName="issue" columnName="base_ref_oid"/>
+            </not>
+        </preConditions>
+        <addColumn tableName="issue">
+            <column name="base_ref_oid" type="VARCHAR(40)"/>
+        </addColumn>
+    </changeSet>
+
+    <!-- ==================== SECTION 17: Cleanup Deprecated Issue Columns ==================== -->
+
+    <changeSet id="1767900000000-10" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="issue" columnName="bad_practice_summary"/>
+        </preConditions>
+        <comment>Drop deprecated bad_practice_summary column (moved to separate analysis system)</comment>
+        <dropColumn tableName="issue" columnName="bad_practice_summary"/>
+    </changeSet>
+
+    <changeSet id="1767900000000-11" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="issue" columnName="last_detection_time"/>
+        </preConditions>
+        <comment>Drop deprecated last_detection_time column (moved to separate analysis system)</comment>
+        <dropColumn tableName="issue" columnName="last_detection_time"/>
+    </changeSet>
+
+    <!-- ==================== SECTION 18: Issue Enum CHECK Constraints ==================== -->
+
+    <changeSet id="1767900000000-12" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="issue" columnName="merge_state_status"/>
+            <sqlCheck expectedResult="0">
+                SELECT COUNT(*) FROM information_schema.table_constraints
+                WHERE constraint_name = 'issue_merge_state_status_check' AND table_name = 'issue'
+            </sqlCheck>
+        </preConditions>
+        <comment>Add CHECK constraint for merge_state_status enum values (GitHub MergeStateStatus)</comment>
+        <sql>
+            ALTER TABLE issue ADD CONSTRAINT issue_merge_state_status_check
+            CHECK ((merge_state_status)::text = ANY (ARRAY['BEHIND'::text, 'BLOCKED'::text, 'CLEAN'::text, 'DIRTY'::text, 'HAS_HOOKS'::text, 'UNKNOWN'::text, 'UNSTABLE'::text]));
+        </sql>
+        <rollback>
+            <sql>
+                ALTER TABLE issue DROP CONSTRAINT IF EXISTS issue_merge_state_status_check;
+            </sql>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="1767900000000-13" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="issue" columnName="review_decision"/>
+            <sqlCheck expectedResult="0">
+                SELECT COUNT(*) FROM information_schema.table_constraints
+                WHERE constraint_name = 'issue_review_decision_check' AND table_name = 'issue'
+            </sqlCheck>
+        </preConditions>
+        <comment>Add CHECK constraint for review_decision enum values (GitHub PullRequestReviewDecision)</comment>
+        <sql>
+            ALTER TABLE issue ADD CONSTRAINT issue_review_decision_check
+            CHECK ((review_decision)::text = ANY (ARRAY['APPROVED'::text, 'CHANGES_REQUESTED'::text, 'REVIEW_REQUIRED'::text]));
+        </sql>
+        <rollback>
+            <sql>
+                ALTER TABLE issue DROP CONSTRAINT IF EXISTS issue_review_decision_check;
+            </sql>
+        </rollback>
+    </changeSet>
+
+    <!-- ==================== SECTION 19: PullRequestBadPractice Enum Migration ==================== -->
+
+    <changeSet id="1767900000000-14-migrate-enum-columns" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <tableExists tableName="pullrequestbadpractice"/>
+            <columnExists tableName="pullrequestbadpractice" columnName="state"/>
+        </preConditions>
+        <comment>Convert enum columns from ordinal (smallint) to string (varchar) using direct ALTER TYPE</comment>
+        <sql>
+            -- Migrate state column (PullRequestBadPracticeState enum)
+            ALTER TABLE pullrequestbadpractice
+            ALTER COLUMN state TYPE VARCHAR(32) USING CASE state::integer
+                WHEN 0 THEN 'GOOD_PRACTICE'
+                WHEN 1 THEN 'MINOR_ISSUE'
+                WHEN 2 THEN 'NORMAL_ISSUE'
+                WHEN 3 THEN 'CRITICAL_ISSUE'
+                WHEN 4 THEN 'FIXED'
+                WHEN 5 THEN 'WONT_FIX'
+                WHEN 6 THEN 'WRONG'
+                ELSE 'NORMAL_ISSUE'
+            END;
+
+            -- Migrate user_state column (PullRequestBadPracticeState enum)
+            ALTER TABLE pullrequestbadpractice
+            ALTER COLUMN user_state TYPE VARCHAR(32) USING CASE user_state::integer
+                WHEN 0 THEN 'GOOD_PRACTICE'
+                WHEN 1 THEN 'MINOR_ISSUE'
+                WHEN 2 THEN 'NORMAL_ISSUE'
+                WHEN 3 THEN 'CRITICAL_ISSUE'
+                WHEN 4 THEN 'FIXED'
+                WHEN 5 THEN 'WONT_FIX'
+                WHEN 6 THEN 'WRONG'
+                ELSE NULL
+            END;
+
+            -- Migrate detection_pullrequest_lifecycle_state column (PullRequestLifecycleState enum)
+            ALTER TABLE pullrequestbadpractice
+            ALTER COLUMN detection_pullrequest_lifecycle_state TYPE VARCHAR(32) USING CASE detection_pullrequest_lifecycle_state::integer
+                WHEN 0 THEN 'DRAFT'
+                WHEN 1 THEN 'OPEN'
+                WHEN 2 THEN 'READY_FOR_REVIEW'
+                WHEN 3 THEN 'READY_TO_MERGE'
+                WHEN 4 THEN 'MERGED'
+                WHEN 5 THEN 'CLOSED'
+                ELSE NULL
+            END;
+        </sql>
+    </changeSet>
+
+    <!-- ==================== SECTION 20: User Preferences Extraction ==================== -->
+
+    <changeSet id="1768100000000-create-user-preferences-table" author="hephaestus">
+        <comment>Create user_preferences table for platform preferences (domain isolation from gitprovider)</comment>
+        <createTable tableName="user_preferences">
+            <column name="id" type="BIGINT" autoIncrement="true">
+                <constraints nullable="false" primaryKey="true" primaryKeyName="user_preferences_pkey"/>
+            </column>
+            <column name="user_id" type="BIGINT">
+                <constraints nullable="false" unique="true" uniqueConstraintName="uk_user_preferences_user_id"/>
+            </column>
+            <column name="notifications_enabled" type="BOOLEAN" defaultValueBoolean="true">
+                <constraints nullable="false"/>
+            </column>
+            <column name="participate_in_research" type="BOOLEAN" defaultValueBoolean="true">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+
+        <addForeignKeyConstraint
+            baseTableName="user_preferences"
+            baseColumnNames="user_id"
+            constraintName="fk_user_preferences_user"
+            referencedTableName="user"
+            referencedColumnNames="id"
+            onDelete="CASCADE"/>
+    </changeSet>
+
+    <changeSet id="1768100000000-migrate-user-preferences-data" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="user" columnName="notifications_enabled"/>
+        </preConditions>
+        <comment>Migrate existing preference data from user table to user_preferences</comment>
+        <sql>
+            INSERT INTO user_preferences (user_id, notifications_enabled, participate_in_research)
+            SELECT id, notifications_enabled, participate_in_research
+            FROM "user"
+            WHERE notifications_enabled IS NOT NULL OR participate_in_research IS NOT NULL
+        </sql>
+    </changeSet>
+
+    <changeSet id="1768100000000-drop-user-preferences-columns" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="user" columnName="notifications_enabled"/>
+        </preConditions>
+        <comment>Remove preference columns from user table (now in user_preferences)</comment>
+        <dropColumn tableName="user" columnName="notifications_enabled"/>
+        <dropColumn tableName="user" columnName="participate_in_research"/>
+    </changeSet>
+
+    <!-- ==================== SECTION 21: Workspace Team Settings Tables ==================== -->
+
+    <changeSet id="1768000000000-1-create-workspace-team-settings" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <tableExists tableName="workspace_team_settings"/>
+            </not>
+        </preConditions>
+        <comment>
+            Create workspace_team_settings table for per-workspace team visibility settings.
+            Composite primary key: (workspace_id, team_id)
+        </comment>
+        <createTable tableName="workspace_team_settings">
+            <column name="workspace_id" type="BIGINT">
+                <constraints nullable="false" primaryKey="true" primaryKeyName="workspace_team_settingsPK"/>
+            </column>
+            <column name="team_id" type="BIGINT">
+                <constraints nullable="false" primaryKey="true" primaryKeyName="workspace_team_settingsPK"/>
+            </column>
+            <column name="hidden" type="BOOLEAN" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+    </changeSet>
+
+    <changeSet id="1768000000000-2-fk-workspace-team-settings-workspace" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <foreignKeyConstraintExists foreignKeyName="fk_workspace_team_settings_workspace"/>
+            </not>
+        </preConditions>
+        <addForeignKeyConstraint
+            baseTableName="workspace_team_settings"
+            baseColumnNames="workspace_id"
+            referencedTableName="workspace"
+            referencedColumnNames="id"
+            constraintName="fk_workspace_team_settings_workspace"
+            onDelete="CASCADE"/>
+    </changeSet>
+
+    <changeSet id="1768000000000-3-fk-workspace-team-settings-team" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <foreignKeyConstraintExists foreignKeyName="fk_workspace_team_settings_team"/>
+            </not>
+        </preConditions>
+        <addForeignKeyConstraint
+            baseTableName="workspace_team_settings"
+            baseColumnNames="team_id"
+            referencedTableName="team"
+            referencedColumnNames="id"
+            constraintName="fk_workspace_team_settings_team"
+            onDelete="CASCADE"/>
+    </changeSet>
+
+    <changeSet id="1768000000000-4-create-workspace-team-repository-settings" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <tableExists tableName="workspace_team_repository_settings"/>
+            </not>
+        </preConditions>
+        <comment>
+            Create workspace_team_repository_settings table for per-workspace team-repository settings.
+            Composite primary key: (workspace_id, team_id, repository_id)
+        </comment>
+        <createTable tableName="workspace_team_repository_settings">
+            <column name="workspace_id" type="BIGINT">
+                <constraints nullable="false" primaryKey="true" primaryKeyName="workspace_team_repository_settingsPK"/>
+            </column>
+            <column name="team_id" type="BIGINT">
+                <constraints nullable="false" primaryKey="true" primaryKeyName="workspace_team_repository_settingsPK"/>
+            </column>
+            <column name="repository_id" type="BIGINT">
+                <constraints nullable="false" primaryKey="true" primaryKeyName="workspace_team_repository_settingsPK"/>
+            </column>
+            <column name="hidden_from_contributions" type="BOOLEAN" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+    </changeSet>
+
+    <changeSet id="1768000000000-5-fk-workspace-team-repo-settings-workspace" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <foreignKeyConstraintExists foreignKeyName="fk_workspace_team_repo_settings_workspace"/>
+            </not>
+        </preConditions>
+        <addForeignKeyConstraint
+            baseTableName="workspace_team_repository_settings"
+            baseColumnNames="workspace_id"
+            referencedTableName="workspace"
+            referencedColumnNames="id"
+            constraintName="fk_workspace_team_repo_settings_workspace"
+            onDelete="CASCADE"/>
+    </changeSet>
+
+    <changeSet id="1768000000000-6-fk-workspace-team-repo-settings-team" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <foreignKeyConstraintExists foreignKeyName="fk_workspace_team_repo_settings_team"/>
+            </not>
+        </preConditions>
+        <addForeignKeyConstraint
+            baseTableName="workspace_team_repository_settings"
+            baseColumnNames="team_id"
+            referencedTableName="team"
+            referencedColumnNames="id"
+            constraintName="fk_workspace_team_repo_settings_team"
+            onDelete="CASCADE"/>
+    </changeSet>
+
+    <changeSet id="1768000000000-7-fk-workspace-team-repo-settings-repository" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <foreignKeyConstraintExists foreignKeyName="fk_workspace_team_repo_settings_repository"/>
+            </not>
+        </preConditions>
+        <addForeignKeyConstraint
+            baseTableName="workspace_team_repository_settings"
+            baseColumnNames="repository_id"
+            referencedTableName="repository"
+            referencedColumnNames="id"
+            constraintName="fk_workspace_team_repo_settings_repository"
+            onDelete="CASCADE"/>
+    </changeSet>
+
+    <changeSet id="1768000000000-8-create-workspace-team-label-filter" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <tableExists tableName="workspace_team_label_filter"/>
+            </not>
+        </preConditions>
+        <comment>
+            Create workspace_team_label_filter table for per-workspace team label filters.
+            Composite primary key: (workspace_id, team_id, label_id)
+        </comment>
+        <createTable tableName="workspace_team_label_filter">
+            <column name="workspace_id" type="BIGINT">
+                <constraints nullable="false" primaryKey="true" primaryKeyName="workspace_team_label_filterPK"/>
+            </column>
+            <column name="team_id" type="BIGINT">
+                <constraints nullable="false" primaryKey="true" primaryKeyName="workspace_team_label_filterPK"/>
+            </column>
+            <column name="label_id" type="BIGINT">
+                <constraints nullable="false" primaryKey="true" primaryKeyName="workspace_team_label_filterPK"/>
+            </column>
+        </createTable>
+    </changeSet>
+
+    <changeSet id="1768000000000-9-fk-workspace-team-label-filter-workspace" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <foreignKeyConstraintExists foreignKeyName="fk_workspace_team_label_filter_workspace"/>
+            </not>
+        </preConditions>
+        <addForeignKeyConstraint
+            baseTableName="workspace_team_label_filter"
+            baseColumnNames="workspace_id"
+            referencedTableName="workspace"
+            referencedColumnNames="id"
+            constraintName="fk_workspace_team_label_filter_workspace"
+            onDelete="CASCADE"/>
+    </changeSet>
+
+    <changeSet id="1768000000000-10-fk-workspace-team-label-filter-team" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <foreignKeyConstraintExists foreignKeyName="fk_workspace_team_label_filter_team"/>
+            </not>
+        </preConditions>
+        <addForeignKeyConstraint
+            baseTableName="workspace_team_label_filter"
+            baseColumnNames="team_id"
+            referencedTableName="team"
+            referencedColumnNames="id"
+            constraintName="fk_workspace_team_label_filter_team"
+            onDelete="CASCADE"/>
+    </changeSet>
+
+    <changeSet id="1768000000000-11-fk-workspace-team-label-filter-label" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <foreignKeyConstraintExists foreignKeyName="fk_workspace_team_label_filter_label"/>
+            </not>
+        </preConditions>
+        <addForeignKeyConstraint
+            baseTableName="workspace_team_label_filter"
+            baseColumnNames="label_id"
+            referencedTableName="label"
+            referencedColumnNames="id"
+            constraintName="fk_workspace_team_label_filter_label"
+            onDelete="CASCADE"/>
+    </changeSet>
+
+    <changeSet id="1768000000000-12-idx-workspace-team-settings-team" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <indexExists indexName="idx_workspace_team_settings_team_id"/>
+            </not>
+        </preConditions>
+        <createIndex tableName="workspace_team_settings" indexName="idx_workspace_team_settings_team_id">
+            <column name="team_id"/>
+        </createIndex>
+    </changeSet>
+
+    <changeSet id="1768000000000-13-idx-workspace-team-repo-settings-team-repo" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <indexExists indexName="idx_workspace_team_repo_settings_team_repo"/>
+            </not>
+        </preConditions>
+        <createIndex tableName="workspace_team_repository_settings" indexName="idx_workspace_team_repo_settings_team_repo">
+            <column name="team_id"/>
+            <column name="repository_id"/>
+        </createIndex>
+    </changeSet>
+
+    <changeSet id="1768000000000-14-idx-workspace-team-label-filter-team" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <indexExists indexName="idx_workspace_team_label_filter_team_id"/>
+            </not>
+        </preConditions>
+        <createIndex tableName="workspace_team_label_filter" indexName="idx_workspace_team_label_filter_team_id">
+            <column name="team_id"/>
+        </createIndex>
+    </changeSet>
+
+    <!-- Data migrations for workspace team settings -->
+    <changeSet id="1768000000000-15-migrate-team-hidden" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <tableExists tableName="workspace_team_settings"/>
+            <tableExists tableName="team"/>
+            <tableExists tableName="workspace"/>
+            <columnExists tableName="team" columnName="hidden"/>
+        </preConditions>
+        <comment>
+            Migrate Team.hidden=true records to workspace_team_settings.
+            Matches workspaces to teams via: workspace.account_login = team.organization (case-insensitive)
+        </comment>
+        <sql>
+            INSERT INTO workspace_team_settings (workspace_id, team_id, hidden)
+            SELECT w.id, t.id, true
+            FROM team t
+            JOIN workspace w ON LOWER(w.account_login) = LOWER(t.organization)
+            WHERE t.hidden = true
+            ON CONFLICT (workspace_id, team_id) DO NOTHING;
+        </sql>
+    </changeSet>
+
+    <changeSet id="1768000000000-16-migrate-hidden-from-contributions" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <tableExists tableName="workspace_team_repository_settings"/>
+            <tableExists tableName="team_repository_permission"/>
+            <tableExists tableName="team"/>
+            <tableExists tableName="workspace"/>
+            <columnExists tableName="team_repository_permission" columnName="hidden_from_contributions"/>
+        </preConditions>
+        <comment>
+            Migrate TeamRepositoryPermission.hiddenFromContributions=true records to workspace_team_repository_settings.
+            Matches workspaces to teams via: workspace.account_login = team.organization (case-insensitive)
+        </comment>
+        <sql>
+            INSERT INTO workspace_team_repository_settings (workspace_id, team_id, repository_id, hidden_from_contributions)
+            SELECT w.id, trp.team_id, trp.repository_id, true
+            FROM team_repository_permission trp
+            JOIN team t ON t.id = trp.team_id
+            JOIN workspace w ON LOWER(w.account_login) = LOWER(t.organization)
+            WHERE trp.hidden_from_contributions = true
+            ON CONFLICT (workspace_id, team_id, repository_id) DO NOTHING;
+        </sql>
+    </changeSet>
+
+    <changeSet id="1768000000000-17-migrate-team-labels" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <tableExists tableName="workspace_team_label_filter"/>
+            <tableExists tableName="team_labels"/>
+            <tableExists tableName="team"/>
+            <tableExists tableName="workspace"/>
+        </preConditions>
+        <comment>
+            Migrate team_labels entries to workspace_team_label_filter.
+            Matches workspaces to teams via: workspace.account_login = team.organization (case-insensitive)
+        </comment>
+        <sql>
+            INSERT INTO workspace_team_label_filter (workspace_id, team_id, label_id)
+            SELECT w.id, tl.team_id, tl.label_id
+            FROM team_labels tl
+            JOIN team t ON t.id = tl.team_id
+            JOIN workspace w ON LOWER(w.account_login) = LOWER(t.organization)
+            ON CONFLICT (workspace_id, team_id, label_id) DO NOTHING;
+        </sql>
+    </changeSet>
+
+    <!-- ==================== SECTION 22: ETL Consistency Fixes ==================== -->
+
+    <changeSet id="1768500000000-1" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="team" columnName="last_synced_at"/>
+        </preConditions>
+        <renameColumn tableName="team"
+                      oldColumnName="last_synced_at"
+                      newColumnName="last_sync_at"
+                      columnDataType="TIMESTAMP"/>
+    </changeSet>
+
+    <changeSet id="1768500000000-2" author="hephaestus">
+        <update tableName="team">
+            <column name="privacy" value="VISIBLE"/>
+            <where>privacy = 'CLOSED'</where>
+        </update>
+    </changeSet>
+
+    <changeSet id="1768500000000-3" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="pull_request_review_thread" columnName="provider_thread_id"/>
+            <indexExists indexName="idx_prrt_provider_thread_id"/>
+        </preConditions>
+        <dropIndex tableName="pull_request_review_thread" indexName="idx_prrt_provider_thread_id"/>
+    </changeSet>
+
+    <changeSet id="1768500000000-4" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="pull_request_review_thread" columnName="provider_thread_id"/>
+        </preConditions>
+        <dropColumn tableName="pull_request_review_thread" columnName="provider_thread_id"/>
+    </changeSet>
+
+    <!-- ==================== SECTION 23: Drop Legacy Columns After Migration ==================== -->
+    <!--
+    These columns were migrated to workspace_team_* tables in SECTION 21.
+    Now we drop the legacy columns to complete the migration.
+    -->
+
+    <changeSet id="1768500000000-5-drop-team-hidden" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="team" columnName="hidden"/>
+        </preConditions>
+        <comment>Drop legacy hidden column from team - now in workspace_team_settings</comment>
+        <dropColumn tableName="team" columnName="hidden"/>
+    </changeSet>
+
+    <changeSet id="1768500000000-6-drop-team-repo-permission-hidden-from-contributions" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="team_repository_permission" columnName="hidden_from_contributions"/>
+        </preConditions>
+        <comment>Drop legacy hidden_from_contributions column from team_repository_permission - now in workspace_team_repository_settings</comment>
+        <dropColumn tableName="team_repository_permission" columnName="hidden_from_contributions"/>
+    </changeSet>
+
+    <changeSet id="1768500000000-7-drop-team-labels-table" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <tableExists tableName="team_labels"/>
+        </preConditions>
+        <comment>Drop legacy team_labels join table - now in workspace_team_label_filter</comment>
+        <dropTable tableName="team_labels"/>
+    </changeSet>
+
+    <!-- ==================== SECTION 24: Add last_sync_at to Sync-Enabled Entities ==================== -->
+    <!--
+    Add last_sync_at timestamp to entities that are synced independently from GitHub.
+    This enables sync cooldown logic, incremental sync, and debugging of stale data.
+    Team and Issue already have this field; adding to other independently-synced entities.
+    -->
+
+    <changeSet id="1768600000000-1-add-repository-last-sync-at" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <columnExists tableName="repository" columnName="last_sync_at"/>
+            </not>
+        </preConditions>
+        <comment>Add last_sync_at to repository for sync tracking</comment>
+        <addColumn tableName="repository">
+            <column name="last_sync_at" type="TIMESTAMP WITH TIME ZONE"/>
+        </addColumn>
+    </changeSet>
+
+    <changeSet id="1768600000000-2-add-organization-last-sync-at" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <columnExists tableName="organization" columnName="last_sync_at"/>
+            </not>
+        </preConditions>
+        <comment>Add last_sync_at to organization for sync tracking</comment>
+        <addColumn tableName="organization">
+            <column name="last_sync_at" type="TIMESTAMP WITH TIME ZONE"/>
+        </addColumn>
+    </changeSet>
+
+    <changeSet id="1768600000000-3-add-milestone-last-sync-at" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <columnExists tableName="milestone" columnName="last_sync_at"/>
+            </not>
+        </preConditions>
+        <comment>Add last_sync_at to milestone for sync tracking</comment>
+        <addColumn tableName="milestone">
+            <column name="last_sync_at" type="TIMESTAMP WITH TIME ZONE"/>
+        </addColumn>
+    </changeSet>
+
+    <changeSet id="1768600000000-4-add-label-last-sync-at" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <columnExists tableName="label" columnName="last_sync_at"/>
+            </not>
+        </preConditions>
+        <comment>Add last_sync_at to label for sync tracking</comment>
+        <addColumn tableName="label">
+            <column name="last_sync_at" type="TIMESTAMP WITH TIME ZONE"/>
+        </addColumn>
+    </changeSet>
+
+    <changeSet id="1768600000000-5-add-issue-type-last-sync-at" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <columnExists tableName="issue_type" columnName="last_sync_at"/>
+            </not>
+        </preConditions>
+        <comment>Add last_sync_at to issue_type for sync tracking</comment>
+        <addColumn tableName="issue_type">
+            <column name="last_sync_at" type="TIMESTAMP WITH TIME ZONE"/>
+        </addColumn>
+    </changeSet>
+
+    <!-- ==================== SECTION 25: Fix Timestamp Type Consistency ==================== -->
+    <!--
+    Fix timestamp type consistency for last_sync_at columns.
+    The issue.last_sync_at and team.last_sync_at columns were created with TIMESTAMP (without timezone)
+    while all other last_sync_at columns use TIMESTAMP WITH TIME ZONE.
+    This converts them to TIMESTAMPTZ for consistency.
+    -->
+
+    <changeSet id="1768700000000-1-fix-issue-last-sync-at-type" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="issue" columnName="last_sync_at"/>
+        </preConditions>
+        <comment>Convert issue.last_sync_at from TIMESTAMP to TIMESTAMPTZ for consistency</comment>
+        <modifyDataType tableName="issue"
+                        columnName="last_sync_at"
+                        newDataType="TIMESTAMP WITH TIME ZONE"/>
+    </changeSet>
+
+    <changeSet id="1768700000000-2-fix-team-last-sync-at-type" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="team" columnName="last_sync_at"/>
+        </preConditions>
+        <comment>Convert team.last_sync_at from TIMESTAMP to TIMESTAMPTZ for consistency</comment>
+        <modifyDataType tableName="team"
+                        columnName="last_sync_at"
+                        newDataType="TIMESTAMP WITH TIME ZONE"/>
+    </changeSet>
+
+    <!-- Fix remaining TIMESTAMP columns to TIMESTAMPTZ for consistency -->
+    <changeSet id="1768700000000-3-fix-repo-monitor-timestamps" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="repository_to_monitor" columnName="issues_and_pull_requests_synced_at"/>
+        </preConditions>
+        <comment>Convert repository_to_monitor sync timestamps from TIMESTAMP to TIMESTAMPTZ</comment>
+        <modifyDataType tableName="repository_to_monitor"
+                        columnName="issues_and_pull_requests_synced_at"
+                        newDataType="TIMESTAMP WITH TIME ZONE"/>
+        <modifyDataType tableName="repository_to_monitor"
+                        columnName="labels_synced_at"
+                        newDataType="TIMESTAMP WITH TIME ZONE"/>
+        <modifyDataType tableName="repository_to_monitor"
+                        columnName="milestones_synced_at"
+                        newDataType="TIMESTAMP WITH TIME ZONE"/>
+        <modifyDataType tableName="repository_to_monitor"
+                        columnName="repository_synced_at"
+                        newDataType="TIMESTAMP WITH TIME ZONE"/>
+    </changeSet>
+
+    <changeSet id="1768700000000-4-fix-workspace-users-synced-at" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="workspace" columnName="users_synced_at"/>
+        </preConditions>
+        <comment>Convert workspace.users_synced_at from TIMESTAMP to TIMESTAMPTZ</comment>
+        <modifyDataType tableName="workspace"
+                        columnName="users_synced_at"
+                        newDataType="TIMESTAMP WITH TIME ZONE"/>
+    </changeSet>
+
+    <!-- ==================== SECTION 26: Add Missing Foreign Key Constraints ==================== -->
+
+    <changeSet id="1768700000000-5-add-team-parent-fk" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <foreignKeyConstraintExists foreignKeyName="fk_team_parent"/>
+            </not>
+        </preConditions>
+        <comment>Add self-referential FK for team.parent_id</comment>
+        <addForeignKeyConstraint constraintName="fk_team_parent"
+                                 baseTableName="team"
+                                 baseColumnNames="parent_id"
+                                 referencedTableName="team"
+                                 referencedColumnNames="id"
+                                 onDelete="SET NULL"/>
+    </changeSet>
+
+    <!-- ==================== SECTION 27: URL Column Length Standardization ==================== -->
+    <!--
+    Standardize all html_url and URL columns to VARCHAR(512).
+    URLs can legitimately exceed 255 characters, especially with long organization/repository names.
+    Repository.html_url is already VARCHAR(512); aligning all others for consistency.
+    -->
+
+    <changeSet id="1768800000000-1-url-length-issue" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="issue" columnName="html_url"/>
+        </preConditions>
+        <comment>Extend issue.html_url from VARCHAR(255) to VARCHAR(512)</comment>
+        <modifyDataType tableName="issue"
+                        columnName="html_url"
+                        newDataType="VARCHAR(512)"/>
+    </changeSet>
+
+    <changeSet id="1768800000000-2-url-length-issue-comment" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="issue_comment" columnName="html_url"/>
+        </preConditions>
+        <comment>Extend issue_comment.html_url from VARCHAR(255) to VARCHAR(512)</comment>
+        <modifyDataType tableName="issue_comment"
+                        columnName="html_url"
+                        newDataType="VARCHAR(512)"/>
+    </changeSet>
+
+    <changeSet id="1768800000000-3-url-length-milestone" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="milestone" columnName="html_url"/>
+        </preConditions>
+        <comment>Extend milestone.html_url from VARCHAR(255) to VARCHAR(512)</comment>
+        <modifyDataType tableName="milestone"
+                        columnName="html_url"
+                        newDataType="VARCHAR(512)"/>
+    </changeSet>
+
+    <changeSet id="1768800000000-4-url-length-organization" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="organization" columnName="html_url"/>
+        </preConditions>
+        <comment>Extend organization.html_url from VARCHAR(255) to VARCHAR(512)</comment>
+        <modifyDataType tableName="organization"
+                        columnName="html_url"
+                        newDataType="VARCHAR(512)"/>
+    </changeSet>
+
+    <changeSet id="1768800000000-5-url-length-pull-request-review" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="pull_request_review" columnName="html_url"/>
+        </preConditions>
+        <comment>Extend pull_request_review.html_url from VARCHAR(255) to VARCHAR(512)</comment>
+        <modifyDataType tableName="pull_request_review"
+                        columnName="html_url"
+                        newDataType="VARCHAR(512)"/>
+    </changeSet>
+
+    <changeSet id="1768800000000-6-url-length-pull-request-review-comment" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="pull_request_review_comment" columnName="html_url"/>
+        </preConditions>
+        <comment>Extend pull_request_review_comment.html_url from VARCHAR(255) to VARCHAR(512)</comment>
+        <modifyDataType tableName="pull_request_review_comment"
+                        columnName="html_url"
+                        newDataType="VARCHAR(512)"/>
+    </changeSet>
+
+    <changeSet id="1768800000000-7-url-length-user" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="user" columnName="html_url"/>
+        </preConditions>
+        <comment>Extend user.html_url from VARCHAR(255) to VARCHAR(512)</comment>
+        <modifyDataType tableName="user"
+                        columnName="html_url"
+                        newDataType="VARCHAR(512)"/>
+    </changeSet>
+
+    <changeSet id="1768800000000-8-url-length-team" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="team" columnName="html_url"/>
+        </preConditions>
+        <comment>Change team.html_url from TEXT to VARCHAR(512) for consistency</comment>
+        <modifyDataType tableName="team"
+                        columnName="html_url"
+                        newDataType="VARCHAR(512)"/>
+    </changeSet>
+
+    <!-- ==================== SECTION 28: Rename pullrequestbadpractice Table ==================== -->
+    <!--
+    Rename table to follow snake_case naming convention used by all other tables.
+    This is a breaking schema change but necessary for consistency.
+    -->
+
+    <changeSet id="1768800000000-9-rename-pullrequestbadpractice-table" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <tableExists tableName="pullrequestbadpractice"/>
+            <not>
+                <tableExists tableName="pull_request_bad_practice"/>
+            </not>
+        </preConditions>
+        <comment>Rename pullrequestbadpractice to pull_request_bad_practice for naming consistency</comment>
+        <renameTable oldTableName="pullrequestbadpractice"
+                     newTableName="pull_request_bad_practice"/>
+    </changeSet>
+
+    <!-- ==================== SECTION 29: Timestamp Column Naming Standardization ==================== -->
+    <!--
+    Standardize timestamp columns to follow the *_at naming pattern used throughout the codebase.
+    Affected tables: bad_practice_detection, bad_practice_feedback, pull_request_bad_practice
+    -->
+
+    <changeSet id="1768800000000-10-rename-bad-practice-detection-time" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="bad_practice_detection" columnName="detection_time"/>
+        </preConditions>
+        <comment>Rename bad_practice_detection.detection_time to detected_at</comment>
+        <renameColumn tableName="bad_practice_detection"
+                      oldColumnName="detection_time"
+                      newColumnName="detected_at"
+                      columnDataType="TIMESTAMP WITH TIME ZONE"/>
+    </changeSet>
+
+    <changeSet id="1768800000000-11-rename-bad-practice-feedback-creation-time" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="bad_practice_feedback" columnName="creation_time"/>
+        </preConditions>
+        <comment>Rename bad_practice_feedback.creation_time to created_at</comment>
+        <renameColumn tableName="bad_practice_feedback"
+                      oldColumnName="creation_time"
+                      newColumnName="created_at"
+                      columnDataType="TIMESTAMP WITH TIME ZONE"/>
+    </changeSet>
+
+    <changeSet id="1768800000000-12-rename-pr-bad-practice-detection-time" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <tableExists tableName="pull_request_bad_practice"/>
+            <columnExists tableName="pull_request_bad_practice" columnName="detection_time"/>
+        </preConditions>
+        <comment>Rename pull_request_bad_practice.detection_time to detected_at</comment>
+        <renameColumn tableName="pull_request_bad_practice"
+                      oldColumnName="detection_time"
+                      newColumnName="detected_at"
+                      columnDataType="TIMESTAMP WITH TIME ZONE"/>
+    </changeSet>
+
+    <changeSet id="1768800000000-13-rename-pr-bad-practice-last-update-time" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <tableExists tableName="pull_request_bad_practice"/>
+            <columnExists tableName="pull_request_bad_practice" columnName="last_update_time"/>
+        </preConditions>
+        <comment>Rename pull_request_bad_practice.last_update_time to updated_at</comment>
+        <renameColumn tableName="pull_request_bad_practice"
+                      oldColumnName="last_update_time"
+                      newColumnName="updated_at"
+                      columnDataType="TIMESTAMP WITH TIME ZONE"/>
+    </changeSet>
+
+    <!-- ==================== SECTION 30: Drop PullRequestReviewThread.resolved_at ==================== -->
+    <!--
+    GitHub's API only provides isResolved (boolean) for review threads, not a timestamp.
+    The resolved_at field was being set to sync time (Instant.now()) which is misleading.
+    The state enum (RESOLVED/UNRESOLVED) is sufficient and accurate.
+    -->
+
+    <changeSet id="1768800000000-30-drop-thread-resolved-at" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="pull_request_review_thread" columnName="resolved_at"/>
+        </preConditions>
+        <comment>Drop resolved_at from pull_request_review_thread - GitHub only provides isResolved boolean, not timestamp</comment>
+        <dropColumn tableName="pull_request_review_thread" columnName="resolved_at"/>
+    </changeSet>
+
+    <!-- ==================== SECTION 31: Add Label createdAt/updatedAt ==================== -->
+    <!--
+    GitHub's GraphQL API provides createdAt and updatedAt for Labels (as nullable fields).
+    Adding these to match GitHub's schema and enable timestamp tracking.
+    -->
+
+    <changeSet id="1768800000000-14-add-label-created-at" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <columnExists tableName="label" columnName="created_at"/>
+            </not>
+        </preConditions>
+        <comment>Add created_at to label (nullable, from GitHub GraphQL)</comment>
+        <addColumn tableName="label">
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE"/>
+        </addColumn>
+    </changeSet>
+
+    <changeSet id="1768800000000-15-add-label-updated-at" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <columnExists tableName="label" columnName="updated_at"/>
+            </not>
+        </preConditions>
+        <comment>Add updated_at to label (nullable, from GitHub GraphQL)</comment>
+        <addColumn tableName="label">
+            <column name="updated_at" type="TIMESTAMP WITH TIME ZONE"/>
+        </addColumn>
+    </changeSet>
+
+    <!-- ==================== SECTION 32: Drop Redundant Issue Columns ==================== -->
+
+    <changeSet id="1768800000000-32-drop-issue-has-pull-request" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="issue" columnName="has_pull_request"/>
+        </preConditions>
+        <comment>
+            Drop has_pull_request column - redundant because:
+            1. The issue_type discriminator already distinguishes ISSUE vs PULL_REQUEST
+            2. JPA's Type() function provides efficient type-based filtering
+        </comment>
+        <dropColumn tableName="issue" columnName="has_pull_request"/>
+    </changeSet>
+
+    <changeSet id="1768800000000-33-drop-org-membership-joined-at" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="organization_membership" columnName="joined_at"/>
+        </preConditions>
+        <comment>
+            Drop joined_at column - GitHub's API does not provide actual join dates,
+            the field was always set to sync time making it meaningless.
+        </comment>
+        <dropColumn tableName="organization_membership" columnName="joined_at"/>
+    </changeSet>
+
+</databaseChangeLog>

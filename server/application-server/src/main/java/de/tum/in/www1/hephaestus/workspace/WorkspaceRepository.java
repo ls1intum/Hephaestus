@@ -21,9 +21,6 @@ public interface WorkspaceRepository extends JpaRepository<Workspace, Long> {
     Optional<Workspace> findByWorkspaceSlug(String workspaceSlug);
     boolean existsByWorkspaceSlug(String workspaceSlug);
 
-    @NotNull
-    List<Workspace> findAll();
-
     List<Workspace> findByStatusNot(Workspace.WorkspaceStatus status);
 
     List<Workspace> findByStatusNotAndIsPubliclyViewableTrue(Workspace.WorkspaceStatus status);

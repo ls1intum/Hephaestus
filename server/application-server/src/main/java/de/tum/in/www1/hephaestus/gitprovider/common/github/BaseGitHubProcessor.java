@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.gitprovider.common.github;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.PostgresStringUtils;
 import de.tum.in.www1.hephaestus.gitprovider.label.Label;
 import de.tum.in.www1.hephaestus.gitprovider.label.LabelRepository;
 import de.tum.in.www1.hephaestus.gitprovider.label.github.dto.GitHubLabelDTO;
@@ -149,12 +150,10 @@ public abstract class BaseGitHubProcessor {
 
     /**
      * Sanitize string for PostgreSQL storage (removes null characters).
+     * Delegates to {@link PostgresStringUtils#sanitize(String)}.
      */
     @Nullable
     protected String sanitize(@Nullable String input) {
-        if (input == null) {
-            return null;
-        }
-        return input.replace("\u0000", "");
+        return PostgresStringUtils.sanitize(input);
     }
 }

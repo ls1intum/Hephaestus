@@ -11,6 +11,7 @@ import de.tum.in.www1.hephaestus.gitprovider.organization.Organization;
 import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationRepository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
+import java.time.Instant;
 import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -179,6 +180,9 @@ public class GitHubRepositorySyncService {
             } else {
                 repository.setVisibility(Repository.Visibility.PRIVATE);
             }
+
+            // Mark sync timestamp
+            repository.setLastSyncAt(Instant.now());
 
             repository = repositoryRepository.save(repository);
             log.debug("Synced repository: {}", safeNameWithOwner);

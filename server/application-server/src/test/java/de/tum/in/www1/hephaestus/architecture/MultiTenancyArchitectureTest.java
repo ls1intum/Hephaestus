@@ -39,6 +39,23 @@ import org.springframework.transaction.event.TransactionalEventListener;
 class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
 
     /**
+     * Package prefixes that are inherently workspace-agnostic.
+     *
+     * <p>The gitprovider package is the ETL/sync layer that ingests data from GitHub.
+     * It operates at the external entity level (GitHub IDs) and resolves workspace
+     * context through entity relationships. The workspace filtering happens at the
+     * domain/application layer, not at the gitprovider layer.
+     */
+    static final String GITPROVIDER_PACKAGE = BASE_PACKAGE + ".gitprovider";
+
+    /**
+     * Checks if a class belongs to a workspace-agnostic package (e.g., gitprovider).
+     */
+    private static boolean isInWorkspaceAgnosticPackage(JavaClass javaClass) {
+        return javaClass.getPackageName().startsWith(GITPROVIDER_PACKAGE);
+    }
+
+    /**
      * Schedulers that are legitimately workspace-agnostic.
      *
      * <p>These scheduled jobs operate on system-wide data or infrastructure,
@@ -110,6 +127,11 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
 
                     String repoName = method.getOwner().getSimpleName();
                     String methodKey = repoName + "." + method.getName();
+
+                    // Skip gitprovider package - inherently workspace-agnostic ETL layer
+                    if (isInWorkspaceAgnosticPackage(method.getOwner())) {
+                        return;
+                    }
 
                     // Skip if class is annotated as workspace-agnostic
                     if (method.getOwner().isAnnotatedWith(WorkspaceAgnostic.class)) {
@@ -221,6 +243,11 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
                 @Override
                 public void check(JavaClass javaClass, ConditionEvents events) {
                     String repoName = javaClass.getSimpleName();
+
+                    // Skip gitprovider package - inherently workspace-agnostic ETL layer
+                    if (isInWorkspaceAgnosticPackage(javaClass)) {
+                        return;
+                    }
 
                     // Skip if class is annotated as workspace-agnostic
                     if (javaClass.isAnnotatedWith(WorkspaceAgnostic.class)) {

@@ -7,6 +7,7 @@ import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContextResolver;
 import de.tum.in.www1.hephaestus.workspace.context.WorkspaceScopedController;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.List;
 import org.slf4j.Logger;
@@ -47,6 +48,7 @@ public class TeamController {
      */
     @GetMapping
     @Operation(summary = "List teams", description = "Returns all teams in the workspace organization")
+    @SecurityRequirements
     public ResponseEntity<List<TeamInfoDTO>> getAllTeams(WorkspaceContext workspaceContext) {
         log.info("Listing teams for workspace {}", workspaceContext.slug());
         Workspace workspace = workspaceResolver.requireWorkspace(workspaceContext);

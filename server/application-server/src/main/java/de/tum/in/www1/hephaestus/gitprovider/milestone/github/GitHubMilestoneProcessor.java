@@ -10,6 +10,7 @@ import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.github.dto.GitHubUserDTO;
+import java.time.Instant;
 import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -131,6 +132,9 @@ public class GitHubMilestoneProcessor {
             User creator = findOrCreateUser(creatorDto);
             milestone.setCreator(creator);
         }
+
+        // Mark sync timestamp
+        milestone.setLastSyncAt(Instant.now());
 
         Milestone saved = milestoneRepository.save(milestone);
 

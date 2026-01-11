@@ -461,7 +461,7 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
             // Given
             Long issueId = 555666777L;
             Long labelId = 9567656085L;
-            GitHubLabelDTO labelDto = new GitHubLabelDTO(labelId, "LA_node", "bug", "Bug label", "ff0000");
+            GitHubLabelDTO labelDto = new GitHubLabelDTO(labelId, "LA_node", "bug", "Bug label", "ff0000", null, null);
             GitHubIssueDTO dto = new GitHubIssueDTO(
                 issueId,
                 null,
@@ -1006,7 +1006,7 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
             eventListener.clear();
 
             Long labelId = 9567656085L;
-            GitHubLabelDTO labelDto = new GitHubLabelDTO(labelId, "LA_node", "enhancement", "Enhancement", "84b6eb");
+            GitHubLabelDTO labelDto = new GitHubLabelDTO(labelId, "LA_node", "enhancement", "Enhancement", "84b6eb", null, null);
 
             // When
             processor.processLabeled(issueDto, labelDto, createContext());
@@ -1026,7 +1026,7 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
             // Given - create issue with label
             Long issueId = FIXTURE_ISSUE_ID;
             Long labelId = 9567656085L;
-            GitHubLabelDTO labelDto = new GitHubLabelDTO(labelId, "LA_node", "bug", "Bug", "ff0000");
+            GitHubLabelDTO labelDto = new GitHubLabelDTO(labelId, "LA_node", "bug", "Bug", "ff0000", null, null);
             GitHubIssueDTO issueDto = new GitHubIssueDTO(
                 issueId,
                 null,

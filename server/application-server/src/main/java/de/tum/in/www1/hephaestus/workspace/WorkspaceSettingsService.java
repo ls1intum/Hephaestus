@@ -144,9 +144,11 @@ public class WorkspaceSettingsService {
 
     private void validateTimeFormat(String time) {
         try {
-            LocalTime.parse(time, DateTimeFormatter.ofPattern("HH:mm"));
+            // Intentional: parsing validates the format; result not needed
+            @SuppressWarnings("unused")
+            LocalTime parsed = LocalTime.parse(time, DateTimeFormatter.ofPattern("HH:mm"));
         } catch (DateTimeParseException e) {
-            throw new IllegalArgumentException("Invalid time format. Expected HH:mm");
+            throw new IllegalArgumentException("Invalid time format. Expected HH:mm", e);
         }
     }
 

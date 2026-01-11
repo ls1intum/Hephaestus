@@ -3,6 +3,7 @@ package de.tum.in.www1.hephaestus.leaderboard;
 import de.tum.in.www1.hephaestus.gitprovider.team.Team;
 import de.tum.in.www1.hephaestus.gitprovider.team.TeamRepository;
 import de.tum.in.www1.hephaestus.workspace.Workspace;
+import de.tum.in.www1.hephaestus.workspace.settings.WorkspaceTeamSettingsService;
 import jakarta.annotation.Nonnull;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -16,6 +17,11 @@ import org.springframework.stereotype.Component;
  * <p>Team paths are human-readable breadcrumb-style paths like "Engineering / Backend / Core"
  * that represent the visible (non-hidden) ancestor chain of a team. This component handles
  * path resolution with proper caching to minimize database queries.
+ *
+ * <p>Hidden status is determined by workspace-scoped settings, enabling different
+ * visibility configurations for the same team across multiple workspaces.
+ *
+ * @see WorkspaceTeamSettingsService
  */
 @Component
 public class TeamPathResolver {
@@ -23,9 +29,11 @@ public class TeamPathResolver {
     private static final Logger log = LoggerFactory.getLogger(TeamPathResolver.class);
 
     private final TeamRepository teamRepository;
+    private final WorkspaceTeamSettingsService workspaceTeamSettingsService;
 
-    public TeamPathResolver(TeamRepository teamRepository) {
+    public TeamPathResolver(TeamRepository teamRepository, WorkspaceTeamSettingsService workspaceTeamSettingsService) {
         this.teamRepository = teamRepository;
+        this.workspaceTeamSettingsService = workspaceTeamSettingsService;
     }
 
     /**
@@ -39,6 +47,9 @@ public class TeamPathResolver {
         if (workspace == null || workspace.getAccountLogin() == null || path.isBlank()) {
             return Optional.empty();
         }
+
+        // Get hidden team IDs for this workspace
+        Set<Long> hiddenTeamIds = workspaceTeamSettingsService.getHiddenTeamIds(workspace.getId());
 
         String[] parts = path.split(" / ");
         String leaf = parts[parts.length - 1];
@@ -99,7 +110,8 @@ public class TeamPathResolver {
                             missingIds.add(parentId);
                             break;
                         }
-                        if (!parent.isHidden()) {
+                        // Use workspace-scoped hidden status
+                        if (!hiddenTeamIds.contains(parent.getId())) {
                             nextVisibleByCandidate.put(candidateId, parent);
                             break;
                         }
@@ -159,7 +171,7 @@ public class TeamPathResolver {
                 if (
                     candidate != null &&
                     belongsToWorkspace(candidate, workspace) &&
-                    equalsVisiblePath(candidate, parts, cache)
+                    equalsVisiblePath(candidate, parts, cache, hiddenTeamIds)
                 ) {
                     return Optional.of(candidate);
                 }
@@ -222,11 +234,21 @@ public class TeamPathResolver {
         return result;
     }
 
-    private boolean equalsVisiblePath(Team team, String[] parts, Map<Long, Team> cache) {
+    /**
+     * Checks if a team's visible path matches the given parts.
+     *
+     * @param team the team to check
+     * @param parts the path parts to match
+     * @param cache the team cache
+     * @param hiddenTeamIds set of team IDs hidden in the workspace
+     * @return true if the visible path matches
+     */
+    private boolean equalsVisiblePath(Team team, String[] parts, Map<Long, Team> cache, Set<Long> hiddenTeamIds) {
         int index = parts.length - 1;
         Team current = team;
         while (current != null) {
-            if (!current.isHidden()) {
+            // Use workspace-scoped hidden status
+            if (!hiddenTeamIds.contains(current.getId())) {
                 if (index < 0 || !parts[index].equals(current.getName())) {
                     return false;
                 }

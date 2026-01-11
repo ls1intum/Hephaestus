@@ -4,6 +4,9 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.Label;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.LabelConnection;
+import static de.tum.in.www1.hephaestus.gitprovider.common.DateTimeUtils.toInstant;
+
+import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
 import org.springframework.lang.Nullable;
@@ -19,7 +22,9 @@ public record GitHubLabelDTO(
     @JsonProperty("node_id") String nodeId,
     @JsonProperty("name") String name,
     @JsonProperty("description") String description,
-    @JsonProperty("color") String color
+    @JsonProperty("color") String color,
+    @Nullable Instant createdAt,
+    @Nullable Instant updatedAt
 ) {
     // ========== STATIC FACTORY METHODS FOR GRAPHQL RESPONSES ==========
 
@@ -31,7 +36,15 @@ public record GitHubLabelDTO(
         if (label == null) {
             return null;
         }
-        return new GitHubLabelDTO(null, label.getId(), label.getName(), label.getDescription(), label.getColor());
+        return new GitHubLabelDTO(
+            null,
+            label.getId(),
+            label.getName(),
+            label.getDescription(),
+            label.getColor(),
+            toInstant(label.getCreatedAt()),
+            toInstant(label.getUpdatedAt())
+        );
     }
 
     /**

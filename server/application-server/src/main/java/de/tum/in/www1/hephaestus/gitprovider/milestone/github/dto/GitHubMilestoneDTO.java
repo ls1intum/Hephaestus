@@ -4,9 +4,10 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.Milestone;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.MilestoneState;
-import java.net.URI;
+import static de.tum.in.www1.hephaestus.gitprovider.common.DateTimeUtils.toInstant;
+import static de.tum.in.www1.hephaestus.gitprovider.common.DateTimeUtils.uriToString;
+
 import java.time.Instant;
-import java.time.OffsetDateTime;
 import org.springframework.lang.Nullable;
 
 /**
@@ -56,13 +57,4 @@ public record GitHubMilestoneDTO(
         return state.name().toLowerCase();
     }
 
-    @Nullable
-    private static Instant toInstant(@Nullable OffsetDateTime dateTime) {
-        return dateTime != null ? dateTime.toInstant() : null;
-    }
-
-    @Nullable
-    private static String uriToString(@Nullable URI uri) {
-        return uri != null ? uri.toString() : null;
-    }
 }

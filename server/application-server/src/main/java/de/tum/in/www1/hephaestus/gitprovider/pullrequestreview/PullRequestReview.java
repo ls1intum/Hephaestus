@@ -66,10 +66,27 @@ public class PullRequestReview {
     @ToString.Exclude
     private Set<PullRequestReviewComment> comments = new HashSet<>();
 
+    /**
+     * Review state. Maps directly to GitHub GraphQL PullRequestReviewState enum.
+     * <p>
+     * Note: The {@code isDismissed} field provides additional context for dismissed
+     * reviews while preserving the original review state (e.g., an APPROVED review
+     * that was later dismissed).
+     *
+     * @see <a href="https://docs.github.com/en/graphql/reference/enums#pullrequestreviewstate">GitHub PullRequestReviewState</a>
+     */
     public enum State {
+        /** Review with comments only, no approval/rejection. */
         COMMENTED,
+        /** Review approving the changes. */
         APPROVED,
+        /** Review requesting changes before merge. */
         CHANGES_REQUESTED,
+        /** Review is pending and not yet submitted (only visible to the author). */
+        PENDING,
+        /** Review was dismissed by a maintainer. */
+        DISMISSED,
+        /** Unknown or unmapped state (fallback for forward compatibility). */
         UNKNOWN,
     }
 }

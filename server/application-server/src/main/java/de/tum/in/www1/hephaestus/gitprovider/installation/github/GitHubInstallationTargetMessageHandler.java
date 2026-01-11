@@ -93,6 +93,6 @@ public class GitHubInstallationTargetMessageHandler extends GitHubMessageHandler
             return;
         }
 
-        organizationService.upsertIdentityAndAttachInstallation(account.id(), login, installationId);
+        organizationService.upsertIdentity(account.id(), login);
     }
 }

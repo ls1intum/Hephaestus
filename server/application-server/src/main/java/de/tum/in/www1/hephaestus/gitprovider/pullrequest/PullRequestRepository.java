@@ -1,8 +1,6 @@
 package de.tum.in.www1.hephaestus.gitprovider.pullrequest;
 
-import de.tum.in.www1.hephaestus.core.WorkspaceAgnostic;
 import jakarta.persistence.QueryHint;
-import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -12,69 +10,19 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.jpa.repository.QueryHints;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
-import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * Repository for PullRequest entities.
+ *
+ * <p>This repository contains only workspace-agnostic queries for the gitprovider domain.
+ * Workspace-scoped queries (those that join with RepositoryToMonitor or other workspace
+ * entities) belong in the consuming packages (leaderboard, profile, practices, etc.)
+ * to maintain clean architecture boundaries.
+ *
+ * @see de.tum.in.www1.hephaestus.profile.ProfilePullRequestQueryRepository
+ */
 @Repository
 public interface PullRequestRepository extends JpaRepository<PullRequest, Long> {
-    /**
-     * Finds the earliest contribution date for a user across all workspaces.
-     * Used for global contributor statistics display.
-     */
-    @WorkspaceAgnostic("Global query for contributor page - shows first contribution across all workspaces")
-    @Query(
-        """
-        SELECT MIN(p.createdAt)
-        FROM PullRequest p
-        WHERE p.author.login ILIKE :authorLogin
-        """
-    )
-    Optional<Instant> firstContributionByAuthorLogin(@Param("authorLogin") String authorLogin);
-
-    @Transactional
-    @Query(
-        """
-        SELECT p
-        FROM PullRequest p
-        LEFT JOIN FETCH p.labels
-        JOIN FETCH p.author
-        LEFT JOIN FETCH p.assignees
-        LEFT JOIN FETCH p.repository r
-        JOIN RepositoryToMonitor rtm ON rtm.nameWithOwner = r.nameWithOwner
-        WHERE (p.author.login ILIKE :assigneeLogin OR LOWER(:assigneeLogin) IN (SELECT LOWER(u.login) FROM p.assignees u))
-            AND p.state IN :states
-            AND rtm.workspace.id = :workspaceId
-        ORDER BY p.createdAt DESC
-        """
-    )
-    List<PullRequest> findAssignedByLoginAndStates(
-        @Param("assigneeLogin") String assigneeLogin,
-        @Param("states") Set<PullRequest.State> states,
-        @Param("workspaceId") Long workspaceId
-    );
-
-    @Query(
-        """
-        SELECT p
-        FROM PullRequest p
-        LEFT JOIN FETCH p.labels
-        JOIN FETCH p.author
-        LEFT JOIN FETCH p.assignees
-        LEFT JOIN FETCH p.repository r
-        JOIN RepositoryToMonitor rtm ON rtm.nameWithOwner = r.nameWithOwner
-        WHERE (p.author.login ILIKE :assigneeLogin OR LOWER(:assigneeLogin) IN (SELECT LOWER(u.login) FROM p.assignees u))
-            AND p.state IN :states
-            AND p.updatedAt >= :activitySince
-            AND rtm.workspace.id = :workspaceId
-        ORDER BY p.createdAt DESC
-        """
-    )
-    List<PullRequest> findAssignedByLoginAndStatesUpdatedSince(
-        @Param("assigneeLogin") String assigneeLogin,
-        @Param("states") Set<PullRequest.State> states,
-        @Param("activitySince") Instant activitySince,
-        @Param("workspaceId") Long workspaceId
-    );
-
     /**
      * Finds a PR by repository ID and number for sync operations.
      * Repository ID inherently has workspace through Workspace.organization.
@@ -118,7 +66,6 @@ public interface PullRequestRepository extends JpaRepository<PullRequest, Long> 
      * @param id the pull request ID
      * @return the pull request with assignees loaded, or empty if not found
      */
-    @WorkspaceAgnostic("Event processing - PR ID is known from domain event")
     @Query(
         """
         SELECT p FROM PullRequest p

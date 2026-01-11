@@ -118,19 +118,51 @@ public class GitHubTestFixtureService {
 
     /**
      * Deletes a repository by its full name (owner/repo).
+     * Retries up to 3 times with exponential backoff on failure.
      */
     public void deleteRepository(String fullName) {
-        try {
-            String[] parts = fullName.split("/");
-            restClient
-                .delete()
-                .uri("/repos/{owner}/{repo}", parts[0], parts[1])
-                .retrieve()
-                .toBodilessEntity()
-                .block(Duration.ofSeconds(30));
-            log.debug("Deleted repository: {}", fullName);
-        } catch (Exception e) {
-            log.warn("Failed to delete repository {}: {}", fullName, e.getMessage());
+        String[] parts = fullName.split("/");
+        int maxRetries = 3;
+        int retryDelayMs = 1000;
+
+        for (int attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                restClient
+                    .delete()
+                    .uri("/repos/{owner}/{repo}", parts[0], parts[1])
+                    .retrieve()
+                    .toBodilessEntity()
+                    .block(Duration.ofSeconds(30));
+                log.info("Deleted repository: {}", fullName);
+                return;
+            } catch (Exception e) {
+                String message = e.getMessage();
+                // Check if it's a 404 - repo already deleted
+                if (message != null && message.contains("404")) {
+                    log.debug("Repository {} already deleted (404)", fullName);
+                    return;
+                }
+                if (attempt == maxRetries) {
+                    log.error("Failed to delete repository {} after {} attempts: {}", fullName, maxRetries, message);
+                } else {
+                    log.warn(
+                        "Attempt {}/{} to delete repository {} failed: {}. Retrying in {}ms...",
+                        attempt,
+                        maxRetries,
+                        fullName,
+                        message,
+                        retryDelayMs
+                    );
+                    try {
+                        Thread.sleep(retryDelayMs);
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        log.error("Interrupted while waiting to retry repository deletion");
+                        return;
+                    }
+                    retryDelayMs *= 2; // Exponential backoff
+                }
+            }
         }
     }
 
@@ -657,17 +689,57 @@ public class GitHubTestFixtureService {
 
     /**
      * Deletes a team via REST API.
+     * Retries up to 3 times with exponential backoff on failure.
      */
     public void deleteTeam(String orgLogin, String teamSlug) {
-        try {
-            restClient
-                .delete()
-                .uri("/orgs/{org}/teams/{team_slug}", orgLogin, teamSlug)
-                .retrieve()
-                .toBodilessEntity()
-                .block(Duration.ofSeconds(30));
-        } catch (Exception e) {
-            log.warn("Failed to delete team {}/{}: {}", orgLogin, teamSlug, e.getMessage());
+        int maxRetries = 3;
+        int retryDelayMs = 1000;
+
+        for (int attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                restClient
+                    .delete()
+                    .uri("/orgs/{org}/teams/{team_slug}", orgLogin, teamSlug)
+                    .retrieve()
+                    .toBodilessEntity()
+                    .block(Duration.ofSeconds(30));
+                log.info("Deleted team: {}/{}", orgLogin, teamSlug);
+                return;
+            } catch (Exception e) {
+                String message = e.getMessage();
+                // Check if it's a 404 - team already deleted
+                if (message != null && message.contains("404")) {
+                    log.debug("Team {}/{} already deleted (404)", orgLogin, teamSlug);
+                    return;
+                }
+                if (attempt == maxRetries) {
+                    log.error(
+                        "Failed to delete team {}/{} after {} attempts: {}",
+                        orgLogin,
+                        teamSlug,
+                        maxRetries,
+                        message
+                    );
+                } else {
+                    log.warn(
+                        "Attempt {}/{} to delete team {}/{} failed: {}. Retrying in {}ms...",
+                        attempt,
+                        maxRetries,
+                        orgLogin,
+                        teamSlug,
+                        message,
+                        retryDelayMs
+                    );
+                    try {
+                        Thread.sleep(retryDelayMs);
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        log.error("Interrupted while waiting to retry team deletion");
+                        return;
+                    }
+                    retryDelayMs *= 2; // Exponential backoff
+                }
+            }
         }
     }
 

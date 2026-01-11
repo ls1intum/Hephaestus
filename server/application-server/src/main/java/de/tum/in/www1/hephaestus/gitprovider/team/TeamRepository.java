@@ -16,22 +16,21 @@ import org.springframework.stereotype.Repository;
 public interface TeamRepository extends JpaRepository<Team, Long> {
     List<Team> findAllByName(String name);
 
-    List<Team> findAllByHiddenFalse();
-
     List<Team> findAllByOrganizationIgnoreCase(String organization);
 
     /**
      * Fetch teams with all collections eagerly loaded for DTO conversion.
      * Uses EntityGraph to fetch repoPermissions (with nested repository and its labels),
-     * team labels, and memberships (with users) in one query.
+     * and memberships (with users) in one query.
+     *
+     * <p>Note: Team labels are now managed via workspace-scoped settings
+     * (WorkspaceTeamLabelFilter) and are fetched separately.
      */
     @EntityGraph(
         attributePaths = {
             "repoPermissions",
             "repoPermissions.repository",
             "repoPermissions.repository.labels",
-            "labels",
-            "labels.repository",
             "memberships",
             "memberships.user",
         }
@@ -40,19 +39,18 @@ public interface TeamRepository extends JpaRepository<Team, Long> {
 
     /**
      * Fetch a single team by ID with all collections eagerly loaded for DTO conversion.
+     *
+     * <p>Note: Team labels are now managed via workspace-scoped settings
+     * (WorkspaceTeamLabelFilter) and are fetched separately.
      */
     @EntityGraph(
         attributePaths = {
             "repoPermissions",
             "repoPermissions.repository",
             "repoPermissions.repository.labels",
-            "labels",
-            "labels.repository",
             "memberships",
             "memberships.user",
         }
     )
     Optional<Team> findWithCollectionsById(Long id);
-
-    List<Team> findAllByOrganizationIgnoreCaseAndHiddenFalse(String organization);
 }

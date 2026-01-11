@@ -4,11 +4,14 @@ import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncCons
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.app.GitHubAppTokenService;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.ExchangeStrategies;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -51,8 +54,12 @@ public class GitHubInstallationRepositoryEnumerationService {
             .build();
     }
 
+    // Pattern to extract URLs from Link header: <url>; rel="next"
+    private static final Pattern LINK_NEXT_PATTERN = Pattern.compile("<([^>]+)>;\\s*rel=\"next\"");
+
     /**
      * Return a lightweight snapshot of every repository visible to the installation.
+     * Handles pagination via GitHub's Link header to fetch all repositories, not just the first page.
      * Falls back to an empty list if GitHub App credentials are not configured or enumeration fails.
      */
     public List<InstallationRepositorySnapshot> enumerate(long installationId) {
@@ -63,21 +70,50 @@ public class GitHubInstallationRepositoryEnumerationService {
 
         try {
             String installationToken = gitHubAppTokenService.getOrRefreshToken(installationId);
+            List<InstallationRepositorySnapshot> allRepositories = new ArrayList<>();
+            String nextUrl = GITHUB_API_BASE_URL + "/installation/repositories?per_page=100";
+            int totalCount = 0;
+            int pageCount = 0;
 
-            InstallationRepositoriesResponse response = webClient
-                .get()
-                .uri(uriBuilder -> uriBuilder.path("/installation/repositories").queryParam("per_page", 100).build())
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + installationToken)
-                .retrieve()
-                .bodyToMono(InstallationRepositoriesResponse.class)
-                .block();
+            while (nextUrl != null) {
+                pageCount++;
+                final String currentUrl = nextUrl;
 
-            if (response == null || response.repositories() == null) {
-                log.warn("Empty response from GitHub API for installation {}", installationId);
-                return List.of();
+                ResponseEntity<InstallationRepositoriesResponse> responseEntity = webClient
+                    .get()
+                    .uri(currentUrl)
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + installationToken)
+                    .retrieve()
+                    .toEntity(InstallationRepositoriesResponse.class)
+                    .block();
+
+                if (responseEntity == null || responseEntity.getBody() == null) {
+                    log.warn("Empty response from GitHub API for installation {} on page {}", installationId, pageCount);
+                    break;
+                }
+
+                InstallationRepositoriesResponse response = responseEntity.getBody();
+                if (pageCount == 1) {
+                    totalCount = response.totalCount();
+                }
+
+                if (response.repositories() != null) {
+                    response.repositories().stream().map(this::toSnapshot).forEach(allRepositories::add);
+                }
+
+                // Parse Link header for next page URL
+                nextUrl = parseLinkHeaderForNext(responseEntity.getHeaders().getFirst("Link"));
             }
 
-            return response.repositories().stream().map(this::toSnapshot).collect(Collectors.toList());
+            log.info(
+                "Enumerated {} repositories for installation {} (total reported: {}, pages: {})",
+                allRepositories.size(),
+                installationId,
+                totalCount,
+                pageCount
+            );
+
+            return allRepositories;
         } catch (Exception e) {
             log.warn(
                 "Failed to enumerate installation {} repositories via GitHub API: {}",
@@ -87,6 +123,21 @@ public class GitHubInstallationRepositoryEnumerationService {
             log.debug("GitHub installation enumeration failure", e);
             return List.of();
         }
+    }
+
+    /**
+     * Parse the Link header to extract the "next" page URL.
+     * GitHub Link header format: {@code <url>; rel="next", <url>; rel="last"}
+     *
+     * @param linkHeader the Link header value, may be null
+     * @return the next page URL, or null if there is no next page
+     */
+    private String parseLinkHeaderForNext(String linkHeader) {
+        if (linkHeader == null) {
+            return null;
+        }
+        Matcher matcher = LINK_NEXT_PATTERN.matcher(linkHeader);
+        return matcher.find() ? matcher.group(1) : null;
     }
 
     private InstallationRepositorySnapshot toSnapshot(RepositoryDto repo) {

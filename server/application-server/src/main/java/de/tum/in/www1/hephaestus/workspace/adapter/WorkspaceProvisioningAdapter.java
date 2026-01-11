@@ -1,7 +1,6 @@
 package de.tum.in.www1.hephaestus.workspace.adapter;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.WorkspaceProvisioningListener;
-import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationService;
 import de.tum.in.www1.hephaestus.workspace.RepositorySelection;
 import de.tum.in.www1.hephaestus.workspace.Workspace;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceInstallationService;
@@ -18,16 +17,13 @@ public class WorkspaceProvisioningAdapter implements WorkspaceProvisioningListen
 
     private final WorkspaceInstallationService workspaceInstallationService;
     private final WorkspaceRepositoryMonitorService repositoryMonitorService;
-    private final OrganizationService organizationService;
 
     public WorkspaceProvisioningAdapter(
         WorkspaceInstallationService workspaceInstallationService,
-        WorkspaceRepositoryMonitorService repositoryMonitorService,
-        OrganizationService organizationService
+        WorkspaceRepositoryMonitorService repositoryMonitorService
     ) {
         this.workspaceInstallationService = workspaceInstallationService;
         this.repositoryMonitorService = repositoryMonitorService;
-        this.organizationService = organizationService;
     }
 
     @Override
@@ -86,10 +82,7 @@ public class WorkspaceProvisioningAdapter implements WorkspaceProvisioningListen
         // When installation is deleted, we clean up all associated data
         repositoryMonitorService.removeAllRepositoriesFromMonitor(installationId, true);
 
-        // 3. Detach organization from installation (set installationId to null)
-        organizationService.detachInstallation(installationId);
-
-        // 4. Mark workspace as PURGED (not SUSPENDED - deleted is permanent)
+        // 3. Mark workspace as PURGED (not SUSPENDED - deleted is permanent)
         workspaceInstallationService.updateWorkspaceStatus(installationId, Workspace.WorkspaceStatus.PURGED);
 
         log.info("Completed cleanup for deleted installation {}", installationId);

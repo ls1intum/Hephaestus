@@ -14,7 +14,6 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
-import java.time.Instant;
 import java.util.HashSet;
 import java.util.Set;
 import lombok.Getter;
@@ -30,17 +29,18 @@ import lombok.ToString;
 @ToString(callSuper = true)
 public class PullRequestReviewThread extends BaseGitServiceEntity {
 
-    @Column(name = "provider_thread_id")
-    private Long providerThreadId;
-
+    /**
+     * GitHub GraphQL node ID for the thread.
+     * <p>
+     * Maps to the {@code id} field from GitHub's PullRequestReviewThread GraphQL type.
+     * Used for GraphQL operations that require the global node ID.
+     */
     @Column(length = 128)
     private String nodeId;
 
     @Enumerated(EnumType.STRING)
     @Column(length = 20)
     private State state = State.UNRESOLVED;
-
-    private Instant resolvedAt;
 
     @Column(columnDefinition = "TEXT")
     private String path;

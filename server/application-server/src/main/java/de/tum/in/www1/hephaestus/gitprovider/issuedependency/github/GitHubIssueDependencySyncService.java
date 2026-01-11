@@ -21,6 +21,7 @@ import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.graphql.client.HttpGraphQlClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -62,19 +63,22 @@ public class GitHubIssueDependencySyncService {
     private final SyncTargetProvider syncTargetProvider;
     private final GitHubGraphQlClientProvider graphQlClientProvider;
     private final int syncCooldownInMinutes;
+    private final GitHubIssueDependencySyncService self;
 
     public GitHubIssueDependencySyncService(
         IssueRepository issueRepository,
         RepositoryRepository repositoryRepository,
         SyncTargetProvider syncTargetProvider,
         GitHubGraphQlClientProvider graphQlClientProvider,
-        @Value("${monitoring.sync-cooldown-in-minutes}") int syncCooldownInMinutes
+        @Value("${monitoring.sync-cooldown-in-minutes}") int syncCooldownInMinutes,
+        @Lazy GitHubIssueDependencySyncService self
     ) {
         this.issueRepository = issueRepository;
         this.repositoryRepository = repositoryRepository;
         this.syncTargetProvider = syncTargetProvider;
         this.graphQlClientProvider = graphQlClientProvider;
         this.syncCooldownInMinutes = syncCooldownInMinutes;
+        this.self = self;
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -154,8 +158,9 @@ public class GitHubIssueDependencySyncService {
             return -1;
         }
 
-        List<Repository> repositories = repositoryRepository.findActiveByWorkspaceId(workspaceId);
-        if (repositories.isEmpty()) {
+        // Get repository names via SPI (workspace package implements this)
+        List<String> repositoryNames = syncTargetProvider.getRepositoryNamesForWorkspace(workspaceId);
+        if (repositoryNames.isEmpty()) {
             log.debug("No repositories found for workspace {}", workspaceId);
             // Still update timestamp to prevent repeated empty checks
             updateSyncTimestamp(workspaceId);
@@ -166,18 +171,24 @@ public class GitHubIssueDependencySyncService {
         int totalSynced = 0;
         int failedRepos = 0;
 
-        for (Repository repo : repositories) {
+        for (String repoNameWithOwner : repositoryNames) {
+            Optional<Repository> repoOpt = repositoryRepository.findByNameWithOwner(repoNameWithOwner);
+            if (repoOpt.isEmpty()) {
+                log.warn("Repository {} not found in database, skipping", sanitizeForLog(repoNameWithOwner));
+                continue;
+            }
+
             try {
-                int synced = syncRepositoryDependencies(client, repo);
+                int synced = syncRepositoryDependencies(client, repoOpt.get());
                 totalSynced += synced;
             } catch (Exception e) {
                 failedRepos++;
-                log.error("Error syncing dependencies for repository {}: {}", repo.getNameWithOwner(), e.getMessage());
+                log.error("Error syncing dependencies for repository {}: {}", repoNameWithOwner, e.getMessage());
             }
         }
 
         // Only update timestamp if at least some repos succeeded
-        if (failedRepos < repositories.size()) {
+        if (failedRepos < repositoryNames.size()) {
             updateSyncTimestamp(workspaceId);
         }
 
@@ -250,8 +261,8 @@ public class GitHubIssueDependencySyncService {
             hasNextPage = issueConnection.getPageInfo().getHasNextPage();
             after = issueConnection.getPageInfo().getEndCursor();
 
-            // Process each page in its own transaction
-            totalSynced += processIssueDependenciesPage(issueConnection);
+            // Process each page in its own transaction (call through proxy for @Transactional to work)
+            totalSynced += self.processIssueDependenciesPage(issueConnection);
         }
 
         return totalSynced;

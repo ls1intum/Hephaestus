@@ -8,9 +8,10 @@ import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.PullRequestRev
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.github.dto.GitHubPullRequestDTO;
 import de.tum.in.www1.hephaestus.gitprovider.repository.github.dto.GitHubRepositoryRefDTO;
 import de.tum.in.www1.hephaestus.gitprovider.user.github.dto.GitHubUserDTO;
-import java.net.URI;
+import static de.tum.in.www1.hephaestus.gitprovider.common.DateTimeUtils.toInstant;
+import static de.tum.in.www1.hephaestus.gitprovider.common.DateTimeUtils.uriToString;
+
 import java.time.Instant;
-import java.time.OffsetDateTime;
 import org.springframework.lang.Nullable;
 
 /**
@@ -69,16 +70,6 @@ public record GitHubPullRequestReviewEventDTO(
                 toInstant(review.getSubmittedAt()),
                 review.getCommit() != null ? review.getCommit().getOid() : null
             );
-        }
-
-        @Nullable
-        private static String uriToString(@Nullable URI uri) {
-            return uri != null ? uri.toString() : null;
-        }
-
-        @Nullable
-        private static Instant toInstant(@Nullable OffsetDateTime dateTime) {
-            return dateTime != null ? dateTime.toInstant() : null;
         }
     }
 }

@@ -7,6 +7,7 @@ import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContextResolver;
 import de.tum.in.www1.hephaestus.workspace.context.WorkspaceScopedController;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.constraints.NotBlank;
 import java.time.Instant;
@@ -58,6 +59,7 @@ public class LeaderboardController {
         summary = "Generate leaderboard",
         description = "Creates a ranked contributor list for the specified time range"
     )
+    @SecurityRequirements
     public ResponseEntity<List<LeaderboardEntryDTO>> getLeaderboard(
         WorkspaceContext workspaceContext,
         @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant after,

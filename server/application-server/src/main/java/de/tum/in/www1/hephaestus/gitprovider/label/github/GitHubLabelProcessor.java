@@ -7,6 +7,7 @@ import de.tum.in.www1.hephaestus.gitprovider.label.Label;
 import de.tum.in.www1.hephaestus.gitprovider.label.LabelRepository;
 import de.tum.in.www1.hephaestus.gitprovider.label.github.dto.GitHubLabelDTO;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
+import java.time.Instant;
 import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -91,6 +92,17 @@ public class GitHubLabelProcessor {
         }
         label.setDescription(dto.description()); // labels allow clearing description to null
         label.setRepository(repository);
+
+        // Set GitHub timestamps (nullable - only available from GraphQL, not webhooks)
+        if (dto.createdAt() != null) {
+            label.setCreatedAt(dto.createdAt());
+        }
+        if (dto.updatedAt() != null) {
+            label.setUpdatedAt(dto.updatedAt());
+        }
+
+        // Mark sync timestamp
+        label.setLastSyncAt(Instant.now());
 
         Label saved = labelRepository.save(label);
 

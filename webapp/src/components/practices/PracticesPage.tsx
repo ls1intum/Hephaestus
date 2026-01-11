@@ -1,5 +1,5 @@
 import { GitPullRequest, InfoIcon } from "lucide-react";
-import type { Activity, BadPracticeFeedback } from "@/api/types.gen";
+import type { BadPracticeFeedback, UserPractices } from "@/api/types.gen";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { ActivitySummaryCard } from "./ActivitySummaryCard";
 import { BadPracticeLegendCard } from "./BadPracticeLegendCard";
@@ -7,7 +7,7 @@ import { PullRequestBadPracticeCard } from "./PullRequestBadPracticeCard";
 import { filterGoodAndBadPractices } from "./utils";
 
 interface PracticesPageProps {
-	activityData?: Activity;
+	activityData?: UserPractices;
 	isLoading: boolean;
 	isDetectingBadPractices: boolean;
 	username: string; // GitHub login name

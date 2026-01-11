@@ -26,4 +26,10 @@ public interface RepositoryToMonitorRepository extends JpaRepository<RepositoryT
      * Used during sync operations to resolve which workspace a repository belongs to.
      */
     Optional<RepositoryToMonitor> findByNameWithOwner(String nameWithOwner);
+
+    /**
+     * Counts the number of workspaces monitoring a given repository.
+     * Used to determine if a repository can be safely deleted when removing a monitor.
+     */
+    long countByNameWithOwner(String nameWithOwner);
 }

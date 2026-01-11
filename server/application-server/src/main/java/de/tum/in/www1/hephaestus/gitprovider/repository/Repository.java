@@ -90,6 +90,15 @@ public class Repository extends BaseGitServiceEntity {
     @NonNull
     private String defaultBranch;
 
+    /**
+     * Timestamp of the last successful sync for this repository from the Git provider.
+     * <p>
+     * This is ETL infrastructure used by the sync engine to track when this repository
+     * was last synchronized via GraphQL. Used to implement sync cooldown logic
+     * and detect stale data.
+     */
+    private Instant lastSyncAt;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "organization_id", foreignKey = @ForeignKey(name = "fk_repository_organization"))
     @ToString.Exclude

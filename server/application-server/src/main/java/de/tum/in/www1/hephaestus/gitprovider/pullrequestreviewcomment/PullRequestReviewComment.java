@@ -64,20 +64,11 @@ public class PullRequestReviewComment extends BaseGitServiceEntity {
     // The first line of the range for a multi-line comment.
     private Integer originalStartLine;
 
-    // The side of the first line of the range for a multi-line comment.
-    @Enumerated(EnumType.STRING)
-    private PullRequestReviewComment.Side startSide;
-
     // The line of the blob to which the comment applies. The last line of the range for a multi-line comment
     private int line;
 
     // The line of the blob to which the comment applies. The last line of the range for a multi-line comment
     private int originalLine;
-
-    // The side of the diff to which the comment applies. The side of the last line of the range for a multi-line comment
-    @NonNull
-    @Enumerated(EnumType.STRING)
-    private PullRequestReviewComment.Side side;
 
     @ManyToOne
     @JoinColumn(name = "author_id")

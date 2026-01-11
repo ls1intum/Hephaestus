@@ -68,6 +68,15 @@ public class Milestone extends BaseGitServiceEntity {
     @ToString.Exclude
     private Repository repository;
 
+    /**
+     * Timestamp of the last successful sync for this milestone from the Git provider.
+     * <p>
+     * This is ETL infrastructure used by the sync engine to track when this milestone
+     * was last synchronized via GraphQL. Used to implement sync cooldown logic
+     * and detect stale data.
+     */
+    private Instant lastSyncAt;
+
     public enum State {
         OPEN,
         CLOSED,

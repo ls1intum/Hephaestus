@@ -1,7 +1,6 @@
 package de.tum.in.www1.hephaestus.workspace;
 
 import de.tum.in.www1.hephaestus.core.exception.EntityNotFoundException;
-import de.tum.in.www1.hephaestus.gitprovider.label.Label;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.workspace.exception.RepositoryAlreadyMonitoredException;
 import de.tum.in.www1.hephaestus.workspace.exception.RepositoryManagementNotAllowedException;
@@ -104,11 +103,14 @@ public class RepositoryMonitorService {
     }
 
     /**
-     * Remove a repository monitor and optionally clean up the repository data.
+     * Remove a repository monitor and optionally clean up orphaned repository data.
+     *
+     * <p>If cleanupRepository is true, the Repository entity will only be deleted
+     * if no other workspace is monitoring it (i.e., it's orphaned).
      *
      * @param workspace the workspace
      * @param nameWithOwner the repository identifier
-     * @param cleanupRepository whether to delete the repository data
+     * @param cleanupRepository whether to delete the repository if orphaned
      * @throws EntityNotFoundException if the monitor doesn't exist
      */
     @Transactional
@@ -121,13 +123,33 @@ public class RepositoryMonitorService {
         workspace.getRepositoriesToMonitor().remove(monitor);
 
         if (cleanupRepository) {
-            repositoryRepository
-                .findByNameWithOwner(nameWithOwner)
-                .ifPresent(repo -> {
-                    repo.getLabels().forEach(Label::removeAllTeams);
-                    repositoryRepository.delete(repo);
-                });
+            deleteRepositoryIfOrphaned(nameWithOwner);
         }
+    }
+
+    /**
+     * Deletes a repository only if no workspace is monitoring it.
+     * This preserves repositories that are shared across multiple workspaces.
+     *
+     * @param nameWithOwner the repository full name (e.g., "owner/repo")
+     */
+    private void deleteRepositoryIfOrphaned(String nameWithOwner) {
+        if (nameWithOwner == null || nameWithOwner.isBlank()) {
+            return;
+        }
+
+        // Check if any workspace is still monitoring this repository
+        // Note: We already deleted this workspace's monitor, so count should be from other workspaces
+        var monitorOpt = repositoryToMonitorRepository.findByNameWithOwner(nameWithOwner);
+        if (monitorOpt.isPresent()) {
+            // Another workspace is monitoring this repository, don't delete
+            return;
+        }
+
+        // No workspace is monitoring this repository, safe to delete
+        repositoryRepository
+            .findByNameWithOwner(nameWithOwner)
+            .ifPresent(repositoryRepository::delete);
     }
 
     /**

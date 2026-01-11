@@ -2,11 +2,11 @@ package de.tum.in.www1.hephaestus.gitprovider.organization;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.IdClass;
-import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
-import java.time.Instant;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -25,16 +25,12 @@ public class OrganizationMembership {
     @Column(name = "user_id")
     private Long userId;
 
+    /**
+     * The user's role in the organization.
+     * <p>
+     * Maps to GitHub's OrganizationMemberRole enum values: ADMIN, MEMBER.
+     */
+    @Enumerated(EnumType.STRING)
     @Column(name = "role", length = 32, nullable = false)
-    private String role; // ADMIN | MEMBER | BILLING_MANAGER | OUTSIDE_COLLABORATOR | UNAFFILIATED
-
-    @Column(name = "joined_at")
-    private Instant joinedAt;
-
-    @PrePersist
-    public void prePersist() {
-        if (joinedAt == null) {
-            joinedAt = Instant.now();
-        }
-    }
+    private OrganizationMemberRole role;
 }

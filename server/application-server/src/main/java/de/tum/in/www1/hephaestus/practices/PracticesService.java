@@ -4,7 +4,6 @@ import de.tum.in.www1.hephaestus.core.exception.AccessForbiddenException;
 import de.tum.in.www1.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
-import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.practices.detection.BadPracticeDetectionRepository;
@@ -42,20 +41,20 @@ public class PracticesService {
     private final PullRequestBadPracticeRepository badPracticeRepository;
     private final BadPracticeDetectionRepository detectionRepository;
     private final UserRepository userRepository;
-    private final PullRequestRepository pullRequestRepository;
+    private final PracticesPullRequestQueryRepository practicesPullRequestQueryRepository;
 
     public PracticesService(
         PullRequestBadPracticeDetector detector,
         PullRequestBadPracticeRepository badPracticeRepository,
         BadPracticeDetectionRepository detectionRepository,
         UserRepository userRepository,
-        PullRequestRepository pullRequestRepository
+        PracticesPullRequestQueryRepository practicesPullRequestQueryRepository
     ) {
         this.detector = detector;
         this.badPracticeRepository = badPracticeRepository;
         this.detectionRepository = detectionRepository;
         this.userRepository = userRepository;
-        this.pullRequestRepository = pullRequestRepository;
+        this.practicesPullRequestQueryRepository = practicesPullRequestQueryRepository;
     }
 
     /**
@@ -67,7 +66,7 @@ public class PracticesService {
      */
     @Transactional(readOnly = true)
     public List<PullRequestWithBadPracticesDTO> getBadPracticesForUser(Workspace workspace, String login) {
-        List<PullRequest> pullRequests = pullRequestRepository.findAssignedByLoginAndStates(
+        List<PullRequest> pullRequests = practicesPullRequestQueryRepository.findAssignedByLoginAndStates(
             login,
             Set.of(Issue.State.OPEN),
             workspace.getId()
@@ -234,7 +233,7 @@ public class PracticesService {
     }
 
     private PullRequest requirePullRequestInWorkspace(Long pullRequestId, Workspace workspace) {
-        PullRequest pr = pullRequestRepository
+        PullRequest pr = practicesPullRequestQueryRepository
             .findById(pullRequestId)
             .orElseThrow(() -> new EntityNotFoundException("PullRequest", pullRequestId));
         if (!belongsToWorkspace(pr, workspace)) {

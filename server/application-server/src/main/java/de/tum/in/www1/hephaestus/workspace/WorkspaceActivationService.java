@@ -1,7 +1,5 @@
 package de.tum.in.www1.hephaestus.workspace;
 
-import de.tum.in.www1.hephaestus.gitprovider.organization.Organization;
-import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationService;
 import de.tum.in.www1.hephaestus.gitprovider.sync.GitHubDataSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.sync.NatsConsumerService;
 import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContext;
@@ -41,7 +39,6 @@ public class WorkspaceActivationService {
     // Services
     private final NatsConsumerService natsConsumerService;
     private final WorkspaceScopeFilter workspaceScopeFilter;
-    private final OrganizationService organizationService;
 
     // Lazy-loaded to break circular reference with GitHubDataSyncService
     private final ObjectProvider<GitHubDataSyncService> gitHubDataSyncServiceProvider;
@@ -55,7 +52,6 @@ public class WorkspaceActivationService {
         WorkspaceRepository workspaceRepository,
         NatsConsumerService natsConsumerService,
         WorkspaceScopeFilter workspaceScopeFilter,
-        OrganizationService organizationService,
         ObjectProvider<GitHubDataSyncService> gitHubDataSyncServiceProvider,
         @Qualifier("monitoringExecutor") AsyncTaskExecutor monitoringExecutor
     ) {
@@ -64,7 +60,6 @@ public class WorkspaceActivationService {
         this.workspaceRepository = workspaceRepository;
         this.natsConsumerService = natsConsumerService;
         this.workspaceScopeFilter = workspaceScopeFilter;
-        this.organizationService = organizationService;
         this.gitHubDataSyncServiceProvider = gitHubDataSyncServiceProvider;
         this.monitoringExecutor = monitoringExecutor;
     }
@@ -211,29 +206,16 @@ public class WorkspaceActivationService {
     /**
      * Derive the account login for a workspace from available sources.
      * Priority:
-     * 1) Existing accountLogin if set
-     * 2) Organization login from installation
-     * 3) Owner from first monitored repository
+     * 1) Existing accountLogin if set (always set during workspace provisioning)
+     * 2) Owner from first monitored repository (fallback for legacy workspaces)
      */
     String deriveAccountLogin(Workspace workspace) {
+        // Account login is set during workspace provisioning from installation events
         if (!isBlank(workspace.getAccountLogin())) {
             return workspace.getAccountLogin();
         }
 
-        String organizationLogin = null;
-        Long installationId = workspace.getInstallationId();
-        if (installationId != null) {
-            organizationLogin = organizationService
-                .getByInstallationId(installationId)
-                .map(Organization::getLogin)
-                .filter(login -> !isBlank(login))
-                .orElse(null);
-        }
-
-        if (!isBlank(organizationLogin)) {
-            return organizationLogin;
-        }
-
+        // Fallback: derive from monitored repositories (for legacy workspaces)
         String repoOwner = workspace
             .getRepositoriesToMonitor()
             .stream()

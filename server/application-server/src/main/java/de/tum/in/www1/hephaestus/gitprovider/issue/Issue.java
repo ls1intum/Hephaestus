@@ -31,7 +31,6 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
-import lombok.experimental.Accessors;
 import org.springframework.lang.NonNull;
 
 @Entity
@@ -71,11 +70,15 @@ public class Issue extends BaseGitServiceEntity {
 
     private int commentsCount;
 
-    @Accessors(prefix = { "" })
-    private boolean hasPullRequest;
-
-    // The last time the issue and its associated comments were updated (is also
-    // used for pull requests with reviews and review comments)
+    /**
+     * Timestamp of the last successful sync for this issue/PR and its associated data.
+     * <p>
+     * This is ETL infrastructure used by the sync engine to track when this issue
+     * (and its comments) or pull request (and its reviews, review comments) was last
+     * synchronized via GraphQL. Used to implement incremental sync and detect stale data.
+     * <p>
+     * Updated by the GitHub sync processors after successfully syncing all related entities.
+     */
     private Instant lastSyncAt;
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -189,10 +192,21 @@ public class Issue extends BaseGitServiceEntity {
         CLOSED,
     }
 
+    /**
+     * Reason for the issue's current state. Maps to GitHub GraphQL IssueClosedStateReason.
+     *
+     * @see <a href="https://docs.github.com/en/graphql/reference/enums#issueclosedstatereason">GitHub IssueClosedStateReason</a>
+     */
     public enum StateReason {
+        /** Issue was completed/resolved. */
         COMPLETED,
+        /** Issue was closed as a duplicate of another issue. */
+        DUPLICATE,
+        /** Issue was closed as not planned/won't fix. */
         NOT_PLANNED,
+        /** Issue was reopened from a closed state. */
         REOPENED,
+        /** Unknown or unmapped state reason (fallback for forward compatibility). */
         UNKNOWN,
     }
 

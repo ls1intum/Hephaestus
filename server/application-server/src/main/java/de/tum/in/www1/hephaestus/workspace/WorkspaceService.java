@@ -3,16 +3,9 @@ package de.tum.in.www1.hephaestus.workspace;
 import de.tum.in.www1.hephaestus.core.LoggingUtils;
 import de.tum.in.www1.hephaestus.core.WorkspaceAgnostic;
 import de.tum.in.www1.hephaestus.core.exception.EntityNotFoundException;
-import de.tum.in.www1.hephaestus.gitprovider.label.Label;
-import de.tum.in.www1.hephaestus.gitprovider.label.LabelRepository;
-import de.tum.in.www1.hephaestus.gitprovider.team.Team;
-import de.tum.in.www1.hephaestus.gitprovider.team.TeamInfoDTO;
-import de.tum.in.www1.hephaestus.gitprovider.team.TeamInfoDTOConverter;
-import de.tum.in.www1.hephaestus.gitprovider.team.TeamRepository;
-import de.tum.in.www1.hephaestus.gitprovider.user.User;
-import de.tum.in.www1.hephaestus.gitprovider.user.UserTeamsDTO;
 import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.in.www1.hephaestus.workspace.exception.*;
+import de.tum.in.www1.hephaestus.workspace.settings.WorkspaceTeamSettingsService;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -29,7 +22,6 @@ import org.springframework.transaction.annotation.Transactional;
  * <ul>
  *   <li><b>Workspace creation:</b> Creates workspaces with owner membership</li>
  *   <li><b>Slug management:</b> Renames with redirect history via {@link WorkspaceSlugService}</li>
- *   <li><b>Team/label management:</b> Associates labels with teams for contribution filtering</li>
  *   <li><b>Settings delegation:</b> Forwards to {@link WorkspaceSettingsService}</li>
  *   <li><b>League points:</b> Triggers recalculation via {@link LeaguePointsRecalculator}</li>
  * </ul>
@@ -42,6 +34,8 @@ import org.springframework.transaction.annotation.Transactional;
  *   <li>{@link WorkspaceInstallationService} – GitHub App installation handling</li>
  *   <li>{@link WorkspaceRepositoryMonitorService} – Repository monitoring configuration</li>
  *   <li>{@link WorkspaceActivationService} – Activation/startup orchestration</li>
+ *   <li>{@link WorkspaceTeamSettingsService} – Workspace-scoped team settings</li>
+ *   <li>{@link WorkspaceTeamLabelService} – Team/label associations</li>
  * </ul>
  *
  * <h2>Multi-Tenancy Note</h2>
@@ -50,6 +44,7 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * @see Workspace
  * @see WorkspaceContext
+ * @see WorkspaceTeamSettingsService
  */
 @Service
 @WorkspaceAgnostic("Manages workspaces themselves - the tenant root, not data within workspaces")
@@ -61,35 +56,23 @@ public class WorkspaceService {
 
     // Core repositories
     private final WorkspaceRepository workspaceRepository;
-    private final TeamRepository teamRepository;
-    private final LabelRepository labelRepository;
-    private final WorkspaceMembershipRepository workspaceMembershipRepository;
 
     // Services
     private final WorkspaceSlugService workspaceSlugService;
     private final WorkspaceSettingsService workspaceSettingsService;
-    private final TeamInfoDTOConverter teamInfoDTOConverter;
     private final LeaguePointsRecalculator leaguePointsRecalculator;
     private final WorkspaceMembershipService workspaceMembershipService;
 
     public WorkspaceService(
         WorkspaceRepository workspaceRepository,
-        TeamRepository teamRepository,
-        LabelRepository labelRepository,
-        WorkspaceMembershipRepository workspaceMembershipRepository,
         WorkspaceSlugService workspaceSlugService,
         WorkspaceSettingsService workspaceSettingsService,
-        TeamInfoDTOConverter teamInfoDTOConverter,
         LeaguePointsRecalculator leaguePointsRecalculator,
         WorkspaceMembershipService workspaceMembershipService
     ) {
         this.workspaceRepository = workspaceRepository;
-        this.teamRepository = teamRepository;
-        this.labelRepository = labelRepository;
-        this.workspaceMembershipRepository = workspaceMembershipRepository;
         this.workspaceSlugService = workspaceSlugService;
         this.workspaceSettingsService = workspaceSettingsService;
-        this.teamInfoDTOConverter = teamInfoDTOConverter;
         this.leaguePointsRecalculator = leaguePointsRecalculator;
         this.workspaceMembershipService = workspaceMembershipService;
     }
@@ -161,7 +144,7 @@ public class WorkspaceService {
             return saved;
         } catch (DataIntegrityViolationException e) {
             // Unique constraint violation on slug
-            throw new WorkspaceSlugConflictException(slug);
+            throw new WorkspaceSlugConflictException(slug, e);
         }
     }
 
@@ -188,105 +171,6 @@ public class WorkspaceService {
         }
 
         return workspace;
-    }
-
-    // ========================================================================
-    // Team/Label Management
-    // ========================================================================
-
-    public List<UserTeamsDTO> getUsersWithTeams(String slug) {
-        Workspace workspace = requireWorkspace(slug);
-        log.info(
-            "Getting users with teams for workspace id={} (slug={})",
-            workspace.getId(),
-            LoggingUtils.sanitizeForLog(slug)
-        );
-        List<User> users = workspaceMembershipRepository.findHumanUsersWithTeamsByWorkspaceId(workspace.getId());
-        return users.stream().map(UserTeamsDTO::fromUser).toList();
-    }
-
-    public List<UserTeamsDTO> getUsersWithTeams(WorkspaceContext workspaceContext) {
-        return getUsersWithTeams(requireSlug(workspaceContext));
-    }
-
-    public Optional<TeamInfoDTO> addLabelToTeam(String slug, Long teamId, Long repositoryId, String label) {
-        Workspace workspace = requireWorkspace(slug);
-        log.info(
-            "Adding label '{}' of repository with ID: {} to team with ID: {} (workspace id={})",
-            LoggingUtils.sanitizeForLog(label),
-            repositoryId,
-            teamId,
-            workspace.getId()
-        );
-        // Fetch with collections to avoid LazyInitializationException when calling
-        // addLabel()
-        Optional<Team> optionalTeam = teamRepository.findWithCollectionsById(teamId);
-        if (optionalTeam.isEmpty()) {
-            return Optional.empty();
-        }
-        Team team = optionalTeam.get();
-        Optional<Label> labelEntity = labelRepository.findByRepositoryIdAndName(repositoryId, label);
-        if (labelEntity.isEmpty()) {
-            return Optional.empty();
-        }
-        team.addLabel(labelEntity.get());
-        teamRepository.save(team);
-        return Optional.of(teamInfoDTOConverter.convert(team));
-    }
-
-    public Optional<TeamInfoDTO> addLabelToTeam(
-        WorkspaceContext workspaceContext,
-        Long teamId,
-        Long repositoryId,
-        String label
-    ) {
-        return addLabelToTeam(requireSlug(workspaceContext), teamId, repositoryId, label);
-    }
-
-    public Optional<TeamInfoDTO> removeLabelFromTeam(String slug, Long teamId, Long labelId) {
-        Workspace workspace = requireWorkspace(slug);
-        log.info(
-            "Removing label with ID: {} from team with ID: {} (workspace id={})",
-            labelId,
-            teamId,
-            workspace.getId()
-        );
-        // Fetch with collections to avoid LazyInitializationException when calling
-        // removeLabel()
-        Optional<Team> optionalTeam = teamRepository.findWithCollectionsById(teamId);
-        if (optionalTeam.isEmpty()) {
-            log.warn("Team not found with ID: {}", teamId);
-            return Optional.empty();
-        }
-        Team team = optionalTeam.get();
-        Optional<Label> labelEntity = labelRepository.findById(labelId);
-        if (labelEntity.isEmpty()) {
-            log.warn("Label not found with ID: {}", labelId);
-            return Optional.empty();
-        }
-        Label labelObj = labelEntity.get();
-        int labelCountBefore = team.getLabels().size();
-        log.info(
-            "Team {} has {} labels before removal. Looking for label id={}, name={}",
-            team.getName(),
-            labelCountBefore,
-            labelObj.getId(),
-            labelObj.getName()
-        );
-        boolean removed = team.getLabels().remove(labelObj);
-        int labelCountAfter = team.getLabels().size();
-        log.info(
-            "Label removal result: removed={}, labelCountBefore={}, labelCountAfter={}",
-            removed,
-            labelCountBefore,
-            labelCountAfter
-        );
-        teamRepository.save(team);
-        return Optional.of(teamInfoDTOConverter.convert(team));
-    }
-
-    public Optional<TeamInfoDTO> removeLabelFromTeam(WorkspaceContext workspaceContext, Long teamId, Long labelId) {
-        return removeLabelFromTeam(requireSlug(workspaceContext), teamId, labelId);
     }
 
     // ========================================================================

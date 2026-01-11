@@ -7,7 +7,7 @@ import static org.mockito.Mockito.*;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.label.Label;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
-import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
+import de.tum.in.www1.hephaestus.practices.PracticesPullRequestQueryRepository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.intelligenceservice.api.DetectorApi;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.BadPractice;
@@ -61,7 +61,7 @@ class PullRequestBadPracticeDetectorTest {
     private static final String BAD_PRACTICE_SUMMARY = "Found some issues with this PR.";
 
     @Mock
-    private PullRequestRepository pullRequestRepository;
+    private PracticesPullRequestQueryRepository practicesPullRequestQueryRepository;
 
     @Mock
     private BadPracticeDetectionRepository badPracticeDetectionRepository;
@@ -83,7 +83,7 @@ class PullRequestBadPracticeDetectorTest {
     @BeforeEach
     void setUp() {
         detector = new PullRequestBadPracticeDetector(
-            pullRequestRepository,
+            practicesPullRequestQueryRepository,
             badPracticeDetectionRepository,
             pullRequestTemplateGetter,
             detectorApi
@@ -98,14 +98,14 @@ class PullRequestBadPracticeDetectorTest {
         @DisplayName("returns ERROR_NO_UPDATE_ON_PULLREQUEST when PR not found")
         void returnsErrorWhenPullRequestNotFound() {
             // Arrange
-            when(pullRequestRepository.findById(PR_ID)).thenReturn(Optional.empty());
+            when(practicesPullRequestQueryRepository.findById(PR_ID)).thenReturn(Optional.empty());
 
             // Act
             DetectionResult result = detector.detectAndSyncBadPractices(PR_ID);
 
             // Assert
             assertThat(result).isEqualTo(DetectionResult.ERROR_NO_UPDATE_ON_PULLREQUEST);
-            verify(pullRequestRepository).findById(PR_ID);
+            verify(practicesPullRequestQueryRepository).findById(PR_ID);
             verifyNoInteractions(detectorApi);
         }
 
@@ -117,7 +117,7 @@ class PullRequestBadPracticeDetectorTest {
             Repository repository = createRepository();
             pullRequest.setRepository(repository);
 
-            when(pullRequestRepository.findById(PR_ID)).thenReturn(Optional.of(pullRequest));
+            when(practicesPullRequestQueryRepository.findById(PR_ID)).thenReturn(Optional.of(pullRequest));
             when(badPracticeDetectionRepository.findMostRecentByPullRequestId(PR_ID)).thenReturn(null);
             when(pullRequestTemplateGetter.getPullRequestTemplate(REPO_NAME_WITH_OWNER)).thenReturn(TEMPLATE_CONTENT);
             when(detectorApi.detectBadPractices(any())).thenReturn(createEmptyDetectorResponse());
@@ -147,7 +147,7 @@ class PullRequestBadPracticeDetectorTest {
 
             // Create a previous detection that was done after the PR was last updated
             BadPracticeDetection previousDetection = new BadPracticeDetection();
-            previousDetection.setDetectionTime(lastDetection);
+            previousDetection.setDetectedAt(lastDetection);
             previousDetection.setBadPractices(List.of());
 
             when(badPracticeDetectionRepository.findMostRecentByPullRequestId(PR_ID)).thenReturn(previousDetection);
@@ -173,7 +173,7 @@ class PullRequestBadPracticeDetectorTest {
 
             // Previous detection was before the PR update
             BadPracticeDetection previousDetection = new BadPracticeDetection();
-            previousDetection.setDetectionTime(lastDetection);
+            previousDetection.setDetectedAt(lastDetection);
             previousDetection.setBadPractices(List.of());
             previousDetection.setSummary("");
 
@@ -311,7 +311,7 @@ class PullRequestBadPracticeDetectorTest {
 
             // Assert
             BadPracticeDetection savedDetection = badPracticeDetectionCaptor.getValue();
-            assertThat(savedDetection.getDetectionTime()).isAfterOrEqualTo(beforeDetection);
+            assertThat(savedDetection.getDetectedAt()).isAfterOrEqualTo(beforeDetection);
             assertThat(savedDetection.getSummary()).isEqualTo(BAD_PRACTICE_SUMMARY);
         }
     }
@@ -363,7 +363,7 @@ class PullRequestBadPracticeDetectorTest {
             BadPracticeDetection previousDetection = new BadPracticeDetection();
             previousDetection.setSummary("Previous summary");
             previousDetection.setBadPractices(List.of(existingBadPractice));
-            previousDetection.setDetectionTime(Instant.now().minusSeconds(7200)); // Detection was 2 hours ago
+            previousDetection.setDetectedAt(Instant.now().minusSeconds(7200)); // Detection was 2 hours ago
 
             // Set PR update time after the previous detection
             pullRequest.setUpdatedAt(Instant.now());
@@ -427,7 +427,7 @@ class PullRequestBadPracticeDetectorTest {
             detector.detectBadPracticesForPullRequest(pullRequest);
 
             // Assert
-            verify(pullRequestRepository, never()).save(any());
+            verify(practicesPullRequestQueryRepository, never()).save(any());
             verify(badPracticeDetectionRepository, never()).save(any());
         }
     }
@@ -672,7 +672,7 @@ class PullRequestBadPracticeDetectorTest {
             BadPracticeDetection previousDetection = new BadPracticeDetection();
             previousDetection.setSummary("Previous summary");
             previousDetection.setBadPractices(List.of(existingBadPractice));
-            previousDetection.setDetectionTime(Instant.now().minusSeconds(3600));
+            previousDetection.setDetectedAt(Instant.now().minusSeconds(3600));
 
             BadPractice newBadPractice = new BadPractice();
             newBadPractice.setTitle("Missing description");

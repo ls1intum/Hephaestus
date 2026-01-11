@@ -9,6 +9,7 @@ import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.issue.IssueRepository;
 import de.tum.in.www1.hephaestus.gitprovider.issue.github.dto.GitHubIssueEventDTO;
 import de.tum.in.www1.hephaestus.gitprovider.issuetype.IssueType;
+import de.tum.in.www1.hephaestus.gitprovider.label.Label;
 import de.tum.in.www1.hephaestus.gitprovider.label.LabelRepository;
 import de.tum.in.www1.hephaestus.gitprovider.milestone.MilestoneRepository;
 import de.tum.in.www1.hephaestus.gitprovider.organization.Organization;
@@ -46,6 +47,21 @@ import org.springframework.transaction.annotation.Transactional;
  * - Issue persistence for all action types
  * - Event publishing through the handler → processor chain
  * - Edge cases in event handling
+ * <p>
+ * <b>Fixture Values (issues.opened.json - Issue #20):</b>
+ * <ul>
+ *   <li>ID: 3578496080</li>
+ *   <li>Number: 20</li>
+ *   <li>Title: "Webhook fixture: parent tracker"</li>
+ *   <li>State: open</li>
+ *   <li>Locked: false</li>
+ *   <li>HTML URL: "https://github.com/HephaestusTest/TestRepository/issues/20"</li>
+ *   <li>Created at: 2025-11-01T21:42:45Z</li>
+ *   <li>Updated at: 2025-11-01T21:42:45Z</li>
+ *   <li>Comments: 0</li>
+ *   <li>Author: FelixTJDietrich (ID: 5898705)</li>
+ *   <li>Label: etl-sample (ID: 9567656085)</li>
+ * </ul>
  */
 @DisplayName("GitHub Issue Message Handler")
 @Transactional
@@ -62,6 +78,27 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
     private static final Long ISSUE_22_ID = 3578518416L; // milestoned, demilestoned, locked, unlocked, pinned, unpinned, transferred
     private static final Long ISSUE_23_ID = 3578523639L; // deleted
     private static final Long ISSUE_25_ID = 3578528003L; // typed, untyped
+
+    // Exact fixture values from issues.opened.json for correctness verification
+    private static final int FIXTURE_ISSUE_NUMBER = 20;
+    private static final String FIXTURE_ISSUE_TITLE = "Webhook fixture: parent tracker";
+    private static final String FIXTURE_ISSUE_HTML_URL = "https://github.com/HephaestusTest/TestRepository/issues/20";
+    private static final String FIXTURE_ISSUE_BODY =
+        "This parent issue seeds webhook fixtures for our ETL pipeline.\n\nChecklist:\n- [ ] add sub tasks\n- [ ] wire dependencies\n- [ ] tidy up at the end";
+    private static final Instant FIXTURE_ISSUE_CREATED_AT = Instant.parse("2025-11-01T21:42:45Z");
+    private static final Instant FIXTURE_ISSUE_UPDATED_AT = Instant.parse("2025-11-01T21:42:45Z");
+    private static final int FIXTURE_ISSUE_COMMENTS_COUNT = 0;
+
+    // Author fixture values
+    private static final Long FIXTURE_AUTHOR_ID = 5898705L;
+    private static final String FIXTURE_AUTHOR_LOGIN = "FelixTJDietrich";
+    private static final String FIXTURE_AUTHOR_AVATAR_URL = "https://avatars.githubusercontent.com/u/5898705?v=4";
+    private static final String FIXTURE_AUTHOR_HTML_URL = "https://github.com/FelixTJDietrich";
+
+    // Label fixture values from issues.opened.json
+    private static final Long FIXTURE_LABEL_ID = 9567656085L;
+    private static final String FIXTURE_LABEL_NAME = "etl-sample";
+    private static final String FIXTURE_LABEL_COLOR = "ededed";
 
     @Autowired
     private GitHubIssueMessageHandler handler;
@@ -120,7 +157,7 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
     class BasicLifecycleEvents {
 
         @Test
-        @DisplayName("Should persist issue on 'opened' event")
+        @DisplayName("Should persist issue with all schema fields on 'opened' event")
         void shouldPersistIssueOnOpenedEvent() throws Exception {
             // Given
             GitHubIssueEventDTO event = loadPayload("issues.opened");
@@ -128,19 +165,56 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
             // When
             handler.handleEvent(event);
 
-            // Then
-            Issue issue = issueRepository.findById(event.issue().getDatabaseId()).orElse(null);
-            assertThat(issue).isNotNull();
-            assertThat(issue.getTitle()).isEqualTo("Webhook fixture: parent tracker");
+            // Then - verify ALL persisted fields against hardcoded fixture values
+            Issue issue = issueRepository.findById(ISSUE_20_ID).orElseThrow();
+
+            // Core identification fields
+            assertThat(issue.getId()).isEqualTo(ISSUE_20_ID);
+            assertThat(issue.getNumber()).isEqualTo(FIXTURE_ISSUE_NUMBER);
+
+            // Content fields
+            assertThat(issue.getTitle()).isEqualTo(FIXTURE_ISSUE_TITLE);
+            assertThat(issue.getBody()).isEqualTo(FIXTURE_ISSUE_BODY);
+
+            // State fields
             assertThat(issue.getState()).isEqualTo(Issue.State.OPEN);
-            assertThat(issue.getNumber()).isEqualTo(20);
+            assertThat(issue.isLocked()).isFalse();
+            assertThat(issue.getClosedAt()).isNull();
+
+            // URL fields
+            assertThat(issue.getHtmlUrl()).isEqualTo(FIXTURE_ISSUE_HTML_URL);
+
+            // Timestamp fields (critical for sync correctness)
+            assertThat(issue.getCreatedAt()).isEqualTo(FIXTURE_ISSUE_CREATED_AT);
+            assertThat(issue.getUpdatedAt()).isEqualTo(FIXTURE_ISSUE_UPDATED_AT);
+
+            // Counts
+            assertThat(issue.getCommentsCount()).isEqualTo(FIXTURE_ISSUE_COMMENTS_COUNT);
+
+            // Repository association (foreign key)
+            assertThat(issue.getRepository()).isNotNull();
             assertThat(issue.getRepository().getId()).isEqualTo(FIXTURE_REPO_ID);
 
-            // Verify author was created
+            // Author association (foreign key) - verify exact fixture values
             assertThat(issue.getAuthor()).isNotNull();
-            assertThat(issue.getAuthor().getLogin()).isEqualTo("FelixTJDietrich");
+            assertThat(issue.getAuthor().getId()).isEqualTo(FIXTURE_AUTHOR_ID);
+            assertThat(issue.getAuthor().getLogin()).isEqualTo(FIXTURE_AUTHOR_LOGIN);
+            assertThat(issue.getAuthor().getAvatarUrl()).isEqualTo(FIXTURE_AUTHOR_AVATAR_URL);
+            assertThat(issue.getAuthor().getHtmlUrl()).isEqualTo(FIXTURE_AUTHOR_HTML_URL);
 
-            // Verify Created event was published
+            // Label association - verify exact fixture values
+            assertThat(issue.getLabels()).hasSize(1);
+            Label label = issue.getLabels().iterator().next();
+            assertThat(label.getId()).isEqualTo(FIXTURE_LABEL_ID);
+            assertThat(label.getName()).isEqualTo(FIXTURE_LABEL_NAME);
+            assertThat(label.getColor()).isEqualTo(FIXTURE_LABEL_COLOR);
+
+            // Null associations (not present in fixture)
+            assertThat(issue.getMilestone()).isNull();
+            assertThat(issue.getAssignees()).isEmpty();
+            assertThat(issue.getIssueType()).isNull();
+
+            // Domain event published
             assertThat(eventListener.getCreatedEvents()).hasSize(1);
         }
 
@@ -580,23 +654,26 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("Should create all related entities (author, labels) from opened event")
+        @DisplayName("Should create author and label entities with correct field values")
         void shouldCreateAllRelatedEntitiesFromOpenedEvent() throws Exception {
-            // Given
-            GitHubIssueEventDTO event = loadPayload("issues.opened");
-
-            // Verify no users or labels exist
+            // Given - no users or labels exist
             assertThat(userRepository.count()).isZero();
             assertThat(labelRepository.count()).isZero();
 
             // When
-            handler.handleEvent(event);
+            handler.handleEvent(loadPayload("issues.opened"));
 
-            // Then - author was created
-            assertThat(userRepository.findById(5898705L)).isPresent();
+            // Then - author created with exact fixture values
+            var author = userRepository.findById(FIXTURE_AUTHOR_ID).orElseThrow();
+            assertThat(author.getLogin()).isEqualTo(FIXTURE_AUTHOR_LOGIN);
+            assertThat(author.getAvatarUrl()).isEqualTo(FIXTURE_AUTHOR_AVATAR_URL);
+            assertThat(author.getHtmlUrl()).isEqualTo(FIXTURE_AUTHOR_HTML_URL);
 
-            // And label from the opened fixture was created
-            assertThat(labelRepository.findById(9567656085L)).isPresent();
+            // Then - label created with exact fixture values
+            var label = labelRepository.findById(FIXTURE_LABEL_ID).orElseThrow();
+            assertThat(label.getName()).isEqualTo(FIXTURE_LABEL_NAME);
+            assertThat(label.getColor()).isEqualTo(FIXTURE_LABEL_COLOR);
+            assertThat(label.getDescription()).isNull(); // fixture has null description
         }
     }
 

@@ -34,8 +34,8 @@ public interface PullRequestBadPracticeRepository extends JpaRepository<PullRequ
         SELECT prbp
         FROM PullRequestBadPractice prbp
         WHERE prbp.pullRequest.id = :pullRequestId
-          AND prbp.detectionTime = (
-            SELECT MAX(prbp2.detectionTime)
+          AND prbp.detectedAt = (
+            SELECT MAX(prbp2.detectedAt)
             FROM PullRequestBadPractice prbp2
             WHERE prbp2.title = prbp.title
               AND prbp2.pullRequest.id = prbp.pullRequest.id)

@@ -4,6 +4,7 @@ import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.DEFAULT_PAGE_SIZE;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.GRAPHQL_TIMEOUT;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.LARGE_PAGE_SIZE;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.MAX_PAGINATION_PAGES;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser;
@@ -144,8 +145,20 @@ public class GitHubPullRequestReviewSyncService {
         int totalSynced = 0;
         String cursor = startCursor;
         boolean hasMore = true;
+        int pageCount = 0;
 
         while (hasMore) {
+            if (pageCount >= MAX_PAGINATION_PAGES) {
+                log.warn(
+                    "Reached maximum pagination limit ({}) for PR #{} in {}, stopping",
+                    MAX_PAGINATION_PAGES,
+                    pullRequest.getNumber(),
+                    safeNameWithOwner
+                );
+                break;
+            }
+            pageCount++;
+
             try {
                 ClientGraphQlResponse response = client
                     .documentName(QUERY_DOCUMENT)
@@ -237,6 +250,15 @@ public class GitHubPullRequestReviewSyncService {
         int fetchedPages = 0;
 
         while (hasMore) {
+            if (fetchedPages >= MAX_PAGINATION_PAGES) {
+                log.warn(
+                    "Reached maximum pagination limit ({}) for review {} comments, stopping",
+                    MAX_PAGINATION_PAGES,
+                    reviewId
+                );
+                break;
+            }
+
             try {
                 ClientGraphQlResponse response = client
                     .documentName(REVIEW_COMMENTS_QUERY_DOCUMENT)

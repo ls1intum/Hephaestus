@@ -1,52 +1,31 @@
 package de.tum.in.www1.hephaestus.gitprovider.repository;
 
-import de.tum.in.www1.hephaestus.core.WorkspaceAgnostic;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.repository.query.Param;
 
+/**
+ * Repository for Repository entities.
+ *
+ * <p>This repository contains only workspace-agnostic queries for the gitprovider domain.
+ * Workspace-scoped queries (those that join with RepositoryToMonitor or other workspace
+ * entities) belong in the consuming packages (leaderboard, profile, etc.) to maintain
+ * clean architecture boundaries.
+ *
+ * @see de.tum.in.www1.hephaestus.profile.ProfileRepositoryQueryRepository
+ */
 @org.springframework.stereotype.Repository
 public interface RepositoryRepository extends JpaRepository<Repository, Long> {
     /**
      * Finds a repository by its full name (owner/name).
      * Used during sync operations to check if repository exists.
      */
-    @WorkspaceAgnostic("Sync operation - lookup by external GitHub identifier")
     Optional<Repository> findByNameWithOwner(String nameWithOwner);
 
     /**
      * Finds all repositories with the given prefix (owner/).
      * Used during installation operations for org login renames.
      */
-    @WorkspaceAgnostic("Installation operation - used during org login rename")
     List<Repository> findByNameWithOwnerStartingWithIgnoreCase(String prefix);
 
-    @Query(
-        """
-        SELECT DISTINCT r
-        FROM Repository r
-        JOIN PullRequest pr ON r.id = pr.repository.id
-        JOIN RepositoryToMonitor rtm ON rtm.nameWithOwner = r.nameWithOwner
-        WHERE pr.author.login ILIKE :contributorLogin
-            AND rtm.workspace.id = :workspaceId
-        ORDER BY r.name ASC
-        """
-    )
-    List<Repository> findContributedByLogin(
-        @Param("contributorLogin") String contributorLogin,
-        @Param("workspaceId") Long workspaceId
-    );
-
-    @Query(
-        """
-        SELECT r
-        FROM Repository r
-        JOIN RepositoryToMonitor rtm ON rtm.nameWithOwner = r.nameWithOwner
-        WHERE rtm.workspace.id = :workspaceId
-        ORDER BY r.name ASC
-        """
-    )
-    List<Repository> findActiveByWorkspaceId(@Param("workspaceId") Long workspaceId);
 }

@@ -174,7 +174,7 @@ public class GitHubTeamSyncService {
                 team.setParentId(graphQlTeam.getParentTeam().getDatabaseId().longValue());
             }
             // Update last synced timestamp
-            team.setLastSyncedAt(Instant.now());
+            team.setLastSyncAt(Instant.now());
             team = teamRepository.save(team);
         }
 
@@ -595,7 +595,7 @@ public class GitHubTeamSyncService {
         }
         return switch (privacy) {
             case SECRET -> "secret";
-            case VISIBLE -> "closed"; // VISIBLE maps to closed in the REST API
+            case VISIBLE -> "visible";
         };
     }
 }

@@ -2,7 +2,7 @@ package de.tum.in.www1.hephaestus.practices.detection;
 
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
-import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
+import de.tum.in.www1.hephaestus.practices.PracticesPullRequestQueryRepository;
 import de.tum.in.www1.hephaestus.intelligenceservice.api.DetectorApi;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.BadPractice;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.DetectorRequest;
@@ -40,7 +40,7 @@ public class PullRequestBadPracticeDetector {
     private static final String READY_FOR_REVIEW = "ready for review";
     private static final String READY_TO_MERGE = "ready to merge";
 
-    private final PullRequestRepository pullRequestRepository;
+    private final PracticesPullRequestQueryRepository practicesPullRequestQueryRepository;
 
     private final BadPracticeDetectionRepository badPracticeDetectionRepository;
 
@@ -49,12 +49,12 @@ public class PullRequestBadPracticeDetector {
     private final DetectorApi detectorApi;
 
     public PullRequestBadPracticeDetector(
-        PullRequestRepository pullRequestRepository,
+        PracticesPullRequestQueryRepository practicesPullRequestQueryRepository,
         BadPracticeDetectionRepository badPracticeDetectionRepository,
         PullRequestTemplateGetter pullRequestTemplateGetter,
         DetectorApi detectorApi
     ) {
-        this.pullRequestRepository = pullRequestRepository;
+        this.practicesPullRequestQueryRepository = practicesPullRequestQueryRepository;
         this.badPracticeDetectionRepository = badPracticeDetectionRepository;
         this.pullRequestTemplateGetter = pullRequestTemplateGetter;
         this.detectorApi = detectorApi;
@@ -71,7 +71,7 @@ public class PullRequestBadPracticeDetector {
     public DetectionResult detectForUser(Long workspaceId, String login) {
         log.info("Detecting bad practices for user {} in workspace {}", login, workspaceId);
 
-        List<PullRequest> pullRequests = pullRequestRepository.findAssignedByLoginAndStates(
+        List<PullRequest> pullRequests = practicesPullRequestQueryRepository.findAssignedByLoginAndStates(
             login,
             Set.of(Issue.State.OPEN),
             workspaceId
@@ -98,7 +98,7 @@ public class PullRequestBadPracticeDetector {
     @Transactional
     public DetectionResult detectAndSyncBadPractices(Long pullRequestId) {
         log.debug("Looking up pull request by ID: {}", pullRequestId);
-        return pullRequestRepository
+        return practicesPullRequestQueryRepository
             .findById(pullRequestId)
             .map(this::detectAndSyncBadPractices)
             .orElseGet(() -> {
@@ -125,8 +125,8 @@ public class PullRequestBadPracticeDetector {
         if (
             pullRequest.getUpdatedAt() != null &&
             lastDetection != null &&
-            lastDetection.getDetectionTime() != null &&
-            pullRequest.getUpdatedAt().isBefore(lastDetection.getDetectionTime())
+            lastDetection.getDetectedAt() != null &&
+            pullRequest.getUpdatedAt().isBefore(lastDetection.getDetectedAt())
         ) {
             log.info("Pull request has not been updated since last detection. Skipping detection.");
             return DetectionResult.ERROR_NO_UPDATE_ON_PULLREQUEST;
@@ -158,16 +158,8 @@ public class PullRequestBadPracticeDetector {
             pullRequest.getId()
         );
 
-        String summary;
-        List<PullRequestBadPractice> existingBadPractices;
-
-        if (lastDetection == null) {
-            summary = "";
-            existingBadPractices = List.of();
-        } else {
-            summary = lastDetection.getSummary();
-            existingBadPractices = lastDetection.getBadPractices();
-        }
+        List<PullRequestBadPractice> existingBadPractices =
+            lastDetection != null ? lastDetection.getBadPractices() : List.of();
 
         PullRequestLifecycleState lifecycleState = this.getLifecycleStateOfPullRequest(pullRequest);
         String template = pullRequestTemplateGetter.getPullRequestTemplate(
@@ -201,7 +193,7 @@ public class PullRequestBadPracticeDetector {
             emptyDetection.setPullRequest(pullRequest);
             emptyDetection.setBadPractices(Collections.emptyList());
             emptyDetection.setSummary("");
-            emptyDetection.setDetectionTime(Instant.now());
+            emptyDetection.setDetectedAt(Instant.now());
             emptyDetection.setTraceId(null);
             return emptyDetection;
         }
@@ -226,7 +218,7 @@ public class PullRequestBadPracticeDetector {
         badPracticeDetection.setPullRequest(pullRequest);
         badPracticeDetection.setBadPractices(detectedBadPractices);
         badPracticeDetection.setSummary(detectorResponse.getBadPracticeSummary());
-        badPracticeDetection.setDetectionTime(Instant.now());
+        badPracticeDetection.setDetectedAt(Instant.now());
         badPracticeDetection.setTraceId(detectorResponse.getTraceId());
 
         detectedBadPractices.forEach(badPractice -> {
@@ -255,8 +247,8 @@ public class PullRequestBadPracticeDetector {
         pullRequestBadPractice.setDescription(badPractice.getDescription());
         pullRequestBadPractice.setPullRequest(pullRequest);
         pullRequestBadPractice.setState(PullRequestBadPracticeState.fromBadPracticeStatus(badPractice.getStatus()));
-        pullRequestBadPractice.setDetectionTime(Instant.now());
-        pullRequestBadPractice.setLastUpdateTime(Instant.now());
+        pullRequestBadPractice.setDetectedAt(Instant.now());
+        pullRequestBadPractice.setUpdatedAt(Instant.now());
         pullRequestBadPractice.setDetectionPullrequestLifecycleState(lifecycleState);
         pullRequestBadPractice.setDetectionTraceId(traceId);
         return pullRequestBadPractice;
@@ -320,7 +312,7 @@ public class PullRequestBadPracticeDetector {
         emptyDetection.setPullRequest(pullRequest);
         emptyDetection.setBadPractices(Collections.emptyList());
         emptyDetection.setSummary("");
-        emptyDetection.setDetectionTime(Instant.now());
+        emptyDetection.setDetectedAt(Instant.now());
         emptyDetection.setTraceId("fallback-" + UUID.randomUUID());
         return emptyDetection;
     }

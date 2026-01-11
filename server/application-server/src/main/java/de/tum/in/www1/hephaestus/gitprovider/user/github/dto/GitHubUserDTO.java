@@ -8,9 +8,10 @@ import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.EnterpriseUser
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.Mannequin;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.Organization;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.User;
-import java.net.URI;
+import static de.tum.in.www1.hephaestus.gitprovider.common.DateTimeUtils.toInstant;
+import static de.tum.in.www1.hephaestus.gitprovider.common.DateTimeUtils.uriToString;
+
 import java.time.Instant;
-import java.time.OffsetDateTime;
 import org.springframework.lang.Nullable;
 
 /**
@@ -119,8 +120,8 @@ public record GitHubUserDTO(
             user.getFollowers() != null ? user.getFollowers().getTotalCount() : null,
             user.getFollowing() != null ? user.getFollowing().getTotalCount() : null,
             // Timestamp fields
-            offsetDateTimeToInstant(user.getCreatedAt()),
-            offsetDateTimeToInstant(user.getUpdatedAt())
+            toInstant(user.getCreatedAt()),
+            toInstant(user.getUpdatedAt())
         );
     }
 
@@ -213,13 +214,5 @@ public record GitHubUserDTO(
             null,
             null
         );
-    }
-
-    private static String uriToString(@Nullable URI uri) {
-        return uri != null ? uri.toString() : null;
-    }
-
-    private static Instant offsetDateTimeToInstant(@Nullable OffsetDateTime odt) {
-        return odt != null ? odt.toInstant() : null;
     }
 }

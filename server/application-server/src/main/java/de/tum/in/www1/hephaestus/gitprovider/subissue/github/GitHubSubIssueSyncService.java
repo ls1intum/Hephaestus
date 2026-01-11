@@ -205,8 +205,9 @@ public class GitHubSubIssueSyncService {
             return -1;
         }
 
-        List<Repository> repositories = repositoryRepository.findActiveByWorkspaceId(workspaceId);
-        if (repositories.isEmpty()) {
+        // Get repository names via SPI (workspace package implements this)
+        List<String> repositoryNames = syncTargetProvider.getRepositoryNamesForWorkspace(workspaceId);
+        if (repositoryNames.isEmpty()) {
             log.debug("No repositories found for workspace {}", workspaceId);
             // Still update timestamp to prevent repeated empty checks
             updateSyncTimestamp(workspaceId);
@@ -218,27 +219,33 @@ public class GitHubSubIssueSyncService {
         log.info(
             "Starting sub-issue sync for workspace '{}' with {} repositories",
             metadata.displayName(),
-            repositories.size()
+            repositoryNames.size()
         );
 
         int totalLinked = 0;
         int failedRepos = 0;
 
-        for (Repository repo : repositories) {
+        for (String repoNameWithOwner : repositoryNames) {
+            Optional<Repository> repoOpt = repositoryRepository.findByNameWithOwner(repoNameWithOwner);
+            if (repoOpt.isEmpty()) {
+                log.warn("Repository {} not found in database, skipping", sanitizeForLog(repoNameWithOwner));
+                continue;
+            }
+
             try {
-                totalLinked += syncSubIssuesForRepository(client, repo);
+                totalLinked += syncSubIssuesForRepository(client, repoOpt.get());
             } catch (Exception e) {
                 failedRepos++;
                 log.error(
                     "Error syncing sub-issues for repository {}: {}",
-                    sanitizeForLog(repo.getNameWithOwner()),
+                    sanitizeForLog(repoNameWithOwner),
                     e.getMessage()
                 );
             }
         }
 
         // Only update timestamp if at least some repos succeeded
-        if (failedRepos < repositories.size()) {
+        if (failedRepos < repositoryNames.size()) {
             updateSyncTimestamp(workspaceId);
         }
 

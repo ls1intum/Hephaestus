@@ -3,6 +3,7 @@ package de.tum.in.www1.hephaestus.gitprovider.pullrequest.github;
 import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.DEFAULT_PAGE_SIZE;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.GRAPHQL_TIMEOUT;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.MAX_PAGINATION_PAGES;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
@@ -102,8 +103,19 @@ public class GitHubPullRequestSyncService {
         List<PullRequestWithReviewCursor> prsNeedingReviewPagination = new ArrayList<>();
         String cursor = null;
         boolean hasMore = true;
+        int pageCount = 0;
 
         while (hasMore) {
+            if (pageCount >= MAX_PAGINATION_PAGES) {
+                log.warn(
+                    "Reached maximum pagination limit ({}) for repository {}, stopping",
+                    MAX_PAGINATION_PAGES,
+                    safeNameWithOwner
+                );
+                break;
+            }
+            pageCount++;
+
             try {
                 ClientGraphQlResponse response = client
                     .documentName(QUERY_DOCUMENT)

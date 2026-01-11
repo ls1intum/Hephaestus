@@ -35,6 +35,14 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>
  * Tests use JSON fixtures parsed directly into DTOs using JSON fixtures for complete isolation.
  * Fixtures are real GitHub webhook payloads from HephaestusTest/TestRepository.
+ * <p>
+ * <b>Fixture Values (label.created.json):</b>
+ * <ul>
+ *   <li>Label ID: 8747399111</li>
+ *   <li>Label name: "documentation"</li>
+ *   <li>Label color: "0075ca"</li>
+ *   <li>Label description: "Improvements or additions to documentation"</li>
+ * </ul>
  */
 @DisplayName("GitHub Label Message Handler")
 @Transactional
@@ -46,6 +54,12 @@ class GitHubLabelMessageHandlerIntegrationTest extends BaseIntegrationTest {
     private static final String FIXTURE_ORG_LOGIN = "HephaestusTest";
     private static final String FIXTURE_REPO_NAME = "TestRepository";
     private static final String FIXTURE_REPO_FULL_NAME = "HephaestusTest/TestRepository";
+
+    // Exact fixture values from label.created.json for correctness verification
+    private static final Long FIXTURE_LABEL_ID = 8747399111L;
+    private static final String FIXTURE_LABEL_NAME = "documentation";
+    private static final String FIXTURE_LABEL_COLOR = "0075ca";
+    private static final String FIXTURE_LABEL_DESCRIPTION = "Improvements or additions to documentation";
 
     @Autowired
     private GitHubLabelMessageHandler handler;
@@ -121,57 +135,58 @@ class GitHubLabelMessageHandlerIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("Should process created label events")
+    @DisplayName("Should process created label events with exact fixture values")
     void shouldProcessCreatedLabelEvents() throws Exception {
         // Given
         GitHubLabelEventDTO event = loadPayload("label.created");
-
-        // Verify label doesn't exist initially
-        assertThat(labelRepository.findById(event.label().id())).isEmpty();
+        assertThat(labelRepository.findById(FIXTURE_LABEL_ID)).isEmpty();
 
         // When
         handler.handleEvent(event);
 
-        // Then
-        assertThat(labelRepository.findById(event.label().id()))
-            .isPresent()
-            .get()
-            .satisfies(label -> {
-                assertThat(label.getId()).isEqualTo(event.label().id());
-                assertThat(label.getName()).isEqualTo(event.label().name());
-                assertThat(label.getColor()).isEqualTo(event.label().color());
-                assertThat(label.getDescription()).isEqualTo(event.label().description());
-            });
+        // Then - verify ALL persisted fields against hardcoded fixture values
+        Label label = labelRepository.findById(FIXTURE_LABEL_ID).orElseThrow();
+
+        // Core schema fields (mapped to DB columns)
+        assertThat(label.getId()).isEqualTo(FIXTURE_LABEL_ID);
+        assertThat(label.getName()).isEqualTo(FIXTURE_LABEL_NAME);
+        assertThat(label.getColor()).isEqualTo(FIXTURE_LABEL_COLOR);
+        assertThat(label.getDescription()).isEqualTo(FIXTURE_LABEL_DESCRIPTION);
+
+        // Repository association (foreign key)
+        assertThat(label.getRepository()).isNotNull();
+        assertThat(label.getRepository().getId()).isEqualTo(FIXTURE_REPO_ID);
+
+        // Note: createdAt/updatedAt are not provided in webhook payloads (only in GraphQL)
+        // Note: lastSyncAt is ETL infrastructure, not set by webhook handler
     }
 
     @Test
-    @DisplayName("Should process edited label events")
+    @DisplayName("Should update all label fields on 'edited' event")
     void shouldProcessEditedLabelEvents() throws Exception {
-        // Given
+        // Given - create existing label with stale data
         GitHubLabelEventDTO event = loadPayload("label.edited");
+        Long labelId = event.label().id();
 
-        // Create existing label with different data
         Label existingLabel = new Label();
-        existingLabel.setId(event.label().id());
-        existingLabel.setName("old-name");
+        existingLabel.setId(labelId);
+        existingLabel.setName("stale-name");
         existingLabel.setColor("ffffff");
-        existingLabel.setDescription("old description");
+        existingLabel.setDescription("stale description");
         existingLabel.setRepository(testRepository);
         labelRepository.save(existingLabel);
 
         // When
         handler.handleEvent(event);
 
-        // Then
-        assertThat(labelRepository.findById(event.label().id()))
-            .isPresent()
-            .get()
-            .satisfies(label -> {
-                assertThat(label.getId()).isEqualTo(event.label().id());
-                assertThat(label.getName()).isEqualTo(event.label().name());
-                assertThat(label.getColor()).isEqualTo(event.label().color());
-                assertThat(label.getDescription()).isEqualTo(event.label().description());
-            });
+        // Then - verify all mutable fields are updated from DTO
+        Label label = labelRepository.findById(labelId).orElseThrow();
+        assertThat(label.getName()).isEqualTo(event.label().name());
+        assertThat(label.getColor()).isEqualTo(event.label().color());
+        assertThat(label.getDescription()).isEqualTo(event.label().description());
+
+        // Verify repository association preserved (not overwritten)
+        assertThat(label.getRepository().getId()).isEqualTo(FIXTURE_REPO_ID);
     }
 
     @Test
@@ -246,7 +261,9 @@ class GitHubLabelMessageHandlerIntegrationTest extends BaseIntegrationTest {
                 "LA_test",
                 "test-label",
                 "Test description",
-                "ff0000"
+                "ff0000",
+                null,
+                null
             );
             GitHubLabelEventDTO event = new GitHubLabelEventDTO("created", labelDto, null, null);
 
@@ -264,7 +281,9 @@ class GitHubLabelMessageHandlerIntegrationTest extends BaseIntegrationTest {
                 "LA_nodeId",
                 "no-description-label",
                 null, // null description
-                "abcdef"
+                "abcdef",
+                null,
+                null
             );
             GitHubLabelEventDTO event = new GitHubLabelEventDTO("created", labelDto, createTestRepoRef(), null);
 
@@ -300,7 +319,9 @@ class GitHubLabelMessageHandlerIntegrationTest extends BaseIntegrationTest {
                 "LA_nodeId",
                 "has-description",
                 null, // setting to null
-                "123456"
+                "123456",
+                null,
+                null
             );
             GitHubLabelEventDTO event = new GitHubLabelEventDTO("edited", labelDto, createTestRepoRef(), null);
             handler.handleEvent(event);
@@ -344,7 +365,9 @@ class GitHubLabelMessageHandlerIntegrationTest extends BaseIntegrationTest {
                 "LA_unknown",
                 "unknown-action-label",
                 "desc",
-                "000000"
+                "000000",
+                null,
+                null
             );
             GitHubLabelEventDTO event = new GitHubLabelEventDTO(
                 "unknown_action", // not created/edited/deleted
@@ -437,7 +460,9 @@ class GitHubLabelMessageHandlerIntegrationTest extends BaseIntegrationTest {
                 createEvent.label().nodeId(),
                 "renamed-documentation",
                 "Updated description",
-                "ff0000"
+                "ff0000",
+                null,
+                null
             );
             GitHubLabelEventDTO editEvent = new GitHubLabelEventDTO("edited", editedDto, createTestRepoRef(), null);
             handler.handleEvent(editEvent);

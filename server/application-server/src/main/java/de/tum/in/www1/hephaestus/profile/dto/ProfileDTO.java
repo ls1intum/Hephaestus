@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestInfoDTO;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryInfoDTO;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserInfoDTO;
+import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
 import java.util.List;
 import org.springframework.lang.NonNull;
@@ -22,10 +23,13 @@ import org.springframework.lang.NonNull;
  * <p>The gitprovider module has NO knowledge of XP or scoring.
  */
 @JsonInclude(JsonInclude.Include.NON_EMPTY)
+@Schema(description = "Complete user profile including contribution history and activity")
 public record ProfileDTO(
-    @NonNull UserInfoDTO userInfo,
-    Instant firstContribution,
-    @NonNull List<RepositoryInfoDTO> contributedRepositories,
-    List<ProfileReviewActivityDTO> reviewActivity,
-    List<PullRequestInfoDTO> openPullRequests
+    @NonNull @Schema(description = "Basic information about the user") UserInfoDTO userInfo,
+    @Schema(description = "Timestamp of the user's first contribution") Instant firstContribution,
+    @NonNull
+    @Schema(description = "Repositories the user has contributed to")
+    List<RepositoryInfoDTO> contributedRepositories,
+    @Schema(description = "Recent review activity with XP scores") List<ProfileReviewActivityDTO> reviewActivity,
+    @Schema(description = "Currently open pull requests authored by the user") List<PullRequestInfoDTO> openPullRequests
 ) {}

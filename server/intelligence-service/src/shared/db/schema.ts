@@ -133,11 +133,7 @@ export const badPracticeDetection = pgTable(
 			increment: 1,
 			cache: 1,
 		}),
-		detectionTime: timestamp("detection_time", {
-			precision: 6,
-			withTimezone: true,
-			mode: "string",
-		}),
+		detectedAt: timestamp("detected_at", { precision: 6, withTimezone: true, mode: "string" }),
 		traceId: varchar("trace_id", { length: 255 }),
 		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
 		pullrequestId: bigint("pullrequest_id", { mode: "number" }),
@@ -165,13 +161,13 @@ export const badPracticeFeedback = pgTable(
 		type: varchar({ length: 255 }),
 		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
 		pullRequestBadPracticeId: bigint("pull_request_bad_practice_id", { mode: "number" }),
-		creationTime: timestamp("creation_time", { precision: 6, withTimezone: true, mode: "string" }),
+		createdAt: timestamp("created_at", { precision: 6, withTimezone: true, mode: "string" }),
 		explanation: text(),
 	},
 	(table) => [
 		foreignKey({
 			columns: [table.pullRequestBadPracticeId],
-			foreignColumns: [pullrequestbadpractice.id],
+			foreignColumns: [pullRequestBadPractice.id],
 			name: "FK34k5tg4qb6gy4g7tn9q8uhogl",
 		}),
 	],
@@ -197,7 +193,6 @@ export const chatMessage = pgTable(
 			table.threadId.asc().nullsLast(),
 			table.createdAt.asc().nullsLast(),
 		),
-		index("idx_chat_message_thread_id").using("btree", table.threadId.asc().nullsLast()),
 		foreignKey({
 			columns: [table.threadId],
 			foreignColumns: [chatThread.id],
@@ -380,7 +375,7 @@ export const issue = pgTable(
 		updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" }),
 		closedAt: timestamp("closed_at", { withTimezone: true, mode: "string" }),
 		commentsCount: integer("comments_count").notNull(),
-		htmlUrl: varchar("html_url", { length: 255 }),
+		htmlUrl: varchar("html_url", { length: 512 }),
 		isLocked: boolean("is_locked").notNull(),
 		number: integer().notNull(),
 		state: varchar({ length: 255 }),
@@ -401,7 +396,7 @@ export const issue = pgTable(
 		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
 		mergedById: bigint("merged_by_id", { mode: "number" }),
 		hasPullRequest: boolean("has_pull_request").notNull(),
-		lastSyncAt: timestamp("last_sync_at", { precision: 6, mode: "string" }),
+		lastSyncAt: timestamp("last_sync_at", { withTimezone: true, mode: "string" }),
 		stateReason: varchar("state_reason", { length: 32 }),
 		body: text(),
 		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
@@ -524,7 +519,7 @@ export const issueComment = pgTable(
 		createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }),
 		updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" }),
 		authorAssociation: varchar("author_association", { length: 255 }),
-		htmlUrl: varchar("html_url", { length: 255 }),
+		htmlUrl: varchar("html_url", { length: 512 }),
 		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
 		authorId: bigint("author_id", { mode: "number" }),
 		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
@@ -580,6 +575,7 @@ export const issueType = pgTable(
 		isEnabled: boolean("is_enabled").default(true).notNull(),
 		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
 		organizationId: bigint("organization_id", { mode: "number" }).notNull(),
+		lastSyncAt: timestamp("last_sync_at", { withTimezone: true, mode: "string" }),
 	},
 	(table) => [
 		index("idx_issue_type_organization_id").using("btree", table.organizationId.asc().nullsLast()),
@@ -601,6 +597,9 @@ export const label = pgTable(
 		name: varchar({ length: 255 }),
 		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
 		repositoryId: bigint("repository_id", { mode: "number" }),
+		lastSyncAt: timestamp("last_sync_at", { withTimezone: true, mode: "string" }),
+		createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }),
+		updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" }),
 	},
 	(table) => [
 		foreignKey({
@@ -620,7 +619,7 @@ export const milestone = pgTable(
 		updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" }),
 		closedAt: timestamp("closed_at", { withTimezone: true, mode: "string" }),
 		dueOn: timestamp("due_on", { withTimezone: true, mode: "string" }),
-		htmlUrl: varchar("html_url", { length: 255 }),
+		htmlUrl: varchar("html_url", { length: 512 }),
 		number: integer().notNull(),
 		state: varchar({ length: 255 }),
 		title: varchar({ length: 255 }),
@@ -631,6 +630,7 @@ export const milestone = pgTable(
 		description: text(),
 		closedIssuesCount: integer("closed_issues_count").default(0).notNull(),
 		openIssuesCount: integer("open_issues_count").default(0).notNull(),
+		lastSyncAt: timestamp("last_sync_at", { withTimezone: true, mode: "string" }),
 	},
 	(table) => [
 		foreignKey({
@@ -656,11 +656,10 @@ export const organization = pgTable(
 		avatarUrl: varchar("avatar_url", { length: 255 }),
 		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
 		githubId: bigint("github_id", { mode: "number" }).notNull(),
-		htmlUrl: varchar("html_url", { length: 255 }),
-		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
-		installationId: bigint("installation_id", { mode: "number" }),
+		htmlUrl: varchar("html_url", { length: 512 }),
 		login: varchar({ length: 255 }).notNull(),
 		name: varchar({ length: 255 }),
+		lastSyncAt: timestamp("last_sync_at", { withTimezone: true, mode: "string" }),
 	},
 	(table) => [
 		unique("uq_organization_github_id").on(table.githubId),
@@ -686,8 +685,8 @@ export const organizationMembership = pgTable(
 	],
 );
 
-export const pullrequestbadpractice = pgTable(
-	"pullrequestbadpractice",
+export const pullRequestBadPractice = pgTable(
+	"pull_request_bad_practice",
 	{
 		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
 		id: bigint({ mode: "number" }).primaryKey().generatedByDefaultAsIdentity({
@@ -700,16 +699,8 @@ export const pullrequestbadpractice = pgTable(
 		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
 		pullrequestId: bigint("pullrequest_id", { mode: "number" }),
 		state: varchar({ length: 32 }).default(0),
-		detectionTime: timestamp("detection_time", {
-			precision: 6,
-			withTimezone: true,
-			mode: "string",
-		}),
-		lastUpdateTime: timestamp("last_update_time", {
-			precision: 6,
-			withTimezone: true,
-			mode: "string",
-		}),
+		detectedAt: timestamp("detected_at", { precision: 6, withTimezone: true, mode: "string" }),
+		updatedAt: timestamp("updated_at", { precision: 6, withTimezone: true, mode: "string" }),
 		userState: varchar("user_state", { length: 32 }),
 		detectionPullrequestLifecycleState: varchar("detection_pullrequest_lifecycle_state", {
 			length: 32,
@@ -765,7 +756,7 @@ export const pullRequestReview = pgTable(
 		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
 		id: bigint({ mode: "number" }).primaryKey().notNull(),
 		commitId: varchar("commit_id", { length: 255 }),
-		htmlUrl: varchar("html_url", { length: 255 }),
+		htmlUrl: varchar("html_url", { length: 512 }),
 		isDismissed: boolean("is_dismissed").notNull(),
 		state: varchar({ length: 255 }),
 		submittedAt: timestamp("submitted_at", { withTimezone: true, mode: "string" }),
@@ -801,7 +792,7 @@ export const pullRequestReviewComment = pgTable(
 		updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" }),
 		authorAssociation: varchar("author_association", { length: 255 }),
 		commitId: varchar("commit_id", { length: 255 }),
-		htmlUrl: varchar("html_url", { length: 255 }),
+		htmlUrl: varchar("html_url", { length: 512 }),
 		line: integer().notNull(),
 		originalCommitId: varchar("original_commit_id", { length: 255 }),
 		originalLine: integer("original_line").notNull(),
@@ -869,8 +860,6 @@ export const pullRequestReviewThread = pgTable(
 		pullRequestId: bigint("pull_request_id", { mode: "number" }).notNull(),
 		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
 		rootCommentId: bigint("root_comment_id", { mode: "number" }),
-		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
-		providerThreadId: bigint("provider_thread_id", { mode: "number" }),
 		nodeId: varchar("node_id", { length: 128 }),
 		path: text(),
 		line: integer(),
@@ -883,10 +872,6 @@ export const pullRequestReviewThread = pgTable(
 		resolvedById: bigint("resolved_by_id", { mode: "number" }),
 	},
 	(table) => [
-		index("idx_pull_request_review_thread_provider").using(
-			"btree",
-			table.providerThreadId.asc().nullsLast(),
-		),
 		index("idx_pull_request_review_thread_pull_request").using(
 			"btree",
 			table.pullRequestId.asc().nullsLast(),
@@ -933,6 +918,7 @@ export const repository = pgTable(
 		visibility: varchar({ length: 255 }),
 		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
 		organizationId: bigint("organization_id", { mode: "number" }),
+		lastSyncAt: timestamp("last_sync_at", { withTimezone: true, mode: "string" }),
 	},
 	(table) => [
 		index("idx_repository_name_with_owner").using("btree", table.nameWithOwner.asc().nullsLast()),
@@ -980,13 +966,13 @@ export const repositoryToMonitor = pgTable(
 			cache: 1,
 		}),
 		issuesAndPullRequestsSyncedAt: timestamp("issues_and_pull_requests_synced_at", {
-			precision: 6,
+			withTimezone: true,
 			mode: "string",
 		}),
-		labelsSyncedAt: timestamp("labels_synced_at", { precision: 6, mode: "string" }),
-		milestonesSyncedAt: timestamp("milestones_synced_at", { precision: 6, mode: "string" }),
+		labelsSyncedAt: timestamp("labels_synced_at", { withTimezone: true, mode: "string" }),
+		milestonesSyncedAt: timestamp("milestones_synced_at", { withTimezone: true, mode: "string" }),
 		nameWithOwner: varchar("name_with_owner", { length: 255 }),
-		repositorySyncedAt: timestamp("repository_synced_at", { precision: 6, mode: "string" }),
+		repositorySyncedAt: timestamp("repository_synced_at", { withTimezone: true, mode: "string" }),
 		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
 		workspaceId: bigint("workspace_id", { mode: "number" }),
 		backfillCheckpoint: integer("backfill_checkpoint"),
@@ -1011,44 +997,30 @@ export const repositoryToMonitor = pgTable(
 	],
 );
 
-export const team = pgTable("team", {
-	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
-	id: bigint({ mode: "number" })
-		.primaryKey()
-		.generatedByDefaultAsIdentity({ name: "team_id_seq", startWith: 1, increment: 1, cache: 1 }),
-	name: varchar({ length: 255 }),
-	hidden: boolean().default(false).notNull(),
-	createdAt: timestamp("created_at", { precision: 6, withTimezone: true, mode: "string" }),
-	description: text(),
-	htmlUrl: text("html_url"),
-	lastSyncedAt: timestamp("last_synced_at", { precision: 6, withTimezone: true, mode: "string" }),
-	organization: varchar({ length: 255 }),
-	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
-	parentId: bigint("parent_id", { mode: "number" }),
-	privacy: varchar({ length: 32 }),
-	updatedAt: timestamp("updated_at", { precision: 6, withTimezone: true, mode: "string" }),
-});
-
-export const teamLabels = pgTable(
-	"team_labels",
+export const team = pgTable(
+	"team",
 	{
 		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
-		teamId: bigint("team_id", { mode: "number" }).notNull(),
+		id: bigint({ mode: "number" })
+			.primaryKey()
+			.generatedByDefaultAsIdentity({ name: "team_id_seq", startWith: 1, increment: 1, cache: 1 }),
+		name: varchar({ length: 255 }),
+		createdAt: timestamp("created_at", { precision: 6, withTimezone: true, mode: "string" }),
+		description: text(),
+		htmlUrl: varchar("html_url", { length: 512 }),
+		lastSyncAt: timestamp("last_sync_at", { withTimezone: true, mode: "string" }),
+		organization: varchar({ length: 255 }),
 		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
-		labelId: bigint("label_id", { mode: "number" }).notNull(),
+		parentId: bigint("parent_id", { mode: "number" }),
+		privacy: varchar({ length: 32 }),
+		updatedAt: timestamp("updated_at", { precision: 6, withTimezone: true, mode: "string" }),
 	},
 	(table) => [
 		foreignKey({
-			columns: [table.teamId],
-			foreignColumns: [team.id],
-			name: "FK3f9iwbjmf3gyflex7xoofnnbh",
-		}),
-		foreignKey({
-			columns: [table.labelId],
-			foreignColumns: [label.id],
-			name: "FKa8aajjyqj8uwnqtrrbg3a9v5o",
-		}),
-		primaryKey({ columns: [table.teamId, table.labelId], name: "team_labelsPK" }),
+			columns: [table.parentId],
+			foreignColumns: [table.id],
+			name: "fk_team_parent",
+		}).onDelete("set null"),
 	],
 );
 
@@ -1084,7 +1056,6 @@ export const teamRepositoryPermission = pgTable(
 		repositoryId: bigint("repository_id", { mode: "number" }).notNull(),
 		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
 		teamId: bigint("team_id", { mode: "number" }).notNull(),
-		hiddenFromContributions: boolean("hidden_from_contributions").default(false).notNull(),
 	},
 	(table) => [
 		foreignKey({
@@ -1111,7 +1082,7 @@ export const user = pgTable("user", {
 	updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" }),
 	avatarUrl: varchar("avatar_url", { length: 255 }),
 	email: varchar({ length: 255 }),
-	htmlUrl: varchar("html_url", { length: 255 }),
+	htmlUrl: varchar("html_url", { length: 512 }),
 	login: varchar({ length: 255 }),
 	name: varchar({ length: 255 }),
 	type: varchar({ length: 255 }),
@@ -1152,7 +1123,7 @@ export const workspace = pgTable(
 			increment: 1,
 			cache: 1,
 		}),
-		usersSyncedAt: timestamp("users_synced_at", { precision: 6, mode: "string" }),
+		usersSyncedAt: timestamp("users_synced_at", { withTimezone: true, mode: "string" }),
 		accountLogin: varchar("account_login", { length: 120 }),
 		gitProviderMode: varchar("git_provider_mode", { length: 255 }),
 		githubRepositorySelection: varchar("github_repository_selection", { length: 255 }),
@@ -1283,5 +1254,103 @@ export const workspaceSlugHistory = pgTable(
 			foreignColumns: [workspace.id],
 			name: "fk_workspace_slug_history_workspace",
 		}).onDelete("cascade"),
+	],
+);
+
+export const workspaceTeamLabelFilter = pgTable(
+	"workspace_team_label_filter",
+	{
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		workspaceId: bigint("workspace_id", { mode: "number" }).notNull(),
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		teamId: bigint("team_id", { mode: "number" }).notNull(),
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		labelId: bigint("label_id", { mode: "number" }).notNull(),
+	},
+	(table) => [
+		index("idx_workspace_team_label_filter_team_id").using("btree", table.teamId.asc().nullsLast()),
+		foreignKey({
+			columns: [table.workspaceId],
+			foreignColumns: [workspace.id],
+			name: "fk_workspace_team_label_filter_workspace",
+		}).onDelete("cascade"),
+		foreignKey({
+			columns: [table.teamId],
+			foreignColumns: [team.id],
+			name: "fk_workspace_team_label_filter_team",
+		}).onDelete("cascade"),
+		foreignKey({
+			columns: [table.labelId],
+			foreignColumns: [label.id],
+			name: "fk_workspace_team_label_filter_label",
+		}).onDelete("cascade"),
+		primaryKey({
+			columns: [table.workspaceId, table.teamId, table.labelId],
+			name: "workspace_team_label_filterPK",
+		}),
+	],
+);
+
+export const workspaceTeamRepositorySettings = pgTable(
+	"workspace_team_repository_settings",
+	{
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		workspaceId: bigint("workspace_id", { mode: "number" }).notNull(),
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		teamId: bigint("team_id", { mode: "number" }).notNull(),
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		repositoryId: bigint("repository_id", { mode: "number" }).notNull(),
+		hiddenFromContributions: boolean("hidden_from_contributions").default(false).notNull(),
+	},
+	(table) => [
+		index("idx_workspace_team_repo_settings_team_repo").using(
+			"btree",
+			table.teamId.asc().nullsLast(),
+			table.repositoryId.asc().nullsLast(),
+		),
+		foreignKey({
+			columns: [table.workspaceId],
+			foreignColumns: [workspace.id],
+			name: "fk_workspace_team_repo_settings_workspace",
+		}).onDelete("cascade"),
+		foreignKey({
+			columns: [table.teamId],
+			foreignColumns: [team.id],
+			name: "fk_workspace_team_repo_settings_team",
+		}).onDelete("cascade"),
+		foreignKey({
+			columns: [table.repositoryId],
+			foreignColumns: [repository.id],
+			name: "fk_workspace_team_repo_settings_repository",
+		}).onDelete("cascade"),
+		primaryKey({
+			columns: [table.workspaceId, table.teamId, table.repositoryId],
+			name: "workspace_team_repository_settingsPK",
+		}),
+	],
+);
+
+export const workspaceTeamSettings = pgTable(
+	"workspace_team_settings",
+	{
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		workspaceId: bigint("workspace_id", { mode: "number" }).notNull(),
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		teamId: bigint("team_id", { mode: "number" }).notNull(),
+		hidden: boolean().default(false).notNull(),
+	},
+	(table) => [
+		index("idx_workspace_team_settings_team_id").using("btree", table.teamId.asc().nullsLast()),
+		foreignKey({
+			columns: [table.workspaceId],
+			foreignColumns: [workspace.id],
+			name: "fk_workspace_team_settings_workspace",
+		}).onDelete("cascade"),
+		foreignKey({
+			columns: [table.teamId],
+			foreignColumns: [team.id],
+			name: "fk_workspace_team_settings_team",
+		}).onDelete("cascade"),
+		primaryKey({ columns: [table.workspaceId, table.teamId], name: "workspace_team_settingsPK" }),
 	],
 );

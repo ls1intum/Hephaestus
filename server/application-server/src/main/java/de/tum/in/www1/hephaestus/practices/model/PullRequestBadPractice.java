@@ -45,7 +45,7 @@ import lombok.*;
 @Setter
 @NoArgsConstructor
 @ToString
-@Table(name = "pullrequestbadpractice")
+@Table(name = "pull_request_bad_practice")
 public class PullRequestBadPractice {
 
     @Id
@@ -91,10 +91,12 @@ public class PullRequestBadPractice {
     private PullRequestBadPracticeState userState;
 
     /** Timestamp when this bad practice was first detected. */
-    private Instant detectionTime;
+    @Column(name = "detected_at")
+    private Instant detectedAt;
 
     /** Timestamp of the most recent update to this record. */
-    private Instant lastUpdateTime;
+    @Column(name = "updated_at")
+    private Instant updatedAt;
 
     /** PR lifecycle state at the time of detection (for analytics). */
     @Enumerated(EnumType.STRING)

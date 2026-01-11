@@ -1,19 +1,22 @@
 package de.tum.in.www1.hephaestus.gitprovider.organization.github;
 
 import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
-import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.*;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.GRAPHQL_TIMEOUT;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.LARGE_PAGE_SIZE;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.MAX_PAGINATION_PAGES;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.OrganizationMemberConnection;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.OrganizationMemberEdge;
-import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.OrganizationMemberRole;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.PageInfo;
 import de.tum.in.www1.hephaestus.gitprovider.organization.Organization;
+import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationMemberRole;
 import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationMembershipRepository;
 import de.tum.in.www1.hephaestus.gitprovider.organization.github.dto.GitHubOrganizationEventDTO;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserProcessor;
 import de.tum.in.www1.hephaestus.gitprovider.user.github.dto.GitHubUserDTO;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -98,6 +101,10 @@ public class GitHubOrganizationSyncService {
             if (organization != null) {
                 // Sync organization memberships with full pagination
                 int membersSynced = syncOrganizationMemberships(client, organization, graphQlOrg);
+
+                // Mark sync timestamp - organization is managed entity, will be persisted at commit
+                organization.setLastSyncAt(Instant.now());
+
                 log.info(
                     "Synced organization {} ({}) with {} members",
                     organization.getLogin(),
@@ -140,9 +147,20 @@ public class GitHubOrganizationSyncService {
         List<OrganizationMemberEdge> allMembers = new ArrayList<>(membersConnection.getEdges());
         PageInfo pageInfo = membersConnection.getPageInfo();
         String cursor = pageInfo != null ? pageInfo.getEndCursor() : null;
+        int pageCount = 0;
 
         // Paginate through all remaining members if there are more pages
         while (pageInfo != null && Boolean.TRUE.equals(pageInfo.getHasNextPage())) {
+            if (pageCount >= MAX_PAGINATION_PAGES) {
+                log.warn(
+                    "Reached maximum pagination limit ({}) for organization {} members, stopping",
+                    MAX_PAGINATION_PAGES,
+                    organization.getLogin()
+                );
+                break;
+            }
+            pageCount++;
+
             OrganizationMemberConnection nextPage = client
                 .documentName(GET_ORGANIZATION_MEMBERS_DOCUMENT)
                 .variable("login", organization.getLogin())
@@ -189,7 +207,7 @@ public class GitHubOrganizationSyncService {
                 syncedUserIds.add(user.getId());
 
                 // Get role from edge
-                String role = mapRole(edge.getRole());
+                OrganizationMemberRole role = mapRole(edge.getRole());
 
                 // Upsert membership
                 organizationMembershipRepository.upsertMembership(organization.getId(), user.getId(), role);
@@ -283,15 +301,20 @@ public class GitHubOrganizationSyncService {
     }
 
     /**
-     * Maps GraphQL OrganizationMemberRole enum to string for storage.
+     * Maps GraphQL OrganizationMemberRole enum to our domain enum.
      *
-     * @param role the GraphQL OrganizationMemberRole enum value
-     * @return the role string (uppercase), or "MEMBER" as default
+     * @param graphQlRole the GraphQL OrganizationMemberRole enum value
+     * @return the domain OrganizationMemberRole, or MEMBER as default
      */
-    private String mapRole(OrganizationMemberRole role) {
-        if (role == null) {
-            return "MEMBER";
+    private OrganizationMemberRole mapRole(
+        de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.OrganizationMemberRole graphQlRole
+    ) {
+        if (graphQlRole == null) {
+            return OrganizationMemberRole.MEMBER;
         }
-        return role.toString().toUpperCase();
+        return switch (graphQlRole) {
+            case ADMIN -> OrganizationMemberRole.ADMIN;
+            case MEMBER -> OrganizationMemberRole.MEMBER;
+        };
     }
 }

@@ -1,6 +1,6 @@
 import { CodeReviewIcon, GitPullRequestIcon } from "@primer/octicons-react";
 import { Link } from "@tanstack/react-router";
-import type { PullRequestBaseInfo, PullRequestInfo, PullRequestReviewInfo } from "@/api/types.gen";
+import type { ProfileReviewActivity, PullRequestBaseInfo, PullRequestInfo } from "@/api/types.gen";
 import { ActivityBadges } from "@/components/leaderboard/ActivityBadges";
 import { Button } from "@/components/ui/button";
 import type { LeaderboardSchedule } from "@/lib/timeframe";
@@ -11,7 +11,7 @@ import { ProfileTimeframePicker } from "./ProfileTimeframePicker";
 import { ReviewActivityCard } from "./ReviewActivityCard";
 
 export interface ProfileContentProps {
-	reviewActivity?: PullRequestReviewInfo[];
+	reviewActivity?: ProfileReviewActivity[];
 	openPullRequests?: PullRequestInfo[];
 	isLoading: boolean;
 	username: string;
@@ -115,7 +115,7 @@ export function ProfileContent({
 					</div>
 					<div className="flex flex-col gap-2 m-1">
 						{filteredReviewActivity.length > 0 ? (
-							(filteredReviewActivity as PullRequestReviewInfo[]).map((activity) => (
+							(filteredReviewActivity as ProfileReviewActivity[]).map((activity) => (
 								<ReviewActivityCard
 									key={activity.id}
 									isLoading={isLoading}

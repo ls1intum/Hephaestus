@@ -8,15 +8,12 @@ import de.tum.in.www1.hephaestus.activity.scoring.ExperiencePointCalculator;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.issue.IssueRepository;
 import de.tum.in.www1.hephaestus.gitprovider.issuecomment.IssueComment;
-import de.tum.in.www1.hephaestus.gitprovider.issuecomment.IssueCommentRepository;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReview;
-import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReviewRepository;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.PullRequestReviewComment;
-import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.PullRequestReviewCommentRepository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
-import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
+import de.tum.in.www1.hephaestus.activity.ActivityRepositoryQueryRepository;
 import de.tum.in.www1.hephaestus.workspace.Workspace;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceRepository;
 import jakarta.persistence.EntityManager;
@@ -122,11 +119,8 @@ public class ActivityEventBackfillService {
     private final ActivityEventService activityEventService;
     private final ExperiencePointCalculator xpCalculator;
     private final WorkspaceRepository workspaceRepository;
-    private final RepositoryRepository repositoryRepository;
+    private final ActivityRepositoryQueryRepository activityRepositoryQueryRepository;
     private final PullRequestRepository pullRequestRepository;
-    private final PullRequestReviewRepository reviewRepository;
-    private final IssueCommentRepository issueCommentRepository;
-    private final PullRequestReviewCommentRepository reviewCommentRepository;
     private final IssueRepository issueRepository;
     private final EntityManager entityManager;
 
@@ -135,11 +129,8 @@ public class ActivityEventBackfillService {
         ActivityEventService activityEventService,
         ExperiencePointCalculator xpCalculator,
         WorkspaceRepository workspaceRepository,
-        RepositoryRepository repositoryRepository,
+        ActivityRepositoryQueryRepository activityRepositoryQueryRepository,
         PullRequestRepository pullRequestRepository,
-        PullRequestReviewRepository reviewRepository,
-        IssueCommentRepository issueCommentRepository,
-        PullRequestReviewCommentRepository reviewCommentRepository,
         IssueRepository issueRepository,
         EntityManager entityManager
     ) {
@@ -147,11 +138,8 @@ public class ActivityEventBackfillService {
         this.activityEventService = activityEventService;
         this.xpCalculator = xpCalculator;
         this.workspaceRepository = workspaceRepository;
-        this.repositoryRepository = repositoryRepository;
+        this.activityRepositoryQueryRepository = activityRepositoryQueryRepository;
         this.pullRequestRepository = pullRequestRepository;
-        this.reviewRepository = reviewRepository;
-        this.issueCommentRepository = issueCommentRepository;
-        this.reviewCommentRepository = reviewCommentRepository;
         this.issueRepository = issueRepository;
         this.entityManager = entityManager;
     }
@@ -241,7 +229,7 @@ public class ActivityEventBackfillService {
     public BackfillProgress backfillPullRequests(Long workspaceId) {
         BackfillProgress.Builder progress = BackfillProgress.builder().entityType("PullRequest").start();
 
-        List<Repository> repositories = repositoryRepository.findActiveByWorkspaceId(workspaceId);
+        List<Repository> repositories = activityRepositoryQueryRepository.findActiveByWorkspaceId(workspaceId);
 
         for (Repository repo : repositories) {
             backfillPullRequestsForRepository(repo, workspaceId, progress);
@@ -389,7 +377,7 @@ public class ActivityEventBackfillService {
     public BackfillProgress backfillReviews(Long workspaceId) {
         BackfillProgress.Builder progress = BackfillProgress.builder().entityType("Review").start();
 
-        List<Repository> repositories = repositoryRepository.findActiveByWorkspaceId(workspaceId);
+        List<Repository> repositories = activityRepositoryQueryRepository.findActiveByWorkspaceId(workspaceId);
 
         for (Repository repo : repositories) {
             backfillReviewsForRepository(repo, workspaceId, progress);
@@ -500,6 +488,8 @@ public class ActivityEventBackfillService {
             case APPROVED -> ActivityEventType.REVIEW_APPROVED;
             case CHANGES_REQUESTED -> ActivityEventType.REVIEW_CHANGES_REQUESTED;
             case COMMENTED -> ActivityEventType.REVIEW_COMMENTED;
+            case PENDING -> ActivityEventType.REVIEW_UNKNOWN; // PENDING reviews are not yet submitted
+            case DISMISSED -> ActivityEventType.REVIEW_UNKNOWN; // DISMISSED reviews don't generate activity
             case UNKNOWN -> ActivityEventType.REVIEW_UNKNOWN;
         };
     }
@@ -521,7 +511,7 @@ public class ActivityEventBackfillService {
     public BackfillProgress backfillIssueComments(Long workspaceId) {
         BackfillProgress.Builder progress = BackfillProgress.builder().entityType("IssueComment").start();
 
-        List<Repository> repositories = repositoryRepository.findActiveByWorkspaceId(workspaceId);
+        List<Repository> repositories = activityRepositoryQueryRepository.findActiveByWorkspaceId(workspaceId);
 
         for (Repository repo : repositories) {
             backfillIssueCommentsForRepository(repo, workspaceId, progress);
@@ -617,7 +607,7 @@ public class ActivityEventBackfillService {
     public BackfillProgress backfillReviewComments(Long workspaceId) {
         BackfillProgress.Builder progress = BackfillProgress.builder().entityType("ReviewComment").start();
 
-        List<Repository> repositories = repositoryRepository.findActiveByWorkspaceId(workspaceId);
+        List<Repository> repositories = activityRepositoryQueryRepository.findActiveByWorkspaceId(workspaceId);
 
         for (Repository repo : repositories) {
             backfillReviewCommentsForRepository(repo, workspaceId, progress);
@@ -717,7 +707,7 @@ public class ActivityEventBackfillService {
     public BackfillProgress backfillIssues(Long workspaceId) {
         BackfillProgress.Builder progress = BackfillProgress.builder().entityType("Issue").start();
 
-        List<Repository> repositories = repositoryRepository.findActiveByWorkspaceId(workspaceId);
+        List<Repository> repositories = activityRepositoryQueryRepository.findActiveByWorkspaceId(workspaceId);
 
         for (Repository repo : repositories) {
             backfillIssuesForRepository(repo, workspaceId, progress);
@@ -826,7 +816,7 @@ public class ActivityEventBackfillService {
      */
     @Transactional(readOnly = true)
     public BackfillEstimate estimateBackfill(Long workspaceId) {
-        List<Repository> repositories = repositoryRepository.findActiveByWorkspaceId(workspaceId);
+        List<Repository> repositories = activityRepositoryQueryRepository.findActiveByWorkspaceId(workspaceId);
 
         long prCount = 0;
         long reviewCount = 0;

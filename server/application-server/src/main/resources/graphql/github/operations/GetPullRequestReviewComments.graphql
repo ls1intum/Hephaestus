@@ -30,6 +30,16 @@ query GetPullRequestReviewComments($owner: String!, $name: String!, $number: Int
                     isOutdated
                     isCollapsed
 
+                    # User who resolved the thread (null if unresolved)
+                    resolvedBy {
+                        id
+                        databaseId
+                        login
+                        avatarUrl
+                        name
+                        email
+                    }
+
                     # Comments in this thread - initial batch, pagination handled by GetThreadComments
                     comments(first: 10) {
                         totalCount
