@@ -9,8 +9,8 @@ import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser.RepositoryOwnerAndName;
-import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.IssueCommentConnection;
-import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.PageInfo;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHIssueCommentConnection;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHPageInfo;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.issue.IssueRepository;
 import de.tum.in.www1.hephaestus.gitprovider.issuecomment.IssueComment;
@@ -123,7 +123,7 @@ public class GitHubIssueCommentSyncService {
 
         while (hasMore) {
             pageCount++;
-            if (pageCount > MAX_PAGINATION_PAGES) {
+            if (pageCount >= MAX_PAGINATION_PAGES) {
                 log.warn(
                     "Reached maximum pagination limit ({}) for issue #{} in {}, stopping",
                     MAX_PAGINATION_PAGES,
@@ -149,9 +149,9 @@ public class GitHubIssueCommentSyncService {
                     break;
                 }
 
-                IssueCommentConnection connection = response
+                GHIssueCommentConnection connection = response
                     .field("repository.issue.comments")
-                    .toEntity(IssueCommentConnection.class);
+                    .toEntity(GHIssueCommentConnection.class);
 
                 if (connection == null || connection.getNodes() == null || connection.getNodes().isEmpty()) {
                     break;
@@ -167,7 +167,7 @@ public class GitHubIssueCommentSyncService {
                     }
                 }
 
-                PageInfo pageInfo = connection.getPageInfo();
+                GHPageInfo pageInfo = connection.getPageInfo();
                 hasMore = pageInfo != null && Boolean.TRUE.equals(pageInfo.getHasNextPage());
                 cursor = pageInfo != null ? pageInfo.getEndCursor() : null;
             } catch (Exception e) {

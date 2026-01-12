@@ -7,8 +7,9 @@ import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser.RepositoryOwnerAndName;
-import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.MilestoneConnection;
-import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.MilestoneState;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHMilestone;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHMilestoneConnection;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHMilestoneState;
 import de.tum.in.www1.hephaestus.gitprovider.milestone.Milestone;
 import de.tum.in.www1.hephaestus.gitprovider.milestone.MilestoneRepository;
 import de.tum.in.www1.hephaestus.gitprovider.milestone.github.dto.GitHubMilestoneDTO;
@@ -89,7 +90,7 @@ public class GitHubMilestoneSyncService {
 
             while (hasNextPage) {
                 pageCount++;
-                if (pageCount > MAX_PAGINATION_PAGES) {
+                if (pageCount >= MAX_PAGINATION_PAGES) {
                     log.warn(
                         "Reached maximum pagination limit ({}) for repository {}, stopping",
                         MAX_PAGINATION_PAGES,
@@ -98,14 +99,14 @@ public class GitHubMilestoneSyncService {
                     break;
                 }
 
-                MilestoneConnection response = client
+                GHMilestoneConnection response = client
                     .documentName(GET_MILESTONES_DOCUMENT)
                     .variable("owner", owner)
                     .variable("name", name)
                     .variable("first", LARGE_PAGE_SIZE)
                     .variable("after", cursor)
                     .retrieve("repository.milestones")
-                    .toEntity(MilestoneConnection.class)
+                    .toEntity(GHMilestoneConnection.class)
                     .block(GRAPHQL_TIMEOUT);
 
                 if (response == null || response.getNodes() == null) {
@@ -152,12 +153,12 @@ public class GitHubMilestoneSyncService {
     }
 
     /**
-     * Converts a GraphQL Milestone to a GitHubMilestoneDTO.
+     * Converts a GraphQL GHMilestone to a GitHubMilestoneDTO.
      * Note: GraphQL doesn't expose databaseId for milestones, so id will be null.
      * The processor handles this by using number-based lookup as fallback.
      */
     private GitHubMilestoneDTO convertToDTO(
-        de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.Milestone graphQlMilestone
+        GHMilestone graphQlMilestone
     ) {
         return new GitHubMilestoneDTO(
             null, // id - GraphQL doesn't expose databaseId for milestones
@@ -172,7 +173,7 @@ public class GitHubMilestoneSyncService {
         );
     }
 
-    private Milestone.State convertState(MilestoneState graphQlState) {
+    private Milestone.State convertState(GHMilestoneState graphQlState) {
         if (graphQlState == null) {
             return Milestone.State.OPEN;
         }

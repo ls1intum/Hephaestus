@@ -2,8 +2,8 @@ package de.tum.in.www1.hephaestus.gitprovider.label.github.dto;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.Label;
-import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.LabelConnection;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHLabel;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHLabelConnection;
 import static de.tum.in.www1.hephaestus.gitprovider.common.DateTimeUtils.toInstant;
 
 import java.time.Instant;
@@ -29,10 +29,10 @@ public record GitHubLabelDTO(
     // ========== STATIC FACTORY METHODS FOR GRAPHQL RESPONSES ==========
 
     /**
-     * Creates a GitHubLabelDTO from a GraphQL Label model.
+     * Creates a GitHubLabelDTO from a GraphQL GHLabel model.
      */
     @Nullable
-    public static GitHubLabelDTO fromLabel(@Nullable Label label) {
+    public static GitHubLabelDTO fromLabel(@Nullable GHLabel label) {
         if (label == null) {
             return null;
         }
@@ -48,9 +48,9 @@ public record GitHubLabelDTO(
     }
 
     /**
-     * Creates a list of GitHubLabelDTOs from a GraphQL LabelConnection.
+     * Creates a list of GitHubLabelDTOs from a GraphQL GHLabelConnection.
      */
-    public static List<GitHubLabelDTO> fromLabelConnection(@Nullable LabelConnection connection) {
+    public static List<GitHubLabelDTO> fromLabelConnection(@Nullable GHLabelConnection connection) {
         if (connection == null || connection.getNodes() == null) {
             return Collections.emptyList();
         }

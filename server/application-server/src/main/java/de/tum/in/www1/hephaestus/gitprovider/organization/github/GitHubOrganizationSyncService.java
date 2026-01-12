@@ -6,9 +6,12 @@ import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncCons
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.MAX_PAGINATION_PAGES;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
-import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.OrganizationMemberConnection;
-import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.OrganizationMemberEdge;
-import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.PageInfo;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHOrganization;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHOrganizationMemberConnection;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHOrganizationMemberEdge;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHOrganizationMemberRole;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHPageInfo;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHUser;
 import de.tum.in.www1.hephaestus.gitprovider.organization.Organization;
 import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationMemberRole;
 import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationMembershipRepository;
@@ -82,11 +85,11 @@ public class GitHubOrganizationSyncService {
         HttpGraphQlClient client = graphQlClientProvider.forWorkspace(workspaceId);
 
         try {
-            de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.Organization graphQlOrg = client
+            GHOrganization graphQlOrg = client
                 .documentName(GET_ORGANIZATION_DOCUMENT)
                 .variable("login", organizationLogin)
                 .retrieve("organization")
-                .toEntity(de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.Organization.class)
+                .toEntity(GHOrganization.class)
                 .block(GRAPHQL_TIMEOUT);
 
             if (graphQlOrg == null) {
@@ -135,7 +138,7 @@ public class GitHubOrganizationSyncService {
     private int syncOrganizationMemberships(
         HttpGraphQlClient client,
         Organization organization,
-        de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.Organization graphQlOrg
+        GHOrganization graphQlOrg
     ) {
         var membersConnection = graphQlOrg.getMembersWithRole();
         if (membersConnection == null || membersConnection.getEdges() == null) {
@@ -144,15 +147,15 @@ public class GitHubOrganizationSyncService {
         }
 
         // Collect all members with pagination
-        List<OrganizationMemberEdge> allMembers = new ArrayList<>(membersConnection.getEdges());
-        PageInfo pageInfo = membersConnection.getPageInfo();
+        List<GHOrganizationMemberEdge> allMembers = new ArrayList<>(membersConnection.getEdges());
+        GHPageInfo pageInfo = membersConnection.getPageInfo();
         String cursor = pageInfo != null ? pageInfo.getEndCursor() : null;
         int pageCount = 0;
 
         // Paginate through all remaining members if there are more pages
         while (pageInfo != null && Boolean.TRUE.equals(pageInfo.getHasNextPage())) {
             pageCount++;
-            if (pageCount > MAX_PAGINATION_PAGES) {
+            if (pageCount >= MAX_PAGINATION_PAGES) {
                 log.warn(
                     "Reached maximum pagination limit ({}) for organization {} members, stopping",
                     MAX_PAGINATION_PAGES,
@@ -161,13 +164,13 @@ public class GitHubOrganizationSyncService {
                 break;
             }
 
-            OrganizationMemberConnection nextPage = client
+            GHOrganizationMemberConnection nextPage = client
                 .documentName(GET_ORGANIZATION_MEMBERS_DOCUMENT)
                 .variable("login", organization.getLogin())
                 .variable("first", LARGE_PAGE_SIZE)
                 .variable("after", cursor)
                 .retrieve("organization.membersWithRole")
-                .toEntity(OrganizationMemberConnection.class)
+                .toEntity(GHOrganizationMemberConnection.class)
                 .block(GRAPHQL_TIMEOUT);
 
             if (nextPage == null || nextPage.getEdges() == null) {
@@ -189,7 +192,7 @@ public class GitHubOrganizationSyncService {
         Set<Long> syncedUserIds = new HashSet<>();
         int memberCount = 0;
 
-        for (OrganizationMemberEdge edge : allMembers) {
+        for (GHOrganizationMemberEdge edge : allMembers) {
             if (edge == null || edge.getNode() == null) {
                 continue;
             }
@@ -256,7 +259,7 @@ public class GitHubOrganizationSyncService {
      * @return the DTO for use with GitHubOrganizationProcessor
      */
     private GitHubOrganizationEventDTO.GitHubOrganizationDTO convertToDTO(
-        de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.Organization graphQlOrg
+        GHOrganization graphQlOrg
     ) {
         Long databaseId = graphQlOrg.getDatabaseId() != null ? graphQlOrg.getDatabaseId().longValue() : null;
 
@@ -281,7 +284,7 @@ public class GitHubOrganizationSyncService {
      * @return the DTO for use with GitHubUserProcessor
      */
     private GitHubUserDTO convertUserToDTO(
-        de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.User graphQlUser
+        GHUser graphQlUser
     ) {
         Long databaseId = graphQlUser.getDatabaseId() != null ? graphQlUser.getDatabaseId().longValue() : null;
 
@@ -307,7 +310,7 @@ public class GitHubOrganizationSyncService {
      * @return the domain OrganizationMemberRole, or MEMBER as default
      */
     private OrganizationMemberRole mapRole(
-        de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.OrganizationMemberRole graphQlRole
+        GHOrganizationMemberRole graphQlRole
     ) {
         if (graphQlRole == null) {
             return OrganizationMemberRole.MEMBER;

@@ -6,8 +6,9 @@ import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncCons
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser.RepositoryOwnerAndName;
-import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.RepositoryCollaboratorConnection;
-import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.RepositoryCollaboratorEdge;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHRepositoryCollaboratorConnection;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHRepositoryCollaboratorEdge;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHRepositoryPermission;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.collaborator.RepositoryCollaborator;
@@ -89,7 +90,7 @@ public class GitHubCollaboratorSyncService {
 
             while (hasNextPage) {
                 pageCount++;
-                if (pageCount > MAX_PAGINATION_PAGES) {
+                if (pageCount >= MAX_PAGINATION_PAGES) {
                     log.warn(
                         "Reached maximum pagination limit ({}) for repository {}, stopping",
                         MAX_PAGINATION_PAGES,
@@ -98,21 +99,21 @@ public class GitHubCollaboratorSyncService {
                     break;
                 }
 
-                RepositoryCollaboratorConnection response = client
+                GHRepositoryCollaboratorConnection response = client
                     .documentName(GET_COLLABORATORS_DOCUMENT)
                     .variable("owner", owner)
                     .variable("name", name)
                     .variable("first", LARGE_PAGE_SIZE)
                     .variable("after", cursor)
                     .retrieve("repository.collaborators")
-                    .toEntity(RepositoryCollaboratorConnection.class)
+                    .toEntity(GHRepositoryCollaboratorConnection.class)
                     .block(GRAPHQL_TIMEOUT);
 
                 if (response == null || response.getEdges() == null) {
                     break;
                 }
 
-                for (RepositoryCollaboratorEdge edge : response.getEdges()) {
+                for (GHRepositoryCollaboratorEdge edge : response.getEdges()) {
                     var graphQlUser = edge.getNode();
                     if (graphQlUser == null) {
                         continue;
@@ -181,13 +182,13 @@ public class GitHubCollaboratorSyncService {
     }
 
     /**
-     * Parses a GraphQL RepositoryPermission to the entity Permission enum.
+     * Parses a GraphQL GHRepositoryPermission to the entity Permission enum.
      *
      * @param permission the GraphQL permission enum
      * @return the entity Permission enum
      */
     private RepositoryCollaborator.Permission parsePermission(
-        de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.RepositoryPermission permission
+        GHRepositoryPermission permission
     ) {
         if (permission == null) {
             return RepositoryCollaborator.Permission.UNKNOWN;

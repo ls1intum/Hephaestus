@@ -4,15 +4,16 @@ import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.*;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
-import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.RepositoryPermission;
-import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.TeamConnection;
-import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.TeamMemberConnection;
-import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.TeamMemberEdge;
-import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.TeamMemberRole;
-import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.TeamPrivacy;
-import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.TeamRepositoryConnection;
-import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.TeamRepositoryEdge;
-import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.User;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHRepositoryPermission;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHTeam;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHTeamConnection;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHTeamMemberConnection;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHTeamMemberEdge;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHTeamMemberRole;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHTeamPrivacy;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHTeamRepositoryConnection;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHTeamRepositoryEdge;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHUser;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.gitprovider.team.Team;
@@ -106,7 +107,7 @@ public class GitHubTeamSyncService {
 
             while (hasNextPage) {
                 pageCount++;
-                if (pageCount > MAX_PAGINATION_PAGES) {
+                if (pageCount >= MAX_PAGINATION_PAGES) {
                     log.warn(
                         "Reached maximum pagination limit ({}) for organization {}, stopping",
                         MAX_PAGINATION_PAGES,
@@ -115,13 +116,13 @@ public class GitHubTeamSyncService {
                     break;
                 }
 
-                TeamConnection response = client
+                GHTeamConnection response = client
                     .documentName(GET_ORGANIZATION_TEAMS_DOCUMENT)
                     .variable("login", organizationLogin)
                     .variable("first", LARGE_PAGE_SIZE)
                     .variable("after", cursor)
                     .retrieve("organization.teams")
-                    .toEntity(TeamConnection.class)
+                    .toEntity(GHTeamConnection.class)
                     .block(GRAPHQL_TIMEOUT);
 
                 if (response == null || response.getNodes() == null) {
@@ -162,7 +163,7 @@ public class GitHubTeamSyncService {
      * @return the persisted Team entity, or null if processing failed
      */
     private Team processTeam(
-        de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.Team graphQlTeam,
+        GHTeam graphQlTeam,
         String organizationLogin
     ) {
         GitHubTeamEventDTO.GitHubTeamDTO dto = convertToDTO(graphQlTeam);
@@ -197,7 +198,7 @@ public class GitHubTeamSyncService {
     private void syncTeamMemberships(
         HttpGraphQlClient client,
         Team team,
-        de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.Team graphQlTeam,
+        GHTeam graphQlTeam,
         String organizationLogin
     ) {
         var membersConnection = graphQlTeam.getMembers();
@@ -206,7 +207,7 @@ public class GitHubTeamSyncService {
         }
 
         // Collect all member edges (with roles) - paginate if needed
-        List<TeamMemberEdge> allMemberEdges = new ArrayList<>(membersConnection.getEdges());
+        List<GHTeamMemberEdge> allMemberEdges = new ArrayList<>(membersConnection.getEdges());
         var membersPageInfo = membersConnection.getPageInfo();
 
         if (membersPageInfo != null && Boolean.TRUE.equals(membersPageInfo.getHasNextPage())) {
@@ -215,7 +216,7 @@ public class GitHubTeamSyncService {
                 team.getName(),
                 membersConnection.getTotalCount()
             );
-            List<TeamMemberEdge> additionalMemberEdges = fetchAllTeamMemberEdges(
+            List<GHTeamMemberEdge> additionalMemberEdges = fetchAllTeamMemberEdges(
                 client,
                 organizationLogin,
                 graphQlTeam.getSlug(),
@@ -237,11 +238,11 @@ public class GitHubTeamSyncService {
                 continue;
             }
 
-            User graphQlUser = memberEdge.getNode();
-            TeamMemberRole graphQlRole = memberEdge.getRole();
+            GHUser graphQlUser = memberEdge.getNode();
+            GHTeamMemberRole graphQlRole = memberEdge.getRole();
 
             // Convert GraphQL role to TeamMembership.Role
-            TeamMembership.Role role = (graphQlRole == TeamMemberRole.MAINTAINER)
+            TeamMembership.Role role = (graphQlRole == GHTeamMemberRole.MAINTAINER)
                 ? TeamMembership.Role.MAINTAINER
                 : TeamMembership.Role.MEMBER;
 
@@ -298,7 +299,7 @@ public class GitHubTeamSyncService {
     private void syncTeamRepoPermissions(
         HttpGraphQlClient client,
         Team team,
-        de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.Team graphQlTeam,
+        GHTeam graphQlTeam,
         String organizationLogin
     ) {
         var reposConnection = graphQlTeam.getRepositories();
@@ -307,7 +308,7 @@ public class GitHubTeamSyncService {
         }
 
         // Collect all repository edges - paginate if needed
-        List<TeamRepositoryEdge> allRepoEdges = new ArrayList<>(reposConnection.getEdges());
+        List<GHTeamRepositoryEdge> allRepoEdges = new ArrayList<>(reposConnection.getEdges());
         var reposPageInfo = reposConnection.getPageInfo();
 
         if (reposPageInfo != null && Boolean.TRUE.equals(reposPageInfo.getHasNextPage())) {
@@ -316,7 +317,7 @@ public class GitHubTeamSyncService {
                 team.getName(),
                 reposConnection.getTotalCount()
             );
-            List<TeamRepositoryEdge> additionalRepoEdges = fetchAllTeamRepositoryEdges(
+            List<GHTeamRepositoryEdge> additionalRepoEdges = fetchAllTeamRepositoryEdges(
                 client,
                 organizationLogin,
                 graphQlTeam.getSlug(),
@@ -363,9 +364,9 @@ public class GitHubTeamSyncService {
     }
 
     /**
-     * Converts GraphQL RepositoryPermission to TeamRepositoryPermission.PermissionLevel.
+     * Converts GraphQL GHRepositoryPermission to TeamRepositoryPermission.PermissionLevel.
      */
-    private TeamRepositoryPermission.PermissionLevel convertPermission(RepositoryPermission graphQlPermission) {
+    private TeamRepositoryPermission.PermissionLevel convertPermission(GHRepositoryPermission graphQlPermission) {
         if (graphQlPermission == null) {
             return TeamRepositoryPermission.PermissionLevel.READ;
         }
@@ -387,20 +388,20 @@ public class GitHubTeamSyncService {
      * @param startCursor       the cursor to start from
      * @return list of all remaining member edges with roles
      */
-    private List<TeamMemberEdge> fetchAllTeamMemberEdges(
+    private List<GHTeamMemberEdge> fetchAllTeamMemberEdges(
         HttpGraphQlClient client,
         String organizationLogin,
         String teamSlug,
         String startCursor
     ) {
-        List<TeamMemberEdge> allMemberEdges = new ArrayList<>();
+        List<GHTeamMemberEdge> allMemberEdges = new ArrayList<>();
         String cursor = startCursor;
         boolean hasNextPage = true;
         int pageCount = 0;
 
         while (hasNextPage) {
             pageCount++;
-            if (pageCount > MAX_PAGINATION_PAGES) {
+            if (pageCount >= MAX_PAGINATION_PAGES) {
                 log.warn(
                     "Reached maximum pagination limit ({}) for team {} members, stopping",
                     MAX_PAGINATION_PAGES,
@@ -409,14 +410,14 @@ public class GitHubTeamSyncService {
                 break;
             }
 
-            TeamMemberConnection response = client
+            GHTeamMemberConnection response = client
                 .documentName(GET_TEAM_MEMBERS_DOCUMENT)
                 .variable("orgLogin", organizationLogin)
                 .variable("teamSlug", teamSlug)
                 .variable("first", LARGE_PAGE_SIZE)
                 .variable("after", cursor)
                 .retrieve("organization.team.members")
-                .toEntity(TeamMemberConnection.class)
+                .toEntity(GHTeamMemberConnection.class)
                 .block(GRAPHQL_TIMEOUT);
 
             if (response == null || response.getEdges() == null) {
@@ -442,20 +443,20 @@ public class GitHubTeamSyncService {
      * @param startCursor       the cursor to start from
      * @return list of all remaining repository edges with permissions
      */
-    private List<TeamRepositoryEdge> fetchAllTeamRepositoryEdges(
+    private List<GHTeamRepositoryEdge> fetchAllTeamRepositoryEdges(
         HttpGraphQlClient client,
         String organizationLogin,
         String teamSlug,
         String startCursor
     ) {
-        List<TeamRepositoryEdge> allEdges = new ArrayList<>();
+        List<GHTeamRepositoryEdge> allEdges = new ArrayList<>();
         String cursor = startCursor;
         boolean hasNextPage = true;
         int pageCount = 0;
 
         while (hasNextPage) {
             pageCount++;
-            if (pageCount > MAX_PAGINATION_PAGES) {
+            if (pageCount >= MAX_PAGINATION_PAGES) {
                 log.warn(
                     "Reached maximum pagination limit ({}) for team {} repositories, stopping",
                     MAX_PAGINATION_PAGES,
@@ -464,14 +465,14 @@ public class GitHubTeamSyncService {
                 break;
             }
 
-            TeamRepositoryConnection response = client
+            GHTeamRepositoryConnection response = client
                 .documentName(GET_TEAM_REPOSITORIES_DOCUMENT)
                 .variable("orgLogin", organizationLogin)
                 .variable("teamSlug", teamSlug)
                 .variable("first", LARGE_PAGE_SIZE)
                 .variable("after", cursor)
                 .retrieve("organization.team.repositories")
-                .toEntity(TeamRepositoryConnection.class)
+                .toEntity(GHTeamRepositoryConnection.class)
                 .block(GRAPHQL_TIMEOUT);
 
             if (response == null || response.getEdges() == null) {
@@ -540,7 +541,7 @@ public class GitHubTeamSyncService {
      * @return the DTO for use with GitHubTeamProcessor
      */
     private GitHubTeamEventDTO.GitHubTeamDTO convertToDTO(
-        de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.Team graphQlTeam
+        GHTeam graphQlTeam
     ) {
         Long databaseId = graphQlTeam.getDatabaseId() != null ? graphQlTeam.getDatabaseId().longValue() : null;
 
@@ -566,7 +567,7 @@ public class GitHubTeamSyncService {
      * @return the DTO for use with GitHubUserProcessor
      */
     private GitHubUserDTO convertUserToDTO(
-        de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.User graphQlUser
+        GHUser graphQlUser
     ) {
         Long databaseId = graphQlUser.getDatabaseId() != null ? graphQlUser.getDatabaseId().longValue() : null;
 
@@ -584,12 +585,12 @@ public class GitHubTeamSyncService {
     }
 
     /**
-     * Maps GraphQL TeamPrivacy enum to string for DTO.
+     * Maps GraphQL GHTeamPrivacy enum to string for DTO.
      *
-     * @param privacy the GraphQL TeamPrivacy enum value
+     * @param privacy the GraphQL GHTeamPrivacy enum value
      * @return the privacy string, or null if privacy is null
      */
-    private String mapPrivacy(TeamPrivacy privacy) {
+    private String mapPrivacy(GHTeamPrivacy privacy) {
         if (privacy == null) {
             return null;
         }

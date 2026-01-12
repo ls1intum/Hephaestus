@@ -8,7 +8,8 @@ import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameP
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser.RepositoryOwnerAndName;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider.WorkspaceSyncMetadata;
-import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.IssueConnection;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHIssue;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHIssueConnection;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.issue.IssueRepository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
@@ -233,7 +234,7 @@ public class GitHubIssueDependencySyncService {
 
         while (hasNextPage) {
             pageCount++;
-            if (pageCount > MAX_PAGINATION_PAGES) {
+            if (pageCount >= MAX_PAGINATION_PAGES) {
                 log.warn(
                     "Reached maximum pagination limit ({}) for repository {}, stopping",
                     MAX_PAGINATION_PAGES,
@@ -243,14 +244,14 @@ public class GitHubIssueDependencySyncService {
             }
 
             // GraphQL call OUTSIDE of @Transactional to avoid blocking DB connection
-            IssueConnection issueConnection = client
+            GHIssueConnection issueConnection = client
                 .documentName(GET_DEPENDENCIES_DOCUMENT)
                 .variable("owner", owner)
                 .variable("name", name)
                 .variable("first", LARGE_PAGE_SIZE)
                 .variable("after", after)
                 .retrieve("repository.issues")
-                .toEntity(IssueConnection.class)
+                .toEntity(GHIssueConnection.class)
                 .block(GRAPHQL_TIMEOUT);
 
             if (issueConnection == null || issueConnection.getNodes() == null) {
@@ -275,7 +276,7 @@ public class GitHubIssueDependencySyncService {
      * providing better resilience if a single page fails.
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    protected int processIssueDependenciesPage(IssueConnection issueConnection) {
+    protected int processIssueDependenciesPage(GHIssueConnection issueConnection) {
         if (issueConnection.getNodes() == null) {
             return 0;
         }
@@ -290,9 +291,7 @@ public class GitHubIssueDependencySyncService {
     /**
      * Process dependencies for a single issue from the GraphQL response.
      */
-    private int processIssueDependencies(
-        de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.Issue graphQlIssue
-    ) {
+    private int processIssueDependencies(GHIssue graphQlIssue) {
         if (graphQlIssue.getFullDatabaseId() == null) {
             return 0;
         }

@@ -4,7 +4,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventAction;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubWebhookEvent;
-import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.PullRequestReview;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHPullRequestReview;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.github.dto.GitHubPullRequestDTO;
 import de.tum.in.www1.hephaestus.gitprovider.repository.github.dto.GitHubRepositoryRefDTO;
 import de.tum.in.www1.hephaestus.gitprovider.user.github.dto.GitHubUserDTO;
@@ -53,11 +53,11 @@ public record GitHubPullRequestReviewEventDTO(
         // ========== STATIC FACTORY METHODS FOR GRAPHQL RESPONSES ==========
 
         /**
-         * Creates a GitHubReviewDTO from a GraphQL PullRequestReview model.
+         * Creates a GitHubReviewDTO from a GraphQL GHPullRequestReview model.
          * Uses fullDatabaseId instead of databaseId to avoid integer overflow.
          */
         @Nullable
-        public static GitHubReviewDTO fromPullRequestReview(@Nullable PullRequestReview review) {
+        public static GitHubReviewDTO fromPullRequestReview(@Nullable GHPullRequestReview review) {
             if (review == null) {
                 return null;
             }

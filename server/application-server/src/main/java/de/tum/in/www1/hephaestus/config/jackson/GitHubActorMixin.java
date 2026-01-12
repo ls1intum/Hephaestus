@@ -2,11 +2,11 @@ package de.tum.in.www1.hephaestus.config.jackson;
 
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
-import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.Bot;
-import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.EnterpriseUserAccount;
-import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.Mannequin;
-import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.Organization;
-import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.User;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHBot;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHEnterpriseUserAccount;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHMannequin;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHOrganization;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHUser;
 
 /**
  * Jackson mixin for GitHub GraphQL Actor interface.
@@ -23,15 +23,15 @@ import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.User;
     include = JsonTypeInfo.As.PROPERTY,
     property = "__typename",
     visible = true,
-    defaultImpl = User.class
+    defaultImpl = GHUser.class
 )
 @JsonSubTypes(
     {
-        @JsonSubTypes.Type(value = User.class, name = "User"),
-        @JsonSubTypes.Type(value = Bot.class, name = "Bot"),
-        @JsonSubTypes.Type(value = Organization.class, name = "Organization"),
-        @JsonSubTypes.Type(value = Mannequin.class, name = "Mannequin"),
-        @JsonSubTypes.Type(value = EnterpriseUserAccount.class, name = "EnterpriseUserAccount"),
+        @JsonSubTypes.Type(value = GHUser.class, name = "User"),
+        @JsonSubTypes.Type(value = GHBot.class, name = "Bot"),
+        @JsonSubTypes.Type(value = GHOrganization.class, name = "Organization"),
+        @JsonSubTypes.Type(value = GHMannequin.class, name = "Mannequin"),
+        @JsonSubTypes.Type(value = GHEnterpriseUserAccount.class, name = "EnterpriseUserAccount"),
     }
 )
 public abstract class GitHubActorMixin {}

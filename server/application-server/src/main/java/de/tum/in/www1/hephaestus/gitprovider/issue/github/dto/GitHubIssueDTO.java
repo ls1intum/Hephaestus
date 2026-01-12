@@ -2,10 +2,10 @@ package de.tum.in.www1.hephaestus.gitprovider.issue.github.dto;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.Issue;
-import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.IssueState;
-import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.IssueStateReason;
-import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.UserConnection;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHIssue;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHIssueState;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHIssueStateReason;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHUserConnection;
 import de.tum.in.www1.hephaestus.gitprovider.label.github.dto.GitHubLabelDTO;
 import de.tum.in.www1.hephaestus.gitprovider.milestone.github.dto.GitHubMilestoneDTO;
 import de.tum.in.www1.hephaestus.gitprovider.repository.github.dto.GitHubRepositoryRefDTO;
@@ -59,13 +59,13 @@ public record GitHubIssueDTO(
     // ========== STATIC FACTORY METHODS FOR GRAPHQL RESPONSES ==========
 
     /**
-     * Creates a GitHubIssueDTO from a GraphQL Issue model.
+     * Creates a GitHubIssueDTO from a GraphQL GHIssue model.
      *
-     * @param issue the GraphQL Issue (may be null)
+     * @param issue the GraphQL GHIssue (may be null)
      * @return GitHubIssueDTO or null if issue is null
      */
     @Nullable
-    public static GitHubIssueDTO fromIssue(@Nullable Issue issue) {
+    public static GitHubIssueDTO fromIssue(@Nullable GHIssue issue) {
         if (issue == null) {
             return null;
         }
@@ -104,7 +104,7 @@ public record GitHubIssueDTO(
         return value.longValueExact();
     }
 
-    private static String convertState(@Nullable IssueState state) {
+    private static String convertState(@Nullable GHIssueState state) {
         if (state == null) {
             return "open";
         }
@@ -112,14 +112,14 @@ public record GitHubIssueDTO(
     }
 
     @Nullable
-    private static String convertStateReason(@Nullable IssueStateReason stateReason) {
+    private static String convertStateReason(@Nullable GHIssueStateReason stateReason) {
         if (stateReason == null) {
             return null;
         }
         return stateReason.name().toLowerCase();
     }
 
-    private static List<GitHubUserDTO> extractAssignees(@Nullable UserConnection connection) {
+    private static List<GitHubUserDTO> extractAssignees(@Nullable GHUserConnection connection) {
         if (connection == null || connection.getNodes() == null) {
             return Collections.emptyList();
         }

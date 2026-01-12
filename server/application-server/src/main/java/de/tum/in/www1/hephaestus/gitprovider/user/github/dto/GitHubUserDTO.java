@@ -2,12 +2,12 @@ package de.tum.in.www1.hephaestus.gitprovider.user.github.dto;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.Actor;
-import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.Bot;
-import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.EnterpriseUserAccount;
-import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.Mannequin;
-import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.Organization;
-import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.User;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHActor;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHBot;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHEnterpriseUserAccount;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHMannequin;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHOrganization;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHUser;
 import static de.tum.in.www1.hephaestus.gitprovider.common.DateTimeUtils.toInstant;
 import static de.tum.in.www1.hephaestus.gitprovider.common.DateTimeUtils.uriToString;
 
@@ -70,37 +70,37 @@ public record GitHubUserDTO(
     // ========== STATIC FACTORY METHODS FOR GRAPHQL RESPONSES ==========
 
     /**
-     * Creates a GitHubUserDTO from a GraphQL Actor interface.
+     * Creates a GitHubUserDTO from a GraphQL GHActor interface.
      * <p>
-     * Handles all Actor implementations: User, Bot, Mannequin, Organization, EnterpriseUserAccount.
+     * Handles all GHActor implementations: GHUser, GHBot, GHMannequin, GHOrganization, GHEnterpriseUserAccount.
      * Uses pattern matching to extract fields specific to each implementation.
      *
-     * @param actor the Actor (may be null)
+     * @param actor the GHActor (may be null)
      * @return GitHubUserDTO or null if actor is null
      */
     @Nullable
-    public static GitHubUserDTO fromActor(@Nullable Actor actor) {
+    public static GitHubUserDTO fromActor(@Nullable GHActor actor) {
         if (actor == null) {
             return null;
         }
         return switch (actor) {
-            case User user -> fromUser(user);
-            case Bot bot -> fromBot(bot);
-            case Mannequin mannequin -> fromMannequin(mannequin);
-            case Organization org -> fromOrganization(org);
-            case EnterpriseUserAccount enterprise -> fromEnterpriseUserAccount(enterprise);
+            case GHUser user -> fromUser(user);
+            case GHBot bot -> fromBot(bot);
+            case GHMannequin mannequin -> fromMannequin(mannequin);
+            case GHOrganization org -> fromOrganization(org);
+            case GHEnterpriseUserAccount enterprise -> fromEnterpriseUserAccount(enterprise);
             default -> fromActorBase(actor);
         };
     }
 
     /**
-     * Creates a GitHubUserDTO from a GraphQL User model.
+     * Creates a GitHubUserDTO from a GraphQL GHUser model.
      * <p>
      * Captures all profile fields available from the GetUser query:
      * bio, company, location, websiteUrl, followers, following.
      */
     @Nullable
-    public static GitHubUserDTO fromUser(@Nullable User user) {
+    public static GitHubUserDTO fromUser(@Nullable GHUser user) {
         if (user == null) {
             return null;
         }
@@ -126,10 +126,10 @@ public record GitHubUserDTO(
     }
 
     /**
-     * Creates a GitHubUserDTO from a GraphQL Bot model.
+     * Creates a GitHubUserDTO from a GraphQL GHBot model.
      */
     @Nullable
-    public static GitHubUserDTO fromBot(@Nullable Bot bot) {
+    public static GitHubUserDTO fromBot(@Nullable GHBot bot) {
         if (bot == null) {
             return null;
         }
@@ -145,10 +145,10 @@ public record GitHubUserDTO(
     }
 
     /**
-     * Creates a GitHubUserDTO from a GraphQL Mannequin model.
+     * Creates a GitHubUserDTO from a GraphQL GHMannequin model.
      */
     @Nullable
-    public static GitHubUserDTO fromMannequin(@Nullable Mannequin mannequin) {
+    public static GitHubUserDTO fromMannequin(@Nullable GHMannequin mannequin) {
         if (mannequin == null) {
             return null;
         }
@@ -164,10 +164,10 @@ public record GitHubUserDTO(
     }
 
     /**
-     * Creates a GitHubUserDTO from a GraphQL Organization model (when acting as Actor).
+     * Creates a GitHubUserDTO from a GraphQL GHOrganization model (when acting as GHActor).
      */
     @Nullable
-    public static GitHubUserDTO fromOrganization(@Nullable Organization org) {
+    public static GitHubUserDTO fromOrganization(@Nullable GHOrganization org) {
         if (org == null) {
             return null;
         }
@@ -183,10 +183,10 @@ public record GitHubUserDTO(
     }
 
     /**
-     * Creates a GitHubUserDTO from a GraphQL EnterpriseUserAccount model.
+     * Creates a GitHubUserDTO from a GraphQL GHEnterpriseUserAccount model.
      */
     @Nullable
-    public static GitHubUserDTO fromEnterpriseUserAccount(@Nullable EnterpriseUserAccount enterprise) {
+    public static GitHubUserDTO fromEnterpriseUserAccount(@Nullable GHEnterpriseUserAccount enterprise) {
         if (enterprise == null) {
             return null;
         }
@@ -202,9 +202,9 @@ public record GitHubUserDTO(
     }
 
     /**
-     * Fallback factory for Actor interface when concrete type is unknown.
+     * Fallback factory for GHActor interface when concrete type is unknown.
      */
-    private static GitHubUserDTO fromActorBase(Actor actor) {
+    private static GitHubUserDTO fromActorBase(GHActor actor) {
         return new GitHubUserDTO(
             null,
             null,

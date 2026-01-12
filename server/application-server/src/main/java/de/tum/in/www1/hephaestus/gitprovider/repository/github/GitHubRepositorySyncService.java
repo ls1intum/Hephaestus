@@ -6,7 +6,10 @@ import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncCons
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser.RepositoryOwnerAndName;
-import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.RepositoryOwner;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHOrganization;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHRepository;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHRepositoryOwner;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHUser;
 import de.tum.in.www1.hephaestus.gitprovider.organization.Organization;
 import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationRepository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
@@ -32,47 +35,7 @@ public class GitHubRepositorySyncService {
 
     private static final Logger log = LoggerFactory.getLogger(GitHubRepositorySyncService.class);
 
-    private static final String REPOSITORY_QUERY = """
-        query GetRepository($owner: String!, $name: String!) {
-            repository(owner: $owner, name: $name) {
-                id
-                databaseId
-                name
-                nameWithOwner
-                description
-                url
-                visibility
-                isArchived
-                isDisabled
-                isFork
-                isPrivate
-                pushedAt
-                defaultBranchRef {
-                    name
-                }
-                owner {
-                    __typename
-                    ... on Organization {
-                        id
-                        databaseId
-                        login
-                        name
-                        description
-                        url
-                        avatarUrl
-                    }
-                    ... on User {
-                        id
-                        databaseId
-                        login
-                        name
-                        url
-                        avatarUrl
-                    }
-                }
-            }
-        }
-        """;
+    private static final String QUERY_DOCUMENT = "GetRepository";
 
     private final GitHubGraphQlClientProvider graphQlClientProvider;
     private final RepositoryRepository repositoryRepository;
@@ -109,7 +72,7 @@ public class GitHubRepositorySyncService {
         try {
             HttpGraphQlClient client = graphQlClientProvider.forWorkspace(workspaceId);
             ClientGraphQlResponse response = client
-                .document(REPOSITORY_QUERY)
+                .documentName(QUERY_DOCUMENT)
                 .variable("owner", repoOwner)
                 .variable("name", repoName)
                 .execute()
@@ -127,14 +90,14 @@ public class GitHubRepositorySyncService {
             // Use typed GraphQL model for type-safe parsing
             var repoData = response
                 .field("repository")
-                .toEntity(de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.Repository.class);
+                .toEntity(GHRepository.class);
             if (repoData == null) {
                 log.warn("Repository {} not found on GitHub", safeNameWithOwner);
                 return Optional.empty();
             }
 
             // Ensure organization exists
-            RepositoryOwner owner = repoData.getOwner();
+            GHRepositoryOwner owner = repoData.getOwner();
             Organization organization = ensureOrganization(owner);
 
             // Create or update repository using typed accessors
@@ -196,17 +159,17 @@ public class GitHubRepositorySyncService {
 
     /**
      * Ensures the organization exists, creating it if necessary.
-     * Uses typed RepositoryOwner model for type-safe access.
+     * Uses typed GHRepositoryOwner model for type-safe access.
      */
     @Nullable
-    private Organization ensureOrganization(RepositoryOwner owner) {
+    private Organization ensureOrganization(GHRepositoryOwner owner) {
         if (owner == null) {
             return null;
         }
 
-        // RepositoryOwner can be Organization or User
+        // GHRepositoryOwner can be GHOrganization or GHUser
         // Only handle Organization type for organization linking
-        if (owner instanceof de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.Organization graphQlOrg) {
+        if (owner instanceof GHOrganization graphQlOrg) {
             Integer dbId = graphQlOrg.getDatabaseId();
             if (dbId == null) {
                 return null;
@@ -233,7 +196,7 @@ public class GitHubRepositorySyncService {
             organization.setAvatarUrl(avatarUrl);
 
             return organizationRepository.save(organization);
-        } else if (owner instanceof de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.User graphQlUser) {
+        } else if (owner instanceof GHUser graphQlUser) {
             // User repositories - create a "virtual" organization from the user
             Integer dbId = graphQlUser.getDatabaseId();
             if (dbId == null) {

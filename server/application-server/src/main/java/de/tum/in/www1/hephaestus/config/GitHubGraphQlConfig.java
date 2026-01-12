@@ -5,9 +5,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import de.tum.in.www1.hephaestus.config.jackson.GitHubActorMixin;
 import de.tum.in.www1.hephaestus.config.jackson.GitHubRepositoryOwnerMixin;
 import de.tum.in.www1.hephaestus.config.jackson.GitHubRequestedReviewerMixin;
-import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.Actor;
-import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.RepositoryOwner;
-import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.RequestedReviewer;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHActor;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHRepositoryOwner;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHRequestedReviewer;
 import java.time.Duration;
 import java.util.List;
 import org.slf4j.Logger;
@@ -73,9 +73,9 @@ public class GitHubGraphQlConfig {
         ObjectMapper graphQlObjectMapper = baseObjectMapper
             .copy()
             .configure(DeserializationFeature.USE_LONG_FOR_INTS, true)
-            .addMixIn(Actor.class, GitHubActorMixin.class)
-            .addMixIn(RequestedReviewer.class, GitHubRequestedReviewerMixin.class)
-            .addMixIn(RepositoryOwner.class, GitHubRepositoryOwnerMixin.class);
+            .addMixIn(GHActor.class, GitHubActorMixin.class)
+            .addMixIn(GHRequestedReviewer.class, GitHubRequestedReviewerMixin.class)
+            .addMixIn(GHRepositoryOwner.class, GitHubRepositoryOwnerMixin.class);
 
         ExchangeStrategies strategies = ExchangeStrategies.builder()
             .codecs(config -> {

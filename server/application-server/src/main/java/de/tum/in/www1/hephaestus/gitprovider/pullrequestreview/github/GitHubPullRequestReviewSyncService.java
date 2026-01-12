@@ -9,9 +9,11 @@ import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncCons
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser.RepositoryOwnerAndName;
-import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.PageInfo;
-import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.PullRequestReviewCommentConnection;
-import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.PullRequestReviewConnection;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHPageInfo;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHPullRequestReview;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHPullRequestReviewComment;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHPullRequestReviewCommentConnection;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHPullRequestReviewConnection;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReview;
@@ -149,7 +151,7 @@ public class GitHubPullRequestReviewSyncService {
 
         while (hasMore) {
             pageCount++;
-            if (pageCount > MAX_PAGINATION_PAGES) {
+            if (pageCount >= MAX_PAGINATION_PAGES) {
                 log.warn(
                     "Reached maximum pagination limit ({}) for PR #{} in {}, stopping",
                     MAX_PAGINATION_PAGES,
@@ -175,9 +177,9 @@ public class GitHubPullRequestReviewSyncService {
                     break;
                 }
 
-                PullRequestReviewConnection connection = response
+                GHPullRequestReviewConnection connection = response
                     .field("repository.pullRequest.reviews")
-                    .toEntity(PullRequestReviewConnection.class);
+                    .toEntity(GHPullRequestReviewConnection.class);
 
                 if (connection == null || connection.getNodes() == null || connection.getNodes().isEmpty()) {
                     break;
@@ -203,7 +205,7 @@ public class GitHubPullRequestReviewSyncService {
                     }
                 }
 
-                PageInfo pageInfo = connection.getPageInfo();
+                GHPageInfo pageInfo = connection.getPageInfo();
                 hasMore = pageInfo != null && Boolean.TRUE.equals(pageInfo.getHasNextPage());
                 cursor = pageInfo != null ? pageInfo.getEndCursor() : null;
             } catch (Exception e) {
@@ -232,17 +234,17 @@ public class GitHubPullRequestReviewSyncService {
      */
     private void fetchAllRemainingComments(
         HttpGraphQlClient client,
-        de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.PullRequestReview graphQlReview,
+        GHPullRequestReview graphQlReview,
         String startCursor
     ) {
         String reviewId = graphQlReview.getId();
-        PullRequestReviewCommentConnection existingComments = graphQlReview.getComments();
+        GHPullRequestReviewCommentConnection existingComments = graphQlReview.getComments();
         if (existingComments == null || existingComments.getNodes() == null) {
             return;
         }
 
         // Create a mutable list to collect all comments
-        List<de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.PullRequestReviewComment> allComments =
+        List<GHPullRequestReviewComment> allComments =
             new ArrayList<>(existingComments.getNodes());
 
         String cursor = startCursor;
@@ -278,9 +280,9 @@ public class GitHubPullRequestReviewSyncService {
                     break;
                 }
 
-                PullRequestReviewCommentConnection commentsConnection = response
+                GHPullRequestReviewCommentConnection commentsConnection = response
                     .field("node.comments")
-                    .toEntity(PullRequestReviewCommentConnection.class);
+                    .toEntity(GHPullRequestReviewCommentConnection.class);
 
                 if (commentsConnection == null || commentsConnection.getNodes() == null) {
                     break;
@@ -288,7 +290,7 @@ public class GitHubPullRequestReviewSyncService {
 
                 allComments.addAll(commentsConnection.getNodes());
 
-                PageInfo pageInfo = commentsConnection.getPageInfo();
+                GHPageInfo pageInfo = commentsConnection.getPageInfo();
                 hasMore = pageInfo != null && Boolean.TRUE.equals(pageInfo.getHasNextPage());
                 cursor = pageInfo != null ? pageInfo.getEndCursor() : null;
             } catch (Exception e) {

@@ -2,14 +2,15 @@ package de.tum.in.www1.hephaestus.gitprovider.pullrequest.github.dto;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.MergeableState;
-import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.PullRequest;
-import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.PullRequestReviewDecision;
-import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.PullRequestState;
-import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.ReviewRequest;
-import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.ReviewRequestConnection;
-import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.User;
-import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.UserConnection;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHMergeStateStatus;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHMergeableState;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHPullRequest;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHPullRequestReviewDecision;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHPullRequestState;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHReviewRequest;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHReviewRequestConnection;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHUser;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHUserConnection;
 import de.tum.in.www1.hephaestus.gitprovider.label.github.dto.GitHubLabelDTO;
 import de.tum.in.www1.hephaestus.gitprovider.milestone.github.dto.GitHubMilestoneDTO;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.MergeStateStatus;
@@ -82,13 +83,13 @@ public record GitHubPullRequestDTO(
     // ========== STATIC FACTORY METHODS FOR GRAPHQL RESPONSES ==========
 
     /**
-     * Creates a GitHubPullRequestDTO from a GraphQL PullRequest model.
+     * Creates a GitHubPullRequestDTO from a GraphQL GHPullRequest model.
      *
-     * @param pr the GraphQL PullRequest (may be null)
+     * @param pr the GraphQL GHPullRequest (may be null)
      * @return GitHubPullRequestDTO or null if pr is null
      */
     @Nullable
-    public static GitHubPullRequestDTO fromPullRequest(@Nullable PullRequest pr) {
+    public static GitHubPullRequestDTO fromPullRequest(@Nullable GHPullRequest pr) {
         if (pr == null) {
             return null;
         }
@@ -145,7 +146,7 @@ public record GitHubPullRequestDTO(
     // ========== CONVERSION HELPERS ==========
 
     @Nullable
-    private static ReviewDecision convertReviewDecision(@Nullable PullRequestReviewDecision decision) {
+    private static ReviewDecision convertReviewDecision(@Nullable GHPullRequestReviewDecision decision) {
         if (decision == null) {
             return null;
         }
@@ -157,7 +158,7 @@ public record GitHubPullRequestDTO(
     }
 
     /**
-     * Maps GraphQL MergeStateStatus to our domain model.
+     * Maps GraphQL GHMergeStateStatus to our domain model.
      *
      * <p>Note: The DRAFT status is deprecated by GitHub but still returned in the schema.
      * We map it to BLOCKED since draft PRs are effectively blocked from merging.
@@ -165,7 +166,7 @@ public record GitHubPullRequestDTO(
     @Nullable
     @SuppressWarnings("deprecation") // DRAFT is deprecated but still in the schema
     private static MergeStateStatus convertMergeStateStatus(
-        @Nullable de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.MergeStateStatus status
+        GHMergeStateStatus status
     ) {
         if (status == null) {
             return null;
@@ -183,7 +184,7 @@ public record GitHubPullRequestDTO(
     }
 
     @Nullable
-    private static Boolean convertMergeableState(@Nullable MergeableState state) {
+    private static Boolean convertMergeableState(@Nullable GHMergeableState state) {
         if (state == null) {
             return null;
         }
@@ -202,30 +203,30 @@ public record GitHubPullRequestDTO(
         return value.longValueExact();
     }
 
-    private static String convertState(@Nullable PullRequestState state) {
+    private static String convertState(@Nullable GHPullRequestState state) {
         if (state == null) {
             return "open";
         }
         return state.name().toLowerCase();
     }
 
-    private static List<GitHubUserDTO> extractAssignees(@Nullable UserConnection connection) {
+    private static List<GitHubUserDTO> extractAssignees(@Nullable GHUserConnection connection) {
         if (connection == null || connection.getNodes() == null) {
             return Collections.emptyList();
         }
         return connection.getNodes().stream().map(GitHubUserDTO::fromUser).filter(Objects::nonNull).toList();
     }
 
-    private static List<GitHubUserDTO> extractRequestedReviewers(@Nullable ReviewRequestConnection connection) {
+    private static List<GitHubUserDTO> extractRequestedReviewers(@Nullable GHReviewRequestConnection connection) {
         if (connection == null || connection.getNodes() == null) {
             return Collections.emptyList();
         }
         return connection
             .getNodes()
             .stream()
-            .map(ReviewRequest::getRequestedReviewer)
-            .filter(reviewer -> reviewer instanceof User)
-            .map(reviewer -> GitHubUserDTO.fromUser((User) reviewer))
+            .map(GHReviewRequest::getRequestedReviewer)
+            .filter(reviewer -> reviewer instanceof GHUser)
+            .map(reviewer -> GitHubUserDTO.fromUser((GHUser) reviewer))
             .filter(Objects::nonNull)
             .toList();
     }

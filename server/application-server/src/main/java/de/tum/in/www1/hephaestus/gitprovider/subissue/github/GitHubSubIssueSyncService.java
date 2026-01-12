@@ -8,8 +8,9 @@ import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameP
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser.RepositoryOwnerAndName;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider.WorkspaceSyncMetadata;
-import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.IssueConnection;
-import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.SubIssuesSummary;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHIssue;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHIssueConnection;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHSubIssuesSummary;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.issue.IssueRepository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
@@ -284,7 +285,7 @@ public class GitHubSubIssueSyncService {
 
         while (hasNextPage) {
             pageCount++;
-            if (pageCount > MAX_PAGINATION_PAGES) {
+            if (pageCount >= MAX_PAGINATION_PAGES) {
                 log.warn(
                     "Reached maximum pagination limit ({}) for repository {}, stopping",
                     MAX_PAGINATION_PAGES,
@@ -295,14 +296,14 @@ public class GitHubSubIssueSyncService {
 
             try {
                 // GraphQL call OUTSIDE of @Transactional to avoid blocking DB connection
-                IssueConnection issueConnection = client
+                GHIssueConnection issueConnection = client
                     .documentName(GET_SUB_ISSUES_DOCUMENT)
                     .variable("owner", owner)
                     .variable("name", name)
                     .variable("first", LARGE_PAGE_SIZE)
                     .variable("after", cursor)
                     .retrieve("repository.issues")
-                    .toEntity(IssueConnection.class)
+                    .toEntity(GHIssueConnection.class)
                     .block(GRAPHQL_TIMEOUT);
 
                 if (issueConnection == null) {
@@ -338,7 +339,7 @@ public class GitHubSubIssueSyncService {
      * providing better resilience if a single page fails.
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    protected int processIssueNodesInTransaction(IssueConnection issueConnection, Repository repository) {
+    protected int processIssueNodesInTransaction(GHIssueConnection issueConnection, Repository repository) {
         if (issueConnection.getNodes() == null) {
             return 0;
         }
@@ -359,7 +360,7 @@ public class GitHubSubIssueSyncService {
     }
 
     private int processParentRelationship(
-        de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.Issue graphQlIssue,
+        GHIssue graphQlIssue,
         Repository repository
     ) {
         long issueDatabaseId = graphQlIssue.getFullDatabaseId().longValue();
@@ -390,9 +391,9 @@ public class GitHubSubIssueSyncService {
     }
 
     private void processSubIssuesSummary(
-        de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.Issue graphQlIssue
+        GHIssue graphQlIssue
     ) {
-        SubIssuesSummary summary = graphQlIssue.getSubIssuesSummary();
+        GHSubIssuesSummary summary = graphQlIssue.getSubIssuesSummary();
         if (summary == null || summary.getTotal() == 0) {
             return;
         }

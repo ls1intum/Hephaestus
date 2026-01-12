@@ -1,6 +1,6 @@
 package de.tum.in.www1.hephaestus.gitprovider.pullrequest.github.dto;
 
-import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.PullRequestReviewConnection;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHPullRequestReviewConnection;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.github.dto.GitHubPullRequestReviewEventDTO.GitHubReviewDTO;
 import java.util.Collections;
 import java.util.List;
@@ -20,12 +20,12 @@ public record EmbeddedReviewsDTO(
     @Nullable String endCursor
 ) {
     /**
-     * Creates an EmbeddedReviewsDTO from a GraphQL PullRequestReviewConnection.
+     * Creates an EmbeddedReviewsDTO from a GraphQL GHPullRequestReviewConnection.
      *
      * @param connection the GraphQL connection (may be null)
      * @return EmbeddedReviewsDTO or empty DTO if connection is null
      */
-    public static EmbeddedReviewsDTO fromConnection(@Nullable PullRequestReviewConnection connection) {
+    public static EmbeddedReviewsDTO fromConnection(@Nullable GHPullRequestReviewConnection connection) {
         if (connection == null) {
             return empty();
         }

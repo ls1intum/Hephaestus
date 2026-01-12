@@ -4,7 +4,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventAction;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubWebhookEvent;
-import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.IssueComment;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHIssueComment;
 import de.tum.in.www1.hephaestus.gitprovider.issue.github.dto.GitHubIssueDTO;
 import de.tum.in.www1.hephaestus.gitprovider.repository.github.dto.GitHubRepositoryRefDTO;
 import de.tum.in.www1.hephaestus.gitprovider.user.github.dto.GitHubUserDTO;
@@ -53,11 +53,11 @@ public record GitHubIssueCommentEventDTO(
         // ========== STATIC FACTORY METHODS FOR GRAPHQL RESPONSES ==========
 
         /**
-         * Creates a GitHubCommentDTO from a GraphQL IssueComment model.
+         * Creates a GitHubCommentDTO from a GraphQL GHIssueComment model.
          * Uses fullDatabaseId instead of databaseId to avoid integer overflow (GitHub IDs exceed 32-bit).
          */
         @Nullable
-        public static GitHubCommentDTO fromIssueComment(@Nullable IssueComment comment) {
+        public static GitHubCommentDTO fromIssueComment(@Nullable GHIssueComment comment) {
             if (comment == null) {
                 return null;
             }

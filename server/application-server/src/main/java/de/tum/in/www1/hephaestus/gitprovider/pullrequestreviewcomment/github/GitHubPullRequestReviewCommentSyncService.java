@@ -6,13 +6,15 @@ import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncCons
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser.RepositoryOwnerAndName;
-import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.Actor;
-import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.CommentAuthorAssociation;
-import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.DiffSide;
-import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.PageInfo;
-import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.PullRequestReviewCommentConnection;
-import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.PullRequestReviewThreadConnection;
-import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.User;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHActor;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHCommentAuthorAssociation;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHDiffSide;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHPageInfo;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHPullRequestReviewComment;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHPullRequestReviewCommentConnection;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHPullRequestReviewThread;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHPullRequestReviewThreadConnection;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHUser;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.PullRequestReviewComment;
@@ -165,7 +167,7 @@ public class GitHubPullRequestReviewCommentSyncService {
 
             while (hasNextPage) {
                 pageCount++;
-                if (pageCount > MAX_PAGINATION_PAGES) {
+                if (pageCount >= MAX_PAGINATION_PAGES) {
                     log.warn(
                         "Reached maximum pagination limit ({}) for PR #{} in repository {}, stopping",
                         MAX_PAGINATION_PAGES,
@@ -175,7 +177,7 @@ public class GitHubPullRequestReviewCommentSyncService {
                     break;
                 }
 
-                PullRequestReviewThreadConnection response = client
+                GHPullRequestReviewThreadConnection response = client
                     .documentName(GET_PR_REVIEW_COMMENTS_DOCUMENT)
                     .variable("owner", owner)
                     .variable("name", name)
@@ -183,7 +185,7 @@ public class GitHubPullRequestReviewCommentSyncService {
                     .variable("first", DEFAULT_PAGE_SIZE)
                     .variable("after", cursor)
                     .retrieve("repository.pullRequest.reviewThreads")
-                    .toEntity(PullRequestReviewThreadConnection.class)
+                    .toEntity(GHPullRequestReviewThreadConnection.class)
                     .block(EXTENDED_GRAPHQL_TIMEOUT);
 
                 if (response == null || response.getNodes() == null) {
@@ -227,14 +229,14 @@ public class GitHubPullRequestReviewCommentSyncService {
      * @return number of comments synced from this thread
      */
     private int processThread(
-        de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.PullRequestReviewThread graphQlThread,
+        GHPullRequestReviewThread graphQlThread,
         PullRequest pullRequest
     ) {
         if (graphQlThread == null) {
             return 0;
         }
 
-        PullRequestReviewCommentConnection commentsConnection = graphQlThread.getComments();
+        GHPullRequestReviewCommentConnection commentsConnection = graphQlThread.getComments();
         if (commentsConnection == null || commentsConnection.getNodes() == null) {
             return 0;
         }
@@ -284,7 +286,7 @@ public class GitHubPullRequestReviewCommentSyncService {
      * @param startCursor   the cursor to start fetching from
      */
     private void fetchAllRemainingThreadComments(
-        de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.PullRequestReviewThread graphQlThread,
+        GHPullRequestReviewThread graphQlThread,
         String startCursor
     ) {
         if (currentClient == null) {
@@ -296,13 +298,13 @@ public class GitHubPullRequestReviewCommentSyncService {
         }
 
         String threadId = graphQlThread.getId();
-        PullRequestReviewCommentConnection existingComments = graphQlThread.getComments();
+        GHPullRequestReviewCommentConnection existingComments = graphQlThread.getComments();
         if (existingComments == null || existingComments.getNodes() == null) {
             return;
         }
 
         // Create a mutable list to collect all comments
-        List<de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.PullRequestReviewComment> allComments =
+        List<GHPullRequestReviewComment> allComments =
             new ArrayList<>(existingComments.getNodes());
 
         String cursor = startCursor;
@@ -338,9 +340,9 @@ public class GitHubPullRequestReviewCommentSyncService {
                     break;
                 }
 
-                PullRequestReviewCommentConnection commentsConnection = response
+                GHPullRequestReviewCommentConnection commentsConnection = response
                     .field("node.comments")
-                    .toEntity(PullRequestReviewCommentConnection.class);
+                    .toEntity(GHPullRequestReviewCommentConnection.class);
 
                 if (commentsConnection == null || commentsConnection.getNodes() == null) {
                     break;
@@ -348,7 +350,7 @@ public class GitHubPullRequestReviewCommentSyncService {
 
                 allComments.addAll(commentsConnection.getNodes());
 
-                PageInfo pageInfo = commentsConnection.getPageInfo();
+                GHPageInfo pageInfo = commentsConnection.getPageInfo();
                 hasMore = pageInfo != null && Boolean.TRUE.equals(pageInfo.getHasNextPage());
                 cursor = pageInfo != null ? pageInfo.getEndCursor() : null;
             } catch (Exception e) {
@@ -375,7 +377,7 @@ public class GitHubPullRequestReviewCommentSyncService {
      */
     private PullRequestReviewThread getOrCreateThread(
         Long threadId,
-        de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.PullRequestReviewThread graphQlThread,
+        GHPullRequestReviewThread graphQlThread,
         PullRequest pullRequest
     ) {
         return threadRepository
@@ -397,7 +399,7 @@ public class GitHubPullRequestReviewCommentSyncService {
                 if (graphQlThread.getIsResolved()) {
                     thread.setState(PullRequestReviewThread.State.RESOLVED);
                     // Set resolvedBy user if available
-                    User graphQlResolvedBy = graphQlThread.getResolvedBy();
+                    GHUser graphQlResolvedBy = graphQlThread.getResolvedBy();
                     if (graphQlResolvedBy != null) {
                         GitHubUserDTO resolvedByDto = convertGraphQlUserToDto(graphQlResolvedBy);
                         de.tum.in.www1.hephaestus.gitprovider.user.User resolvedBy = userProcessor.ensureExists(
@@ -414,9 +416,9 @@ public class GitHubPullRequestReviewCommentSyncService {
     }
 
     /**
-     * Converts a GraphQL User to a GitHubUserDTO.
+     * Converts a GraphQL GHUser to a GitHubUserDTO.
      */
-    private GitHubUserDTO convertGraphQlUserToDto(User graphQlUser) {
+    private GitHubUserDTO convertGraphQlUserToDto(GHUser graphQlUser) {
         if (graphQlUser == null) {
             return null;
         }
@@ -436,7 +438,7 @@ public class GitHubPullRequestReviewCommentSyncService {
      * Uses fullDatabaseId if available, otherwise falls back to deprecated databaseId.
      */
     private Long extractDatabaseId(
-        de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.PullRequestReviewComment graphQlComment
+        GHPullRequestReviewComment graphQlComment
     ) {
         if (graphQlComment == null) {
             return null;
@@ -457,14 +459,14 @@ public class GitHubPullRequestReviewCommentSyncService {
     }
 
     /**
-     * Converts a GraphQL PullRequestReviewComment to a GitHubReviewCommentDTO.
+     * Converts a GraphQL GHPullRequestReviewComment to a GitHubReviewCommentDTO.
      *
      * @param graphQlComment the GraphQL review comment
      * @param thread         the thread this comment belongs to
      * @return the DTO for processing, or null if databaseId is missing
      */
     private GitHubReviewCommentDTO convertToDTO(
-        de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.PullRequestReviewComment graphQlComment,
+        GHPullRequestReviewComment graphQlComment,
         PullRequestReviewThread thread
     ) {
         if (graphQlComment == null) {
@@ -479,8 +481,8 @@ public class GitHubPullRequestReviewCommentSyncService {
 
         // Convert author
         GitHubUserDTO author = null;
-        Actor graphQlAuthor = graphQlComment.getAuthor();
-        if (graphQlAuthor instanceof User graphQlUser) {
+        GHActor graphQlAuthor = graphQlComment.getAuthor();
+        if (graphQlAuthor instanceof GHUser graphQlUser) {
             author = new GitHubUserDTO(
                 null, // id (node_id)
                 graphQlUser.getDatabaseId() != null ? graphQlUser.getDatabaseId().longValue() : null, // databaseId
@@ -551,12 +553,12 @@ public class GitHubPullRequestReviewCommentSyncService {
     }
 
     /**
-     * Converts a GraphQL CommentAuthorAssociation to its string representation.
+     * Converts a GraphQL GHCommentAuthorAssociation to its string representation.
      *
      * @param association the GraphQL author association
      * @return the string representation
      */
-    private String convertAuthorAssociation(CommentAuthorAssociation association) {
+    private String convertAuthorAssociation(GHCommentAuthorAssociation association) {
         if (association == null) {
             return "NONE";
         }
@@ -564,9 +566,9 @@ public class GitHubPullRequestReviewCommentSyncService {
     }
 
     /**
-     * Maps a GraphQL DiffSide to the entity Side enum.
+     * Maps a GraphQL GHDiffSide to the entity Side enum.
      */
-    private PullRequestReviewComment.Side mapDiffSide(DiffSide diffSide) {
+    private PullRequestReviewComment.Side mapDiffSide(GHDiffSide diffSide) {
         if (diffSide == null) {
             return null;
         }

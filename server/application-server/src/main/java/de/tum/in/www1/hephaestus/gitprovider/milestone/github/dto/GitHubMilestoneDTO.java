@@ -2,8 +2,8 @@ package de.tum.in.www1.hephaestus.gitprovider.milestone.github.dto;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.Milestone;
-import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.MilestoneState;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHMilestone;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHMilestoneState;
 import static de.tum.in.www1.hephaestus.gitprovider.common.DateTimeUtils.toInstant;
 import static de.tum.in.www1.hephaestus.gitprovider.common.DateTimeUtils.uriToString;
 
@@ -30,10 +30,10 @@ public record GitHubMilestoneDTO(
     // ========== STATIC FACTORY METHODS FOR GRAPHQL RESPONSES ==========
 
     /**
-     * Creates a GitHubMilestoneDTO from a GraphQL Milestone model.
+     * Creates a GitHubMilestoneDTO from a GraphQL GHMilestone model.
      */
     @Nullable
-    public static GitHubMilestoneDTO fromMilestone(@Nullable Milestone milestone) {
+    public static GitHubMilestoneDTO fromMilestone(@Nullable GHMilestone milestone) {
         if (milestone == null) {
             return null;
         }
@@ -50,7 +50,7 @@ public record GitHubMilestoneDTO(
         );
     }
 
-    private static String convertState(@Nullable MilestoneState state) {
+    private static String convertState(@Nullable GHMilestoneState state) {
         if (state == null) {
             return "open";
         }

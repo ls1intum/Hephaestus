@@ -9,8 +9,8 @@ import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser.RepositoryOwnerAndName;
-import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.IssueConnection;
-import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.PageInfo;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHIssueConnection;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHPageInfo;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.issue.github.dto.GitHubIssueDTO;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
@@ -83,7 +83,7 @@ public class GitHubIssueSyncService {
 
         while (hasMore) {
             pageCount++;
-            if (pageCount > MAX_PAGINATION_PAGES) {
+            if (pageCount >= MAX_PAGINATION_PAGES) {
                 log.warn(
                     "Reached maximum pagination limit ({}) for repository {}, stopping",
                     MAX_PAGINATION_PAGES,
@@ -107,7 +107,7 @@ public class GitHubIssueSyncService {
                     break;
                 }
 
-                IssueConnection connection = response.field("repository.issues").toEntity(IssueConnection.class);
+                GHIssueConnection connection = response.field("repository.issues").toEntity(GHIssueConnection.class);
 
                 if (connection == null || connection.getNodes() == null || connection.getNodes().isEmpty()) {
                     break;
@@ -123,7 +123,7 @@ public class GitHubIssueSyncService {
                     }
                 }
 
-                PageInfo pageInfo = connection.getPageInfo();
+                GHPageInfo pageInfo = connection.getPageInfo();
                 hasMore = pageInfo != null && Boolean.TRUE.equals(pageInfo.getHasNextPage());
                 cursor = pageInfo != null ? pageInfo.getEndCursor() : null;
             } catch (Exception e) {

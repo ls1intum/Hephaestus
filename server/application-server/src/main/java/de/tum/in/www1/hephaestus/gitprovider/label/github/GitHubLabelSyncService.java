@@ -7,7 +7,7 @@ import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser.RepositoryOwnerAndName;
-import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.LabelConnection;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHLabelConnection;
 import de.tum.in.www1.hephaestus.gitprovider.label.Label;
 import de.tum.in.www1.hephaestus.gitprovider.label.LabelRepository;
 import de.tum.in.www1.hephaestus.gitprovider.label.github.dto.GitHubLabelDTO;
@@ -88,7 +88,7 @@ public class GitHubLabelSyncService {
 
             while (hasNextPage) {
                 pageCount++;
-                if (pageCount > MAX_PAGINATION_PAGES) {
+                if (pageCount >= MAX_PAGINATION_PAGES) {
                     log.warn(
                         "Reached maximum pagination limit ({}) for repository {}, stopping",
                         MAX_PAGINATION_PAGES,
@@ -97,14 +97,14 @@ public class GitHubLabelSyncService {
                     break;
                 }
 
-                LabelConnection response = client
+                GHLabelConnection response = client
                     .documentName(GET_LABELS_DOCUMENT)
                     .variable("owner", owner)
                     .variable("name", name)
                     .variable("first", LARGE_PAGE_SIZE)
                     .variable("after", cursor)
                     .retrieve("repository.labels")
-                    .toEntity(LabelConnection.class)
+                    .toEntity(GHLabelConnection.class)
                     .block(GRAPHQL_TIMEOUT);
 
                 if (response == null || response.getNodes() == null) {
@@ -165,11 +165,11 @@ public class GitHubLabelSyncService {
     }
 
     /**
-     * Converts a GraphQL Label to a GitHubLabelDTO.
+     * Converts a GraphQL GHLabel to a GitHubLabelDTO.
      * Note: GraphQL doesn't expose databaseId for labels, so id will be null.
      * The processor handles this by using name-based lookup as fallback.
      */
-    private GitHubLabelDTO convertToDTO(de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.Label graphQlLabel) {
+    private GitHubLabelDTO convertToDTO(de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHLabel graphQlLabel) {
         return GitHubLabelDTO.fromLabel(graphQlLabel);
     }
 }

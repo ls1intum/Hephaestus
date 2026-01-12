@@ -1,6 +1,6 @@
 package de.tum.in.www1.hephaestus.gitprovider.pullrequest.github.dto;
 
-import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.PullRequest;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHPullRequest;
 import org.springframework.lang.Nullable;
 
 /**
@@ -10,13 +10,13 @@ import org.springframework.lang.Nullable;
  */
 public record PullRequestWithReviews(GitHubPullRequestDTO pullRequest, EmbeddedReviewsDTO embeddedReviews) {
     /**
-     * Creates a PullRequestWithReviews from a GraphQL PullRequest model.
+     * Creates a PullRequestWithReviews from a GraphQL GHPullRequest model.
      *
-     * @param pr the GraphQL PullRequest (may be null)
+     * @param pr the GraphQL GHPullRequest (may be null)
      * @return PullRequestWithReviews or null if pr is null
      */
     @Nullable
-    public static PullRequestWithReviews fromPullRequest(@Nullable PullRequest pr) {
+    public static PullRequestWithReviews fromPullRequest(@Nullable GHPullRequest pr) {
         if (pr == null) {
             return null;
         }

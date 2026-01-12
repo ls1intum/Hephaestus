@@ -448,7 +448,8 @@
                             <packageName>de.tum.in.www1.hephaestus.gitprovider.graphql.github</packageName>
                             <apiPackageName>de.tum.in.www1.hephaestus.gitprovider.graphql.github.api</apiPackageName>
                             <modelPackageName>de.tum.in.www1.hephaestus.gitprovider.graphql.github.model</modelPackageName>
-                            
+                            <modelNamePrefix>GH</modelNamePrefix>
+
                             <!-- Client-side code generation (for consuming GitHub API) -->
                             <generateClient>true</generateClient>
                             <generateApis>false</generateApis>

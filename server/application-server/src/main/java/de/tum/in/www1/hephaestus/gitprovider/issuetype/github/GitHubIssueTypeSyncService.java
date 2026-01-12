@@ -5,8 +5,8 @@ import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncCons
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider.WorkspaceSyncMetadata;
-import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.IssueTypeColor;
-import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.IssueTypeConnection;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHIssueTypeColor;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHIssueTypeConnection;
 import de.tum.in.www1.hephaestus.gitprovider.issuetype.IssueType;
 import de.tum.in.www1.hephaestus.gitprovider.issuetype.IssueTypeRepository;
 import de.tum.in.www1.hephaestus.gitprovider.organization.Organization;
@@ -98,7 +98,7 @@ public class GitHubIssueTypeSyncService {
 
             while (hasNextPage) {
                 pageCount++;
-                if (pageCount > MAX_PAGINATION_PAGES) {
+                if (pageCount >= MAX_PAGINATION_PAGES) {
                     log.warn(
                         "Reached maximum pagination limit ({}) for organization {}, stopping",
                         MAX_PAGINATION_PAGES,
@@ -107,13 +107,13 @@ public class GitHubIssueTypeSyncService {
                     break;
                 }
 
-                IssueTypeConnection response = client
+                GHIssueTypeConnection response = client
                     .documentName(GET_ISSUE_TYPES_DOCUMENT)
                     .variable("login", orgLogin)
                     .variable("first", LARGE_PAGE_SIZE)
                     .variable("after", cursor)
                     .retrieve("organization.issueTypes")
-                    .toEntity(IssueTypeConnection.class)
+                    .toEntity(GHIssueTypeConnection.class)
                     .block(GRAPHQL_TIMEOUT);
 
                 if (response == null || response.getNodes() == null) {
@@ -161,7 +161,7 @@ public class GitHubIssueTypeSyncService {
     }
 
     private void syncIssueType(
-        de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.IssueType graphQlType,
+        de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHIssueType graphQlType,
         Organization organization
     ) {
         String id = graphQlType.getId();
@@ -216,7 +216,7 @@ public class GitHubIssueTypeSyncService {
         return issueTypeRepository.findById(nodeId);
     }
 
-    private IssueType.Color convertColor(IssueTypeColor graphQlColor) {
+    private IssueType.Color convertColor(GHIssueTypeColor graphQlColor) {
         if (graphQlColor == null) {
             return IssueType.Color.GRAY;
         }

@@ -2,8 +2,8 @@ package de.tum.in.www1.hephaestus.config.jackson;
 
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
-import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.Organization;
-import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.User;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHOrganization;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHUser;
 
 /**
  * Jackson mixin for GitHub GraphQL RepositoryOwner interface.
@@ -16,12 +16,12 @@ import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.User;
     include = JsonTypeInfo.As.PROPERTY,
     property = "__typename",
     visible = true,
-    defaultImpl = User.class
+    defaultImpl = GHUser.class
 )
 @JsonSubTypes(
     {
-        @JsonSubTypes.Type(value = Organization.class, name = "Organization"),
-        @JsonSubTypes.Type(value = User.class, name = "User"),
+        @JsonSubTypes.Type(value = GHOrganization.class, name = "Organization"),
+        @JsonSubTypes.Type(value = GHUser.class, name = "User"),
     }
 )
 public abstract class GitHubRepositoryOwnerMixin {}
