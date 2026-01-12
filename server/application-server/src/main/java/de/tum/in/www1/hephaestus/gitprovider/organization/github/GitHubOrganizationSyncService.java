@@ -305,6 +305,9 @@ public class GitHubOrganizationSyncService {
 
     /**
      * Maps GraphQL OrganizationMemberRole enum to our domain enum.
+     * <p>
+     * Uses if-else instead of switch expression to avoid anonymous class generation
+     * that causes NoClassDefFoundError with Spring Boot DevTools hot reload.
      *
      * @param graphQlRole the GraphQL OrganizationMemberRole enum value
      * @return the domain OrganizationMemberRole, or MEMBER as default
@@ -315,9 +318,9 @@ public class GitHubOrganizationSyncService {
         if (graphQlRole == null) {
             return OrganizationMemberRole.MEMBER;
         }
-        return switch (graphQlRole) {
-            case ADMIN -> OrganizationMemberRole.ADMIN;
-            case MEMBER -> OrganizationMemberRole.MEMBER;
-        };
+        if (graphQlRole == GHOrganizationMemberRole.ADMIN) {
+            return OrganizationMemberRole.ADMIN;
+        }
+        return OrganizationMemberRole.MEMBER;
     }
 }

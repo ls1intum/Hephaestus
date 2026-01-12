@@ -43,6 +43,9 @@
         <failsafe.excludedGroups>live</failsafe.excludedGroups>
         <failsafe.includedGroups>integration</failsafe.includedGroups>
 
+        <!-- GraphQL Codegen Skip (auto-set by 'quick' profile when target/classes exists) -->
+        <graphql.codegen.skip>false</graphql.codegen.skip>
+
         <!-- Coverage Configuration (disabled by default) -->
         <skipCoverage>true</skipCoverage>
         <jacoco.line.coverage.minimum>0.00</jacoco.line.coverage.minimum>
@@ -438,6 +441,9 @@
                             <goal>generate</goal>
                         </goals>
                         <configuration>
+                            <!-- Skip generation (auto-set true by 'quick' profile) -->
+                            <skip>${graphql.codegen.skip}</skip>
+
                             <!-- Schema location -->
                             <graphqlSchemas>
                                 <rootDir>${project.basedir}/src/main/resources/graphql/github</rootDir>
@@ -509,47 +515,43 @@
                     </execution>
                 </executions>
             </plugin>
-            <!-- Delete Relay files that depend on missing Query root type -->
+            <!-- Post-processing for GraphQL generated code (cross-platform) -->
+            <!-- Deletes Relay files that reference missing Query type and adds @SuppressWarnings -->
             <plugin>
-                <groupId>org.codehaus.mojo</groupId>
-                <artifactId>exec-maven-plugin</artifactId>
-                <version>3.4.1</version>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-antrun-plugin</artifactId>
+                <version>3.1.0</version>
                 <executions>
                     <execution>
-                        <id>delete-relay-classes</id>
+                        <id>graphql-post-process</id>
                         <phase>generate-sources</phase>
                         <goals>
-                            <goal>exec</goal>
+                            <goal>run</goal>
                         </goals>
                         <configuration>
-                            <executable>rm</executable>
-                            <arguments>
-                                <argument>-f</argument>
-                                <argument>${project.build.directory}/generated-sources/graphql/de/tum/in/www1/hephaestus/gitprovider/graphql/github/model/RelayQueryRequest.java</argument>
-                                <argument>${project.build.directory}/generated-sources/graphql/de/tum/in/www1/hephaestus/gitprovider/graphql/github/model/RelayQueryResponse.java</argument>
-                            </arguments>
-                        </configuration>
-                    </execution>
-                    <execution>
-                        <id>add-suppress-warnings-to-deprecated-classes</id>
-                        <phase>generate-sources</phase>
-                        <goals>
-                            <goal>exec</goal>
-                        </goals>
-                        <configuration>
-                            <!-- Add @SuppressWarnings("deprecation") to classes using deprecated GitHub API fields -->
-                            <executable>bash</executable>
-                            <arguments>
-                                <argument>-c</argument>
-                                <argument>
-                                    for f in ProjectPendingCardsParametrizedInput IssueProjectCardsParametrizedInput PullRequestProjectCardsParametrizedInput ProjectColumnCardsParametrizedInput; do
-                                        file="${project.build.directory}/generated-sources/graphql/de/tum/in/www1/hephaestus/gitprovider/graphql/github/model/$f.java"
-                                        if [ -f "$file" ]; then
-                                            sed -i '' 's/^public class /@SuppressWarnings("deprecation")\npublic class /' "$file" 2>/dev/null || sed -i 's/^public class /@SuppressWarnings("deprecation")\npublic class /' "$file"
-                                        fi
-                                    done
-                                </argument>
-                            </arguments>
+                            <!-- Skip if codegen was skipped -->
+                            <skip>${graphql.codegen.skip}</skip>
+                            <target>
+                                <!-- Delete Relay files that depend on missing Query root type -->
+                                <delete failonerror="false">
+                                    <fileset dir="${project.build.directory}/generated-sources/graphql/de/tum/in/www1/hephaestus/gitprovider/graphql/github/model">
+                                        <include name="RelayQueryRequest.java"/>
+                                        <include name="RelayQueryResponse.java"/>
+                                    </fileset>
+                                </delete>
+                                <!-- Add @SuppressWarnings("deprecation") to classes using deprecated GitHub API fields -->
+                                <!-- flags="gm": g=global, m=multiline (^ matches start of each line) -->
+                                <replaceregexp flags="gm" byline="false">
+                                    <regexp pattern="^(public class (ProjectPendingCardsParametrizedInput|IssueProjectCardsParametrizedInput|PullRequestProjectCardsParametrizedInput|ProjectColumnCardsParametrizedInput))"/>
+                                    <substitution expression="@SuppressWarnings(&quot;deprecation&quot;)${line.separator}\1"/>
+                                    <fileset dir="${project.build.directory}/generated-sources/graphql/de/tum/in/www1/hephaestus/gitprovider/graphql/github/model">
+                                        <include name="ProjectPendingCardsParametrizedInput.java"/>
+                                        <include name="IssueProjectCardsParametrizedInput.java"/>
+                                        <include name="PullRequestProjectCardsParametrizedInput.java"/>
+                                        <include name="ProjectColumnCardsParametrizedInput.java"/>
+                                    </fileset>
+                                </replaceregexp>
+                            </target>
                         </configuration>
                     </execution>
                 </executions>
@@ -841,6 +843,37 @@
                 <surefire.includedGroups>architecture</surefire.includedGroups>
                 <failsafe.excludedGroups></failsafe.excludedGroups>
                 <failsafe.includedGroups></failsafe.includedGroups>
+            </properties>
+        </profile>
+
+        <!--
+            Quick Development Profile (Auto-Activated)
+
+            Automatically skips GraphQL code regeneration AND Java compilation
+            when compiled classes already exist. This makes `mvn spring-boot:run` fast.
+
+            Auto-activation:
+            - Activates when target/classes exists (already compiled)
+            - Does NOT activate after `mvn clean` (forces full rebuild)
+
+            Manual override:
+              ./mvnw spring-boot:run -P!quick                      (force full build)
+              ./mvnw spring-boot:run -Dmaven.main.skip=false       (force compile)
+
+            CI/CD: Use `mvn clean compile` to ensure full regeneration.
+        -->
+        <profile>
+            <id>quick</id>
+            <activation>
+                <!-- Auto-activate when compiled classes exist -->
+                <file>
+                    <exists>${basedir}/target/classes</exists>
+                </file>
+            </activation>
+            <properties>
+                <graphql.codegen.skip>true</graphql.codegen.skip>
+                <maven.main.skip>true</maven.main.skip>
+                <maven.test.skip>true</maven.test.skip>
             </properties>
         </profile>
     </profiles>

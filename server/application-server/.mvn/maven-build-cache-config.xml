@@ -1,0 +1,395 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    Maven Build Cache Configuration for Hephaestus
+
+    This configuration is tailored for a Spring Boot application with:
+    - GraphQL code generation (kobylynskyi/graphql-codegen-maven-plugin)
+    - OpenAPI spec generation
+    - Liquibase migrations
+    - JaCoCo coverage
+    - Surefire/Failsafe testing
+
+    Documentation: https://maven.apache.org/extensions/maven-build-cache-extension/
+
+    CRITICAL: Review buildinfo.xml in ~/.m2/build-cache after first build to verify
+    that all expected source files are included and all critical plugin parameters
+    are being tracked.
+-->
+<cache xmlns="http://maven.apache.org/BUILD-CACHE-CONFIG/1.2.0"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xsi:schemaLocation="http://maven.apache.org/BUILD-CACHE-CONFIG/1.2.0
+                           https://maven.apache.org/xsd/build-cache-config-1.2.0.xsd">
+
+    <!-- ============================================================== -->
+    <!-- MAIN CONFIGURATION                                             -->
+    <!-- ============================================================== -->
+    <configuration>
+        <!-- Enable/disable the build cache -->
+        <enabled>true</enabled>
+
+        <!-- Hash algorithm for cache keys
+             Options: XX (fast), SHA-256 (secure), SHA-512
+             SHA-256 recommended for production to avoid hash collisions -->
+        <hashAlgorithm>SHA-256</hashAlgorithm>
+
+        <!-- Validate XML configuration against schema -->
+        <validateXml>true</validateXml>
+
+        <!-- Require 'clean' phase for caching (recommended for CI)
+             Set to true in CI to reduce risk of stale files in cache -->
+        <mandatoryClean>false</mandatoryClean>
+
+        <!-- Project versioning behavior
+             adjustMetaInf: false = don't modify version in META-INF
+             calculateProjectVersionChecksum: false = version-agnostic caching
+             Setting both to false enables caching across version bumps -->
+        <projectVersioning adjustMetaInf="false" calculateProjectVersionChecksum="false"/>
+
+        <!-- Remote cache configuration (disabled by default for local dev)
+             Enable in CI with: -Dmaven.build.cache.remote.enabled=true -->
+        <remote enabled="false" saveToRemote="false" transport="resolver" id="build-cache">
+            <!-- Configure your cache server URL here
+                 Examples:
+                 - Nexus: https://nexus.example.com/repository/maven-build-cache/
+                 - Artifactory: https://artifactory.example.com/artifactory/build-cache/
+                 - S3 (via wagon): s3://bucket-name/build-cache/
+            -->
+            <url>https://your-cache-server/build-cache/</url>
+        </remote>
+
+        <!-- Directories to cache alongside the main artifact
+             These are relative to target/ directory -->
+        <attachedOutputs>
+            <!-- Preserve Unix file permissions (important for scripts) -->
+            <preservePermissions>true</preservePermissions>
+            <dirNames>
+                <!-- Compiled classes -->
+                <dirName>classes</dirName>
+                <dirName>test-classes</dirName>
+
+                <!-- Generated sources (GraphQL, OpenAPI, etc.) -->
+                <dirName>generated-sources</dirName>
+                <dirName>generated-test-sources</dirName>
+
+                <!-- Coverage reports (for caching JaCoCo reports) -->
+                <dirName glob="jacoco.exec"></dirName>
+                <dirName glob="site/jacoco/**"></dirName>
+            </dirNames>
+        </attachedOutputs>
+
+        <!-- Local cache configuration
+             Using defaults: location=~/.m2/build-cache, maxBuildsCached=3
+             Note: Custom location with ${user.home} doesn't resolve correctly,
+             so we rely on the extension's default behavior which works properly -->
+        <local>
+            <maxBuildsCached>3</maxBuildsCached>
+        </local>
+
+        <!-- Debug options (enable for troubleshooting cache misses)
+             FileHash: logs hash of each input file
+             EffectivePom: logs effective POM used for hashing -->
+        <debugs>
+            <!-- Uncomment for debugging:
+            <debug>FileHash</debug>
+            <debug>EffectivePom</debug>
+            -->
+        </debugs>
+    </configuration>
+
+    <!-- ============================================================== -->
+    <!-- INPUT CONFIGURATION                                            -->
+    <!-- Defines what files/parameters affect the cache key             -->
+    <!-- ============================================================== -->
+    <input>
+        <global>
+            <!-- File types to include in hash calculation
+                 {pattern1,pattern2} syntax for multiple patterns -->
+            <glob>{*.java,*.xml,*.properties,*.yml,*.yaml,*.graphql,*.ftl,*.sql}</glob>
+
+            <!-- Directories to include in hash calculation -->
+            <includes>
+                <include recursive="true">src/main/java</include>
+                <include recursive="true">src/main/resources</include>
+                <include recursive="true">src/test/java</include>
+                <include recursive="true">src/test/resources</include>
+            </includes>
+
+            <!-- Files/directories to exclude from hash calculation -->
+            <excludes>
+                <!-- IDE and editor files -->
+                <exclude glob="*.iml" matcherType="FILENAME"></exclude>
+                <exclude glob=".idea/**" matcherType="PATH"></exclude>
+                <exclude glob=".vscode/**" matcherType="PATH"></exclude>
+                <exclude glob=".project" matcherType="FILENAME"></exclude>
+                <exclude glob=".classpath" matcherType="FILENAME"></exclude>
+                <exclude glob=".settings/**" matcherType="PATH"></exclude>
+
+                <!-- Documentation files that don't affect build -->
+                <exclude glob="*.md" matcherType="FILENAME"></exclude>
+                <exclude glob="*.txt" matcherType="FILENAME"></exclude>
+                <exclude glob="LICENSE*" matcherType="FILENAME"></exclude>
+                <exclude glob="README*" matcherType="FILENAME"></exclude>
+                <exclude glob="CHANGELOG*" matcherType="FILENAME"></exclude>
+
+                <!-- Git and VCS files -->
+                <exclude glob=".git/**" matcherType="PATH"></exclude>
+                <exclude glob=".gitignore" matcherType="FILENAME"></exclude>
+                <exclude glob=".gitattributes" matcherType="FILENAME"></exclude>
+
+                <!-- Build output directories (handled separately) -->
+                <exclude glob="target/**" matcherType="PATH"></exclude>
+                <exclude glob="build/**" matcherType="PATH"></exclude>
+
+                <!-- Test data that may be environment-specific -->
+                <exclude glob="**/test-output/**" matcherType="PATH"></exclude>
+
+                <!-- OS-specific files -->
+                <exclude glob=".DS_Store" matcherType="FILENAME"></exclude>
+                <exclude glob="Thumbs.db" matcherType="FILENAME"></exclude>
+
+                <!-- Temp files -->
+                <exclude glob="*.tmp" matcherType="FILENAME"></exclude>
+                <exclude glob="*.bak" matcherType="FILENAME"></exclude>
+                <exclude glob="*.swp" matcherType="FILENAME"></exclude>
+                <exclude glob="*~" matcherType="FILENAME"></exclude>
+            </excludes>
+        </global>
+
+        <!-- ============================================================== -->
+        <!-- PLUGIN-SPECIFIC INPUT CONFIGURATION                            -->
+        <!-- ============================================================== -->
+        <plugins>
+            <!-- Maven Compiler Plugin -->
+            <plugin groupId="org.apache.maven.plugins" artifactId="maven-compiler-plugin">
+                <effectivePom>
+                    <excludeProperties>
+                        <!-- Exclude properties that don't affect compilation output -->
+                        <excludeProperty>skipTests</excludeProperty>
+                        <excludeProperty>maven.test.skip</excludeProperty>
+                    </excludeProperties>
+                </effectivePom>
+                <dirScan mode="auto">
+                    <includes>
+                        <include recursive="true" glob="*.java" tagName="source"></include>
+                    </includes>
+                </dirScan>
+            </plugin>
+
+            <!-- GraphQL Code Generator Plugin (kobylynskyi)
+                 CRITICAL: This configuration ensures proper caching of GraphQL codegen -->
+            <plugin groupId="io.github.kobylynskyi" artifactId="graphql-codegen-maven-plugin">
+                <effectivePom>
+                    <!-- Track all configuration parameters that affect generated code -->
+                    <excludeProperties>
+                        <!-- skip is handled separately via execution control -->
+                        <excludeProperty>skip</excludeProperty>
+                    </excludeProperties>
+                </effectivePom>
+                <dirScan mode="auto">
+                    <includes>
+                        <!-- GraphQL schema files -->
+                        <include recursive="true" glob="*.graphql" tagName="graphqlSchemas"></include>
+                        <!-- Custom Freemarker templates -->
+                        <include recursive="true" glob="*.ftl" tagName="customTemplatesRoot"></include>
+                    </includes>
+                    <tagScanConfigs>
+                        <!-- Ensure schema directory is scanned -->
+                        <tagScanConfig recursive="true" glob="*.graphql" tagName="rootDir"></tagScanConfig>
+                    </tagScanConfigs>
+                </dirScan>
+            </plugin>
+
+            <!-- Build Helper Plugin (for adding generated sources) -->
+            <plugin groupId="org.codehaus.mojo" artifactId="build-helper-maven-plugin">
+                <effectivePom>
+                    <excludeProperties>
+                        <!-- These don't affect the actual sources added -->
+                    </excludeProperties>
+                </effectivePom>
+            </plugin>
+
+            <!-- Properties Maven Plugin -->
+            <plugin groupId="org.codehaus.mojo" artifactId="properties-maven-plugin">
+                <effectivePom>
+                    <excludeProperties>
+                        <excludeProperty>quiet</excludeProperty>
+                    </excludeProperties>
+                </effectivePom>
+            </plugin>
+
+            <!-- Spring Boot Maven Plugin -->
+            <plugin groupId="org.springframework.boot" artifactId="spring-boot-maven-plugin">
+                <effectivePom>
+                    <excludeProperties>
+                        <!-- Runtime-only properties -->
+                        <excludeProperty>profiles</excludeProperty>
+                        <excludeProperty>jvmArguments</excludeProperty>
+                        <excludeProperty>wait</excludeProperty>
+                        <excludeProperty>maxAttempts</excludeProperty>
+                    </excludeProperties>
+                </effectivePom>
+            </plugin>
+
+            <!-- Surefire Plugin -->
+            <plugin groupId="org.apache.maven.plugins" artifactId="maven-surefire-plugin">
+                <effectivePom>
+                    <excludeProperties>
+                        <!-- Runtime/environment properties -->
+                        <excludeProperty>argLine</excludeProperty>
+                        <excludeProperty>threadCount</excludeProperty>
+                        <excludeProperty>parallel</excludeProperty>
+                        <excludeProperty>perCoreThreadCount</excludeProperty>
+                        <excludeProperty>forkedProcessTimeoutInSeconds</excludeProperty>
+                        <excludeProperty>forkedProcessExitTimeoutInSeconds</excludeProperty>
+                        <excludeProperty>skipAfterFailureCount</excludeProperty>
+                        <excludeProperty>redirectTestOutputToFile</excludeProperty>
+                        <excludeProperty>printSummary</excludeProperty>
+                    </excludeProperties>
+                </effectivePom>
+            </plugin>
+
+            <!-- Failsafe Plugin -->
+            <plugin groupId="org.apache.maven.plugins" artifactId="maven-failsafe-plugin">
+                <effectivePom>
+                    <excludeProperties>
+                        <excludeProperty>argLine</excludeProperty>
+                    </excludeProperties>
+                </effectivePom>
+            </plugin>
+
+            <!-- JaCoCo Plugin -->
+            <plugin groupId="org.jacoco" artifactId="jacoco-maven-plugin">
+                <effectivePom>
+                    <excludeProperties>
+                        <excludeProperty>skip</excludeProperty>
+                        <excludeProperty>skipCoverage</excludeProperty>
+                    </excludeProperties>
+                </effectivePom>
+            </plugin>
+        </plugins>
+    </input>
+
+    <!-- ============================================================== -->
+    <!-- OUTPUT CONFIGURATION                                           -->
+    <!-- Defines what artifacts to exclude from caching                 -->
+    <!-- ============================================================== -->
+    <output>
+        <exclude>
+            <patterns>
+                <!-- Exclude large artifacts that are environment-specific -->
+                <!-- Using regex-compatible patterns -->
+                <pattern>.*\.war</pattern>
+                <pattern>.*\.ear</pattern>
+            </patterns>
+        </exclude>
+    </output>
+
+    <!-- ============================================================== -->
+    <!-- EXECUTION CONTROL                                              -->
+    <!-- Controls which plugins run/skip during cached builds           -->
+    <!-- ============================================================== -->
+    <executionControl>
+        <!-- Plugins that ALWAYS run, even on cache hit
+             Use sparingly - these reduce cache effectiveness -->
+        <runAlways>
+            <plugins>
+                <!-- Tests should always run to catch regressions -->
+                <plugin groupId="org.apache.maven.plugins" artifactId="maven-surefire-plugin"></plugin>
+                <plugin groupId="org.apache.maven.plugins" artifactId="maven-failsafe-plugin"></plugin>
+                <!-- JaCoCo must run to set argLine for test coverage -->
+                <plugin groupId="org.jacoco" artifactId="jacoco-maven-plugin"></plugin>
+            </plugins>
+            <executions>
+                <!-- Test resources and compile must run to ensure test classes can find main classes -->
+                <execution groupId="org.apache.maven.plugins" artifactId="maven-resources-plugin">
+                    <execIds>
+                        <execId>default-testResources</execId>
+                    </execIds>
+                </execution>
+                <execution groupId="org.apache.maven.plugins" artifactId="maven-compiler-plugin">
+                    <execIds>
+                        <execId>default-testCompile</execId>
+                    </execIds>
+                </execution>
+            </executions>
+        </runAlways>
+
+        <!-- Plugins/executions that don't affect artifacts and can be skipped safely -->
+        <ignoreMissing>
+            <plugins>
+                <!-- Documentation and reports -->
+                <plugin groupId="org.apache.maven.plugins" artifactId="maven-javadoc-plugin"></plugin>
+                <plugin groupId="org.apache.maven.plugins" artifactId="maven-site-plugin"></plugin>
+                <plugin groupId="org.apache.maven.plugins" artifactId="maven-pmd-plugin"></plugin>
+
+                <!-- Liquibase (migrations run at runtime, not build time for validation) -->
+                <plugin groupId="org.liquibase" artifactId="liquibase-maven-plugin"></plugin>
+            </plugins>
+            <executions>
+                <!-- OpenAPI spec generation (runs as integration test, skip if cached) -->
+                <execution groupId="org.springframework.boot" artifactId="spring-boot-maven-plugin">
+                    <execIds>
+                        <execId>start-for-openapi</execId>
+                        <execId>stop-after-openapi</execId>
+                    </execIds>
+                </execution>
+                <execution groupId="org.springdoc" artifactId="springdoc-openapi-maven-plugin">
+                    <execIds>
+                        <execId>integration-test</execId>
+                    </execIds>
+                </execution>
+            </executions>
+        </ignoreMissing>
+
+        <!-- Property reconciliation for command-line overrides
+             Ensures cache hits even when certain properties differ -->
+        <reconcile logAllProperties="false">
+            <plugins>
+                <!-- Compiler reconciliation -->
+                <plugin goal="compile"
+                        groupId="org.apache.maven.plugins"
+                        artifactId="maven-compiler-plugin">
+                    <reconciles>
+                        <reconcile propertyName="debug" skipValue="false" defaultValue="true"></reconcile>
+                        <reconcile propertyName="optimize" skipValue="false" defaultValue="false"></reconcile>
+                        <reconcile propertyName="verbose" skipValue="false" defaultValue="false"></reconcile>
+                        <reconcile propertyName="showWarnings" skipValue="false" defaultValue="false"></reconcile>
+                        <reconcile propertyName="showDeprecation" skipValue="false" defaultValue="false"></reconcile>
+                    </reconciles>
+                    <logs>
+                        <log propertyName="source"></log>
+                        <log propertyName="target"></log>
+                        <log propertyName="release"></log>
+                    </logs>
+                </plugin>
+
+                <!-- GraphQL codegen reconciliation -->
+                <plugin goal="generate"
+                        groupId="io.github.kobylynskyi"
+                        artifactId="graphql-codegen-maven-plugin">
+                    <reconciles>
+                        <!-- Skip flag should be reconciled -->
+                        <reconcile propertyName="skip" skipValue="true" defaultValue="false"></reconcile>
+                    </reconciles>
+                    <logs>
+                        <!-- Log these for debugging cache misses -->
+                        <log propertyName="packageName"></log>
+                        <log propertyName="modelNamePrefix"></log>
+                        <log propertyName="generateClient"></log>
+                    </logs>
+                </plugin>
+
+                <!-- Spring Boot plugin reconciliation -->
+                <plugin goal="repackage"
+                        groupId="org.springframework.boot"
+                        artifactId="spring-boot-maven-plugin">
+                    <nologs>
+                        <nolog propertyName="profiles"></nolog>
+                        <nolog propertyName="jvmArguments"></nolog>
+                    </nologs>
+                </plugin>
+            </plugins>
+        </reconcile>
+    </executionControl>
+
+</cache>
