@@ -105,7 +105,8 @@ public class GitHubTeamSyncService {
             int pageCount = 0;
 
             while (hasNextPage) {
-                if (pageCount >= MAX_PAGINATION_PAGES) {
+                pageCount++;
+                if (pageCount > MAX_PAGINATION_PAGES) {
                     log.warn(
                         "Reached maximum pagination limit ({}) for organization {}, stopping",
                         MAX_PAGINATION_PAGES,
@@ -113,7 +114,6 @@ public class GitHubTeamSyncService {
                     );
                     break;
                 }
-                pageCount++;
 
                 TeamConnection response = client
                     .documentName(GET_ORGANIZATION_TEAMS_DOCUMENT)
@@ -399,7 +399,8 @@ public class GitHubTeamSyncService {
         int pageCount = 0;
 
         while (hasNextPage) {
-            if (pageCount >= MAX_PAGINATION_PAGES) {
+            pageCount++;
+            if (pageCount > MAX_PAGINATION_PAGES) {
                 log.warn(
                     "Reached maximum pagination limit ({}) for team {} members, stopping",
                     MAX_PAGINATION_PAGES,
@@ -407,7 +408,6 @@ public class GitHubTeamSyncService {
                 );
                 break;
             }
-            pageCount++;
 
             TeamMemberConnection response = client
                 .documentName(GET_TEAM_MEMBERS_DOCUMENT)
@@ -454,7 +454,8 @@ public class GitHubTeamSyncService {
         int pageCount = 0;
 
         while (hasNextPage) {
-            if (pageCount >= MAX_PAGINATION_PAGES) {
+            pageCount++;
+            if (pageCount > MAX_PAGINATION_PAGES) {
                 log.warn(
                     "Reached maximum pagination limit ({}) for team {} repositories, stopping",
                     MAX_PAGINATION_PAGES,
@@ -462,7 +463,6 @@ public class GitHubTeamSyncService {
                 );
                 break;
             }
-            pageCount++;
 
             TeamRepositoryConnection response = client
                 .documentName(GET_TEAM_REPOSITORIES_DOCUMENT)

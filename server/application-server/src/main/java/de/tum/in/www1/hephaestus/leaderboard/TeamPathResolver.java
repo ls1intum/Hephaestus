@@ -1,5 +1,7 @@
 package de.tum.in.www1.hephaestus.leaderboard;
 
+import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
+
 import de.tum.in.www1.hephaestus.gitprovider.team.Team;
 import de.tum.in.www1.hephaestus.gitprovider.team.TeamRepository;
 import de.tum.in.www1.hephaestus.workspace.Workspace;
@@ -296,9 +298,5 @@ public class TeamPathResolver {
         String org = team.getOrganization();
         String workspaceLogin = workspace.getAccountLogin();
         return org != null && workspaceLogin != null && org.equalsIgnoreCase(workspaceLogin);
-    }
-
-    private String sanitizeForLog(String input) {
-        return input == null ? null : input.replaceAll("[\\r\\n]", "");
     }
 }

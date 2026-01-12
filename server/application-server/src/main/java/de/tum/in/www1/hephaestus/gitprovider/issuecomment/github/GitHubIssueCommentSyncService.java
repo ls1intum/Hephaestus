@@ -122,7 +122,8 @@ public class GitHubIssueCommentSyncService {
         int pageCount = 0;
 
         while (hasMore) {
-            if (pageCount >= MAX_PAGINATION_PAGES) {
+            pageCount++;
+            if (pageCount > MAX_PAGINATION_PAGES) {
                 log.warn(
                     "Reached maximum pagination limit ({}) for issue #{} in {}, stopping",
                     MAX_PAGINATION_PAGES,
@@ -131,7 +132,6 @@ public class GitHubIssueCommentSyncService {
                 );
                 break;
             }
-            pageCount++;
 
             try {
                 ClientGraphQlResponse response = client

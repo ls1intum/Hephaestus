@@ -25,6 +25,7 @@ public record GitHubIssueCommentEventDTO(
     @JsonProperty("repository") GitHubRepositoryRefDTO repository,
     @JsonProperty("sender") GitHubUserDTO sender
 ) implements GitHubWebhookEvent {
+    @Override
     public GitHubEventAction.IssueComment actionType() {
         return GitHubEventAction.IssueComment.fromString(action);
     }

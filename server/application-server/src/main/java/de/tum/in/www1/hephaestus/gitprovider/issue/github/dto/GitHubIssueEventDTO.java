@@ -23,6 +23,7 @@ public record GitHubIssueEventDTO(
     @JsonProperty("type") GitHubIssueTypeDTO issueType,
     @JsonProperty("changes") Map<String, Object> changes
 ) implements GitHubWebhookEvent {
+    @Override
     public GitHubEventAction.Issue actionType() {
         return GitHubEventAction.Issue.fromString(action);
     }

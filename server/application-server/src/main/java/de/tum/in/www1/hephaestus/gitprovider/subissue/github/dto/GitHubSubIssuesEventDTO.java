@@ -19,6 +19,7 @@ public record GitHubSubIssuesEventDTO(
     @JsonProperty("repository") GitHubRepositoryRefDTO repository,
     @JsonProperty("sender") GitHubUserDTO sender
 ) implements GitHubWebhookEvent {
+    @Override
     public GitHubEventAction.SubIssue actionType() {
         return GitHubEventAction.SubIssue.fromString(action);
     }

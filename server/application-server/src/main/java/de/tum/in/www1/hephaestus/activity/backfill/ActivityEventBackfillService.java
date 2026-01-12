@@ -2,6 +2,7 @@ package de.tum.in.www1.hephaestus.activity.backfill;
 
 import de.tum.in.www1.hephaestus.activity.ActivityEventService;
 import de.tum.in.www1.hephaestus.activity.ActivityEventType;
+import de.tum.in.www1.hephaestus.activity.ActivityRepositoryQueryRepository;
 import de.tum.in.www1.hephaestus.activity.ActivityTargetType;
 import de.tum.in.www1.hephaestus.activity.SourceSystem;
 import de.tum.in.www1.hephaestus.activity.scoring.ExperiencePointCalculator;
@@ -13,7 +14,6 @@ import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReview;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.PullRequestReviewComment;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
-import de.tum.in.www1.hephaestus.activity.ActivityRepositoryQueryRepository;
 import de.tum.in.www1.hephaestus.workspace.Workspace;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceRepository;
 import jakarta.persistence.EntityManager;
@@ -22,6 +22,8 @@ import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Slice;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -244,27 +246,21 @@ public class ActivityEventBackfillService {
         BackfillProgress.Builder progress
     ) {
         int page = 0;
+        Slice<PullRequest> batch;
 
-        List<PullRequest> batch;
         do {
-            batch = pullRequestRepository.findAllByRepository_Id(repo.getId());
+            // Fetch only one page at a time from the database
+            batch = pullRequestRepository.findByRepository_Id(repo.getId(), PageRequest.of(page, DEFAULT_BATCH_SIZE));
 
-            // Process in smaller chunks for pagination (since findAllByRepository_Id returns all)
-            int start = page * DEFAULT_BATCH_SIZE;
-            int end = Math.min(start + DEFAULT_BATCH_SIZE, batch.size());
+            if (batch.hasContent()) {
+                selfProvider.getObject().processPullRequestBatch(batch.getContent(), workspaceId, progress);
 
-            if (start >= batch.size()) {
-                break;
+                // Clear entity manager to prevent memory buildup
+                entityManager.clear();
             }
 
-            List<PullRequest> chunk = batch.subList(start, end);
-            selfProvider.getObject().processPullRequestBatch(chunk, workspaceId, progress);
-
-            // Clear entity manager to prevent memory buildup
-            entityManager.clear();
-
             page++;
-        } while (page * DEFAULT_BATCH_SIZE < batch.size());
+        } while (batch.hasNext());
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -387,24 +383,22 @@ public class ActivityEventBackfillService {
     }
 
     private void backfillReviewsForRepository(Repository repo, Long workspaceId, BackfillProgress.Builder progress) {
-        // Get all PRs for this repository with reviews eagerly fetched
-        // to avoid LazyInitializationException after entityManager.clear()
-        List<PullRequest> pullRequests = pullRequestRepository.findAllByRepositoryIdWithReviews(repo.getId());
+        int page = 0;
+        Slice<PullRequest> batch;
 
-        // Process in batches to avoid memory issues
-        int batchCount = 0;
-        for (PullRequest pr : pullRequests) {
-            // Process each PR's reviews in its own transaction via self-injection
-            selfProvider.getObject().processReviewsForPullRequest(pr, workspaceId, progress);
+        do {
+            // Fetch PRs with reviews in pages to avoid loading all into memory
+            batch = pullRequestRepository.findByRepositoryIdWithReviews(repo.getId(), PageRequest.of(page, DEFAULT_BATCH_SIZE));
 
-            batchCount++;
-            // Clear periodically to prevent memory issues
-            if (batchCount % DEFAULT_BATCH_SIZE == 0) {
-                entityManager.clear();
-                // Re-fetch remaining PRs since entities were cleared
-                // This is safe because we track progress by PR, not by review
+            for (PullRequest pr : batch.getContent()) {
+                // Process each PR's reviews in its own transaction via self-injection
+                selfProvider.getObject().processReviewsForPullRequest(pr, workspaceId, progress);
             }
-        }
+
+            // Clear entity manager after each batch to prevent memory buildup
+            entityManager.clear();
+            page++;
+        } while (batch.hasNext());
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -525,23 +519,23 @@ public class ActivityEventBackfillService {
         Long workspaceId,
         BackfillProgress.Builder progress
     ) {
-        // Get all issues (including PRs) for this repository with comments eagerly fetched
-        // to avoid LazyInitializationException after entityManager.clear()
-        List<Issue> issues = issueRepository.findAllByRepositoryIdWithComments(repo.getId());
+        int page = 0;
+        Slice<Issue> batch;
 
-        int batchCount = 0;
+        do {
+            // Fetch issues with comments in pages to avoid loading all into memory
+            batch = issueRepository.findByRepositoryIdWithComments(repo.getId(), PageRequest.of(page, DEFAULT_BATCH_SIZE));
 
-        for (Issue issue : issues) {
-            for (IssueComment comment : issue.getComments()) {
-                selfProvider.getObject().processIssueComment(comment, workspaceId, progress);
-
-                batchCount++;
-                // Clear periodically
-                if (batchCount % DEFAULT_BATCH_SIZE == 0) {
-                    entityManager.clear();
+            for (Issue issue : batch.getContent()) {
+                for (IssueComment comment : issue.getComments()) {
+                    selfProvider.getObject().processIssueComment(comment, workspaceId, progress);
                 }
             }
-        }
+
+            // Clear entity manager after each batch to prevent memory buildup
+            entityManager.clear();
+            page++;
+        } while (batch.hasNext());
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -621,23 +615,23 @@ public class ActivityEventBackfillService {
         Long workspaceId,
         BackfillProgress.Builder progress
     ) {
-        // Get all PRs for this repository with review comments eagerly fetched
-        // to avoid LazyInitializationException after entityManager.clear()
-        List<PullRequest> pullRequests = pullRequestRepository.findAllByRepositoryIdWithReviewComments(repo.getId());
+        int page = 0;
+        Slice<PullRequest> batch;
 
-        int batchCount = 0;
+        do {
+            // Fetch PRs with review comments in pages to avoid loading all into memory
+            batch = pullRequestRepository.findByRepositoryIdWithReviewComments(repo.getId(), PageRequest.of(page, DEFAULT_BATCH_SIZE));
 
-        for (PullRequest pr : pullRequests) {
-            for (PullRequestReviewComment comment : pr.getReviewComments()) {
-                selfProvider.getObject().processReviewComment(comment, workspaceId, progress);
-
-                batchCount++;
-                // Clear periodically
-                if (batchCount % DEFAULT_BATCH_SIZE == 0) {
-                    entityManager.clear();
+            for (PullRequest pr : batch.getContent()) {
+                for (PullRequestReviewComment comment : pr.getReviewComments()) {
+                    selfProvider.getObject().processReviewComment(comment, workspaceId, progress);
                 }
             }
-        }
+
+            // Clear entity manager after each batch to prevent memory buildup
+            entityManager.clear();
+            page++;
+        } while (batch.hasNext());
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -717,25 +711,22 @@ public class ActivityEventBackfillService {
     }
 
     private void backfillIssuesForRepository(Repository repo, Long workspaceId, BackfillProgress.Builder progress) {
-        List<Issue> issues = issueRepository.findAllByRepository_Id(repo.getId());
-
         int page = 0;
-        int start, end;
+        Slice<Issue> batch;
 
         do {
-            start = page * DEFAULT_BATCH_SIZE;
-            end = Math.min(start + DEFAULT_BATCH_SIZE, issues.size());
+            // Fetch only one page at a time from the database
+            batch = issueRepository.findByRepository_Id(repo.getId(), PageRequest.of(page, DEFAULT_BATCH_SIZE));
 
-            if (start >= issues.size()) {
-                break;
+            if (batch.hasContent()) {
+                selfProvider.getObject().processIssueBatch(batch.getContent(), workspaceId, progress);
+
+                // Clear entity manager to prevent memory buildup
+                entityManager.clear();
             }
 
-            List<Issue> chunk = issues.subList(start, end);
-            selfProvider.getObject().processIssueBatch(chunk, workspaceId, progress);
-
-            entityManager.clear();
             page++;
-        } while (end < issues.size());
+        } while (batch.hasNext());
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -809,7 +800,8 @@ public class ActivityEventBackfillService {
     /**
      * Gets the total estimated count of entities to backfill for a workspace.
      *
-     * <p>This is useful for progress tracking and UI display.
+     * <p>This is useful for progress tracking and UI display. Uses COUNT queries
+     * to avoid loading all entities into memory.
      *
      * @param workspaceId the workspace to estimate
      * @return estimated entity count
@@ -825,21 +817,12 @@ public class ActivityEventBackfillService {
         long issueCount = 0;
 
         for (Repository repo : repositories) {
-            List<PullRequest> prs = pullRequestRepository.findAllByRepository_Id(repo.getId());
-            prCount += prs.size();
-
-            for (PullRequest pr : prs) {
-                reviewCount += pr.getReviews().size();
-                reviewCommentCount += pr.getReviewComments().size();
-            }
-
-            List<Issue> issues = issueRepository.findAllByRepository_Id(repo.getId());
-            for (Issue issue : issues) {
-                if (!issue.isPullRequest()) {
-                    issueCount++;
-                }
-                issueCommentCount += issue.getComments().size();
-            }
+            // Use COUNT queries instead of loading all entities into memory
+            prCount += pullRequestRepository.countByRepositoryId(repo.getId());
+            reviewCount += pullRequestRepository.countReviewsByRepositoryId(repo.getId());
+            reviewCommentCount += pullRequestRepository.countReviewCommentsByRepositoryId(repo.getId());
+            issueCount += issueRepository.countIssuesByRepositoryId(repo.getId());
+            issueCommentCount += issueRepository.countCommentsByRepositoryId(repo.getId());
         }
 
         return new BackfillEstimate(prCount, reviewCount, issueCommentCount, reviewCommentCount, issueCount);

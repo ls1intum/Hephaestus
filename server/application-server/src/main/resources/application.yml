@@ -39,8 +39,6 @@ spring:
         change-log: classpath:db/master.xml
 
     devtools:
-        restart:
-            additional-exclude: org/kohsuke/github/**
         add-properties: false
 
     security:
@@ -80,13 +78,6 @@ spring:
 springdoc:
     default-produces-media-type: application/json
     writer-with-order-by-keys: true
-
-logging:
-    level:
-        # Suppress warnings about unknown enum values from GitHub API responses
-        # For example: when GitHub returns null for the 'side' field in PR review comments
-        # (typically for outdated comments, multi-line comments, or file-level comments)
-        org.kohsuke.github.internal.EnumUtils: ERROR
 
 hephaestus:
     host-url: https://hephaestus.ase.cit.tum.de/

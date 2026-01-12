@@ -148,7 +148,8 @@ public class GitHubPullRequestReviewSyncService {
         int pageCount = 0;
 
         while (hasMore) {
-            if (pageCount >= MAX_PAGINATION_PAGES) {
+            pageCount++;
+            if (pageCount > MAX_PAGINATION_PAGES) {
                 log.warn(
                     "Reached maximum pagination limit ({}) for PR #{} in {}, stopping",
                     MAX_PAGINATION_PAGES,
@@ -157,7 +158,6 @@ public class GitHubPullRequestReviewSyncService {
                 );
                 break;
             }
-            pageCount++;
 
             try {
                 ClientGraphQlResponse response = client
@@ -250,7 +250,8 @@ public class GitHubPullRequestReviewSyncService {
         int fetchedPages = 0;
 
         while (hasMore) {
-            if (fetchedPages >= MAX_PAGINATION_PAGES) {
+            fetchedPages++;
+            if (fetchedPages > MAX_PAGINATION_PAGES) {
                 log.warn(
                     "Reached maximum pagination limit ({}) for review {} comments, stopping",
                     MAX_PAGINATION_PAGES,
@@ -286,7 +287,6 @@ public class GitHubPullRequestReviewSyncService {
                 }
 
                 allComments.addAll(commentsConnection.getNodes());
-                fetchedPages++;
 
                 PageInfo pageInfo = commentsConnection.getPageInfo();
                 hasMore = pageInfo != null && Boolean.TRUE.equals(pageInfo.getHasNextPage());

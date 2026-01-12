@@ -23,6 +23,7 @@ public record GitHubPullRequestEventDTO(
     @JsonProperty("requested_reviewer") GitHubUserDTO requestedReviewer,
     @JsonProperty("changes") Map<String, Object> changes
 ) implements GitHubWebhookEvent {
+    @Override
     public GitHubEventAction.PullRequest actionType() {
         return GitHubEventAction.PullRequest.fromString(action);
     }

@@ -119,12 +119,14 @@ public abstract class BaseGitHubProcessor {
     /**
      * Generate a deterministic negative ID for labels created from GraphQL data.
      * <p>
+     * Uses bit shifting to combine repo ID and label name hash without collision.
+     * The formula repositoryId * 31 + labelName.hashCode() can produce collisions.
      * Uses negative values to avoid collision with real GitHub label IDs which are
      * always positive.
      */
     private Long generateDeterministicLabelId(Long repositoryId, String labelName) {
-        long hash = repositoryId * 31L + labelName.hashCode();
-        return -Math.abs(hash);
+        long combined = (repositoryId << 32) | (labelName.hashCode() & 0xFFFFFFFFL);
+        return -combined;
     }
 
     /**

@@ -150,11 +150,6 @@ public class PullRequest extends Issue {
         return true;
     }
     /*
-     * Fields dropped in 1767500000000 migration (previously unused):
-     * - mergeCommitSha (REST-only, not exposed via GraphQL)
-     * - maintainerCanModify (cross-repo PRs only)
-     * - badPracticeSummary, lastDetectionTime (deprecated AI features)
-     *
      * Other fields intentionally not synced:
      * - MergeQueueEntry.position / MergeQueueEntry.estimatedTimeToMerge (GraphQL only)
      * - PullRequest.closingIssuesReferences (GraphQL only)

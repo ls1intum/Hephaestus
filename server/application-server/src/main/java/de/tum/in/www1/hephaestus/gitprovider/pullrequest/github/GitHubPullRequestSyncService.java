@@ -106,7 +106,8 @@ public class GitHubPullRequestSyncService {
         int pageCount = 0;
 
         while (hasMore) {
-            if (pageCount >= MAX_PAGINATION_PAGES) {
+            pageCount++;
+            if (pageCount > MAX_PAGINATION_PAGES) {
                 log.warn(
                     "Reached maximum pagination limit ({}) for repository {}, stopping",
                     MAX_PAGINATION_PAGES,
@@ -114,7 +115,6 @@ public class GitHubPullRequestSyncService {
                 );
                 break;
             }
-            pageCount++;
 
             try {
                 ClientGraphQlResponse response = client

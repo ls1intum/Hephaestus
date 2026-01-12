@@ -117,7 +117,3 @@ slack:
 
 sentry:
     dsn: ${SENTRY_DSN}
-
-logging:
-    level:
-        org.kohsuke.github.GitHubClient: DEBUG

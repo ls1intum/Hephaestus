@@ -55,6 +55,7 @@ public class Issue extends BaseGitServiceEntity {
     private Issue.StateReason stateReason;
 
     @NonNull
+    @Column(length = 1024)
     private String title;
 
     @Column(columnDefinition = "TEXT")

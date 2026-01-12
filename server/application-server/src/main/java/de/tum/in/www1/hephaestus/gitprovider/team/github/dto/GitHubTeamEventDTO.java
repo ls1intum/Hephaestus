@@ -18,6 +18,7 @@ public record GitHubTeamEventDTO(
     @JsonProperty("repository") GitHubRepositoryRefDTO repository,
     @JsonProperty("sender") GitHubUserDTO sender
 ) implements GitHubWebhookEvent {
+    @Override
     public GitHubEventAction.Team actionType() {
         return GitHubEventAction.Team.fromString(action);
     }

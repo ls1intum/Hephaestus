@@ -470,6 +470,15 @@ public sealed interface GitHubEventAction {
 
     // ========== Issue Dependency Events ==========
 
+    /**
+     * Actions for the issue_dependencies webhook event.
+     * <p>
+     * <b>Note:</b> As of January 2026, the issue_dependencies webhook cannot be subscribed to
+     * via GitHub App settings. This enum is defined based on documentation and will become
+     * active when GitHub enables webhook subscription for this event type.
+     *
+     * @see GitHubEventType#ISSUE_DEPENDENCIES
+     */
     enum IssueDependency implements GitHubEventAction {
         ADDED,
         REMOVED,

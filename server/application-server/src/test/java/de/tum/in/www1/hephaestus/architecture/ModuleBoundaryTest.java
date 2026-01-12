@@ -202,27 +202,6 @@ class ModuleBoundaryTest extends HephaestusArchitectureTest {
             rule.check(classes);
         }
 
-        /**
-         * hub4j (org.kohsuke.github) types must be isolated to github packages.
-         *
-         * <p>This is CRITICAL for multi-provider architecture. When GitLab support
-         * is added, provider-specific SDK dependencies must not leak into shared
-         * code. Only github/ subpackages may use hub4j types directly.
-         */
-        @Test
-        @DisplayName("hub4j types are isolated to github packages for multi-provider support")
-        void hub4jTypesIsolatedToGithubPackages() {
-            ArchRule rule = noClasses()
-                .that()
-                .resideInAPackage(BASE_PACKAGE + "..")
-                .and()
-                .resideOutsideOfPackage("..github..")
-                .should()
-                .dependOnClassesThat()
-                .resideInAPackage("org.kohsuke.github..")
-                .because("hub4j SDK must be isolated to github/ packages for GitLab multi-provider support");
-            rule.check(classes);
-        }
     }
 
     // ========================================================================

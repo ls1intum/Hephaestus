@@ -134,10 +134,12 @@ public class GitHubLabelProcessor {
      * @return a deterministic negative Long ID
      */
     private Long generateDeterministicId(Long repositoryId, String labelName) {
-        // Use a combination of repo ID and label name hash to generate a unique negative ID
-        // Negative IDs won't collide with GitHub's positive databaseIds
-        long hash = repositoryId * 31L + labelName.hashCode();
-        return -Math.abs(hash);
+        // Use bit shifting to combine repo ID and label name hash without collision.
+        // The formula repositoryId * 31 + labelName.hashCode() can produce collisions.
+        // Bit shifting separates components: repo ID in upper 32 bits, label name hash in lower 32 bits.
+        // Negative IDs won't collide with GitHub's positive databaseIds.
+        long combined = (repositoryId << 32) | (labelName.hashCode() & 0xFFFFFFFFL);
+        return -combined;
     }
 
     /**

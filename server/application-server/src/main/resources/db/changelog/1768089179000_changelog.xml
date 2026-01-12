@@ -9,7 +9,7 @@
     Consolidated GitProvider ETL Refactoring Migration
     =======================================================================================
 
-    This changelog consolidates all schema changes for the hub4j removal refactoring,
+    This changelog consolidates all schema changes for the GraphQL migration refactoring,
     activity event ledger implementation, workspace team settings, and ETL consistency fixes.
 
     Table of Contents:
@@ -46,6 +46,7 @@
     SECTION 30: Drop PullRequestReviewThread.resolved_at (GitHub only provides boolean)
     SECTION 31: Add Label createdAt/updatedAt (created_at, updated_at columns)
     SECTION 32: Drop Redundant Issue Columns (has_pull_request, organization_membership.joined_at)
+    SECTION 33: Issue Title Column Length Extension
 
     Original files consolidated:
     - 1767500000000_changelog.xml (GraphQL sync migration)
@@ -53,6 +54,7 @@
     - 1768500000000_etl_consistency_fixes.xml
     - 1768200000000_drop_has_pull_request.xml
     - 1768300000000_drop_organization_membership_joined_at.xml
+    - 1768500000000_issue_title_length.xml (issue title column length)
 
     See: docs/contributor/database-migration.mdx
     =======================================================================================
@@ -1759,6 +1761,16 @@
             the field was always set to sync time making it meaningless.
         </comment>
         <dropColumn tableName="organization_membership" columnName="joined_at"/>
+    </changeSet>
+
+    <!-- ==================== SECTION 33: Issue Title Column Length Extension ==================== -->
+
+    <changeSet id="1768800000000-34-issue-title-length" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="issue" columnName="title"/>
+        </preConditions>
+        <comment>Increase issue title column length from 255 to 1024 characters to support long GitHub issue titles</comment>
+        <modifyDataType tableName="issue" columnName="title" newDataType="VARCHAR(1024)"/>
     </changeSet>
 
 </databaseChangeLog>

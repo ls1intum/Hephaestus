@@ -19,6 +19,7 @@ public record GitHubPullRequestReviewThreadEventDTO(
     @JsonProperty("repository") GitHubRepositoryRefDTO repository,
     @JsonProperty("sender") GitHubUserDTO sender
 ) implements GitHubWebhookEvent {
+    @Override
     public GitHubEventAction.PullRequestReviewThread actionType() {
         return GitHubEventAction.PullRequestReviewThread.fromString(action);
     }

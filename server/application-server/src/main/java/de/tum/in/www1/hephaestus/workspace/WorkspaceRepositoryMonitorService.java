@@ -355,7 +355,7 @@ public class WorkspaceRepositoryMonitorService {
             log.warn(
                 "Installation {} (workspace={}) configured for ALL repositories but enumeration returned no data; monitors might be stale.",
                 installationId,
-                workspace.getWorkspaceSlug()
+                LoggingUtils.sanitizeForLog(workspace.getWorkspaceSlug())
             );
             return;
         }
@@ -422,7 +422,7 @@ public class WorkspaceRepositoryMonitorService {
         if (monitorCount > 0) {
             log.debug(
                 "Repository {} is still monitored by {} workspace(s), skipping deletion",
-                nameWithOwner,
+                LoggingUtils.sanitizeForLog(nameWithOwner),
                 monitorCount
             );
             return;
@@ -433,7 +433,7 @@ public class WorkspaceRepositoryMonitorService {
             .findByNameWithOwner(nameWithOwner)
             .ifPresent(repository -> {
                 repositoryRepository.delete(repository);
-                log.debug("Deleted orphaned repository {}", nameWithOwner);
+                log.debug("Deleted orphaned repository {}", LoggingUtils.sanitizeForLog(nameWithOwner));
             });
     }
 
@@ -459,13 +459,13 @@ public class WorkspaceRepositoryMonitorService {
             natsConsumerService.updateWorkspaceConsumer(workspace.getId());
         }
         if (deferSync) {
-            log.debug("Repository {} persisted with deferred sync.", monitor.getNameWithOwner());
+            log.debug("Repository {} persisted with deferred sync.", LoggingUtils.sanitizeForLog(monitor.getNameWithOwner()));
             return;
         }
         if (repositoryAllowed) {
             getGitHubDataSyncService().syncSyncTargetAsync(SyncTargetFactory.create(workspace, monitor));
         } else {
-            log.debug("Repository {} persisted but monitoring disabled by filters.", monitor.getNameWithOwner());
+            log.debug("Repository {} persisted but monitoring disabled by filters.", LoggingUtils.sanitizeForLog(monitor.getNameWithOwner()));
         }
     }
 
@@ -555,7 +555,7 @@ public class WorkspaceRepositoryMonitorService {
             repo.setPushedAt(Instant.now()); // Placeholder, will be updated by sync
 
             repositoryRepository.save(repo);
-            log.debug("Created repository {} from installation snapshot", snapshot.nameWithOwner());
+            log.debug("Created repository {} from installation snapshot", LoggingUtils.sanitizeForLog(snapshot.nameWithOwner()));
         }
     }
 

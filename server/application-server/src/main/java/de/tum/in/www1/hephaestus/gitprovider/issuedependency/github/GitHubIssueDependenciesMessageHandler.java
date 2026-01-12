@@ -17,13 +17,37 @@ import org.springframework.transaction.annotation.Transactional;
  * Handles GitHub {@code issue_dependencies} webhook events.
  * <p>
  * GitHub sends these events when issue blocking/blocked-by relationships change.
- * Actions include {@code added} and {@code removed}. To receive these events, a GitHub App
- * must have at least read-level access for the "Issues" repository permission.
+ * Actions include {@code added} and {@code removed}. According to GitHub documentation,
+ * to receive these events a GitHub App must have at least read-level access for the
+ * "Issues" repository permission.
  * <p>
- * Documentation: https://docs.github.com/en/webhooks/webhook-events-and-payloads#issue_dependencies
+ * <b>IMPORTANT - Webhook Availability Limitation (as of January 2026):</b>
+ * <p>
+ * While the {@code issue_dependencies} event is documented in GitHub's webhook reference,
+ * <b>it cannot actually be subscribed to via GitHub App settings</b>. The event type does
+ * not appear in the GitHub App permissions/events configuration UI. This appears to be a
+ * gap where GitHub shipped the "Blocked by" UI feature without corresponding webhook support.
+ * <p>
+ * <b>Current Workaround:</b> Use {@link GitHubIssueDependencySyncService#syncDependenciesForWorkspace}
+ * for periodic GraphQL-based synchronization of blocking relationships.
+ * <p>
+ * <b>Status Tracking:</b>
+ * <ul>
+ *   <li><a href="https://github.com/orgs/community/discussions/165749">GitHub Community Discussion #165749</a>
+ *       - Tracks the feature request for API/webhook support</li>
+ *   <li>GitHub's announcement mentions "API and webhook support" as a future goal</li>
+ * </ul>
+ * <p>
+ * This handler is implemented in anticipation of webhook support being enabled. When GitHub
+ * adds the event to App settings, this handler will automatically start processing events
+ * via the NATS message queue.
+ * <p>
+ * <b>No test fixtures exist</b> for this event type because webhooks cannot be received
+ * to capture real payloads. The DTO structure is based on GitHub's documentation.
  *
+ * @see GitHubIssueDependencySyncService for the GraphQL-based sync alternative
  * @see <a href="https://docs.github.com/en/webhooks/webhook-events-and-payloads#issue_dependencies">
- *      GitHub Webhook Events - issue_dependencies</a>
+ *      GitHub Webhook Events - issue_dependencies (documented but not subscribable)</a>
  */
 @Component
 public class GitHubIssueDependenciesMessageHandler extends GitHubMessageHandler<GitHubIssueDependenciesEventDTO> {

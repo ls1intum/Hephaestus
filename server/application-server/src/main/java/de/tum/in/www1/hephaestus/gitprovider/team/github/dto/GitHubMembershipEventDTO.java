@@ -19,6 +19,7 @@ public record GitHubMembershipEventDTO(
     @JsonProperty("organization") GitHubTeamEventDTO.GitHubOrgRefDTO organization,
     @JsonProperty("sender") GitHubUserDTO sender
 ) implements GitHubWebhookEvent {
+    @Override
     public GitHubEventAction.Membership actionType() {
         return GitHubEventAction.Membership.fromString(action);
     }

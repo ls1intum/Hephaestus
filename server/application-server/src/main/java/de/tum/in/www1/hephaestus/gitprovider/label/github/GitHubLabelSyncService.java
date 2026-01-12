@@ -87,7 +87,8 @@ public class GitHubLabelSyncService {
             int pageCount = 0;
 
             while (hasNextPage) {
-                if (pageCount >= MAX_PAGINATION_PAGES) {
+                pageCount++;
+                if (pageCount > MAX_PAGINATION_PAGES) {
                     log.warn(
                         "Reached maximum pagination limit ({}) for repository {}, stopping",
                         MAX_PAGINATION_PAGES,
@@ -95,7 +96,6 @@ public class GitHubLabelSyncService {
                     );
                     break;
                 }
-                pageCount++;
 
                 LabelConnection response = client
                     .documentName(GET_LABELS_DOCUMENT)

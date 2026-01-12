@@ -151,7 +151,8 @@ public class GitHubOrganizationSyncService {
 
         // Paginate through all remaining members if there are more pages
         while (pageInfo != null && Boolean.TRUE.equals(pageInfo.getHasNextPage())) {
-            if (pageCount >= MAX_PAGINATION_PAGES) {
+            pageCount++;
+            if (pageCount > MAX_PAGINATION_PAGES) {
                 log.warn(
                     "Reached maximum pagination limit ({}) for organization {} members, stopping",
                     MAX_PAGINATION_PAGES,
@@ -159,7 +160,6 @@ public class GitHubOrganizationSyncService {
                 );
                 break;
             }
-            pageCount++;
 
             OrganizationMemberConnection nextPage = client
                 .documentName(GET_ORGANIZATION_MEMBERS_DOCUMENT)
