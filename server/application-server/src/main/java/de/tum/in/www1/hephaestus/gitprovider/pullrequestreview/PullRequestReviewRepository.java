@@ -19,7 +19,6 @@ import org.springframework.stereotype.Repository;
  */
 @Repository
 public interface PullRequestReviewRepository extends JpaRepository<PullRequestReview, Long> {
-
     /**
      * Find all reviews for a specific pull request by a specific author.
      * Used for calculating per-PR XP (aggregating all reviews together for harmonic mean).

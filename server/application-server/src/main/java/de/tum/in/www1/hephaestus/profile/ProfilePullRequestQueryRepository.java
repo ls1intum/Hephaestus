@@ -21,7 +21,6 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Repository
 public interface ProfilePullRequestQueryRepository extends JpaRepository<PullRequest, Long> {
-
     /**
      * Finds pull requests assigned to a user by login and states, scoped to a workspace.
      *

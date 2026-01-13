@@ -388,7 +388,10 @@ public class ActivityEventBackfillService {
 
         do {
             // Fetch PRs with reviews in pages to avoid loading all into memory
-            batch = pullRequestRepository.findByRepositoryIdWithReviews(repo.getId(), PageRequest.of(page, DEFAULT_BATCH_SIZE));
+            batch = pullRequestRepository.findByRepositoryIdWithReviews(
+                repo.getId(),
+                PageRequest.of(page, DEFAULT_BATCH_SIZE)
+            );
 
             for (PullRequest pr : batch.getContent()) {
                 // Process each PR's reviews in its own transaction via self-injection
@@ -524,7 +527,10 @@ public class ActivityEventBackfillService {
 
         do {
             // Fetch issues with comments in pages to avoid loading all into memory
-            batch = issueRepository.findByRepositoryIdWithComments(repo.getId(), PageRequest.of(page, DEFAULT_BATCH_SIZE));
+            batch = issueRepository.findByRepositoryIdWithComments(
+                repo.getId(),
+                PageRequest.of(page, DEFAULT_BATCH_SIZE)
+            );
 
             for (Issue issue : batch.getContent()) {
                 for (IssueComment comment : issue.getComments()) {
@@ -620,7 +626,10 @@ public class ActivityEventBackfillService {
 
         do {
             // Fetch PRs with review comments in pages to avoid loading all into memory
-            batch = pullRequestRepository.findByRepositoryIdWithReviewComments(repo.getId(), PageRequest.of(page, DEFAULT_BATCH_SIZE));
+            batch = pullRequestRepository.findByRepositoryIdWithReviewComments(
+                repo.getId(),
+                PageRequest.of(page, DEFAULT_BATCH_SIZE)
+            );
 
             for (PullRequest pr : batch.getContent()) {
                 for (PullRequestReviewComment comment : pr.getReviewComments()) {

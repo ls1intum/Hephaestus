@@ -157,9 +157,7 @@ public class GitHubMilestoneSyncService {
      * Note: GraphQL doesn't expose databaseId for milestones, so id will be null.
      * The processor handles this by using number-based lookup as fallback.
      */
-    private GitHubMilestoneDTO convertToDTO(
-        GHMilestone graphQlMilestone
-    ) {
+    private GitHubMilestoneDTO convertToDTO(GHMilestone graphQlMilestone) {
         return new GitHubMilestoneDTO(
             null, // id - GraphQL doesn't expose databaseId for milestones
             graphQlMilestone.getNumber(),

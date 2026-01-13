@@ -187,9 +187,7 @@ public class GitHubCollaboratorSyncService {
      * @param permission the GraphQL permission enum
      * @return the entity Permission enum
      */
-    private RepositoryCollaborator.Permission parsePermission(
-        GHRepositoryPermission permission
-    ) {
+    private RepositoryCollaborator.Permission parsePermission(GHRepositoryPermission permission) {
         if (permission == null) {
             return RepositoryCollaborator.Permission.UNKNOWN;
         }

@@ -122,7 +122,9 @@ class UserProfileServiceTest {
                     eq(WORKSPACE_ID)
                 )
             ).thenReturn(List.of());
-            when(profilePullRequestQueryRepository.findAssignedByLoginAndStates(any(), any(), any())).thenReturn(List.of());
+            when(profilePullRequestQueryRepository.findAssignedByLoginAndStates(any(), any(), any())).thenReturn(
+                List.of()
+            );
             when(profileRepositoryQueryRepository.findContributedByLogin(any(), any())).thenReturn(List.of());
 
             // XP from activity_event ledger
@@ -182,7 +184,9 @@ class UserProfileServiceTest {
                     eq(WORKSPACE_ID)
                 )
             ).thenReturn(List.of());
-            when(profilePullRequestQueryRepository.findAssignedByLoginAndStates(any(), any(), any())).thenReturn(List.of());
+            when(profilePullRequestQueryRepository.findAssignedByLoginAndStates(any(), any(), any())).thenReturn(
+                List.of()
+            );
             when(profileRepositoryQueryRepository.findContributedByLogin(any(), any())).thenReturn(List.of());
 
             // No XP in ledger (historical review before activity_event existed)
@@ -227,7 +231,9 @@ class UserProfileServiceTest {
                     eq(WORKSPACE_ID)
                 )
             ).thenReturn(List.of(comment));
-            when(profilePullRequestQueryRepository.findAssignedByLoginAndStates(any(), any(), any())).thenReturn(List.of());
+            when(profilePullRequestQueryRepository.findAssignedByLoginAndStates(any(), any(), any())).thenReturn(
+                List.of()
+            );
             when(profileRepositoryQueryRepository.findContributedByLogin(any(), any())).thenReturn(List.of());
 
             // XP from activity_event ledger (batch query for all 3 items)

@@ -92,7 +92,6 @@ public interface UserRepository extends JpaRepository<User, Long> {
         return findAllByTeamIds(List.of(teamId));
     }
 
-
     /**
      * @return existing user object by current user login
      */

@@ -375,11 +375,11 @@ export const issue = pgTable(
 		updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" }),
 		closedAt: timestamp("closed_at", { withTimezone: true, mode: "string" }),
 		commentsCount: integer("comments_count").notNull(),
-		htmlUrl: varchar("html_url", { length: 512 }),
+		htmlUrl: varchar("html_url", { length: 255 }),
 		isLocked: boolean("is_locked").notNull(),
 		number: integer().notNull(),
 		state: varchar({ length: 255 }),
-		title: varchar({ length: 255 }),
+		title: varchar({ length: 1024 }),
 		additions: integer(),
 		changedFiles: integer("changed_files"),
 		commits: integer(),
@@ -395,7 +395,6 @@ export const issue = pgTable(
 		repositoryId: bigint("repository_id", { mode: "number" }),
 		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
 		mergedById: bigint("merged_by_id", { mode: "number" }),
-		hasPullRequest: boolean("has_pull_request").notNull(),
 		lastSyncAt: timestamp("last_sync_at", { withTimezone: true, mode: "string" }),
 		stateReason: varchar("state_reason", { length: 32 }),
 		body: text(),
@@ -519,7 +518,7 @@ export const issueComment = pgTable(
 		createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }),
 		updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" }),
 		authorAssociation: varchar("author_association", { length: 255 }),
-		htmlUrl: varchar("html_url", { length: 512 }),
+		htmlUrl: varchar("html_url", { length: 255 }),
 		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
 		authorId: bigint("author_id", { mode: "number" }),
 		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
@@ -619,7 +618,7 @@ export const milestone = pgTable(
 		updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" }),
 		closedAt: timestamp("closed_at", { withTimezone: true, mode: "string" }),
 		dueOn: timestamp("due_on", { withTimezone: true, mode: "string" }),
-		htmlUrl: varchar("html_url", { length: 512 }),
+		htmlUrl: varchar("html_url", { length: 255 }),
 		number: integer().notNull(),
 		state: varchar({ length: 255 }),
 		title: varchar({ length: 255 }),
@@ -656,7 +655,7 @@ export const organization = pgTable(
 		avatarUrl: varchar("avatar_url", { length: 255 }),
 		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
 		githubId: bigint("github_id", { mode: "number" }).notNull(),
-		htmlUrl: varchar("html_url", { length: 512 }),
+		htmlUrl: varchar("html_url", { length: 255 }),
 		login: varchar({ length: 255 }).notNull(),
 		name: varchar({ length: 255 }),
 		lastSyncAt: timestamp("last_sync_at", { withTimezone: true, mode: "string" }),
@@ -674,7 +673,6 @@ export const organizationMembership = pgTable(
 		organizationId: bigint("organization_id", { mode: "number" }).notNull(),
 		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
 		userId: bigint("user_id", { mode: "number" }).notNull(),
-		joinedAt: timestamp("joined_at", { precision: 6, withTimezone: true, mode: "string" }),
 		role: varchar({ length: 32 }),
 	},
 	(table) => [
@@ -756,7 +754,7 @@ export const pullRequestReview = pgTable(
 		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
 		id: bigint({ mode: "number" }).primaryKey().notNull(),
 		commitId: varchar("commit_id", { length: 255 }),
-		htmlUrl: varchar("html_url", { length: 512 }),
+		htmlUrl: varchar("html_url", { length: 255 }),
 		isDismissed: boolean("is_dismissed").notNull(),
 		state: varchar({ length: 255 }),
 		submittedAt: timestamp("submitted_at", { withTimezone: true, mode: "string" }),
@@ -792,7 +790,7 @@ export const pullRequestReviewComment = pgTable(
 		updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" }),
 		authorAssociation: varchar("author_association", { length: 255 }),
 		commitId: varchar("commit_id", { length: 255 }),
-		htmlUrl: varchar("html_url", { length: 512 }),
+		htmlUrl: varchar("html_url", { length: 255 }),
 		line: integer().notNull(),
 		originalCommitId: varchar("original_commit_id", { length: 255 }),
 		originalLine: integer("original_line").notNull(),
@@ -855,7 +853,6 @@ export const pullRequestReviewThread = pgTable(
 		createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }),
 		updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" }),
 		state: varchar({ length: 20 }).default("UNRESOLVED").notNull(),
-		resolvedAt: timestamp("resolved_at", { withTimezone: true, mode: "string" }),
 		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
 		pullRequestId: bigint("pull_request_id", { mode: "number" }).notNull(),
 		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
@@ -1082,7 +1079,7 @@ export const user = pgTable("user", {
 	updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" }),
 	avatarUrl: varchar("avatar_url", { length: 255 }),
 	email: varchar({ length: 255 }),
-	htmlUrl: varchar("html_url", { length: 512 }),
+	htmlUrl: varchar("html_url", { length: 255 }),
 	login: varchar({ length: 255 }),
 	name: varchar({ length: 255 }),
 	type: varchar({ length: 255 }),

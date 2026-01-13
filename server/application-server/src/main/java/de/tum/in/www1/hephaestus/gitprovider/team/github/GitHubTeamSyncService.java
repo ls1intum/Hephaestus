@@ -162,10 +162,7 @@ public class GitHubTeamSyncService {
      * @param organizationLogin the organization login
      * @return the persisted Team entity, or null if processing failed
      */
-    private Team processTeam(
-        GHTeam graphQlTeam,
-        String organizationLogin
-    ) {
+    private Team processTeam(GHTeam graphQlTeam, String organizationLogin) {
         GitHubTeamEventDTO.GitHubTeamDTO dto = convertToDTO(graphQlTeam);
         Team team = teamProcessor.process(dto, organizationLogin);
 
@@ -540,9 +537,7 @@ public class GitHubTeamSyncService {
      * @param graphQlTeam the GraphQL team object
      * @return the DTO for use with GitHubTeamProcessor
      */
-    private GitHubTeamEventDTO.GitHubTeamDTO convertToDTO(
-        GHTeam graphQlTeam
-    ) {
+    private GitHubTeamEventDTO.GitHubTeamDTO convertToDTO(GHTeam graphQlTeam) {
         Long databaseId = graphQlTeam.getDatabaseId() != null ? graphQlTeam.getDatabaseId().longValue() : null;
 
         String privacy = mapPrivacy(graphQlTeam.getPrivacy());
@@ -566,9 +561,7 @@ public class GitHubTeamSyncService {
      * @param graphQlUser the GraphQL user object
      * @return the DTO for use with GitHubUserProcessor
      */
-    private GitHubUserDTO convertUserToDTO(
-        GHUser graphQlUser
-    ) {
+    private GitHubUserDTO convertUserToDTO(GHUser graphQlUser) {
         Long databaseId = graphQlUser.getDatabaseId() != null ? graphQlUser.getDatabaseId().longValue() : null;
 
         String avatarUrl = graphQlUser.getAvatarUrl() != null ? graphQlUser.getAvatarUrl().toString() : null;

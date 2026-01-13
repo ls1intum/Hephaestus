@@ -201,7 +201,6 @@ class ModuleBoundaryTest extends HephaestusArchitectureTest {
                 .because("GitHub-specific logic should be in github/ subpackages for multi-provider support");
             rule.check(classes);
         }
-
     }
 
     // ========================================================================

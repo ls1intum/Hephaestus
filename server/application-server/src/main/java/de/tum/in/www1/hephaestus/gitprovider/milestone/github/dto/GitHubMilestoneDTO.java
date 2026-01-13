@@ -1,12 +1,12 @@
 package de.tum.in.www1.hephaestus.gitprovider.milestone.github.dto;
 
+import static de.tum.in.www1.hephaestus.gitprovider.common.DateTimeUtils.toInstant;
+import static de.tum.in.www1.hephaestus.gitprovider.common.DateTimeUtils.uriToString;
+
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHMilestone;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHMilestoneState;
-import static de.tum.in.www1.hephaestus.gitprovider.common.DateTimeUtils.toInstant;
-import static de.tum.in.www1.hephaestus.gitprovider.common.DateTimeUtils.uriToString;
-
 import java.time.Instant;
 import org.springframework.lang.Nullable;
 
@@ -56,5 +56,4 @@ public record GitHubMilestoneDTO(
         }
         return state.name().toLowerCase();
     }
-
 }

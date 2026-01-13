@@ -19,7 +19,6 @@ import org.springframework.stereotype.Repository;
  */
 @Repository
 public interface ProfileReviewQueryRepository extends JpaRepository<PullRequestReview, Long> {
-
     /**
      * Finds all reviews by an author since a given time, scoped to a workspace's monitored repositories.
      *

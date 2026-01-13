@@ -258,9 +258,7 @@ public class GitHubOrganizationSyncService {
      * @param graphQlOrg the GraphQL organization object
      * @return the DTO for use with GitHubOrganizationProcessor
      */
-    private GitHubOrganizationEventDTO.GitHubOrganizationDTO convertToDTO(
-        GHOrganization graphQlOrg
-    ) {
+    private GitHubOrganizationEventDTO.GitHubOrganizationDTO convertToDTO(GHOrganization graphQlOrg) {
         Long databaseId = graphQlOrg.getDatabaseId() != null ? graphQlOrg.getDatabaseId().longValue() : null;
 
         String avatarUrl = graphQlOrg.getAvatarUrl() != null ? graphQlOrg.getAvatarUrl().toString() : null;
@@ -283,9 +281,7 @@ public class GitHubOrganizationSyncService {
      * @param graphQlUser the GraphQL user object
      * @return the DTO for use with GitHubUserProcessor
      */
-    private GitHubUserDTO convertUserToDTO(
-        GHUser graphQlUser
-    ) {
+    private GitHubUserDTO convertUserToDTO(GHUser graphQlUser) {
         Long databaseId = graphQlUser.getDatabaseId() != null ? graphQlUser.getDatabaseId().longValue() : null;
 
         String avatarUrl = graphQlUser.getAvatarUrl() != null ? graphQlUser.getAvatarUrl().toString() : null;
@@ -312,9 +308,7 @@ public class GitHubOrganizationSyncService {
      * @param graphQlRole the GraphQL OrganizationMemberRole enum value
      * @return the domain OrganizationMemberRole, or MEMBER as default
      */
-    private OrganizationMemberRole mapRole(
-        GHOrganizationMemberRole graphQlRole
-    ) {
+    private OrganizationMemberRole mapRole(GHOrganizationMemberRole graphQlRole) {
         if (graphQlRole == null) {
             return OrganizationMemberRole.MEMBER;
         }

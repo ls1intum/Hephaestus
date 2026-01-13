@@ -20,7 +20,6 @@ import org.springframework.stereotype.Repository;
  */
 @Repository
 public interface LeaderboardCommentQueryRepository extends JpaRepository<IssueComment, Long> {
-
     /**
      * Finds all issue comments in a timeframe for a workspace, scoped to repositories monitored by the workspace.
      *

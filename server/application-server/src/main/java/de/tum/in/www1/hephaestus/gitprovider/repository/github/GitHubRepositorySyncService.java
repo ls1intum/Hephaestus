@@ -88,9 +88,7 @@ public class GitHubRepositorySyncService {
             }
 
             // Use typed GraphQL model for type-safe parsing
-            var repoData = response
-                .field("repository")
-                .toEntity(GHRepository.class);
+            var repoData = response.field("repository").toEntity(GHRepository.class);
             if (repoData == null) {
                 log.warn("Repository {} not found on GitHub", safeNameWithOwner);
                 return Optional.empty();

@@ -244,8 +244,9 @@ class GitHubGraphQlErrorUtilsTest {
             ClientGraphQlResponse response = mock(ClientGraphQlResponse.class);
             when(response.getErrors()).thenReturn(List.of(error));
 
-            assertThat(GitHubGraphQlErrorUtils.getNotFoundErrorMessage(response))
-                .isEqualTo("Could not resolve to an Issue with the number of 7.");
+            assertThat(GitHubGraphQlErrorUtils.getNotFoundErrorMessage(response)).isEqualTo(
+                "Could not resolve to an Issue with the number of 7."
+            );
         }
 
         @Test

@@ -19,7 +19,6 @@ import org.springframework.stereotype.Repository;
  */
 @Repository
 public interface ProfileCommentQueryRepository extends JpaRepository<IssueComment, Long> {
-
     /**
      * Finds all comments by an author since a given time, scoped to a workspace's monitored repositories.
      *

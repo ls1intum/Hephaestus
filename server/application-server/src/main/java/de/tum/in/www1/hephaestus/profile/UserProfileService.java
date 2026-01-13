@@ -121,7 +121,9 @@ public class UserProfileService {
         // First contribution is workspace-scoped to only show activity in monitored repositories
         var firstContribution = workspaceId == null
             ? null
-            : workspaceContributionActivityService.findFirstContributionInstant(workspaceId, userEntity.getId()).orElse(null);
+            : workspaceContributionActivityService
+                  .findFirstContributionInstant(workspaceId, userEntity.getId())
+                  .orElse(null);
 
         List<PullRequestInfoDTO> openPullRequests = workspaceId == null
             ? List.of()

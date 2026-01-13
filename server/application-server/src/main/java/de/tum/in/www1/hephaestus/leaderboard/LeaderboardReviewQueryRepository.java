@@ -20,7 +20,6 @@ import org.springframework.stereotype.Repository;
  */
 @Repository
 public interface LeaderboardReviewQueryRepository extends JpaRepository<PullRequestReview, Long> {
-
     /**
      * Finds all reviews in a timeframe for a workspace, scoped to repositories monitored by the workspace.
      *

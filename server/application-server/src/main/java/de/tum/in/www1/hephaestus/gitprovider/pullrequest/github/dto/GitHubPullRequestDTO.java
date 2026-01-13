@@ -1,5 +1,8 @@
 package de.tum.in.www1.hephaestus.gitprovider.pullrequest.github.dto;
 
+import static de.tum.in.www1.hephaestus.gitprovider.common.DateTimeUtils.toInstant;
+import static de.tum.in.www1.hephaestus.gitprovider.common.DateTimeUtils.uriToString;
+
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHMergeStateStatus;
@@ -17,9 +20,6 @@ import de.tum.in.www1.hephaestus.gitprovider.pullrequest.MergeStateStatus;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.ReviewDecision;
 import de.tum.in.www1.hephaestus.gitprovider.repository.github.dto.GitHubRepositoryRefDTO;
 import de.tum.in.www1.hephaestus.gitprovider.user.github.dto.GitHubUserDTO;
-import static de.tum.in.www1.hephaestus.gitprovider.common.DateTimeUtils.toInstant;
-import static de.tum.in.www1.hephaestus.gitprovider.common.DateTimeUtils.uriToString;
-
 import java.math.BigInteger;
 import java.time.Instant;
 import java.util.Collections;
@@ -165,9 +165,7 @@ public record GitHubPullRequestDTO(
      */
     @Nullable
     @SuppressWarnings("deprecation") // DRAFT is deprecated but still in the schema
-    private static MergeStateStatus convertMergeStateStatus(
-        GHMergeStateStatus status
-    ) {
+    private static MergeStateStatus convertMergeStateStatus(GHMergeStateStatus status) {
         if (status == null) {
             return null;
         }

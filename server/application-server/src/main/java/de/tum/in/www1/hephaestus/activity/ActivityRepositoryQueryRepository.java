@@ -15,7 +15,6 @@ import org.springframework.data.repository.query.Param;
  */
 @org.springframework.stereotype.Repository
 public interface ActivityRepositoryQueryRepository extends JpaRepository<Repository, Long> {
-
     /**
      * Finds all active (monitored) repositories in a workspace.
      * Used by backfill operations to iterate over workspace repositories.

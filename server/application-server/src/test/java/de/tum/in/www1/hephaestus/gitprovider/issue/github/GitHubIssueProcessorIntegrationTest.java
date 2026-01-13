@@ -1006,7 +1006,15 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
             eventListener.clear();
 
             Long labelId = 9567656085L;
-            GitHubLabelDTO labelDto = new GitHubLabelDTO(labelId, "LA_node", "enhancement", "Enhancement", "84b6eb", null, null);
+            GitHubLabelDTO labelDto = new GitHubLabelDTO(
+                labelId,
+                "LA_node",
+                "enhancement",
+                "Enhancement",
+                "84b6eb",
+                null,
+                null
+            );
 
             // When
             processor.processLabeled(issueDto, labelDto, createContext());

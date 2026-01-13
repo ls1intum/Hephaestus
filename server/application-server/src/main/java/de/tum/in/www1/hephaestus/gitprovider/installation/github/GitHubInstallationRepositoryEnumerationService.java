@@ -88,7 +88,11 @@ public class GitHubInstallationRepositoryEnumerationService {
                     .block();
 
                 if (responseEntity == null || responseEntity.getBody() == null) {
-                    log.warn("Empty response from GitHub API for installation {} on page {}", installationId, pageCount);
+                    log.warn(
+                        "Empty response from GitHub API for installation {} on page {}",
+                        installationId,
+                        pageCount
+                    );
                     break;
                 }
 

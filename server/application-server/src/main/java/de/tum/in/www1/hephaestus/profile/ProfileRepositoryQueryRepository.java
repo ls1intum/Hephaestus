@@ -17,7 +17,6 @@ import org.springframework.data.repository.query.Param;
  */
 @org.springframework.stereotype.Repository
 public interface ProfileRepositoryQueryRepository extends JpaRepository<Repository, Long> {
-
     /**
      * Finds all repositories a user has contributed to within a workspace.
      *

@@ -120,11 +120,11 @@ erDiagram
         TIMESTAMPTZ updated_at
         TIMESTAMPTZ closed_at
         INTEGER comments_count "NOT NULL"
-        VARCHAR(512) html_url
+        VARCHAR(255) html_url
         BOOLEAN is_locked "NOT NULL"
         INTEGER number "NOT NULL"
         VARCHAR(255) state
-        VARCHAR(255) title
+        VARCHAR(1024) title
         INTEGER additions
         INTEGER changed_files
         INTEGER commits
@@ -136,7 +136,6 @@ erDiagram
         BIGINT milestone_id FK
         BIGINT repository_id FK
         BIGINT merged_by_id FK
-        BOOLEAN has_pull_request "NOT NULL"
         TIMESTAMPTZ last_sync_at
         VARCHAR(32) state_reason
         TEXT body
@@ -169,7 +168,7 @@ erDiagram
         TIMESTAMPTZ created_at
         TIMESTAMPTZ updated_at
         VARCHAR(255) author_association
-        VARCHAR(512) html_url
+        VARCHAR(255) html_url
         BIGINT author_id FK
         BIGINT issue_id FK
         TEXT body
@@ -207,7 +206,7 @@ erDiagram
         TIMESTAMPTZ updated_at
         TIMESTAMPTZ closed_at
         TIMESTAMPTZ due_on
-        VARCHAR(512) html_url
+        VARCHAR(255) html_url
         INTEGER number "NOT NULL"
         VARCHAR(255) state
         VARCHAR(255) title
@@ -225,7 +224,7 @@ erDiagram
         TIMESTAMPTZ updated_at
         VARCHAR(255) avatar_url
         BIGINT github_id UK "NOT NULL"
-        VARCHAR(512) html_url
+        VARCHAR(255) html_url
         VARCHAR(255) login UK "NOT NULL"
         VARCHAR(255) name
         TIMESTAMPTZ last_sync_at
@@ -234,7 +233,6 @@ erDiagram
     OrganizationMembership {
         BIGINT organization_id PK
         BIGINT user_id PK
-        TIMESTAMPTZ joined_at
         VARCHAR(32) role
     }
 
@@ -260,7 +258,7 @@ erDiagram
     PullRequestReview {
         BIGINT id PK
         VARCHAR(255) commit_id
-        VARCHAR(512) html_url
+        VARCHAR(255) html_url
         BOOLEAN is_dismissed "NOT NULL"
         VARCHAR(255) state
         TIMESTAMPTZ submitted_at
@@ -275,7 +273,7 @@ erDiagram
         TIMESTAMPTZ updated_at
         VARCHAR(255) author_association
         VARCHAR(255) commit_id
-        VARCHAR(512) html_url
+        VARCHAR(255) html_url
         INTEGER line "NOT NULL"
         VARCHAR(255) original_commit_id
         INTEGER original_line "NOT NULL"
@@ -298,7 +296,6 @@ erDiagram
         TIMESTAMPTZ created_at
         TIMESTAMPTZ updated_at
         VARCHAR(20) state "NOT NULL"
-        TIMESTAMPTZ resolved_at
         BIGINT pull_request_id FK "NOT NULL"
         BIGINT root_comment_id FK,UK
         VARCHAR(128) node_id
@@ -381,7 +378,7 @@ erDiagram
         TIMESTAMPTZ updated_at
         VARCHAR(255) avatar_url
         VARCHAR(255) email
-        VARCHAR(512) html_url
+        VARCHAR(255) html_url
         VARCHAR(255) login
         VARCHAR(255) name
         VARCHAR(255) type

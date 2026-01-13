@@ -459,13 +459,19 @@ public class WorkspaceRepositoryMonitorService {
             natsConsumerService.updateWorkspaceConsumer(workspace.getId());
         }
         if (deferSync) {
-            log.debug("Repository {} persisted with deferred sync.", LoggingUtils.sanitizeForLog(monitor.getNameWithOwner()));
+            log.debug(
+                "Repository {} persisted with deferred sync.",
+                LoggingUtils.sanitizeForLog(monitor.getNameWithOwner())
+            );
             return;
         }
         if (repositoryAllowed) {
             getGitHubDataSyncService().syncSyncTargetAsync(SyncTargetFactory.create(workspace, monitor));
         } else {
-            log.debug("Repository {} persisted but monitoring disabled by filters.", LoggingUtils.sanitizeForLog(monitor.getNameWithOwner()));
+            log.debug(
+                "Repository {} persisted but monitoring disabled by filters.",
+                LoggingUtils.sanitizeForLog(monitor.getNameWithOwner())
+            );
         }
     }
 
@@ -555,7 +561,10 @@ public class WorkspaceRepositoryMonitorService {
             repo.setPushedAt(Instant.now()); // Placeholder, will be updated by sync
 
             repositoryRepository.save(repo);
-            log.debug("Created repository {} from installation snapshot", LoggingUtils.sanitizeForLog(snapshot.nameWithOwner()));
+            log.debug(
+                "Created repository {} from installation snapshot",
+                LoggingUtils.sanitizeForLog(snapshot.nameWithOwner())
+            );
         }
     }
 

@@ -204,7 +204,10 @@ public interface PullRequestRepository extends JpaRepository<PullRequest, Long> 
         ORDER BY p.id
         """
     )
-    Slice<PullRequest> findByRepositoryIdWithReviewComments(@Param("repositoryId") Long repositoryId, Pageable pageable);
+    Slice<PullRequest> findByRepositoryIdWithReviewComments(
+        @Param("repositoryId") Long repositoryId,
+        Pageable pageable
+    );
 
     /**
      * Counts the number of pull requests in a repository.

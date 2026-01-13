@@ -1,5 +1,8 @@
 package de.tum.in.www1.hephaestus.gitprovider.issue.github.dto;
 
+import static de.tum.in.www1.hephaestus.gitprovider.common.DateTimeUtils.toInstant;
+import static de.tum.in.www1.hephaestus.gitprovider.common.DateTimeUtils.uriToString;
+
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHIssue;
@@ -10,9 +13,6 @@ import de.tum.in.www1.hephaestus.gitprovider.label.github.dto.GitHubLabelDTO;
 import de.tum.in.www1.hephaestus.gitprovider.milestone.github.dto.GitHubMilestoneDTO;
 import de.tum.in.www1.hephaestus.gitprovider.repository.github.dto.GitHubRepositoryRefDTO;
 import de.tum.in.www1.hephaestus.gitprovider.user.github.dto.GitHubUserDTO;
-import static de.tum.in.www1.hephaestus.gitprovider.common.DateTimeUtils.toInstant;
-import static de.tum.in.www1.hephaestus.gitprovider.common.DateTimeUtils.uriToString;
-
 import java.math.BigInteger;
 import java.time.Instant;
 import java.util.Collections;

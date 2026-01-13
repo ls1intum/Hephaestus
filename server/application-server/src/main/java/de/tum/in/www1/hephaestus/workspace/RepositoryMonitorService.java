@@ -147,9 +147,7 @@ public class RepositoryMonitorService {
         }
 
         // No workspace is monitoring this repository, safe to delete
-        repositoryRepository
-            .findByNameWithOwner(nameWithOwner)
-            .ifPresent(repositoryRepository::delete);
+        repositoryRepository.findByNameWithOwner(nameWithOwner).ifPresent(repositoryRepository::delete);
     }
 
     /**

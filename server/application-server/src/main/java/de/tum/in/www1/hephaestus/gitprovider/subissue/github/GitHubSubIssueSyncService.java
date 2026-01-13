@@ -359,10 +359,7 @@ public class GitHubSubIssueSyncService {
         return linkedCount;
     }
 
-    private int processParentRelationship(
-        GHIssue graphQlIssue,
-        Repository repository
-    ) {
+    private int processParentRelationship(GHIssue graphQlIssue, Repository repository) {
         long issueDatabaseId = graphQlIssue.getFullDatabaseId().longValue();
         long parentDatabaseId = graphQlIssue.getParent().getFullDatabaseId().longValue();
 
@@ -390,9 +387,7 @@ public class GitHubSubIssueSyncService {
         return 0;
     }
 
-    private void processSubIssuesSummary(
-        GHIssue graphQlIssue
-    ) {
+    private void processSubIssuesSummary(GHIssue graphQlIssue) {
         GHSubIssuesSummary summary = graphQlIssue.getSubIssuesSummary();
         if (summary == null || summary.getTotal() == 0) {
             return;

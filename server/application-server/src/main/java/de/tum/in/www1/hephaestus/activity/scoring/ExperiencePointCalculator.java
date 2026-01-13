@@ -295,8 +295,11 @@ public class ExperiencePointCalculator implements ExperiencePointStrategy {
             );
             if (optionalPullRequest.isEmpty()) {
                 // Expected case: comment is on a regular issue, not a PR - no XP awarded
-                log.debug("Issue comment {} on issue #{} is not associated with a pull request, skipping XP",
-                    issueComment.getId(), issue.getNumber());
+                log.debug(
+                    "Issue comment {} on issue #{} is not associated with a pull request, skipping XP",
+                    issueComment.getId(),
+                    issue.getNumber()
+                );
                 return 0;
             }
             pullRequest = optionalPullRequest.get();

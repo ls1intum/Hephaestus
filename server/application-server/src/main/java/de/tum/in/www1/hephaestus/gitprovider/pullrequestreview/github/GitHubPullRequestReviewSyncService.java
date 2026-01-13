@@ -273,8 +273,7 @@ public class GitHubPullRequestReviewSyncService {
         }
 
         // Create a mutable list to collect all comments
-        List<GHPullRequestReviewComment> allComments =
-            new ArrayList<>(existingComments.getNodes());
+        List<GHPullRequestReviewComment> allComments = new ArrayList<>(existingComments.getNodes());
 
         String cursor = startCursor;
         boolean hasMore = true;

@@ -63,10 +63,7 @@ public interface SyncTargetProvider extends WorkspaceSyncMetadataProvider, Backf
      * @return list of repository nameWithOwner strings, never null (may be empty)
      */
     default List<String> getRepositoryNamesForWorkspace(Long workspaceId) {
-        return getSyncTargetsForWorkspace(workspaceId)
-            .stream()
-            .map(SyncTarget::repositoryNameWithOwner)
-            .toList();
+        return getSyncTargetsForWorkspace(workspaceId).stream().map(SyncTarget::repositoryNameWithOwner).toList();
     }
 
     /**

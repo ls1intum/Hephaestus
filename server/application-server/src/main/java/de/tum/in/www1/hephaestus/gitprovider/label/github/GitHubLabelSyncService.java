@@ -169,7 +169,9 @@ public class GitHubLabelSyncService {
      * Note: GraphQL doesn't expose databaseId for labels, so id will be null.
      * The processor handles this by using name-based lookup as fallback.
      */
-    private GitHubLabelDTO convertToDTO(de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHLabel graphQlLabel) {
+    private GitHubLabelDTO convertToDTO(
+        de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHLabel graphQlLabel
+    ) {
         return GitHubLabelDTO.fromLabel(graphQlLabel);
     }
 }

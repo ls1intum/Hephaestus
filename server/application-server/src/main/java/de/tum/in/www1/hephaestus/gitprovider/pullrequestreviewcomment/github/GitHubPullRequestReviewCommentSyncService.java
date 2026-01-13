@@ -114,10 +114,7 @@ public class GitHubPullRequestReviewCommentSyncService {
         }
 
         if (prCount.get() == 0) {
-            log.debug(
-                "No pull requests found for repository {}, skipping review comment sync",
-                safeRepoName
-            );
+            log.debug("No pull requests found for repository {}, skipping review comment sync", safeRepoName);
             return 0;
         }
 
@@ -249,10 +246,7 @@ public class GitHubPullRequestReviewCommentSyncService {
      * @param pullRequest   the pull request the thread belongs to
      * @return number of comments synced from this thread
      */
-    private int processThread(
-        GHPullRequestReviewThread graphQlThread,
-        PullRequest pullRequest
-    ) {
+    private int processThread(GHPullRequestReviewThread graphQlThread, PullRequest pullRequest) {
         if (graphQlThread == null) {
             return 0;
         }
@@ -306,10 +300,7 @@ public class GitHubPullRequestReviewCommentSyncService {
      * @param graphQlThread the thread to fetch remaining comments for
      * @param startCursor   the cursor to start fetching from
      */
-    private void fetchAllRemainingThreadComments(
-        GHPullRequestReviewThread graphQlThread,
-        String startCursor
-    ) {
+    private void fetchAllRemainingThreadComments(GHPullRequestReviewThread graphQlThread, String startCursor) {
         if (currentClient == null) {
             log.warn(
                 "No client available for nested pagination, skipping remaining comments for thread {}",
@@ -325,8 +316,7 @@ public class GitHubPullRequestReviewCommentSyncService {
         }
 
         // Create a mutable list to collect all comments
-        List<GHPullRequestReviewComment> allComments =
-            new ArrayList<>(existingComments.getNodes());
+        List<GHPullRequestReviewComment> allComments = new ArrayList<>(existingComments.getNodes());
 
         String cursor = startCursor;
         boolean hasMore = true;
@@ -458,9 +448,7 @@ public class GitHubPullRequestReviewCommentSyncService {
      * Extracts the database ID from a GraphQL comment.
      * Uses fullDatabaseId if available, otherwise falls back to deprecated databaseId.
      */
-    private Long extractDatabaseId(
-        GHPullRequestReviewComment graphQlComment
-    ) {
+    private Long extractDatabaseId(GHPullRequestReviewComment graphQlComment) {
         if (graphQlComment == null) {
             return null;
         }

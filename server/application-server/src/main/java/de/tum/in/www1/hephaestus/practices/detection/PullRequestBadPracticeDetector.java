@@ -2,11 +2,11 @@ package de.tum.in.www1.hephaestus.practices.detection;
 
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
-import de.tum.in.www1.hephaestus.practices.PracticesPullRequestQueryRepository;
 import de.tum.in.www1.hephaestus.intelligenceservice.api.DetectorApi;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.BadPractice;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.DetectorRequest;
 import de.tum.in.www1.hephaestus.intelligenceservice.model.DetectorResponse;
+import de.tum.in.www1.hephaestus.practices.PracticesPullRequestQueryRepository;
 import de.tum.in.www1.hephaestus.practices.model.BadPracticeDetection;
 import de.tum.in.www1.hephaestus.practices.model.DetectionResult;
 import de.tum.in.www1.hephaestus.practices.model.PullRequestBadPractice;
@@ -158,8 +158,9 @@ public class PullRequestBadPracticeDetector {
             pullRequest.getId()
         );
 
-        List<PullRequestBadPractice> existingBadPractices =
-            lastDetection != null ? lastDetection.getBadPractices() : List.of();
+        List<PullRequestBadPractice> existingBadPractices = lastDetection != null
+            ? lastDetection.getBadPractices()
+            : List.of();
 
         PullRequestLifecycleState lifecycleState = this.getLifecycleStateOfPullRequest(pullRequest);
         String template = pullRequestTemplateGetter.getPullRequestTemplate(

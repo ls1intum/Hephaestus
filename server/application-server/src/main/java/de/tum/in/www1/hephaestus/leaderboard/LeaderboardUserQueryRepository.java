@@ -20,7 +20,6 @@ import org.springframework.stereotype.Repository;
  */
 @Repository
 public interface LeaderboardUserQueryRepository extends JpaRepository<User, Long> {
-
     /**
      * Finds all users who have contributed to a set of teams, excluding contributions from
      * repositories marked as hidden for those teams.
