@@ -7,6 +7,8 @@ import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
 /**
@@ -35,8 +37,13 @@ public class PullRequestTemplateGetter {
         String url = String.format(TEMPLATE_URL, nameWithOwner);
         try {
             return restTemplate.getForObject(url, String.class);
-        } catch (Exception e) {
-            log.warn("Error getting pull request template: {}", e.getMessage());
+        } catch (HttpClientErrorException.NotFound e) {
+            // No template file exists - this is expected for most repositories
+            log.debug("No pull request template found for {}", nameWithOwner);
+            return "";
+        } catch (RestClientException e) {
+            // Network or server error - log with stack trace for debugging
+            log.warn("Error fetching pull request template for {}: {}", nameWithOwner, e.getMessage(), e);
             return "";
         }
     }

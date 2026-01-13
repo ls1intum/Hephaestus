@@ -93,7 +93,7 @@ public class GitHubPullRequestReviewSyncService {
 
         String safeNameWithOwner = sanitizeForLog(repository.getNameWithOwner());
         if (prCount.get() == 0) {
-            log.info("No pull requests found for {}, skipping review sync", safeNameWithOwner);
+            log.debug("No pull requests found for {}, skipping review sync", safeNameWithOwner);
             return 0;
         }
 

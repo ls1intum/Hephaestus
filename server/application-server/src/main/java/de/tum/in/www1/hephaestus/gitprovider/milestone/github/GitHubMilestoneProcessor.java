@@ -150,7 +150,6 @@ public class GitHubMilestoneProcessor {
             );
         }
 
-        log.debug("Processed milestone {} ({}): {}", saved.getTitle(), saved.getId(), isNew ? "created" : "updated");
         return saved;
     }
 

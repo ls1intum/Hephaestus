@@ -156,36 +156,27 @@ public class GitHubDataSyncService {
 
             // Sync collaborators
             int collaboratorsCount = syncCollaboratorsIfNeeded(syncTarget, workspaceId, repositoryId);
-            if (collaboratorsCount >= 0) {
-                log.debug("Synced {} collaborators for {}", collaboratorsCount, safeNameWithOwner);
-            }
 
             // Sync labels
             int labelsCount = labelSyncService.syncLabelsForRepository(workspaceId, repositoryId);
-            log.debug("Synced {} labels for {}", labelsCount, safeNameWithOwner);
 
             // Sync milestones
             int milestonesCount = milestoneSyncService.syncMilestonesForRepository(workspaceId, repositoryId);
-            log.debug("Synced {} milestones for {}", milestonesCount, safeNameWithOwner);
 
             // Sync issues
             int issuesCount = issueSyncService.syncForRepository(workspaceId, repositoryId);
-            log.debug("Synced {} issues for {}", issuesCount, safeNameWithOwner);
 
             // Sync issue comments (requires issues to exist)
             int issueCommentsCount = issueCommentSyncService.syncForRepository(workspaceId, repositoryId);
-            log.debug("Synced {} issue comments for {}", issueCommentsCount, safeNameWithOwner);
 
             // Sync pull requests
             int prsCount = pullRequestSyncService.syncForRepository(workspaceId, repositoryId);
-            log.debug("Synced {} pull requests for {}", prsCount, safeNameWithOwner);
 
             // Sync PR review comments/threads (requires PRs to exist)
             int prReviewCommentsCount = pullRequestReviewCommentSyncService.syncCommentsForRepository(
                 workspaceId,
                 repositoryId
             );
-            log.debug("Synced {} PR review comments for {}", prReviewCommentsCount, safeNameWithOwner);
 
             // Update sync timestamp via SPI
             syncTargetProvider.updateSyncTimestamp(

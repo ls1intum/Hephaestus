@@ -164,7 +164,7 @@ public class GitHubDataSyncScheduler {
             log.debug("Syncing sub-issue relationships for workspace {}", session.workspaceSlug());
             subIssueSyncService.syncSubIssuesForWorkspace(session.workspaceId());
         } catch (Exception e) {
-            log.error("Failed to sync sub-issues for workspace {}: {}", session.workspaceSlug(), e.getMessage());
+            log.error("Failed to sync sub-issues for workspace {}: {}", session.workspaceSlug(), e.getMessage(), e);
         }
     }
 
@@ -173,7 +173,7 @@ public class GitHubDataSyncScheduler {
             log.debug("Syncing issue types for workspace {}", session.workspaceSlug());
             issueTypeSyncService.syncIssueTypesForWorkspace(session.workspaceId());
         } catch (Exception e) {
-            log.error("Failed to sync issue types for workspace {}: {}", session.workspaceSlug(), e.getMessage());
+            log.error("Failed to sync issue types for workspace {}: {}", session.workspaceSlug(), e.getMessage(), e);
         }
     }
 
@@ -188,7 +188,8 @@ public class GitHubDataSyncScheduler {
             log.error(
                 "Failed to sync issue dependencies for workspace {}: {}",
                 session.workspaceSlug(),
-                e.getMessage()
+                e.getMessage(),
+                e
             );
         }
     }

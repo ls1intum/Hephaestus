@@ -49,7 +49,7 @@ public class SlackMessageService {
                 .usersList(r -> r)
                 .getMembers();
         } catch (IOException | SlackApiException e) {
-            log.error("Failed to get all members from Slack: " + e.getMessage());
+            log.error("Failed to get all members from Slack: {}", e.getMessage(), e);
             return new ArrayList<>();
         }
     }
@@ -73,7 +73,7 @@ public class SlackMessageService {
         ChatPostMessageResponse response = slackApp.client().chatPostMessage(request);
 
         if (!response.isOk()) {
-            log.error("Failed to send message to Slack channel: " + response.getError());
+            log.error("Failed to send message to Slack channel: {}", response.getError());
         }
     }
 

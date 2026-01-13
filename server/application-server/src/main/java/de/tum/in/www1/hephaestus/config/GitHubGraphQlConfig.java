@@ -8,8 +8,11 @@ import de.tum.in.www1.hephaestus.config.jackson.GitHubRequestedReviewerMixin;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHActor;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHRepositoryOwner;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHRequestedReviewer;
+import io.micrometer.core.instrument.Gauge;
+import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Duration;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Bean;
@@ -64,6 +67,25 @@ public class GitHubGraphQlConfig {
     private static final String HEADER_RATE_RESET = "x-ratelimit-reset";
     private static final String HEADER_RATE_USED = "x-ratelimit-used";
     private static final String HEADER_RETRY_AFTER = "retry-after";
+
+    // Rate limit metrics - exposed via Micrometer for dashboards/alerting
+    private final AtomicInteger rateLimitRemaining = new AtomicInteger(0);
+    private final AtomicInteger rateLimitLimit = new AtomicInteger(0);
+    private final AtomicInteger rateLimitUsed = new AtomicInteger(0);
+
+    public GitHubGraphQlConfig(MeterRegistry meterRegistry) {
+        // Register gauges for rate limit monitoring
+        // These are more appropriate than logs for continuous monitoring
+        Gauge.builder("github.graphql.ratelimit.remaining", rateLimitRemaining, AtomicInteger::get)
+            .description("GitHub GraphQL API rate limit points remaining")
+            .register(meterRegistry);
+        Gauge.builder("github.graphql.ratelimit.limit", rateLimitLimit, AtomicInteger::get)
+            .description("GitHub GraphQL API rate limit total points")
+            .register(meterRegistry);
+        Gauge.builder("github.graphql.ratelimit.used", rateLimitUsed, AtomicInteger::get)
+            .description("GitHub GraphQL API rate limit points used")
+            .register(meterRegistry);
+    }
 
     @Bean
     public WebClient gitHubGraphQlWebClient(ObjectMapper baseObjectMapper) {
@@ -136,9 +158,15 @@ public class GitHubGraphQlConfig {
         if (remaining != null && limit != null) {
             int remainingInt = Integer.parseInt(remaining);
             int limitInt = Integer.parseInt(limit);
-            double usagePercent = (100.0 * (limitInt - remainingInt)) / limitInt;
+            int usedInt = used != null ? Integer.parseInt(used) : limitInt - remainingInt;
 
-            // Warn when usage exceeds 80%
+            // Update metrics for dashboard monitoring (best practice: metrics over logs)
+            rateLimitRemaining.set(remainingInt);
+            rateLimitLimit.set(limitInt);
+            rateLimitUsed.set(usedInt);
+
+            // Only log actionable events - approaching limit is a warning condition
+            double usagePercent = (100.0 * (limitInt - remainingInt)) / limitInt;
             if (usagePercent > 80) {
                 log.warn(
                     "GitHub GraphQL rate limit: {}/{} remaining ({}% used), resets at epoch {}",
@@ -147,12 +175,11 @@ public class GitHubGraphQlConfig {
                     String.format("%.1f", usagePercent),
                     reset
                 );
-            } else if (log.isDebugEnabled()) {
-                log.debug("GitHub GraphQL rate limit: {}/{} remaining, {} used", remaining, limit, used);
             }
+            // Routine rate limit status is available via metrics endpoint, not logs
         }
 
-        // Special handling for 429 Too Many Requests
+        // Special handling for 429 Too Many Requests - this is an error condition
         if (response.statusCode().value() == 429) {
             String retryAfter = headers.getFirst(HEADER_RETRY_AFTER);
             log.error("GitHub rate limit exceeded! Retry-After: {} seconds", retryAfter);

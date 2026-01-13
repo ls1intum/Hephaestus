@@ -40,6 +40,13 @@ spring:
 
     devtools:
         add-properties: false
+        restart:
+            # Use trigger file for controlled restarts - touch .reloadtrigger to restart
+            # This prevents NoClassDefFoundError issues with synthetic classes during automatic restarts
+            trigger-file: .reloadtrigger
+            # Increase quiet period to ensure full compilation before restart
+            quiet-period: 1000
+            poll-interval: 2000
 
     security:
         oauth2:

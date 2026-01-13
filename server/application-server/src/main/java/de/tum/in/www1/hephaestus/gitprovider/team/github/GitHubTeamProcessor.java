@@ -90,7 +90,6 @@ public class GitHubTeamProcessor {
             }
         }
 
-        log.debug("Processed team {} ({}): {}", saved.getName(), saved.getId(), isNew ? "created" : "updated");
         return saved;
     }
 

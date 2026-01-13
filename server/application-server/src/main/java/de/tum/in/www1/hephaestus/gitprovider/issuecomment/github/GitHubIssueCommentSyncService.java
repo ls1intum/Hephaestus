@@ -87,7 +87,7 @@ public class GitHubIssueCommentSyncService {
 
         String safeNameWithOwner = sanitizeForLog(repository.getNameWithOwner());
         if (issueCount.get() == 0) {
-            log.info("No issues found for {}, skipping comment sync", safeNameWithOwner);
+            log.debug("No issues found for {}, skipping comment sync", safeNameWithOwner);
             return 0;
         }
 

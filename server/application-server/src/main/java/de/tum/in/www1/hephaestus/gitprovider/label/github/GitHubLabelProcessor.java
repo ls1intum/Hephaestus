@@ -118,7 +118,6 @@ public class GitHubLabelProcessor {
             );
         }
 
-        log.debug("Processed label {} ({}): {}", saved.getName(), saved.getId(), isNew ? "created" : "updated");
         return saved;
     }
 

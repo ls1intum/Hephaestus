@@ -101,6 +101,7 @@ public class GitHubPullRequestReviewCommentSyncService {
             return 0;
         }
 
+        String safeRepoName = sanitizeForLog(repository.getNameWithOwner());
         AtomicInteger totalSynced = new AtomicInteger(0);
         AtomicInteger prCount = new AtomicInteger(0);
 
@@ -113,9 +114,9 @@ public class GitHubPullRequestReviewCommentSyncService {
         }
 
         if (prCount.get() == 0) {
-            log.info(
+            log.debug(
                 "No pull requests found for repository {}, skipping review comment sync",
-                repository.getNameWithOwner()
+                safeRepoName
             );
             return 0;
         }
@@ -124,7 +125,7 @@ public class GitHubPullRequestReviewCommentSyncService {
             "Synced {} review comments for {} pull requests in repository {}",
             totalSynced.get(),
             prCount.get(),
-            repository.getNameWithOwner()
+            safeRepoName
         );
         return totalSynced.get();
     }
@@ -174,7 +175,7 @@ public class GitHubPullRequestReviewCommentSyncService {
                         "Reached maximum pagination limit ({}) for PR #{} in repository {}, stopping",
                         MAX_PAGINATION_PAGES,
                         pullRequest.getNumber(),
-                        repository.getNameWithOwner()
+                        safeNameWithOwner
                     );
                     break;
                 }
@@ -208,7 +209,7 @@ public class GitHubPullRequestReviewCommentSyncService {
                 "Synced {} review comments for PR #{} in repository {}",
                 totalSynced,
                 pullRequest.getNumber(),
-                repository.getNameWithOwner()
+                safeNameWithOwner
             );
             return totalSynced;
         } catch (FieldAccessException e) {
@@ -224,7 +225,7 @@ public class GitHubPullRequestReviewCommentSyncService {
             log.error(
                 "Error syncing review comments for PR #{} in repository {}: {}",
                 pullRequest.getNumber(),
-                repository.getNameWithOwner(),
+                safeNameWithOwner,
                 e.getMessage(),
                 e
             );
@@ -233,7 +234,7 @@ public class GitHubPullRequestReviewCommentSyncService {
             log.error(
                 "Error syncing review comments for PR #{} in repository {}: {}",
                 pullRequest.getNumber(),
-                repository.getNameWithOwner(),
+                safeNameWithOwner,
                 e.getMessage(),
                 e
             );
