@@ -128,9 +128,9 @@ jobs:
           # Use -Dsurefire.includedGroups to override the property defined in pom.xml
           # The pom.xml configures <groups>${surefire.includedGroups}</groups>
           case "${{ matrix.test-type }}" in
-            "application-server-unit") ./mvnw test -Dsurefire.includedGroups="unit" -T 2C --batch-mode ;;
-            "application-server-integration") ./mvnw test -Dsurefire.includedGroups="integration" -T 2C --batch-mode ;;
-            "application-server-architecture") ./mvnw test -Dsurefire.includedGroups="architecture" -T 2C --batch-mode ;;
+            "application-server-unit") ./mvnw test -Dsurefire.includedGroups="unit" -T 2C --batch-mode -Dmaven.build.cache.enabled=true ;;
+            "application-server-integration") ./mvnw test -Dsurefire.includedGroups="integration" -T 2C --batch-mode -Dmaven.build.cache.enabled=true ;;
+            "application-server-architecture") ./mvnw test -Dsurefire.includedGroups="architecture" -T 2C --batch-mode -Dmaven.build.cache.enabled=true ;;
           esac
 
       - name: Run tests

@@ -388,6 +388,17 @@
                 <configuration>
                     <source>${java.version}</source>
                     <target>${java.version}</target>
+                    <!--
+                        IMPORTANT: Set to false for ACTUAL incremental compilation!
+                        Due to Maven bug MCOMPILER-209, the behavior is inverted:
+                        - true  = recompiles ALL files on every change (broken)
+                        - false = recompiles only changed files (correct)
+
+                        Caveat: Deleted source files may leave orphaned .class files.
+                        Run 'mvn clean' periodically or when deleting source files.
+                        See: https://issues.apache.org/jira/browse/MCOMPILER-209
+                    -->
+                    <useIncrementalCompilation>false</useIncrementalCompilation>
                     <!-- Suppress warnings for generated code using deprecated GitHub API values -->
                     <compilerArgs>
                         <arg>-Xlint:all,-deprecation</arg>
@@ -849,19 +860,28 @@
         <!--
             Quick Development Profile (Auto-Activated)
 
-            Skips slow GraphQL code regeneration when generated sources already exist.
-            Java compilation remains ENABLED for incremental development - only GraphQL
-            codegen (~5s) is skipped, normal Java changes are still compiled.
+            Skips GraphQL code regeneration for fast incremental builds (~2-3s vs ~40s).
+            Java compilation remains ENABLED - only GraphQL codegen is skipped.
+
+            WHY THIS EXISTS:
+            - GraphQL codegen regenerates 3711 files (~6s) even if schema unchanged
+            - Regenerated files get new timestamps, triggering Java to recompile ALL of them (~30s)
+            - Skipping codegen when generated sources exist = fast incremental builds
+
+            IMPORTANT - SCHEMA CHANGES:
+            ⚠️  When you modify .graphql schema files, run: mvn clean compile
+            ⚠️  The quick profile cannot detect schema changes (plugin limitation)
+            ⚠️  Stale generated code will cause compile errors or runtime bugs
 
             Auto-activation:
             - Activates when target/classes exists (already compiled once)
-            - Does NOT activate after `mvn clean` (forces full rebuild including GraphQL)
+            - Does NOT activate after `mvn clean` (forces full rebuild)
 
             Manual override:
-              ./mvnw spring-boot:run -P!quick                      (force full GraphQL regen)
-              ./mvnw spring-boot:run -Dgraphql.codegen.skip=false  (force GraphQL regen)
+              mvn compile -Dgraphql.codegen.skip=false    (force GraphQL regen)
+              mvn compile -P!quick                        (disable quick profile)
 
-            CI/CD: Use `mvn clean compile` to ensure full regeneration.
+            CI/CD: Always use `mvn clean compile` to ensure fresh generation.
         -->
         <profile>
             <id>quick</id>
@@ -872,7 +892,8 @@
                 </file>
             </activation>
             <properties>
-                <!-- Skip GraphQL codegen (~5s) - regenerated sources already exist -->
+                <!-- Skip GraphQL codegen - regenerated sources already exist
+                     ⚠️ Run 'mvn clean' when schema files change! -->
                 <graphql.codegen.skip>true</graphql.codegen.skip>
                 <!-- Keep Java compilation enabled for incremental development -->
                 <!-- maven.main.skip deliberately NOT set - we want incremental compile -->
