@@ -47,6 +47,8 @@
     SECTION 31: Add Label createdAt/updatedAt (created_at, updated_at columns)
     SECTION 32: Drop Redundant Issue Columns (has_pull_request, organization_membership.joined_at)
     SECTION 33: Issue Title Column Length Extension
+    SECTION 34: Chat Message Performance Index
+    SECTION 35: Schema Drift Fixes (PK column order, html_url lengths, dropped columns)
 
     Original files consolidated:
     - 1767500000000_changelog.xml (GraphQL sync migration)
@@ -55,6 +57,8 @@
     - 1768200000000_drop_has_pull_request.xml
     - 1768300000000_drop_organization_membership_joined_at.xml
     - 1768500000000_issue_title_length.xml (issue title column length)
+    - 1765851336797_changelog.xml (chat message index)
+    - 1768339998000_changelog.xml (schema drift fixes)
 
     See: docs/contributor/database-migration.mdx
     =======================================================================================
@@ -62,7 +66,7 @@
 
     <!-- ==================== SECTION 1: Documentation Changesets ==================== -->
 
-    <changeSet id="1767287604000-1-add-triage-permission-doc" author="hephaestus">
+    <changeSet id="1767287604000-1-add-triage-permission-doc" author="FelixTJDietrich">
         <comment>
             Added TRIAGE permission level to TeamRepositoryPermission.PermissionLevel enum.
             No schema migration needed - the permission column is VARCHAR(32).
@@ -74,7 +78,7 @@
 
     <!-- ==================== SECTION 2: Drop Legacy Tables ==================== -->
 
-    <changeSet id="1767300000000-drop-contribution-event" author="hephaestus">
+    <changeSet id="1767300000000-drop-contribution-event" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <tableExists tableName="contribution_event"/>
         </preConditions>
@@ -94,7 +98,7 @@
     - DX Core 4 metrics: Speed, Effectiveness, Quality, Impact
     -->
 
-    <changeSet id="1767300000000-create-activity-event" author="hephaestus">
+    <changeSet id="1767300000000-create-activity-event" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <not>
                 <tableExists tableName="activity_event"/>
@@ -238,7 +242,7 @@
     </changeSet>
 
     <!-- XP non-negative constraint -->
-    <changeSet id="1767600000000-1-check-xp-non-negative" author="hephaestus">
+    <changeSet id="1767600000000-1-check-xp-non-negative" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <tableExists tableName="activity_event"/>
             <columnExists tableName="activity_event" columnName="xp"/>
@@ -259,7 +263,7 @@
 
     <!-- ==================== SECTION 4: Issue Types ==================== -->
 
-    <changeSet id="1767300000000-create-issue-type-table" author="hephaestus">
+    <changeSet id="1767300000000-create-issue-type-table" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <not>
                 <tableExists tableName="issue_type"/>
@@ -301,7 +305,7 @@
 
     <!-- ==================== SECTION 5: Sub-Issues Hierarchy ==================== -->
 
-    <changeSet id="1767300000000-add-sub-issue-hierarchy" author="hephaestus">
+    <changeSet id="1767300000000-add-sub-issue-hierarchy" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <not>
                 <columnExists tableName="issue" columnName="parent_issue_id"/>
@@ -326,7 +330,7 @@
         </createIndex>
     </changeSet>
 
-    <changeSet id="1767300000000-add-sub-issue-summary" author="hephaestus">
+    <changeSet id="1767300000000-add-sub-issue-summary" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <not>
                 <columnExists tableName="issue" columnName="sub_issues_total"/>
@@ -345,7 +349,7 @@
         </addColumn>
     </changeSet>
 
-    <changeSet id="1767300000000-add-issue-type-to-issue" author="hephaestus">
+    <changeSet id="1767300000000-add-issue-type-to-issue" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <not>
                 <columnExists tableName="issue" columnName="issue_type_id"/>
@@ -372,7 +376,7 @@
 
     <!-- ==================== SECTION 6: Issue Dependencies ==================== -->
 
-    <changeSet id="1767300000000-create-issue-blocking-table" author="hephaestus">
+    <changeSet id="1767300000000-create-issue-blocking-table" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <not>
                 <tableExists tableName="issue_blocking"/>
@@ -417,7 +421,7 @@
 
     <!-- ==================== SECTION 7: Workspace Sync Timestamps ==================== -->
 
-    <changeSet id="1767300000000-add-workspace-sync-timestamps" author="hephaestus">
+    <changeSet id="1767300000000-add-workspace-sync-timestamps" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <not>
                 <columnExists tableName="workspace" columnName="sub_issues_synced_at"/>
@@ -438,56 +442,56 @@
 
     <!-- ==================== SECTION 8: Drop Unused User Columns ==================== -->
 
-    <changeSet id="1767300000000-drop-user-followers" author="hephaestus">
+    <changeSet id="1767300000000-drop-user-followers" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <columnExists tableName="user" columnName="followers"/>
         </preConditions>
         <dropColumn tableName="user" columnName="followers"/>
     </changeSet>
 
-    <changeSet id="1767300000000-drop-user-following" author="hephaestus">
+    <changeSet id="1767300000000-drop-user-following" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <columnExists tableName="user" columnName="following"/>
         </preConditions>
         <dropColumn tableName="user" columnName="following"/>
     </changeSet>
 
-    <changeSet id="1767300000000-drop-user-blog" author="hephaestus">
+    <changeSet id="1767300000000-drop-user-blog" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <columnExists tableName="user" columnName="blog"/>
         </preConditions>
         <dropColumn tableName="user" columnName="blog"/>
     </changeSet>
 
-    <changeSet id="1767300000000-drop-user-company" author="hephaestus">
+    <changeSet id="1767300000000-drop-user-company" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <columnExists tableName="user" columnName="company"/>
         </preConditions>
         <dropColumn tableName="user" columnName="company"/>
     </changeSet>
 
-    <changeSet id="1767300000000-drop-user-description" author="hephaestus">
+    <changeSet id="1767300000000-drop-user-description" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <columnExists tableName="user" columnName="description"/>
         </preConditions>
         <dropColumn tableName="user" columnName="description"/>
     </changeSet>
 
-    <changeSet id="1767300000000-drop-user-location" author="hephaestus">
+    <changeSet id="1767300000000-drop-user-location" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <columnExists tableName="user" columnName="location"/>
         </preConditions>
         <dropColumn tableName="user" columnName="location"/>
     </changeSet>
 
-    <changeSet id="1767300000000-drop-user-league-points" author="hephaestus">
+    <changeSet id="1767300000000-drop-user-league-points" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <columnExists tableName="user" columnName="league_points"/>
         </preConditions>
         <dropColumn tableName="user" columnName="league_points"/>
     </changeSet>
 
-    <changeSet id="1767300000000-drop-hephaestus-user-league-points" author="hephaestus">
+    <changeSet id="1767300000000-drop-hephaestus-user-league-points" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <columnExists tableName="hephaestus_user" columnName="league_points"/>
         </preConditions>
@@ -496,7 +500,7 @@
 
     <!-- ==================== SECTION 9: Drop Unused Organization Columns ==================== -->
 
-    <changeSet id="1767300000000-drop-org-installation-id" author="hephaestus">
+    <changeSet id="1767300000000-drop-org-installation-id" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <columnExists tableName="organization" columnName="installation_id"/>
         </preConditions>
@@ -506,42 +510,42 @@
 
     <!-- ==================== SECTION 10: Drop Unused Repository Columns ==================== -->
 
-    <changeSet id="1767300000000-drop-repo-has-issues" author="hephaestus">
+    <changeSet id="1767300000000-drop-repo-has-issues" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <columnExists tableName="repository" columnName="has_issues"/>
         </preConditions>
         <dropColumn tableName="repository" columnName="has_issues"/>
     </changeSet>
 
-    <changeSet id="1767300000000-drop-repo-has-projects" author="hephaestus">
+    <changeSet id="1767300000000-drop-repo-has-projects" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <columnExists tableName="repository" columnName="has_projects"/>
         </preConditions>
         <dropColumn tableName="repository" columnName="has_projects"/>
     </changeSet>
 
-    <changeSet id="1767300000000-drop-repo-has-wiki" author="hephaestus">
+    <changeSet id="1767300000000-drop-repo-has-wiki" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <columnExists tableName="repository" columnName="has_wiki"/>
         </preConditions>
         <dropColumn tableName="repository" columnName="has_wiki"/>
     </changeSet>
 
-    <changeSet id="1767300000000-drop-repo-homepage" author="hephaestus">
+    <changeSet id="1767300000000-drop-repo-homepage" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <columnExists tableName="repository" columnName="homepage"/>
         </preConditions>
         <dropColumn tableName="repository" columnName="homepage"/>
     </changeSet>
 
-    <changeSet id="1767300000000-drop-repo-stargazers-count" author="hephaestus">
+    <changeSet id="1767300000000-drop-repo-stargazers-count" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <columnExists tableName="repository" columnName="stargazers_count"/>
         </preConditions>
         <dropColumn tableName="repository" columnName="stargazers_count"/>
     </changeSet>
 
-    <changeSet id="1767300000000-drop-repo-watchers-count" author="hephaestus">
+    <changeSet id="1767300000000-drop-repo-watchers-count" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <columnExists tableName="repository" columnName="watchers_count"/>
         </preConditions>
@@ -550,28 +554,28 @@
 
     <!-- ==================== SECTION 11: Drop Unused Issue Columns ==================== -->
 
-    <changeSet id="1767300000000-drop-issue-is-mergeable" author="hephaestus">
+    <changeSet id="1767300000000-drop-issue-is-mergeable" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <columnExists tableName="issue" columnName="is_mergeable"/>
         </preConditions>
         <dropColumn tableName="issue" columnName="is_mergeable"/>
     </changeSet>
 
-    <changeSet id="1767300000000-drop-issue-maintainer-can-modify" author="hephaestus">
+    <changeSet id="1767300000000-drop-issue-maintainer-can-modify" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <columnExists tableName="issue" columnName="maintainer_can_modify"/>
         </preConditions>
         <dropColumn tableName="issue" columnName="maintainer_can_modify"/>
     </changeSet>
 
-    <changeSet id="1767300000000-drop-issue-merge-commit-sha" author="hephaestus">
+    <changeSet id="1767300000000-drop-issue-merge-commit-sha" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <columnExists tableName="issue" columnName="merge_commit_sha"/>
         </preConditions>
         <dropColumn tableName="issue" columnName="merge_commit_sha"/>
     </changeSet>
 
-    <changeSet id="1767300000000-drop-issue-mergeable-state" author="hephaestus">
+    <changeSet id="1767300000000-drop-issue-mergeable-state" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <columnExists tableName="issue" columnName="mergeable_state"/>
         </preConditions>
@@ -580,14 +584,14 @@
 
     <!-- ==================== SECTION 12: Drop Deprecated PR Review Comment Columns ==================== -->
 
-    <changeSet id="1767300000000-drop-pr-review-comment-position" author="hephaestus">
+    <changeSet id="1767300000000-drop-pr-review-comment-position" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <columnExists tableName="pull_request_review_comment" columnName="position"/>
         </preConditions>
         <dropColumn tableName="pull_request_review_comment" columnName="position"/>
     </changeSet>
 
-    <changeSet id="1767300000000-drop-pr-review-comment-original-position" author="hephaestus">
+    <changeSet id="1767300000000-drop-pr-review-comment-original-position" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <columnExists tableName="pull_request_review_comment" columnName="original_position"/>
         </preConditions>
@@ -596,19 +600,19 @@
 
     <!-- ==================== SECTION 13: Column Type Fixes ==================== -->
 
-    <changeSet id="1767300000000-fix-nodeid-column-length" author="hephaestus">
+    <changeSet id="1767300000000-fix-nodeid-column-length" author="FelixTJDietrich">
         <modifyDataType tableName="pull_request_review_thread"
             columnName="node_id"
             newDataType="varchar(128)"/>
     </changeSet>
 
-    <changeSet id="1767300000000-fix-repository-description-type" author="hephaestus">
+    <changeSet id="1767300000000-fix-repository-description-type" author="FelixTJDietrich">
         <sql>ALTER TABLE repository ALTER COLUMN description TYPE TEXT;</sql>
     </changeSet>
 
     <!-- ==================== SECTION 14: Performance Indexes ==================== -->
 
-    <changeSet id="1767300000000-idx-issue-repository-id" author="hephaestus">
+    <changeSet id="1767300000000-idx-issue-repository-id" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <not><indexExists indexName="idx_issue_repository_id"/></not>
         </preConditions>
@@ -617,7 +621,7 @@
         </createIndex>
     </changeSet>
 
-    <changeSet id="1767300000000-idx-issue-author-id" author="hephaestus">
+    <changeSet id="1767300000000-idx-issue-author-id" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <not><indexExists indexName="idx_issue_author_id"/></not>
         </preConditions>
@@ -626,7 +630,7 @@
         </createIndex>
     </changeSet>
 
-    <changeSet id="1767300000000-idx-issue-state" author="hephaestus">
+    <changeSet id="1767300000000-idx-issue-state" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <not><indexExists indexName="idx_issue_state"/></not>
         </preConditions>
@@ -635,7 +639,7 @@
         </createIndex>
     </changeSet>
 
-    <changeSet id="1767300000000-idx-pr-review-author-id" author="hephaestus">
+    <changeSet id="1767300000000-idx-pr-review-author-id" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <not><indexExists indexName="idx_pr_review_author_id"/></not>
         </preConditions>
@@ -644,7 +648,7 @@
         </createIndex>
     </changeSet>
 
-    <changeSet id="1767300000000-idx-pr-review-submitted-at" author="hephaestus">
+    <changeSet id="1767300000000-idx-pr-review-submitted-at" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <not><indexExists indexName="idx_pr_review_submitted_at"/></not>
         </preConditions>
@@ -653,7 +657,7 @@
         </createIndex>
     </changeSet>
 
-    <changeSet id="1767300000000-idx-pr-review-pull-request-id" author="hephaestus">
+    <changeSet id="1767300000000-idx-pr-review-pull-request-id" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <not><indexExists indexName="idx_pr_review_pull_request_id"/></not>
         </preConditions>
@@ -662,7 +666,7 @@
         </createIndex>
     </changeSet>
 
-    <changeSet id="1767300000000-idx-issue-comment-author-id" author="hephaestus">
+    <changeSet id="1767300000000-idx-issue-comment-author-id" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <not><indexExists indexName="idx_issue_comment_author_id"/></not>
         </preConditions>
@@ -671,7 +675,7 @@
         </createIndex>
     </changeSet>
 
-    <changeSet id="1767300000000-idx-issue-comment-created-at" author="hephaestus">
+    <changeSet id="1767300000000-idx-issue-comment-created-at" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <not><indexExists indexName="idx_issue_comment_created_at"/></not>
         </preConditions>
@@ -680,7 +684,7 @@
         </createIndex>
     </changeSet>
 
-    <changeSet id="1767300000000-idx-repository-name-with-owner" author="hephaestus">
+    <changeSet id="1767300000000-idx-repository-name-with-owner" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <not><indexExists indexName="idx_repository_name_with_owner"/></not>
         </preConditions>
@@ -689,7 +693,7 @@
         </createIndex>
     </changeSet>
 
-    <changeSet id="1767300000000-idx-repository-organization-id" author="hephaestus">
+    <changeSet id="1767300000000-idx-repository-organization-id" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <not><indexExists indexName="idx_repository_organization_id"/></not>
         </preConditions>
@@ -698,7 +702,7 @@
         </createIndex>
     </changeSet>
 
-    <changeSet id="1767300000000-idx-workspace-membership-user-id" author="hephaestus">
+    <changeSet id="1767300000000-idx-workspace-membership-user-id" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <not><indexExists indexName="idx_workspace_membership_user_id"/></not>
         </preConditions>
@@ -709,7 +713,7 @@
 
     <!-- ==================== SECTION 15: Dead Letter Event Storage ==================== -->
 
-    <changeSet id="1767700000000-1-create-dead-letter-event-table" author="hephaestus">
+    <changeSet id="1767700000000-1-create-dead-letter-event-table" author="FelixTJDietrich">
         <createTable tableName="dead_letter_event">
             <column name="id" type="UUID">
                 <constraints primaryKey="true" nullable="false"/>
@@ -755,7 +759,7 @@
         <comment>Create dead_letter_event table for persisting failed activity events</comment>
     </changeSet>
 
-    <changeSet id="1767700000000-2-dead-letter-status-created-index" author="hephaestus">
+    <changeSet id="1767700000000-2-dead-letter-status-created-index" author="FelixTJDietrich">
         <createIndex tableName="dead_letter_event" indexName="idx_dead_letter_status_created">
             <column name="status"/>
             <column name="created_at"/>
@@ -763,7 +767,7 @@
         <comment>Index for finding pending dead letters for retry</comment>
     </changeSet>
 
-    <changeSet id="1767700000000-3-dead-letter-workspace-created-index" author="hephaestus">
+    <changeSet id="1767700000000-3-dead-letter-workspace-created-index" author="FelixTJDietrich">
         <createIndex tableName="dead_letter_event" indexName="idx_dead_letter_workspace_created">
             <column name="workspace_id"/>
             <column name="created_at" descending="true"/>
@@ -771,7 +775,7 @@
         <comment>Index for workspace-specific dead letter queries</comment>
     </changeSet>
 
-    <changeSet id="1767700000000-4-dead-letter-event-type-index" author="hephaestus">
+    <changeSet id="1767700000000-4-dead-letter-event-type-index" author="FelixTJDietrich">
         <createIndex tableName="dead_letter_event" indexName="idx_dead_letter_event_type">
             <column name="event_type"/>
             <column name="created_at" descending="true"/>
@@ -779,7 +783,7 @@
         <comment>Index for analyzing failure patterns by event type</comment>
     </changeSet>
 
-    <changeSet id="1767700000000-5-dead-letter-status-check" author="hephaestus">
+    <changeSet id="1767700000000-5-dead-letter-status-check" author="FelixTJDietrich">
         <sql>
             ALTER TABLE dead_letter_event
             ADD CONSTRAINT chk_dead_letter_status
@@ -796,7 +800,7 @@
 
     <!-- ==================== SECTION 16: Pull Request GraphQL Fields ==================== -->
 
-    <changeSet id="1767900000000-1" author="hephaestus">
+    <changeSet id="1767900000000-1" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <not>
                 <columnExists tableName="issue" columnName="merge_state_status"/>
@@ -808,7 +812,7 @@
         </addColumn>
     </changeSet>
 
-    <changeSet id="1767900000000-2" author="hephaestus">
+    <changeSet id="1767900000000-2" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <not>
                 <columnExists tableName="issue" columnName="mergeable"/>
@@ -820,7 +824,7 @@
         </addColumn>
     </changeSet>
 
-    <changeSet id="1767900000000-3" author="hephaestus">
+    <changeSet id="1767900000000-3" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <not>
                 <columnExists tableName="issue" columnName="review_decision"/>
@@ -832,7 +836,7 @@
         </addColumn>
     </changeSet>
 
-    <changeSet id="1767900000000-4" author="hephaestus">
+    <changeSet id="1767900000000-4" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <not>
                 <columnExists tableName="issue" columnName="head_ref_name"/>
@@ -844,7 +848,7 @@
         </addColumn>
     </changeSet>
 
-    <changeSet id="1767900000000-5" author="hephaestus">
+    <changeSet id="1767900000000-5" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <not>
                 <columnExists tableName="issue" columnName="head_ref_oid"/>
@@ -855,7 +859,7 @@
         </addColumn>
     </changeSet>
 
-    <changeSet id="1767900000000-6" author="hephaestus">
+    <changeSet id="1767900000000-6" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <not>
                 <columnExists tableName="issue" columnName="base_ref_name"/>
@@ -866,7 +870,7 @@
         </addColumn>
     </changeSet>
 
-    <changeSet id="1767900000000-7" author="hephaestus">
+    <changeSet id="1767900000000-7" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <not>
                 <columnExists tableName="issue" columnName="base_ref_oid"/>
@@ -879,7 +883,7 @@
 
     <!-- ==================== SECTION 17: Cleanup Deprecated Issue Columns ==================== -->
 
-    <changeSet id="1767900000000-10" author="hephaestus">
+    <changeSet id="1767900000000-10" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <columnExists tableName="issue" columnName="bad_practice_summary"/>
         </preConditions>
@@ -887,7 +891,7 @@
         <dropColumn tableName="issue" columnName="bad_practice_summary"/>
     </changeSet>
 
-    <changeSet id="1767900000000-11" author="hephaestus">
+    <changeSet id="1767900000000-11" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <columnExists tableName="issue" columnName="last_detection_time"/>
         </preConditions>
@@ -897,7 +901,7 @@
 
     <!-- ==================== SECTION 18: Issue Enum CHECK Constraints ==================== -->
 
-    <changeSet id="1767900000000-12" author="hephaestus">
+    <changeSet id="1767900000000-12" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <columnExists tableName="issue" columnName="merge_state_status"/>
             <sqlCheck expectedResult="0">
@@ -917,7 +921,7 @@
         </rollback>
     </changeSet>
 
-    <changeSet id="1767900000000-13" author="hephaestus">
+    <changeSet id="1767900000000-13" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <columnExists tableName="issue" columnName="review_decision"/>
             <sqlCheck expectedResult="0">
@@ -939,7 +943,7 @@
 
     <!-- ==================== SECTION 19: PullRequestBadPractice Enum Migration ==================== -->
 
-    <changeSet id="1767900000000-14-migrate-enum-columns" author="hephaestus">
+    <changeSet id="1767900000000-14-migrate-enum-columns" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <tableExists tableName="pullrequestbadpractice"/>
             <columnExists tableName="pullrequestbadpractice" columnName="state"/>
@@ -988,7 +992,7 @@
 
     <!-- ==================== SECTION 20: User Preferences Extraction ==================== -->
 
-    <changeSet id="1768100000000-create-user-preferences-table" author="hephaestus">
+    <changeSet id="1768100000000-create-user-preferences-table" author="FelixTJDietrich">
         <comment>Create user_preferences table for platform preferences (domain isolation from gitprovider)</comment>
         <createTable tableName="user_preferences">
             <column name="id" type="BIGINT" autoIncrement="true">
@@ -1014,7 +1018,7 @@
             onDelete="CASCADE"/>
     </changeSet>
 
-    <changeSet id="1768100000000-migrate-user-preferences-data" author="hephaestus">
+    <changeSet id="1768100000000-migrate-user-preferences-data" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <columnExists tableName="user" columnName="notifications_enabled"/>
         </preConditions>
@@ -1027,7 +1031,7 @@
         </sql>
     </changeSet>
 
-    <changeSet id="1768100000000-drop-user-preferences-columns" author="hephaestus">
+    <changeSet id="1768100000000-drop-user-preferences-columns" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <columnExists tableName="user" columnName="notifications_enabled"/>
         </preConditions>
@@ -1038,7 +1042,7 @@
 
     <!-- ==================== SECTION 21: Workspace Team Settings Tables ==================== -->
 
-    <changeSet id="1768000000000-1-create-workspace-team-settings" author="hephaestus">
+    <changeSet id="1768000000000-1-create-workspace-team-settings" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <not>
                 <tableExists tableName="workspace_team_settings"/>
@@ -1061,7 +1065,7 @@
         </createTable>
     </changeSet>
 
-    <changeSet id="1768000000000-2-fk-workspace-team-settings-workspace" author="hephaestus">
+    <changeSet id="1768000000000-2-fk-workspace-team-settings-workspace" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <not>
                 <foreignKeyConstraintExists foreignKeyName="fk_workspace_team_settings_workspace"/>
@@ -1076,7 +1080,7 @@
             onDelete="CASCADE"/>
     </changeSet>
 
-    <changeSet id="1768000000000-3-fk-workspace-team-settings-team" author="hephaestus">
+    <changeSet id="1768000000000-3-fk-workspace-team-settings-team" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <not>
                 <foreignKeyConstraintExists foreignKeyName="fk_workspace_team_settings_team"/>
@@ -1091,7 +1095,7 @@
             onDelete="CASCADE"/>
     </changeSet>
 
-    <changeSet id="1768000000000-4-create-workspace-team-repository-settings" author="hephaestus">
+    <changeSet id="1768000000000-4-create-workspace-team-repository-settings" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <not>
                 <tableExists tableName="workspace_team_repository_settings"/>
@@ -1117,7 +1121,7 @@
         </createTable>
     </changeSet>
 
-    <changeSet id="1768000000000-5-fk-workspace-team-repo-settings-workspace" author="hephaestus">
+    <changeSet id="1768000000000-5-fk-workspace-team-repo-settings-workspace" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <not>
                 <foreignKeyConstraintExists foreignKeyName="fk_workspace_team_repo_settings_workspace"/>
@@ -1132,7 +1136,7 @@
             onDelete="CASCADE"/>
     </changeSet>
 
-    <changeSet id="1768000000000-6-fk-workspace-team-repo-settings-team" author="hephaestus">
+    <changeSet id="1768000000000-6-fk-workspace-team-repo-settings-team" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <not>
                 <foreignKeyConstraintExists foreignKeyName="fk_workspace_team_repo_settings_team"/>
@@ -1147,7 +1151,7 @@
             onDelete="CASCADE"/>
     </changeSet>
 
-    <changeSet id="1768000000000-7-fk-workspace-team-repo-settings-repository" author="hephaestus">
+    <changeSet id="1768000000000-7-fk-workspace-team-repo-settings-repository" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <not>
                 <foreignKeyConstraintExists foreignKeyName="fk_workspace_team_repo_settings_repository"/>
@@ -1162,7 +1166,7 @@
             onDelete="CASCADE"/>
     </changeSet>
 
-    <changeSet id="1768000000000-8-create-workspace-team-label-filter" author="hephaestus">
+    <changeSet id="1768000000000-8-create-workspace-team-label-filter" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <not>
                 <tableExists tableName="workspace_team_label_filter"/>
@@ -1185,7 +1189,7 @@
         </createTable>
     </changeSet>
 
-    <changeSet id="1768000000000-9-fk-workspace-team-label-filter-workspace" author="hephaestus">
+    <changeSet id="1768000000000-9-fk-workspace-team-label-filter-workspace" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <not>
                 <foreignKeyConstraintExists foreignKeyName="fk_workspace_team_label_filter_workspace"/>
@@ -1200,7 +1204,7 @@
             onDelete="CASCADE"/>
     </changeSet>
 
-    <changeSet id="1768000000000-10-fk-workspace-team-label-filter-team" author="hephaestus">
+    <changeSet id="1768000000000-10-fk-workspace-team-label-filter-team" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <not>
                 <foreignKeyConstraintExists foreignKeyName="fk_workspace_team_label_filter_team"/>
@@ -1215,7 +1219,7 @@
             onDelete="CASCADE"/>
     </changeSet>
 
-    <changeSet id="1768000000000-11-fk-workspace-team-label-filter-label" author="hephaestus">
+    <changeSet id="1768000000000-11-fk-workspace-team-label-filter-label" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <not>
                 <foreignKeyConstraintExists foreignKeyName="fk_workspace_team_label_filter_label"/>
@@ -1230,7 +1234,7 @@
             onDelete="CASCADE"/>
     </changeSet>
 
-    <changeSet id="1768000000000-12-idx-workspace-team-settings-team" author="hephaestus">
+    <changeSet id="1768000000000-12-idx-workspace-team-settings-team" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <not>
                 <indexExists indexName="idx_workspace_team_settings_team_id"/>
@@ -1241,7 +1245,7 @@
         </createIndex>
     </changeSet>
 
-    <changeSet id="1768000000000-13-idx-workspace-team-repo-settings-team-repo" author="hephaestus">
+    <changeSet id="1768000000000-13-idx-workspace-team-repo-settings-team-repo" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <not>
                 <indexExists indexName="idx_workspace_team_repo_settings_team_repo"/>
@@ -1253,7 +1257,7 @@
         </createIndex>
     </changeSet>
 
-    <changeSet id="1768000000000-14-idx-workspace-team-label-filter-team" author="hephaestus">
+    <changeSet id="1768000000000-14-idx-workspace-team-label-filter-team" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <not>
                 <indexExists indexName="idx_workspace_team_label_filter_team_id"/>
@@ -1265,7 +1269,7 @@
     </changeSet>
 
     <!-- Data migrations for workspace team settings -->
-    <changeSet id="1768000000000-15-migrate-team-hidden" author="hephaestus">
+    <changeSet id="1768000000000-15-migrate-team-hidden" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <tableExists tableName="workspace_team_settings"/>
             <tableExists tableName="team"/>
@@ -1286,7 +1290,7 @@
         </sql>
     </changeSet>
 
-    <changeSet id="1768000000000-16-migrate-hidden-from-contributions" author="hephaestus">
+    <changeSet id="1768000000000-16-migrate-hidden-from-contributions" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <tableExists tableName="workspace_team_repository_settings"/>
             <tableExists tableName="team_repository_permission"/>
@@ -1309,7 +1313,7 @@
         </sql>
     </changeSet>
 
-    <changeSet id="1768000000000-17-migrate-team-labels" author="hephaestus">
+    <changeSet id="1768000000000-17-migrate-team-labels" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <tableExists tableName="workspace_team_label_filter"/>
             <tableExists tableName="team_labels"/>
@@ -1332,7 +1336,7 @@
 
     <!-- ==================== SECTION 22: ETL Consistency Fixes ==================== -->
 
-    <changeSet id="1768500000000-1" author="hephaestus">
+    <changeSet id="1768500000000-1" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <columnExists tableName="team" columnName="last_synced_at"/>
         </preConditions>
@@ -1342,14 +1346,14 @@
                       columnDataType="TIMESTAMP"/>
     </changeSet>
 
-    <changeSet id="1768500000000-2" author="hephaestus">
+    <changeSet id="1768500000000-2" author="FelixTJDietrich">
         <update tableName="team">
             <column name="privacy" value="VISIBLE"/>
             <where>privacy = 'CLOSED'</where>
         </update>
     </changeSet>
 
-    <changeSet id="1768500000000-3" author="hephaestus">
+    <changeSet id="1768500000000-3" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <columnExists tableName="pull_request_review_thread" columnName="provider_thread_id"/>
             <indexExists indexName="idx_prrt_provider_thread_id"/>
@@ -1357,7 +1361,7 @@
         <dropIndex tableName="pull_request_review_thread" indexName="idx_prrt_provider_thread_id"/>
     </changeSet>
 
-    <changeSet id="1768500000000-4" author="hephaestus">
+    <changeSet id="1768500000000-4" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <columnExists tableName="pull_request_review_thread" columnName="provider_thread_id"/>
         </preConditions>
@@ -1370,7 +1374,7 @@
     Now we drop the legacy columns to complete the migration.
     -->
 
-    <changeSet id="1768500000000-5-drop-team-hidden" author="hephaestus">
+    <changeSet id="1768500000000-5-drop-team-hidden" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <columnExists tableName="team" columnName="hidden"/>
         </preConditions>
@@ -1378,7 +1382,7 @@
         <dropColumn tableName="team" columnName="hidden"/>
     </changeSet>
 
-    <changeSet id="1768500000000-6-drop-team-repo-permission-hidden-from-contributions" author="hephaestus">
+    <changeSet id="1768500000000-6-drop-team-repo-permission-hidden-from-contributions" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <columnExists tableName="team_repository_permission" columnName="hidden_from_contributions"/>
         </preConditions>
@@ -1386,7 +1390,7 @@
         <dropColumn tableName="team_repository_permission" columnName="hidden_from_contributions"/>
     </changeSet>
 
-    <changeSet id="1768500000000-7-drop-team-labels-table" author="hephaestus">
+    <changeSet id="1768500000000-7-drop-team-labels-table" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <tableExists tableName="team_labels"/>
         </preConditions>
@@ -1401,7 +1405,7 @@
     Team and Issue already have this field; adding to other independently-synced entities.
     -->
 
-    <changeSet id="1768600000000-1-add-repository-last-sync-at" author="hephaestus">
+    <changeSet id="1768600000000-1-add-repository-last-sync-at" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <not>
                 <columnExists tableName="repository" columnName="last_sync_at"/>
@@ -1413,7 +1417,7 @@
         </addColumn>
     </changeSet>
 
-    <changeSet id="1768600000000-2-add-organization-last-sync-at" author="hephaestus">
+    <changeSet id="1768600000000-2-add-organization-last-sync-at" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <not>
                 <columnExists tableName="organization" columnName="last_sync_at"/>
@@ -1425,7 +1429,7 @@
         </addColumn>
     </changeSet>
 
-    <changeSet id="1768600000000-3-add-milestone-last-sync-at" author="hephaestus">
+    <changeSet id="1768600000000-3-add-milestone-last-sync-at" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <not>
                 <columnExists tableName="milestone" columnName="last_sync_at"/>
@@ -1437,7 +1441,7 @@
         </addColumn>
     </changeSet>
 
-    <changeSet id="1768600000000-4-add-label-last-sync-at" author="hephaestus">
+    <changeSet id="1768600000000-4-add-label-last-sync-at" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <not>
                 <columnExists tableName="label" columnName="last_sync_at"/>
@@ -1449,7 +1453,7 @@
         </addColumn>
     </changeSet>
 
-    <changeSet id="1768600000000-5-add-issue-type-last-sync-at" author="hephaestus">
+    <changeSet id="1768600000000-5-add-issue-type-last-sync-at" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <not>
                 <columnExists tableName="issue_type" columnName="last_sync_at"/>
@@ -1469,7 +1473,7 @@
     This converts them to TIMESTAMPTZ for consistency.
     -->
 
-    <changeSet id="1768700000000-1-fix-issue-last-sync-at-type" author="hephaestus">
+    <changeSet id="1768700000000-1-fix-issue-last-sync-at-type" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <columnExists tableName="issue" columnName="last_sync_at"/>
         </preConditions>
@@ -1479,7 +1483,7 @@
                         newDataType="TIMESTAMP WITH TIME ZONE"/>
     </changeSet>
 
-    <changeSet id="1768700000000-2-fix-team-last-sync-at-type" author="hephaestus">
+    <changeSet id="1768700000000-2-fix-team-last-sync-at-type" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <columnExists tableName="team" columnName="last_sync_at"/>
         </preConditions>
@@ -1490,7 +1494,7 @@
     </changeSet>
 
     <!-- Fix remaining TIMESTAMP columns to TIMESTAMPTZ for consistency -->
-    <changeSet id="1768700000000-3-fix-repo-monitor-timestamps" author="hephaestus">
+    <changeSet id="1768700000000-3-fix-repo-monitor-timestamps" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <columnExists tableName="repository_to_monitor" columnName="issues_and_pull_requests_synced_at"/>
         </preConditions>
@@ -1509,7 +1513,7 @@
                         newDataType="TIMESTAMP WITH TIME ZONE"/>
     </changeSet>
 
-    <changeSet id="1768700000000-4-fix-workspace-users-synced-at" author="hephaestus">
+    <changeSet id="1768700000000-4-fix-workspace-users-synced-at" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <columnExists tableName="workspace" columnName="users_synced_at"/>
         </preConditions>
@@ -1521,7 +1525,7 @@
 
     <!-- ==================== SECTION 26: Add Missing Foreign Key Constraints ==================== -->
 
-    <changeSet id="1768700000000-5-add-team-parent-fk" author="hephaestus">
+    <changeSet id="1768700000000-5-add-team-parent-fk" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <not>
                 <foreignKeyConstraintExists foreignKeyName="fk_team_parent"/>
@@ -1543,7 +1547,7 @@
     Repository.html_url is already VARCHAR(512); aligning all others for consistency.
     -->
 
-    <changeSet id="1768800000000-1-url-length-issue" author="hephaestus">
+    <changeSet id="1768800000000-1-url-length-issue" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <columnExists tableName="issue" columnName="html_url"/>
         </preConditions>
@@ -1553,7 +1557,7 @@
                         newDataType="VARCHAR(512)"/>
     </changeSet>
 
-    <changeSet id="1768800000000-2-url-length-issue-comment" author="hephaestus">
+    <changeSet id="1768800000000-2-url-length-issue-comment" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <columnExists tableName="issue_comment" columnName="html_url"/>
         </preConditions>
@@ -1563,7 +1567,7 @@
                         newDataType="VARCHAR(512)"/>
     </changeSet>
 
-    <changeSet id="1768800000000-3-url-length-milestone" author="hephaestus">
+    <changeSet id="1768800000000-3-url-length-milestone" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <columnExists tableName="milestone" columnName="html_url"/>
         </preConditions>
@@ -1573,7 +1577,7 @@
                         newDataType="VARCHAR(512)"/>
     </changeSet>
 
-    <changeSet id="1768800000000-4-url-length-organization" author="hephaestus">
+    <changeSet id="1768800000000-4-url-length-organization" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <columnExists tableName="organization" columnName="html_url"/>
         </preConditions>
@@ -1583,7 +1587,7 @@
                         newDataType="VARCHAR(512)"/>
     </changeSet>
 
-    <changeSet id="1768800000000-5-url-length-pull-request-review" author="hephaestus">
+    <changeSet id="1768800000000-5-url-length-pull-request-review" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <columnExists tableName="pull_request_review" columnName="html_url"/>
         </preConditions>
@@ -1593,7 +1597,7 @@
                         newDataType="VARCHAR(512)"/>
     </changeSet>
 
-    <changeSet id="1768800000000-6-url-length-pull-request-review-comment" author="hephaestus">
+    <changeSet id="1768800000000-6-url-length-pull-request-review-comment" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <columnExists tableName="pull_request_review_comment" columnName="html_url"/>
         </preConditions>
@@ -1603,7 +1607,7 @@
                         newDataType="VARCHAR(512)"/>
     </changeSet>
 
-    <changeSet id="1768800000000-7-url-length-user" author="hephaestus">
+    <changeSet id="1768800000000-7-url-length-user" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <columnExists tableName="user" columnName="html_url"/>
         </preConditions>
@@ -1613,7 +1617,7 @@
                         newDataType="VARCHAR(512)"/>
     </changeSet>
 
-    <changeSet id="1768800000000-8-url-length-team" author="hephaestus">
+    <changeSet id="1768800000000-8-url-length-team" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <columnExists tableName="team" columnName="html_url"/>
         </preConditions>
@@ -1629,7 +1633,7 @@
     This is a breaking schema change but necessary for consistency.
     -->
 
-    <changeSet id="1768800000000-9-rename-pullrequestbadpractice-table" author="hephaestus">
+    <changeSet id="1768800000000-9-rename-pullrequestbadpractice-table" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <tableExists tableName="pullrequestbadpractice"/>
             <not>
@@ -1647,7 +1651,7 @@
     Affected tables: bad_practice_detection, bad_practice_feedback, pull_request_bad_practice
     -->
 
-    <changeSet id="1768800000000-10-rename-bad-practice-detection-time" author="hephaestus">
+    <changeSet id="1768800000000-10-rename-bad-practice-detection-time" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <columnExists tableName="bad_practice_detection" columnName="detection_time"/>
         </preConditions>
@@ -1658,7 +1662,7 @@
                       columnDataType="TIMESTAMP WITH TIME ZONE"/>
     </changeSet>
 
-    <changeSet id="1768800000000-11-rename-bad-practice-feedback-creation-time" author="hephaestus">
+    <changeSet id="1768800000000-11-rename-bad-practice-feedback-creation-time" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <columnExists tableName="bad_practice_feedback" columnName="creation_time"/>
         </preConditions>
@@ -1669,7 +1673,7 @@
                       columnDataType="TIMESTAMP WITH TIME ZONE"/>
     </changeSet>
 
-    <changeSet id="1768800000000-12-rename-pr-bad-practice-detection-time" author="hephaestus">
+    <changeSet id="1768800000000-12-rename-pr-bad-practice-detection-time" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <tableExists tableName="pull_request_bad_practice"/>
             <columnExists tableName="pull_request_bad_practice" columnName="detection_time"/>
@@ -1681,7 +1685,7 @@
                       columnDataType="TIMESTAMP WITH TIME ZONE"/>
     </changeSet>
 
-    <changeSet id="1768800000000-13-rename-pr-bad-practice-last-update-time" author="hephaestus">
+    <changeSet id="1768800000000-13-rename-pr-bad-practice-last-update-time" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <tableExists tableName="pull_request_bad_practice"/>
             <columnExists tableName="pull_request_bad_practice" columnName="last_update_time"/>
@@ -1700,7 +1704,7 @@
     The state enum (RESOLVED/UNRESOLVED) is sufficient and accurate.
     -->
 
-    <changeSet id="1768800000000-30-drop-thread-resolved-at" author="hephaestus">
+    <changeSet id="1768800000000-30-drop-thread-resolved-at" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <columnExists tableName="pull_request_review_thread" columnName="resolved_at"/>
         </preConditions>
@@ -1714,7 +1718,7 @@
     Adding these to match GitHub's schema and enable timestamp tracking.
     -->
 
-    <changeSet id="1768800000000-14-add-label-created-at" author="hephaestus">
+    <changeSet id="1768800000000-14-add-label-created-at" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <not>
                 <columnExists tableName="label" columnName="created_at"/>
@@ -1726,7 +1730,7 @@
         </addColumn>
     </changeSet>
 
-    <changeSet id="1768800000000-15-add-label-updated-at" author="hephaestus">
+    <changeSet id="1768800000000-15-add-label-updated-at" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <not>
                 <columnExists tableName="label" columnName="updated_at"/>
@@ -1740,7 +1744,7 @@
 
     <!-- ==================== SECTION 32: Drop Redundant Issue Columns ==================== -->
 
-    <changeSet id="1768800000000-32-drop-issue-has-pull-request" author="hephaestus">
+    <changeSet id="1768800000000-32-drop-issue-has-pull-request" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <columnExists tableName="issue" columnName="has_pull_request"/>
         </preConditions>
@@ -1752,7 +1756,7 @@
         <dropColumn tableName="issue" columnName="has_pull_request"/>
     </changeSet>
 
-    <changeSet id="1768800000000-33-drop-org-membership-joined-at" author="hephaestus">
+    <changeSet id="1768800000000-33-drop-org-membership-joined-at" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <columnExists tableName="organization_membership" columnName="joined_at"/>
         </preConditions>
@@ -1765,12 +1769,96 @@
 
     <!-- ==================== SECTION 33: Issue Title Column Length Extension ==================== -->
 
-    <changeSet id="1768800000000-34-issue-title-length" author="hephaestus">
+    <changeSet id="1768800000000-34-issue-title-length" author="FelixTJDietrich">
         <preConditions onFail="MARK_RAN">
             <columnExists tableName="issue" columnName="title"/>
         </preConditions>
         <comment>Increase issue title column length from 255 to 1024 characters to support long GitHub issue titles</comment>
         <modifyDataType tableName="issue" columnName="title" newDataType="VARCHAR(1024)"/>
+    </changeSet>
+
+    <!-- ==================== SECTION 34: Chat Message Performance Index ==================== -->
+
+    <changeSet author="FelixTJDietrich" id="1765851336797-1">
+        <createIndex indexName="idx_chat_message_thread_created" tableName="chat_message">
+            <column name="thread_id"/>
+            <column name="created_at"/>
+        </createIndex>
+    </changeSet>
+
+    <!-- ==================== SECTION 35: Schema Drift Fixes ==================== -->
+    <!--
+    These changesets fix schema drift detected between JPA entities and database.
+    The JPA entities are the source of truth; these changes align the DB schema.
+    -->
+
+    <changeSet author="FelixTJDietrich" id="1768339983522-17">
+        <dropForeignKeyConstraint baseTableName="team" constraintName="fk_team_parent"/>
+    </changeSet>
+    <changeSet author="FelixTJDietrich" id="1768339983522-14">
+        <createIndex indexName="IX_workspace_team_label_filterPK" tableName="workspace_team_label_filter" unique="true">
+            <column name="label_id"/>
+            <column name="team_id"/>
+            <column name="workspace_id"/>
+        </createIndex>
+    </changeSet>
+    <changeSet author="FelixTJDietrich" id="1768339983522-15">
+        <createIndex indexName="IX_workspace_team_repository_settingsPK" tableName="workspace_team_repository_settings" unique="true">
+            <column name="repository_id"/>
+            <column name="team_id"/>
+            <column name="workspace_id"/>
+        </createIndex>
+    </changeSet>
+    <changeSet author="FelixTJDietrich" id="1768339983522-16">
+        <createIndex indexName="IX_workspace_team_settingsPK" tableName="workspace_team_settings" unique="true">
+            <column name="team_id"/>
+            <column name="workspace_id"/>
+        </createIndex>
+    </changeSet>
+    <changeSet author="FelixTJDietrich" id="1768339983522-18">
+        <dropColumn columnName="side" tableName="pull_request_review_comment"/>
+    </changeSet>
+    <changeSet author="FelixTJDietrich" id="1768339983522-19">
+        <dropColumn columnName="start_side" tableName="pull_request_review_comment"/>
+    </changeSet>
+    <changeSet author="FelixTJDietrich" id="1768339983522-1">
+        <modifyDataType columnName="html_url" newDataType="varchar(255)" tableName="issue"/>
+    </changeSet>
+    <changeSet author="FelixTJDietrich" id="1768339983522-2">
+        <modifyDataType columnName="html_url" newDataType="varchar(255)" tableName="issue_comment"/>
+    </changeSet>
+    <changeSet author="FelixTJDietrich" id="1768339983522-3">
+        <modifyDataType columnName="html_url" newDataType="varchar(255)" tableName="milestone"/>
+    </changeSet>
+    <changeSet author="FelixTJDietrich" id="1768339983522-4">
+        <modifyDataType columnName="html_url" newDataType="varchar(255)" tableName="organization"/>
+    </changeSet>
+    <changeSet author="FelixTJDietrich" id="1768339983522-5">
+        <modifyDataType columnName="html_url" newDataType="varchar(255)" tableName="pull_request_review"/>
+    </changeSet>
+    <changeSet author="FelixTJDietrich" id="1768339983522-6">
+        <modifyDataType columnName="html_url" newDataType="varchar(255)" tableName="pull_request_review_comment"/>
+    </changeSet>
+    <changeSet author="FelixTJDietrich" id="1768339983522-7">
+        <modifyDataType columnName="html_url" newDataType="varchar(255)" tableName="user"/>
+    </changeSet>
+    <changeSet author="FelixTJDietrich" id="1768339983522-8">
+        <dropPrimaryKey tableName="workspace_team_label_filter"/>
+    </changeSet>
+    <changeSet author="FelixTJDietrich" id="1768339983522-9">
+        <addPrimaryKey columnNames="label_id, team_id, workspace_id" constraintName="workspace_team_label_filterPK" tableName="workspace_team_label_filter"/>
+    </changeSet>
+    <changeSet author="FelixTJDietrich" id="1768339983522-10">
+        <dropPrimaryKey tableName="workspace_team_repository_settings"/>
+    </changeSet>
+    <changeSet author="FelixTJDietrich" id="1768339983522-11">
+        <addPrimaryKey columnNames="repository_id, team_id, workspace_id" constraintName="workspace_team_repository_settingsPK" tableName="workspace_team_repository_settings"/>
+    </changeSet>
+    <changeSet author="FelixTJDietrich" id="1768339983522-12">
+        <dropPrimaryKey tableName="workspace_team_settings"/>
+    </changeSet>
+    <changeSet author="FelixTJDietrich" id="1768339983522-13">
+        <addPrimaryKey columnNames="team_id, workspace_id" constraintName="workspace_team_settingsPK" tableName="workspace_team_settings"/>
     </changeSet>
 
 </databaseChangeLog>
