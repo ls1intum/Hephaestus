@@ -47,8 +47,7 @@
     SECTION 31: Add Label createdAt/updatedAt (created_at, updated_at columns)
     SECTION 32: Drop Redundant Issue Columns (has_pull_request, organization_membership.joined_at)
     SECTION 33: Issue Title Column Length Extension
-    SECTION 34: Chat Message Performance Index
-    SECTION 35: Schema Drift Fixes (PK column order, html_url lengths, dropped columns)
+    SECTION 34: Schema Drift Fixes (PK column order, html_url lengths, dropped columns)
 
     Original files consolidated:
     - 1767500000000_changelog.xml (GraphQL sync migration)
@@ -57,7 +56,6 @@
     - 1768200000000_drop_has_pull_request.xml
     - 1768300000000_drop_organization_membership_joined_at.xml
     - 1768500000000_issue_title_length.xml (issue title column length)
-    - 1765851336797_changelog.xml (chat message index)
     - 1768339998000_changelog.xml (schema drift fixes)
 
     See: docs/contributor/database-migration.mdx
@@ -1777,16 +1775,7 @@
         <modifyDataType tableName="issue" columnName="title" newDataType="VARCHAR(1024)"/>
     </changeSet>
 
-    <!-- ==================== SECTION 34: Chat Message Performance Index ==================== -->
-
-    <changeSet author="FelixTJDietrich" id="1765851336797-1">
-        <createIndex indexName="idx_chat_message_thread_created" tableName="chat_message">
-            <column name="thread_id"/>
-            <column name="created_at"/>
-        </createIndex>
-    </changeSet>
-
-    <!-- ==================== SECTION 35: Schema Drift Fixes ==================== -->
+    <!-- ==================== SECTION 34: Schema Drift Fixes ==================== -->
     <!--
     These changesets fix schema drift detected between JPA entities and database.
     The JPA entities are the source of truth; these changes align the DB schema.
