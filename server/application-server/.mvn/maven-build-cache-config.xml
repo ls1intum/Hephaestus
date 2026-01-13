@@ -24,8 +24,10 @@
     <!-- MAIN CONFIGURATION                                             -->
     <!-- ============================================================== -->
     <configuration>
-        <!-- Enable/disable the build cache -->
-        <enabled>true</enabled>
+        <!-- Enable/disable the build cache
+             DISABLED by default for development (spring-boot:run doesn't work well with cache)
+             Enable in CI with: -Dmaven.build.cache.enabled=true -->
+        <enabled>false</enabled>
 
         <!-- Hash algorithm for cache keys
              Options: XX (fast), SHA-256 (secure), SHA-512

@@ -193,7 +193,7 @@ jobs:
         run: |
           npm ci --prefer-offline --no-audit
           cd server/application-server
-          [ ! -d "target" ] && mvn compile -DskipTests --quiet
+          [ ! -d "target" ] && mvn compile -DskipTests --quiet -Dmaven.build.cache.enabled=true
           cd ../..
 
           npm run generate:api
@@ -216,7 +216,7 @@ jobs:
           export SPRING_DATASOURCE_PASSWORD="root"
 
           npm ci --prefer-offline --no-audit
-          cd server/application-server && mvn compile -DskipTests --quiet && cd ../..
+          cd server/application-server && mvn compile -DskipTests --quiet -Dmaven.build.cache.enabled=true && cd ../..
           scripts/db-utils.sh draft-changelog || { docker stop postgres-schema && docker rm postgres-schema; exit 1; }
           docker stop postgres-schema && docker rm postgres-schema
 
@@ -239,7 +239,7 @@ jobs:
           export SPRING_DATASOURCE_PASSWORD="root"
 
           npm ci --prefer-offline --no-audit
-          cd server/application-server && mvn compile -DskipTests --quiet && cd ../..
+          cd server/application-server && mvn compile -DskipTests --quiet -Dmaven.build.cache.enabled=true && cd ../..
           scripts/db-utils.sh generate-erd || { docker stop postgres-erd && docker rm postgres-erd; exit 1; }
           docker stop postgres-erd && docker rm postgres-erd
 
@@ -264,7 +264,7 @@ jobs:
           export SPRING_DATASOURCE_USERNAME="root"
           export SPRING_DATASOURCE_PASSWORD="root"
 
-          cd server/application-server && mvn compile -DskipTests --quiet && cd ../..
+          cd server/application-server && mvn compile -DskipTests --quiet -Dmaven.build.cache.enabled=true && cd ../..
           scripts/db-utils.sh generate-models-intelligence-service || { docker stop postgres-models && docker rm postgres-models; exit 1; }
           docker stop postgres-models && docker rm postgres-models
 

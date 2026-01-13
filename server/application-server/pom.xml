@@ -849,16 +849,17 @@
         <!--
             Quick Development Profile (Auto-Activated)
 
-            Automatically skips GraphQL code regeneration AND Java compilation
-            when compiled classes already exist. This makes `mvn spring-boot:run` fast.
+            Skips slow GraphQL code regeneration when generated sources already exist.
+            Java compilation remains ENABLED for incremental development - only GraphQL
+            codegen (~5s) is skipped, normal Java changes are still compiled.
 
             Auto-activation:
-            - Activates when target/classes exists (already compiled)
-            - Does NOT activate after `mvn clean` (forces full rebuild)
+            - Activates when target/classes exists (already compiled once)
+            - Does NOT activate after `mvn clean` (forces full rebuild including GraphQL)
 
             Manual override:
-              ./mvnw spring-boot:run -P!quick                      (force full build)
-              ./mvnw spring-boot:run -Dmaven.main.skip=false       (force compile)
+              ./mvnw spring-boot:run -P!quick                      (force full GraphQL regen)
+              ./mvnw spring-boot:run -Dgraphql.codegen.skip=false  (force GraphQL regen)
 
             CI/CD: Use `mvn clean compile` to ensure full regeneration.
         -->
@@ -871,8 +872,11 @@
                 </file>
             </activation>
             <properties>
+                <!-- Skip GraphQL codegen (~5s) - regenerated sources already exist -->
                 <graphql.codegen.skip>true</graphql.codegen.skip>
-                <maven.main.skip>true</maven.main.skip>
+                <!-- Keep Java compilation enabled for incremental development -->
+                <!-- maven.main.skip deliberately NOT set - we want incremental compile -->
+                <!-- Skip test compilation for faster spring-boot:run -->
                 <maven.test.skip>true</maven.test.skip>
             </properties>
         </profile>
