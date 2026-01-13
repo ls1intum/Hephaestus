@@ -2286,7 +2286,8 @@ components:
       - type
     ChatMessageVote:
       type: object
-      x-hephaestus: a1
+      x-hephaestus:
+        export: true
       properties:
         createdAt:
           type: string
@@ -2306,7 +2307,8 @@ components:
       - updatedAt
     ChatThreadGroup:
       type: object
-      x-hephaestus: a1
+      x-hephaestus:
+        export: true
       properties:
         groupName:
           type: string
@@ -2319,7 +2321,8 @@ components:
       - threads
     ChatThreadSummary:
       type: object
-      x-hephaestus: a1
+      x-hephaestus:
+        export: true
       properties:
         createdAt:
           type: string
@@ -2365,7 +2368,8 @@ components:
       - name
     CreateDocumentRequest:
       type: object
-      x-hephaestus: a1
+      x-hephaestus:
+        export: true
       properties:
         content:
           type: string
@@ -2542,7 +2546,8 @@ components:
       - reason
     Document:
       type: object
-      x-hephaestus: a1
+      x-hephaestus:
+        export: true
       properties:
         content:
           type: string
@@ -2572,10 +2577,12 @@ components:
       type: string
       enum:
       - text
-      x-hephaestus: a1
+      x-hephaestus:
+        export: true
     DocumentSummary:
       type: object
-      x-hephaestus: a1
+      x-hephaestus:
+        export: true
       properties:
         createdAt:
           type: string
@@ -3088,7 +3095,8 @@ components:
     StreamPart:
       type: object
       additionalProperties: {}
-      x-hephaestus: a1
+      x-hephaestus:
+        export: true
       properties:
         type:
           type: string
@@ -3199,7 +3207,8 @@ components:
       - name
     ThreadDetail:
       type: object
-      x-hephaestus: a1
+      x-hephaestus:
+        export: true
       properties:
         id:
           type: string
@@ -3434,7 +3443,8 @@ components:
       - url
     VoteMessageRequest:
       type: object
-      x-hephaestus: a1
+      x-hephaestus:
+        export: true
       properties:
         isUpvoted:
           type: boolean
