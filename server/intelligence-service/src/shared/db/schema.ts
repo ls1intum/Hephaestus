@@ -16,6 +16,7 @@ import {
 	text,
 	timestamp,
 	unique,
+	uniqueIndex,
 	uuid,
 	varchar,
 } from "drizzle-orm/pg-core";
@@ -796,9 +797,7 @@ export const pullRequestReviewComment = pgTable(
 		originalLine: integer("original_line").notNull(),
 		originalStartLine: integer("original_start_line"),
 		path: varchar({ length: 255 }),
-		side: varchar({ length: 255 }),
 		startLine: integer("start_line"),
-		startSide: varchar("start_side", { length: 255 }),
 		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
 		authorId: bigint("author_id", { mode: "number" }),
 		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
@@ -994,32 +993,22 @@ export const repositoryToMonitor = pgTable(
 	],
 );
 
-export const team = pgTable(
-	"team",
-	{
-		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
-		id: bigint({ mode: "number" })
-			.primaryKey()
-			.generatedByDefaultAsIdentity({ name: "team_id_seq", startWith: 1, increment: 1, cache: 1 }),
-		name: varchar({ length: 255 }),
-		createdAt: timestamp("created_at", { precision: 6, withTimezone: true, mode: "string" }),
-		description: text(),
-		htmlUrl: varchar("html_url", { length: 512 }),
-		lastSyncAt: timestamp("last_sync_at", { withTimezone: true, mode: "string" }),
-		organization: varchar({ length: 255 }),
-		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
-		parentId: bigint("parent_id", { mode: "number" }),
-		privacy: varchar({ length: 32 }),
-		updatedAt: timestamp("updated_at", { precision: 6, withTimezone: true, mode: "string" }),
-	},
-	(table) => [
-		foreignKey({
-			columns: [table.parentId],
-			foreignColumns: [table.id],
-			name: "fk_team_parent",
-		}).onDelete("set null"),
-	],
-);
+export const team = pgTable("team", {
+	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+	id: bigint({ mode: "number" })
+		.primaryKey()
+		.generatedByDefaultAsIdentity({ name: "team_id_seq", startWith: 1, increment: 1, cache: 1 }),
+	name: varchar({ length: 255 }),
+	createdAt: timestamp("created_at", { precision: 6, withTimezone: true, mode: "string" }),
+	description: text(),
+	htmlUrl: varchar("html_url", { length: 512 }),
+	lastSyncAt: timestamp("last_sync_at", { withTimezone: true, mode: "string" }),
+	organization: varchar({ length: 255 }),
+	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+	parentId: bigint("parent_id", { mode: "number" }),
+	privacy: varchar({ length: 32 }),
+	updatedAt: timestamp("updated_at", { precision: 6, withTimezone: true, mode: "string" }),
+});
 
 export const teamMembership = pgTable(
 	"team_membership",
@@ -1265,6 +1254,12 @@ export const workspaceTeamLabelFilter = pgTable(
 		labelId: bigint("label_id", { mode: "number" }).notNull(),
 	},
 	(table) => [
+		uniqueIndex("IX_workspace_team_label_filterPK").using(
+			"btree",
+			table.labelId.asc().nullsLast(),
+			table.teamId.asc().nullsLast(),
+			table.workspaceId.asc().nullsLast(),
+		),
 		index("idx_workspace_team_label_filter_team_id").using("btree", table.teamId.asc().nullsLast()),
 		foreignKey({
 			columns: [table.workspaceId],
@@ -1300,6 +1295,12 @@ export const workspaceTeamRepositorySettings = pgTable(
 		hiddenFromContributions: boolean("hidden_from_contributions").default(false).notNull(),
 	},
 	(table) => [
+		uniqueIndex("IX_workspace_team_repository_settingsPK").using(
+			"btree",
+			table.repositoryId.asc().nullsLast(),
+			table.teamId.asc().nullsLast(),
+			table.workspaceId.asc().nullsLast(),
+		),
 		index("idx_workspace_team_repo_settings_team_repo").using(
 			"btree",
 			table.teamId.asc().nullsLast(),
@@ -1337,6 +1338,11 @@ export const workspaceTeamSettings = pgTable(
 		hidden: boolean().default(false).notNull(),
 	},
 	(table) => [
+		uniqueIndex("IX_workspace_team_settingsPK").using(
+			"btree",
+			table.teamId.asc().nullsLast(),
+			table.workspaceId.asc().nullsLast(),
+		),
 		index("idx_workspace_team_settings_team_id").using("btree", table.teamId.asc().nullsLast()),
 		foreignKey({
 			columns: [table.workspaceId],

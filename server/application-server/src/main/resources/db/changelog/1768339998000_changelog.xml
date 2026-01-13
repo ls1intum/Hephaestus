@@ -1,0 +1,71 @@
+<?xml version="1.1" encoding="UTF-8" standalone="no"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog" xmlns:ext="http://www.liquibase.org/xml/ns/dbchangelog-ext" xmlns:pro="http://www.liquibase.org/xml/ns/pro" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog-ext http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-ext.xsd http://www.liquibase.org/xml/ns/pro http://www.liquibase.org/xml/ns/pro/liquibase-pro-latest.xsd http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+    <changeSet author="felixdietrich (generated)" id="1768339983522-17">
+        <dropForeignKeyConstraint baseTableName="team" constraintName="fk_team_parent"/>
+    </changeSet>
+    <changeSet author="felixdietrich (generated)" id="1768339983522-14">
+        <createIndex indexName="IX_workspace_team_label_filterPK" tableName="workspace_team_label_filter" unique="true">
+            <column name="label_id"/>
+            <column name="team_id"/>
+            <column name="workspace_id"/>
+        </createIndex>
+    </changeSet>
+    <changeSet author="felixdietrich (generated)" id="1768339983522-15">
+        <createIndex indexName="IX_workspace_team_repository_settingsPK" tableName="workspace_team_repository_settings" unique="true">
+            <column name="repository_id"/>
+            <column name="team_id"/>
+            <column name="workspace_id"/>
+        </createIndex>
+    </changeSet>
+    <changeSet author="felixdietrich (generated)" id="1768339983522-16">
+        <createIndex indexName="IX_workspace_team_settingsPK" tableName="workspace_team_settings" unique="true">
+            <column name="team_id"/>
+            <column name="workspace_id"/>
+        </createIndex>
+    </changeSet>
+    <changeSet author="felixdietrich (generated)" id="1768339983522-18">
+        <dropColumn columnName="side" tableName="pull_request_review_comment"/>
+    </changeSet>
+    <changeSet author="felixdietrich (generated)" id="1768339983522-19">
+        <dropColumn columnName="start_side" tableName="pull_request_review_comment"/>
+    </changeSet>
+    <changeSet author="felixdietrich (generated)" id="1768339983522-1">
+        <modifyDataType columnName="html_url" newDataType="varchar(255)" tableName="issue"/>
+    </changeSet>
+    <changeSet author="felixdietrich (generated)" id="1768339983522-2">
+        <modifyDataType columnName="html_url" newDataType="varchar(255)" tableName="issue_comment"/>
+    </changeSet>
+    <changeSet author="felixdietrich (generated)" id="1768339983522-3">
+        <modifyDataType columnName="html_url" newDataType="varchar(255)" tableName="milestone"/>
+    </changeSet>
+    <changeSet author="felixdietrich (generated)" id="1768339983522-4">
+        <modifyDataType columnName="html_url" newDataType="varchar(255)" tableName="organization"/>
+    </changeSet>
+    <changeSet author="felixdietrich (generated)" id="1768339983522-5">
+        <modifyDataType columnName="html_url" newDataType="varchar(255)" tableName="pull_request_review"/>
+    </changeSet>
+    <changeSet author="felixdietrich (generated)" id="1768339983522-6">
+        <modifyDataType columnName="html_url" newDataType="varchar(255)" tableName="pull_request_review_comment"/>
+    </changeSet>
+    <changeSet author="felixdietrich (generated)" id="1768339983522-7">
+        <modifyDataType columnName="html_url" newDataType="varchar(255)" tableName="user"/>
+    </changeSet>
+    <changeSet author="felixdietrich (generated)" id="1768339983522-8">
+        <dropPrimaryKey tableName="workspace_team_label_filter"/>
+    </changeSet>
+    <changeSet author="felixdietrich (generated)" id="1768339983522-9">
+        <addPrimaryKey columnNames="label_id, team_id, workspace_id" constraintName="workspace_team_label_filterPK" tableName="workspace_team_label_filter"/>
+    </changeSet>
+    <changeSet author="felixdietrich (generated)" id="1768339983522-10">
+        <dropPrimaryKey tableName="workspace_team_repository_settings"/>
+    </changeSet>
+    <changeSet author="felixdietrich (generated)" id="1768339983522-11">
+        <addPrimaryKey columnNames="repository_id, team_id, workspace_id" constraintName="workspace_team_repository_settingsPK" tableName="workspace_team_repository_settings"/>
+    </changeSet>
+    <changeSet author="felixdietrich (generated)" id="1768339983522-12">
+        <dropPrimaryKey tableName="workspace_team_settings"/>
+    </changeSet>
+    <changeSet author="felixdietrich (generated)" id="1768339983522-13">
+        <addPrimaryKey columnNames="team_id, workspace_id" constraintName="workspace_team_settingsPK" tableName="workspace_team_settings"/>
+    </changeSet>
+</databaseChangeLog>

@@ -279,9 +279,7 @@ erDiagram
         INTEGER original_line "NOT NULL"
         INTEGER original_start_line
         VARCHAR(255) path
-        VARCHAR(255) side
         INTEGER start_line
-        VARCHAR(255) start_side
         BIGINT author_id FK
         BIGINT pull_request_id FK
         BIGINT review_id FK
@@ -355,7 +353,7 @@ erDiagram
         VARCHAR(512) html_url
         TIMESTAMPTZ last_sync_at
         VARCHAR(255) organization
-        BIGINT parent_id FK
+        BIGINT parent_id
         VARCHAR(32) privacy
         TIMESTAMPTZ updated_at
     }
@@ -505,7 +503,6 @@ erDiagram
     User ||--o{ PullRequestReviewThread : reviewed
     Organization ||--o{ Repository : has
     Workspace ||--o{ RepositoryToMonitor : monitors
-    Team ||--o{ Team : references
     Workspace ||--o{ WorkspaceSlugHistory : has
 
     %% Many-to-Many relationships
