@@ -1,8 +1,5 @@
 package de.tum.in.www1.hephaestus.workspace;
 
-import de.tum.in.www1.hephaestus.profile.ProfileCommentQueryRepository;
-import de.tum.in.www1.hephaestus.profile.ProfilePullRequestQueryRepository;
-import de.tum.in.www1.hephaestus.profile.ProfileReviewQueryRepository;
 import java.time.Instant;
 import java.util.Objects;
 import java.util.Optional;
@@ -22,18 +19,10 @@ import org.springframework.stereotype.Service;
 @Service
 public class WorkspaceContributionActivityService {
 
-    private final ProfilePullRequestQueryRepository profilePullRequestQueryRepository;
-    private final ProfileReviewQueryRepository profileReviewQueryRepository;
-    private final ProfileCommentQueryRepository profileCommentQueryRepository;
+    private final WorkspaceContributionQueryRepository contributionQueryRepository;
 
-    public WorkspaceContributionActivityService(
-        ProfilePullRequestQueryRepository profilePullRequestQueryRepository,
-        ProfileReviewQueryRepository profileReviewQueryRepository,
-        ProfileCommentQueryRepository profileCommentQueryRepository
-    ) {
-        this.profilePullRequestQueryRepository = profilePullRequestQueryRepository;
-        this.profileReviewQueryRepository = profileReviewQueryRepository;
-        this.profileCommentQueryRepository = profileCommentQueryRepository;
+    public WorkspaceContributionActivityService(WorkspaceContributionQueryRepository contributionQueryRepository) {
+        this.contributionQueryRepository = contributionQueryRepository;
     }
 
     /**
@@ -50,9 +39,9 @@ public class WorkspaceContributionActivityService {
             return Optional.empty();
         }
 
-        Instant firstPullRequest = profilePullRequestQueryRepository.findEarliestCreatedAt(workspaceId, userId);
-        Instant firstReview = profileReviewQueryRepository.findEarliestSubmissionInstant(workspaceId, userId);
-        Instant firstIssueComment = profileCommentQueryRepository.findEarliestCreatedAt(workspaceId, userId);
+        Instant firstPullRequest = contributionQueryRepository.findEarliestPullRequestCreatedAt(workspaceId, userId);
+        Instant firstReview = contributionQueryRepository.findEarliestReviewSubmittedAt(workspaceId, userId);
+        Instant firstIssueComment = contributionQueryRepository.findEarliestCommentCreatedAt(workspaceId, userId);
 
         Instant firstContribution = Stream.of(firstPullRequest, firstReview, firstIssueComment)
             .filter(Objects::nonNull)

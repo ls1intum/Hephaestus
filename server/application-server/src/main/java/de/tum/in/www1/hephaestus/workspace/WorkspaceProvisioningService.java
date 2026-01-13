@@ -323,7 +323,7 @@ public class WorkspaceProvisioningService {
 
         log.info("Organization sync for workspace {} will be handled via webhooks", workspace.getWorkspaceSlug());
 
-        workspaceRepositoryMonitorService.ensureAllInstallationRepositoriesCovered(installationId, true);
+        workspaceRepositoryMonitorService.ensureAllInstallationRepositoriesCovered(installationId, null, true);
     }
 
     private boolean isBlank(String value) {

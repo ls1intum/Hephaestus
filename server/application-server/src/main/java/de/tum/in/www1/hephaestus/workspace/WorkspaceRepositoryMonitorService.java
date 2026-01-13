@@ -307,33 +307,12 @@ public class WorkspaceRepositoryMonitorService {
     /**
      * Enumerate all repositories available to the installation when repository
      * selection is ALL and ensure monitors exist.
-     */
-    @Transactional
-    public void ensureAllInstallationRepositoriesCovered(long installationId) {
-        ensureAllInstallationRepositoriesCovered(installationId, Collections.emptySet(), false);
-    }
-
-    /**
-     * Enumerate all repositories available to the installation when repository
-     * selection is ALL and ensure monitors exist.
      *
-     * @param installationId the GitHub App installation ID
-     * @param deferSync      if true, skip immediate sync (use during provisioning
-     *                       when activation will sync in bulk)
+     * @param installationId       the GitHub App installation ID
+     * @param protectedRepositories repositories to keep even if not in installation (can be null)
+     * @param deferSync            if true, skip immediate sync (use during provisioning
+     *                             when activation will sync in bulk)
      */
-    @Transactional
-    public void ensureAllInstallationRepositoriesCovered(long installationId, boolean deferSync) {
-        ensureAllInstallationRepositoriesCovered(installationId, Collections.emptySet(), deferSync);
-    }
-
-    @Transactional
-    public void ensureAllInstallationRepositoriesCovered(
-        long installationId,
-        Collection<String> protectedRepositories
-    ) {
-        ensureAllInstallationRepositoriesCovered(installationId, protectedRepositories, false);
-    }
-
     @Transactional
     public void ensureAllInstallationRepositoriesCovered(
         long installationId,
