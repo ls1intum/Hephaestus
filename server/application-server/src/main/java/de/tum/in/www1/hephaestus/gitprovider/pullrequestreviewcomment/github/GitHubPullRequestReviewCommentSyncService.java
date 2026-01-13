@@ -1,6 +1,7 @@
 package de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.github;
 
 import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlErrorUtils.isNotFoundError;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.*;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
@@ -34,6 +35,7 @@ import java.util.stream.Stream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.graphql.client.ClientGraphQlResponse;
+import org.springframework.graphql.client.FieldAccessException;
 import org.springframework.graphql.client.HttpGraphQlClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -209,6 +211,24 @@ public class GitHubPullRequestReviewCommentSyncService {
                 repository.getNameWithOwner()
             );
             return totalSynced;
+        } catch (FieldAccessException e) {
+            // Check if this is a NOT_FOUND error (PR deleted from GitHub)
+            if (isNotFoundError(e.getResponse(), "repository.pullRequest")) {
+                log.debug(
+                    "PR #{} in {} no longer exists on GitHub, skipping review comment sync",
+                    pullRequest.getNumber(),
+                    safeNameWithOwner
+                );
+                return 0;
+            }
+            log.error(
+                "Error syncing review comments for PR #{} in repository {}: {}",
+                pullRequest.getNumber(),
+                repository.getNameWithOwner(),
+                e.getMessage(),
+                e
+            );
+            return 0;
         } catch (Exception e) {
             log.error(
                 "Error syncing review comments for PR #{} in repository {}: {}",

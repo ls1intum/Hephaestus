@@ -1,6 +1,7 @@
 package de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.github;
 
 import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlErrorUtils.isNotFoundError;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.DEFAULT_PAGE_SIZE;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.GRAPHQL_TIMEOUT;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.LARGE_PAGE_SIZE;
@@ -28,6 +29,7 @@ import java.util.stream.Stream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.graphql.client.ClientGraphQlResponse;
+import org.springframework.graphql.client.FieldAccessException;
 import org.springframework.graphql.client.HttpGraphQlClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -173,6 +175,15 @@ public class GitHubPullRequestReviewSyncService {
                     .block(GRAPHQL_TIMEOUT);
 
                 if (response == null || !response.isValid()) {
+                    // Check if this is a NOT_FOUND error (PR deleted from GitHub)
+                    if (isNotFoundError(response, "repository.pullRequest")) {
+                        log.debug(
+                            "PR #{} in {} no longer exists on GitHub, skipping review sync",
+                            pullRequest.getNumber(),
+                            safeNameWithOwner
+                        );
+                        return 0;
+                    }
                     log.warn("Invalid GraphQL response: {}", response != null ? response.getErrors() : "null");
                     break;
                 }
@@ -208,6 +219,24 @@ public class GitHubPullRequestReviewSyncService {
                 GHPageInfo pageInfo = connection.getPageInfo();
                 hasMore = pageInfo != null && Boolean.TRUE.equals(pageInfo.getHasNextPage());
                 cursor = pageInfo != null ? pageInfo.getEndCursor() : null;
+            } catch (FieldAccessException e) {
+                // Check if this is a NOT_FOUND error (PR deleted from GitHub)
+                if (isNotFoundError(e.getResponse(), "repository.pullRequest")) {
+                    log.debug(
+                        "PR #{} in {} no longer exists on GitHub, skipping review sync",
+                        pullRequest.getNumber(),
+                        safeNameWithOwner
+                    );
+                    return 0;
+                }
+                log.error(
+                    "Error syncing reviews for PR #{} in {}: {}",
+                    pullRequest.getNumber(),
+                    safeNameWithOwner,
+                    e.getMessage(),
+                    e
+                );
+                break;
             } catch (Exception e) {
                 log.error(
                     "Error syncing reviews for PR #{} in {}: {}",

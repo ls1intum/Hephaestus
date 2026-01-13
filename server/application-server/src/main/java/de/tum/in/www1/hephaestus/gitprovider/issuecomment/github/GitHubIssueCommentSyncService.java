@@ -1,6 +1,7 @@
 package de.tum.in.www1.hephaestus.gitprovider.issuecomment.github;
 
 import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlErrorUtils.isNotFoundError;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.DEFAULT_PAGE_SIZE;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.GRAPHQL_TIMEOUT;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.MAX_PAGINATION_PAGES;
@@ -23,6 +24,7 @@ import java.util.stream.Stream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.graphql.client.ClientGraphQlResponse;
+import org.springframework.graphql.client.FieldAccessException;
 import org.springframework.graphql.client.HttpGraphQlClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -145,6 +147,15 @@ public class GitHubIssueCommentSyncService {
                     .block(GRAPHQL_TIMEOUT);
 
                 if (response == null || !response.isValid()) {
+                    // Check if this is a NOT_FOUND error (issue deleted from GitHub)
+                    if (isNotFoundError(response, "repository.issue")) {
+                        log.debug(
+                            "Issue #{} in {} no longer exists on GitHub, skipping comment sync",
+                            issue.getNumber(),
+                            safeNameWithOwner
+                        );
+                        return 0;
+                    }
                     log.warn("Invalid GraphQL response: {}", response != null ? response.getErrors() : "null");
                     break;
                 }
@@ -170,6 +181,25 @@ public class GitHubIssueCommentSyncService {
                 GHPageInfo pageInfo = connection.getPageInfo();
                 hasMore = pageInfo != null && Boolean.TRUE.equals(pageInfo.getHasNextPage());
                 cursor = pageInfo != null ? pageInfo.getEndCursor() : null;
+            } catch (FieldAccessException e) {
+                // Check if this is a NOT_FOUND error (issue deleted from GitHub)
+                if (isNotFoundError(e.getResponse(), "repository.issue")) {
+                    // Log at DEBUG - deleted issues are expected during sync, not actionable
+                    log.debug(
+                        "Issue #{} in {} no longer exists on GitHub, skipping comment sync",
+                        issue.getNumber(),
+                        safeNameWithOwner
+                    );
+                    return 0;
+                }
+                log.error(
+                    "Error syncing comments for issue #{} in {}: {}",
+                    issue.getNumber(),
+                    safeNameWithOwner,
+                    e.getMessage(),
+                    e
+                );
+                break;
             } catch (Exception e) {
                 log.error(
                     "Error syncing comments for issue #{} in {}: {}",
