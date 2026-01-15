@@ -137,7 +137,7 @@ public class WorkspaceProvisioningService {
                 monitor.setWorkspace(savedWorkspace);
                 repositoryToMonitorRepository.save(monitor);
                 savedWorkspace.getRepositoriesToMonitor().add(monitor);
-                log.info("Queued repository for monitoring: nameWithOwner={}", nameWithOwner);
+                log.info("Queued repository for monitoring: repoName={}", nameWithOwner);
             });
 
         workspaceRepository.save(savedWorkspace);
@@ -180,7 +180,7 @@ public class WorkspaceProvisioningService {
                     log.info("Added default admin to workspace: workspaceSlug={}, role=ADMIN", workspace.getWorkspaceSlug());
                 } catch (IllegalArgumentException ex) {
                     log.debug(
-                        "Failed to add default admin to workspace: workspaceSlug={}",
+                        "Skipped default admin addition: workspaceSlug={}",
                         workspace.getWorkspaceSlug(),
                         ex
                     );
@@ -196,7 +196,7 @@ public class WorkspaceProvisioningService {
     public void ensureGitHubAppInstallations() {
         if (!gitHubAppTokenService.isConfigured()) {
             log.info(
-                "Skipped GitHub App installation processing, credentials not configured: appId={}",
+                "Skipped GitHub App installation processing: reason=credentialsNotConfigured, appId={}",
                 gitHubAppTokenService.getConfiguredAppId()
             );
             return;
@@ -215,13 +215,13 @@ public class WorkspaceProvisioningService {
                 .block();
 
             if (appInfo == null) {
-                log.warn("Skipped GitHub App processing: reason=appInfoResponseNull");
+                log.warn("Skipped GitHub App processing: reason=nullAppInfoResponse");
                 return;
             }
 
             String ownerLogin = appInfo.owner() != null ? appInfo.owner().login() : "unknown";
             log.info(
-                "Authenticated as GitHub App: appName={}, appSlug={}, appId={}, owner={}",
+                "Authenticated as GitHub App: appName={}, appSlug={}, appId={}, ownerLogin={}",
                 appInfo.name(),
                 appInfo.slug(),
                 appInfo.id(),
@@ -240,7 +240,7 @@ public class WorkspaceProvisioningService {
 
             if (installations == null || installations.isEmpty()) {
                 log.warn(
-                    "No installations returned for GitHub App: appSlug={}, appId={}",
+                    "Skipped GitHub App processing: reason=noInstallations, appSlug={}, appId={}",
                     appInfo.slug(),
                     appInfo.id()
                 );
@@ -260,13 +260,13 @@ public class WorkspaceProvisioningService {
                 synchronizeInstallation(installation);
             }
         } catch (Exception e) {
-            log.warn("Failed to reconcile GitHub App installations", e);
+            log.warn("Failed to reconcile GitHub App installations: reason=apiError", e);
         }
     }
 
     private void synchronizeInstallation(InstallationDto installation) {
         if (installation.account() == null) {
-            log.warn("Skipped installation sync: reason=noAccountInformation, installationId={}", installation.id());
+            log.warn("Skipped installation sync: reason=noAccountInfo, installationId={}", installation.id());
             return;
         }
 
@@ -274,7 +274,7 @@ public class WorkspaceProvisioningService {
 
         if (workspaceScopeFilter.isActive() && !workspaceScopeFilter.isOrganizationAllowed(login)) {
             log.info(
-                "Skipped installation, not in allowed-organizations filter: installationId={}, accountLogin={}",
+                "Skipped installation sync: reason=filteredByScope, installationId={}, accountLogin={}",
                 installation.id(),
                 login
             );
@@ -284,7 +284,7 @@ public class WorkspaceProvisioningService {
         String accountType = installation.account().type();
         if (!"Organization".equalsIgnoreCase(accountType)) {
             log.info(
-                "Skipped installation, owner type not supported: installationId={}, accountType={}",
+                "Skipped installation sync: reason=unsupportedAccountType, installationId={}, accountType={}",
                 installation.id(),
                 accountType
             );
@@ -294,7 +294,7 @@ public class WorkspaceProvisioningService {
         long installationId = installation.id();
         RepositorySelection selection = convertRepositorySelection(installation.repositorySelection());
 
-        log.info("Ensured installation: installationId={}, orgLogin={}, selection={}", installationId, login, selection);
+        log.info("Ensured installation workspace: installationId={}, orgLogin={}, selection={}", installationId, login, selection);
 
         var account = installation.account();
         ProvisioningListener.AccountType wsAccountType = "Organization".equalsIgnoreCase(accountType)
@@ -312,7 +312,7 @@ public class WorkspaceProvisioningService {
 
         if (workspace == null) {
             log.warn(
-                "Skipped workspace creation, user may not exist: installationId={}, orgLogin={}",
+                "Skipped workspace creation: reason=userNotFound, installationId={}, orgLogin={}",
                 installationId,
                 login
             );

@@ -64,7 +64,7 @@ public class GitHubInstallationRepositoryEnumerationService {
      */
     public List<InstallationRepositorySnapshot> enumerate(long installationId) {
         if (!gitHubAppTokenService.isConfigured()) {
-            log.warn("GitHub App credentials missing; cannot enumerate installation {} repositories.", installationId);
+            log.warn("Skipped installation enumeration: reason=missingCredentials, installationId={}", installationId);
             return List.of();
         }
 
@@ -88,11 +88,7 @@ public class GitHubInstallationRepositoryEnumerationService {
                     .block();
 
                 if (responseEntity == null || responseEntity.getBody() == null) {
-                    log.warn(
-                        "Empty response from GitHub API for installation {} on page {}",
-                        installationId,
-                        pageCount
-                    );
+                    log.warn("Received empty response: installationId={}, pageNumber={}", installationId, pageCount);
                     break;
                 }
 
@@ -110,21 +106,16 @@ public class GitHubInstallationRepositoryEnumerationService {
             }
 
             log.info(
-                "Enumerated {} repositories for installation {} (total reported: {}, pages: {})",
-                allRepositories.size(),
+                "Enumerated installation repositories: installationId={}, repoCount={}, totalReported={}, pageCount={}",
                 installationId,
+                allRepositories.size(),
                 totalCount,
                 pageCount
             );
 
             return allRepositories;
         } catch (Exception e) {
-            log.warn(
-                "Failed to enumerate installation {} repositories via GitHub API: {}",
-                installationId,
-                e.getMessage()
-            );
-            log.debug("GitHub installation enumeration failure", e);
+            log.warn("Failed to enumerate installation repositories: installationId={}", installationId, e);
             return List.of();
         }
     }

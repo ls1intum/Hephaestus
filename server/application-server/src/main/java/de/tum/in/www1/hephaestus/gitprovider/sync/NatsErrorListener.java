@@ -20,7 +20,7 @@ public class NatsErrorListener implements ErrorListener {
 
     @Override
     public void errorOccurred(Connection conn, String error) {
-        log.error("nats.error serverPort={} message={}", getServerPort(conn), error);
+        log.error("NATS error occurred: serverPort={}, message={}", getServerPort(conn), error);
     }
 
     @Override
@@ -32,7 +32,7 @@ public class NatsErrorListener implements ErrorListener {
     ) {
         String consumerName = sub != null ? sub.getConsumerName() : "unknown";
         log.warn(
-            "nats.heartbeat_alarm consumer={} streamSeq={} consumerSeq={}",
+            "NATS heartbeat alarm: consumerName={}, streamSeq={}, consumerSeq={}",
             consumerName,
             lastStreamSequence,
             lastConsumerSequence
@@ -42,7 +42,7 @@ public class NatsErrorListener implements ErrorListener {
     @Override
     public void slowConsumerDetected(Connection conn, Consumer consumer) {
         String consumerName = consumer != null ? consumer.toString() : "unknown";
-        log.warn("nats.slow_consumer_detected consumer={}", consumerName);
+        log.warn("NATS slow consumer detected: consumerName={}", consumerName);
     }
 
     private String getServerPort(Connection conn) {

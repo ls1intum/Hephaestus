@@ -49,7 +49,7 @@ public class LeaguePointsService {
         int newPoints = Math.max(1, effectivePoints + pointChange);
 
         log.debug(
-            "Points calculation for user {}: old={}, k={}, decay={}, performance={}, placement={}, change={}, new={}",
+            "Calculated league points: userLogin={}, oldPoints={}, kFactor={}, decay={}, performanceBonus={}, placementBonus={}, pointChange={}, newPoints={}",
             user.getLogin(),
             effectivePoints,
             kFactor,

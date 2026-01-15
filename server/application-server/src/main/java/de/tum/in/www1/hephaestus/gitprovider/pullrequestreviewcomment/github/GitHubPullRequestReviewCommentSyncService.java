@@ -97,7 +97,7 @@ public class GitHubPullRequestReviewCommentSyncService {
     public int syncCommentsForRepository(Long scopeId, Long repositoryId) {
         Repository repository = repositoryRepository.findById(repositoryId).orElse(null);
         if (repository == null) {
-            log.warn("Repository not found, skipping review comment sync: repoId={}", repositoryId);
+            log.warn("Skipped review comment sync: reason=repositoryNotFound, repoId={}", repositoryId);
             return 0;
         }
 
@@ -114,7 +114,7 @@ public class GitHubPullRequestReviewCommentSyncService {
         }
 
         if (prCount.get() == 0) {
-            log.debug("No pull requests found, skipping review comment sync: repoName={}", safeRepoName);
+            log.debug("Skipped review comment sync: reason=noPullRequestsFound, repoName={}", safeRepoName);
             return 0;
         }
 
@@ -137,20 +137,20 @@ public class GitHubPullRequestReviewCommentSyncService {
     @Transactional
     public int syncCommentsForPullRequest(Long scopeId, PullRequest pullRequest) {
         if (pullRequest == null) {
-            log.warn("Pull request is null, skipping review comment sync");
+            log.warn("Skipped review comment sync: reason=prIsNull");
             return 0;
         }
 
         Repository repository = pullRequest.getRepository();
         if (repository == null) {
-            log.warn("Pull request has no repository, skipping review comment sync: prId={}", pullRequest.getId());
+            log.warn("Skipped review comment sync: reason=prHasNoRepository, prId={}", pullRequest.getId());
             return 0;
         }
 
         String safeNameWithOwner = sanitizeForLog(repository.getNameWithOwner());
         Optional<RepositoryOwnerAndName> parsedName = GitHubRepositoryNameParser.parse(repository.getNameWithOwner());
         if (parsedName.isEmpty()) {
-            log.warn("Invalid repository name format, skipping review comment sync: repoName={}", safeNameWithOwner);
+            log.warn("Skipped review comment sync: reason=invalidRepoNameFormat, repoName={}", safeNameWithOwner);
             return 0;
         }
         String owner = parsedName.get().owner();
@@ -213,7 +213,7 @@ public class GitHubPullRequestReviewCommentSyncService {
             // Check if this is a NOT_FOUND error (PR deleted from GitHub)
             if (isNotFoundError(e.getResponse(), "repository.pullRequest")) {
                 log.debug(
-                    "Pull request no longer exists on GitHub, skipping review comment sync: repoName={}, prNumber={}",
+                    "Skipped review comment sync: reason=prDeletedFromGitHub, repoName={}, prNumber={}",
                     safeNameWithOwner,
                     pullRequest.getNumber()
                 );

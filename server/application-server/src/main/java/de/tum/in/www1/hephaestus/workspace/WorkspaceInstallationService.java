@@ -323,7 +323,7 @@ public class WorkspaceInstallationService {
                     renameTrackedRepositories(oldLogin, newLogin);
                     rotateOrganizationConsumer(workspace, oldLogin, newLogin);
                 },
-                () -> log.warn("Skipped installation_target event: reason=unknownInstallation, installationId={}", installationId)
+                () -> log.warn("Skipped account rename: reason=unknownInstallation, installationId={}", installationId)
             );
     }
 
@@ -497,7 +497,7 @@ public class WorkspaceInstallationService {
         }
 
         log.warn(
-            "Failed to create user, missing account ID from webhook: userLogin={}, installationId={}",
+            "Skipped user creation: reason=missingAccountId, userLogin={}, installationId={}",
             LoggingUtils.sanitizeForLog(accountLogin),
             installationId
         );

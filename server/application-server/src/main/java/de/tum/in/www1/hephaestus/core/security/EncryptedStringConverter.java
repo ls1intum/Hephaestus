@@ -56,7 +56,7 @@ public class EncryptedStringConverter implements AttributeConverter<String, Stri
     public EncryptedStringConverter() {
         this.secretKey = null;
         this.enabled = false;
-        log.debug("EncryptedStringConverter instantiated without Spring context - encryption disabled");
+        log.debug("Instantiated EncryptedStringConverter: enabled=false, reason=no_spring_context");
     }
 
     public EncryptedStringConverter(
@@ -70,8 +70,8 @@ public class EncryptedStringConverter implements AttributeConverter<String, Stri
                 );
             }
             log.warn(
-                "Encryption key not configured - sensitive data will NOT be encrypted at rest. " +
-                    "Set hephaestus.security.encryption-key in production!"
+                "Skipped encryption configuration: reason=missing_key, " +
+                    "action=set_hephaestus_security_encryption_key_in_production"
             );
             this.secretKey = null;
             this.enabled = false;
@@ -82,7 +82,7 @@ public class EncryptedStringConverter implements AttributeConverter<String, Stri
         } else {
             this.secretKey = new SecretKeySpec(encryptionKey.getBytes(StandardCharsets.UTF_8), "AES");
             this.enabled = true;
-            log.info("Encryption enabled for sensitive database fields");
+            log.info("Enabled encryption for sensitive database fields");
         }
     }
 
@@ -121,7 +121,7 @@ public class EncryptedStringConverter implements AttributeConverter<String, Stri
 
         // Handle unencrypted legacy data
         if (!dbData.startsWith(PREFIX)) {
-            log.debug("Found unencrypted value in database - returning as-is");
+            log.debug("Found unencrypted value in database: action=returning_as_is");
             return dbData;
         }
 

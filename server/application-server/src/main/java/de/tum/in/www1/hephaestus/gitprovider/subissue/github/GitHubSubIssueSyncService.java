@@ -103,7 +103,7 @@ public class GitHubSubIssueSyncService {
 
         Optional<Issue> subIssueOpt = issueRepository.findById(subIssueId);
         if (subIssueOpt.isEmpty()) {
-            log.debug("Sub-issue not found in database, skipping: issueId={}", subIssueId);
+            log.debug("Skipped sub-issue processing: reason=issueNotFound, issueId={}", subIssueId);
             return;
         }
 
@@ -124,7 +124,7 @@ public class GitHubSubIssueSyncService {
     private void linkSubIssueToParent(Issue subIssue, long parentIssueId, @Nullable SubIssuesSummaryDTO parentSummary) {
         Optional<Issue> parentOpt = issueRepository.findById(parentIssueId);
         if (parentOpt.isEmpty()) {
-            log.debug("Parent issue not found in database, skipping link: issueId={}", parentIssueId);
+            log.debug("Skipped sub-issue link: reason=parentNotFound, issueId={}", parentIssueId);
             return;
         }
 
@@ -199,7 +199,7 @@ public class GitHubSubIssueSyncService {
         // Check cooldown
         if (!metadata.needsSubIssuesSync(syncCooldownInMinutes)) {
             log.debug(
-                "Skipping sub-issues sync due to cooldown: scopeId={}, lastSyncedAt={}",
+                "Skipped sub-issues sync: reason=cooldownActive, scopeId={}, lastSyncedAt={}",
                 scopeId,
                 metadata.subIssuesSyncedAt()
             );
@@ -225,7 +225,7 @@ public class GitHubSubIssueSyncService {
         for (String repoNameWithOwner : repositoryNames) {
             Optional<Repository> repoOpt = repositoryRepository.findByNameWithOwner(repoNameWithOwner);
             if (repoOpt.isEmpty()) {
-                log.warn("Repository not found in database, skipping: repoName={}", sanitizeForLog(repoNameWithOwner));
+                log.warn("Skipped sub-issue sync: reason=repositoryNotFound, repoName={}", sanitizeForLog(repoNameWithOwner));
                 continue;
             }
 

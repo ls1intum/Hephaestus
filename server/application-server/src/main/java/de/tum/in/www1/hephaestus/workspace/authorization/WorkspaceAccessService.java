@@ -32,13 +32,13 @@ public class WorkspaceAccessService {
     public boolean hasRole(WorkspaceRole requiredRole) {
         WorkspaceContext context = WorkspaceContextHolder.getContext();
         if (context == null) {
-            log.warn("No workspace context found when checking role: {}", requiredRole);
+            log.warn("Denied role check: reason=noWorkspaceContext, requiredRole={}", requiredRole);
             return false;
         }
 
         Set<WorkspaceRole> userRoles = context.roles();
         if (userRoles == null || userRoles.isEmpty()) {
-            log.debug("User has no roles in workspace: {}", context.slug());
+            log.debug("Denied role check: reason=noRoles, workspaceSlug={}", context.slug());
             return false;
         }
 
@@ -50,7 +50,7 @@ public class WorkspaceAccessService {
         }
 
         log.debug(
-            "User roles {} do not satisfy required role {} in workspace: {}",
+            "Denied role check: reason=insufficientRole, userRoles={}, requiredRole={}, workspaceSlug={}",
             userRoles,
             requiredRole,
             context.slug()

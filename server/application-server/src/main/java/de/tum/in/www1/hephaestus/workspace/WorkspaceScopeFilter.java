@@ -44,12 +44,12 @@ public class WorkspaceScopeFilter {
     void logConfiguration() {
         if (isActive()) {
             log.info(
-                "Workspace scope filter ACTIVE: allowed-organizations={}, allowed-repositories={}",
+                "Initialized workspace scope filter: status=ACTIVE, allowedOrganizations={}, allowedRepositories={}",
                 allowedOrganizations,
                 allowedRepositories
             );
         } else {
-            log.info("Workspace scope filter INACTIVE: all workspaces and repositories will be synced.");
+            log.info("Initialized workspace scope filter: status=INACTIVE");
         }
     }
 

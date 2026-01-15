@@ -44,7 +44,7 @@ public class WorkspaceInstallationTokenProvider implements InstallationTokenProv
                     : AuthMode.PERSONAL_ACCESS_TOKEN
             )
             .orElseGet(() -> {
-                log.warn("Defaulted to GITHUB_APP auth mode, scope not found: scopeId={}", scopeId);
+                log.warn("Defaulted to GITHUB_APP auth mode: reason=scopeNotFound, scopeId={}", scopeId);
                 return AuthMode.GITHUB_APP;
             });
     }

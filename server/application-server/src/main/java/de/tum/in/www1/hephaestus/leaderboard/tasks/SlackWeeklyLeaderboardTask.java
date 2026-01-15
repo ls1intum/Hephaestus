@@ -109,8 +109,9 @@ public class SlackWeeklyLeaderboardTask implements Runnable {
         );
         var top3 = leaderboard.subList(0, Math.min(3, leaderboard.size()));
         log.debug(
-            "Top 3 Users of the last week for workspace {}: {}",
-            workspace.getWorkspaceSlug(),
+            "Fetched top reviewers: workspaceId={}, userCount={}, users={}",
+            workspace.getId(),
+            top3.size(),
             top3
                 .stream()
                 .map(entry -> entry.user() != null ? entry.user().name() : "<team>")
@@ -195,8 +196,8 @@ public class SlackWeeklyLeaderboardTask implements Runnable {
             var topReviewers = getTop3SlackReviewers(workspace, after, before, Optional.ofNullable(team));
             if (topReviewers.isEmpty()) {
                 log.info(
-                    "Skipped Slack notification: reason=noQualifiedReviewers, workspaceSlug={}",
-                    workspace.getWorkspaceSlug()
+                    "Skipped Slack notification: reason=noQualifiedReviewers, workspaceId={}",
+                    workspace.getId()
                 );
                 continue;
             }
@@ -206,8 +207,8 @@ public class SlackWeeklyLeaderboardTask implements Runnable {
                 slackMessageService.sendMessage(channelId, blocks, "Weekly review highlights");
             } catch (IOException | SlackApiException e) {
                 log.error(
-                    "Failed to send scheduled Slack message: workspaceSlug={}",
-                    workspace.getWorkspaceSlug(),
+                    "Failed to send scheduled Slack message: workspaceId={}",
+                    workspace.getId(),
                     e
                 );
             }

@@ -65,7 +65,7 @@ public class GitHubMilestoneSyncService {
     public int syncMilestonesForRepository(Long scopeId, Long repositoryId) {
         Repository repository = repositoryRepository.findById(repositoryId).orElse(null);
         if (repository == null) {
-            log.warn("Repository not found, skipping milestone sync: repoId={}", repositoryId);
+            log.warn("Skipped milestone sync: reason=repositoryNotFound, repoId={}", repositoryId);
             return 0;
         }
 

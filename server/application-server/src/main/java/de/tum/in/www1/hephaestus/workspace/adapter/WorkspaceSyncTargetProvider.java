@@ -100,7 +100,7 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
                     }
                     repositoryToMonitorRepository.save(rtm);
                 },
-                () -> log.warn("Failed to update sync timestamp, sync target not found: syncTargetId={}", syncTargetId)
+                () -> log.warn("Failed to update sync timestamp: reason=syncTargetNotFound, syncTargetId={}", syncTargetId)
             );
     }
 
@@ -125,7 +125,7 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
                     }
                     workspaceRepository.save(ws);
                 },
-                () -> log.warn("Failed to update scope sync timestamp, scope not found: scopeId={}", scopeId)
+                () -> log.warn("Failed to update scope sync timestamp: reason=scopeNotFound, scopeId={}", scopeId)
             );
     }
 
@@ -171,7 +171,7 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
                     ws.setUsersSyncedAt(syncedAt);
                     workspaceRepository.save(ws);
                 },
-                () -> log.warn("Failed to update users sync timestamp, scope not found: scopeId={}", scopeId)
+                () -> log.warn("Failed to update users sync timestamp: reason=scopeNotFound, scopeId={}", scopeId)
             );
     }
 
@@ -202,7 +202,7 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
                     ws.setTeamsSyncedAt(syncedAt);
                     workspaceRepository.save(ws);
                 },
-                () -> log.warn("Failed to update teams sync timestamp, scope not found: scopeId={}", scopeId)
+                () -> log.warn("Failed to update teams sync timestamp: reason=scopeNotFound, scopeId={}", scopeId)
             );
     }
 
@@ -239,7 +239,7 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
                     }
                     repositoryToMonitorRepository.save(rtm);
                 },
-                () -> log.warn("Failed to update backfill state, sync target not found: syncTargetId={}", syncTargetId)
+                () -> log.warn("Failed to update backfill state: reason=syncTargetNotFound, syncTargetId={}", syncTargetId)
             );
     }
 

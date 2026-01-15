@@ -78,7 +78,7 @@ public class GitHubOrganizationSyncService {
     @Transactional
     public Organization syncOrganization(Long scopeId, String organizationLogin) {
         if (organizationLogin == null || organizationLogin.isBlank()) {
-            log.warn("Skipped organization sync: reason=missing login, scopeId={}", scopeId);
+            log.warn("Skipped organization sync: reason=missingLogin, scopeId={}", scopeId);
             return null;
         }
 
@@ -93,7 +93,7 @@ public class GitHubOrganizationSyncService {
                 .block(GRAPHQL_TIMEOUT);
 
             if (graphQlOrg == null) {
-                log.warn("Skipped organization sync: reason=not found, orgLogin={}", sanitizeForLog(organizationLogin));
+                log.warn("Skipped organization sync: reason=notFound, orgLogin={}", sanitizeForLog(organizationLogin));
                 return null;
             }
 

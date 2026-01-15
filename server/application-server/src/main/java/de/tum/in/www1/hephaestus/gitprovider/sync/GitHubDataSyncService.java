@@ -140,7 +140,7 @@ public class GitHubDataSyncService {
 
         Repository repository = repositoryRepository.findByNameWithOwner(nameWithOwner).orElse(null);
         if (repository == null) {
-            log.warn("Repository not found, skipping sync: scopeId={}, repoName={}", scopeId, safeNameWithOwner);
+            log.warn("Skipped sync: reason=repositoryNotFound, scopeId={}, repoName={}", scopeId, safeNameWithOwner);
             return;
         }
 
@@ -221,7 +221,7 @@ public class GitHubDataSyncService {
     public void syncAllRepositories(Long scopeId) {
         var syncTargets = syncTargetProvider.getSyncTargetsForScope(scopeId);
         if (syncTargets.isEmpty()) {
-            log.warn("No sync targets found, skipping sync: scopeId={}", scopeId);
+            log.warn("Skipped scope sync: reason=noSyncTargets, scopeId={}", scopeId);
             return;
         }
 
@@ -253,7 +253,7 @@ public class GitHubDataSyncService {
     private void syncOrganizationAndTeams(Long scopeId) {
         Optional<SyncMetadata> metadataOpt = syncTargetProvider.getSyncMetadata(scopeId);
         if (metadataOpt.isEmpty()) {
-            log.debug("Skipped organization sync (no metadata): scopeId={}", scopeId);
+            log.debug("Skipped organization sync: reason=noMetadata, scopeId={}", scopeId);
             return;
         }
 
@@ -261,7 +261,7 @@ public class GitHubDataSyncService {
         String organizationLogin = metadata.organizationLogin();
 
         if (organizationLogin == null || organizationLogin.isBlank()) {
-            log.debug("Skipped organization sync (no org login): scopeId={}", scopeId);
+            log.debug("Skipped organization sync: reason=noOrgLogin, scopeId={}", scopeId);
             return;
         }
 
@@ -307,7 +307,7 @@ public class GitHubDataSyncService {
             if (dependenciesCount >= 0) {
                 log.debug("Synced issue dependencies: scopeId={}, dependencyCount={}", scopeId, dependenciesCount);
             } else {
-                log.debug("Skipped issue dependencies sync (cooldown active): scopeId={}", scopeId);
+                log.debug("Skipped issue dependencies sync: reason=cooldownActive, scopeId={}", scopeId);
             }
         } catch (Exception e) {
             log.error("Failed to sync issue dependencies: scopeId={}", scopeId, e);
@@ -319,7 +319,7 @@ public class GitHubDataSyncService {
             if (subIssuesCount >= 0) {
                 log.debug("Synced sub-issues: scopeId={}, subIssueCount={}", scopeId, subIssuesCount);
             } else {
-                log.debug("Skipped sub-issues sync (cooldown active): scopeId={}", scopeId);
+                log.debug("Skipped sub-issues sync: reason=cooldownActive, scopeId={}", scopeId);
             }
         } catch (Exception e) {
             log.error("Failed to sync sub-issues: scopeId={}", scopeId, e);
@@ -342,7 +342,7 @@ public class GitHubDataSyncService {
 
         if (!shouldSync) {
             log.debug(
-                "Skipped collaborator sync (cooldown active): repoId={}, lastSyncedAt={}",
+                "Skipped collaborator sync: reason=cooldownActive, repoId={}, lastSyncedAt={}",
                 repositoryId,
                 syncTarget.lastCollaboratorsSyncedAt()
             );

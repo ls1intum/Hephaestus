@@ -82,7 +82,7 @@ public class GitHubPullRequestSyncService {
     public int syncForRepository(Long scopeId, Long repositoryId) {
         Repository repository = repositoryRepository.findById(repositoryId).orElse(null);
         if (repository == null) {
-            log.warn("Repository not found, skipping pull request sync: repoId={}", repositoryId);
+            log.warn("Skipped pull request sync: reason=repositoryNotFound, repoId={}", repositoryId);
             return 0;
         }
 
@@ -90,7 +90,7 @@ public class GitHubPullRequestSyncService {
         String safeNameWithOwner = sanitizeForLog(nameWithOwner);
         Optional<RepositoryOwnerAndName> parsedName = GitHubRepositoryNameParser.parse(nameWithOwner);
         if (parsedName.isEmpty()) {
-            log.warn("Invalid repository name format, skipping pull request sync: repoName={}", safeNameWithOwner);
+            log.warn("Skipped pull request sync: reason=invalidRepoNameFormat, repoName={}", safeNameWithOwner);
             return 0;
         }
         RepositoryOwnerAndName ownerAndName = parsedName.get();

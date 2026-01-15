@@ -88,7 +88,7 @@ public class WorkspaceTeamSettingsController {
         WorkspaceContext workspaceContext,
         @PathVariable Long teamId
     ) {
-        log.info("Getting settings for team {} in workspace {}", teamId, workspaceContext.slug());
+        log.info("Getting team settings: teamId={}, workspaceSlug={}", teamId, workspaceContext.slug());
 
         WorkspaceTeamSettingsDTO dto = settingsService
             .getTeamSettings(workspaceContext.id(), teamId)
@@ -124,7 +124,7 @@ public class WorkspaceTeamSettingsController {
         @Valid @RequestBody UpdateTeamSettingsRequestDTO request
     ) {
         log.info(
-            "Updating settings for team {} in workspace {}: hidden={}",
+            "Updating team settings: teamId={}, workspaceSlug={}, hidden={}",
             teamId,
             workspaceContext.slug(),
             request.hidden()
@@ -168,7 +168,7 @@ public class WorkspaceTeamSettingsController {
         @PathVariable Long repositoryId
     ) {
         log.info(
-            "Getting settings for repository {} in team {} in workspace {}",
+            "Getting repository settings: repositoryId={}, teamId={}, workspaceSlug={}",
             repositoryId,
             teamId,
             workspaceContext.slug()
@@ -212,7 +212,7 @@ public class WorkspaceTeamSettingsController {
         @Valid @RequestBody UpdateRepositorySettingsRequestDTO request
     ) {
         log.info(
-            "Updating settings for repository {} in team {} in workspace {}: hiddenFromContributions={}",
+            "Updating repository settings: repositoryId={}, teamId={}, workspaceSlug={}, hiddenFromContributions={}",
             repositoryId,
             teamId,
             workspaceContext.slug(),
@@ -254,7 +254,7 @@ public class WorkspaceTeamSettingsController {
         WorkspaceContext workspaceContext,
         @PathVariable Long teamId
     ) {
-        log.info("Getting label filters for team {} in workspace {}", teamId, workspaceContext.slug());
+        log.info("Getting label filters: teamId={}, workspaceSlug={}", teamId, workspaceContext.slug());
 
         List<LabelInfoDTO> labels = settingsService
             .getTeamLabelFilters(workspaceContext.id(), teamId)
@@ -283,7 +283,7 @@ public class WorkspaceTeamSettingsController {
         @PathVariable Long teamId,
         @PathVariable Long labelId
     ) {
-        log.info("Adding label {} as filter for team {} in workspace {}", labelId, teamId, workspaceContext.slug());
+        log.info("Adding label filter: labelId={}, teamId={}, workspaceSlug={}", labelId, teamId, workspaceContext.slug());
 
         Workspace workspace = workspaceResolver.requireWorkspace(workspaceContext);
 
@@ -311,7 +311,7 @@ public class WorkspaceTeamSettingsController {
         @PathVariable Long teamId,
         @PathVariable Long labelId
     ) {
-        log.info("Removing label {} filter from team {} in workspace {}", labelId, teamId, workspaceContext.slug());
+        log.info("Removing label filter: labelId={}, teamId={}, workspaceSlug={}", labelId, teamId, workspaceContext.slug());
 
         Workspace workspace = workspaceResolver.requireWorkspace(workspaceContext);
 

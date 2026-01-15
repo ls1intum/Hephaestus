@@ -102,7 +102,7 @@ public class PullRequestBadPracticeDetector {
             .findById(pullRequestId)
             .map(this::detectAndSyncBadPractices)
             .orElseGet(() -> {
-                log.warn("Pull request with ID {} not found", pullRequestId);
+                log.warn("Skipped detection: reason=pullRequestNotFound, prId={}", pullRequestId);
                 return DetectionResult.ERROR_NO_UPDATE_ON_PULLREQUEST;
             });
     }
@@ -116,7 +116,7 @@ public class PullRequestBadPracticeDetector {
      */
     @Transactional
     public DetectionResult detectAndSyncBadPractices(PullRequest pullRequest) {
-        log.info("Detecting bad practices for pull request: {}", pullRequest.getId());
+        log.info("Detecting bad practices for pull request: prId={}", pullRequest.getId());
 
         // Check if detection is needed based on last detection time from BadPracticeDetection
         BadPracticeDetection lastDetection = badPracticeDetectionRepository.findMostRecentByPullRequestId(
@@ -128,7 +128,7 @@ public class PullRequestBadPracticeDetector {
             lastDetection.getDetectedAt() != null &&
             pullRequest.getUpdatedAt().isBefore(lastDetection.getDetectedAt())
         ) {
-            log.info("Pull request has not been updated since last detection. Skipping detection.");
+            log.info("Skipped detection: reason=noUpdateSinceLastDetection, prId={}", pullRequest.getId());
             return DetectionResult.ERROR_NO_UPDATE_ON_PULLREQUEST;
         }
 
@@ -183,11 +183,11 @@ public class PullRequestBadPracticeDetector {
             detectorResponse = detectorApi.detectBadPractices(detectorRequest);
         } catch (RestClientException e) {
             log.error(
-                "Failed to detect bad practices for pull request {} (PR #{} in {}): {}",
+                "Failed to detect bad practices: prId={}, prNumber={}, repoName={}",
                 pullRequest.getId(),
                 pullRequest.getNumber(),
                 pullRequest.getRepository().getNameWithOwner(),
-                e.getMessage()
+                e
             );
             // Return empty detection to prevent transaction issues
             BadPracticeDetection emptyDetection = new BadPracticeDetection();
@@ -213,7 +213,7 @@ public class PullRequestBadPracticeDetector {
             )
             .toList();
 
-        log.info("Detected {} bad practices for pull request: {}", detectedBadPractices.size(), pullRequest.getId());
+        log.info("Detected bad practices: prId={}, count={}", pullRequest.getId(), detectedBadPractices.size());
 
         BadPracticeDetection badPracticeDetection = new BadPracticeDetection();
         badPracticeDetection.setPullRequest(pullRequest);
@@ -303,10 +303,10 @@ public class PullRequestBadPracticeDetector {
     @SuppressWarnings("unused") // Used by Resilience4j via reflection
     private BadPracticeDetection fallbackDetection(PullRequest pullRequest, Throwable throwable) {
         log.warn(
-            "Circuit breaker triggered for PR {} ({}): {}",
+            "Circuit breaker triggered for PR: prId={}, repoName={}",
             pullRequest.getId(),
             pullRequest.getRepository().getNameWithOwner(),
-            throwable.getMessage()
+            throwable
         );
 
         BadPracticeDetection emptyDetection = new BadPracticeDetection();

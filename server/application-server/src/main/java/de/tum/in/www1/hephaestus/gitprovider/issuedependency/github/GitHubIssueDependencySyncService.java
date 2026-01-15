@@ -106,13 +106,13 @@ public class GitHubIssueDependencySyncService {
 
         Optional<Issue> blockedIssueOpt = issueRepository.findById(blockedIssueId);
         if (blockedIssueOpt.isEmpty()) {
-            log.debug("Blocked issue not found in database, skipping: issueId={}", blockedIssueId);
+            log.debug("Skipped dependency processing: reason=blockedIssueNotFound, issueId={}", blockedIssueId);
             return;
         }
 
         Optional<Issue> blockingIssueOpt = issueRepository.findById(blockingIssueId);
         if (blockingIssueOpt.isEmpty()) {
-            log.debug("Blocking issue not found in database, skipping: issueId={}", blockingIssueId);
+            log.debug("Skipped dependency processing: reason=blockingIssueNotFound, issueId={}", blockingIssueId);
             return;
         }
 
@@ -152,7 +152,7 @@ public class GitHubIssueDependencySyncService {
         SyncMetadata metadata = metadataOpt.get();
         if (!metadata.needsIssueDependenciesSync(syncCooldownInMinutes)) {
             log.debug(
-                "Skipping issue dependencies sync due to cooldown: scopeId={}, lastSyncedAt={}",
+                "Skipped issue dependencies sync: reason=cooldownActive, scopeId={}, lastSyncedAt={}",
                 scopeId,
                 metadata.issueDependenciesSyncedAt()
             );
@@ -175,7 +175,7 @@ public class GitHubIssueDependencySyncService {
         for (String repoNameWithOwner : repositoryNames) {
             Optional<Repository> repoOpt = repositoryRepository.findByNameWithOwner(repoNameWithOwner);
             if (repoOpt.isEmpty()) {
-                log.warn("Repository not found in database, skipping: repoName={}", sanitizeForLog(repoNameWithOwner));
+                log.warn("Skipped dependency sync: reason=repositoryNotFound, repoName={}", sanitizeForLog(repoNameWithOwner));
                 continue;
             }
 
@@ -369,7 +369,7 @@ public class GitHubIssueDependencySyncService {
     private void addBlockingRelationship(Issue blockedIssue, Issue blockingIssue) {
         if (blockedIssue.getBlockedBy().contains(blockingIssue)) {
             log.debug(
-                "Issue already blocked, skipping: blockedIssueNumber={}, blockingIssueNumber={}",
+                "Skipped adding blocking relationship: reason=alreadyBlocked, blockedIssueNumber={}, blockingIssueNumber={}",
                 blockedIssue.getNumber(),
                 blockingIssue.getNumber()
             );

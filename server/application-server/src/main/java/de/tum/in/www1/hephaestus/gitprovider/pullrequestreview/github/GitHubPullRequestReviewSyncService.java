@@ -77,7 +77,7 @@ public class GitHubPullRequestReviewSyncService {
     public int syncForRepository(Long scopeId, Long repositoryId) {
         Repository repository = repositoryRepository.findById(repositoryId).orElse(null);
         if (repository == null) {
-            log.warn("Repository not found, skipping review sync: repoId={}", repositoryId);
+            log.warn("Skipped review sync: reason=repositoryNotFound, repoId={}", repositoryId);
             return 0;
         }
 
@@ -93,7 +93,7 @@ public class GitHubPullRequestReviewSyncService {
 
         String safeNameWithOwner = sanitizeForLog(repository.getNameWithOwner());
         if (prCount.get() == 0) {
-            log.debug("No pull requests found, skipping review sync: repoName={}", safeNameWithOwner);
+            log.debug("Skipped review sync: reason=noPullRequestsFound, repoName={}", safeNameWithOwner);
             return 0;
         }
 
@@ -130,7 +130,7 @@ public class GitHubPullRequestReviewSyncService {
     @Transactional
     public int syncRemainingReviews(Long scopeId, PullRequest pullRequest, String startCursor) {
         if (pullRequest == null || pullRequest.getRepository() == null) {
-            log.warn("Pull request or repository is null, skipping review sync: prId={}", pullRequest != null ? pullRequest.getId() : "null");
+            log.warn("Skipped review sync: reason=prOrRepositoryNull, prId={}", pullRequest != null ? pullRequest.getId() : "null");
             return 0;
         }
 
@@ -139,7 +139,7 @@ public class GitHubPullRequestReviewSyncService {
         String safeNameWithOwner = sanitizeForLog(nameWithOwner);
         Optional<RepositoryOwnerAndName> parsedName = GitHubRepositoryNameParser.parse(nameWithOwner);
         if (parsedName.isEmpty()) {
-            log.warn("Invalid repository name format, skipping review sync: repoName={}", safeNameWithOwner);
+            log.warn("Skipped review sync: reason=invalidRepoNameFormat, repoName={}", safeNameWithOwner);
             return 0;
         }
         RepositoryOwnerAndName ownerAndName = parsedName.get();
@@ -178,7 +178,7 @@ public class GitHubPullRequestReviewSyncService {
                     // Check if this is a NOT_FOUND error (PR deleted from GitHub)
                     if (isNotFoundError(response, "repository.pullRequest")) {
                         log.debug(
-                            "Pull request no longer exists on GitHub, skipping review sync: repoName={}, prNumber={}",
+                            "Skipped review sync: reason=prDeletedFromGitHub, repoName={}, prNumber={}",
                             safeNameWithOwner,
                             pullRequest.getNumber()
                         );
@@ -228,7 +228,7 @@ public class GitHubPullRequestReviewSyncService {
                 // Check if this is a NOT_FOUND error (PR deleted from GitHub)
                 if (isNotFoundError(e.getResponse(), "repository.pullRequest")) {
                     log.debug(
-                        "Pull request no longer exists on GitHub, skipping review sync: repoName={}, prNumber={}",
+                        "Skipped review sync: reason=prDeletedFromGitHub, repoName={}, prNumber={}",
                         safeNameWithOwner,
                         pullRequest.getNumber()
                     );

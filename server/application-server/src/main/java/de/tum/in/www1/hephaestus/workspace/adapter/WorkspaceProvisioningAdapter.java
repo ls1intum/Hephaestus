@@ -29,7 +29,7 @@ public class WorkspaceProvisioningAdapter implements ProvisioningListener {
     @Override
     public void onInstallationCreated(InstallationData installation) {
         if (installation == null) {
-            log.warn("Skipped workspace provisioning: installationData=null");
+            log.warn("Skipped workspace provisioning: reason=nullInstallationData");
             return;
         }
 
@@ -71,7 +71,7 @@ public class WorkspaceProvisioningAdapter implements ProvisioningListener {
     @Override
     public void onInstallationDeleted(Long installationId) {
         if (installationId == null) {
-            log.warn("Skipped installation deletion: installationId=null");
+            log.warn("Skipped installation deletion: reason=nullInstallationId");
             return;
         }
 
@@ -126,7 +126,7 @@ public class WorkspaceProvisioningAdapter implements ProvisioningListener {
     public void onAccountRenamed(Long installationId, String oldLogin, String newLogin) {
         if (installationId == null || newLogin == null || newLogin.isBlank()) {
             log.warn(
-                "Invalid account rename data: installationId={}, oldLogin={}, newLogin={}",
+                "Skipped account rename: reason=invalidData, installationId={}, oldLogin={}, newLogin={}",
                 installationId,
                 oldLogin,
                 newLogin
@@ -140,7 +140,7 @@ public class WorkspaceProvisioningAdapter implements ProvisioningListener {
     @Override
     public void onInstallationSuspended(Long installationId) {
         if (installationId == null) {
-            log.warn("Skipped installation suspension: installationId=null");
+            log.warn("Skipped installation suspension: reason=nullInstallationId");
             return;
         }
 
@@ -151,7 +151,7 @@ public class WorkspaceProvisioningAdapter implements ProvisioningListener {
     @Override
     public void onInstallationActivated(Long installationId) {
         if (installationId == null) {
-            log.warn("Skipped installation activation: installationId=null");
+            log.warn("Skipped installation activation: reason=nullInstallationId");
             return;
         }
 
@@ -162,7 +162,7 @@ public class WorkspaceProvisioningAdapter implements ProvisioningListener {
     @Override
     public void onRepositorySelectionChanged(Long installationId, String selection) {
         if (installationId == null) {
-            log.warn("Skipped repository selection change: installationId=null");
+            log.warn("Skipped repository selection change: reason=nullInstallationId");
             return;
         }
 

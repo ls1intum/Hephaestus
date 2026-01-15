@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.workspace.settings;
 
+import de.tum.in.www1.hephaestus.core.LoggingUtils;
 import de.tum.in.www1.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.in.www1.hephaestus.gitprovider.label.Label;
 import de.tum.in.www1.hephaestus.gitprovider.label.LabelRepository;
@@ -122,7 +123,7 @@ public class WorkspaceTeamSettingsService {
             log.warn(
                 "Skipped team visibility update: reason=teamNotFoundOrWrongWorkspace, teamId={}, workspaceSlug={}",
                 teamId,
-                workspace.getWorkspaceSlug()
+                LoggingUtils.sanitizeForLog(workspace.getWorkspaceSlug())
             );
             return Optional.empty();
         }
@@ -139,7 +140,7 @@ public class WorkspaceTeamSettingsService {
             "Updated team visibility: teamId={}, hidden={}, workspaceSlug={}",
             teamId,
             hidden,
-            workspace.getWorkspaceSlug()
+            LoggingUtils.sanitizeForLog(workspace.getWorkspaceSlug())
         );
 
         return Optional.of(saved);
@@ -233,7 +234,7 @@ public class WorkspaceTeamSettingsService {
             log.warn(
                 "Skipped repository visibility update: reason=teamNotFoundOrWrongWorkspace, teamId={}, workspaceSlug={}",
                 teamId,
-                workspace.getWorkspaceSlug()
+                LoggingUtils.sanitizeForLog(workspace.getWorkspaceSlug())
             );
             return Optional.empty();
         }
@@ -259,7 +260,7 @@ public class WorkspaceTeamSettingsService {
             repositoryId,
             teamId,
             hiddenFromContributions,
-            workspace.getWorkspaceSlug()
+            LoggingUtils.sanitizeForLog(workspace.getWorkspaceSlug())
         );
 
         return Optional.of(saved);
@@ -307,7 +308,7 @@ public class WorkspaceTeamSettingsService {
             log.warn(
                 "Skipped label filter addition: reason=teamNotFoundOrWrongWorkspace, teamId={}, workspaceSlug={}",
                 teamId,
-                workspace.getWorkspaceSlug()
+                LoggingUtils.sanitizeForLog(workspace.getWorkspaceSlug())
             );
             return Optional.empty();
         }
@@ -328,7 +329,7 @@ public class WorkspaceTeamSettingsService {
                 "Skipped label filter addition: reason=filterAlreadyExists, teamId={}, labelId={}, workspaceSlug={}",
                 teamId,
                 labelId,
-                workspace.getWorkspaceSlug()
+                LoggingUtils.sanitizeForLog(workspace.getWorkspaceSlug())
             );
             return labelFilterRepository.findById(filterId);
         }
@@ -336,7 +337,7 @@ public class WorkspaceTeamSettingsService {
         WorkspaceTeamLabelFilter filter = new WorkspaceTeamLabelFilter(workspace, team, label);
         WorkspaceTeamLabelFilter saved = labelFilterRepository.save(filter);
 
-        log.info("Added label filter: labelId={}, teamId={}, workspaceSlug={}", labelId, teamId, workspace.getWorkspaceSlug());
+        log.info("Added label filter: labelId={}, teamId={}, workspaceSlug={}", labelId, teamId, LoggingUtils.sanitizeForLog(workspace.getWorkspaceSlug()));
 
         return Optional.of(saved);
     }
@@ -387,14 +388,14 @@ public class WorkspaceTeamSettingsService {
                 "Skipped label filter removal: reason=filterNotExists, teamId={}, labelId={}, workspaceSlug={}",
                 teamId,
                 labelId,
-                workspace.getWorkspaceSlug()
+                LoggingUtils.sanitizeForLog(workspace.getWorkspaceSlug())
             );
             return false;
         }
 
         labelFilterRepository.deleteByWorkspaceIdAndTeamIdAndLabelId(workspace.getId(), teamId, labelId);
 
-        log.info("Removed label filter: labelId={}, teamId={}, workspaceSlug={}", labelId, teamId, workspace.getWorkspaceSlug());
+        log.info("Removed label filter: labelId={}, teamId={}, workspaceSlug={}", labelId, teamId, LoggingUtils.sanitizeForLog(workspace.getWorkspaceSlug()));
 
         return true;
     }
@@ -408,7 +409,7 @@ public class WorkspaceTeamSettingsService {
     @Transactional
     public void removeAllLabelFilters(Workspace workspace, Long teamId) {
         labelFilterRepository.deleteAllByWorkspaceIdAndTeamId(workspace.getId(), teamId);
-        log.info("Removed all label filters: teamId={}, workspaceSlug={}", teamId, workspace.getWorkspaceSlug());
+        log.info("Removed all label filters: teamId={}, workspaceSlug={}", teamId, LoggingUtils.sanitizeForLog(workspace.getWorkspaceSlug()));
     }
 
     // ========================================================================

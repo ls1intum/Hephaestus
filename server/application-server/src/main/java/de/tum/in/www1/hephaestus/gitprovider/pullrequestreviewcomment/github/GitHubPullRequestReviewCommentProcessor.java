@@ -70,13 +70,13 @@ public class GitHubPullRequestReviewCommentProcessor {
         ProcessingContext context
     ) {
         if (commentRepository.existsById(dto.id())) {
-            log.debug("Comment {} already exists, skipping", dto.id());
+            log.debug("Skipped comment creation: reason=alreadyExists, commentId={}", dto.id());
             return null;
         }
 
         PullRequest pr = prRepository.findById(prId).orElse(null);
         if (pr == null) {
-            log.warn("PR not found for comment: prId={}", prId);
+            log.warn("Skipped comment creation: reason=prNotFound, prId={}", prId);
             return null;
         }
 
@@ -93,7 +93,7 @@ public class GitHubPullRequestReviewCommentProcessor {
                 )
             );
         }
-        log.debug("Created comment {} in thread {}", dto.id(), thread.getId());
+        log.debug("Created review comment: commentId={}, threadId={}", dto.id(), thread.getId());
         return saved;
     }
 
@@ -119,11 +119,11 @@ public class GitHubPullRequestReviewCommentProcessor {
                         )
                     );
                 }
-                log.debug("Updated comment {}", dto.id());
+                log.debug("Updated review comment: commentId={}", dto.id());
                 return saved;
             })
             .orElseGet(() -> {
-                log.warn("Comment {} not found for edit", dto.id());
+                log.warn("Skipped comment edit: reason=commentNotFound, commentId={}", dto.id());
                 return null;
             });
     }
@@ -136,7 +136,7 @@ public class GitHubPullRequestReviewCommentProcessor {
                 new DomainEvent.ReviewCommentDeleted(commentId, prId, EventContext.from(context))
             );
         }
-        log.debug("Deleted comment {}", commentId);
+        log.debug("Deleted review comment: commentId={}", commentId);
     }
 
     private PullRequestReviewComment createComment(

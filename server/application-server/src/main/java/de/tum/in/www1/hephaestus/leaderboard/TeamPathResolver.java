@@ -179,7 +179,7 @@ public class TeamPathResolver {
                 }
             }
             log.warn(
-                "Ambiguous team path '{}' resolved to multiple workspace candidates; picking first.",
+                "Resolved ambiguous team path to first candidate: teamPath={}",
                 sanitizeForLog(path)
             );
         }

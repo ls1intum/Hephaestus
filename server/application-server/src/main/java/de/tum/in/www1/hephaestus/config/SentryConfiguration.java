@@ -36,12 +36,12 @@ public class SentryConfiguration {
     @PostConstruct
     public void init() {
         if (environment.matchesProfiles("specs")) {
-            log.info("Sentry is disabled in specs profile");
+            log.info("Skipped Sentry initialization: reason=specs_profile");
             return;
         }
 
         if (sentryDsn.isEmpty() || sentryDsn.get().isEmpty()) {
-            log.info("Sentry is disabled: Provide a DSN to enable Sentry.");
+            log.info("Skipped Sentry initialization: reason=missing_dsn");
             return;
         }
 
@@ -56,9 +56,9 @@ public class SentryConfiguration {
                 options.setTracesSampleRate(getTracesSampleRate());
             });
 
-            log.info("Sentry configuration was successful");
+            log.info("Initialized Sentry");
         } catch (Exception ex) {
-            log.error("Sentry configuration was not successful due to exception!", ex);
+            log.error("Failed to initialize Sentry", ex);
         }
     }
 

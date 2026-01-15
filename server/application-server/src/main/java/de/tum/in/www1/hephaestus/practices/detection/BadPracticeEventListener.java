@@ -48,7 +48,7 @@ public class BadPracticeEventListener {
     public void onPullRequestCreated(DomainEvent.PullRequestCreated event) {
         EventPayload.PullRequestData pr = event.pullRequest();
         log.info(
-            "PR #{} created in {} - scheduling bad practice detection with 1-hour delay",
+            "Scheduling bad practice detection: prNumber={}, repoName={}, delay=1hour, event=created",
             pr.number(),
             pr.repository().nameWithOwner()
         );
@@ -64,7 +64,7 @@ public class BadPracticeEventListener {
     public void onPullRequestUpdated(DomainEvent.PullRequestUpdated event) {
         EventPayload.PullRequestData pr = event.pullRequest();
         log.info(
-            "PR #{} updated in {} - rescheduling bad practice detection with 1-hour delay",
+            "Rescheduling bad practice detection: prNumber={}, repoName={}, delay=1hour, event=updated",
             pr.number(),
             pr.repository().nameWithOwner()
         );
@@ -81,7 +81,7 @@ public class BadPracticeEventListener {
         EventPayload.PullRequestData pr = event.pullRequest();
         String labelName = event.label() != null ? event.label().name() : "";
         log.info(
-            "PR #{} labeled with '{}' in {} - checking for ready label detection",
+            "Checking for ready label detection: prNumber={}, labelName={}, repoName={}",
             pr.number(),
             labelName,
             pr.repository().nameWithOwner()
@@ -98,7 +98,7 @@ public class BadPracticeEventListener {
     public void onPullRequestReady(DomainEvent.PullRequestReady event) {
         EventPayload.PullRequestData pr = event.pullRequest();
         log.info(
-            "PR #{} marked ready for review in {} - scheduling bad practice detection with 1-hour delay",
+            "Scheduling bad practice detection: prNumber={}, repoName={}, delay=1hour, event=readyForReview",
             pr.number(),
             pr.repository().nameWithOwner()
         );
@@ -114,7 +114,7 @@ public class BadPracticeEventListener {
     public void onPullRequestSynchronized(DomainEvent.PullRequestSynchronized event) {
         EventPayload.PullRequestData pr = event.pullRequest();
         log.info(
-            "PR #{} synchronized in {} - rescheduling bad practice detection with 1-hour delay",
+            "Rescheduling bad practice detection: prNumber={}, repoName={}, delay=1hour, event=synchronized",
             pr.number(),
             pr.repository().nameWithOwner()
         );
@@ -130,7 +130,7 @@ public class BadPracticeEventListener {
     public void onPullRequestReopened(DomainEvent.PullRequestReopened event) {
         EventPayload.PullRequestData pr = event.pullRequest();
         log.info(
-            "PR #{} reopened in {} - scheduling bad practice detection with 1-hour delay",
+            "Scheduling bad practice detection: prNumber={}, repoName={}, delay=1hour, event=reopened",
             pr.number(),
             pr.repository().nameWithOwner()
         );
@@ -146,7 +146,7 @@ public class BadPracticeEventListener {
     public void onPullRequestClosed(DomainEvent.PullRequestClosed event) {
         EventPayload.PullRequestData pr = event.pullRequest();
         log.info(
-            "PR #{} closed in {} - triggering immediate bad practice detection (no email)",
+            "Triggering immediate bad practice detection: prNumber={}, repoName={}, event=closed, sendEmail=false",
             pr.number(),
             pr.repository().nameWithOwner()
         );
@@ -161,12 +161,12 @@ public class BadPracticeEventListener {
         try {
             PullRequest pullRequest = pullRequestRepository.findByIdWithAssignees(pullRequestId).orElse(null);
             if (pullRequest == null) {
-                log.warn("Skipped bad practice detection: reason=pullRequestNotFound, pullRequestNumber={}, pullRequestId={}", pullRequestNumber, pullRequestId);
+                log.warn("Skipped bad practice detection: reason=pullRequestNotFound, prNumber={}, prId={}", pullRequestNumber, pullRequestId);
                 return;
             }
             badPracticeDetectorScheduler.detectBadPracticeForPrWhenOpenedOrReadyForReviewEvent(pullRequest);
         } catch (Exception e) {
-            log.error("Failed to schedule bad practice detection: pullRequestNumber={}", pullRequestNumber, e);
+            log.error("Failed to schedule bad practice detection: prNumber={}", pullRequestNumber, e);
         }
     }
 
@@ -178,13 +178,13 @@ public class BadPracticeEventListener {
         try {
             PullRequest pullRequest = pullRequestRepository.findByIdWithAssignees(pullRequestId).orElse(null);
             if (pullRequest == null) {
-                log.warn("Skipped bad practice detection: reason=pullRequestNotFound, pullRequestNumber={}, pullRequestId={}", pullRequestNumber, pullRequestId);
+                log.warn("Skipped bad practice detection: reason=pullRequestNotFound, prNumber={}, prId={}", pullRequestNumber, pullRequestId);
                 return;
             }
             // Use the scheduler method that checks exact label names and runs immediately
             badPracticeDetectorScheduler.detectBadPracticeForPrIfReadyLabel(pullRequest, labelName);
         } catch (Exception e) {
-            log.error("Failed to trigger bad practice detection: pullRequestNumber={}", pullRequestNumber, e);
+            log.error("Failed to trigger bad practice detection: prNumber={}", pullRequestNumber, e);
         }
     }
 
@@ -195,12 +195,12 @@ public class BadPracticeEventListener {
         try {
             PullRequest pullRequest = pullRequestRepository.findByIdWithAssignees(pullRequestId).orElse(null);
             if (pullRequest == null) {
-                log.warn("Skipped bad practice detection: reason=pullRequestNotFound, pullRequestNumber={}, pullRequestId={}", pullRequestNumber, pullRequestId);
+                log.warn("Skipped bad practice detection: reason=pullRequestNotFound, prNumber={}, prId={}", pullRequestNumber, pullRequestId);
                 return;
             }
             badPracticeDetectorScheduler.detectBadPracticeForPrIfClosedEvent(pullRequest);
         } catch (Exception e) {
-            log.error("Failed to trigger closed PR detection: pullRequestNumber={}", pullRequestNumber, e);
+            log.error("Failed to trigger closed PR detection: prNumber={}", pullRequestNumber, e);
         }
     }
 }

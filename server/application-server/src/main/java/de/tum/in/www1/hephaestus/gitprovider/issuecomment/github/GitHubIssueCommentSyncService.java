@@ -71,7 +71,7 @@ public class GitHubIssueCommentSyncService {
     public int syncForRepository(Long scopeId, Long repositoryId) {
         Repository repository = repositoryRepository.findById(repositoryId).orElse(null);
         if (repository == null) {
-            log.warn("Repository not found, skipping comment sync: repoId={}", repositoryId);
+            log.warn("Skipped comment sync: reason=repositoryNotFound, repoId={}", repositoryId);
             return 0;
         }
 
@@ -87,7 +87,7 @@ public class GitHubIssueCommentSyncService {
 
         String safeNameWithOwner = sanitizeForLog(repository.getNameWithOwner());
         if (issueCount.get() == 0) {
-            log.debug("No issues found, skipping comment sync: repoName={}", safeNameWithOwner);
+            log.debug("Skipped comment sync: reason=noIssuesFound, repoName={}", safeNameWithOwner);
             return 0;
         }
 
@@ -105,7 +105,7 @@ public class GitHubIssueCommentSyncService {
     @Transactional
     public int syncForIssue(Long scopeId, Issue issue) {
         if (issue == null || issue.getRepository() == null) {
-            log.warn("Issue or repository is null, skipping comment sync: issueId={}", issue != null ? issue.getId() : "null");
+            log.warn("Skipped comment sync: reason=issueOrRepositoryNull, issueId={}", issue != null ? issue.getId() : "null");
             return 0;
         }
 
@@ -154,7 +154,7 @@ public class GitHubIssueCommentSyncService {
                     // Check if this is a NOT_FOUND error (issue deleted from GitHub)
                     if (isNotFoundError(response, "repository.issue")) {
                         log.debug(
-                            "Issue no longer exists on GitHub, skipping comment sync: repoName={}, issueNumber={}",
+                            "Skipped comment sync: reason=issueDeletedFromGitHub, repoName={}, issueNumber={}",
                             safeNameWithOwner,
                             issue.getNumber()
                         );
@@ -190,7 +190,7 @@ public class GitHubIssueCommentSyncService {
                 if (isNotFoundError(e.getResponse(), "repository.issue")) {
                     // Log at DEBUG - deleted issues are expected during sync, not actionable
                     log.debug(
-                        "Issue no longer exists on GitHub, skipping comment sync: repoName={}, issueNumber={}",
+                        "Skipped comment sync: reason=issueDeletedFromGitHub, repoName={}, issueNumber={}",
                         safeNameWithOwner,
                         issue.getNumber()
                     );

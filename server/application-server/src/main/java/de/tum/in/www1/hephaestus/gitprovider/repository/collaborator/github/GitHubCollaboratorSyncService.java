@@ -66,14 +66,14 @@ public class GitHubCollaboratorSyncService {
     public int syncCollaboratorsForRepository(Long scopeId, Long repositoryId) {
         Repository repository = repositoryRepository.findById(repositoryId).orElse(null);
         if (repository == null) {
-            log.warn("Skipped collaborator sync: reason=repository not found, repoId={}", repositoryId);
+            log.warn("Skipped collaborator sync: reason=repositoryNotFound, repoId={}", repositoryId);
             return 0;
         }
 
         String safeNameWithOwner = sanitizeForLog(repository.getNameWithOwner());
         Optional<RepositoryOwnerAndName> parsedName = GitHubRepositoryNameParser.parse(repository.getNameWithOwner());
         if (parsedName.isEmpty()) {
-            log.warn("Skipped collaborator sync: reason=invalid repository name format, repoName={}", safeNameWithOwner);
+            log.warn("Skipped collaborator sync: reason=invalidRepoNameFormat, repoName={}", safeNameWithOwner);
             return 0;
         }
         String owner = parsedName.get().owner();

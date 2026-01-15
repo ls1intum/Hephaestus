@@ -201,10 +201,10 @@ public class WorkspaceMembershipService {
                 User user = entityManager.find(User.class, userId);
                 if (user == null) {
                     log.warn(
-                    "Skipped workspace membership creation: reason=userNotFound, userId={}, workspaceId={}",
-                    userId,
-                    workspace.getId()
-                );
+                        "Skipped workspace membership creation: reason=userNotFound, userId={}, workspaceId={}",
+                        userId,
+                        workspace.getId()
+                    );
                     continue;
                 }
                 WorkspaceMembership member = createMembershipInternal(workspace, user, desiredRole);

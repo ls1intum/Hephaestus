@@ -50,7 +50,7 @@ public class TeamController {
     @Operation(summary = "List teams", description = "Returns all teams in the workspace organization")
     @SecurityRequirements
     public ResponseEntity<List<TeamInfoDTO>> getAllTeams(WorkspaceContext workspaceContext) {
-        log.info("Listing teams for workspace {}", workspaceContext.slug());
+        log.info("Listing teams: workspaceSlug={}", workspaceContext.slug());
         Workspace workspace = workspaceResolver.requireWorkspace(workspaceContext);
         List<TeamInfoDTO> teams = teamService.getAllTeams(workspace);
         return ResponseEntity.ok(teams);
@@ -75,7 +75,7 @@ public class TeamController {
         @RequestBody(required = false) Boolean hidden,
         @RequestParam(name = "hidden", required = false) Boolean hiddenParam
     ) {
-        log.info("Updating team {} visibility in workspace {}", id, workspaceContext.slug());
+        log.info("Updating team visibility: teamId={}, workspaceSlug={}", id, workspaceContext.slug());
         Workspace workspace = workspaceResolver.requireWorkspace(workspaceContext);
 
         // Accept hidden flag from body (preferred) or from query parameter as fallback
@@ -95,7 +95,7 @@ public class TeamController {
         @RequestParam(name = "hiddenFromContributions", required = false) Boolean hiddenFromContributionsParam
     ) {
         log.info(
-            "Updating repository {} visibility for team {} in workspace {}",
+            "Updating repository visibility: repositoryId={}, teamId={}, workspaceSlug={}",
             repositoryId,
             teamId,
             workspaceContext.slug()

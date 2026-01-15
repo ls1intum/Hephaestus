@@ -37,31 +37,31 @@ public class GlobalControllerAdvice {
 
     @ExceptionHandler(EntityNotFoundException.class)
     ProblemDetail handleNotFound(EntityNotFoundException exception) {
-        log.debug("Entity not found: {}", exception.getMessage());
+        log.debug("Handled entity not found exception: message={}", exception.getMessage());
         return problem(HttpStatus.NOT_FOUND, "Resource not found", exception.getMessage());
     }
 
     @ExceptionHandler(NoResourceFoundException.class)
     ProblemDetail handleNoResourceFound(NoResourceFoundException exception) {
-        log.debug("No resource found: {}", exception.getMessage());
+        log.debug("Handled no resource found exception: message={}", exception.getMessage());
         return problem(HttpStatus.NOT_FOUND, "Resource not found", exception.getMessage());
     }
 
     @ExceptionHandler(AccessForbiddenException.class)
     ProblemDetail handleForbidden(AccessForbiddenException exception) {
-        log.warn("Access forbidden: {}", exception.getMessage());
+        log.warn("Handled access forbidden exception: message={}", exception.getMessage());
         return problem(HttpStatus.FORBIDDEN, "Access denied", exception.getMessage());
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
     ProblemDetail handleBadRequest(IllegalArgumentException exception) {
-        log.debug("Bad request: {}", exception.getMessage());
+        log.debug("Handled bad request exception: message={}", exception.getMessage());
         return problem(HttpStatus.BAD_REQUEST, "Invalid request", exception.getMessage());
     }
 
     @ExceptionHandler(IllegalStateException.class)
     ProblemDetail handleIllegalState(IllegalStateException exception) {
-        log.warn("Illegal state: {}", exception.getMessage());
+        log.warn("Handled illegal state exception: message={}", exception.getMessage());
         return problem(HttpStatus.CONFLICT, "Invalid state", exception.getMessage());
     }
 
@@ -119,7 +119,7 @@ public class GlobalControllerAdvice {
     @ExceptionHandler(Exception.class)
     ProblemDetail handleGeneric(Exception exception) {
         // Log the full exception for debugging, but don't expose details to client
-        log.error("Unhandled exception: {}", exception.getMessage(), exception);
+        log.error("Caught unhandled exception: exceptionType={}", exception.getClass().getSimpleName(), exception);
         return problem(
             HttpStatus.INTERNAL_SERVER_ERROR,
             "Internal server error",

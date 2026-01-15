@@ -116,7 +116,7 @@ public class WorkspaceControllerAdvice {
 
     @ExceptionHandler(IllegalStateException.class)
     ProblemDetail handleIllegalState(IllegalStateException exception) {
-        log.error("Unexpected workspace state", exception);
+        log.error("Encountered unexpected workspace state", exception);
         return problem(
             HttpStatus.INTERNAL_SERVER_ERROR,
             "Workspace operation failed",

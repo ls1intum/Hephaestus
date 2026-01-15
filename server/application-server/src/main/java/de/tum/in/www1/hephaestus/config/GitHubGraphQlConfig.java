@@ -182,7 +182,7 @@ public class GitHubGraphQlConfig {
         // Special handling for 429 Too Many Requests - this is an error condition
         if (response.statusCode().value() == 429) {
             String retryAfter = headers.getFirst(HEADER_RETRY_AFTER);
-            log.error("GitHub rate limit exceeded! Retry-After: {} seconds", retryAfter);
+            log.error("Exceeded GitHub rate limit: retryAfterSeconds={}", retryAfter);
         }
     }
 
@@ -226,7 +226,7 @@ public class GitHubGraphQlConfig {
                         .doBeforeRetry(signal -> {
                             RetryableException ex = (RetryableException) signal.failure();
                             log.warn(
-                                "GitHub GraphQL request failed with status {}, retry attempt {} of {}",
+                                "Retrying GitHub GraphQL request: statusCode={}, attempt={}, maxRetries={}",
                                 ex.getStatusCode(),
                                 signal.totalRetries() + 1,
                                 MAX_RETRIES
@@ -235,7 +235,7 @@ public class GitHubGraphQlConfig {
                         .onRetryExhaustedThrow((spec, signal) -> {
                             RetryableException ex = (RetryableException) signal.failure();
                             log.error(
-                                "GitHub GraphQL request failed after {} retries with status {}",
+                                "Failed GitHub GraphQL request after retries exhausted: retryCount={}, statusCode={}",
                                 MAX_RETRIES,
                                 ex.getStatusCode()
                             );

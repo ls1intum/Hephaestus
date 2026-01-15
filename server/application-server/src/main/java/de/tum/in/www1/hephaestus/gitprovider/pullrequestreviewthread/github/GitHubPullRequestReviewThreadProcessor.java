@@ -51,7 +51,7 @@ public class GitHubPullRequestReviewThreadProcessor {
     @Transactional
     public boolean resolve(Long threadId, User resolvedBy, ProcessingContext context) {
         if (threadId == null) {
-            log.warn("Cannot resolve thread: threadId is null");
+            log.warn("Skipped thread resolve: reason=nullThreadId");
             return false;
         }
 
@@ -71,11 +71,11 @@ public class GitHubPullRequestReviewThreadProcessor {
                         )
                     );
                 }
-                log.info("Thread {} resolved{}", threadId, resolvedBy != null ? " by " + resolvedBy.getLogin() : "");
+                log.info("Resolved thread: threadId={}, resolvedByLogin={}", threadId, resolvedBy != null ? resolvedBy.getLogin() : null);
                 return true;
             })
             .orElseGet(() -> {
-                log.debug("Thread {} not found for resolve action, may not have been synced yet", threadId);
+                log.debug("Skipped thread resolve: reason=threadNotFound, threadId={}", threadId);
                 return false;
             });
     }
@@ -91,7 +91,7 @@ public class GitHubPullRequestReviewThreadProcessor {
     @Transactional
     public boolean unresolve(Long threadId, ProcessingContext context) {
         if (threadId == null) {
-            log.warn("Cannot unresolve thread: threadId is null");
+            log.warn("Skipped thread unresolve: reason=nullThreadId");
             return false;
         }
 
@@ -109,11 +109,11 @@ public class GitHubPullRequestReviewThreadProcessor {
                         )
                     );
                 }
-                log.info("Thread {} unresolved", threadId);
+                log.info("Unresolved thread: threadId={}", threadId);
                 return true;
             })
             .orElseGet(() -> {
-                log.debug("Thread {} not found for unresolve action, may not have been synced yet", threadId);
+                log.debug("Skipped thread unresolve: reason=threadNotFound, threadId={}", threadId);
                 return false;
             });
     }

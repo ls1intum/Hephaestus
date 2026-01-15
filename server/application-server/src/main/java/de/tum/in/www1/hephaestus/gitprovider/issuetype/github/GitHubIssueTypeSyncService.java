@@ -70,13 +70,13 @@ public class GitHubIssueTypeSyncService {
         SyncMetadata metadata = metadataOpt.get();
         String orgLogin = metadata.organizationLogin();
         if (orgLogin == null) {
-            log.debug("Scope has no organization, skipping issue type sync: scopeId={}", scopeId);
+            log.debug("Skipped issue type sync: reason=noOrganization, scopeId={}", scopeId);
             return 0;
         }
         String safeOrgLogin = sanitizeForLog(orgLogin);
 
         if (!metadata.needsIssueTypesSync(syncCooldownInMinutes)) {
-            log.debug("Skipping issue type sync due to cooldown: scopeId={}", scopeId);
+            log.debug("Skipped issue type sync: reason=cooldownActive, scopeId={}", scopeId);
             return -1;
         }
 

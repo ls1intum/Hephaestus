@@ -63,7 +63,7 @@ public class GitHubLabelSyncService {
     public int syncLabelsForRepository(Long scopeId, Long repositoryId) {
         Repository repository = repositoryRepository.findById(repositoryId).orElse(null);
         if (repository == null) {
-            log.warn("Repository not found, skipping label sync: repoId={}", repositoryId);
+            log.warn("Skipped label sync: reason=repositoryNotFound, repoId={}", repositoryId);
             return 0;
         }
 

@@ -169,7 +169,7 @@ public class WorkspaceOrganizationMembershipAdapter implements OrganizationMembe
         );
 
         if (orgMemberships.isEmpty()) {
-            log.debug("Skipped workspace member sync: reason=noOrgMembersFound, workspaceId={}, orgId={}", workspaceId, organizationId);
+            log.debug("Skipped workspace member sync: reason=noOrgMembersFound, workspaceId={}, organizationId={}", workspaceId, organizationId);
             return 0;
         }
 

@@ -67,8 +67,7 @@ public class LeaguePointsUpdateTask implements Runnable {
                 updateLeaguePointsForWorkspace(workspace);
             } catch (Exception e) {
                 log.error(
-                    "Failed to update league points: workspaceSlug={}, workspaceId={}",
-                    workspace.getWorkspaceSlug(),
+                    "Failed to update league points: workspaceId={}",
                     workspace.getId(),
                     e
                 );
@@ -90,7 +89,7 @@ public class LeaguePointsUpdateTask implements Runnable {
         }
 
         Long workspaceId = workspace.getId();
-        log.debug("Processing league points update: workspaceId={}", workspaceId);
+        log.debug("Started league points update: workspaceId={}", workspaceId);
 
         List<LeaderboardEntryDTO> leaderboard = getLatestLeaderboard(workspace);
         leaderboard.forEach(updateLeaderboardEntry(workspaceId));
