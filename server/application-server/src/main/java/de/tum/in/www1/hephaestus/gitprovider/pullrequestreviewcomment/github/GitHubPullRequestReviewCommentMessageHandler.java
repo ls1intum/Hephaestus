@@ -1,5 +1,7 @@
 package de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.github;
 
+import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
+
 import de.tum.in.www1.hephaestus.gitprovider.common.NatsMessageDeserializer;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContextFactory;
@@ -50,16 +52,16 @@ public class GitHubPullRequestReviewCommentMessageHandler
         var prDto = event.pullRequest();
 
         if (commentDto == null || prDto == null) {
-            log.warn("Received pull_request_review_comment event with missing data");
+            log.warn("Received pull_request_review_comment event with missing data: action={}", event.action());
             return;
         }
 
         log.info(
-            "Received pull_request_review_comment event: action={}, pr=#{}, comment={}, repo={}",
+            "Received pull_request_review_comment event: action={}, prNumber={}, commentId={}, repoName={}",
             event.action(),
             prDto.number(),
             commentDto.id(),
-            event.repository() != null ? event.repository().fullName() : "unknown"
+            event.repository() != null ? sanitizeForLog(event.repository().fullName()) : "unknown"
         );
 
         ProcessingContext context = contextFactory.forWebhookEvent(event).orElse(null);
@@ -89,7 +91,7 @@ public class GitHubPullRequestReviewCommentMessageHandler
                 prId,
                 context
             );
-            default -> log.debug("Unhandled comment action: {}", event.action());
+            default -> log.debug("Skipped pull_request_review_comment event: reason=unhandledAction, action={}", event.action());
         }
     }
 }

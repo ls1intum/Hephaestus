@@ -54,23 +54,23 @@ public class GitHubRepositorySyncService {
     /**
      * Syncs a single repository from GitHub.
      *
-     * @param workspaceId the workspace ID for authentication
+     * @param scopeId the scope ID for authentication
      * @param nameWithOwner the full repository name (owner/repo)
      * @return the synced Repository entity, or empty if not found
      */
     @Transactional
-    public Optional<Repository> syncRepository(Long workspaceId, String nameWithOwner) {
+    public Optional<Repository> syncRepository(Long scopeId, String nameWithOwner) {
         String safeNameWithOwner = sanitizeForLog(nameWithOwner);
         Optional<RepositoryOwnerAndName> parsedName = GitHubRepositoryNameParser.parse(nameWithOwner);
         if (parsedName.isEmpty()) {
-            log.warn("Invalid repository name format: {}", safeNameWithOwner);
+            log.warn("Skipped repository sync: reason=invalid name format, repoName={}", safeNameWithOwner);
             return Optional.empty();
         }
         String repoOwner = parsedName.get().owner();
         String repoName = parsedName.get().name();
 
         try {
-            HttpGraphQlClient client = graphQlClientProvider.forWorkspace(workspaceId);
+            HttpGraphQlClient client = graphQlClientProvider.forScope(scopeId);
             ClientGraphQlResponse response = client
                 .documentName(QUERY_DOCUMENT)
                 .variable("owner", repoOwner)
@@ -80,7 +80,7 @@ public class GitHubRepositorySyncService {
 
             if (response == null || !response.isValid()) {
                 log.warn(
-                    "Failed to fetch repository {}: {}",
+                    "Failed to fetch repository: repoName={}, errors={}",
                     safeNameWithOwner,
                     response != null ? response.getErrors() : "null response"
                 );
@@ -90,7 +90,7 @@ public class GitHubRepositorySyncService {
             // Use typed GraphQL model for type-safe parsing
             var repoData = response.field("repository").toEntity(GHRepository.class);
             if (repoData == null) {
-                log.warn("Repository {} not found on GitHub", safeNameWithOwner);
+                log.warn("Skipped repository sync: reason=not found on GitHub, repoName={}", safeNameWithOwner);
                 return Optional.empty();
             }
 
@@ -101,7 +101,7 @@ public class GitHubRepositorySyncService {
             // Create or update repository using typed accessors
             Long githubDatabaseId = repoData.getDatabaseId() != null ? repoData.getDatabaseId().longValue() : null;
             if (githubDatabaseId == null) {
-                log.warn("Repository {} missing databaseId", safeNameWithOwner);
+                log.warn("Skipped repository sync: reason=missing databaseId, repoName={}", safeNameWithOwner);
                 return Optional.empty();
             }
 
@@ -146,11 +146,11 @@ public class GitHubRepositorySyncService {
             repository.setLastSyncAt(Instant.now());
 
             repository = repositoryRepository.save(repository);
-            log.debug("Synced repository: {}", safeNameWithOwner);
+            log.info("Synced repository: repoId={}, repoName={}", repository.getId(), safeNameWithOwner);
 
             return Optional.of(repository);
         } catch (Exception e) {
-            log.error("Error syncing repository {}: {}", safeNameWithOwner, e.getMessage(), e);
+            log.error("Failed to sync repository: repoName={}, scopeId={}", safeNameWithOwner, scopeId, e);
             return Optional.empty();
         }
     }

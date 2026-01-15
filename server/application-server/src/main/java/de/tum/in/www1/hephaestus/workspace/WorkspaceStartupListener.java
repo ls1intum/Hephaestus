@@ -30,7 +30,7 @@ public class WorkspaceStartupListener {
 
     @EventListener(ApplicationReadyEvent.class)
     public void onApplicationReady() {
-        log.info("Starting workspace provisioning.");
+        log.info("Started workspace provisioning");
         provisioningService.bootstrapDefaultPatWorkspace();
         provisioningService.ensureGitHubAppInstallations();
         workspaceActivationService.activateAllWorkspaces();

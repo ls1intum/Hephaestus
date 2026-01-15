@@ -169,7 +169,7 @@ public class GitHubGraphQlConfig {
             double usagePercent = (100.0 * (limitInt - remainingInt)) / limitInt;
             if (usagePercent > 80) {
                 log.warn(
-                    "GitHub GraphQL rate limit: {}/{} remaining ({}% used), resets at epoch {}",
+                    "Approaching GitHub GraphQL rate limit: remaining={}, limit={}, usagePercent={}, resetEpoch={}",
                     remaining,
                     limit,
                     String.format("%.1f", usagePercent),

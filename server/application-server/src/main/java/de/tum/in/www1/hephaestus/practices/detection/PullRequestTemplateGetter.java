@@ -39,11 +39,11 @@ public class PullRequestTemplateGetter {
             return restTemplate.getForObject(url, String.class);
         } catch (HttpClientErrorException.NotFound e) {
             // No template file exists - this is expected for most repositories
-            log.debug("No pull request template found for {}", nameWithOwner);
+            log.debug("No pull request template found: repository={}", nameWithOwner);
             return "";
         } catch (RestClientException e) {
             // Network or server error - log with stack trace for debugging
-            log.warn("Error fetching pull request template for {}: {}", nameWithOwner, e.getMessage(), e);
+            log.warn("Failed to fetch pull request template: repository={}", nameWithOwner, e);
             return "";
         }
     }

@@ -105,7 +105,7 @@ public class WorkspaceActivationService {
         // Wait for all workspace activations to complete (non-blocking to main thread
         // but ensures all are started before the method returns)
         CompletableFuture.allOf(activationFutures.toArray(CompletableFuture[]::new)).exceptionally(ex -> {
-            log.error("Error during workspace activation: {}", ex.getMessage(), ex);
+            log.error("Failed to activate workspaces", ex);
             return null;
         });
     }
@@ -119,7 +119,7 @@ public class WorkspaceActivationService {
             isBlank(workspace.getPersonalAccessToken())
         ) {
             log.info(
-                "Workspace id={} remains idle: PAT mode without personal access token. Configure a token or migrate to the GitHub App.",
+                "Skipped workspace activation: reason=patModeWithoutToken, workspaceId={}",
                 workspace.getId()
             );
             return true;
@@ -136,12 +136,12 @@ public class WorkspaceActivationService {
      */
     public void activateWorkspace(Workspace workspace, Set<String> organizationConsumersStarted) {
         if (!workspaceScopeFilter.isWorkspaceAllowed(workspace)) {
-            log.info("Workspace id={} skipped: workspace scope filters active.", workspace.getId());
+            log.info("Skipped workspace activation: reason=filteredByScope, workspaceId={}", workspace.getId());
             return;
         }
 
         if (runMonitoringOnStartup) {
-            log.info("Running monitoring on startup for workspace id={}", workspace.getId());
+            log.info("Starting monitoring on startup: workspaceId={}", workspace.getId());
 
             // Set workspace context for the sync operations (enables proper logging via
             // MDC)
@@ -154,7 +154,7 @@ public class WorkspaceActivationService {
                 // 3. Workspace-level relationships (issue dependencies, sub-issues)
                 getGitHubDataSyncService().syncAllRepositories(workspace.getId());
 
-                log.info("Finished running monitoring on startup for workspace id={}", workspace.getId());
+                log.info("Completed monitoring on startup: workspaceId={}", workspace.getId());
             } finally {
                 // Clear context after sync operations complete
                 WorkspaceContextHolder.clearContext();
@@ -165,7 +165,7 @@ public class WorkspaceActivationService {
         // The startup sync ensures all entities exist before NATS starts processing
         // webhook events that might reference them.
         if (shouldUseNats(workspace)) {
-            natsConsumerService.startConsumingWorkspace(workspace.getId());
+            natsConsumerService.startConsumingScope(workspace.getId());
         }
     }
 

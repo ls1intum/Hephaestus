@@ -9,10 +9,9 @@ import org.springframework.stereotype.Repository;
 /**
  * Repository for PullRequestReview entities.
  *
- * <p>This repository contains only workspace-agnostic queries for the gitprovider domain.
- * Workspace-scoped queries (those that join with RepositoryToMonitor, WorkspaceTeamRepositorySettings,
- * or other workspace entities) belong in the consuming packages (leaderboard, profile, etc.)
- * to maintain clean architecture boundaries.
+ * <p>This repository contains only domain-agnostic queries for the gitprovider domain.
+ * Scope-filtered queries (those that join with host application entities)
+ * belong in the host application to maintain clean architecture boundaries.
  *
  * @see de.tum.in.www1.hephaestus.leaderboard.LeaderboardReviewQueryRepository
  * @see de.tum.in.www1.hephaestus.profile.ProfileReviewQueryRepository
@@ -22,7 +21,7 @@ public interface PullRequestReviewRepository extends JpaRepository<PullRequestRe
     /**
      * Find all reviews for a specific pull request by a specific author.
      * Used for calculating per-PR XP (aggregating all reviews together for harmonic mean).
-     * PullRequest ID inherently has workspace through repository.
+     * PullRequest ID inherently has scope through repository.
      *
      * @param pullRequestId the pull request ID
      * @param authorId the author ID

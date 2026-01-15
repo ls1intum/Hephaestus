@@ -1,5 +1,7 @@
 package de.tum.in.www1.hephaestus.gitprovider.milestone.github;
 
+import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
+
 import de.tum.in.www1.hephaestus.gitprovider.common.NatsMessageDeserializer;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContextFactory;
@@ -45,15 +47,15 @@ public class GitHubMilestoneMessageHandler extends GitHubMessageHandler<GitHubMi
         GitHubMilestoneDTO milestoneDto = event.milestone();
 
         if (milestoneDto == null) {
-            log.warn("Received milestone event with missing data");
+            log.warn("Received milestone event with missing data: action={}", event.action());
             return;
         }
 
         log.info(
-            "Received milestone event: action={}, milestone={}, repo={}",
+            "Received milestone event: action={}, milestoneTitle={}, repoName={}",
             event.action(),
-            milestoneDto.title(),
-            event.repository() != null ? event.repository().fullName() : "unknown"
+            sanitizeForLog(milestoneDto.title()),
+            event.repository() != null ? sanitizeForLog(event.repository().fullName()) : "unknown"
         );
 
         ProcessingContext context = contextFactory.forWebhookEvent(event).orElse(null);

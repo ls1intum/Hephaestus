@@ -2,6 +2,7 @@ package de.tum.in.www1.hephaestus.gitprovider.milestone.github;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.events.DomainEvent;
+import de.tum.in.www1.hephaestus.gitprovider.common.events.EventContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.events.EventPayload;
 import de.tum.in.www1.hephaestus.gitprovider.milestone.Milestone;
 import de.tum.in.www1.hephaestus.gitprovider.milestone.MilestoneRepository;
@@ -59,7 +60,7 @@ public class GitHubMilestoneProcessor {
      * @param dto the GitHub milestone DTO
      * @param repository the repository this milestone belongs to
      * @param creatorDto optional creator user DTO
-     * @param context processing context with workspace information
+     * @param context processing context with scope information
      * @return the persisted Milestone entity
      */
     @Transactional
@@ -70,7 +71,7 @@ public class GitHubMilestoneProcessor {
         ProcessingContext context
     ) {
         if (dto == null) {
-            log.warn("Milestone DTO is null, skipping");
+            log.warn("Skipped milestone processing: reason=nullDto, repoId={}", repository != null ? repository.getId() : null);
             return null;
         }
 
@@ -81,7 +82,7 @@ public class GitHubMilestoneProcessor {
         } else if (dto.number() > 0) {
             existingOpt = milestoneRepository.findByNumberAndRepositoryId(dto.number(), repository.getId());
         } else {
-            log.warn("Milestone DTO is missing both id and number, skipping");
+            log.warn("Skipped milestone processing: reason=missingIdAndNumber, repoId={}", repository.getId());
             return null;
         }
         boolean isNew = existingOpt.isEmpty();
@@ -140,14 +141,13 @@ public class GitHubMilestoneProcessor {
 
         // Publish domain event with EventPayload DTO
         EventPayload.MilestoneData milestoneData = EventPayload.MilestoneData.from(saved);
+        EventContext eventContext = EventContext.from(context);
         if (isNew) {
-            eventPublisher.publishEvent(
-                new DomainEvent.MilestoneCreated(milestoneData, context.workspaceId(), repository.getId())
-            );
+            eventPublisher.publishEvent(new DomainEvent.MilestoneCreated(milestoneData, eventContext));
+            log.debug("Created milestone: milestoneId={}, milestoneNumber={}", saved.getId(), saved.getNumber());
         } else {
-            eventPublisher.publishEvent(
-                new DomainEvent.MilestoneUpdated(milestoneData, context.workspaceId(), repository.getId())
-            );
+            eventPublisher.publishEvent(new DomainEvent.MilestoneUpdated(milestoneData, eventContext));
+            log.debug("Updated milestone: milestoneId={}, milestoneNumber={}", saved.getId(), saved.getNumber());
         }
 
         return saved;
@@ -178,7 +178,7 @@ public class GitHubMilestoneProcessor {
      * Delete a milestone by its ID.
      *
      * @param milestoneId the milestone database ID
-     * @param context processing context with workspace information
+     * @param context processing context with scope information
      */
     @Transactional
     public void delete(Long milestoneId, ProcessingContext context) {
@@ -189,12 +189,11 @@ public class GitHubMilestoneProcessor {
         milestoneRepository
             .findById(milestoneId)
             .ifPresent(milestone -> {
-                Long repoId = milestone.getRepository() != null ? milestone.getRepository().getId() : null;
                 milestoneRepository.delete(milestone);
                 eventPublisher.publishEvent(
-                    new DomainEvent.MilestoneDeleted(milestoneId, milestone.getTitle(), context.workspaceId(), repoId)
+                    new DomainEvent.MilestoneDeleted(milestoneId, milestone.getTitle(), EventContext.from(context))
                 );
-                log.debug("Deleted milestone {} ({})", milestone.getTitle(), milestoneId);
+                log.info("Deleted milestone: milestoneId={}, milestoneNumber={}", milestoneId, milestone.getNumber());
             });
     }
 

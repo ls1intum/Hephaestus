@@ -69,12 +69,13 @@ public final class DomainEvent {
 
     /** All issue-related events. Subscribe to handle any issue event. */
     public sealed interface IssueEvent
-        extends Event
+        extends Event, ContextualEvent
         permits
             IssueCreated,
             IssueUpdated,
             IssueClosed,
             IssueReopened,
+            IssueDeleted,
             IssueLabeled,
             IssueUnlabeled,
             IssueTyped,
@@ -98,7 +99,12 @@ public final class DomainEvent {
         IssueEvent, ContextualEvent {}
 
     /** Deleted event is separate - entity no longer exists, only ID available. */
-    public record IssueDeleted(Long issueId, EventContext context) implements ContextualEvent {}
+    public record IssueDeleted(Long issueId, EventContext context) implements IssueEvent {
+        @Override
+        public EventPayload.IssueData issue() {
+            return null; // Entity no longer exists
+        }
+    }
 
     public record IssueLabeled(
         EventPayload.IssueData issue,
@@ -130,7 +136,7 @@ public final class DomainEvent {
 
     /** All pull request-related events. Subscribe to handle any PR event. */
     public sealed interface PullRequestEvent
-        extends Event
+        extends Event, ContextualEvent
         permits
             PullRequestCreated,
             PullRequestUpdated,
@@ -192,45 +198,33 @@ public final class DomainEvent {
     // ========================================================================
 
     /** All label-related events. */
-    public sealed interface LabelEvent extends Event permits LabelCreated, LabelUpdated, LabelDeleted {
-        Long repositoryId();
-        Long workspaceId();
-    }
+    public sealed interface LabelEvent extends Event, ContextualEvent permits LabelCreated, LabelUpdated, LabelDeleted {}
 
-    public record LabelCreated(EventPayload.LabelData label, Long workspaceId, Long repositoryId) implements
-        LabelEvent {}
+    public record LabelCreated(EventPayload.LabelData label, EventContext context) implements LabelEvent {}
 
-    public record LabelUpdated(EventPayload.LabelData label, Long workspaceId, Long repositoryId) implements
-        LabelEvent {}
+    public record LabelUpdated(EventPayload.LabelData label, EventContext context) implements LabelEvent {}
 
-    public record LabelDeleted(Long labelId, String labelName, Long workspaceId, Long repositoryId) implements
-        LabelEvent {}
+    public record LabelDeleted(Long labelId, String labelName, EventContext context) implements LabelEvent {}
 
     // ========================================================================
     // Milestone Events
     // ========================================================================
 
     /** All milestone-related events. */
-    public sealed interface MilestoneEvent extends Event permits MilestoneCreated, MilestoneUpdated, MilestoneDeleted {
-        Long repositoryId();
-        Long workspaceId();
-    }
+    public sealed interface MilestoneEvent extends Event, ContextualEvent permits MilestoneCreated, MilestoneUpdated, MilestoneDeleted {}
 
-    public record MilestoneCreated(EventPayload.MilestoneData milestone, Long workspaceId, Long repositoryId) implements
-        MilestoneEvent {}
+    public record MilestoneCreated(EventPayload.MilestoneData milestone, EventContext context) implements MilestoneEvent {}
 
-    public record MilestoneUpdated(EventPayload.MilestoneData milestone, Long workspaceId, Long repositoryId) implements
-        MilestoneEvent {}
+    public record MilestoneUpdated(EventPayload.MilestoneData milestone, EventContext context) implements MilestoneEvent {}
 
-    public record MilestoneDeleted(Long milestoneId, String title, Long workspaceId, Long repositoryId) implements
-        MilestoneEvent {}
+    public record MilestoneDeleted(Long milestoneId, String title, EventContext context) implements MilestoneEvent {}
 
     // ========================================================================
     // Comment Events
     // ========================================================================
 
     /** All comment-related events. */
-    public sealed interface CommentEvent extends Event permits CommentCreated, CommentUpdated, CommentDeleted {
+    public sealed interface CommentEvent extends Event, ContextualEvent permits CommentCreated, CommentUpdated, CommentDeleted {
         Long issueId();
     }
 
@@ -251,7 +245,7 @@ public final class DomainEvent {
     // Pull Request Review Events
     // ========================================================================
 
-    public sealed interface ReviewEvent extends Event permits ReviewSubmitted, ReviewEdited, ReviewDismissed {
+    public sealed interface ReviewEvent extends Event, ContextualEvent permits ReviewSubmitted, ReviewEdited, ReviewDismissed {
         EventPayload.ReviewData review();
     }
 
@@ -272,7 +266,7 @@ public final class DomainEvent {
     // ========================================================================
 
     public sealed interface ReviewCommentEvent
-        extends Event
+        extends Event, ContextualEvent
         permits ReviewCommentCreated, ReviewCommentEdited, ReviewCommentDeleted {
         Long pullRequestId();
     }
@@ -297,7 +291,7 @@ public final class DomainEvent {
     // Pull Request Review Thread Events
     // ========================================================================
 
-    public sealed interface ReviewThreadEvent extends Event permits ReviewThreadResolved, ReviewThreadUnresolved {
+    public sealed interface ReviewThreadEvent extends Event, ContextualEvent permits ReviewThreadResolved, ReviewThreadUnresolved {
         EventPayload.ReviewThreadData thread();
     }
 
@@ -311,7 +305,7 @@ public final class DomainEvent {
     // Team Events
     // ========================================================================
 
-    public sealed interface TeamEvent extends Event permits TeamCreated, TeamUpdated, TeamDeleted {
+    public sealed interface TeamEvent extends Event, ContextualEvent permits TeamCreated, TeamUpdated, TeamDeleted {
         Long teamId();
     }
 

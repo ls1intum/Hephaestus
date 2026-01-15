@@ -9,8 +9,8 @@ import org.springframework.stereotype.Repository;
 /**
  * Repository for team entities.
  *
- * <p>Teams are scoped through their organization field which carries workspace context
- * through the Team.organization -> Workspace.organization relationship.
+ * <p>Teams are scoped through their organization field which carries scope
+ * through the Team.organization relationship.
  */
 @Repository
 public interface TeamRepository extends JpaRepository<Team, Long> {
@@ -23,8 +23,8 @@ public interface TeamRepository extends JpaRepository<Team, Long> {
      * Uses EntityGraph to fetch repoPermissions (with nested repository and its labels),
      * and memberships (with users) in one query.
      *
-     * <p>Note: Team labels are now managed via workspace-scoped settings
-     * (WorkspaceTeamLabelFilter) and are fetched separately.
+     * <p>Note: Team labels are now managed via scope-specific settings
+     * (via consuming module) and are fetched separately.
      */
     @EntityGraph(
         attributePaths = {
@@ -40,8 +40,8 @@ public interface TeamRepository extends JpaRepository<Team, Long> {
     /**
      * Fetch a single team by ID with all collections eagerly loaded for DTO conversion.
      *
-     * <p>Note: Team labels are now managed via workspace-scoped settings
-     * (WorkspaceTeamLabelFilter) and are fetched separately.
+     * <p>Note: Team labels are now managed via scope-specific settings
+     * (via consuming module) and are fetched separately.
      */
     @EntityGraph(
         attributePaths = {

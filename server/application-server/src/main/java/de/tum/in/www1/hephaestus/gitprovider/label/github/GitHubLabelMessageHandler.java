@@ -1,5 +1,7 @@
 package de.tum.in.www1.hephaestus.gitprovider.label.github;
 
+import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
+
 import de.tum.in.www1.hephaestus.gitprovider.common.NatsMessageDeserializer;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContextFactory;
@@ -45,15 +47,15 @@ public class GitHubLabelMessageHandler extends GitHubMessageHandler<GitHubLabelE
         GitHubLabelDTO labelDto = event.label();
 
         if (labelDto == null) {
-            log.warn("Received label event with missing data");
+            log.warn("Received label event with missing data: action={}", event.action());
             return;
         }
 
         log.info(
-            "Received label event: action={}, label={}, repo={}",
+            "Received label event: action={}, labelName={}, repoName={}",
             event.action(),
-            labelDto.name(),
-            event.repository() != null ? event.repository().fullName() : "unknown"
+            sanitizeForLog(labelDto.name()),
+            event.repository() != null ? sanitizeForLog(event.repository().fullName()) : "unknown"
         );
 
         ProcessingContext context = contextFactory.forWebhookEvent(event).orElse(null);

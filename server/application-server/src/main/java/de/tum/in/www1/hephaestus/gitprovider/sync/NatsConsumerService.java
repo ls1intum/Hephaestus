@@ -1,5 +1,7 @@
 package de.tum.in.www1.hephaestus.gitprovider.sync;
 
+import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
+
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandlerRegistry;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.NatsSubscriptionProvider;
@@ -44,14 +46,14 @@ import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Service;
 
 /**
- * NATS consumer service that manages one consumer per workspace.
+ * NATS consumer service that manages one consumer per scope.
  *
  * <h2>Architecture</h2>
  * <ul>
- *   <li>Each workspace gets exactly ONE NATS consumer</li>
- *   <li>Consumer subscribes to all repositories in the workspace using wildcard subjects</li>
- *   <li>Messages are processed SEQUENTIALLY within each workspace (avoids race conditions)</li>
- *   <li>Workspaces process in PARALLEL using virtual threads (scales to 100s of workspaces)</li>
+ *   <li>Each scope gets exactly ONE NATS consumer</li>
+ *   <li>Consumer subscribes to all repositories in the scope using wildcard subjects</li>
+ *   <li>Messages are processed SEQUENTIALLY within each scope (avoids race conditions)</li>
+ *   <li>Scopes process in PARALLEL using virtual threads (scales to 100s of scopes)</li>
  *   <li>Installation-level events are handled by a single global consumer</li>
  * </ul>
  *
@@ -59,8 +61,8 @@ import org.springframework.stereotype.Service;
  * This class is thread-safe. Key synchronization mechanisms:
  * <ul>
  *   <li>{@code shuttingDown} - AtomicBoolean for shutdown coordination</li>
- *   <li>{@code workspaceConsumers} - ConcurrentHashMap for consumer registry</li>
- *   <li>{@code pendingWorkspaceSetup} - ConcurrentHashMap.newKeySet() prevents duplicate setup</li>
+ *   <li>{@code scopeConsumers} - ConcurrentHashMap for consumer registry</li>
+ *   <li>{@code pendingScopeSetup} - ConcurrentHashMap.newKeySet() prevents duplicate setup</li>
  *   <li>{@code connectionLock} - Guards NATS connection creation/access</li>
  *   <li>{@code installationConsumer} - volatile for safe publication</li>
  * </ul>
@@ -68,8 +70,8 @@ import org.springframework.stereotype.Service;
  * <h2>Lifecycle</h2>
  * <ol>
  *   <li>{@code init()} - Called on ApplicationReadyEvent, establishes NATS connection</li>
- *   <li>{@code startConsumingWorkspace()} - Creates consumer for a workspace (idempotent)</li>
- *   <li>{@code stopConsumingWorkspace()} - Removes consumer for a workspace</li>
+ *   <li>{@code startConsumingScope()} - Creates consumer for a scope (idempotent)</li>
+ *   <li>{@code stopConsumingScope()} - Removes consumer for a scope</li>
  *   <li>{@code shutdown()} - Called on @PreDestroy, graceful cleanup of all resources</li>
  * </ol>
  *
@@ -86,7 +88,7 @@ import org.springframework.stereotype.Service;
  *   <li>{@code nats.consumer.request-timeout-seconds} - JetStream API timeout (default: 60)</li>
  * </ul>
  *
- * @see WorkspaceNatsConsumer
+ * @see ScopeNatsConsumer
  */
 @Order(1)
 @Service
@@ -110,16 +112,16 @@ public class NatsConsumerService {
 
     private Connection natsConnection;
 
-    /** One consumer per workspace - keyed by workspace ID */
-    private final Map<Long, WorkspaceConsumer> workspaceConsumers = new ConcurrentHashMap<>();
+    /** One consumer per scope - keyed by scope ID */
+    private final Map<Long, ScopeConsumer> scopeConsumers = new ConcurrentHashMap<>();
 
-    /** Tracks workspace IDs currently being set up to prevent duplicate consumer creation */
-    private final Set<Long> pendingWorkspaceSetup = ConcurrentHashMap.newKeySet();
+    /** Tracks scope IDs currently being set up to prevent duplicate consumer creation */
+    private final Set<Long> pendingScopeSetup = ConcurrentHashMap.newKeySet();
 
     /** Global installation consumer for installation-level events */
-    private volatile WorkspaceConsumer installationConsumer;
+    private volatile ScopeConsumer installationConsumer;
 
-    /** Virtual thread executor for workspace message processing */
+    /** Virtual thread executor for scope message processing */
     private final ExecutorService virtualThreadExecutor = Executors.newVirtualThreadPerTaskExecutor();
 
     private final GitHubMessageHandlerRegistry handlerRegistry;
@@ -152,7 +154,7 @@ public class NatsConsumerService {
     @EventListener(ApplicationReadyEvent.class)
     public void init() {
         if (!isNatsEnabled) {
-            log.info("NATS is disabled. Skipping initialization.");
+            log.info("Skipped NATS initialization: reason=disabled");
             return;
         }
 
@@ -173,13 +175,13 @@ public class NatsConsumerService {
             try {
                 natsConnection = Nats.connect(options);
                 setupInstallationConsumer();
-                log.info("NATS connection and installation consumer setup successful");
+                log.info("Established NATS connection: server={}", natsServer);
                 return;
             } catch (InterruptedException interrupted) {
                 Thread.currentThread().interrupt();
                 return;
             } catch (IOException e) {
-                log.error("NATS connection error: {}", e.getMessage(), e);
+                log.error("Failed to connect to NATS: server={}", natsServer, e);
                 backoffBeforeRetry();
             }
         }
@@ -192,9 +194,9 @@ public class NatsConsumerService {
             .server(natsServer)
             .connectionListener((conn, type) -> {
                 if (conn != null && conn.getServerInfo() != null) {
-                    log.info("NATS connection event - Server: {}, {}", conn.getServerInfo().getPort(), type);
+                    log.info("NATS connection event: type={}, port={}", type, conn.getServerInfo().getPort());
                 } else {
-                    log.info("NATS connection event - {}", type);
+                    log.info("NATS connection event: type={}", type);
                 }
             })
             .errorListener(new JetStreamErrorListener())
@@ -205,89 +207,86 @@ public class NatsConsumerService {
     }
 
     /**
-     * Starts consuming events for a workspace.
-     * Creates a single consumer that subscribes to ALL repositories in the workspace.
+     * Starts consuming events for a scope.
+     * Creates a single consumer that subscribes to ALL repositories in the scope.
      * Messages are processed sequentially to avoid race conditions.
      *
-     * @param workspaceId The workspace ID to start consuming for
+     * @param scopeId The scope ID to start consuming for
      */
-    public void startConsumingWorkspace(Long workspaceId) {
-        if (!isNatsEnabled || shuttingDown.get() || workspaceId == null) {
+    public void startConsumingScope(Long scopeId) {
+        if (!isNatsEnabled || shuttingDown.get() || scopeId == null) {
             return;
         }
 
         // Check if consumer already exists
-        if (workspaceConsumers.containsKey(workspaceId)) {
-            log.debug("Consumer already exists for workspace id={}", workspaceId);
+        if (scopeConsumers.containsKey(scopeId)) {
+            log.debug("Consumer already exists: scopeId={}", scopeId);
             return;
         }
 
         // Use atomic add to prevent concurrent setup attempts
-        if (!pendingWorkspaceSetup.add(workspaceId)) {
-            log.debug("Consumer setup already in progress for workspace id={}", workspaceId);
+        if (!pendingScopeSetup.add(scopeId)) {
+            log.debug("Consumer setup already in progress: scopeId={}", scopeId);
             return;
         }
 
         virtualThreadExecutor.submit(() -> {
             try {
                 ensureNatsConnectionEstablished();
-                setupWorkspaceConsumer(workspaceId);
+                setupScopeConsumer(scopeId);
             } catch (Exception e) {
-                log.error("Failed to start consumer for workspace id={}: {}", workspaceId, e.getMessage(), e);
+                log.error("Failed to start consumer: scopeId={}", scopeId, e);
             } finally {
-                pendingWorkspaceSetup.remove(workspaceId);
+                pendingScopeSetup.remove(scopeId);
             }
         });
     }
 
     /**
-     * Updates the subjects for an existing workspace consumer.
-     * Call this when repositories are added/removed from a workspace.
-     * NOTE: Does NOT start a consumer if one doesn't exist - use startConsumingWorkspace for that.
+     * Updates the subjects for an existing scope consumer.
+     * Call this when repositories are added/removed from a scope.
+     * NOTE: Does NOT start a consumer if one doesn't exist - use startConsumingScope for that.
      *
-     * @param workspaceId The workspace ID with updated repositories
+     * @param scopeId The scope ID with updated repositories
      */
-    public void updateWorkspaceConsumer(Long workspaceId) {
-        if (!isNatsEnabled || shuttingDown.get() || workspaceId == null) {
+    public void updateScopeConsumer(Long scopeId) {
+        if (!isNatsEnabled || shuttingDown.get() || scopeId == null) {
             return;
         }
 
-        WorkspaceConsumer existing = workspaceConsumers.get(workspaceId);
+        ScopeConsumer existing = scopeConsumers.get(scopeId);
 
         if (existing == null) {
             // No consumer yet - don't start one here. Consumer will be started
-            // during workspace activation which happens after provisioning completes.
-            log.debug(
-                "No existing consumer for workspace id={}, skipping update (consumer will be started during activation)",
-                workspaceId
-            );
+            // during scope activation which happens after provisioning completes.
+            log.debug("Skipped consumer update: scopeId={}, reason=not yet created", scopeId);
             return;
         }
 
         virtualThreadExecutor.submit(() -> {
             try {
-                String[] newSubjects = buildWorkspaceSubjects(workspaceId);
+                String[] newSubjects = buildScopeSubjects(scopeId);
                 existing.updateSubjects(newSubjects);
-                log.info("Updated consumer subjects for workspace id={}", workspaceId);
+                log.info("Updated consumer subjects: scopeId={}, subjectCount={}", scopeId, newSubjects.length);
             } catch (Exception e) {
-                log.error("Failed to update consumer for workspace id={}: {}", workspaceId, e.getMessage(), e);
+                log.error("Failed to update consumer: scopeId={}", scopeId, e);
             }
         });
     }
 
     /**
-     * Stops consuming events for a workspace.
+     * Stops consuming events for a scope.
      *
-     * @param workspaceId The workspace ID to stop consuming for
+     * @param scopeId The scope ID to stop consuming for
      */
-    public void stopConsumingWorkspace(Long workspaceId) {
-        if (workspaceId == null) {
+    public void stopConsumingScope(Long scopeId) {
+        if (scopeId == null) {
             return;
         }
-        WorkspaceConsumer consumer = workspaceConsumers.remove(workspaceId);
+        ScopeConsumer consumer = scopeConsumers.remove(scopeId);
 
         if (consumer == null) {
-            log.debug("No consumer found for workspace id={}", workspaceId);
+            log.debug("No consumer found: scopeId={}", scopeId);
             return;
         }
 
@@ -295,9 +294,9 @@ public class NatsConsumerService {
             try {
                 consumer.stop();
                 cleanupConsumer(consumer.consumerName);
-                log.info("Stopped consumer for workspace id={}", workspaceId);
+                log.info("Stopped consumer: scopeId={}", scopeId);
             } catch (Exception e) {
-                log.error("Error stopping consumer for workspace id={}: {}", workspaceId, e.getMessage(), e);
+                log.error("Failed to stop consumer: scopeId={}", scopeId, e);
             }
         });
     }
@@ -306,37 +305,37 @@ public class NatsConsumerService {
     // Internal implementation
     // =========================================================================
 
-    private void setupWorkspaceConsumer(Long workspaceId) throws IOException {
-        String[] subjects = buildWorkspaceSubjects(workspaceId);
+    private void setupScopeConsumer(Long scopeId) throws IOException {
+        String[] subjects = buildScopeSubjects(scopeId);
 
         if (subjects.length == 0) {
-            log.info("No subjects to consume for workspace id={} - skipping consumer setup", workspaceId);
+            log.info("Skipped consumer setup: scopeId={}, reason=no subjects", scopeId);
             return;
         }
 
-        String consumerName = durableConsumerName + "-workspace-" + workspaceId;
+        String consumerName = durableConsumerName + "-scope-" + scopeId;
 
         try {
-            // Use longer timeout for workspaces with many repositories
+            // Use longer timeout for scopes with many repositories
             JetStreamOptions jsOptions = JetStreamOptions.builder()
                 .requestTimeout(Duration.ofSeconds(requestTimeoutSeconds))
                 .build();
             StreamContext streamContext = natsConnection.getStreamContext("github", jsOptions);
             ConsumerContext consumerContext = createOrUpdateConsumer(streamContext, consumerName, subjects);
 
-            WorkspaceConsumer workspaceConsumer = new WorkspaceConsumer(
-                workspaceId,
+            ScopeConsumer scopeConsumer = new ScopeConsumer(
+                scopeId,
                 consumerName,
                 consumerContext,
                 streamContext,
                 subjects
             );
-            workspaceConsumer.start();
+            scopeConsumer.start();
 
-            workspaceConsumers.put(workspaceId, workspaceConsumer);
-            log.info("Started consumer for workspace id={} with {} subjects", workspaceId, subjects.length);
+            scopeConsumers.put(scopeId, scopeConsumer);
+            log.info("Started consumer: scopeId={}, subjectCount={}", scopeId, subjects.length);
         } catch (JetStreamApiException e) {
-            throw new IOException("Failed to setup consumer for workspace " + workspaceId, e);
+            throw new IOException("Failed to setup consumer for scope " + scopeId, e);
         }
     }
 
@@ -351,9 +350,9 @@ public class NatsConsumerService {
             StreamContext streamContext = natsConnection.getStreamContext("github", jsOptions);
             ConsumerContext consumerContext = createOrUpdateConsumer(streamContext, consumerName, subjects);
 
-            installationConsumer = new WorkspaceConsumer(null, consumerName, consumerContext, streamContext, subjects);
+            installationConsumer = new ScopeConsumer(null, consumerName, consumerContext, streamContext, subjects);
             installationConsumer.start();
-            log.info("Started installation consumer with {} subjects", subjects.length);
+            log.info("Started installation consumer: consumerName={}, subjectCount={}", consumerName, subjects.length);
         } catch (JetStreamApiException e) {
             throw new IOException("Failed to setup installation consumer", e);
         }
@@ -373,7 +372,7 @@ public class NatsConsumerService {
 
                 if (!existingSubjects.equals(newSubjects)) {
                     log.info(
-                        "Updating durable consumer {} subjects: {} -> {}",
+                        "Updating durable consumer subjects: consumerName={}, oldCount={}, newCount={}",
                         consumerName,
                         existingSubjects.size(),
                         newSubjects.size()
@@ -382,19 +381,19 @@ public class NatsConsumerService {
                         ConsumerConfiguration.builder(config).filterSubjects(subjects).build()
                     );
                 }
-                log.debug("Durable consumer {} already exists with correct subjects", consumerName);
+                log.debug("Found existing consumer: consumerName={}", consumerName);
                 return consumerContext;
             }
         } catch (JetStreamApiException e) {
             // Consumer doesn't exist - fall through to create it
-            log.debug("Consumer {} not found, will create new one", consumerName);
+            log.debug("Consumer not found: consumerName={}", consumerName);
         }
 
         // Create new consumer (ephemeral if no durable name, durable otherwise)
         log.info(
-            "Creating {} consumer{} with {} subjects, startTime=now-{}days",
+            "Creating consumer: type={}, consumerName={}, subjectCount={}, startTimeDaysAgo={}",
             isDurable ? "durable" : "ephemeral",
-            isDurable ? " " + consumerName : "",
+            isDurable ? consumerName : "ephemeral",
             subjects.length,
             timeframe
         );
@@ -413,22 +412,22 @@ public class NatsConsumerService {
         return streamContext.createOrUpdateConsumer(configBuilder.build());
     }
 
-    private String[] buildWorkspaceSubjects(Long workspaceId) {
-        var subscriptionInfoOpt = subscriptionProvider.getSubscriptionInfo(workspaceId);
+    private String[] buildScopeSubjects(Long scopeId) {
+        var subscriptionInfoOpt = subscriptionProvider.getSubscriptionInfo(scopeId);
         if (subscriptionInfoOpt.isEmpty()) {
-            log.warn("No subscription info found for workspace id={}", workspaceId);
+            log.warn("No subscription info found: scopeId={}", scopeId);
             return new String[0];
         }
 
         NatsSubscriptionInfo subscriptionInfo = subscriptionInfoOpt.get();
         Set<String> subjects = new HashSet<>();
 
-        // Add subjects for all repositories in the workspace
+        // Add subjects for all repositories in the scope
         for (String repoNameWithOwner : subscriptionInfo.repositoryNamesWithOwner()) {
             subjects.addAll(Arrays.asList(getRepositorySubjects(repoNameWithOwner)));
         }
 
-        // Add organization-level subjects if workspace has an organization
+        // Add organization-level subjects if scope has an organization
         if (subscriptionInfo.hasOrganization()) {
             subjects.addAll(Arrays.asList(getOrganizationSubjects(subscriptionInfo.organizationLogin())));
         }
@@ -493,7 +492,7 @@ public class NatsConsumerService {
             GitHubMessageHandler<?> eventHandler = handlerRegistry.getHandler(eventKey);
 
             if (eventHandler == null) {
-                log.warn("No handler found for event type: {}", eventKey);
+                log.warn("No handler found for event: eventType={}", eventKey);
                 msg.ack();
                 return;
             }
@@ -502,7 +501,7 @@ public class NatsConsumerService {
             msg.ack();
         } catch (Exception e) {
             if (!shuttingDown.get()) {
-                log.error("Error processing message: {}", e.getMessage(), e);
+                log.error("Failed to process message: subject={}", sanitizeForLog(msg.getSubject()), e);
             }
             msg.nak();
         }
@@ -528,12 +527,12 @@ public class NatsConsumerService {
                 return;
             }
 
-            log.info("NATS connection is not connected. Attempting to connect...");
+            log.info("Reconnecting to NATS server: server={}", natsServer);
             try {
                 natsConnection = Nats.connect(buildNatsOptions());
-                log.info("Connected to NATS server.");
+                log.info("Connected to NATS: server={}", natsServer);
             } catch (IOException e) {
-                log.error("Failed to connect to NATS server: {}", e.getMessage(), e);
+                log.error("Failed to connect to NATS: server={}", natsServer, e);
                 throw new NatsConnectionException("Failed to establish NATS connection", e);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
@@ -550,7 +549,7 @@ public class NatsConsumerService {
         try {
             natsConnection.jetStreamManagement().deleteConsumer("github", consumerName);
         } catch (Exception e) {
-            log.debug("Failed to delete consumer {}: {}", consumerName, e.getMessage());
+            log.debug("Failed to delete consumer: consumerName={}", consumerName, e);
         }
     }
 
@@ -568,26 +567,26 @@ public class NatsConsumerService {
             return;
         }
 
-        log.info("Initiating NATS consumer graceful shutdown...");
+        log.info("Shutting down NATS consumers");
         shuttingDown.set(true);
 
-        // Stop all workspace consumers
-        for (var entry : workspaceConsumers.entrySet()) {
+        // Stop all scope consumers
+        for (var entry : scopeConsumers.entrySet()) {
             try {
                 entry.getValue().stop();
-                log.debug("Stopped consumer for workspace id={}", entry.getKey());
+                log.debug("Stopped consumer: scopeId={}", entry.getKey());
             } catch (Exception e) {
-                log.debug("Error stopping workspace consumer: {}", e.getMessage());
+                log.debug("Failed to stop scope consumer: scopeId={}", entry.getKey(), e);
             }
         }
-        workspaceConsumers.clear();
+        scopeConsumers.clear();
 
         // Stop installation consumer
         if (installationConsumer != null) {
             try {
                 installationConsumer.stop();
             } catch (Exception e) {
-                log.debug("Error stopping installation consumer: {}", e.getMessage());
+                log.debug("Failed to stop installation consumer: consumerName={}", installationConsumer.consumerName, e);
             }
             installationConsumer = null;
         }
@@ -607,14 +606,14 @@ public class NatsConsumerService {
         if (natsConnection != null) {
             try {
                 natsConnection.close();
-                log.info("NATS connection closed.");
+                log.info("Closed NATS connection: server={}", natsServer);
             } catch (Exception e) {
-                log.debug("Error closing NATS connection: {}", e.getMessage());
+                log.debug("Failed to close NATS connection: server={}", natsServer, e);
             }
             natsConnection = null;
         }
 
-        log.info("NATS consumer shutdown complete.");
+        log.info("Completed NATS consumer shutdown: server={}", natsServer);
     }
 
     private static class JetStreamErrorListener implements ErrorListener {
@@ -623,7 +622,7 @@ public class NatsConsumerService {
 
         @Override
         public void errorOccurred(Connection conn, String error) {
-            log.error("NATS error: {}", error);
+            log.error("NATS error: error={}", error);
         }
 
         @Override
@@ -635,7 +634,7 @@ public class NatsConsumerService {
         ) {
             String consumerName = sub != null ? sub.getConsumerName() : "unknown";
             log.warn(
-                "NATS heartbeat alarm for consumer {} (streamSeq={}, consumerSeq={})",
+                "NATS heartbeat alarm: consumerName={}, streamSeq={}, consumerSeq={}",
                 consumerName,
                 lastStreamSequence,
                 lastConsumerSequence
@@ -644,18 +643,18 @@ public class NatsConsumerService {
     }
 
     /**
-     * Internal NATS consumer for a single workspace.
+     * Internal NATS consumer for a single scope.
      * <p>
      * This is an inner class (not static) so it can access {@link #handleMessage(Message)}
      * from the enclosing service. For a reusable standalone implementation, see
-     * {@link WorkspaceNatsConsumer} which accepts a message handler as a parameter.
+     * {@link ScopeNatsConsumer} which accepts a message handler as a parameter.
      * <p>
-     * <b>Thread Safety:</b> Same guarantees as {@link WorkspaceNatsConsumer} - uses
+     * <b>Thread Safety:</b> Same guarantees as {@link ScopeNatsConsumer} - uses
      * AtomicBoolean, BlockingQueue, and synchronized lifecycle methods.
      */
-    private class WorkspaceConsumer {
+    private class ScopeConsumer {
 
-        private final Long workspaceId; // null for installation consumer
+        private final Long scopeId; // null for installation consumer
         private final String consumerName;
         private final ConsumerContext context;
         private final StreamContext streamContext;
@@ -672,14 +671,14 @@ public class NatsConsumerService {
         /** Virtual thread for processing messages from the queue */
         private volatile Thread processorThread;
 
-        WorkspaceConsumer(
-            Long workspaceId,
+        ScopeConsumer(
+            Long scopeId,
             String consumerName,
             ConsumerContext context,
             StreamContext streamContext,
             String[] subjects
         ) {
-            this.workspaceId = workspaceId;
+            this.scopeId = scopeId;
             this.consumerName = consumerName;
             this.context = context;
             this.streamContext = streamContext;
@@ -695,7 +694,7 @@ public class NatsConsumerService {
 
             // Start the sequential message processor on a virtual thread
             processorThread = Thread.ofVirtual()
-                .name("nats-processor-" + (workspaceId != null ? "ws-" + workspaceId : "installation"))
+                .name("nats-processor-" + (scopeId != null ? "scope-" + scopeId : "installation"))
                 .start(this::processMessagesSequentially);
 
             // Subscribe to NATS - messages go to queue for sequential processing
@@ -709,7 +708,7 @@ public class NatsConsumerService {
                 try {
                     subscription.close();
                 } catch (Exception e) {
-                    log.debug("Error closing subscription: {}", e.getMessage());
+                    log.debug("Failed to close subscription: consumerName={}", consumerName, e);
                 }
                 subscription = null;
             }
@@ -727,7 +726,7 @@ public class NatsConsumerService {
                     msg.nak();
                 } catch (Exception e) {
                     // Expected during shutdown when connection is already closed
-                    log.trace("Ignored NAK error during shutdown: {}", e.getMessage());
+                    log.trace("Ignored NAK error during shutdown: consumerName={}", consumerName);
                 }
             }
         }
@@ -750,7 +749,7 @@ public class NatsConsumerService {
                 try {
                     subscription.close();
                 } catch (Exception e) {
-                    log.warn("Error closing subscription during subject update: {}", e.getMessage());
+                    log.warn("Failed to close subscription during subject update: consumerName={}", consumerName, e);
                 }
             }
             subscription = context.consume(this::enqueueMessage);
@@ -772,12 +771,11 @@ public class NatsConsumerService {
 
         /**
          * Processes messages from the queue ONE AT A TIME.
-         * This ensures sequential processing within a workspace,
+         * This ensures sequential processing within a scope,
          * avoiding race conditions for shared entities.
          */
         private void processMessagesSequentially() {
-            String label = workspaceId != null ? "workspace-" + workspaceId : "installation";
-            log.debug("Started sequential message processor for {}", label);
+            log.debug("Started message processor: consumerName={}, scopeId={}", consumerName, scopeId);
 
             while (running.get() && !Thread.currentThread().isInterrupted()) {
                 try {
@@ -790,11 +788,11 @@ public class NatsConsumerService {
                     Thread.currentThread().interrupt();
                     break;
                 } catch (Exception e) {
-                    log.error("Error in message processor for {}: {}", label, e.getMessage(), e);
+                    log.error("Failed to process message: consumerName={}, scopeId={}", consumerName, scopeId, e);
                 }
             }
 
-            log.debug("Stopped sequential message processor for {}", label);
+            log.debug("Stopped message processor: consumerName={}, scopeId={}", consumerName, scopeId);
         }
     }
 }

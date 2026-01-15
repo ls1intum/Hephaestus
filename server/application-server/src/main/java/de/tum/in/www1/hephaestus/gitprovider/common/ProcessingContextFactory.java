@@ -1,7 +1,9 @@
 package de.tum.in.www1.hephaestus.gitprovider.common;
 
+import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
+
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubWebhookEvent;
-import de.tum.in.www1.hephaestus.gitprovider.common.spi.WorkspaceIdResolver;
+import de.tum.in.www1.hephaestus.gitprovider.common.spi.ScopeIdResolver;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import java.util.Optional;
@@ -13,12 +15,12 @@ import org.springframework.stereotype.Service;
  * Factory for creating ProcessingContext instances.
  * <p>
  * This factory creates contexts for repository-scoped webhook events (issues, PRs, etc.)
- * and sync operations. It resolves the workspace ID from the repository's organization.
+ * and sync operations. It resolves the scope ID from the repository's organization.
  * <p>
  * <b>Installation events are handled differently:</b>
  * Installation events (installation, installation_repositories, installation_target) are
  * account-level events without repository context. They use the installation ID directly
- * to resolve the workspace via {@link de.tum.in.www1.hephaestus.workspace.WorkspaceRepository#findByInstallationId(Long)}.
+ * to resolve the scope via the host application's scope repository.
  * These handlers don't use ProcessingContext.
  */
 @Service
@@ -27,14 +29,14 @@ public class ProcessingContextFactory {
     private static final Logger log = LoggerFactory.getLogger(ProcessingContextFactory.class);
 
     private final RepositoryRepository repositoryRepository;
-    private final WorkspaceIdResolver workspaceIdResolver;
+    private final ScopeIdResolver scopeIdResolver;
 
     public ProcessingContextFactory(
         RepositoryRepository repositoryRepository,
-        WorkspaceIdResolver workspaceIdResolver
+        ScopeIdResolver scopeIdResolver
     ) {
         this.repositoryRepository = repositoryRepository;
-        this.workspaceIdResolver = workspaceIdResolver;
+        this.scopeIdResolver = scopeIdResolver;
     }
 
     /**
@@ -42,7 +44,7 @@ public class ProcessingContextFactory {
      */
     public Optional<ProcessingContext> forWebhookEvent(GitHubWebhookEvent event) {
         if (event.repository() == null || event.repository().fullName() == null) {
-            log.warn("Webhook event missing repository data");
+            log.warn("Skipped webhook event: reason=missingRepositoryData, action={}", event.action());
             return Optional.empty();
         }
 
@@ -50,12 +52,12 @@ public class ProcessingContextFactory {
         Repository repository = repositoryRepository.findByNameWithOwner(repoFullName).orElse(null);
 
         if (repository == null) {
-            log.warn("Repository {} not found for webhook event, skipping", repoFullName);
+            log.warn("Skipped webhook event: reason=repositoryNotFound, repoName={}, action={}", sanitizeForLog(repoFullName), event.action());
             return Optional.empty();
         }
 
-        Long workspaceId = resolveWorkspaceId(repository);
-        ProcessingContext context = ProcessingContext.forWebhook(workspaceId, repository, event.action());
+        Long scopeId = resolveScopeId(repository);
+        ProcessingContext context = ProcessingContext.forWebhook(scopeId, repository, event.action());
 
         return Optional.of(context);
     }
@@ -64,15 +66,15 @@ public class ProcessingContextFactory {
      * Create a ProcessingContext for a sync operation.
      */
     public ProcessingContext forSync(Repository repository) {
-        Long workspaceId = resolveWorkspaceId(repository);
-        return ProcessingContext.forSync(workspaceId, repository);
+        Long scopeId = resolveScopeId(repository);
+        return ProcessingContext.forSync(scopeId, repository);
     }
 
-    private Long resolveWorkspaceId(Repository repository) {
+    private Long resolveScopeId(Repository repository) {
         if (repository.getOrganization() == null) {
             return null;
         }
         String orgLogin = repository.getOrganization().getLogin();
-        return workspaceIdResolver.findWorkspaceIdByOrgLogin(orgLogin).orElse(null);
+        return scopeIdResolver.findScopeIdByOrgLogin(orgLogin).orElse(null);
     }
 }

@@ -1,5 +1,7 @@
 package de.tum.in.www1.hephaestus.gitprovider.pullrequest.github;
 
+import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
+
 import de.tum.in.www1.hephaestus.gitprovider.common.NatsMessageDeserializer;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContextFactory;
@@ -45,15 +47,15 @@ public class GitHubPullRequestMessageHandler extends GitHubMessageHandler<GitHub
         GitHubPullRequestDTO prDto = event.pullRequest();
 
         if (prDto == null) {
-            log.warn("Received pull_request event with missing PR data");
+            log.warn("Received pull_request event with missing data: action={}", event.action());
             return;
         }
 
         log.info(
-            "Received pull_request event: action={}, pr=#{}, repo={}",
+            "Received pull_request event: action={}, prNumber={}, repoName={}",
             event.action(),
             prDto.number(),
-            event.repository() != null ? event.repository().fullName() : "unknown"
+            event.repository() != null ? sanitizeForLog(event.repository().fullName()) : "unknown"
         );
 
         ProcessingContext context = contextFactory.forWebhookEvent(event).orElse(null);
@@ -106,7 +108,7 @@ public class GitHubPullRequestMessageHandler extends GitHubMessageHandler<GitHub
                 }
             }
             default -> {
-                log.debug("Unhandled pull_request action: {}", event.action());
+                log.debug("Skipped pull_request event: reason=unhandledAction, action={}", event.action());
                 prProcessor.process(prDto, context);
             }
         }

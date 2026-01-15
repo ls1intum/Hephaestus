@@ -10,8 +10,8 @@ import org.springframework.stereotype.Repository;
 /**
  * Repository for milestone entities.
  *
- * <p>All queries filter by repository ID which inherently carries workspace scope
- * through the Repository -> Organization -> Workspace.organization chain.
+ * <p>All queries filter by repository ID which inherently carries scope
+ * through the Repository -> Organization relationship chain.
  */
 @Repository
 public interface MilestoneRepository extends JpaRepository<Milestone, Long> {

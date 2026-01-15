@@ -97,14 +97,14 @@ public class WorkspaceService {
         List<Workspace> all = workspaceRepository.findAll();
         if (all.size() == 1) {
             log.info(
-                "Falling back to the only configured workspace id={} for {}.",
+                "Resolved fallback workspace: workspaceId={}, context={}",
                 all.getFirst().getId(),
                 LoggingUtils.sanitizeForLog(context)
             );
             return Optional.of(all.getFirst());
         }
         log.warn(
-            "Unable to resolve workspace for {}. Available workspace count={}",
+            "Skipped workspace resolution: reason=ambiguousContext, context={}, workspaceCount={}",
             LoggingUtils.sanitizeForLog(context),
             all.size()
         );
@@ -185,7 +185,7 @@ public class WorkspaceService {
     public void resetAndRecalculateLeagues(String slug) {
         Workspace workspace = requireWorkspace(slug);
         log.info(
-            "Resetting and recalculating league points for workspace id={}, slug={}",
+            "Reset league points: workspaceId={}, workspaceSlug={}",
             workspace.getId(),
             workspace.getWorkspaceSlug()
         );
@@ -198,16 +198,16 @@ public class WorkspaceService {
     }
 
     private void resetAndRecalculateLeaguesInternal(Long workspaceId) {
-        log.info("Resetting and recalculating league points for workspace id={}", workspaceId);
+        log.debug("Recalculating league points: workspaceId={}", workspaceId);
 
         if (workspaceId == null) {
-            log.warn("Skipping league recalculation because no workspace is configured.");
+            log.warn("Skipped league recalculation: reason=workspaceIdIsNull");
             return;
         }
 
         Workspace workspace = workspaceRepository.findById(workspaceId).orElse(null);
         if (workspace == null) {
-            log.warn("Workspace {} no longer exists; skipping recalculation", workspaceId);
+            log.warn("Skipped league recalculation: reason=workspaceNotFound, workspaceId={}", workspaceId);
             return;
         }
 
@@ -299,8 +299,8 @@ public class WorkspaceService {
         String currentSlug = workspace.getWorkspaceSlug();
 
         if (currentSlug.equals(newSlug)) {
-            log.info(
-                "Workspace id={} rename to '{}' is no-op (already current slug)",
+            log.debug(
+                "Skipped workspace rename: reason=slugUnchanged, workspaceId={}, slug={}",
                 workspaceId,
                 LoggingUtils.sanitizeForLog(newSlug)
             );
@@ -321,7 +321,7 @@ public class WorkspaceService {
         Workspace saved = workspaceRepository.save(workspace);
 
         log.info(
-            "Workspace id={} renamed from '{}' to '{}' (permanent redirect created)",
+            "Renamed workspace: workspaceId={}, oldSlug={}, newSlug={}",
             workspaceId,
             LoggingUtils.sanitizeForLog(currentSlug),
             LoggingUtils.sanitizeForLog(newSlug)

@@ -338,7 +338,7 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
                 .first()
                 .satisfies(event -> {
                     assertThat(event.issue().id()).isEqualTo(issueId);
-                    assertThat(event.context().workspaceId()).isEqualTo(testWorkspace.getId());
+                    assertThat(event.context().scopeId()).isEqualTo(testWorkspace.getId());
                 });
         }
 

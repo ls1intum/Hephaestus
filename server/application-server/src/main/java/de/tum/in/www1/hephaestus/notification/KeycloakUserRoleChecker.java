@@ -38,7 +38,7 @@ public class KeycloakUserRoleChecker implements UserRoleChecker {
     @Override
     public boolean hasAutomaticDetectionRole(@NonNull String username) {
         if (!healthy.get()) {
-            log.debug("Skipping role check for user {} because Keycloak is marked unhealthy", username);
+            log.debug("Skipped role check: reason=keycloakUnhealthy, userLogin={}", username);
             return false;
         }
 
@@ -46,7 +46,7 @@ public class KeycloakUserRoleChecker implements UserRoleChecker {
             List<UserRepresentation> users = keycloak.realm(realm).users().searchByUsername(username, true);
 
             if (users.isEmpty()) {
-                log.debug("User {} not found in Keycloak", username);
+                log.debug("User not found in Keycloak: userLogin={}", username);
                 return false;
             }
 
@@ -62,23 +62,19 @@ public class KeycloakUserRoleChecker implements UserRoleChecker {
             boolean hasRole = roles.stream().anyMatch(role -> AUTOMATIC_DETECTION_ROLE.equals(role.getName()));
 
             if (hasRole) {
-                log.debug("User {} has the {} role", username, AUTOMATIC_DETECTION_ROLE);
+                log.debug("User has role: userLogin={}, role={}", username, AUTOMATIC_DETECTION_ROLE);
             } else {
-                log.debug("User {} does not have the {} role", username, AUTOMATIC_DETECTION_ROLE);
+                log.debug("User missing role: userLogin={}, role={}", username, AUTOMATIC_DETECTION_ROLE);
             }
 
             return hasRole;
         } catch (ProcessingException | NotAuthorizedException e) {
             if (healthy.compareAndSet(true, false)) {
-                log.info(
-                    "Disabling Keycloak role checks after error: {}. " +
-                        "Configure KEYCLOAK credentials or restart to re-enable.",
-                    e.getMessage()
-                );
+                log.warn("Disabled Keycloak role checks: userLogin={}", username, e);
             }
             return false;
         } catch (Exception e) {
-            log.error("Error checking user role for {}: {}", username, e.toString());
+            log.error("Failed to check user role: userLogin={}", username, e);
             return false;
         }
     }

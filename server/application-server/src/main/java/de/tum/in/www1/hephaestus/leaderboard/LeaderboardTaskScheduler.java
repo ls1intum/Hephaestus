@@ -66,7 +66,7 @@ public class LeaderboardTaskScheduler {
         );
 
         if (!CronExpression.isValidExpression(cron)) {
-            log.error("Invalid cron expression: " + cron);
+            log.error("Rejected invalid cron expression: cronExpression={}", cron);
             return;
         }
 
@@ -79,39 +79,39 @@ public class LeaderboardTaskScheduler {
      */
     private void scheduleSlackMessage(String cron) {
         if (!runScheduledMessage) {
-            log.info("Leaderboard notifications disabled; Slack message not scheduled.");
+            log.info("Skipped Slack message scheduling: reason=notificationsDisabled");
             return;
         }
 
         if (slackWeeklyLeaderboardTask == null) {
-            log.warn("SlackWeeklyLeaderboardTask bean not available; skipping Slack scheduling.");
+            log.warn("Skipped Slack message scheduling: reason=beanNotAvailable");
             return;
         }
 
         if (!slackWeeklyLeaderboardTask.testSlackConnection()) {
-            log.error("Failed to schedule Slack message");
+            log.error("Failed to schedule Slack message: reason=connectionTestFailed");
             return;
         }
 
-        log.info("Scheduling Slack message to run with {}", cron);
+        log.info("Scheduled Slack message: cronExpression={}", cron);
         scheduleSafely(slackWeeklyLeaderboardTask, new CronTrigger(cron), "Slack weekly leaderboard message");
     }
 
     private void scheduleLeaguePointsUpdate(String cron) {
-        log.info("Scheduling league points update to run with {}", cron);
+        log.info("Scheduled league points update: cronExpression={}", cron);
         scheduleSafely(leaguePointsUpdateTask, new CronTrigger(cron), "league points update");
     }
 
     private void scheduleSafely(Runnable task, CronTrigger trigger, String description) {
         if (isSchedulerShuttingDown()) {
-            log.info("Skipping {} scheduling because task scheduler is shutting down.", description);
+            log.info("Skipped scheduling: reason=schedulerShuttingDown, task={}", description);
             return;
         }
 
         try {
             taskScheduler.schedule(task, trigger);
         } catch (TaskRejectedException ex) {
-            log.warn("Task scheduler rejected {} scheduling: {}", description, ex.getMessage());
+            log.warn("Skipped scheduling: reason=taskRejected, task={}", description, ex);
         }
     }
 

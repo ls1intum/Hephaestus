@@ -128,7 +128,7 @@ public class ContributorService {
             ContributorDTO dto = contributor.toContributorDTO(fullName);
             accumulator.putIfAbsent(dto.id(), dto);
         } catch (IllegalArgumentException e) {
-            log.error("Error converting contributor to DTO: {}", e.getMessage(), e);
+            log.error("Failed to convert contributor to DTO", e);
         }
     }
 

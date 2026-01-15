@@ -83,7 +83,7 @@ public class BadPracticeFeedbackService {
         PullRequestBadPracticeState state
     ) {
         log.info(
-            "Resolving bad practice {} from {} to {} in workspace {}",
+            "Resolved bad practice: badPracticeId={}, fromState={}, toState={}, workspaceSlug={}",
             badPractice.getId(),
             badPractice.getUserState(),
             state,
@@ -106,7 +106,7 @@ public class BadPracticeFeedbackService {
         BadPracticeFeedbackDTO feedback
     ) {
         log.info(
-            "Recording feedback for bad practice {} in workspace {}",
+            "Recorded feedback for bad practice: badPracticeId={}, workspaceSlug={}",
             badPractice.getId(),
             workspace.getWorkspaceSlug()
         );
@@ -140,7 +140,7 @@ public class BadPracticeFeedbackService {
             return;
         }
 
-        log.info("Sending feedback to Langfuse for bad practice: {}", badPractice.getId());
+        log.info("Sending feedback to Langfuse: badPracticeId={}", badPractice.getId());
         try {
             CreateScoreRequest request = CreateScoreRequest.builder()
                 .traceId(badPractice.getDetectionTraceId())
@@ -152,14 +152,10 @@ public class BadPracticeFeedbackService {
                 .build();
 
             CreateScoreResponse response = langfuseClient.score().create(request);
-            log.info("Feedback sent to Langfuse successfully (id={})", response.getId());
+            log.info("Sent feedback to Langfuse: responseId={}", response.getId());
         } catch (RuntimeException e) {
             // Log with context but don't propagate - Langfuse is optional observability
-            log.error(
-                "Failed to send feedback to Langfuse for bad practice {}: {}",
-                badPractice.getId(),
-                e.getMessage()
-            );
+            log.error("Failed to send feedback to Langfuse: badPracticeId={}", badPractice.getId(), e);
         }
     }
 }

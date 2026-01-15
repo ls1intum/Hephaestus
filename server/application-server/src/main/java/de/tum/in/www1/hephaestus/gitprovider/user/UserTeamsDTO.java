@@ -15,16 +15,16 @@ public record UserTeamsDTO(
     @NonNull Set<TeamSummaryDTO> teams
 ) {
     /**
-     * Creates a UserTeamsDTO from a User entity using workspace-scoped settings.
+     * Creates a UserTeamsDTO from a User entity using scope-specific settings.
      *
-     * <p>This method applies workspace-specific visibility settings,
-     * enabling different configurations for the same team across multiple workspaces.
+     * <p>This method applies scope-specific visibility settings,
+     * enabling different configurations for the same team across multiple scopes.
      *
      * @param user the user entity
-     * @param hiddenTeamIds set of team IDs that are hidden in this workspace
-     * @return the DTO with workspace-scoped settings applied
+     * @param hiddenTeamIds set of team IDs that are hidden in this scope
+     * @return the DTO with scope-specific settings applied
      */
-    public static UserTeamsDTO fromUserWithWorkspaceSettings(User user, Set<Long> hiddenTeamIds) {
+    public static UserTeamsDTO fromUserWithScopeSettings(User user, Set<Long> hiddenTeamIds) {
         return new UserTeamsDTO(
             user.getId(),
             user.getLogin(),
@@ -36,7 +36,7 @@ public record UserTeamsDTO(
                 .stream()
                 .map(m -> m.getTeam())
                 .filter(t -> t != null)
-                .map(team -> TeamSummaryDTO.fromTeamWithWorkspaceSettings(team, hiddenTeamIds.contains(team.getId())))
+                .map(team -> TeamSummaryDTO.fromTeamWithScopeSettings(team, hiddenTeamIds.contains(team.getId())))
                 .collect(Collectors.toCollection(LinkedHashSet::new))
         );
     }

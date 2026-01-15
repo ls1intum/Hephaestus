@@ -89,15 +89,15 @@ public class GitHubPullRequestReviewCommentSyncService {
      * <p>
      * Uses streaming to avoid loading all pull requests into memory at once.
      *
-     * @param workspaceId  the workspace ID for authentication
+     * @param scopeId  the scope ID for authentication
      * @param repositoryId the repository ID to sync comments for
      * @return number of comments synced
      */
     @Transactional
-    public int syncCommentsForRepository(Long workspaceId, Long repositoryId) {
+    public int syncCommentsForRepository(Long scopeId, Long repositoryId) {
         Repository repository = repositoryRepository.findById(repositoryId).orElse(null);
         if (repository == null) {
-            log.warn("Repository {} not found, cannot sync review comments", repositoryId);
+            log.warn("Repository not found, skipping review comment sync: repoId={}", repositoryId);
             return 0;
         }
 
@@ -107,22 +107,22 @@ public class GitHubPullRequestReviewCommentSyncService {
 
         try (Stream<PullRequest> prStream = pullRequestRepository.streamAllByRepository_Id(repositoryId)) {
             prStream.forEach(pullRequest -> {
-                int synced = syncCommentsForPullRequest(workspaceId, pullRequest);
+                int synced = syncCommentsForPullRequest(scopeId, pullRequest);
                 totalSynced.addAndGet(synced);
                 prCount.incrementAndGet();
             });
         }
 
         if (prCount.get() == 0) {
-            log.debug("No pull requests found for repository {}, skipping review comment sync", safeRepoName);
+            log.debug("No pull requests found, skipping review comment sync: repoName={}", safeRepoName);
             return 0;
         }
 
         log.info(
-            "Synced {} review comments for {} pull requests in repository {}",
+            "Completed review comment sync: repoName={}, commentCount={}, prCount={}",
+            safeRepoName,
             totalSynced.get(),
-            prCount.get(),
-            safeRepoName
+            prCount.get()
         );
         return totalSynced.get();
     }
@@ -130,33 +130,33 @@ public class GitHubPullRequestReviewCommentSyncService {
     /**
      * Synchronizes all review comments for a single pull request using GraphQL.
      *
-     * @param workspaceId the workspace ID for authentication
+     * @param scopeId the scope ID for authentication
      * @param pullRequest the pull request to sync comments for
      * @return number of comments synced
      */
     @Transactional
-    public int syncCommentsForPullRequest(Long workspaceId, PullRequest pullRequest) {
+    public int syncCommentsForPullRequest(Long scopeId, PullRequest pullRequest) {
         if (pullRequest == null) {
-            log.warn("Pull request is null, cannot sync review comments");
+            log.warn("Pull request is null, skipping review comment sync");
             return 0;
         }
 
         Repository repository = pullRequest.getRepository();
         if (repository == null) {
-            log.warn("Pull request {} has no repository, cannot sync review comments", pullRequest.getId());
+            log.warn("Pull request has no repository, skipping review comment sync: prId={}", pullRequest.getId());
             return 0;
         }
 
         String safeNameWithOwner = sanitizeForLog(repository.getNameWithOwner());
         Optional<RepositoryOwnerAndName> parsedName = GitHubRepositoryNameParser.parse(repository.getNameWithOwner());
         if (parsedName.isEmpty()) {
-            log.warn("Invalid repository name format: {}", safeNameWithOwner);
+            log.warn("Invalid repository name format, skipping review comment sync: repoName={}", safeNameWithOwner);
             return 0;
         }
         String owner = parsedName.get().owner();
         String name = parsedName.get().name();
 
-        HttpGraphQlClient client = graphQlClientProvider.forWorkspace(workspaceId);
+        HttpGraphQlClient client = graphQlClientProvider.forScope(scopeId);
         this.currentClient = client; // Store for nested pagination
 
         try {
@@ -169,10 +169,10 @@ public class GitHubPullRequestReviewCommentSyncService {
                 pageCount++;
                 if (pageCount >= MAX_PAGINATION_PAGES) {
                     log.warn(
-                        "Reached maximum pagination limit ({}) for PR #{} in repository {}, stopping",
-                        MAX_PAGINATION_PAGES,
+                        "Reached maximum pagination limit for review comments: repoName={}, prNumber={}, limit={}",
+                        safeNameWithOwner,
                         pullRequest.getNumber(),
-                        safeNameWithOwner
+                        MAX_PAGINATION_PAGES
                     );
                     break;
                 }
@@ -203,36 +203,34 @@ public class GitHubPullRequestReviewCommentSyncService {
             }
 
             log.debug(
-                "Synced {} review comments for PR #{} in repository {}",
-                totalSynced,
+                "Synced review comments for pull request: repoName={}, prNumber={}, commentCount={}",
+                safeNameWithOwner,
                 pullRequest.getNumber(),
-                safeNameWithOwner
+                totalSynced
             );
             return totalSynced;
         } catch (FieldAccessException e) {
             // Check if this is a NOT_FOUND error (PR deleted from GitHub)
             if (isNotFoundError(e.getResponse(), "repository.pullRequest")) {
                 log.debug(
-                    "PR #{} in {} no longer exists on GitHub, skipping review comment sync",
-                    pullRequest.getNumber(),
-                    safeNameWithOwner
+                    "Pull request no longer exists on GitHub, skipping review comment sync: repoName={}, prNumber={}",
+                    safeNameWithOwner,
+                    pullRequest.getNumber()
                 );
                 return 0;
             }
             log.error(
-                "Error syncing review comments for PR #{} in repository {}: {}",
-                pullRequest.getNumber(),
+                "Failed to sync review comments: repoName={}, prNumber={}",
                 safeNameWithOwner,
-                e.getMessage(),
+                pullRequest.getNumber(),
                 e
             );
             return 0;
         } catch (Exception e) {
             log.error(
-                "Error syncing review comments for PR #{} in repository {}: {}",
-                pullRequest.getNumber(),
+                "Failed to sync review comments: repoName={}, prNumber={}",
                 safeNameWithOwner,
-                e.getMessage(),
+                pullRequest.getNumber(),
                 e
             );
             return 0;
@@ -272,7 +270,7 @@ public class GitHubPullRequestReviewCommentSyncService {
         var firstComment = graphQlComments.get(0);
         Long threadId = extractDatabaseId(firstComment);
         if (threadId == null) {
-            log.warn("First comment in thread has no databaseId, skipping thread: nodeId={}", graphQlThread.getId());
+            log.warn("Skipped thread with missing databaseId on first comment: threadId={}", graphQlThread.getId());
             return 0;
         }
 
@@ -303,7 +301,7 @@ public class GitHubPullRequestReviewCommentSyncService {
     private void fetchAllRemainingThreadComments(GHPullRequestReviewThread graphQlThread, String startCursor) {
         if (currentClient == null) {
             log.warn(
-                "No client available for nested pagination, skipping remaining comments for thread {}",
+                "No client available for nested pagination, skipping remaining comments: threadId={}",
                 graphQlThread.getId()
             );
             return;
@@ -326,9 +324,9 @@ public class GitHubPullRequestReviewCommentSyncService {
             fetchedPages++;
             if (fetchedPages > MAX_PAGINATION_PAGES) {
                 log.warn(
-                    "Reached maximum pagination limit ({}) for thread {} comments, stopping",
-                    MAX_PAGINATION_PAGES,
-                    threadId
+                    "Reached maximum pagination limit for thread comments: threadId={}, limit={}",
+                    threadId,
+                    MAX_PAGINATION_PAGES
                 );
                 break;
             }
@@ -344,7 +342,7 @@ public class GitHubPullRequestReviewCommentSyncService {
 
                 if (response == null || !response.isValid()) {
                     log.warn(
-                        "Invalid GraphQL response fetching comments for thread {}: {}",
+                        "Invalid GraphQL response for thread comments: threadId={}, errors={}",
                         threadId,
                         response != null ? response.getErrors() : "null"
                     );
@@ -365,7 +363,7 @@ public class GitHubPullRequestReviewCommentSyncService {
                 hasMore = pageInfo != null && Boolean.TRUE.equals(pageInfo.getHasNextPage());
                 cursor = pageInfo != null ? pageInfo.getEndCursor() : null;
             } catch (Exception e) {
-                log.error("Error fetching additional comments for thread {}: {}", threadId, e.getMessage(), e);
+                log.error("Failed to fetch thread comments: threadId={}", threadId, e);
                 break;
             }
         }
@@ -375,9 +373,9 @@ public class GitHubPullRequestReviewCommentSyncService {
 
         if (fetchedPages > 0) {
             log.debug(
-                "Fetched {} additional pages of comments for thread {} (total: {} comments)",
-                fetchedPages,
+                "Fetched additional thread comments: threadId={}, pageCount={}, totalComments={}",
                 threadId,
+                fetchedPages,
                 allComments.size()
             );
         }
@@ -484,7 +482,7 @@ public class GitHubPullRequestReviewCommentSyncService {
 
         Long databaseId = extractDatabaseId(graphQlComment);
         if (databaseId == null) {
-            log.warn("Comment has no databaseId, skipping: nodeId={}", graphQlComment.getId());
+            log.warn("Skipped comment with missing databaseId: nodeId={}", graphQlComment.getId());
             return null;
         }
 

@@ -21,8 +21,8 @@ public class WorkspaceNatsSubscriptionProvider implements NatsSubscriptionProvid
 
     @Override
     @Transactional(readOnly = true)
-    public Optional<NatsSubscriptionInfo> getSubscriptionInfo(Long workspaceId) {
-        return workspaceRepository.findById(workspaceId).map(this::toSubscriptionInfo);
+    public Optional<NatsSubscriptionInfo> getSubscriptionInfo(Long scopeId) {
+        return workspaceRepository.findById(scopeId).map(this::toSubscriptionInfo);
     }
 
     private NatsSubscriptionInfo toSubscriptionInfo(Workspace workspace) {

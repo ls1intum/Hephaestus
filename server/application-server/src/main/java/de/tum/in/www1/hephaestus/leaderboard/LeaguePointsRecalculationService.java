@@ -59,18 +59,18 @@ public class LeaguePointsRecalculationService implements LeaguePointsRecalculato
     @Override
     public void recalculate(Workspace workspace) {
         if (workspace == null || workspace.getId() == null) {
-            log.warn("Skipping league recalculation because workspace is missing or not persisted");
+            log.warn("Skipped league points recalculation: reason=missingWorkspace");
             return;
         }
 
         Long workspaceId = workspace.getId();
-        log.info("Recalculating league points per member for workspace id={}", workspaceId);
+        log.info("Started league points recalculation: workspaceId={}", workspaceId);
 
         workspaceMembershipService.resetLeaguePoints(workspaceId, POINTS_DEFAULT);
 
         List<WorkspaceMembership> memberships = workspaceMembershipRepository.findAllWithUserByWorkspaceId(workspaceId);
         if (memberships.isEmpty()) {
-            log.info("Workspace id={} has no memberships; nothing to recalculate", workspaceId);
+            log.info("Skipped league points recalculation: reason=noMemberships, workspaceId={}", workspaceId);
             return;
         }
 
@@ -97,7 +97,7 @@ public class LeaguePointsRecalculationService implements LeaguePointsRecalculato
         });
 
         if (memberUsersById.isEmpty()) {
-            log.info("Workspace id={} has no eligible members for recalculation", workspaceId);
+            log.info("Skipped league points recalculation: reason=noEligibleMembers, workspaceId={}", workspaceId);
             return;
         }
 
@@ -109,7 +109,7 @@ public class LeaguePointsRecalculationService implements LeaguePointsRecalculato
             .orElse(null);
 
         if (earliestContribution == null) {
-            log.info("Workspace id={} has no contributions; league points remain at default", workspaceId);
+            log.info("Skipped league points recalculation: reason=noContributions, workspaceId={}", workspaceId);
             return;
         }
 
@@ -150,7 +150,7 @@ public class LeaguePointsRecalculationService implements LeaguePointsRecalculato
             windowStart = windowEnd;
         }
 
-        log.info("Finished recalculating league points for workspace id={}", workspaceId);
+        log.info("Completed league points recalculation: workspaceId={}", workspaceId);
     }
 
     private void updateMemberPointsForEntry(

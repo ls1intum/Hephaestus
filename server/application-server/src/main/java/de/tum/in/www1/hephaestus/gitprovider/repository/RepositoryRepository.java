@@ -7,8 +7,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 /**
  * Repository for Repository entities.
  *
- * <p>This repository contains only workspace-agnostic queries for the gitprovider domain.
- * Workspace-scoped queries (those that join with RepositoryToMonitor or other workspace
+ * <p>This repository contains only domain-agnostic queries for the gitprovider domain.
+ * Scope-filtered queries (those that join with RepositoryToMonitor or other consuming module
  * entities) belong in the consuming packages (leaderboard, profile, etc.) to maintain
  * clean architecture boundaries.
  *

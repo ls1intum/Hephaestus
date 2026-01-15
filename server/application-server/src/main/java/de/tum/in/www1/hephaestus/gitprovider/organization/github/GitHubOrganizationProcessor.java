@@ -44,7 +44,7 @@ public class GitHubOrganizationProcessor {
     @Transactional
     public Organization process(GitHubOrganizationEventDTO.GitHubOrganizationDTO dto) {
         if (dto == null || dto.id() == null) {
-            log.warn("Organization DTO is null or missing ID, skipping");
+            log.warn("Skipped organization processing: reason=nullOrMissingId");
             return null;
         }
 
@@ -71,12 +71,11 @@ public class GitHubOrganizationProcessor {
         }
 
         Organization saved = organizationRepository.save(organization);
-        log.debug(
-            "Processed organization {} ({}): {}",
-            saved.getLogin(),
-            saved.getGithubId(),
-            isNew ? "created" : "updated"
-        );
+        if (isNew) {
+            log.debug("Created organization: orgId={}, orgLogin={}", saved.getGithubId(), saved.getLogin());
+        } else {
+            log.debug("Updated organization: orgId={}, orgLogin={}", saved.getGithubId(), saved.getLogin());
+        }
         return saved;
     }
 
@@ -99,7 +98,7 @@ public class GitHubOrganizationProcessor {
                 String oldLogin = org.getLogin();
                 org.setLogin(newLogin);
                 Organization saved = organizationRepository.save(org);
-                log.info("Renamed organization {} -> {} ({})", oldLogin, newLogin, githubId);
+                log.info("Renamed organization: orgId={}, oldLogin={}, newLogin={}", githubId, oldLogin, newLogin);
                 return saved;
             })
             .orElse(null);
@@ -120,7 +119,7 @@ public class GitHubOrganizationProcessor {
             .findByGithubId(githubId)
             .ifPresent(org -> {
                 organizationRepository.delete(org);
-                log.info("Deleted organization {} ({})", sanitizeForLog(org.getLogin()), githubId);
+                log.info("Deleted organization: orgId={}, orgLogin={}", githubId, sanitizeForLog(org.getLogin()));
             });
     }
 }

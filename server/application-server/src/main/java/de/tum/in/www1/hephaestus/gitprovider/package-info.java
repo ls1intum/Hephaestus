@@ -27,7 +27,7 @@
  * │
  * └── sync/                             # Orchestration layer
  *     ├── GitHubDataSyncScheduler.java  # Scheduled sync jobs
- *     ├── GitHubDataSyncService.java    # Coordinates full workspace sync
+ *     ├── GitHubDataSyncService.java    # Coordinates full scope sync
  *     └── NatsConsumerService.java      # Webhook event consumption
  * </pre>
  *
@@ -41,7 +41,7 @@
  *   <li><b>Domain Events</b>: Processors publish events for reactive features (activity tracking,
  *       leaderboard updates, etc.).</li>
  *   <li><b>Module Boundaries</b>: SPI interfaces in {@code common/spi/} define contracts with
- *       workspace/leaderboard modules, preventing circular dependencies.</li>
+ *       the host application, preventing circular dependencies.</li>
  * </ul>
  *
  * <h2>Adding GitLab Support</h2>

@@ -49,7 +49,7 @@ public class SlackMessageService {
                 .usersList(r -> r)
                 .getMembers();
         } catch (IOException | SlackApiException e) {
-            log.error("Failed to get all members from Slack: {}", e.getMessage(), e);
+            log.error("Failed to get Slack members:", e);
             return new ArrayList<>();
         }
     }
@@ -73,7 +73,7 @@ public class SlackMessageService {
         ChatPostMessageResponse response = slackApp.client().chatPostMessage(request);
 
         if (!response.isOk()) {
-            log.error("Failed to send message to Slack channel: {}", response.getError());
+            log.error("Failed to send Slack message: channelId={}, error={}", channelId, response.getError());
         }
     }
 
@@ -82,7 +82,7 @@ public class SlackMessageService {
      * Does not guarantee that the app has the necessary permissions to send messages.
      */
     public boolean initTest() {
-        log.info("Testing Slack app initialization...");
+        log.debug("Started Slack app initialization test");
         AuthTestResponse response;
         try {
             response = slackApp.client().authTest(r -> r);
@@ -92,10 +92,10 @@ public class SlackMessageService {
             response.setError(e.getMessage());
         }
         if (response.isOk()) {
-            log.info("Slack app is successfully initialized.");
+            log.info("Slack app initialized successfully");
             return true;
         } else {
-            log.error("Failed to initialize Slack app: " + response.getError());
+            log.error("Failed to initialize Slack app: error={}", response.getError());
             return false;
         }
     }

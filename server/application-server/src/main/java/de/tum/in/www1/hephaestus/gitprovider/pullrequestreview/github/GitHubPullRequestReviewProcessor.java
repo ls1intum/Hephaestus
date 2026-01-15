@@ -58,7 +58,7 @@ public class GitHubPullRequestReviewProcessor {
     ) {
         PullRequest pr = prRepository.findById(prId).orElse(null);
         if (pr == null) {
-            log.warn("PR not found for review: prId={}", prId);
+            log.warn("Skipped review processing: reason=prNotFound, prId={}", prId);
             return null;
         }
 
@@ -83,7 +83,7 @@ public class GitHubPullRequestReviewProcessor {
                         )
                     );
                 }
-                log.info("Review {} dismissed", reviewId);
+                log.debug("Dismissed review: reviewId={}", reviewId);
             });
     }
 
@@ -107,7 +107,7 @@ public class GitHubPullRequestReviewProcessor {
                 )
             );
         }
-        log.debug("Updated review {}", dto.id());
+        log.debug("Updated review: reviewId={}", dto.id());
         return saved;
     }
 
@@ -135,7 +135,7 @@ public class GitHubPullRequestReviewProcessor {
                 new DomainEvent.ReviewSubmitted(EventPayload.ReviewData.from(saved), EventContext.from(context))
             );
         }
-        log.debug("Created review {}", dto.id());
+        log.debug("Created review: reviewId={}", dto.id());
         return saved;
     }
 

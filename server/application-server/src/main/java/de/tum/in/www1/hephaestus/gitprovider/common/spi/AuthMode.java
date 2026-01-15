@@ -30,7 +30,7 @@ public enum AuthMode {
     /**
      * Personal Access Token authentication.
      * <p>
-     * Uses a user-provided PAT stored in the workspace configuration.
+     * Uses a user-provided PAT stored in the scope configuration.
      * This mode is useful for:
      * <ul>
      *   <li>Simple personal use cases</li>

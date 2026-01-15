@@ -235,7 +235,7 @@ public class ActivityEventService {
         if (workspace == null) {
             eventsFailedCounter.increment();
             log.warn(
-                "Failed to record event: workspace not found. workspaceId={}, eventType={}, targetId={}",
+                "Failed to record event, workspace not found: scopeId={}, eventType={}, targetId={}",
                 workspaceId,
                 eventType,
                 targetId
@@ -247,7 +247,7 @@ public class ActivityEventService {
         double maxXp = xpProperties.getMaxXpPerEvent();
         double clampedXp = Math.max(0.0, Math.min(xp, maxXp));
         if (clampedXp != xp) {
-            log.debug("Clamped XP from {} to {} for event type {}", xp, clampedXp, eventType);
+            log.debug("Clamped XP value: originalXp={}, clampedXp={}, eventType={}", xp, clampedXp, eventType);
         }
 
         // Round to 2 decimal places for consistent precision (HALF_UP rounding)
@@ -262,7 +262,7 @@ public class ActivityEventService {
         // By checking first, we avoid the constraint violation entirely.
         if (eventRepository.existsByWorkspaceIdAndEventKey(workspaceId, eventKey)) {
             eventsDuplicateCounter.increment();
-            log.debug("Duplicate skipped (pre-check): {}", eventKey);
+            log.debug("Skipped duplicate event (pre-check): eventKey={}", eventKey);
             return false;
         }
 
@@ -296,7 +296,7 @@ public class ActivityEventService {
 
             // Structured logging with trace context
             log.info(
-                "activity.event.recorded eventType={} targetId={} xp={} workspaceId={} actorId={}",
+                "Recorded activity event: eventType={}, targetId={}, xp={}, scopeId={}, actorId={}",
                 eventType,
                 targetId,
                 roundedXp,
@@ -306,7 +306,7 @@ public class ActivityEventService {
             return true;
         } catch (DataIntegrityViolationException e) {
             eventsDuplicateCounter.increment();
-            log.debug("Duplicate skipped: {}", eventKey);
+            log.debug("Skipped duplicate event: eventKey={}", eventKey);
             return false;
         }
     }
@@ -329,7 +329,7 @@ public class ActivityEventService {
         }
 
         log.debug(
-            "Migrated event {} from schema v{} to v{}",
+            "Migrated event: eventKey={}, fromVersion={}, toVersion={}",
             event.getEventKey(),
             event.getSchemaVersion(),
             CURRENT_SCHEMA_VERSION
@@ -440,9 +440,9 @@ public class ActivityEventService {
         ) {
             // Log with full context for immediate alerting
             log.error(
-                "DEAD_LETTER: Failed to record activity event after {} retries. " +
-                    "eventKey={}, workspaceId={}, eventType={}, targetType={}, targetId={}, " +
-                    "xp={}, source={}, actorId={}, repositoryId={}, errorType={}, error={}",
+                "Failed to record activity event after retries: " +
+                    "retryCount={}, eventKey={}, scopeId={}, eventType={}, targetType={}, targetId={}, " +
+                    "xp={}, source={}, actorId={}, repoId={}, errorType={}",
                 MAX_RETRY_ATTEMPTS,
                 eventKey,
                 workspaceId,
@@ -454,7 +454,6 @@ public class ActivityEventService {
                 actor != null ? actor.getId() : null,
                 repository != null ? repository.getId() : null,
                 e.getClass().getName(),
-                e.getMessage(),
                 e
             );
 
@@ -521,7 +520,7 @@ public class ActivityEventService {
             deadLettersPersistedCounter.increment();
 
             log.info(
-                "Dead letter persisted for later retry. deadLetterId={}, eventType={}, targetId={}",
+                "Persisted dead letter for retry: deadLetterId={}, eventType={}, targetId={}",
                 deadLetter.getId(),
                 eventType,
                 targetId
@@ -530,12 +529,10 @@ public class ActivityEventService {
             // Dead letter persistence failed - log but don't throw
             // The original failure is already logged, this is defense-in-depth
             log.error(
-                "CRITICAL: Failed to persist dead letter. Event data may be lost. " +
-                    "workspaceId={}, eventType={}, targetId={}, persistError={}",
+                "Failed to persist dead letter, event data may be lost: scopeId={}, eventType={}, targetId={}",
                 workspaceId,
                 eventType,
                 targetId,
-                persistError.getMessage(),
                 persistError
             );
         }

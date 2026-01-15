@@ -75,22 +75,22 @@ public class BackfillStartupRunner implements ApplicationRunner {
 
     @Override
     public void run(ApplicationArguments args) {
-        log.info("=== Starting activity event backfill on startup ===");
+        log.info("Starting activity event backfill on startup");
 
         // Get all non-purged workspaces
         List<Workspace> workspaces = workspaceRepository.findByStatusNot(Workspace.WorkspaceStatus.PURGED);
 
         if (workspaces.isEmpty()) {
-            log.warn("No active workspaces found for backfill");
+            log.warn("Skipped backfill, no active workspaces found");
             return;
         }
 
-        log.info("Found {} workspaces to backfill", workspaces.size());
+        log.info("Found workspaces for backfill: count={}", workspaces.size());
 
         for (Workspace workspace : workspaces) {
             try {
                 log.info(
-                    "Starting backfill for workspace: {} (id={}, status={})",
+                    "Starting backfill for workspace: scopeSlug={}, scopeId={}, status={}",
                     workspace.getWorkspaceSlug(),
                     workspace.getId(),
                     workspace.getStatus()
@@ -100,23 +100,22 @@ public class BackfillStartupRunner implements ApplicationRunner {
                 ActivityEventBackfillService.BackfillEstimate estimate = backfillService.estimateBackfill(
                     workspace.getId()
                 );
-                log.info("Backfill estimate for {}: {}", workspace.getWorkspaceSlug(), estimate.summary());
+                log.info("Estimated backfill for workspace: scopeSlug={}, estimate={}", workspace.getWorkspaceSlug(), estimate.summary());
 
                 // Run the backfill
                 BackfillProgress progress = backfillService.backfillWorkspace(workspace.getId());
 
-                log.info("Completed backfill for workspace {}: {}", workspace.getWorkspaceSlug(), progress.summary());
+                log.info("Completed backfill for workspace: scopeSlug={}, progress={}", workspace.getWorkspaceSlug(), progress.summary());
             } catch (Exception e) {
                 log.error(
-                    "Failed to backfill workspace {} (id={}): {}",
+                    "Failed to backfill workspace: scopeSlug={}, scopeId={}",
                     workspace.getWorkspaceSlug(),
                     workspace.getId(),
-                    e.getMessage(),
                     e
                 );
             }
         }
 
-        log.info("=== Activity event backfill on startup complete ({} workspaces processed) ===", workspaces.size());
+        log.info("Completed activity event backfill on startup: workspacesProcessed={}", workspaces.size());
     }
 }

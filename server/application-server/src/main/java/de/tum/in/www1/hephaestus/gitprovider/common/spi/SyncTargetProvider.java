@@ -10,35 +10,33 @@ import java.util.List;
  * and manage synchronization targets. It extends focused sub-interfaces to comply
  * with the Interface Segregation Principle (ISP):
  * <ul>
- *   <li>{@link WorkspaceSyncMetadataProvider} – Workspace-level sync state</li>
+ *   <li>{@link SyncTimestampProvider} – Sync timestamp operations</li>
  *   <li>{@link BackfillStateProvider} – Backfill tracking for incremental sync</li>
  * </ul>
  * <p>
- * <b>Dependency Guidance:</b>
+ * <b>Design Principles:</b>
  * <ul>
- *   <li>For repository-level sync: depend on {@code SyncTargetProvider}</li>
- *   <li>For workspace metadata only: depend on {@link WorkspaceSyncMetadataProvider}</li>
- *   <li>For backfill management only: depend on {@link BackfillStateProvider}</li>
+ *   <li>This SPI is domain-agnostic - it uses generic terms like "scope" and "sync target"</li>
+ *   <li>The host application maps its domain concepts to these generic abstractions</li>
+ *   <li>Sync targets are identified by {@code syncTargetId}, not compound keys</li>
+ *   <li>Scopes group sync targets and are identified by {@code scopeId}</li>
  * </ul>
  * <p>
  * <b>Thread Safety:</b> Implementations must be thread-safe. The sync engine may call
  * methods concurrently from multiple sync threads.
- * <p>
- * <b>Null Handling:</b> All {@code workspaceId} parameters must be non-null.
- * Repository identifiers ({@code repositoryNameWithOwner}) follow the format "owner/repo".
  *
- * @see WorkspaceSyncMetadataProvider
+ * @see SyncTimestampProvider
  * @see BackfillStateProvider
  */
-public interface SyncTargetProvider extends WorkspaceSyncMetadataProvider, BackfillStateProvider {
+public interface SyncTargetProvider extends SyncTimestampProvider, BackfillStateProvider {
     // ═══════════════════════════════════════════════════════════════════════════
     // CORE SYNC TARGET OPERATIONS
     // ═══════════════════════════════════════════════════════════════════════════
 
     /**
-     * Gets all active sync targets (repositories) across all workspaces.
+     * Gets all active sync targets (repositories) across all scopes.
      * <p>
-     * Active targets are those in workspaces with {@code ACTIVE} status that have
+     * Active targets are those in scopes with active status that have
      * at least one configured repository.
      *
      * @return list of active sync targets, never null (may be empty)
@@ -46,48 +44,46 @@ public interface SyncTargetProvider extends WorkspaceSyncMetadataProvider, Backf
     List<SyncTarget> getActiveSyncTargets();
 
     /**
-     * Gets sync targets for a specific workspace.
+     * Gets sync targets for a specific scope.
      *
-     * @param workspaceId the workspace ID (must not be null)
-     * @return list of sync targets for the workspace, never null (may be empty if workspace not found)
+     * @param scopeId the scope ID (must not be null)
+     * @return list of sync targets for the scope, never null (may be empty if scope not found)
      */
-    List<SyncTarget> getSyncTargetsForWorkspace(Long workspaceId);
+    List<SyncTarget> getSyncTargetsForScope(Long scopeId);
 
     /**
-     * Gets repository nameWithOwner values for a workspace's active sync targets.
+     * Gets repository nameWithOwner values for a scope's active sync targets.
      *
      * <p>This provides a lightweight alternative to fetching full Repository entities
      * when only the repository identifier is needed (e.g., for GraphQL queries).
      *
-     * @param workspaceId the workspace ID (must not be null)
+     * @param scopeId the scope ID (must not be null)
      * @return list of repository nameWithOwner strings, never null (may be empty)
      */
-    default List<String> getRepositoryNamesForWorkspace(Long workspaceId) {
-        return getSyncTargetsForWorkspace(workspaceId).stream().map(SyncTarget::repositoryNameWithOwner).toList();
+    default List<String> getRepositoryNamesForScope(Long scopeId) {
+        return getSyncTargetsForScope(scopeId).stream().map(SyncTarget::repositoryNameWithOwner).toList();
     }
 
     /**
      * Updates the sync timestamp for a repository-level sync operation.
      *
-     * @param workspaceId             the workspace ID (must not be null)
-     * @param repositoryNameWithOwner the repository identifier in "owner/repo" format (must not be null)
-     * @param syncType                the type of sync (must not be null)
-     * @param syncedAt                the timestamp of the sync (must not be null)
-     * @throws IllegalArgumentException if any parameter is null or repositoryNameWithOwner format is invalid
+     * @param syncTargetId the sync target ID (must not be null)
+     * @param syncType     the type of sync (must not be null)
+     * @param syncedAt     the timestamp of the sync (must not be null)
      */
-    void updateSyncTimestamp(Long workspaceId, String repositoryNameWithOwner, SyncType syncType, Instant syncedAt);
+    void updateSyncTimestamp(Long syncTargetId, SyncType syncType, Instant syncedAt);
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // WORKSPACE SYNC SESSIONS
+    // SYNC SESSIONS
     // ═══════════════════════════════════════════════════════════════════════════
 
     /**
-     * Gets workspace sync sessions for batch synchronization.
-     * Each session contains all sync targets for a workspace with its sync context.
+     * Gets sync sessions for batch synchronization.
+     * Each session contains all sync targets for a scope with its sync context.
      *
-     * @return list of workspace sync sessions
+     * @return list of sync sessions
      */
-    default List<WorkspaceSyncSession> getWorkspaceSyncSessions() {
+    default List<SyncSession> getSyncSessions() {
         return List.of();
     }
 
@@ -105,19 +101,19 @@ public interface SyncTargetProvider extends WorkspaceSyncMetadataProvider, Backf
     // ═══════════════════════════════════════════════════════════════════════════
 
     /**
-     * A batch of sync targets for a single workspace, used for parallel processing.
+     * A batch of sync targets for a single scope, used for parallel processing.
      *
-     * @param workspaceId    unique workspace identifier
-     * @param workspaceSlug  URL-safe workspace identifier
-     * @param displayName    human-readable workspace name
+     * @param scopeId        unique scope identifier
+     * @param slug           URL-safe scope identifier
+     * @param displayName    human-readable scope name
      * @param accountLogin   GitHub organization/user login
      * @param installationId GitHub App installation ID (null for PAT auth)
-     * @param syncTargets    repositories to sync in this workspace
-     * @param syncContext    thread-local context for logging and workspace isolation
+     * @param syncTargets    repositories to sync in this scope
+     * @param syncContext    thread-local context for logging and scope isolation
      */
-    record WorkspaceSyncSession(
-        Long workspaceId,
-        String workspaceSlug,
+    record SyncSession(
+        Long scopeId,
+        String slug,
         String displayName,
         String accountLogin,
         Long installationId,
@@ -128,14 +124,14 @@ public interface SyncTargetProvider extends WorkspaceSyncMetadataProvider, Backf
     /**
      * Statistics about sync target filtering for observability.
      *
-     * @param totalWorkspaces  total number of workspaces in the system
-     * @param skippedByStatus  workspaces skipped due to non-ACTIVE status
-     * @param skippedByFilter  workspaces skipped due to allowlist filtering
-     * @param activeAndAllowed workspaces that passed all filters
+     * @param totalScopes      total number of scopes in the system
+     * @param skippedByStatus  scopes skipped due to non-active status
+     * @param skippedByFilter  scopes skipped due to allowlist filtering
+     * @param activeAndAllowed scopes that passed all filters
      * @param filterActive     whether allowlist filtering is enabled
      */
     record SyncStatistics(
-        int totalWorkspaces,
+        int totalScopes,
         int skippedByStatus,
         int skippedByFilter,
         int activeAndAllowed,
@@ -143,18 +139,18 @@ public interface SyncTargetProvider extends WorkspaceSyncMetadataProvider, Backf
     ) {}
 
     /**
-     * Workspace-level sync metadata for organization-wide features.
+     * Scope-level sync metadata for organization-wide features.
      *
-     * @param workspaceId              unique workspace identifier
-     * @param displayName              human-readable workspace name
+     * @param scopeId                  unique scope identifier
+     * @param displayName              human-readable scope name
      * @param organizationLogin        GitHub organization login
      * @param organizationId           GitHub organization database ID
      * @param issueTypesSyncedAt       last sync of issue types (org-level feature)
      * @param issueDependenciesSyncedAt last sync of issue blocking relationships
      * @param subIssuesSyncedAt        last sync of sub-issues hierarchy
      */
-    record WorkspaceSyncMetadata(
-        Long workspaceId,
+    record SyncMetadata(
+        Long scopeId,
         String displayName,
         String organizationLogin,
         Long organizationId,
@@ -185,10 +181,10 @@ public interface SyncTargetProvider extends WorkspaceSyncMetadataProvider, Backf
     }
 
     /**
-     * A repository configured for synchronization within a workspace.
+     * A repository configured for synchronization within a scope.
      *
      * @param id                              unique sync target identifier
-     * @param workspaceId                     parent workspace identifier
+     * @param scopeId                         parent scope identifier
      * @param installationId                  GitHub App installation ID (null for PAT auth)
      * @param personalAccessToken             PAT for authentication (null for App auth)
      * @param authMode                        authentication mechanism to use
@@ -204,7 +200,7 @@ public interface SyncTargetProvider extends WorkspaceSyncMetadataProvider, Backf
      */
     record SyncTarget(
         Long id,
-        Long workspaceId,
+        Long scopeId,
         Long installationId,
         String personalAccessToken,
         AuthMode authMode,
@@ -260,12 +256,12 @@ public interface SyncTargetProvider extends WorkspaceSyncMetadataProvider, Backf
     }
 
     /**
-     * User sync metadata for a workspace.
+     * User sync state for a scope.
      *
-     * @param workspaceId   unique workspace identifier
+     * @param scopeId       unique scope identifier
      * @param usersSyncedAt last users sync timestamp
      */
-    record WorkspaceUserSyncMetadata(Long workspaceId, Instant usersSyncedAt) {
+    record UserSyncState(Long scopeId, Instant usersSyncedAt) {
         private static final long SECONDS_PER_MINUTE = 60L;
 
         public boolean needsSync(int cooldownMinutes) {
@@ -277,13 +273,13 @@ public interface SyncTargetProvider extends WorkspaceSyncMetadataProvider, Backf
     }
 
     /**
-     * Team sync metadata for a workspace.
+     * Team sync state for a scope.
      *
-     * @param workspaceId       unique workspace identifier
+     * @param scopeId           unique scope identifier
      * @param teamsSyncedAt     last teams sync timestamp
      * @param organizationNames GitHub organizations to sync teams from
      */
-    record WorkspaceTeamSyncMetadata(Long workspaceId, Instant teamsSyncedAt, List<String> organizationNames) {
+    record TeamSyncState(Long scopeId, Instant teamsSyncedAt, List<String> organizationNames) {
         private static final long SECONDS_PER_MINUTE = 60L;
 
         public boolean needsSync(int cooldownMinutes) {

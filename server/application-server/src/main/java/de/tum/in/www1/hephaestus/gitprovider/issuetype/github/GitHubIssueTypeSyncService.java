@@ -1,10 +1,11 @@
 package de.tum.in.www1.hephaestus.gitprovider.issuetype.github;
 
+import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.*;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider;
-import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider.WorkspaceSyncMetadata;
+import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider.SyncMetadata;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHIssueTypeColor;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHIssueTypeConnection;
 import de.tum.in.www1.hephaestus.gitprovider.issuetype.IssueType;
@@ -53,41 +54,42 @@ public class GitHubIssueTypeSyncService {
     }
 
     /**
-     * Sync all issue types for a workspace from its GitHub organization.
+     * Sync all issue types for a scope from its GitHub organization.
      *
-     * @param workspaceId The workspace to sync issue types for
+     * @param scopeId The scope to sync issue types for
      * @return Number of issue types synced, or -1 if skipped due to cooldown
      */
     @Transactional
-    public int syncIssueTypesForWorkspace(Long workspaceId) {
-        Optional<WorkspaceSyncMetadata> metadataOpt = syncTargetProvider.getWorkspaceSyncMetadata(workspaceId);
+    public int syncIssueTypesForScope(Long scopeId) {
+        Optional<SyncMetadata> metadataOpt = syncTargetProvider.getSyncMetadata(scopeId);
         if (metadataOpt.isEmpty()) {
-            log.warn("Workspace {} not found, cannot sync issue types", workspaceId);
+            log.warn("Scope not found, cannot sync issue types: scopeId={}", scopeId);
             return 0;
         }
 
-        WorkspaceSyncMetadata metadata = metadataOpt.get();
+        SyncMetadata metadata = metadataOpt.get();
         String orgLogin = metadata.organizationLogin();
         if (orgLogin == null) {
-            log.debug("Workspace {} has no organization, skipping issue type sync", workspaceId);
+            log.debug("Scope has no organization, skipping issue type sync: scopeId={}", scopeId);
             return 0;
         }
+        String safeOrgLogin = sanitizeForLog(orgLogin);
 
         if (!metadata.needsIssueTypesSync(syncCooldownInMinutes)) {
-            log.debug("Skipping issue type sync for workspace {} - cooldown active", workspaceId);
+            log.debug("Skipping issue type sync due to cooldown: scopeId={}", scopeId);
             return -1;
         }
 
         // Load organization from gitprovider's repository
         Organization organization = organizationRepository.findById(metadata.organizationId()).orElse(null);
         if (organization == null) {
-            log.warn("Organization {} not found in database", orgLogin);
+            log.warn("Organization not found in database: orgLogin={}", safeOrgLogin);
             return 0;
         }
 
-        log.info("Syncing issue types for organization {}", orgLogin);
+        log.info("Starting issue type sync: orgLogin={}", safeOrgLogin);
 
-        HttpGraphQlClient client = graphQlClientProvider.forWorkspace(workspaceId);
+        HttpGraphQlClient client = graphQlClientProvider.forScope(scopeId);
 
         try {
             Set<String> syncedIds = new HashSet<>();
@@ -100,9 +102,9 @@ public class GitHubIssueTypeSyncService {
                 pageCount++;
                 if (pageCount >= MAX_PAGINATION_PAGES) {
                     log.warn(
-                        "Reached maximum pagination limit ({}) for organization {}, stopping",
-                        MAX_PAGINATION_PAGES,
-                        orgLogin
+                        "Reached maximum pagination limit for issue type sync: orgLogin={}, limit={}",
+                        safeOrgLogin,
+                        MAX_PAGINATION_PAGES
                     );
                     break;
                 }
@@ -133,16 +135,16 @@ public class GitHubIssueTypeSyncService {
             }
 
             removeDeletedIssueTypes(organization.getId(), syncedIds);
-            syncTargetProvider.updateWorkspaceSyncTimestamp(
-                workspaceId,
+            syncTargetProvider.updateScopeSyncTimestamp(
+                scopeId,
                 SyncTargetProvider.SyncType.ISSUE_TYPES,
                 Instant.now()
             );
 
-            log.info("Synced {} issue types for organization {}", totalSynced, orgLogin);
+            log.info("Completed issue type sync: orgLogin={}, issueTypeCount={}", safeOrgLogin, totalSynced);
             return totalSynced;
         } catch (Exception e) {
-            log.error("Error syncing issue types for organization {}: {}", orgLogin, e.getMessage(), e);
+            log.error("Failed to sync issue types: orgLogin={}", safeOrgLogin, e);
             return 0;
         }
     }
@@ -155,7 +157,7 @@ public class GitHubIssueTypeSyncService {
         for (IssueType existingType : existingTypes) {
             if (!syncedIds.contains(existingType.getId())) {
                 issueTypeRepository.delete(existingType);
-                log.debug("Removed deleted issue type: {}", existingType.getName());
+                log.debug("Removed deleted issue type: issueTypeName={}", existingType.getName());
             }
         }
     }
@@ -223,7 +225,7 @@ public class GitHubIssueTypeSyncService {
         try {
             return IssueType.Color.valueOf(graphQlColor.name());
         } catch (IllegalArgumentException e) {
-            log.warn("Unknown issue type color '{}', using GRAY as fallback", graphQlColor);
+            log.warn("Unknown issue type color, using GRAY as fallback: color={}", graphQlColor);
             return IssueType.Color.GRAY;
         }
     }
@@ -235,7 +237,7 @@ public class GitHubIssueTypeSyncService {
         try {
             return IssueType.Color.valueOf(colorString.toUpperCase());
         } catch (IllegalArgumentException e) {
-            log.warn("Unknown issue type color '{}', using GRAY as fallback", colorString);
+            log.warn("Unknown issue type color, using GRAY as fallback: color={}", colorString);
             return IssueType.Color.GRAY;
         }
     }

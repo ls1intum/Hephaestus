@@ -2,6 +2,7 @@ package de.tum.in.www1.hephaestus.gitprovider.label.github;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.events.DomainEvent;
+import de.tum.in.www1.hephaestus.gitprovider.common.events.EventContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.events.EventPayload;
 import de.tum.in.www1.hephaestus.gitprovider.label.Label;
 import de.tum.in.www1.hephaestus.gitprovider.label.LabelRepository;
@@ -57,13 +58,13 @@ public class GitHubLabelProcessor {
      *
      * @param dto the GitHub label DTO
      * @param repository the repository this label belongs to
-     * @param context processing context with workspace information
+     * @param context processing context with scope information
      * @return the persisted Label entity
      */
     @Transactional
     public Label process(GitHubLabelDTO dto, Repository repository, ProcessingContext context) {
         if (dto == null || dto.name() == null) {
-            log.warn("Label DTO is null or missing name, skipping");
+            log.warn("Skipped label processing: reason=nullOrMissingName, repoId={}", repository != null ? repository.getId() : null);
             return null;
         }
 
@@ -108,14 +109,13 @@ public class GitHubLabelProcessor {
 
         // Publish domain event with DTO payload (safe for async handling)
         EventPayload.LabelData labelData = EventPayload.LabelData.from(saved);
+        EventContext eventContext = EventContext.from(context);
         if (isNew) {
-            eventPublisher.publishEvent(
-                new DomainEvent.LabelCreated(labelData, context.workspaceId(), repository.getId())
-            );
+            eventPublisher.publishEvent(new DomainEvent.LabelCreated(labelData, eventContext));
+            log.debug("Created label: labelId={}, labelName={}", saved.getId(), saved.getName());
         } else {
-            eventPublisher.publishEvent(
-                new DomainEvent.LabelUpdated(labelData, context.workspaceId(), repository.getId())
-            );
+            eventPublisher.publishEvent(new DomainEvent.LabelUpdated(labelData, eventContext));
+            log.debug("Updated label: labelId={}, labelName={}", saved.getId(), saved.getName());
         }
 
         return saved;
@@ -145,7 +145,7 @@ public class GitHubLabelProcessor {
      * Delete a label by its ID.
      *
      * @param labelId the label database ID
-     * @param context processing context with workspace information
+     * @param context processing context with scope information
      */
     @Transactional
     public void delete(Long labelId, ProcessingContext context) {
@@ -156,12 +156,11 @@ public class GitHubLabelProcessor {
         labelRepository
             .findById(labelId)
             .ifPresent(label -> {
-                Long repoId = label.getRepository() != null ? label.getRepository().getId() : null;
                 labelRepository.delete(label);
                 eventPublisher.publishEvent(
-                    new DomainEvent.LabelDeleted(labelId, label.getName(), context.workspaceId(), repoId)
+                    new DomainEvent.LabelDeleted(labelId, label.getName(), EventContext.from(context))
                 );
-                log.debug("Deleted label {} ({})", label.getName(), labelId);
+                log.info("Deleted label: labelId={}, labelName={}", labelId, label.getName());
             });
     }
 }

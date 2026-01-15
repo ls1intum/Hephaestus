@@ -169,13 +169,13 @@ public class SlackWeeklyLeaderboardTask implements Runnable {
     @Override
     public void run() {
         if (slackMessageService == null) {
-            log.warn("SlackMessageService not available; skipping message send.");
+            log.warn("Skipped Slack notification: reason=serviceUnavailable");
             return;
         }
 
         List<Workspace> workspaces = workspaceRepository.findAll();
         if (workspaces.isEmpty()) {
-            log.info("No workspaces configured for Slack notifications; skipping message.");
+            log.info("Skipped Slack notification: reason=noWorkspacesConfigured");
             return;
         }
 
@@ -195,7 +195,7 @@ public class SlackWeeklyLeaderboardTask implements Runnable {
             var topReviewers = getTop3SlackReviewers(workspace, after, before, Optional.ofNullable(team));
             if (topReviewers.isEmpty()) {
                 log.info(
-                    "Skipping Slack notification for workspace {} because no reviewers qualified.",
+                    "Skipped Slack notification: reason=noQualifiedReviewers, workspaceSlug={}",
                     workspace.getWorkspaceSlug()
                 );
                 continue;
@@ -206,9 +206,9 @@ public class SlackWeeklyLeaderboardTask implements Runnable {
                 slackMessageService.sendMessage(channelId, blocks, "Weekly review highlights");
             } catch (IOException | SlackApiException e) {
                 log.error(
-                    "Failed to send scheduled message for workspace {}: {}",
+                    "Failed to send scheduled Slack message: workspaceSlug={}",
                     workspace.getWorkspaceSlug(),
-                    e.getMessage()
+                    e
                 );
             }
         }

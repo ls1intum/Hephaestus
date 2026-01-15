@@ -61,19 +61,19 @@ public class GitHubIssueCommentProcessor {
      *
      * @param dto the GitHub comment DTO
      * @param issueId the database ID of the issue this comment belongs to
-     * @param context processing context with workspace information
+     * @param context processing context with scope information
      * @return the persisted IssueComment entity, or null if processing failed
      */
     @Transactional
     public IssueComment process(GitHubCommentDTO dto, Long issueId, ProcessingContext context) {
         if (dto == null || dto.id() == null) {
-            log.warn("Comment DTO is null or missing ID, skipping");
+            log.warn("Skipped comment processing: reason=nullOrMissingId");
             return null;
         }
 
         Issue issue = issueRepository.findById(issueId).orElse(null);
         if (issue == null) {
-            log.warn("Issue not found for comment: issueId={}", issueId);
+            log.warn("Skipped comment processing: reason=issueNotFound, issueId={}", issueId);
             return null;
         }
 
@@ -138,7 +138,7 @@ public class GitHubIssueCommentProcessor {
                     EventContext.from(context)
                 )
             );
-            log.debug("Created comment {} for issue {}", saved.getId(), issueId);
+            log.debug("Created comment: commentId={}, issueId={}", saved.getId(), issueId);
         } else if (!changedFields.isEmpty()) {
             eventPublisher.publishEvent(
                 new DomainEvent.CommentUpdated(
@@ -148,7 +148,7 @@ public class GitHubIssueCommentProcessor {
                     EventContext.from(context)
                 )
             );
-            log.debug("Updated comment {} with changes: {}", saved.getId(), changedFields);
+            log.debug("Updated comment: commentId={}, changedFields={}", saved.getId(), changedFields);
         }
 
         return saved;
@@ -175,7 +175,7 @@ public class GitHubIssueCommentProcessor {
                 eventPublisher.publishEvent(
                     new DomainEvent.CommentDeleted(commentId, issueId, EventContext.from(context))
                 );
-                log.info("Deleted comment {}", commentId);
+                log.info("Deleted comment: commentId={}", commentId);
             });
     }
 }

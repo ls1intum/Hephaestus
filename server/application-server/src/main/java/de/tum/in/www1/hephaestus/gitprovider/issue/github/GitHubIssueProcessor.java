@@ -1,7 +1,5 @@
 package de.tum.in.www1.hephaestus.gitprovider.issue.github;
 
-import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
-
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.events.DomainEvent;
 import de.tum.in.www1.hephaestus.gitprovider.common.events.EventContext;
@@ -85,7 +83,7 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
         // Use getDatabaseId() which falls back to id for webhook payloads
         Long dbId = dto.getDatabaseId();
         if (dbId == null) {
-            log.warn("Issue DTO missing databaseId, skipping");
+            log.warn("Skipped issue processing: reason=missingDatabaseId, issueNumber={}", dto.number());
             return null;
         }
 
@@ -103,7 +101,7 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
             eventPublisher.publishEvent(
                 new DomainEvent.IssueCreated(EventPayload.IssueData.from(issue), EventContext.from(context))
             );
-            log.debug("Created issue #{} in {}", dto.number(), sanitizeForLog(context.repository().getNameWithOwner()));
+            log.debug("Created issue: issueId={}, issueNumber={}", dbId, dto.number());
         } else {
             issue = existingOpt.get();
             Set<String> changedFields = updateIssue(dto, issue, repository);
@@ -119,12 +117,7 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
                         EventContext.from(context)
                     )
                 );
-                log.debug(
-                    "Updated issue #{} in {} - changed: {}",
-                    dto.number(),
-                    sanitizeForLog(context.repository().getNameWithOwner()),
-                    changedFields
-                );
+                log.debug("Updated issue: issueId={}, changedFields={}", dbId, changedFields);
             }
         }
 
@@ -155,7 +148,7 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
                         EventContext.from(context)
                     )
                 );
-                log.info("Issue #{} typed as '{}'", issue.getNumber(), issueType.getName());
+                log.debug("Updated issue type: issueId={}, issueTypeName={}", issue.getId(), issueType.getName());
             }
         }
 
@@ -180,7 +173,7 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
                     EventContext.from(context)
                 )
             );
-            log.info("Issue #{} untyped (was '{}')", issue.getNumber(), previousType.getName());
+            log.debug("Removed issue type: issueId={}, previousTypeName={}", issue.getId(), previousType.getName());
         }
 
         return issue;
@@ -196,7 +189,7 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
         eventPublisher.publishEvent(
             new DomainEvent.IssueClosed(EventPayload.IssueData.from(issue), stateReason, EventContext.from(context))
         );
-        log.debug("Issue #{} closed: {}", issue.getNumber(), stateReason);
+        log.debug("Closed issue: issueId={}, stateReason={}", issue.getId(), stateReason);
         return issue;
     }
 
@@ -209,7 +202,7 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
         eventPublisher.publishEvent(
             new DomainEvent.IssueReopened(EventPayload.IssueData.from(issue), EventContext.from(context))
         );
-        log.debug("Issue #{} reopened", issue.getNumber());
+        log.debug("Reopened issue: issueId={}", issue.getId());
         return issue;
     }
 
@@ -228,7 +221,7 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
                     EventContext.from(context)
                 )
             );
-            log.debug("Issue #{} labeled: {}", issue.getNumber(), label.getName());
+            log.debug("Labeled issue: issueId={}, labelName={}", issue.getId(), label.getName());
         }
         return issue;
     }
@@ -248,7 +241,7 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
                     EventContext.from(context)
                 )
             );
-            log.debug("Issue #{} unlabeled: {}", issue.getNumber(), label.getName());
+            log.debug("Unlabeled issue: issueId={}, labelName={}", issue.getId(), label.getName());
         }
         return issue;
     }
@@ -263,7 +256,7 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
         if (dbId != null) {
             issueRepository.deleteById(dbId);
             eventPublisher.publishEvent(new DomainEvent.IssueDeleted(dbId, EventContext.from(context)));
-            log.info("Deleted issue with id {}", dbId);
+            log.info("Deleted issue: issueId={}", dbId);
         }
     }
 
@@ -446,7 +439,7 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
             .orElseGet(() -> {
                 var orgOpt = organizationRepository.findByLoginIgnoreCase(orgLogin);
                 if (orgOpt.isEmpty()) {
-                    log.warn("Cannot create issue type '{}' - org '{}' not found", dto.name(), orgLogin);
+                    log.warn("Skipped issue type creation: reason=orgNotFound, issueTypeName={}, orgLogin={}", dto.name(), orgLogin);
                     return null;
                 }
                 return issueTypeSyncService.findOrCreateFromWebhook(

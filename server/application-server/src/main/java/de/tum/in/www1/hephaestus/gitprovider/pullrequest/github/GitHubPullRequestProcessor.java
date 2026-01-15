@@ -1,7 +1,5 @@
 package de.tum.in.www1.hephaestus.gitprovider.pullrequest.github;
 
-import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
-
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.events.DomainEvent;
 import de.tum.in.www1.hephaestus.gitprovider.common.events.EventContext;
@@ -76,7 +74,7 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
     public PullRequest process(GitHubPullRequestDTO dto, ProcessingContext context) {
         Long prId = dto.getDatabaseId();
         if (prId == null) {
-            log.warn("Cannot process pull request with null ID");
+            log.warn("Skipped pull request processing: reason=missingDatabaseId, prNumber={}", dto.number());
             return null;
         }
         Optional<PullRequest> existingOpt = pullRequestRepository.findById(prId);
@@ -90,7 +88,7 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
             eventPublisher.publishEvent(
                 new DomainEvent.PullRequestCreated(EventPayload.PullRequestData.from(pr), EventContext.from(context))
             );
-            log.debug("Created PR #{} in {}", dto.number(), sanitizeForLog(context.repository().getNameWithOwner()));
+            log.debug("Created pull request: prId={}, prNumber={}", prId, dto.number());
         } else {
             pr = existingOpt.get();
             Set<String> changedFields = updatePullRequest(dto, pr, context.repository());
@@ -104,12 +102,7 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
                         EventContext.from(context)
                     )
                 );
-                log.debug(
-                    "Updated PR #{} in {} - changed: {}",
-                    dto.number(),
-                    sanitizeForLog(context.repository().getNameWithOwner()),
-                    changedFields
-                );
+                log.debug("Updated pull request: prId={}, changedFields={}", prId, changedFields);
             }
         }
 
@@ -130,9 +123,9 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
 
         if (wasMerged) {
             eventPublisher.publishEvent(new DomainEvent.PullRequestMerged(prData, eventContext));
-            log.info("PR #{} merged", pr.getNumber());
+            log.info("Merged pull request: prId={}, prNumber={}", pr.getId(), pr.getNumber());
         } else {
-            log.debug("PR #{} closed without merging", pr.getNumber());
+            log.debug("Closed pull request: prId={}, merged=false", pr.getId());
         }
 
         return pr;
@@ -147,7 +140,7 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
         eventPublisher.publishEvent(
             new DomainEvent.PullRequestReopened(EventPayload.PullRequestData.from(pr), EventContext.from(context))
         );
-        log.info("PR #{} reopened", pr.getNumber());
+        log.debug("Reopened pull request: prId={}", pr.getId());
         return pr;
     }
 
@@ -160,7 +153,7 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
         eventPublisher.publishEvent(
             new DomainEvent.PullRequestReady(EventPayload.PullRequestData.from(pr), EventContext.from(context))
         );
-        log.info("PR #{} is ready for review", pr.getNumber());
+        log.debug("Marked pull request ready for review: prId={}", pr.getId());
         return pr;
     }
 
@@ -173,7 +166,7 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
         eventPublisher.publishEvent(
             new DomainEvent.PullRequestDrafted(EventPayload.PullRequestData.from(pr), EventContext.from(context))
         );
-        log.debug("PR #{} converted to draft", pr.getNumber());
+        log.debug("Converted pull request to draft: prId={}", pr.getId());
         return pr;
     }
 
@@ -186,7 +179,7 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
         eventPublisher.publishEvent(
             new DomainEvent.PullRequestSynchronized(EventPayload.PullRequestData.from(pr), EventContext.from(context))
         );
-        log.debug("PR #{} synchronized (new commits)", pr.getNumber());
+        log.debug("Synchronized pull request: prId={}", pr.getId());
         return pr;
     }
 
@@ -205,7 +198,7 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
                     EventContext.from(context)
                 )
             );
-            log.debug("PR #{} labeled: {}", pr.getNumber(), label.getName());
+            log.debug("Labeled pull request: prId={}, labelName={}", pr.getId(), label.getName());
         }
         return pr;
     }
@@ -225,7 +218,7 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
                     EventContext.from(context)
                 )
             );
-            log.debug("PR #{} unlabeled: {}", pr.getNumber(), label.getName());
+            log.debug("Unlabeled pull request: prId={}, labelName={}", pr.getId(), label.getName());
         }
         return pr;
     }

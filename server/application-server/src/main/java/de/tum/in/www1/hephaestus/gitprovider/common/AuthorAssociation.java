@@ -33,7 +33,7 @@ public enum AuthorAssociation {
         try {
             return valueOf(value.toUpperCase().replace("-", "_"));
         } catch (IllegalArgumentException e) {
-            log.debug("Unknown author association: {}, defaulting to NONE", value);
+            log.debug("Defaulted author association: value={}, defaultedTo=NONE", value);
             return NONE;
         }
     }

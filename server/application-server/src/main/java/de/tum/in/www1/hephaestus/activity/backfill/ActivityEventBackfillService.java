@@ -173,26 +173,26 @@ public class ActivityEventBackfillService {
             .orElseThrow(() -> new IllegalArgumentException("Workspace not found: " + workspaceId));
 
         log.info(
-            "Starting activity event backfill for workspace: {} (id={})",
+            "Starting activity event backfill: scopeSlug={}, scopeId={}",
             workspace.getWorkspaceSlug(),
             workspaceId
         );
 
         // Backfill each entity type
         BackfillProgress prProgress = backfillPullRequests(workspaceId);
-        log.info(prProgress.summary());
+        log.info("Backfilled pull requests: progress={}", prProgress.summary());
 
         BackfillProgress reviewProgress = backfillReviews(workspaceId);
-        log.info(reviewProgress.summary());
+        log.info("Backfilled reviews: progress={}", reviewProgress.summary());
 
         BackfillProgress issueCommentProgress = backfillIssueComments(workspaceId);
-        log.info(issueCommentProgress.summary());
+        log.info("Backfilled issue comments: progress={}", issueCommentProgress.summary());
 
         BackfillProgress reviewCommentProgress = backfillReviewComments(workspaceId);
-        log.info(reviewCommentProgress.summary());
+        log.info("Backfilled review comments: progress={}", reviewCommentProgress.summary());
 
         BackfillProgress issueProgress = backfillIssues(workspaceId);
-        log.info(issueProgress.summary());
+        log.info("Backfilled issues: progress={}", issueProgress.summary());
 
         // Aggregate all progress
         BackfillProgress combined = prProgress
@@ -202,7 +202,7 @@ public class ActivityEventBackfillService {
             .merge(issueProgress);
 
         log.info(
-            "Completed activity event backfill for workspace {}: {}",
+            "Completed activity event backfill: scopeSlug={}, progress={}",
             workspace.getWorkspaceSlug(),
             combined.summary()
         );
@@ -274,7 +274,7 @@ public class ActivityEventBackfillService {
 
             // Skip PRs without authors
             if (pr.getAuthor() == null) {
-                log.debug("Skipping PR {} - no author", pr.getId());
+                log.debug("Skipped PR backfill, no author: prId={}", pr.getId());
                 progress.incrementSkipped();
                 continue;
             }
@@ -322,7 +322,7 @@ public class ActivityEventBackfillService {
                     }
                 }
             } catch (Exception e) {
-                log.error("Error backfilling PR {}: {}", pr.getId(), e.getMessage(), e);
+                log.error("Failed to backfill PR: prId={}", pr.getId(), e);
                 progress.incrementFailed();
             }
         }
@@ -412,7 +412,7 @@ public class ActivityEventBackfillService {
 
                 // Skip reviews without authors
                 if (review.getAuthor() == null) {
-                    log.debug("Skipping review {} - no author", review.getId());
+                    log.debug("Skipped review backfill, no author: reviewId={}", review.getId());
                     progress.incrementSkipped();
                     continue;
                 }
@@ -425,7 +425,7 @@ public class ActivityEventBackfillService {
                     Instant occurredAt = review.getSubmittedAt();
                     if (occurredAt == null) {
                         occurredAt = pr.getCreatedAt() != null ? pr.getCreatedAt() : Instant.now();
-                        log.debug("Review {} has null submittedAt, using fallback: {}", review.getId(), occurredAt);
+                        log.debug("Using fallback timestamp for review: reviewId={}, fallbackTimestamp={}", review.getId(), occurredAt);
                     }
 
                     // Record the primary review event
@@ -468,14 +468,14 @@ public class ActivityEventBackfillService {
                         }
                     }
                 } catch (Exception e) {
-                    log.error("Error backfilling review {}: {}", review.getId(), e.getMessage(), e);
+                    log.error("Failed to backfill review: reviewId={}", review.getId(), e);
                     progress.incrementFailed();
                 }
             }
         } catch (Exception e) {
             // Catch any exception at the PR level (e.g., LazyInitializationException on getReviews())
             // to prevent transaction rollback from bubbling up
-            log.error("Error processing reviews for PR {}: {}", pr.getId(), e.getMessage(), e);
+            log.error("Failed to process reviews for PR: prId={}", pr.getId(), e);
             progress.incrementFailed();
         }
     }
@@ -550,14 +550,14 @@ public class ActivityEventBackfillService {
 
         // Skip comments without authors
         if (comment.getAuthor() == null) {
-            log.debug("Skipping issue comment {} - no author", comment.getId());
+            log.debug("Skipped issue comment backfill, no author: commentId={}", comment.getId());
             progress.incrementSkipped();
             return;
         }
 
         // Skip comments without associated issues
         if (comment.getIssue() == null || comment.getIssue().getRepository() == null) {
-            log.debug("Skipping issue comment {} - no issue or repository", comment.getId());
+            log.debug("Skipped issue comment backfill, no issue or repository: commentId={}", comment.getId());
             progress.incrementSkipped();
             return;
         }
@@ -585,7 +585,7 @@ public class ActivityEventBackfillService {
                 progress.incrementCreated();
             }
         } catch (Exception e) {
-            log.error("Error backfilling issue comment {}: {}", comment.getId(), e.getMessage(), e);
+            log.error("Failed to backfill issue comment: commentId={}", comment.getId(), e);
             progress.incrementFailed();
         }
     }
@@ -653,14 +653,14 @@ public class ActivityEventBackfillService {
 
         // Skip comments without authors
         if (comment.getAuthor() == null) {
-            log.debug("Skipping review comment {} - no author", comment.getId());
+            log.debug("Skipped review comment backfill, no author: commentId={}", comment.getId());
             progress.incrementSkipped();
             return;
         }
 
         // Skip comments without associated PR
         if (comment.getPullRequest() == null || comment.getPullRequest().getRepository() == null) {
-            log.debug("Skipping review comment {} - no PR or repository", comment.getId());
+            log.debug("Skipped review comment backfill, no PR or repository: commentId={}", comment.getId());
             progress.incrementSkipped();
             return;
         }
@@ -689,7 +689,7 @@ public class ActivityEventBackfillService {
                 progress.incrementCreated();
             }
         } catch (Exception e) {
-            log.error("Error backfilling review comment {}: {}", comment.getId(), e.getMessage(), e);
+            log.error("Failed to backfill review comment: commentId={}", comment.getId(), e);
             progress.incrementFailed();
         }
     }
@@ -750,7 +750,7 @@ public class ActivityEventBackfillService {
 
             // Skip issues without authors
             if (issue.getAuthor() == null) {
-                log.debug("Skipping issue {} - no author", issue.getId());
+                log.debug("Skipped issue backfill, no author: issueId={}", issue.getId());
                 progress.incrementSkipped();
                 continue;
             }
@@ -796,7 +796,7 @@ public class ActivityEventBackfillService {
                     }
                 }
             } catch (Exception e) {
-                log.error("Error backfilling issue {}: {}", issue.getId(), e.getMessage(), e);
+                log.error("Failed to backfill issue: issueId={}", issue.getId(), e);
                 progress.incrementFailed();
             }
         }

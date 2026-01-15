@@ -1,10 +1,12 @@
 package de.tum.in.www1.hephaestus.gitprovider.sync;
 
+import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
+
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncContextProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider.SyncStatistics;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider.SyncTarget;
-import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider.WorkspaceSyncSession;
+import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider.SyncSession;
 import de.tum.in.www1.hephaestus.gitprovider.issuedependency.github.GitHubIssueDependencySyncService;
 import de.tum.in.www1.hephaestus.gitprovider.issuetype.github.GitHubIssueTypeSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.subissue.github.GitHubSubIssueSyncService;
@@ -17,16 +19,16 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 /**
- * Scheduler for periodic GitHub data synchronization across all workspaces.
+ * Scheduler for periodic GitHub data synchronization across all scopes.
  *
  * <h2>Purpose</h2>
  * Runs scheduled sync jobs using Spring's {@code @Scheduled} annotation.
- * Iterates over all active workspaces and syncs their repositories via GraphQL.
+ * Iterates over all active scopes and syncs their repositories via GraphQL.
  *
  * <h2>Architecture</h2>
- * Uses SPI interfaces to remain decoupled from workspace module:
+ * Uses SPI interfaces to remain decoupled from consuming modules:
  * <ul>
- *   <li>{@link SyncTargetProvider} - provides workspace/repository info to sync</li>
+ *   <li>{@link SyncTargetProvider} - provides scope/repository info to sync</li>
  *   <li>{@link SyncContextProvider} - manages context for logging and isolation</li>
  * </ul>
  *
@@ -35,8 +37,8 @@ import org.springframework.stereotype.Component;
  * <ul>
  *   <li>Spring's default scheduling uses a single-threaded executor, so
  *       {@code syncDataCron()} will not run concurrently with itself</li>
- *   <li>Each workspace sync is isolated - no shared mutable state between workspaces</li>
- *   <li>Context is set/cleared per workspace via {@code SyncContextProvider}</li>
+ *   <li>Each scope sync is isolated - no shared mutable state between scopes</li>
+ *   <li>Context is set/cleared per scope via {@code SyncContextProvider}</li>
  * </ul>
  *
  * <h2>Lifecycle</h2>
@@ -44,7 +46,7 @@ import org.springframework.stereotype.Component;
  *   <li>Spring creates this component at startup (after {@code NatsConsumerService}
  *       due to {@code @Order(2)})</li>
  *   <li>{@code @Scheduled} method runs at cron interval from {@code monitoring.sync-cron}</li>
- *   <li>Each run processes all ACTIVE workspaces, respecting monitoring filters</li>
+ *   <li>Each run processes all ACTIVE scopes, respecting monitoring filters</li>
  * </ol>
  *
  * <h2>Configuration</h2>
@@ -72,23 +74,23 @@ public class GitHubDataSyncScheduler {
     private final GitHubIssueDependencySyncService issueDependencySyncService;
 
     /**
-     * Scheduled job to sync GitHub data for all active workspaces.
+     * Scheduled job to sync GitHub data for all active scopes.
      * Respects monitoring filters to limit sync scope during development.
      */
     @Scheduled(cron = "${monitoring.sync-cron}")
     public void syncDataCron() {
-        log.info("Starting scheduled GitHub data sync...");
+        log.info("Starting scheduled sync");
 
         // Get statistics for logging
         SyncStatistics stats = syncTargetProvider.getSyncStatistics();
 
-        // Get workspace sync sessions (already filtered by status and monitoring scope)
-        List<WorkspaceSyncSession> sessions = syncTargetProvider.getWorkspaceSyncSessions();
+        // Get sync sessions (already filtered by status and monitoring scope)
+        List<SyncSession> sessions = syncTargetProvider.getSyncSessions();
 
         if (sessions.isEmpty()) {
             log.info(
-                "No workspaces to sync. Total: {}, skipped by status: {}, skipped by filter: {}",
-                stats.totalWorkspaces(),
+                "No scopes to sync: totalScopes={}, skippedByStatus={}, skippedByFilter={}",
+                stats.totalScopes(),
                 stats.skippedByStatus(),
                 stats.skippedByFilter()
             );
@@ -97,38 +99,33 @@ public class GitHubDataSyncScheduler {
 
         if (stats.filterActive()) {
             log.info(
-                "Monitoring filter active. Syncing {} of {} workspaces (skipped {} by status, {} by filter)",
+                "Monitoring filter active: scopesToSync={}, totalScopes={}, skippedByStatus={}, skippedByFilter={}",
                 stats.activeAndAllowed(),
-                stats.totalWorkspaces(),
+                stats.totalScopes(),
                 stats.skippedByStatus(),
                 stats.skippedByFilter()
             );
         } else {
             log.info(
-                "Found {} ACTIVE workspaces to sync (skipped {} non-active)",
+                "Found scopes to sync: count={}, skippedByStatus={}",
                 stats.activeAndAllowed(),
                 stats.skippedByStatus()
             );
         }
 
-        for (WorkspaceSyncSession session : sessions) {
-            syncWorkspace(session);
+        for (SyncSession session : sessions) {
+            syncScope(session);
         }
 
-        log.info("Scheduled GitHub data sync completed for {} workspaces.", sessions.size());
+        log.info("Completed scheduled sync: scopeCount={}", sessions.size());
     }
 
-    private void syncWorkspace(WorkspaceSyncSession session) {
+    private void syncScope(SyncSession session) {
         try {
             // Set context for logging and isolation
             syncContextProvider.setContext(session.syncContext());
 
-            log.info(
-                "Syncing workspace {} (slug={}, login={})",
-                session.workspaceId(),
-                session.workspaceSlug(),
-                session.accountLogin()
-            );
+            log.info("Starting scope sync: scopeId={}, scopeSlug={}, accountLogin={}", session.scopeId(), session.slug(), sanitizeForLog(session.accountLogin()));
 
             // Wrap sync operations with context propagation for async threads
             Runnable syncTask = syncContextProvider.wrapWithContext(() -> {
@@ -138,7 +135,7 @@ public class GitHubDataSyncScheduler {
                 }
 
                 // Sync sub-issues, issue types, and issue dependencies via GraphQL
-                // These are workspace-level operations (fetched across all repositories)
+                // These are scope-level operations (fetched across all repositories)
                 syncSubIssues(session);
                 syncIssueTypes(session);
                 syncIssueDependencies(session);
@@ -147,50 +144,39 @@ public class GitHubDataSyncScheduler {
             // Execute synchronously in the scheduler thread
             syncTask.run();
         } catch (Exception e) {
-            log.error(
-                "Error syncing workspace {} (slug={}): {}",
-                session.workspaceId(),
-                session.workspaceSlug(),
-                e.getMessage(),
-                e
-            );
+            log.error("Failed to sync scope: scopeId={}, scopeSlug={}", session.scopeId(), session.slug(), e);
         } finally {
             syncContextProvider.clearContext();
         }
     }
 
-    private void syncSubIssues(WorkspaceSyncSession session) {
+    private void syncSubIssues(SyncSession session) {
         try {
-            log.debug("Syncing sub-issue relationships for workspace {}", session.workspaceSlug());
-            subIssueSyncService.syncSubIssuesForWorkspace(session.workspaceId());
+            log.debug("Starting sub-issues sync: scopeId={}, scopeSlug={}", session.scopeId(), session.slug());
+            subIssueSyncService.syncSubIssuesForScope(session.scopeId());
         } catch (Exception e) {
-            log.error("Failed to sync sub-issues for workspace {}: {}", session.workspaceSlug(), e.getMessage(), e);
+            log.error("Failed to sync sub-issues: scopeId={}, scopeSlug={}", session.scopeId(), session.slug(), e);
         }
     }
 
-    private void syncIssueTypes(WorkspaceSyncSession session) {
+    private void syncIssueTypes(SyncSession session) {
         try {
-            log.debug("Syncing issue types for workspace {}", session.workspaceSlug());
-            issueTypeSyncService.syncIssueTypesForWorkspace(session.workspaceId());
+            log.debug("Starting issue types sync: scopeId={}, scopeSlug={}", session.scopeId(), session.slug());
+            issueTypeSyncService.syncIssueTypesForScope(session.scopeId());
         } catch (Exception e) {
-            log.error("Failed to sync issue types for workspace {}: {}", session.workspaceSlug(), e.getMessage(), e);
+            log.error("Failed to sync issue types: scopeId={}, scopeSlug={}", session.scopeId(), session.slug(), e);
         }
     }
 
-    private void syncIssueDependencies(WorkspaceSyncSession session) {
+    private void syncIssueDependencies(SyncSession session) {
         // NOTE (Dec 2025): issue_dependencies webhook is STILL NOT AVAILABLE
         // (GitHub shipped UI without API/webhook - see Discussion #165749)
         // GraphQL bulk sync is currently the ONLY way to get dependency data
         try {
-            log.debug("Syncing issue dependencies for workspace {}", session.workspaceSlug());
-            issueDependencySyncService.syncDependenciesForWorkspace(session.workspaceId());
+            log.debug("Starting issue dependencies sync: scopeId={}, scopeSlug={}", session.scopeId(), session.slug());
+            issueDependencySyncService.syncDependenciesForScope(session.scopeId());
         } catch (Exception e) {
-            log.error(
-                "Failed to sync issue dependencies for workspace {}: {}",
-                session.workspaceSlug(),
-                e.getMessage(),
-                e
-            );
+            log.error("Failed to sync issue dependencies: scopeId={}, scopeSlug={}", session.scopeId(), session.slug(), e);
         }
     }
 }

@@ -57,29 +57,29 @@ public class GitHubMilestoneSyncService {
     /**
      * Synchronizes all milestones for a repository using GraphQL.
      *
-     * @param workspaceId  the workspace ID for authentication
+     * @param scopeId  the scope ID for authentication
      * @param repositoryId the repository ID to sync milestones for
      * @return number of milestones synced
      */
     @Transactional
-    public int syncMilestonesForRepository(Long workspaceId, Long repositoryId) {
+    public int syncMilestonesForRepository(Long scopeId, Long repositoryId) {
         Repository repository = repositoryRepository.findById(repositoryId).orElse(null);
         if (repository == null) {
-            log.warn("Repository {} not found, cannot sync milestones", repositoryId);
+            log.warn("Repository not found, skipping milestone sync: repoId={}", repositoryId);
             return 0;
         }
 
         String safeNameWithOwner = sanitizeForLog(repository.getNameWithOwner());
         Optional<RepositoryOwnerAndName> parsedName = GitHubRepositoryNameParser.parse(repository.getNameWithOwner());
         if (parsedName.isEmpty()) {
-            log.warn("Invalid repository name format: {}", safeNameWithOwner);
+            log.warn("Invalid repository name format: repoName={}", safeNameWithOwner);
             return 0;
         }
         String owner = parsedName.get().owner();
         String name = parsedName.get().name();
 
-        HttpGraphQlClient client = graphQlClientProvider.forWorkspace(workspaceId);
-        ProcessingContext context = ProcessingContext.forSync(workspaceId, repository);
+        HttpGraphQlClient client = graphQlClientProvider.forScope(scopeId);
+        ProcessingContext context = ProcessingContext.forSync(scopeId, repository);
 
         try {
             Set<Integer> syncedNumbers = new HashSet<>();
@@ -92,9 +92,9 @@ public class GitHubMilestoneSyncService {
                 pageCount++;
                 if (pageCount >= MAX_PAGINATION_PAGES) {
                     log.warn(
-                        "Reached maximum pagination limit ({}) for repository {}, stopping",
-                        MAX_PAGINATION_PAGES,
-                        safeNameWithOwner
+                        "Reached maximum pagination limit for milestones: repoName={}, limit={}",
+                        safeNameWithOwner,
+                        MAX_PAGINATION_PAGES
                     );
                     break;
                 }
@@ -130,10 +130,10 @@ public class GitHubMilestoneSyncService {
             // Remove milestones that no longer exist
             removeDeletedMilestones(repository.getId(), syncedNumbers, context);
 
-            log.info("Synced {} milestones for repository {}", totalSynced, safeNameWithOwner);
+            log.info("Completed milestone sync: repoName={}, milestoneCount={}, scopeId={}", safeNameWithOwner, totalSynced, scopeId);
             return totalSynced;
         } catch (Exception e) {
-            log.error("Error syncing milestones for repository {}: {}", safeNameWithOwner, e.getMessage(), e);
+            log.error("Failed to sync milestones: repoName={}, scopeId={}", safeNameWithOwner, scopeId, e);
             return 0;
         }
     }
@@ -148,7 +148,7 @@ public class GitHubMilestoneSyncService {
             }
         }
         if (removed > 0) {
-            log.info("Deleted {} stale milestones for repositoryId={}", removed, repositoryId);
+            log.info("Removed stale milestones: milestoneCount={}, repoId={}", removed, repositoryId);
         }
     }
 

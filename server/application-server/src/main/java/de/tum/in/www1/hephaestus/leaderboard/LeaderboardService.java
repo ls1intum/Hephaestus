@@ -113,16 +113,16 @@ public class LeaderboardService {
         Map<Long, List<Team>> teamHierarchy
     ) {
         if (workspace == null || workspace.getId() == null) {
-            log.warn("Skipping leaderboard dataset creation because workspace id is missing.");
+            log.warn("Skipped leaderboard creation: reason=missingWorkspaceId");
             return Collections.emptyList();
         }
 
-        log.info(
-            "Creating leaderboard dataset with timeframe: {} - {} and team: {} for workspace {}",
+        log.debug(
+            "Prepared leaderboard query: workspaceId={}, after={}, before={}, team={}",
+            workspace.getId(),
             after,
             before,
-            team.isEmpty() ? "all" : team.get().getName(),
-            workspace.getWorkspaceSlug()
+            team.isEmpty() ? "all" : team.get().getName()
         );
 
         Long workspaceId = workspace.getId();
@@ -166,7 +166,7 @@ public class LeaderboardService {
         }
 
         if (activityData.isEmpty()) {
-            log.info("No team members found for leaderboard");
+            log.debug("Found no team members for leaderboard: workspaceId={}", workspaceId);
             return Collections.emptyList();
         }
 
@@ -291,11 +291,11 @@ public class LeaderboardService {
         Instant before,
         LeaderboardSortType sort
     ) {
-        log.info(
-            "Creating team leaderboard dataset with timeframe: {} - {} in workspace {}",
+        log.debug(
+            "Prepared team leaderboard query: workspaceId={}, after={}, before={}",
+            workspace.getId(),
             after,
-            before,
-            workspace.getWorkspaceSlug()
+            before
         );
 
         Map<Long, List<Team>> teamHierarchy = teamPathResolver.buildHierarchy(workspace);
@@ -310,7 +310,7 @@ public class LeaderboardService {
                   .toList();
 
         if (targetTeams.isEmpty()) {
-            log.info("No teams found for team leaderboard in workspace {}", workspace.getWorkspaceSlug());
+            log.debug("Found no teams for team leaderboard: workspaceId={}", workspace.getId());
             return Collections.emptyList();
         }
 
@@ -369,7 +369,7 @@ public class LeaderboardService {
                 i + 1,
                 score,
                 null,
-                TeamInfoDTO.fromTeamWithWorkspaceSettings(
+                TeamInfoDTO.fromTeamWithScopeSettings(
                     teamEntity,
                     isHiddenInWorkspace,
                     workspaceLabels,

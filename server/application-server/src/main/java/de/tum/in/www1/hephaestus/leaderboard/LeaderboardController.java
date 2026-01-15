@@ -72,12 +72,12 @@ public class LeaderboardController {
         ) @RequestParam LeaderboardSortType sort,
         @RequestParam LeaderboardMode mode
     ) {
-        log.info(
-            "Generating {} leaderboard for workspace {}",
-            mode,
-            LoggingUtils.sanitizeForLog(workspaceContext.slug())
-        );
         Workspace workspace = workspaceResolver.requireWorkspace(workspaceContext);
+        log.info(
+            "Received leaderboard request: workspaceId={}, mode={}",
+            workspace.getId(),
+            mode
+        );
         return ResponseEntity.ok(leaderboardService.createLeaderboard(workspace, after, before, team, sort, mode));
     }
 
@@ -102,12 +102,12 @@ public class LeaderboardController {
         @PathVariable String login,
         @RequestBody LeaderboardEntryDTO entry
     ) {
-        log.info(
-            "Calculating league stats for user {} in workspace {}",
-            LoggingUtils.sanitizeForLog(login),
-            LoggingUtils.sanitizeForLog(workspaceContext.slug())
-        );
         Workspace workspace = workspaceResolver.requireWorkspace(workspaceContext);
+        log.info(
+            "Received league stats request: workspaceId={}, userLogin={}",
+            workspace.getId(),
+            LoggingUtils.sanitizeForLog(login)
+        );
         return ResponseEntity.ok(leaderboardService.getUserLeagueStats(workspace, login, entry));
     }
 }

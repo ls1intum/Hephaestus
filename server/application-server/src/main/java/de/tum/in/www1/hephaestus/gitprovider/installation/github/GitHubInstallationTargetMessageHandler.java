@@ -4,7 +4,9 @@ import de.tum.in.www1.hephaestus.gitprovider.common.NatsMessageDeserializer;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventAction;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventType;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
-import de.tum.in.www1.hephaestus.gitprovider.common.spi.WorkspaceProvisioningListener;
+import de.tum.in.www1.hephaestus.gitprovider.common.spi.ProvisioningListener;
+import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
+
 import de.tum.in.www1.hephaestus.gitprovider.installation.github.dto.GitHubInstallationTargetEventDTO;
 import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationService;
 import org.slf4j.Logger;
@@ -20,11 +22,11 @@ public class GitHubInstallationTargetMessageHandler extends GitHubMessageHandler
 
     private static final Logger log = LoggerFactory.getLogger(GitHubInstallationTargetMessageHandler.class);
 
-    private final WorkspaceProvisioningListener provisioningListener;
+    private final ProvisioningListener provisioningListener;
     private final OrganizationService organizationService;
 
     GitHubInstallationTargetMessageHandler(
-        WorkspaceProvisioningListener provisioningListener,
+        ProvisioningListener provisioningListener,
         OrganizationService organizationService,
         NatsMessageDeserializer deserializer
     ) {
@@ -54,7 +56,7 @@ public class GitHubInstallationTargetMessageHandler extends GitHubMessageHandler
         var account = event.account();
 
         if (installation == null || account == null) {
-            log.warn("installation_target payload missing installation/account block");
+            log.warn("Received installation_target event with missing data: action={}", event.action());
             return;
         }
 
@@ -62,7 +64,7 @@ public class GitHubInstallationTargetMessageHandler extends GitHubMessageHandler
         String newLogin = account.login();
 
         if (newLogin == null || newLogin.isBlank()) {
-            log.warn("installation_target event {} ignored because login is empty", installationId);
+            log.warn("Skipped installation_target event: reason=emptyLogin, installationId={}", installationId);
             return;
         }
 
@@ -75,10 +77,10 @@ public class GitHubInstallationTargetMessageHandler extends GitHubMessageHandler
         upsertOrganization(event, installationId, newLogin);
 
         log.info(
-            "Handled installation_target rename for installation {}: {} -> {}",
+            "Processed installation_target rename: installationId={}, previousLogin={}, newLogin={}",
             installationId,
-            previousLogin,
-            newLogin
+            sanitizeForLog(previousLogin),
+            sanitizeForLog(newLogin)
         );
     }
 
@@ -89,7 +91,7 @@ public class GitHubInstallationTargetMessageHandler extends GitHubMessageHandler
 
         var account = event.account();
         if (account == null || account.id() == null) {
-            log.warn("installation_target event {} missing account details for organization upsert", installationId);
+            log.warn("Skipped organization upsert: reason=missingAccountDetails, installationId={}", installationId);
             return;
         }
 

@@ -96,12 +96,12 @@ public class MailBuilder {
 
     public void send(JavaMailSender mailSender) {
         if (recipientLogin == null || email == null) {
-            log.warn("No primary recipient specified");
+            log.warn("Skipped sending email: reason=noPrimaryRecipient, template={}", template);
             return;
         }
 
         if (!notificationsEnabled) {
-            log.warn("Primary recipient has notifications disabled");
+            log.warn("Skipped sending email: reason=notificationsDisabled, userLogin={}, template={}", recipientLogin, template);
             return;
         }
         try {
@@ -137,10 +137,10 @@ public class MailBuilder {
             if (config.isEnabled()) {
                 mailSender.send(message);
             } else {
-                log.info("Sending Mail (postfix disabled)\n{}", messageBody.getContent());
+                log.info("Skipped sending email: reason=mailDisabled, userLogin={}, template={}", recipientLogin, template);
             }
         } catch (Exception exception) {
-            log.warn("Failed to send email", exception);
+            log.warn("Failed to send email: userLogin={}, template={}", recipientLogin, template, exception);
         }
     }
 }

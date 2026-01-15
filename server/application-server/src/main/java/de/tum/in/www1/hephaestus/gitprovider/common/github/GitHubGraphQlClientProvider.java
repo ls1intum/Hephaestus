@@ -20,7 +20,7 @@ import org.springframework.stereotype.Component;
  * <p>
  * This provider creates per-request authenticated clients by cloning the base
  * client
- * and injecting workspace-specific authentication tokens. Unlike the REST API
+ * and injecting scope-specific authentication tokens. Unlike the REST API
  * client
  * ({@link GitHubClientProvider}), GraphQL clients are lightweight and don't
  * need caching.
@@ -37,8 +37,8 @@ import org.springframework.stereotype.Component;
  * public class PullRequestGraphQlService {
  *   private final GitHubGraphQlClientProvider clientProvider;
  *
- *   public Mono<PullRequest> fetchPR(Long workspaceId, String owner, String repo, int number) {
- *     return clientProvider.forWorkspace(workspaceId)
+ *   public Mono<PullRequest> fetchPR(Long scopeId, String owner, String repo, int number) {
+ *     return clientProvider.forScope(scopeId)
  *         .document(GetPullRequestRequest.builder()
  *             .owner(owner)
  *             .name(repo)
@@ -126,29 +126,29 @@ public class GitHubGraphQlClientProvider {
         try {
             circuitBreaker.acquirePermission();
         } catch (CallNotPermittedException e) {
-            log.warn("GitHub GraphQL circuit breaker is OPEN - rejecting call");
+            log.warn("Rejected GraphQL call: reason=circuitBreakerOpen, state={}", circuitBreaker.getState());
             throw new CircuitBreakerOpenException("GitHub GraphQL API circuit breaker is open", e);
         }
     }
 
     /**
-     * Returns an authenticated HttpGraphQlClient for the given workspace.
+     * Returns an authenticated HttpGraphQlClient for the given scope.
      * <p>
      * The client is created by cloning the base client and adding the appropriate
-     * authentication header based on the workspace's git provider mode:
+     * authentication header based on the scope's git provider mode:
      * <ul>
      * <li>GitHub App Installation: Uses short-lived installation tokens</li>
      * <li>Personal Access Token: Uses the stored PAT</li>
      * </ul>
      *
-     * @param workspaceId the workspace ID to authenticate for
+     * @param scopeId the scope ID to authenticate for
      * @return authenticated HttpGraphQlClient ready for use
-     * @throws IllegalArgumentException if workspace not found
-     * @throws IllegalStateException    if workspace has invalid authentication
+     * @throws IllegalArgumentException if scope not found
+     * @throws IllegalStateException    if scope has invalid authentication
      *                                  config
      */
-    public HttpGraphQlClient forWorkspace(Long workspaceId) {
-        String token = getToken(workspaceId);
+    public HttpGraphQlClient forScope(Long scopeId) {
+        String token = getToken(scopeId);
         return baseClient.mutate().header(HttpHeaders.AUTHORIZATION, "Bearer " + token).build();
     }
 
@@ -166,23 +166,23 @@ public class GitHubGraphQlClientProvider {
         return baseClient.mutate().header(HttpHeaders.AUTHORIZATION, "Bearer " + token).build();
     }
 
-    private String getToken(Long workspaceId) {
-        AuthMode authMode = tokenProvider.getAuthMode(workspaceId);
+    private String getToken(Long scopeId) {
+        AuthMode authMode = tokenProvider.getAuthMode(scopeId);
 
         if (authMode == AuthMode.GITHUB_APP) {
             Long installationId = tokenProvider
-                .getInstallationId(workspaceId)
-                .orElseThrow(() -> new IllegalStateException("Workspace " + workspaceId + " has no installation id."));
+                .getInstallationId(scopeId)
+                .orElseThrow(() -> new IllegalStateException("Scope " + scopeId + " has no installation id."));
             InstallationToken token = appTokens.getInstallationTokenDetails(installationId);
             return token.token();
         }
 
         return tokenProvider
-            .getPersonalAccessToken(workspaceId)
+            .getPersonalAccessToken(scopeId)
             .filter(t -> !t.isBlank())
             .orElseThrow(() ->
                 new IllegalStateException(
-                    "Workspace " + workspaceId + " is configured for PAT access but no token is stored."
+                    "Scope " + scopeId + " is configured for PAT access but no token is stored."
                 )
             );
     }

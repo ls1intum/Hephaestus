@@ -117,16 +117,13 @@ public class WorkspaceTeamSettingsService {
      */
     @Transactional
     public Optional<WorkspaceTeamSettings> updateTeamVisibility(Workspace workspace, Long teamId, boolean hidden) {
-        log.info(
-            "Updating team {} visibility to hidden={} in workspace {}",
-            teamId,
-            hidden,
-            workspace.getWorkspaceSlug()
-        );
-
         Optional<Team> teamOpt = teamRepository.findById(teamId);
         if (teamOpt.isEmpty() || !belongsToWorkspace(teamOpt.get(), workspace)) {
-            log.warn("Team {} not found or does not belong to workspace {}", teamId, workspace.getWorkspaceSlug());
+            log.warn(
+                "Skipped team visibility update: reason=teamNotFoundOrWrongWorkspace, teamId={}, workspaceSlug={}",
+                teamId,
+                workspace.getWorkspaceSlug()
+            );
             return Optional.empty();
         }
 
@@ -139,7 +136,7 @@ public class WorkspaceTeamSettingsService {
         WorkspaceTeamSettings saved = teamSettingsRepository.save(settings);
 
         log.info(
-            "Team {} visibility updated to hidden={} in workspace {}",
+            "Updated team visibility: teamId={}, hidden={}, workspaceSlug={}",
             teamId,
             hidden,
             workspace.getWorkspaceSlug()
@@ -231,23 +228,19 @@ public class WorkspaceTeamSettingsService {
         Long repositoryId,
         boolean hiddenFromContributions
     ) {
-        log.info(
-            "Updating repository {} visibility for team {} to hiddenFromContributions={} in workspace {}",
-            repositoryId,
-            teamId,
-            hiddenFromContributions,
-            workspace.getWorkspaceSlug()
-        );
-
         Optional<Team> teamOpt = teamRepository.findById(teamId);
         if (teamOpt.isEmpty() || !belongsToWorkspace(teamOpt.get(), workspace)) {
-            log.warn("Team {} not found or does not belong to workspace {}", teamId, workspace.getWorkspaceSlug());
+            log.warn(
+                "Skipped repository visibility update: reason=teamNotFoundOrWrongWorkspace, teamId={}, workspaceSlug={}",
+                teamId,
+                workspace.getWorkspaceSlug()
+            );
             return Optional.empty();
         }
 
         Optional<Repository> repoOpt = repositoryRepository.findById(repositoryId);
         if (repoOpt.isEmpty()) {
-            log.warn("Repository {} not found", repositoryId);
+            log.warn("Skipped repository visibility update: reason=repositoryNotFound, repositoryId={}", repositoryId);
             return Optional.empty();
         }
 
@@ -262,7 +255,7 @@ public class WorkspaceTeamSettingsService {
         WorkspaceTeamRepositorySettings saved = repositorySettingsRepository.save(settings);
 
         log.info(
-            "Repository {} visibility for team {} updated to hiddenFromContributions={} in workspace {}",
+            "Updated repository visibility: repositoryId={}, teamId={}, hiddenFromContributions={}, workspaceSlug={}",
             repositoryId,
             teamId,
             hiddenFromContributions,
@@ -309,22 +302,19 @@ public class WorkspaceTeamSettingsService {
      */
     @Transactional
     public Optional<WorkspaceTeamLabelFilter> addLabelFilter(Workspace workspace, Long teamId, Long labelId) {
-        log.info(
-            "Adding label {} as filter for team {} in workspace {}",
-            labelId,
-            teamId,
-            workspace.getWorkspaceSlug()
-        );
-
         Optional<Team> teamOpt = teamRepository.findById(teamId);
         if (teamOpt.isEmpty() || !belongsToWorkspace(teamOpt.get(), workspace)) {
-            log.warn("Team {} not found or does not belong to workspace {}", teamId, workspace.getWorkspaceSlug());
+            log.warn(
+                "Skipped label filter addition: reason=teamNotFoundOrWrongWorkspace, teamId={}, workspaceSlug={}",
+                teamId,
+                workspace.getWorkspaceSlug()
+            );
             return Optional.empty();
         }
 
         Optional<Label> labelOpt = labelRepository.findById(labelId);
         if (labelOpt.isEmpty()) {
-            log.warn("Label {} not found", labelId);
+            log.warn("Skipped label filter addition: reason=labelNotFound, labelId={}", labelId);
             return Optional.empty();
         }
 
@@ -334,8 +324,8 @@ public class WorkspaceTeamSettingsService {
         // Check if filter already exists
         WorkspaceTeamLabelFilter.Id filterId = new WorkspaceTeamLabelFilter.Id(workspace.getId(), teamId, labelId);
         if (labelFilterRepository.existsById(filterId)) {
-            log.info(
-                "Label filter already exists for team {} and label {} in workspace {}",
+            log.debug(
+                "Skipped label filter addition: reason=filterAlreadyExists, teamId={}, labelId={}, workspaceSlug={}",
                 teamId,
                 labelId,
                 workspace.getWorkspaceSlug()
@@ -346,7 +336,7 @@ public class WorkspaceTeamSettingsService {
         WorkspaceTeamLabelFilter filter = new WorkspaceTeamLabelFilter(workspace, team, label);
         WorkspaceTeamLabelFilter saved = labelFilterRepository.save(filter);
 
-        log.info("Label {} added as filter for team {} in workspace {}", labelId, teamId, workspace.getWorkspaceSlug());
+        log.info("Added label filter: labelId={}, teamId={}, workspaceSlug={}", labelId, teamId, workspace.getWorkspaceSlug());
 
         return Optional.of(saved);
     }
@@ -367,17 +357,13 @@ public class WorkspaceTeamSettingsService {
         Long repositoryId,
         String labelName
     ) {
-        log.info(
-            "Adding label '{}' from repository {} as filter for team {} in workspace {}",
-            labelName,
-            repositoryId,
-            teamId,
-            workspace.getWorkspaceSlug()
-        );
-
         Optional<Label> labelOpt = labelRepository.findByRepositoryIdAndName(repositoryId, labelName);
         if (labelOpt.isEmpty()) {
-            log.warn("Label '{}' not found in repository {}", labelName, repositoryId);
+            log.warn(
+                "Skipped label filter addition: reason=labelNotFoundInRepository, labelName={}, repositoryId={}",
+                labelName,
+                repositoryId
+            );
             return Optional.empty();
         }
 
@@ -394,13 +380,11 @@ public class WorkspaceTeamSettingsService {
      */
     @Transactional
     public boolean removeLabelFilter(Workspace workspace, Long teamId, Long labelId) {
-        log.info("Removing label {} filter for team {} in workspace {}", labelId, teamId, workspace.getWorkspaceSlug());
-
         WorkspaceTeamLabelFilter.Id filterId = new WorkspaceTeamLabelFilter.Id(workspace.getId(), teamId, labelId);
 
         if (!labelFilterRepository.existsById(filterId)) {
-            log.info(
-                "Label filter does not exist for team {} and label {} in workspace {}",
+            log.debug(
+                "Skipped label filter removal: reason=filterNotExists, teamId={}, labelId={}, workspaceSlug={}",
                 teamId,
                 labelId,
                 workspace.getWorkspaceSlug()
@@ -410,7 +394,7 @@ public class WorkspaceTeamSettingsService {
 
         labelFilterRepository.deleteByWorkspaceIdAndTeamIdAndLabelId(workspace.getId(), teamId, labelId);
 
-        log.info("Label {} filter removed for team {} in workspace {}", labelId, teamId, workspace.getWorkspaceSlug());
+        log.info("Removed label filter: labelId={}, teamId={}, workspaceSlug={}", labelId, teamId, workspace.getWorkspaceSlug());
 
         return true;
     }
@@ -423,9 +407,8 @@ public class WorkspaceTeamSettingsService {
      */
     @Transactional
     public void removeAllLabelFilters(Workspace workspace, Long teamId) {
-        log.info("Removing all label filters for team {} in workspace {}", teamId, workspace.getWorkspaceSlug());
-
         labelFilterRepository.deleteAllByWorkspaceIdAndTeamId(workspace.getId(), teamId);
+        log.info("Removed all label filters: teamId={}, workspaceSlug={}", teamId, workspace.getWorkspaceSlug());
     }
 
     // ========================================================================

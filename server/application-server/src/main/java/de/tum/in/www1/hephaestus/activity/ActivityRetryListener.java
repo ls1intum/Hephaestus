@@ -49,7 +49,7 @@ public class ActivityRetryListener implements RetryListener {
         retryAttemptsCounter.increment();
 
         log.warn(
-            "activity.event.retry_attempt attempt={} errorType={} errorMessage={}",
+            "Retrying activity event recording: attempt={}, errorType={}, errorMessage={}",
             retryCount,
             errorType,
             throwable.getMessage()
@@ -67,12 +67,12 @@ public class ActivityRetryListener implements RetryListener {
 
         if (exhausted) {
             log.error(
-                "activity.event.retry_exhausted totalAttempts={} finalError={}",
+                "Exhausted retries for activity event recording: totalAttempts={}, finalError={}",
                 totalAttempts,
                 throwable.getClass().getSimpleName()
             );
         } else if (totalAttempts > 0) {
-            log.info("activity.event.retry_succeeded afterAttempts={}", totalAttempts);
+            log.info("Succeeded after retries for activity event recording: totalAttempts={}", totalAttempts);
         }
     }
 }

@@ -55,29 +55,29 @@ public class GitHubLabelSyncService {
     /**
      * Synchronizes all labels for a repository using GraphQL.
      *
-     * @param workspaceId  the workspace ID for authentication
+     * @param scopeId  the scope ID for authentication
      * @param repositoryId the repository ID to sync labels for
      * @return number of labels synced
      */
     @Transactional
-    public int syncLabelsForRepository(Long workspaceId, Long repositoryId) {
+    public int syncLabelsForRepository(Long scopeId, Long repositoryId) {
         Repository repository = repositoryRepository.findById(repositoryId).orElse(null);
         if (repository == null) {
-            log.warn("Repository {} not found, cannot sync labels", repositoryId);
+            log.warn("Repository not found, skipping label sync: repoId={}", repositoryId);
             return 0;
         }
 
         String safeNameWithOwner = sanitizeForLog(repository.getNameWithOwner());
         Optional<RepositoryOwnerAndName> parsedName = GitHubRepositoryNameParser.parse(repository.getNameWithOwner());
         if (parsedName.isEmpty()) {
-            log.warn("Invalid repository name format: {}", safeNameWithOwner);
+            log.warn("Invalid repository name format: repoName={}", safeNameWithOwner);
             return 0;
         }
         String owner = parsedName.get().owner();
         String name = parsedName.get().name();
 
-        HttpGraphQlClient client = graphQlClientProvider.forWorkspace(workspaceId);
-        ProcessingContext context = ProcessingContext.forSync(workspaceId, repository);
+        HttpGraphQlClient client = graphQlClientProvider.forScope(scopeId);
+        ProcessingContext context = ProcessingContext.forSync(scopeId, repository);
 
         try {
             int totalSynced = 0;
@@ -90,9 +90,9 @@ public class GitHubLabelSyncService {
                 pageCount++;
                 if (pageCount >= MAX_PAGINATION_PAGES) {
                     log.warn(
-                        "Reached maximum pagination limit ({}) for repository {}, stopping",
-                        MAX_PAGINATION_PAGES,
-                        safeNameWithOwner
+                        "Reached maximum pagination limit for labels: repoName={}, limit={}",
+                        safeNameWithOwner,
+                        MAX_PAGINATION_PAGES
                     );
                     break;
                 }
@@ -129,14 +129,15 @@ public class GitHubLabelSyncService {
             int removedCount = removeStaleLabels(repositoryId, syncedNodeIds);
 
             log.info(
-                "Synced {} labels for repository {} (removed {} stale)",
-                totalSynced,
+                "Completed label sync: repoName={}, labelCount={}, removedCount={}, scopeId={}",
                 safeNameWithOwner,
-                removedCount
+                totalSynced,
+                removedCount,
+                scopeId
             );
             return totalSynced;
         } catch (Exception e) {
-            log.error("Error syncing labels for repository {}: {}", safeNameWithOwner, e.getMessage(), e);
+            log.error("Failed to sync labels: repoName={}, scopeId={}", safeNameWithOwner, scopeId, e);
             return 0;
         }
     }
@@ -157,7 +158,7 @@ public class GitHubLabelSyncService {
             if (!syncedNames.contains(existingLabel.getName())) {
                 labelRepository.delete(existingLabel);
                 removedCount++;
-                log.debug("Removed stale label: {}", existingLabel.getName());
+                log.debug("Removed stale label: labelName={}, repoId={}", existingLabel.getName(), repositoryId);
             }
         }
 

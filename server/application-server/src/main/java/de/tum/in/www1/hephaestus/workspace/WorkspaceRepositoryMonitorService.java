@@ -89,8 +89,8 @@ public class WorkspaceRepositoryMonitorService {
     @Transactional(readOnly = true)
     public List<String> getMonitoredRepositories(String slug) {
         Workspace workspace = requireWorkspace(slug);
-        log.info(
-            "Getting repositories to monitor for workspace id={} (slug={})",
+        log.debug(
+            "Retrieved monitored repositories: workspaceId={}, workspaceSlug={}",
             workspace.getId(),
             LoggingUtils.sanitizeForLog(slug)
         );
@@ -114,28 +114,35 @@ public class WorkspaceRepositoryMonitorService {
             throw new RepositoryManagementNotAllowedException(slug);
         }
 
-        log.info(
-            "Adding repository to monitor: {} for workspace id={}",
-            LoggingUtils.sanitizeForLog(nameWithOwner),
-            workspace.getId()
-        );
-
         if (
             workspace
                 .getRepositoriesToMonitor()
                 .stream()
                 .anyMatch(r -> r.getNameWithOwner().equals(nameWithOwner))
         ) {
-            log.info("Repository is already being monitored");
+            log.debug(
+                "Skipped repository monitor addition: reason=alreadyMonitored, nameWithOwner={}, workspaceId={}",
+                LoggingUtils.sanitizeForLog(nameWithOwner),
+                workspace.getId()
+            );
             throw new RepositoryAlreadyMonitoredException(nameWithOwner);
         }
 
         // Validate that repository exists in the database
         var repository = findRepository(nameWithOwner);
         if (repository.isEmpty()) {
-            log.info("Repository does not exist");
+            log.debug(
+                "Skipped repository monitor addition: reason=repositoryNotFound, nameWithOwner={}",
+                LoggingUtils.sanitizeForLog(nameWithOwner)
+            );
             throw new EntityNotFoundException("Repository", nameWithOwner);
         }
+
+        log.info(
+            "Added repository to monitor: nameWithOwner={}, workspaceId={}",
+            LoggingUtils.sanitizeForLog(nameWithOwner),
+            workspace.getId()
+        );
 
         RepositoryToMonitor repositoryToMonitor = new RepositoryToMonitor();
         repositoryToMonitor.setNameWithOwner(nameWithOwner);
@@ -178,12 +185,6 @@ public class WorkspaceRepositoryMonitorService {
             throw new RepositoryManagementNotAllowedException(slug);
         }
 
-        log.info(
-            "Removing repository from monitor: {} for workspace id={}",
-            LoggingUtils.sanitizeForLog(nameWithOwner),
-            workspace.getId()
-        );
-
         RepositoryToMonitor repositoryToMonitor = workspace
             .getRepositoriesToMonitor()
             .stream()
@@ -192,9 +193,19 @@ public class WorkspaceRepositoryMonitorService {
             .orElse(null);
 
         if (repositoryToMonitor == null) {
-            log.info("Repository is not being monitored");
+            log.debug(
+                "Skipped repository monitor removal: reason=notMonitored, nameWithOwner={}, workspaceId={}",
+                LoggingUtils.sanitizeForLog(nameWithOwner),
+                workspace.getId()
+            );
             throw new EntityNotFoundException("Repository", nameWithOwner);
         }
+
+        log.info(
+            "Removed repository from monitor: nameWithOwner={}, workspaceId={}",
+            LoggingUtils.sanitizeForLog(nameWithOwner),
+            workspace.getId()
+        );
 
         deleteRepositoryMonitor(workspace, repositoryToMonitor);
 
@@ -332,7 +343,7 @@ public class WorkspaceRepositoryMonitorService {
         var snapshots = installationRepositoryEnumerator.enumerate(installationId);
         if (snapshots.isEmpty()) {
             log.warn(
-                "Installation {} (workspace={}) configured for ALL repositories but enumeration returned no data; monitors might be stale.",
+                "Skipped repository enumeration: reason=noDataReturned, installationId={}, workspaceSlug={}",
                 installationId,
                 LoggingUtils.sanitizeForLog(workspace.getWorkspaceSlug())
             );
@@ -400,7 +411,7 @@ public class WorkspaceRepositoryMonitorService {
         long monitorCount = repositoryToMonitorRepository.countByNameWithOwner(nameWithOwner);
         if (monitorCount > 0) {
             log.debug(
-                "Repository {} is still monitored by {} workspace(s), skipping deletion",
+                "Skipped repository deletion: reason=stillMonitored, repoName={}, monitorCount={}",
                 LoggingUtils.sanitizeForLog(nameWithOwner),
                 monitorCount
             );
@@ -412,7 +423,7 @@ public class WorkspaceRepositoryMonitorService {
             .findByNameWithOwner(nameWithOwner)
             .ifPresent(repository -> {
                 repositoryRepository.delete(repository);
-                log.debug("Deleted orphaned repository {}", LoggingUtils.sanitizeForLog(nameWithOwner));
+                log.debug("Deleted orphaned repository: repoName={}", LoggingUtils.sanitizeForLog(nameWithOwner));
             });
     }
 
@@ -435,11 +446,11 @@ public class WorkspaceRepositoryMonitorService {
         boolean repositoryAllowed = workspaceScopeFilter.isRepositoryAllowed(monitor);
         if (shouldUseNats(workspace) && repositoryAllowed) {
             // Update workspace consumer to include new repository subjects
-            natsConsumerService.updateWorkspaceConsumer(workspace.getId());
+            natsConsumerService.updateScopeConsumer(workspace.getId());
         }
         if (deferSync) {
             log.debug(
-                "Repository {} persisted with deferred sync.",
+                "Persisted repository with deferred sync: repoName={}",
                 LoggingUtils.sanitizeForLog(monitor.getNameWithOwner())
             );
             return;
@@ -448,7 +459,7 @@ public class WorkspaceRepositoryMonitorService {
             getGitHubDataSyncService().syncSyncTargetAsync(SyncTargetFactory.create(workspace, monitor));
         } else {
             log.debug(
-                "Repository {} persisted but monitoring disabled by filters.",
+                "Persisted repository without sync: reason=filteredByScope, repoName={}",
                 LoggingUtils.sanitizeForLog(monitor.getNameWithOwner())
             );
         }
@@ -460,7 +471,7 @@ public class WorkspaceRepositoryMonitorService {
         workspaceRepository.save(workspace);
         if (shouldUseNats(workspace)) {
             // Update workspace consumer to remove repository subjects
-            natsConsumerService.updateWorkspaceConsumer(workspace.getId());
+            natsConsumerService.updateScopeConsumer(workspace.getId());
         }
     }
 
@@ -541,7 +552,7 @@ public class WorkspaceRepositoryMonitorService {
 
             repositoryRepository.save(repo);
             log.debug(
-                "Created repository {} from installation snapshot",
+                "Created repository from installation snapshot: repoName={}",
                 LoggingUtils.sanitizeForLog(snapshot.nameWithOwner())
             );
         }

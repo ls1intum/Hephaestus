@@ -28,21 +28,21 @@ public record TeamInfoDTO(
     @NonNull @Schema(description = "Count of repository permissions") Integer repoPermissionCount
 ) {
     /**
-     * Creates a TeamInfoDTO from a Team entity using workspace-scoped settings.
+     * Creates a TeamInfoDTO from a Team entity using scope-specific settings.
      *
-     * <p>This method applies workspace-specific visibility and label settings,
-     * enabling different configurations for the same team across multiple workspaces.
+     * <p>This method applies scope-specific visibility and label settings,
+     * enabling different configurations for the same team across multiple scopes.
      *
      * @param team the team entity
-     * @param isHidden whether the team is hidden in this workspace
-     * @param workspaceLabels labels configured as filters for this team in this workspace
-     * @param hiddenRepoIds repository IDs hidden from contributions in this workspace
-     * @return the DTO with workspace-scoped settings applied
+     * @param isHidden whether the team is hidden in this scope
+     * @param scopeLabels labels configured as filters for this team in this scope
+     * @param hiddenRepoIds repository IDs hidden from contributions in this scope
+     * @return the DTO with scope-specific settings applied
      */
-    public static TeamInfoDTO fromTeamWithWorkspaceSettings(
+    public static TeamInfoDTO fromTeamWithScopeSettings(
         Team team,
         boolean isHidden,
-        Set<Label> workspaceLabels,
+        Set<Label> scopeLabels,
         Set<Long> hiddenRepoIds
     ) {
         return new TeamInfoDTO(
@@ -58,13 +58,13 @@ public record TeamInfoDTO(
                 .getRepoPermissions()
                 .stream()
                 .map(permission ->
-                    RepositoryInfoDTO.fromPermissionWithWorkspaceSettings(
+                    RepositoryInfoDTO.fromPermissionWithScopeSettings(
                         permission,
                         hiddenRepoIds.contains(permission.getRepository().getId())
                     )
                 )
                 .toList(),
-            workspaceLabels.stream().map(LabelInfoDTO::fromLabel).toList(),
+            scopeLabels.stream().map(LabelInfoDTO::fromLabel).toList(),
             team
                 .getMemberships()
                 .stream()

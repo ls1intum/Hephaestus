@@ -56,27 +56,26 @@ public class LeaguePointsUpdateTask implements Runnable {
         List<Workspace> workspaces = workspaceRepository.findAll();
 
         if (workspaces.isEmpty()) {
-            log.debug("Skipping league points update because no workspaces are configured.");
+            log.debug("Skipped league points update: reason=noWorkspacesConfigured");
             return;
         }
 
-        log.info("Starting scheduled league points update for {} workspace(s).", workspaces.size());
+        log.info("Started scheduled league points update: workspaceCount={}", workspaces.size());
 
         for (Workspace workspace : workspaces) {
             try {
                 updateLeaguePointsForWorkspace(workspace);
             } catch (Exception e) {
                 log.error(
-                    "Failed to update league points for workspace '{}' (id={}): {}",
+                    "Failed to update league points: workspaceSlug={}, workspaceId={}",
                     workspace.getWorkspaceSlug(),
                     workspace.getId(),
-                    e.getMessage(),
                     e
                 );
             }
         }
 
-        log.info("Completed scheduled league points update for {} workspace(s).", workspaces.size());
+        log.info("Completed scheduled league points update: workspaceCount={}", workspaces.size());
     }
 
     /**
@@ -86,17 +85,17 @@ public class LeaguePointsUpdateTask implements Runnable {
      */
     private void updateLeaguePointsForWorkspace(Workspace workspace) {
         if (workspace == null || workspace.getId() == null) {
-            log.warn("Skipping league points update because workspace context is missing an id");
+            log.warn("Skipped league points update: reason=missingWorkspaceId");
             return;
         }
 
         Long workspaceId = workspace.getId();
-        log.debug("Updating league points for workspace id={}.", workspaceId);
+        log.debug("Processing league points update: workspaceId={}", workspaceId);
 
         List<LeaderboardEntryDTO> leaderboard = getLatestLeaderboard(workspace);
         leaderboard.forEach(updateLeaderboardEntry(workspaceId));
 
-        log.debug("Updated league points for {} users in workspace id={}.", leaderboard.size(), workspaceId);
+        log.debug("Updated league points: workspaceId={}, userCount={}", workspaceId, leaderboard.size());
     }
 
     /**

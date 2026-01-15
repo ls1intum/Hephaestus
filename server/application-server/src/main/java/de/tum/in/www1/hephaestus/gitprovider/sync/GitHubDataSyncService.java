@@ -2,10 +2,12 @@ package de.tum.in.www1.hephaestus.gitprovider.sync;
 
 import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.spi.OrganizationMembershipListener;
+import de.tum.in.www1.hephaestus.gitprovider.common.spi.OrganizationMembershipListener.OrganizationSyncedEvent;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider.SyncMetadata;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider.SyncTarget;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider.SyncType;
-import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider.WorkspaceSyncMetadata;
 import de.tum.in.www1.hephaestus.gitprovider.issue.github.GitHubIssueSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.issuecomment.github.GitHubIssueCommentSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.issuedependency.github.GitHubIssueDependencySyncService;
@@ -34,14 +36,14 @@ import org.springframework.stereotype.Service;
  *
  * <h2>Purpose</h2>
  * Orchestrates synchronization of all GitHub data using typed GraphQL models.
- * Uses the {@link SyncTargetProvider} SPI to decouple from workspace entities.
+ * Uses the {@link SyncTargetProvider} SPI to decouple from consuming module entities.
  *
  * <h2>Thread Safety</h2>
  * This class is thread-safe. All methods can be called from multiple threads:
  * <ul>
  *   <li>{@code syncSyncTargetAsync()} submits work to the virtual thread executor</li>
  *   <li>{@code syncSyncTarget()} is safe for concurrent calls (each operates on independent data)</li>
- *   <li>{@code syncAllRepositories()} synchronizes on workspace level (one call per workspace)</li>
+ *   <li>{@code syncAllRepositories()} synchronizes on scope level (one call per scope)</li>
  * </ul>
  * Note: Underlying sync services must also be thread-safe.
  *
@@ -61,6 +63,7 @@ public class GitHubDataSyncService {
     private final int syncCooldownInMinutes;
 
     private final SyncTargetProvider syncTargetProvider;
+    private final OrganizationMembershipListener organizationMembershipListener;
     private final RepositoryRepository repositoryRepository;
 
     private final GitHubLabelSyncService labelSyncService;
@@ -81,6 +84,7 @@ public class GitHubDataSyncService {
     public GitHubDataSyncService(
         @Value("${monitoring.sync-cooldown-in-minutes}") int syncCooldownInMinutes,
         SyncTargetProvider syncTargetProvider,
+        OrganizationMembershipListener organizationMembershipListener,
         RepositoryRepository repositoryRepository,
         GitHubLabelSyncService labelSyncService,
         GitHubMilestoneSyncService milestoneSyncService,
@@ -98,6 +102,7 @@ public class GitHubDataSyncService {
     ) {
         this.syncCooldownInMinutes = syncCooldownInMinutes;
         this.syncTargetProvider = syncTargetProvider;
+        this.organizationMembershipListener = organizationMembershipListener;
         this.repositoryRepository = repositoryRepository;
         this.labelSyncService = labelSyncService;
         this.milestoneSyncService = milestoneSyncService;
@@ -129,67 +134,63 @@ public class GitHubDataSyncService {
      * @param syncTarget the sync target to sync
      */
     public void syncSyncTarget(SyncTarget syncTarget) {
-        Long workspaceId = syncTarget.workspaceId();
+        Long scopeId = syncTarget.scopeId();
         String nameWithOwner = syncTarget.repositoryNameWithOwner();
         String safeNameWithOwner = sanitizeForLog(nameWithOwner);
 
         Repository repository = repositoryRepository.findByNameWithOwner(nameWithOwner).orElse(null);
         if (repository == null) {
-            log.warn("Repository {} not found in database, skipping sync", safeNameWithOwner);
+            log.warn("Repository not found, skipping sync: scopeId={}, repoName={}", scopeId, safeNameWithOwner);
             return;
         }
 
         Long repositoryId = repository.getId();
-        log.info("Starting GraphQL sync for repository {}", safeNameWithOwner);
+        log.info("Starting repository sync: scopeId={}, repoId={}, repoName={}", scopeId, repositoryId, safeNameWithOwner);
 
         try {
             // Sync repository metadata first (ensures entity is up-to-date before syncing related data)
-            var syncedRepository = repositorySyncService.syncRepository(workspaceId, nameWithOwner);
+            var syncedRepository = repositorySyncService.syncRepository(scopeId, nameWithOwner);
             if (syncedRepository.isPresent()) {
-                log.debug("Synced repository metadata for {}", safeNameWithOwner);
+                log.debug("Synced repository metadata: scopeId={}, repoId={}", scopeId, repositoryId);
             } else {
-                log.warn(
-                    "Failed to sync repository metadata for {}, continuing with other sync operations",
-                    safeNameWithOwner
-                );
+                log.warn("Failed to sync repository metadata, continuing: scopeId={}, repoId={}", scopeId, repositoryId);
             }
 
             // Sync collaborators
-            int collaboratorsCount = syncCollaboratorsIfNeeded(syncTarget, workspaceId, repositoryId);
+            int collaboratorsCount = syncCollaboratorsIfNeeded(syncTarget, scopeId, repositoryId);
 
             // Sync labels
-            int labelsCount = labelSyncService.syncLabelsForRepository(workspaceId, repositoryId);
+            int labelsCount = labelSyncService.syncLabelsForRepository(scopeId, repositoryId);
 
             // Sync milestones
-            int milestonesCount = milestoneSyncService.syncMilestonesForRepository(workspaceId, repositoryId);
+            int milestonesCount = milestoneSyncService.syncMilestonesForRepository(scopeId, repositoryId);
 
             // Sync issues
-            int issuesCount = issueSyncService.syncForRepository(workspaceId, repositoryId);
+            int issuesCount = issueSyncService.syncForRepository(scopeId, repositoryId);
 
             // Sync issue comments (requires issues to exist)
-            int issueCommentsCount = issueCommentSyncService.syncForRepository(workspaceId, repositoryId);
+            int issueCommentsCount = issueCommentSyncService.syncForRepository(scopeId, repositoryId);
 
             // Sync pull requests
-            int prsCount = pullRequestSyncService.syncForRepository(workspaceId, repositoryId);
+            int prsCount = pullRequestSyncService.syncForRepository(scopeId, repositoryId);
 
             // Sync PR review comments/threads (requires PRs to exist)
             int prReviewCommentsCount = pullRequestReviewCommentSyncService.syncCommentsForRepository(
-                workspaceId,
+                scopeId,
                 repositoryId
             );
 
             // Update sync timestamp via SPI
             syncTargetProvider.updateSyncTimestamp(
-                workspaceId,
-                nameWithOwner,
+                syncTarget.id(),
                 SyncType.ISSUES_AND_PULL_REQUESTS,
                 Instant.now()
             );
 
             log.info(
-                "Completed GraphQL sync for {}: repo metadata {}, {} collaborators, {} labels, {} milestones, {} issues, {} issue comments, {} PRs, {} PR review comments",
-                safeNameWithOwner,
-                syncedRepository.isPresent() ? "synced" : "failed",
+                "Completed repository sync: scopeId={}, repoId={}, collaborators={}, labels={}, milestones={}, issues={}, issueComments={}, prs={}, prReviewComments={}",
+                scopeId,
+                repositoryId,
                 collaboratorsCount >= 0 ? collaboratorsCount : "skipped",
                 labelsCount,
                 milestonesCount,
@@ -199,35 +200,35 @@ public class GitHubDataSyncService {
                 prReviewCommentsCount
             );
         } catch (Exception e) {
-            log.error("Error syncing repository {} via GraphQL: {}", safeNameWithOwner, e.getMessage(), e);
+            log.error("Failed to sync repository: scopeId={}, repoId={}", scopeId, repositoryId, e);
         }
     }
 
     /**
-     * Syncs all repositories in a workspace using GraphQL.
+     * Syncs all repositories for a scope using GraphQL.
      * <p>
      * This method orchestrates:
      * <ol>
      *   <li>Organization sync (if organization exists)</li>
      *   <li>Team sync (if organization exists)</li>
      *   <li>Per-repository syncs (labels, milestones, issues, PRs, comments)</li>
-     *   <li>Workspace-level issue dependencies sync</li>
-     *   <li>Workspace-level sub-issues sync</li>
+     *   <li>Scope-level issue dependencies sync</li>
+     *   <li>Scope-level sub-issues sync</li>
      * </ol>
      *
-     * @param workspaceId the workspace ID
+     * @param scopeId the scope ID
      */
-    public void syncAllRepositories(Long workspaceId) {
-        var syncTargets = syncTargetProvider.getSyncTargetsForWorkspace(workspaceId);
+    public void syncAllRepositories(Long scopeId) {
+        var syncTargets = syncTargetProvider.getSyncTargetsForScope(scopeId);
         if (syncTargets.isEmpty()) {
-            log.warn("No sync targets found for workspace {}; skipping sync.", workspaceId);
+            log.warn("No sync targets found, skipping sync: scopeId={}", scopeId);
             return;
         }
 
-        log.info("Syncing {} repositories for workspace {}", syncTargets.size(), workspaceId);
+        log.info("Starting scope sync: scopeId={}, repoCount={}", scopeId, syncTargets.size());
 
         // Sync organization and teams first (if applicable)
-        syncOrganizationAndTeams(workspaceId);
+        syncOrganizationAndTeams(scopeId);
 
         // Sync each repository
         for (SyncTarget target : syncTargets) {
@@ -236,55 +237,58 @@ public class GitHubDataSyncService {
             }
         }
 
-        // Sync workspace-level relationships (after all issues/PRs are synced)
-        syncWorkspaceLevelRelationships(workspaceId);
+        // Sync scope-level relationships (after all issues/PRs are synced)
+        syncScopeLevelRelationships(scopeId);
     }
 
     /**
-     * Syncs organization and teams for a workspace.
+     * Syncs organization and teams for a scope.
      * <p>
      * Organization sync includes memberships.
      * Team sync includes team memberships.
+     * After org sync, scope members are synced from organization members.
      *
-     * @param workspaceId the workspace ID
+     * @param scopeId the scope ID
      */
-    private void syncOrganizationAndTeams(Long workspaceId) {
-        Optional<WorkspaceSyncMetadata> metadataOpt = syncTargetProvider.getWorkspaceSyncMetadata(workspaceId);
+    private void syncOrganizationAndTeams(Long scopeId) {
+        Optional<SyncMetadata> metadataOpt = syncTargetProvider.getSyncMetadata(scopeId);
         if (metadataOpt.isEmpty()) {
-            log.debug("No workspace metadata found for workspace {}, skipping org/team sync", workspaceId);
+            log.debug("Skipped organization sync (no metadata): scopeId={}", scopeId);
             return;
         }
 
-        WorkspaceSyncMetadata metadata = metadataOpt.get();
+        SyncMetadata metadata = metadataOpt.get();
         String organizationLogin = metadata.organizationLogin();
 
         if (organizationLogin == null || organizationLogin.isBlank()) {
-            log.debug("No organization login for workspace {}, skipping org/team sync", workspaceId);
+            log.debug("Skipped organization sync (no org login): scopeId={}", scopeId);
             return;
         }
 
+        String safeOrgLogin = sanitizeForLog(organizationLogin);
+
         try {
             // Sync organization and memberships
-            var organization = organizationSyncService.syncOrganization(workspaceId, organizationLogin);
+            var organization = organizationSyncService.syncOrganization(scopeId, organizationLogin);
             if (organization != null) {
-                log.debug("Synced organization {} for workspace {}", organizationLogin, workspaceId);
+                log.debug("Synced organization: scopeId={}, orgLogin={}", scopeId, safeOrgLogin);
+
+                // Notify listener to sync scope members from organization members
+                organizationMembershipListener.onOrganizationMembershipsSynced(
+                    new OrganizationSyncedEvent(organization.getId(), organizationLogin)
+                );
             }
 
             // Sync teams and team memberships
-            int teamsCount = teamSyncService.syncTeamsForOrganization(workspaceId, organizationLogin);
-            log.debug(
-                "Synced {} teams for organization {} in workspace {}",
-                teamsCount,
-                organizationLogin,
-                workspaceId
-            );
+            int teamsCount = teamSyncService.syncTeamsForOrganization(scopeId, organizationLogin);
+            log.debug("Synced teams: scopeId={}, orgLogin={}, teamCount={}", scopeId, safeOrgLogin, teamsCount);
         } catch (Exception e) {
-            log.error("Error syncing organization/teams for workspace {}: {}", workspaceId, e.getMessage(), e);
+            log.error("Failed to sync organization and teams: scopeId={}, orgLogin={}", scopeId, safeOrgLogin, e);
         }
     }
 
     /**
-     * Syncs workspace-level relationships that require issues and PRs to exist first.
+     * Syncs scope-level relationships that require issues and PRs to exist first.
      * <p>
      * This includes:
      * <ul>
@@ -294,31 +298,31 @@ public class GitHubDataSyncService {
      * <p>
      * These sync operations have their own cooldown mechanisms.
      *
-     * @param workspaceId the workspace ID
+     * @param scopeId the scope ID
      */
-    private void syncWorkspaceLevelRelationships(Long workspaceId) {
+    private void syncScopeLevelRelationships(Long scopeId) {
         try {
             // Sync issue dependencies (has internal cooldown check)
-            int dependenciesCount = issueDependencySyncService.syncDependenciesForWorkspace(workspaceId);
+            int dependenciesCount = issueDependencySyncService.syncDependenciesForScope(scopeId);
             if (dependenciesCount >= 0) {
-                log.debug("Synced {} issue dependencies for workspace {}", dependenciesCount, workspaceId);
+                log.debug("Synced issue dependencies: scopeId={}, dependencyCount={}", scopeId, dependenciesCount);
             } else {
-                log.debug("Issue dependencies sync skipped due to cooldown for workspace {}", workspaceId);
+                log.debug("Skipped issue dependencies sync (cooldown active): scopeId={}", scopeId);
             }
         } catch (Exception e) {
-            log.error("Error syncing issue dependencies for workspace {}: {}", workspaceId, e.getMessage(), e);
+            log.error("Failed to sync issue dependencies: scopeId={}", scopeId, e);
         }
 
         try {
             // Sync sub-issues (has internal cooldown check)
-            int subIssuesCount = subIssueSyncService.syncSubIssuesForWorkspace(workspaceId);
+            int subIssuesCount = subIssueSyncService.syncSubIssuesForScope(scopeId);
             if (subIssuesCount >= 0) {
-                log.debug("Synced {} sub-issue relationships for workspace {}", subIssuesCount, workspaceId);
+                log.debug("Synced sub-issues: scopeId={}, subIssueCount={}", scopeId, subIssuesCount);
             } else {
-                log.debug("Sub-issues sync skipped due to cooldown for workspace {}", workspaceId);
+                log.debug("Skipped sub-issues sync (cooldown active): scopeId={}", scopeId);
             }
         } catch (Exception e) {
-            log.error("Error syncing sub-issues for workspace {}: {}", workspaceId, e.getMessage(), e);
+            log.error("Failed to sync sub-issues: scopeId={}", scopeId, e);
         }
     }
 
@@ -326,11 +330,11 @@ public class GitHubDataSyncService {
      * Syncs collaborators for a repository if the cooldown has expired.
      *
      * @param syncTarget   the sync target containing cooldown timestamps
-     * @param workspaceId  the workspace ID
+     * @param scopeId      the scope ID
      * @param repositoryId the repository ID
      * @return number of collaborators synced, or -1 if skipped due to cooldown
      */
-    private int syncCollaboratorsIfNeeded(SyncTarget syncTarget, Long workspaceId, Long repositoryId) {
+    private int syncCollaboratorsIfNeeded(SyncTarget syncTarget, Long scopeId, Long repositoryId) {
         Instant cooldownThreshold = Instant.now().minusSeconds(syncCooldownInMinutes * 60L);
         boolean shouldSync =
             syncTarget.lastCollaboratorsSyncedAt() == null ||
@@ -338,19 +342,18 @@ public class GitHubDataSyncService {
 
         if (!shouldSync) {
             log.debug(
-                "Skipping collaborator sync for repository {} (cooldown active, last synced at {})",
+                "Skipped collaborator sync (cooldown active): repoId={}, lastSyncedAt={}",
                 repositoryId,
                 syncTarget.lastCollaboratorsSyncedAt()
             );
             return -1;
         }
 
-        int count = collaboratorSyncService.syncCollaboratorsForRepository(workspaceId, repositoryId);
+        int count = collaboratorSyncService.syncCollaboratorsForRepository(scopeId, repositoryId);
 
         // Update sync timestamp
         syncTargetProvider.updateSyncTimestamp(
-            workspaceId,
-            syncTarget.repositoryNameWithOwner(),
+            syncTarget.id(),
             SyncType.COLLABORATORS,
             Instant.now()
         );

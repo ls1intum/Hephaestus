@@ -276,7 +276,7 @@ public class ExperiencePointCalculator implements ExperiencePointStrategy {
     public double calculateIssueCommentExperiencePoints(IssueComment issueComment) {
         Issue issue = issueComment.getIssue();
         if (issue == null) {
-            log.warn("Issue comment has no associated issue");
+            log.warn("Skipped XP calculation, issue comment has no associated issue: commentId={}", issueComment.getId());
             return 0;
         }
 
@@ -286,7 +286,7 @@ public class ExperiencePointCalculator implements ExperiencePointStrategy {
             pullRequest = (PullRequest) issue;
         } else {
             if (issue.getRepository() == null) {
-                log.warn("Issue has no repository, cannot find associated pull request");
+                log.warn("Skipped XP calculation, issue has no repository: issueId={}", issue.getId());
                 return 0;
             }
             var optionalPullRequest = pullRequestRepository.findByRepositoryIdAndNumber(
@@ -296,7 +296,7 @@ public class ExperiencePointCalculator implements ExperiencePointStrategy {
             if (optionalPullRequest.isEmpty()) {
                 // Expected case: comment is on a regular issue, not a PR - no XP awarded
                 log.debug(
-                    "Issue comment {} on issue #{} is not associated with a pull request, skipping XP",
+                    "Skipped XP for non-PR issue comment: commentId={}, issueNumber={}",
                     issueComment.getId(),
                     issue.getNumber()
                 );

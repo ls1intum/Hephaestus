@@ -69,7 +69,7 @@ public class PullRequestBadPracticeDetector {
      */
     @Transactional
     public DetectionResult detectForUser(Long workspaceId, String login) {
-        log.info("Detecting bad practices for user {} in workspace {}", login, workspaceId);
+        log.info("Detecting bad practices for user: userLogin={}, workspaceId={}", login, workspaceId);
 
         List<PullRequest> pullRequests = practicesPullRequestQueryRepository.findAssignedByLoginAndStates(
             login,
@@ -97,7 +97,7 @@ public class PullRequestBadPracticeDetector {
      */
     @Transactional
     public DetectionResult detectAndSyncBadPractices(Long pullRequestId) {
-        log.debug("Looking up pull request by ID: {}", pullRequestId);
+        log.debug("Looking up pull request: prId={}", pullRequestId);
         return practicesPullRequestQueryRepository
             .findById(pullRequestId)
             .map(this::detectAndSyncBadPractices)

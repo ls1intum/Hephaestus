@@ -1,10 +1,13 @@
 package de.tum.in.www1.hephaestus.gitprovider.team.github;
 
+import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
+
 import de.tum.in.www1.hephaestus.gitprovider.common.NatsMessageDeserializer;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventAction;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventType;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
+import de.tum.in.www1.hephaestus.gitprovider.common.spi.ScopeIdResolver;
 import de.tum.in.www1.hephaestus.gitprovider.team.github.dto.GitHubTeamEventDTO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -20,10 +23,16 @@ public class GitHubTeamMessageHandler extends GitHubMessageHandler<GitHubTeamEve
     private static final Logger log = LoggerFactory.getLogger(GitHubTeamMessageHandler.class);
 
     private final GitHubTeamProcessor teamProcessor;
+    private final ScopeIdResolver scopeIdResolver;
 
-    GitHubTeamMessageHandler(GitHubTeamProcessor teamProcessor, NatsMessageDeserializer deserializer) {
+    GitHubTeamMessageHandler(
+        GitHubTeamProcessor teamProcessor,
+        ScopeIdResolver scopeIdResolver,
+        NatsMessageDeserializer deserializer
+    ) {
         super(GitHubTeamEventDTO.class, deserializer);
         this.teamProcessor = teamProcessor;
+        this.scopeIdResolver = scopeIdResolver;
     }
 
     @Override
@@ -42,20 +51,27 @@ public class GitHubTeamMessageHandler extends GitHubMessageHandler<GitHubTeamEve
         var teamDto = event.team();
 
         if (teamDto == null) {
-            log.warn("Received team event with missing data");
+            log.warn("Received team event with missing data: action={}", event.action());
             return;
         }
 
+        String orgLogin = event.organization() != null ? event.organization().login() : null;
+
         log.info(
-            "Received team event: action={}, team={}, org={}",
+            "Received team event: action={}, teamName={}, orgLogin={}",
             event.action(),
-            teamDto.name(),
-            event.organization() != null ? event.organization().login() : "unknown"
+            sanitizeForLog(teamDto.name()),
+            orgLogin != null ? sanitizeForLog(orgLogin) : "unknown"
         );
 
-        String orgLogin = event.organization() != null ? event.organization().login() : null;
-        // Create a minimal context for team events (no repository context available)
-        ProcessingContext context = ProcessingContext.forWebhook(null, null, event.action());
+        // Resolve scope from organization login
+        Long scopeId = orgLogin != null ? scopeIdResolver.findScopeIdByOrgLogin(orgLogin).orElse(null) : null;
+        if (scopeId == null) {
+            log.debug("Skipped team event: reason=noAssociatedScope, orgLogin={}", sanitizeForLog(orgLogin));
+            return;
+        }
+        // Create context for team events (no repository context available, but scope is resolved)
+        ProcessingContext context = ProcessingContext.forWebhook(scopeId, null, event.action());
 
         switch (event.actionType()) {
             case GitHubEventAction.Team.DELETED -> teamProcessor.delete(teamDto.id(), context);
@@ -64,7 +80,7 @@ public class GitHubTeamMessageHandler extends GitHubMessageHandler<GitHubTeamEve
                 orgLogin,
                 context
             );
-            default -> log.debug("Unhandled team action: {}", event.action());
+            default -> log.debug("Skipped team event: reason=unhandledAction, action={}", event.action());
         }
     }
 }

@@ -106,7 +106,7 @@ public class LeaderboardXpQueryService {
         Set<Long> teamIds
     ) {
         log.debug(
-            "Fetching leaderboard data: workspaceId={}, since={}, until={}, teamIds={}",
+            "Fetched leaderboard XP query params: workspaceId={}, since={}, until={}, teamIds={}",
             workspaceId,
             since,
             until,
@@ -127,7 +127,7 @@ public class LeaderboardXpQueryService {
         }
 
         if (xpData.isEmpty()) {
-            log.debug("No activity events found for leaderboard");
+            log.debug("No activity events found for leaderboard: workspaceId={}", workspaceId);
             return Map.of();
         }
 
@@ -155,7 +155,7 @@ public class LeaderboardXpQueryService {
             Long actorId = xp.getActorId();
             User user = usersById.get(actorId);
             if (user == null) {
-                log.warn("User not found for actor ID: {}", actorId);
+                log.warn("User not found for leaderboard data: actorId={}", actorId);
                 continue;
             }
 
@@ -211,7 +211,7 @@ public class LeaderboardXpQueryService {
             .stream()
             .collect(toMap(Map.Entry::getKey, e -> e.getValue().build()));
 
-        log.debug("Built leaderboard data for {} users", result.size());
+        log.debug("Built leaderboard data: workspaceId={}, userCount={}", workspaceId, result.size());
         return result;
     }
 }

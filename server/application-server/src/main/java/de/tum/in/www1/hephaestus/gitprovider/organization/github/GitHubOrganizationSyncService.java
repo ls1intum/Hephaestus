@@ -71,18 +71,18 @@ public class GitHubOrganizationSyncService {
      * processes it using {@link GitHubOrganizationProcessor}, and also synchronizes
      * organization memberships.
      *
-     * @param workspaceId        the workspace ID for authentication
+     * @param scopeId        the scope ID for authentication
      * @param organizationLogin  the GitHub organization login to sync
      * @return the synchronized Organization entity, or null if sync failed
      */
     @Transactional
-    public Organization syncOrganization(Long workspaceId, String organizationLogin) {
+    public Organization syncOrganization(Long scopeId, String organizationLogin) {
         if (organizationLogin == null || organizationLogin.isBlank()) {
-            log.warn("Organization login is null or blank, cannot sync");
+            log.warn("Skipped organization sync: reason=missing login, scopeId={}", scopeId);
             return null;
         }
 
-        HttpGraphQlClient client = graphQlClientProvider.forWorkspace(workspaceId);
+        HttpGraphQlClient client = graphQlClientProvider.forScope(scopeId);
 
         try {
             GHOrganization graphQlOrg = client
@@ -93,7 +93,7 @@ public class GitHubOrganizationSyncService {
                 .block(GRAPHQL_TIMEOUT);
 
             if (graphQlOrg == null) {
-                log.warn("Organization not found via GraphQL: {}", organizationLogin);
+                log.warn("Skipped organization sync: reason=not found, orgLogin={}", sanitizeForLog(organizationLogin));
                 return null;
             }
 
@@ -109,16 +109,16 @@ public class GitHubOrganizationSyncService {
                 organization.setLastSyncAt(Instant.now());
 
                 log.info(
-                    "Synced organization {} ({}) with {} members",
-                    organization.getLogin(),
+                    "Synced organization: orgId={}, orgLogin={}, memberCount={}",
                     organization.getGithubId(),
+                    sanitizeForLog(organization.getLogin()),
                     membersSynced
                 );
             }
 
             return organization;
         } catch (Exception e) {
-            log.error("Error syncing organization {}: {}", organizationLogin, e.getMessage(), e);
+            log.error("Failed to sync organization: orgLogin={}, scopeId={}", sanitizeForLog(organizationLogin), scopeId, e);
             return null;
         }
     }
@@ -142,7 +142,7 @@ public class GitHubOrganizationSyncService {
     ) {
         var membersConnection = graphQlOrg.getMembersWithRole();
         if (membersConnection == null || membersConnection.getEdges() == null) {
-            log.debug("No members found for organization {}", sanitizeForLog(organization.getLogin()));
+            log.debug("No members found for organization: orgId={}, orgLogin={}", organization.getGithubId(), sanitizeForLog(organization.getLogin()));
             return 0;
         }
 
@@ -157,9 +157,9 @@ public class GitHubOrganizationSyncService {
             pageCount++;
             if (pageCount >= MAX_PAGINATION_PAGES) {
                 log.warn(
-                    "Reached maximum pagination limit ({}) for organization {} members, stopping",
-                    MAX_PAGINATION_PAGES,
-                    organization.getLogin()
+                    "Reached maximum pagination limit for organization members: orgLogin={}, limit={}",
+                    sanitizeForLog(organization.getLogin()),
+                    MAX_PAGINATION_PAGES
                 );
                 break;
             }
@@ -183,9 +183,10 @@ public class GitHubOrganizationSyncService {
         }
 
         log.debug(
-            "Fetched {} total members for organization {} (totalCount={})",
+            "Fetched organization members: orgId={}, orgLogin={}, fetchedCount={}, totalCount={}",
+            organization.getGithubId(),
+            sanitizeForLog(organization.getLogin()),
             allMembers.size(),
-            organization.getLogin(),
             membersConnection.getTotalCount()
         );
 
@@ -216,9 +217,10 @@ public class GitHubOrganizationSyncService {
                 organizationMembershipRepository.upsertMembership(organization.getId(), user.getId(), role);
                 memberCount++;
                 log.debug(
-                    "Synced membership for user {} in organization {} with role {}",
-                    user.getLogin(),
-                    organization.getLogin(),
+                    "Synced organization membership: orgId={}, userId={}, userLogin={}, role={}",
+                    organization.getGithubId(),
+                    user.getId(),
+                    sanitizeForLog(user.getLogin()),
                     role
                 );
             }
@@ -245,9 +247,10 @@ public class GitHubOrganizationSyncService {
         if (!staleUserIds.isEmpty()) {
             organizationMembershipRepository.deleteByOrganizationIdAndUserIdIn(organization.getId(), staleUserIds);
             log.debug(
-                "Removed {} stale memberships from organization {}",
-                staleUserIds.size(),
-                organization.getLogin()
+                "Removed stale organization memberships: orgId={}, orgLogin={}, removedCount={}",
+                organization.getGithubId(),
+                sanitizeForLog(organization.getLogin()),
+                staleUserIds.size()
             );
         }
     }

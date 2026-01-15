@@ -3,9 +3,9 @@ package de.tum.in.www1.hephaestus.gitprovider.common.spi;
 import java.util.List;
 
 /**
- * Handles workspace provisioning in response to GitHub App installation events.
+ * Handles provisioning in response to GitHub App installation events.
  */
-public interface WorkspaceProvisioningListener {
+public interface ProvisioningListener {
     void onInstallationCreated(InstallationData installation);
 
     void onInstallationDeleted(Long installationId);
@@ -33,10 +33,6 @@ public interface WorkspaceProvisioningListener {
 
     enum AccountType {
         ORGANIZATION,
-        USER;
-
-        public static AccountType fromGitHubType(String type) {
-            return "Organization".equalsIgnoreCase(type) ? ORGANIZATION : USER;
-        }
+        USER
     }
 }

@@ -21,16 +21,16 @@ public record TeamSummaryDTO(
     @NonNull @Schema(description = "Whether the team is hidden from leaderboard display") Boolean hidden
 ) {
     /**
-     * Creates a TeamSummaryDTO from a Team entity using workspace-scoped settings.
+     * Creates a TeamSummaryDTO from a Team entity using scope-specific settings.
      *
-     * <p>This method applies workspace-specific visibility settings,
-     * enabling different configurations for the same team across multiple workspaces.
+     * <p>This method applies scope-specific visibility settings,
+     * enabling different configurations for the same team across multiple scopes.
      *
      * @param team the team entity
-     * @param isHidden whether the team is hidden in this workspace
-     * @return the DTO with workspace-scoped settings applied
+     * @param isHidden whether the team is hidden in this scope
+     * @return the DTO with scope-specific settings applied
      */
-    public static TeamSummaryDTO fromTeamWithWorkspaceSettings(Team team, boolean isHidden) {
+    public static TeamSummaryDTO fromTeamWithScopeSettings(Team team, boolean isHidden) {
         return new TeamSummaryDTO(
             team.getId(),
             team.getName(),

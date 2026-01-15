@@ -1,5 +1,7 @@
 package de.tum.in.www1.hephaestus.gitprovider.issuecomment.github;
 
+import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
+
 import de.tum.in.www1.hephaestus.gitprovider.common.NatsMessageDeserializer;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContextFactory;
@@ -49,16 +51,16 @@ public class GitHubIssueCommentMessageHandler extends GitHubMessageHandler<GitHu
         var issueDto = event.issue();
 
         if (commentDto == null || issueDto == null) {
-            log.warn("Received issue_comment event with missing data");
+            log.warn("Received issue_comment event with missing data: action={}", event.action());
             return;
         }
 
         log.info(
-            "Received issue_comment event: action={}, issue=#{}, comment={}, repo={}",
+            "Received issue_comment event: action={}, issueNumber={}, commentId={}, repoName={}",
             event.action(),
             issueDto.number(),
             commentDto.id(),
-            event.repository() != null ? event.repository().fullName() : "unknown"
+            event.repository() != null ? sanitizeForLog(event.repository().fullName()) : "unknown"
         );
 
         ProcessingContext context = contextFactory.forWebhookEvent(event).orElse(null);

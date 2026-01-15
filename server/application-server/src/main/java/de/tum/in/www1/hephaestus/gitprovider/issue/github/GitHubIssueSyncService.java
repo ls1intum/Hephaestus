@@ -52,15 +52,15 @@ public class GitHubIssueSyncService {
     /**
      * Synchronizes all issues for a repository.
      *
-     * @param workspaceId  the workspace ID for authentication
+     * @param scopeId  the scope ID for authentication
      * @param repositoryId the repository ID to sync issues for
      * @return number of issues synced
      */
     @Transactional
-    public int syncForRepository(Long workspaceId, Long repositoryId) {
+    public int syncForRepository(Long scopeId, Long repositoryId) {
         Repository repository = repositoryRepository.findById(repositoryId).orElse(null);
         if (repository == null) {
-            log.warn("Repository {} not found, skipping issue sync", repositoryId);
+            log.warn("Repository not found, skipping issue sync: repoId={}", repositoryId);
             return 0;
         }
 
@@ -68,13 +68,13 @@ public class GitHubIssueSyncService {
         String safeNameWithOwner = sanitizeForLog(nameWithOwner);
         Optional<RepositoryOwnerAndName> parsedName = GitHubRepositoryNameParser.parse(nameWithOwner);
         if (parsedName.isEmpty()) {
-            log.warn("Invalid repository name format: {}", safeNameWithOwner);
+            log.warn("Invalid repository name format: repoName={}", safeNameWithOwner);
             return 0;
         }
         RepositoryOwnerAndName ownerAndName = parsedName.get();
 
-        HttpGraphQlClient client = graphQlClientProvider.forWorkspace(workspaceId);
-        ProcessingContext context = ProcessingContext.forSync(workspaceId, repository);
+        HttpGraphQlClient client = graphQlClientProvider.forScope(scopeId);
+        ProcessingContext context = ProcessingContext.forSync(scopeId, repository);
 
         int totalSynced = 0;
         String cursor = null;
@@ -85,9 +85,9 @@ public class GitHubIssueSyncService {
             pageCount++;
             if (pageCount >= MAX_PAGINATION_PAGES) {
                 log.warn(
-                    "Reached maximum pagination limit ({}) for repository {}, stopping",
-                    MAX_PAGINATION_PAGES,
-                    safeNameWithOwner
+                    "Reached maximum pagination limit for issue sync: repoName={}, limit={}",
+                    safeNameWithOwner,
+                    MAX_PAGINATION_PAGES
                 );
                 break;
             }
@@ -103,7 +103,11 @@ public class GitHubIssueSyncService {
                     .block(GRAPHQL_TIMEOUT);
 
                 if (response == null || !response.isValid()) {
-                    log.warn("Invalid GraphQL response: {}", response != null ? response.getErrors() : "null");
+                    log.warn(
+                        "Invalid GraphQL response for issue sync: repoName={}, errors={}",
+                        safeNameWithOwner,
+                        response != null ? response.getErrors() : "null"
+                    );
                     break;
                 }
 
@@ -127,12 +131,12 @@ public class GitHubIssueSyncService {
                 hasMore = pageInfo != null && Boolean.TRUE.equals(pageInfo.getHasNextPage());
                 cursor = pageInfo != null ? pageInfo.getEndCursor() : null;
             } catch (Exception e) {
-                log.error("Error syncing issues for {}: {}", safeNameWithOwner, e.getMessage(), e);
+                log.error("Failed to sync issues: repoName={}", safeNameWithOwner, e);
                 break;
             }
         }
 
-        log.info("Synced {} issues for {}", totalSynced, safeNameWithOwner);
+        log.info("Completed issue sync: repoName={}, issueCount={}", safeNameWithOwner, totalSynced);
         return totalSynced;
     }
 }

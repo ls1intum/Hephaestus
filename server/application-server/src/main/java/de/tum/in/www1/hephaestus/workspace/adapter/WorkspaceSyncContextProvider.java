@@ -20,8 +20,8 @@ public class WorkspaceSyncContextProvider implements SyncContextProvider {
         // Convert SyncContext to WorkspaceContext
         // For sync operations, we use empty roles since this is a system operation
         WorkspaceContext workspaceContext = new WorkspaceContext(
-            context.workspaceId(),
-            context.workspaceSlug(),
+            context.scopeId(),
+            context.slug(),
             context.displayName(),
             null, // accountType not needed for sync operations
             context.installationId(),

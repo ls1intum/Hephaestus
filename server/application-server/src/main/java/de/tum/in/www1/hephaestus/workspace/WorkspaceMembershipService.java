@@ -129,14 +129,14 @@ public class WorkspaceMembershipService {
             return;
         }
         if (workspaceId == null) {
-            log.debug("Skipping league point update for user {} because no workspace is configured.", user.getLogin());
+            log.debug("Skipped league point update: reason=noWorkspaceConfigured, userLogin={}", user.getLogin());
             return;
         }
 
         Workspace workspace = workspaceRepository.findById(workspaceId).orElse(null);
         if (workspace == null) {
             log.debug(
-                "Skipping league point update for user {} because workspace {} not found.",
+                "Skipped league point update: reason=workspaceNotFound, userLogin={}, workspaceId={}",
                 user.getLogin(),
                 workspaceId
             );
@@ -153,7 +153,7 @@ public class WorkspaceMembershipService {
     @Transactional
     public void resetLeaguePoints(Long workspaceId, int points) {
         if (workspaceId == null) {
-            log.debug("Skipping league point reset because no workspace is configured.");
+            log.debug("Skipped league point reset: reason=noWorkspaceConfigured");
             return;
         }
 
@@ -197,8 +197,17 @@ public class WorkspaceMembershipService {
             );
             WorkspaceMembership existing = existingByUserId.get(userId);
             if (existing == null) {
-                User userReference = entityManager.getReference(User.class, userId);
-                WorkspaceMembership member = createMembershipInternal(workspace, userReference, desiredRole);
+                // Use find() instead of getReference() to avoid lazy EntityNotFoundException
+                User user = entityManager.find(User.class, userId);
+                if (user == null) {
+                    log.warn(
+                    "Skipped workspace membership creation: reason=userNotFound, userId={}, workspaceId={}",
+                    userId,
+                    workspace.getId()
+                );
+                    continue;
+                }
+                WorkspaceMembership member = createMembershipInternal(workspace, user, desiredRole);
                 member.setLeaguePoints(POINTS_DEFAULT);
                 toCreate.add(member);
             } else if (existing.getRole() != desiredRole) {
@@ -285,7 +294,7 @@ public class WorkspaceMembershipService {
             // Update existing membership
             WorkspaceMembership membership = membershipOpt.get();
             membership.setRole(role);
-            log.info("Updated role for user {} in workspace {} to {}", userId, workspaceId, role);
+            log.info("Updated membership role: userId={}, workspaceId={}, role={}", userId, workspaceId, role);
             return workspaceMembershipRepository.save(membership);
         } else {
             // Create new membership
@@ -296,7 +305,7 @@ public class WorkspaceMembershipService {
 
             WorkspaceMembership membership = createMembershipInternal(workspace, user, role);
             membership.setLeaguePoints(POINTS_DEFAULT);
-            log.info("Created new membership for user {} in workspace {} with role {}", userId, workspaceId, role);
+            log.info("Created membership: userId={}, workspaceId={}, role={}", userId, workspaceId, role);
             return workspaceMembershipRepository.save(membership);
         }
     }
@@ -314,7 +323,7 @@ public class WorkspaceMembershipService {
             .orElseThrow(() -> new IllegalArgumentException("Workspace membership not found"));
 
         workspaceMembershipRepository.delete(membership);
-        log.info("Removed user {} from workspace {}", userId, workspaceId);
+        log.info("Removed membership: userId={}, workspaceId={}", userId, workspaceId);
     }
 
     private WorkspaceMembership createMembershipInternal(Workspace workspace, User user) {

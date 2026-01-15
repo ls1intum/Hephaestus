@@ -4,13 +4,13 @@ import java.util.Optional;
 import java.util.Set;
 
 /**
- * Provides NATS subscription information for workspaces.
+ * Provides NATS subscription information for scopes.
  */
 public interface NatsSubscriptionProvider {
-    /** Get subscription info for a workspace. */
-    Optional<NatsSubscriptionInfo> getSubscriptionInfo(Long workspaceId);
+    /** Get subscription info for a scope. */
+    Optional<NatsSubscriptionInfo> getSubscriptionInfo(Long scopeId);
 
-    record NatsSubscriptionInfo(Long workspaceId, Set<String> repositoryNamesWithOwner, String organizationLogin) {
+    record NatsSubscriptionInfo(Long scopeId, Set<String> repositoryNamesWithOwner, String organizationLogin) {
         public boolean hasRepositories() {
             return repositoryNamesWithOwner != null && !repositoryNamesWithOwner.isEmpty();
         }

@@ -231,6 +231,8 @@ class ModuleBoundaryTest extends HephaestusArchitectureTest {
                 .resideOutsideOfPackage("..graphql..") // Exclude generated GraphQL model
                 .and()
                 .areNotInterfaces()
+                .and()
+                .areNotMemberClasses() // Exclude nested records in SPI interfaces (e.g., callback DTOs)
                 .should()
                 .resideInAPackage("..events..")
                 .because("Domain events should be in events packages");

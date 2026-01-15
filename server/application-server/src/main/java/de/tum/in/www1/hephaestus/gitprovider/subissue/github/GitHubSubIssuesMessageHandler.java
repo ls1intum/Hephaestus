@@ -1,5 +1,7 @@
 package de.tum.in.www1.hephaestus.gitprovider.subissue.github;
 
+import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
+
 import de.tum.in.www1.hephaestus.gitprovider.common.NatsMessageDeserializer;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContextFactory;
@@ -49,16 +51,16 @@ public class GitHubSubIssuesMessageHandler extends GitHubMessageHandler<GitHubSu
         var parentIssueDto = event.parentIssue();
 
         if (subIssueDto == null || parentIssueDto == null) {
-            log.warn("Received sub_issues event with missing data");
+            log.warn("Received sub_issues event with missing data: action={}", event.action());
             return;
         }
 
         log.info(
-            "Received sub_issues event: action={}, parent=#{}, sub=#{}, repo={}",
+            "Received sub_issues event: action={}, parentIssueNumber={}, subIssueNumber={}, repoName={}",
             event.action(),
             parentIssueDto.number(),
             subIssueDto.number(),
-            event.repository() != null ? event.repository().fullName() : "unknown"
+            event.repository() != null ? sanitizeForLog(event.repository().fullName()) : "unknown"
         );
 
         ProcessingContext context = contextFactory.forWebhookEvent(event).orElse(null);
@@ -80,7 +82,7 @@ public class GitHubSubIssuesMessageHandler extends GitHubMessageHandler<GitHubSu
         } else if (action.isRemoved()) {
             subIssueSyncService.processSubIssueEvent(subIssueId, parentIssueId, false);
         } else {
-            log.debug("Unhandled sub_issues action: {}", event.action());
+            log.debug("Skipped sub_issues event: reason=unhandledAction, action={}", event.action());
         }
     }
 }

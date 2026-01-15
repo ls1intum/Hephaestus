@@ -181,8 +181,8 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
                 .first()
                 .satisfies(event -> {
                     assertThat(event.milestone().id()).isEqualTo(milestoneId);
-                    assertThat(event.workspaceId()).isEqualTo(testWorkspace.getId());
-                    assertThat(event.repositoryId()).isEqualTo(FIXTURE_REPO_ID);
+                    assertThat(event.context().scopeId()).isEqualTo(testWorkspace.getId());
+                    assertThat(event.context().repository().id()).isEqualTo(FIXTURE_REPO_ID);
                 });
             assertThat(eventListener.getUpdatedEvents()).isEmpty();
         }
@@ -563,8 +563,8 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
                 .satisfies(event -> {
                     assertThat(event.milestoneId()).isEqualTo(milestoneId);
                     assertThat(event.title()).isEqualTo("To Delete Milestone");
-                    assertThat(event.workspaceId()).isEqualTo(testWorkspace.getId());
-                    assertThat(event.repositoryId()).isEqualTo(FIXTURE_REPO_ID);
+                    assertThat(event.context().scopeId()).isEqualTo(testWorkspace.getId());
+                    assertThat(event.context().repository().id()).isEqualTo(FIXTURE_REPO_ID);
                 });
         }
 

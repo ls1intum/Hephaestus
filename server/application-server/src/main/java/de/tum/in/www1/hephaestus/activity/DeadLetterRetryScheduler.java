@@ -128,7 +128,7 @@ public class DeadLetterRetryScheduler implements HealthIndicator {
     @Scheduled(cron = "${hephaestus.activity.dead-letter.auto-retry.cron:0 */5 * * * *}")
     public void retryPendingDeadLetters() {
         if (!enabled) {
-            log.debug("Dead letter auto-retry disabled");
+            log.debug("Skipped dead letter auto-retry: enabled=false");
             return;
         }
 
@@ -137,11 +137,11 @@ public class DeadLetterRetryScheduler implements HealthIndicator {
             lastRunTimestamp.set(Instant.now());
             lastSuccessCount.set(0);
             lastFailedCount.set(0);
-            log.debug("No pending dead letters to retry");
+            log.debug("Skipped dead letter auto-retry: pendingCount=0");
             return;
         }
 
-        log.info("activity.dead_letter.auto_retry.started batchSize={}", pending.size());
+        log.info("Starting dead letter auto-retry: batchSize={}", pending.size());
 
         Instant minCreatedAt = Instant.now().minus(Duration.ofMinutes(minAgeMinutes));
         long successCount = 0;
@@ -151,7 +151,7 @@ public class DeadLetterRetryScheduler implements HealthIndicator {
         for (DeadLetterEvent event : pending) {
             // Skip events that are too recent (respect backoff)
             if (event.getCreatedAt().isAfter(minCreatedAt)) {
-                log.debug("Skipping recent dead letter {}: created {}", event.getId(), event.getCreatedAt());
+                log.debug("Skipped recent dead letter: deadLetterId={}, createdAt={}", event.getId(), event.getCreatedAt());
                 continue;
             }
 
@@ -160,7 +160,7 @@ public class DeadLetterRetryScheduler implements HealthIndicator {
                 skippedCount++;
                 skippedCounter.increment();
                 log.warn(
-                    "activity.dead_letter.max_retries_exceeded eventId={} retryCount={} eventType={}",
+                    "Discarded dead letter, max retries exceeded: deadLetterId={}, retryCount={}, eventType={}",
                     event.getId(),
                     event.getRetryCount(),
                     event.getEventType()
@@ -179,12 +179,12 @@ public class DeadLetterRetryScheduler implements HealthIndicator {
             if (result.success()) {
                 successCount++;
                 successCounter.increment();
-                log.info("activity.dead_letter.auto_retry.success eventId={}", event.getId());
+                log.info("Retried dead letter successfully: deadLetterId={}", event.getId());
             } else {
                 failedCount++;
                 failedCounter.increment();
                 log.warn(
-                    "activity.dead_letter.auto_retry.failed eventId={} reason={}",
+                    "Failed to retry dead letter: deadLetterId={}, reason={}",
                     event.getId(),
                     result.message()
                 );
@@ -196,7 +196,7 @@ public class DeadLetterRetryScheduler implements HealthIndicator {
         lastFailedCount.set(failedCount);
 
         log.info(
-            "activity.dead_letter.auto_retry.completed success={} failed={} skipped={}",
+            "Completed dead letter auto-retry: successCount={}, failedCount={}, skippedCount={}",
             successCount,
             failedCount,
             skippedCount

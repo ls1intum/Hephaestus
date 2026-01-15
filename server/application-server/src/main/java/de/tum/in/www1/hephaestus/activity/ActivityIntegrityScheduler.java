@@ -97,11 +97,11 @@ public class ActivityIntegrityScheduler implements HealthIndicator {
     @Scheduled(cron = "${hephaestus.activity.integrity.cron:0 0 * * * *}")
     public void verifyEventIntegrity() {
         if (!enabled) {
-            log.debug("Integrity verification disabled");
+            log.debug("Skipped integrity verification: enabled=false");
             return;
         }
 
-        log.info("activity.integrity.started sampleSize={}", sampleSize);
+        log.info("Starting integrity verification: sampleSize={}", sampleSize);
         Instant startTime = Instant.now();
 
         Timer.Sample timerSample = Timer.start();
@@ -109,7 +109,7 @@ public class ActivityIntegrityScheduler implements HealthIndicator {
             List<ActivityEvent> sample = eventRepository.findRandomSample(sampleSize);
 
             if (sample.isEmpty()) {
-                log.debug("No events to verify");
+                log.debug("Skipped integrity verification: eventCount=0");
                 lastRunTimestamp.set(Instant.now());
                 lastVerifiedCount.set(0);
                 lastCorruptedCount.set(0);
@@ -131,7 +131,7 @@ public class ActivityIntegrityScheduler implements HealthIndicator {
                 corruptedEventsCounter.increment(corrupted.size());
                 for (ActivityEvent event : corrupted) {
                     log.error(
-                        "INTEGRITY_VIOLATION eventId={} eventKey={} eventType={} targetId={}",
+                        "Detected integrity violation: eventId={}, eventKey={}, eventType={}, targetId={}",
                         event.getId(),
                         event.getEventKey(),
                         event.getEventType(),
@@ -139,14 +139,14 @@ public class ActivityIntegrityScheduler implements HealthIndicator {
                     );
                 }
                 log.error(
-                    "activity.integrity.failed corruptedCount={} sampledCount={} corruptionRate={}",
+                    "Failed integrity verification: corruptedCount={}, sampledCount={}, corruptionRate={}",
                     corrupted.size(),
                     sample.size(),
                     String.format("%.2f%%", (corrupted.size() * 100.0) / sample.size())
                 );
             } else {
                 log.info(
-                    "activity.integrity.passed verifiedCount={} durationMs={}",
+                    "Completed integrity verification: verifiedCount={}, durationMs={}",
                     verifiedCount,
                     java.time.Duration.between(startTime, Instant.now()).toMillis()
                 );

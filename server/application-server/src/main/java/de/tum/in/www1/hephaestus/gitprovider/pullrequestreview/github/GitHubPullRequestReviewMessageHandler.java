@@ -1,5 +1,7 @@
 package de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.github;
 
+import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
+
 import de.tum.in.www1.hephaestus.gitprovider.common.NatsMessageDeserializer;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContextFactory;
@@ -49,16 +51,16 @@ public class GitHubPullRequestReviewMessageHandler extends GitHubMessageHandler<
         var prDto = event.pullRequest();
 
         if (reviewDto == null || prDto == null) {
-            log.warn("Received pull_request_review event with missing data");
+            log.warn("Received pull_request_review event with missing data: action={}", event.action());
             return;
         }
 
         log.info(
-            "Received pull_request_review event: action={}, pr=#{}, review={}, repo={}",
+            "Received pull_request_review event: action={}, prNumber={}, reviewId={}, repoName={}",
             event.action(),
             prDto.number(),
             reviewDto.id(),
-            event.repository() != null ? event.repository().fullName() : "unknown"
+            event.repository() != null ? sanitizeForLog(event.repository().fullName()) : "unknown"
         );
 
         ProcessingContext context = contextFactory.forWebhookEvent(event).orElse(null);

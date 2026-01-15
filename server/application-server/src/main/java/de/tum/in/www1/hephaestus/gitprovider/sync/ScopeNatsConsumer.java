@@ -17,12 +17,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Represents a NATS consumer for a single workspace (or installation).
+ * Represents a NATS consumer for a single scope (or installation).
  *
  * <h2>Purpose</h2>
- * Processes messages SEQUENTIALLY to avoid race conditions within a workspace.
- * Each workspace gets its own consumer instance, enabling parallel processing
- * across workspaces while maintaining sequential ordering within each.
+ * Processes messages SEQUENTIALLY to avoid race conditions within a scope.
+ * Each scope gets its own consumer instance, enabling parallel processing
+ * across scopes while maintaining sequential ordering within each.
  *
  * <h2>Thread Safety</h2>
  * This class is thread-safe with the following guarantees:
@@ -36,7 +36,7 @@ import org.slf4j.LoggerFactory;
  *
  * <h2>Lifecycle</h2>
  * <ol>
- *   <li>Construct with workspace ID, consumer context, and message handler</li>
+ *   <li>Construct with scope ID, consumer context, and message handler</li>
  *   <li>Call {@code start()} to begin consuming - spawns a virtual thread processor</li>
  *   <li>Optionally call {@code updateSubjects()} to change subscribed subjects</li>
  *   <li>Call {@code stop()} to gracefully shutdown - drains queue and NAKs remaining messages</li>
@@ -44,11 +44,11 @@ import org.slf4j.LoggerFactory;
  *
  * @see NatsConsumerService
  */
-public class WorkspaceNatsConsumer {
+public class ScopeNatsConsumer {
 
-    private static final Logger log = LoggerFactory.getLogger(WorkspaceNatsConsumer.class);
+    private static final Logger log = LoggerFactory.getLogger(ScopeNatsConsumer.class);
 
-    private final Long workspaceId; // null for installation consumer
+    private final Long scopeId; // null for installation consumer
     private final String consumerName;
     private final ConsumerContext context;
     private final StreamContext streamContext;
@@ -68,57 +68,29 @@ public class WorkspaceNatsConsumer {
     private volatile Thread processorThread;
 
     /**
-     * Creates a new workspace consumer with a custom message handler.
+     * Creates a new scope consumer with a custom message handler.
      *
-     * @param workspaceId    the workspace ID (null for installation consumer)
+     * @param scopeId        the scope ID (null for installation consumer)
      * @param consumerName   the durable consumer name
      * @param context        the NATS consumer context
      * @param streamContext  the NATS stream context
      * @param subjects       the subjects to subscribe to
      * @param messageHandler the handler for processing messages
      */
-    public WorkspaceNatsConsumer(
-        Long workspaceId,
+    public ScopeNatsConsumer(
+        Long scopeId,
         String consumerName,
         ConsumerContext context,
         StreamContext streamContext,
         String[] subjects,
         Consumer<Message> messageHandler
     ) {
-        this.workspaceId = workspaceId;
+        this.scopeId = scopeId;
         this.consumerName = consumerName;
         this.context = context;
         this.streamContext = streamContext;
         this.currentSubjects = subjects.clone();
         this.messageHandler = messageHandler;
-    }
-
-    /**
-     * Creates a new workspace consumer without a message handler.
-     * <p>
-     * <b>Warning:</b> This constructor is deprecated. Messages will be ACKed without
-     * processing, which means events will be silently dropped. Use the constructor
-     * that takes a {@code messageHandler} parameter instead.
-     *
-     * @param workspaceId   the workspace ID (null for installation consumer)
-     * @param consumerName  the durable consumer name
-     * @param context       the NATS consumer context
-     * @param streamContext the NATS stream context
-     * @param subjects      the subjects to subscribe to
-     * @deprecated Use {@link #WorkspaceNatsConsumer(Long, String, ConsumerContext, StreamContext, String[], Consumer)}
-     */
-    @Deprecated(forRemoval = true)
-    public WorkspaceNatsConsumer(
-        Long workspaceId,
-        String consumerName,
-        ConsumerContext context,
-        StreamContext streamContext,
-        String[] subjects
-    ) {
-        this(workspaceId, consumerName, context, streamContext, subjects, msg -> {
-            log.warn("No message handler configured, ACKing message without processing: {}", msg.getSubject());
-            msg.ack();
-        });
     }
 
     /**
@@ -129,12 +101,12 @@ public class WorkspaceNatsConsumer {
     }
 
     /**
-     * Gets the workspace ID.
+     * Gets the scope ID.
      *
-     * @return the workspace ID, or null for installation consumer
+     * @return the scope ID, or null for installation consumer
      */
-    public Long getWorkspaceId() {
-        return workspaceId;
+    public Long getScopeId() {
+        return scopeId;
     }
 
     /**
@@ -161,14 +133,13 @@ public class WorkspaceNatsConsumer {
         running.set(true);
 
         // Start the sequential message processor on a virtual thread
-        String threadName = "nats-processor-" + (workspaceId != null ? "ws-" + workspaceId : "installation");
+        String threadName = "nats-processor-" + (scopeId != null ? "scope-" + scopeId : "installation");
         processorThread = Thread.ofVirtual().name(threadName).start(this::processMessagesSequentially);
 
         // Subscribe to NATS - messages go to queue for sequential processing
         subscription = context.consume(this::enqueueMessage);
 
-        String label = workspaceId != null ? "workspace-" + workspaceId : "installation";
-        log.debug("Started consumer for {} with {} subjects", label, currentSubjects.length);
+        log.debug("Started consumer: consumerName={}, scopeId={}, subjectCount={}", consumerName, scopeId, currentSubjects.length);
     }
 
     /**
@@ -184,7 +155,7 @@ public class WorkspaceNatsConsumer {
             try {
                 subscription.close();
             } catch (Exception e) {
-                log.debug("Error closing subscription: {}", e.getMessage());
+                log.debug("Failed to close subscription: consumerName={}", consumerName, e);
             }
             subscription = null;
         }
@@ -198,8 +169,7 @@ public class WorkspaceNatsConsumer {
         // Drain remaining messages (NAK them) - exceptions during shutdown are expected
         drainMessageQueue();
 
-        String label = workspaceId != null ? "workspace-" + workspaceId : "installation";
-        log.debug("Stopped consumer for {}", label);
+        log.debug("Stopped consumer: consumerName={}, scopeId={}", consumerName, scopeId);
     }
 
     /**
@@ -228,13 +198,12 @@ public class WorkspaceNatsConsumer {
             try {
                 subscription.close();
             } catch (Exception e) {
-                log.warn("Error closing subscription during subject update: {}", e.getMessage());
+                log.warn("Failed to close subscription during subject update: consumerName={}", consumerName, e);
             }
         }
         subscription = context.consume(this::enqueueMessage);
 
-        String label = workspaceId != null ? "workspace-" + workspaceId : "installation";
-        log.debug("Updated consumer for {} with {} subjects", label, newSubjects.length);
+        log.debug("Updated consumer subjects: consumerName={}, scopeId={}, subjectCount={}", consumerName, scopeId, newSubjects.length);
     }
 
     /**
@@ -260,12 +229,11 @@ public class WorkspaceNatsConsumer {
     /**
      * Processes messages from the queue ONE AT A TIME.
      * <p>
-     * This ensures sequential processing within a workspace,
+     * This ensures sequential processing within a scope,
      * avoiding race conditions for shared entities.
      */
     private void processMessagesSequentially() {
-        String label = workspaceId != null ? "workspace-" + workspaceId : "installation";
-        log.debug("Started sequential message processor for {}", label);
+        log.debug("Started message processor: consumerName={}, scopeId={}", consumerName, scopeId);
 
         while (running.get() && !Thread.currentThread().isInterrupted()) {
             try {
@@ -278,11 +246,11 @@ public class WorkspaceNatsConsumer {
                 Thread.currentThread().interrupt();
                 break;
             } catch (Exception e) {
-                log.error("Error in message processor for {}: {}", label, e.getMessage(), e);
+                log.error("Failed to process message: consumerName={}, scopeId={}", consumerName, scopeId, e);
             }
         }
 
-        log.debug("Stopped sequential message processor for {}", label);
+        log.debug("Stopped message processor: consumerName={}, scopeId={}", consumerName, scopeId);
     }
 
     /**
@@ -298,7 +266,7 @@ public class WorkspaceNatsConsumer {
                 msg.nak();
             } catch (Exception e) {
                 // Expected during shutdown when connection is already closed
-                log.trace("Ignored NAK error during shutdown: {}", e.getMessage());
+                log.trace("Ignored NAK error during shutdown: consumerName={}", consumerName);
             }
         }
     }

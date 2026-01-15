@@ -53,7 +53,7 @@ public class GitHubUserProcessor {
         }
         Long userId = dto.getDatabaseId();
         if (userId == null) {
-            log.debug("User DTO has no database ID, skipping");
+            log.debug("Skipped user processing: reason=missingDatabaseId, userLogin={}", dto.login());
             return null;
         }
         return userRepository
@@ -71,7 +71,7 @@ public class GitHubUserProcessor {
                 // Sync profile fields from DTO
                 syncProfileFieldsToUser(user, dto);
                 User saved = userRepository.save(user);
-                log.debug("Created user {} ({})", sanitizeForLog(saved.getLogin()), saved.getId());
+                log.debug("Created user: userId={}, userLogin={}", saved.getId(), sanitizeForLog(saved.getLogin()));
                 return saved;
             });
     }
@@ -113,7 +113,7 @@ public class GitHubUserProcessor {
         }
 
         if (changed) {
-            log.debug("Updated profile fields for user {} ({})", sanitizeForLog(existing.getLogin()), existing.getId());
+            log.debug("Updated user: userId={}, userLogin={}", existing.getId(), sanitizeForLog(existing.getLogin()));
             return userRepository.save(existing);
         }
         return existing;

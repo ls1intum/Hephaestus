@@ -69,15 +69,15 @@ public class GitHubPullRequestReviewSyncService {
      * <p>
      * Uses streaming to avoid loading all pull requests into memory at once.
      *
-     * @param workspaceId  the workspace ID for authentication
+     * @param scopeId  the scope ID for authentication
      * @param repositoryId the repository ID to sync reviews for
      * @return number of reviews synced
      */
     @Transactional
-    public int syncForRepository(Long workspaceId, Long repositoryId) {
+    public int syncForRepository(Long scopeId, Long repositoryId) {
         Repository repository = repositoryRepository.findById(repositoryId).orElse(null);
         if (repository == null) {
-            log.warn("Repository {} not found, skipping review sync", repositoryId);
+            log.warn("Repository not found, skipping review sync: repoId={}", repositoryId);
             return 0;
         }
 
@@ -86,18 +86,18 @@ public class GitHubPullRequestReviewSyncService {
 
         try (Stream<PullRequest> prStream = pullRequestRepository.streamAllByRepository_Id(repositoryId)) {
             prStream.forEach(pullRequest -> {
-                totalSynced.addAndGet(syncForPullRequest(workspaceId, pullRequest));
+                totalSynced.addAndGet(syncForPullRequest(scopeId, pullRequest));
                 prCount.incrementAndGet();
             });
         }
 
         String safeNameWithOwner = sanitizeForLog(repository.getNameWithOwner());
         if (prCount.get() == 0) {
-            log.debug("No pull requests found for {}, skipping review sync", safeNameWithOwner);
+            log.debug("No pull requests found, skipping review sync: repoName={}", safeNameWithOwner);
             return 0;
         }
 
-        log.info("Synced {} reviews for {} PRs in {}", totalSynced.get(), prCount.get(), safeNameWithOwner);
+        log.info("Completed review sync: repoName={}, reviewCount={}, prCount={}", safeNameWithOwner, totalSynced.get(), prCount.get());
         return totalSynced.get();
     }
 
@@ -111,8 +111,8 @@ public class GitHubPullRequestReviewSyncService {
      * a starting cursor.
      */
     @Transactional
-    public int syncForPullRequest(Long workspaceId, PullRequest pullRequest) {
-        return syncRemainingReviews(workspaceId, pullRequest, null);
+    public int syncForPullRequest(Long scopeId, PullRequest pullRequest) {
+        return syncRemainingReviews(scopeId, pullRequest, null);
     }
 
     /**
@@ -122,15 +122,15 @@ public class GitHubPullRequestReviewSyncService {
      * processed inline with the PR query. Pass the endCursor from the embedded
      * reviews to skip already-processed reviews.
      *
-     * @param workspaceId  the workspace ID for authentication
+     * @param scopeId  the scope ID for authentication
      * @param pullRequest  the pull request to sync reviews for
      * @param startCursor  the cursor to start from (null to fetch all reviews)
      * @return number of reviews synced
      */
     @Transactional
-    public int syncRemainingReviews(Long workspaceId, PullRequest pullRequest, String startCursor) {
+    public int syncRemainingReviews(Long scopeId, PullRequest pullRequest, String startCursor) {
         if (pullRequest == null || pullRequest.getRepository() == null) {
-            log.warn("Pull request or repository is null, skipping review sync");
+            log.warn("Pull request or repository is null, skipping review sync: prId={}", pullRequest != null ? pullRequest.getId() : "null");
             return 0;
         }
 
@@ -139,12 +139,12 @@ public class GitHubPullRequestReviewSyncService {
         String safeNameWithOwner = sanitizeForLog(nameWithOwner);
         Optional<RepositoryOwnerAndName> parsedName = GitHubRepositoryNameParser.parse(nameWithOwner);
         if (parsedName.isEmpty()) {
-            log.warn("Invalid repository name format: {}", safeNameWithOwner);
+            log.warn("Invalid repository name format, skipping review sync: repoName={}", safeNameWithOwner);
             return 0;
         }
         RepositoryOwnerAndName ownerAndName = parsedName.get();
 
-        HttpGraphQlClient client = graphQlClientProvider.forWorkspace(workspaceId);
+        HttpGraphQlClient client = graphQlClientProvider.forScope(scopeId);
 
         int totalSynced = 0;
         String cursor = startCursor;
@@ -155,10 +155,10 @@ public class GitHubPullRequestReviewSyncService {
             pageCount++;
             if (pageCount >= MAX_PAGINATION_PAGES) {
                 log.warn(
-                    "Reached maximum pagination limit ({}) for PR #{} in {}, stopping",
-                    MAX_PAGINATION_PAGES,
+                    "Reached maximum pagination limit for reviews: repoName={}, prNumber={}, limit={}",
+                    safeNameWithOwner,
                     pullRequest.getNumber(),
-                    safeNameWithOwner
+                    MAX_PAGINATION_PAGES
                 );
                 break;
             }
@@ -178,13 +178,18 @@ public class GitHubPullRequestReviewSyncService {
                     // Check if this is a NOT_FOUND error (PR deleted from GitHub)
                     if (isNotFoundError(response, "repository.pullRequest")) {
                         log.debug(
-                            "PR #{} in {} no longer exists on GitHub, skipping review sync",
-                            pullRequest.getNumber(),
-                            safeNameWithOwner
+                            "Pull request no longer exists on GitHub, skipping review sync: repoName={}, prNumber={}",
+                            safeNameWithOwner,
+                            pullRequest.getNumber()
                         );
                         return 0;
                     }
-                    log.warn("Invalid GraphQL response: {}", response != null ? response.getErrors() : "null");
+                    log.warn(
+                        "Invalid GraphQL response for reviews: repoName={}, prNumber={}, errors={}",
+                        safeNameWithOwner,
+                        pullRequest.getNumber(),
+                        response != null ? response.getErrors() : "null"
+                    );
                     break;
                 }
 
@@ -223,33 +228,31 @@ public class GitHubPullRequestReviewSyncService {
                 // Check if this is a NOT_FOUND error (PR deleted from GitHub)
                 if (isNotFoundError(e.getResponse(), "repository.pullRequest")) {
                     log.debug(
-                        "PR #{} in {} no longer exists on GitHub, skipping review sync",
-                        pullRequest.getNumber(),
-                        safeNameWithOwner
+                        "Pull request no longer exists on GitHub, skipping review sync: repoName={}, prNumber={}",
+                        safeNameWithOwner,
+                        pullRequest.getNumber()
                     );
                     return 0;
                 }
                 log.error(
-                    "Error syncing reviews for PR #{} in {}: {}",
-                    pullRequest.getNumber(),
+                    "Failed to sync reviews: repoName={}, prNumber={}",
                     safeNameWithOwner,
-                    e.getMessage(),
+                    pullRequest.getNumber(),
                     e
                 );
                 break;
             } catch (Exception e) {
                 log.error(
-                    "Error syncing reviews for PR #{} in {}: {}",
-                    pullRequest.getNumber(),
+                    "Failed to sync reviews: repoName={}, prNumber={}",
                     safeNameWithOwner,
-                    e.getMessage(),
+                    pullRequest.getNumber(),
                     e
                 );
                 break;
             }
         }
 
-        log.debug("Synced {} reviews for PR #{} in {}", totalSynced, pullRequest.getNumber(), safeNameWithOwner);
+        log.debug("Synced reviews for pull request: repoName={}, prNumber={}, reviewCount={}", safeNameWithOwner, pullRequest.getNumber(), totalSynced);
         return totalSynced;
     }
 
@@ -283,9 +286,9 @@ public class GitHubPullRequestReviewSyncService {
             fetchedPages++;
             if (fetchedPages > MAX_PAGINATION_PAGES) {
                 log.warn(
-                    "Reached maximum pagination limit ({}) for review {} comments, stopping",
-                    MAX_PAGINATION_PAGES,
-                    reviewId
+                    "Reached maximum pagination limit for review comments: reviewId={}, limit={}",
+                    reviewId,
+                    MAX_PAGINATION_PAGES
                 );
                 break;
             }
@@ -301,7 +304,7 @@ public class GitHubPullRequestReviewSyncService {
 
                 if (response == null || !response.isValid()) {
                     log.warn(
-                        "Invalid GraphQL response fetching comments for review {}: {}",
+                        "Invalid GraphQL response for review comments: reviewId={}, errors={}",
                         reviewId,
                         response != null ? response.getErrors() : "null"
                     );
@@ -322,7 +325,7 @@ public class GitHubPullRequestReviewSyncService {
                 hasMore = pageInfo != null && Boolean.TRUE.equals(pageInfo.getHasNextPage());
                 cursor = pageInfo != null ? pageInfo.getEndCursor() : null;
             } catch (Exception e) {
-                log.error("Error fetching additional comments for review {}: {}", reviewId, e.getMessage(), e);
+                log.error("Failed to fetch additional review comments: reviewId={}", reviewId, e);
                 break;
             }
         }
@@ -332,9 +335,9 @@ public class GitHubPullRequestReviewSyncService {
 
         if (fetchedPages > 0) {
             log.debug(
-                "Fetched {} additional pages of comments for review {} (total: {} comments)",
-                fetchedPages,
+                "Fetched additional review comments: reviewId={}, pageCount={}, totalComments={}",
                 reviewId,
+                fetchedPages,
                 allComments.size()
             );
         }

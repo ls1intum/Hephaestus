@@ -169,7 +169,7 @@ public class TeamService {
         boolean isHidden = hiddenTeamIds.contains(team.getId());
         Set<Label> workspaceLabels = workspaceTeamSettingsService.getTeamLabelFilters(workspaceId, team.getId());
 
-        return TeamInfoDTO.fromTeamWithWorkspaceSettings(team, isHidden, workspaceLabels, hiddenRepoIds);
+        return TeamInfoDTO.fromTeamWithScopeSettings(team, isHidden, workspaceLabels, hiddenRepoIds);
     }
 
     /**

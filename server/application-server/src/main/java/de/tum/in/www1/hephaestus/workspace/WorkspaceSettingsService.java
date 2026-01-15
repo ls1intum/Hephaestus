@@ -55,7 +55,7 @@ public class WorkspaceSettingsService {
             workspace.setLeaderboardScheduleTime(time);
         }
 
-        log.info("Updated schedule for workspace {}: day={}, time={}", workspaceId, day, time);
+        log.info("Updated workspace schedule: workspaceId={}, day={}, time={}", workspaceId, day, time);
         return workspaceRepository.save(workspace);
     }
 
@@ -85,7 +85,7 @@ public class WorkspaceSettingsService {
             workspace.setLeaderboardNotificationChannelId(channelId);
         }
 
-        log.info("Updated notifications for workspace {}: enabled={}", workspaceId, enabled);
+        log.info("Updated workspace notifications: workspaceId={}, enabled={}", workspaceId, enabled);
         return workspaceRepository.save(workspace);
     }
 
@@ -100,7 +100,7 @@ public class WorkspaceSettingsService {
     public Workspace updateToken(Long workspaceId, String token) {
         Workspace workspace = requireWorkspace(workspaceId);
         workspace.setPersonalAccessToken(token);
-        log.info("Updated PAT for workspace {}", workspaceId);
+        log.info("Updated workspace PAT: workspaceId={}", workspaceId);
         return workspaceRepository.save(workspace);
     }
 
@@ -117,7 +117,7 @@ public class WorkspaceSettingsService {
         Workspace workspace = requireWorkspace(workspaceId);
         workspace.setSlackToken(slackToken);
         workspace.setSlackSigningSecret(slackSigningSecret);
-        log.info("Updated Slack credentials for workspace {}", workspaceId);
+        log.info("Updated workspace Slack credentials: workspaceId={}", workspaceId);
         return workspaceRepository.save(workspace);
     }
 
@@ -132,7 +132,7 @@ public class WorkspaceSettingsService {
     public Workspace updatePublicVisibility(Long workspaceId, Boolean isPubliclyViewable) {
         Workspace workspace = requireWorkspace(workspaceId);
         workspace.setIsPubliclyViewable(isPubliclyViewable);
-        log.info("Updated visibility for workspace {}: public={}", workspaceId, isPubliclyViewable);
+        log.info("Updated workspace visibility: workspaceId={}, isPublic={}", workspaceId, isPubliclyViewable);
         return workspaceRepository.save(workspace);
     }
 

@@ -69,14 +69,34 @@ public class ActivityEventListener {
         try {
             recordAction.run();
         } catch (Exception e) {
-            log.error("Failed to record {}: {}", eventName, entityId, e);
+            log.error("Failed to record activity event: eventType={}, entityId={}", eventName, entityId, e);
         }
+    }
+
+    /**
+     * Validates that the event context has a valid scopeId.
+     * Events without scopeId cannot be properly associated with a scope.
+     *
+     * @param eventName name of the event for logging
+     * @param entityId  ID of the entity for logging
+     * @param scopeId   the scopeId to validate
+     * @return true if scopeId is valid, false otherwise
+     */
+    private boolean hasValidScopeId(String eventName, Long entityId, Long scopeId) {
+        if (scopeId == null) {
+            log.warn("Skipped event due to null scopeId: eventType={}, entityId={}", eventName, entityId);
+            return false;
+        }
+        return true;
     }
 
     @Async
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onPullRequestCreated(DomainEvent.PullRequestCreated event) {
         var pr = event.pullRequest();
+        if (!hasValidScopeId("PR created", pr.id(), event.context().scopeId())) {
+            return;
+        }
         if (pr.authorId() == null || pr.createdAt() == null) {
             log.warn(
                 "PR created event missing required data: prId={}, authorId={}, createdAt={}",
@@ -88,7 +108,7 @@ public class ActivityEventListener {
         }
         safeRecord("PR opened", pr.id(), () ->
             activityEventService.record(
-                event.context().workspaceId(),
+                event.context().scopeId(),
                 ActivityEventType.PULL_REQUEST_OPENED,
                 pr.createdAt(),
                 userRepository.getReferenceById(pr.authorId()),
@@ -105,6 +125,9 @@ public class ActivityEventListener {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onPullRequestMerged(DomainEvent.PullRequestMerged event) {
         var pr = event.pullRequest();
+        if (!hasValidScopeId("PR merged", pr.id(), event.context().scopeId())) {
+            return;
+        }
         // For merged PRs, prefer mergedBy, fall back to author
         Long awardeeId = pr.mergedById() != null ? pr.mergedById() : pr.authorId();
         if (awardeeId == null) {
@@ -118,7 +141,7 @@ public class ActivityEventListener {
         final Instant finalOccurredAt = occurredAt;
         safeRecord("PR merged", pr.id(), () ->
             activityEventService.record(
-                event.context().workspaceId(),
+                event.context().scopeId(),
                 ActivityEventType.PULL_REQUEST_MERGED,
                 finalOccurredAt,
                 userRepository.getReferenceById(awardeeId),
@@ -138,6 +161,9 @@ public class ActivityEventListener {
             return;
         }
         var pr = event.pullRequest();
+        if (!hasValidScopeId("PR closed", pr.id(), event.context().scopeId())) {
+            return;
+        }
         if (pr.authorId() == null) {
             log.warn("PR closed event missing authorId: prId={}", pr.id());
             return;
@@ -149,7 +175,7 @@ public class ActivityEventListener {
         final Instant finalOccurredAt = occurredAt;
         safeRecord("PR closed", pr.id(), () ->
             activityEventService.record(
-                event.context().workspaceId(),
+                event.context().scopeId(),
                 ActivityEventType.PULL_REQUEST_CLOSED,
                 finalOccurredAt,
                 userRepository.getReferenceById(pr.authorId()),
@@ -166,6 +192,9 @@ public class ActivityEventListener {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onPullRequestReopened(DomainEvent.PullRequestReopened event) {
         var pr = event.pullRequest();
+        if (!hasValidScopeId("PR reopened", pr.id(), event.context().scopeId())) {
+            return;
+        }
         if (pr.authorId() == null) {
             log.warn("PR reopened event missing authorId: prId={}", pr.id());
             return;
@@ -173,7 +202,7 @@ public class ActivityEventListener {
         Instant occurredAt = pr.updatedAt() != null ? pr.updatedAt() : Instant.now();
         safeRecord("PR reopened", pr.id(), () ->
             activityEventService.record(
-                event.context().workspaceId(),
+                event.context().scopeId(),
                 ActivityEventType.PULL_REQUEST_REOPENED,
                 occurredAt,
                 userRepository.getReferenceById(pr.authorId()),
@@ -190,6 +219,9 @@ public class ActivityEventListener {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onPullRequestReady(DomainEvent.PullRequestReady event) {
         var pr = event.pullRequest();
+        if (!hasValidScopeId("PR ready", pr.id(), event.context().scopeId())) {
+            return;
+        }
         if (pr.authorId() == null) {
             log.warn("PR ready event missing authorId: prId={}", pr.id());
             return;
@@ -197,7 +229,7 @@ public class ActivityEventListener {
         Instant occurredAt = pr.updatedAt() != null ? pr.updatedAt() : Instant.now();
         safeRecord("PR ready", pr.id(), () ->
             activityEventService.record(
-                event.context().workspaceId(),
+                event.context().scopeId(),
                 ActivityEventType.PULL_REQUEST_READY,
                 occurredAt,
                 userRepository.getReferenceById(pr.authorId()),
@@ -214,6 +246,9 @@ public class ActivityEventListener {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onReviewSubmitted(DomainEvent.ReviewSubmitted event) {
         var reviewData = event.review();
+        if (!hasValidScopeId("Review submitted", reviewData.id(), event.context().scopeId())) {
+            return;
+        }
         if (reviewData.authorId() == null || reviewData.repositoryId() == null) {
             log.warn(
                 "Review submitted event missing required data: reviewId={}, authorId={}, repositoryId={}",
@@ -234,7 +269,7 @@ public class ActivityEventListener {
         Instant occurredAt = reviewData.submittedAt() != null ? reviewData.submittedAt() : Instant.now();
         safeRecord("review", reviewData.id(), () ->
             activityEventService.record(
-                event.context().workspaceId(),
+                event.context().scopeId(),
                 mapReviewState(reviewData.state()),
                 occurredAt,
                 userRepository.getReferenceById(reviewData.authorId()),
@@ -251,6 +286,9 @@ public class ActivityEventListener {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onReviewDismissed(DomainEvent.ReviewDismissed event) {
         var reviewData = event.review();
+        if (!hasValidScopeId("Review dismissed", reviewData.id(), event.context().scopeId())) {
+            return;
+        }
         if (reviewData.authorId() == null || reviewData.repositoryId() == null) {
             log.warn(
                 "Review dismissed event missing required data: reviewId={}, authorId={}, repositoryId={}",
@@ -266,7 +304,7 @@ public class ActivityEventListener {
 
         safeRecord("review dismissed", reviewData.id(), () ->
             activityEventService.record(
-                event.context().workspaceId(),
+                event.context().scopeId(),
                 ActivityEventType.REVIEW_DISMISSED,
                 Instant.now(), // Use current time for dismissal
                 userRepository.getReferenceById(reviewData.authorId()),
@@ -293,6 +331,9 @@ public class ActivityEventListener {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onReviewEdited(DomainEvent.ReviewEdited event) {
         var reviewData = event.review();
+        if (!hasValidScopeId("Review edited", reviewData.id(), event.context().scopeId())) {
+            return;
+        }
         if (reviewData.authorId() == null || reviewData.repositoryId() == null) {
             log.warn(
                 "Review edited event missing required data: reviewId={}, authorId={}, repositoryId={}",
@@ -313,7 +354,7 @@ public class ActivityEventListener {
         Instant occurredAt = reviewData.submittedAt() != null ? reviewData.submittedAt() : Instant.now();
         safeRecord("review edited", reviewData.id(), () ->
             activityEventService.record(
-                event.context().workspaceId(),
+                event.context().scopeId(),
                 ActivityEventType.REVIEW_EDITED,
                 occurredAt,
                 userRepository.getReferenceById(reviewData.authorId()),
@@ -330,6 +371,9 @@ public class ActivityEventListener {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onCommentCreated(DomainEvent.CommentCreated event) {
         var commentData = event.comment();
+        if (!hasValidScopeId("Comment created", commentData.id(), event.context().scopeId())) {
+            return;
+        }
         if (commentData.authorId() == null || commentData.repositoryId() == null) {
             log.warn(
                 "Comment created event missing required data: commentId={}, authorId={}, repositoryId={}",
@@ -352,7 +396,7 @@ public class ActivityEventListener {
         final double finalXp = xp;
         safeRecord("comment", commentData.id(), () ->
             activityEventService.record(
-                event.context().workspaceId(),
+                event.context().scopeId(),
                 ActivityEventType.COMMENT_CREATED,
                 occurredAt,
                 userRepository.getReferenceById(commentData.authorId()),
@@ -369,6 +413,9 @@ public class ActivityEventListener {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onReviewCommentCreated(DomainEvent.ReviewCommentCreated event) {
         var commentData = event.comment();
+        if (!hasValidScopeId("Review comment created", commentData.id(), event.context().scopeId())) {
+            return;
+        }
         if (commentData.authorId() == null || commentData.repositoryId() == null) {
             log.warn(
                 "Review comment created event missing required data: commentId={}, authorId={}, repositoryId={}",
@@ -381,7 +428,7 @@ public class ActivityEventListener {
         Instant occurredAt = commentData.createdAt() != null ? commentData.createdAt() : Instant.now();
         safeRecord("review comment", commentData.id(), () ->
             activityEventService.record(
-                event.context().workspaceId(),
+                event.context().scopeId(),
                 ActivityEventType.REVIEW_COMMENT_CREATED,
                 occurredAt,
                 userRepository.getReferenceById(commentData.authorId()),
@@ -402,6 +449,9 @@ public class ActivityEventListener {
         if (issueData.isPullRequest()) {
             return;
         }
+        if (!hasValidScopeId("Issue created", issueData.id(), event.context().scopeId())) {
+            return;
+        }
         if (issueData.authorId() == null) {
             log.warn("Issue created event missing authorId: issueId={}", issueData.id());
             return;
@@ -409,7 +459,7 @@ public class ActivityEventListener {
         Instant occurredAt = issueData.createdAt() != null ? issueData.createdAt() : Instant.now();
         safeRecord("issue created", issueData.id(), () ->
             activityEventService.record(
-                event.context().workspaceId(),
+                event.context().scopeId(),
                 ActivityEventType.ISSUE_CREATED,
                 occurredAt,
                 userRepository.getReferenceById(issueData.authorId()),
@@ -430,6 +480,9 @@ public class ActivityEventListener {
         if (issueData.isPullRequest()) {
             return;
         }
+        if (!hasValidScopeId("Issue closed", issueData.id(), event.context().scopeId())) {
+            return;
+        }
         if (issueData.authorId() == null) {
             log.warn("Issue closed event missing authorId: issueId={}", issueData.id());
             return;
@@ -441,7 +494,7 @@ public class ActivityEventListener {
         final Instant finalOccurredAt = occurredAt;
         safeRecord("issue closed", issueData.id(), () ->
             activityEventService.record(
-                event.context().workspaceId(),
+                event.context().scopeId(),
                 ActivityEventType.ISSUE_CLOSED,
                 finalOccurredAt,
                 userRepository.getReferenceById(issueData.authorId()),
@@ -471,13 +524,11 @@ public class ActivityEventListener {
      * Map event context source to SourceSystem.
      * Defaults to SYSTEM if source is null.
      */
-    private SourceSystem mapSource(EventContext.Source source) {
+    private SourceSystem mapSource(de.tum.in.www1.hephaestus.gitprovider.common.DataSource source) {
         if (source == null) {
             return SourceSystem.SYSTEM;
         }
-        if (source == EventContext.Source.WEBHOOK || source == EventContext.Source.GRAPHQL_SYNC) {
-            return SourceSystem.GITHUB;
-        }
-        return SourceSystem.SYSTEM;
+        // All data sources from gitprovider are GitHub data
+        return SourceSystem.GITHUB;
     }
 }

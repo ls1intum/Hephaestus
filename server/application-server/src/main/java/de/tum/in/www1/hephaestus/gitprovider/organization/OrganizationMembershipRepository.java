@@ -10,13 +10,15 @@ import org.springframework.data.repository.query.Param;
 /**
  * Repository for organization membership records.
  *
- * <p>All queries filter by Organization ID which inherently carries workspace scope
- * through the Organization -> Workspace.organization relationship.
+ * <p>All queries filter by Organization ID which inherently carries scope
+ * through the Organization relationship.
  */
 public interface OrganizationMembershipRepository
     extends JpaRepository<OrganizationMembership, OrganizationMembershipId> {
     @Query("SELECT m.userId FROM OrganizationMembership m WHERE m.organizationId = :orgId")
     List<Long> findUserIdsByOrganizationId(@Param("orgId") Long organizationId);
+
+    List<OrganizationMembership> findByOrganizationId(Long organizationId);
 
     @Modifying
     @Query(

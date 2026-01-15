@@ -1,6 +1,6 @@
 package de.tum.in.www1.hephaestus.workspace.adapter;
 
-import de.tum.in.www1.hephaestus.gitprovider.common.spi.WorkspaceProvisioningListener;
+import de.tum.in.www1.hephaestus.gitprovider.common.spi.ProvisioningListener;
 import de.tum.in.www1.hephaestus.workspace.RepositorySelection;
 import de.tum.in.www1.hephaestus.workspace.Workspace;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceInstallationService;
@@ -11,7 +11,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 @Component
-public class WorkspaceProvisioningAdapter implements WorkspaceProvisioningListener {
+public class WorkspaceProvisioningAdapter implements ProvisioningListener {
 
     private static final Logger log = LoggerFactory.getLogger(WorkspaceProvisioningAdapter.class);
 
@@ -29,7 +29,7 @@ public class WorkspaceProvisioningAdapter implements WorkspaceProvisioningListen
     @Override
     public void onInstallationCreated(InstallationData installation) {
         if (installation == null) {
-            log.warn("Received null installation data, skipping workspace provisioning");
+            log.warn("Skipped workspace provisioning: installationData=null");
             return;
         }
 
@@ -44,8 +44,8 @@ public class WorkspaceProvisioningAdapter implements WorkspaceProvisioningListen
         );
 
         if (workspace == null) {
-            log.info(
-                "Skipping installation event for {}: workspace could not be ensured",
+            log.warn(
+                "Skipped installation event, workspace could not be ensured: installationId={}",
                 installation.installationId()
             );
             return;
@@ -55,9 +55,9 @@ public class WorkspaceProvisioningAdapter implements WorkspaceProvisioningListen
         // These are provided for "created" events with "selected" repository selection
         if (installation.repositoryNames() != null && !installation.repositoryNames().isEmpty()) {
             log.info(
-                "Adding {} initial repositories for installation {}",
-                installation.repositoryNames().size(),
-                installation.installationId()
+                "Added initial repositories: installationId={}, repoCount={}",
+                installation.installationId(),
+                installation.repositoryNames().size()
             );
             for (String nameWithOwner : installation.repositoryNames()) {
                 repositoryMonitorService.ensureRepositoryMonitorForInstallation(
@@ -71,7 +71,7 @@ public class WorkspaceProvisioningAdapter implements WorkspaceProvisioningListen
     @Override
     public void onInstallationDeleted(Long installationId) {
         if (installationId == null) {
-            log.warn("Received null installation ID for deletion, skipping");
+            log.warn("Skipped installation deletion: installationId=null");
             return;
         }
 
@@ -85,43 +85,41 @@ public class WorkspaceProvisioningAdapter implements WorkspaceProvisioningListen
         // 3. Mark workspace as PURGED (not SUSPENDED - deleted is permanent)
         workspaceInstallationService.updateWorkspaceStatus(installationId, Workspace.WorkspaceStatus.PURGED);
 
-        log.info("Completed cleanup for deleted installation {}", installationId);
+        log.info("Completed installation cleanup: installationId={}", installationId);
     }
 
     @Override
     public void onRepositoriesAdded(Long installationId, List<String> repositoryNames) {
         if (installationId == null || repositoryNames == null || repositoryNames.isEmpty()) {
             log.debug(
-                "Skipping onRepositoriesAdded: installationId={}, repositoryNames={}",
+                "Skipped repositories added event: reason=missingData, installationId={}, hasRepositories={}",
                 installationId,
-                repositoryNames
+                repositoryNames != null && !repositoryNames.isEmpty()
             );
             return;
         }
 
-        log.info("Adding {} repositories to monitor for installation {}", repositoryNames.size(), installationId);
         for (String nameWithOwner : repositoryNames) {
             repositoryMonitorService.ensureRepositoryMonitorForInstallation(installationId, nameWithOwner);
         }
-        log.debug("Repositories added to installation {}: {}", installationId, repositoryNames);
+        log.info("Added repositories to monitor: installationId={}, repoCount={}", installationId, repositoryNames.size());
     }
 
     @Override
     public void onRepositoriesRemoved(Long installationId, List<String> repositoryNames) {
         if (installationId == null || repositoryNames == null || repositoryNames.isEmpty()) {
             log.debug(
-                "Skipping onRepositoriesRemoved: installationId={}, repositoryNames={}",
+                "Skipped repositories removed event: reason=missingData, installationId={}, hasRepositories={}",
                 installationId,
-                repositoryNames
+                repositoryNames != null && !repositoryNames.isEmpty()
             );
             return;
         }
 
-        log.info("Removing {} repositories from monitor for installation {}", repositoryNames.size(), installationId);
         for (String nameWithOwner : repositoryNames) {
             repositoryMonitorService.removeRepositoryMonitorForInstallation(installationId, nameWithOwner);
         }
-        log.debug("Repositories removed from installation {}: {}", installationId, repositoryNames);
+        log.info("Removed repositories from monitor: installationId={}, repoCount={}", installationId, repositoryNames.size());
     }
 
     @Override
@@ -142,35 +140,35 @@ public class WorkspaceProvisioningAdapter implements WorkspaceProvisioningListen
     @Override
     public void onInstallationSuspended(Long installationId) {
         if (installationId == null) {
-            log.warn("Received null installation ID for suspension, skipping");
+            log.warn("Skipped installation suspension: installationId=null");
             return;
         }
 
         workspaceInstallationService.updateWorkspaceStatus(installationId, Workspace.WorkspaceStatus.SUSPENDED);
-        log.debug("Installation {} suspended", installationId);
+        log.debug("Suspended installation: installationId={}", installationId);
     }
 
     @Override
     public void onInstallationActivated(Long installationId) {
         if (installationId == null) {
-            log.warn("Received null installation ID for activation, skipping");
+            log.warn("Skipped installation activation: installationId=null");
             return;
         }
 
         workspaceInstallationService.updateWorkspaceStatus(installationId, Workspace.WorkspaceStatus.ACTIVE);
-        log.debug("Installation {} activated", installationId);
+        log.debug("Activated installation: installationId={}", installationId);
     }
 
     @Override
     public void onRepositorySelectionChanged(Long installationId, String selection) {
         if (installationId == null) {
-            log.warn("Received null installation ID for repository selection change, skipping");
+            log.warn("Skipped repository selection change: installationId=null");
             return;
         }
 
         RepositorySelection repoSelection = parseRepositorySelection(selection);
         workspaceInstallationService.updateRepositorySelection(installationId, repoSelection);
-        log.debug("Updated repository selection for installation {} to {}", installationId, repoSelection);
+        log.debug("Updated repository selection: installationId={}, selection={}", installationId, repoSelection);
     }
 
     private RepositorySelection parseRepositorySelection(String selection) {

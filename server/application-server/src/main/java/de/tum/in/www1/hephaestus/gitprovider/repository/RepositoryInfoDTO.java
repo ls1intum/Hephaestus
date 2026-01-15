@@ -7,6 +7,18 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.List;
 import org.springframework.lang.NonNull;
 
+/**
+ * Information about a git repository.
+ *
+ * <h2>ETL Extraction Note</h2>
+ * <p>
+ * The {@code hiddenFromContributions} field is a scope-specific concept that
+ * does not belong in the gitprovider domain. During ETL extraction, this field
+ * should be moved to a scope-specific DTO in the workspace module:
+ * <pre>
+ * public record ScopedRepositoryDTO(RepositoryInfoDTO repository, boolean hiddenFromContributions) {}
+ * </pre>
+ */
 @JsonInclude(JsonInclude.Include.NON_EMPTY)
 @Schema(description = "Information about a git repository")
 public record RepositoryInfoDTO(
@@ -16,6 +28,12 @@ public record RepositoryInfoDTO(
     @Schema(description = "Description of the repository") String description,
     @NonNull @Schema(description = "URL to the repository on the git provider") String htmlUrl,
     @Schema(description = "Labels defined in the repository") List<LabelInfoDTO> labels,
+    /**
+     * Whether contributions from this repository are hidden from leaderboard calculations.
+     * <p>
+     * <b>Note:</b> This field is scope-specific business logic and should be moved
+     * to a workspace-specific DTO during ETL extraction.
+     */
     @NonNull
     @Schema(description = "Whether contributions from this repository are hidden from leaderboard calculations")
     Boolean hiddenFromContributions
@@ -40,16 +58,16 @@ public record RepositoryInfoDTO(
     }
 
     /**
-     * Creates a RepositoryInfoDTO from a TeamRepositoryPermission using workspace-scoped settings.
+     * Creates a RepositoryInfoDTO from a TeamRepositoryPermission using scope-specific settings.
      *
-     * <p>This method applies workspace-specific visibility settings,
-     * enabling different configurations for the same repository across multiple workspaces.
+     * <p>This method applies scope-specific visibility settings,
+     * enabling different configurations for the same repository across multiple scopes.
      *
      * @param permission the team repository permission
-     * @param hiddenFromContributions whether this repository is hidden from contributions in the workspace
-     * @return the DTO with workspace-scoped settings applied
+     * @param hiddenFromContributions whether this repository is hidden from contributions in the scope
+     * @return the DTO with scope-specific settings applied
      */
-    public static RepositoryInfoDTO fromPermissionWithWorkspaceSettings(
+    public static RepositoryInfoDTO fromPermissionWithScopeSettings(
         TeamRepositoryPermission permission,
         boolean hiddenFromContributions
     ) {

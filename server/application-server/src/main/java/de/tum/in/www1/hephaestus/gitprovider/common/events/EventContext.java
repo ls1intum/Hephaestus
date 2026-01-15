@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.gitprovider.common.events;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.DataSource;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import java.time.Instant;
 import java.util.UUID;
@@ -12,16 +13,18 @@ import org.springframework.lang.Nullable;
 public record EventContext(
     @NonNull UUID eventId,
     @NonNull Instant occurredAt,
-    @Nullable Long workspaceId,
+    @Nullable Long scopeId,
     @Nullable RepositoryRef repository,
-    @NonNull Source source,
+    @NonNull DataSource source,
     @Nullable String webhookAction,
     @NonNull String correlationId
 ) {
-    public enum Source {
-        GRAPHQL_SYNC,
-        WEBHOOK,
-    }
+    /**
+     * Alias for backwards compatibility.
+     * @deprecated Use {@link DataSource} directly
+     */
+    @Deprecated(forRemoval = true)
+    public static final Class<DataSource> Source = DataSource.class;
 
     /**
      * Creates an EventContext from a ProcessingContext.
@@ -30,9 +33,9 @@ public record EventContext(
         return new EventContext(
             UUID.randomUUID(),
             Instant.now(),
-            ctx.workspaceId(),
+            ctx.scopeId(),
             ctx.repository() != null ? RepositoryRef.from(ctx.repository()) : null,
-            ctx.isWebhook() ? Source.WEBHOOK : Source.GRAPHQL_SYNC,
+            ctx.source(),
             ctx.webhookAction(),
             ctx.correlationId()
         );
@@ -41,23 +44,23 @@ public record EventContext(
     /**
      * Creates an EventContext for sync operations.
      */
-    public static EventContext forSync(Long workspaceId, RepositoryRef repository) {
+    public static EventContext forSync(Long scopeId, RepositoryRef repository) {
         return new EventContext(
             UUID.randomUUID(),
             Instant.now(),
-            workspaceId,
+            scopeId,
             repository,
-            Source.GRAPHQL_SYNC,
+            DataSource.GRAPHQL_SYNC,
             null,
             UUID.randomUUID().toString()
         );
     }
 
     public boolean isWebhook() {
-        return source == Source.WEBHOOK;
+        return source == DataSource.WEBHOOK;
     }
 
     public boolean isSync() {
-        return source == Source.GRAPHQL_SYNC;
+        return source == DataSource.GRAPHQL_SYNC;
     }
 }

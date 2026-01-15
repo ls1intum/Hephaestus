@@ -41,7 +41,7 @@ public class GitHubTeamProcessor {
     @Transactional
     public Team process(GitHubTeamEventDTO.GitHubTeamDTO dto, String orgLogin, ProcessingContext context) {
         if (dto == null || dto.id() == null) {
-            log.warn("Team DTO is null or missing ID, skipping");
+            log.warn("Skipped team processing: reason=nullOrMissingId");
             return null;
         }
 
@@ -79,6 +79,7 @@ public class GitHubTeamProcessor {
                 eventPublisher.publishEvent(
                     new DomainEvent.TeamCreated(EventPayload.TeamData.from(saved), EventContext.from(context))
                 );
+                log.debug("Created team: teamId={}, teamSlug={}", saved.getId(), saved.getName());
             } else {
                 eventPublisher.publishEvent(
                     new DomainEvent.TeamUpdated(
@@ -87,6 +88,7 @@ public class GitHubTeamProcessor {
                         EventContext.from(context)
                     )
                 );
+                log.debug("Updated team: teamId={}, teamSlug={}", saved.getId(), saved.getName());
             }
         }
 
@@ -117,7 +119,7 @@ public class GitHubTeamProcessor {
                         new DomainEvent.TeamDeleted(teamId, teamName, EventContext.from(context))
                     );
                 }
-                log.info("Deleted team {} ({})", teamName, teamId);
+                log.info("Deleted team: teamId={}, teamSlug={}", teamId, teamName);
             });
     }
 

@@ -46,21 +46,21 @@ public class AccountService {
         return userPreferencesRepository
             .findByUserId(user.getId())
             .orElseGet(() -> {
-                log.debug("Creating default preferences for user: {}", user.getLogin());
+                log.debug("Created default preferences: userLogin={}", user.getLogin());
                 UserPreferences preferences = new UserPreferences(user);
                 return userPreferencesRepository.save(preferences);
             });
     }
 
     public UserSettingsDTO getUserSettings(User user) {
-        log.debug("Getting user settings for user: {}", user.getLogin());
+        log.debug("Fetching user settings: userLogin={}", user.getLogin());
         UserPreferences preferences = getOrCreatePreferences(user);
         return new UserSettingsDTO(preferences.isNotificationsEnabled(), preferences.isParticipateInResearch());
     }
 
     @Transactional
     public UserSettingsDTO updateUserSettings(User user, UserSettingsDTO userSettings, String keycloakUserId) {
-        log.info("Updating user settings for user: {}", user.getLogin());
+        log.info("Updating user settings: userLogin={}", user.getLogin());
 
         UserPreferences preferences = getOrCreatePreferences(user);
 
@@ -84,7 +84,7 @@ public class AccountService {
             try {
                 boolean anyDeleted = deletePosthogIdentities(user, keycloakUserId);
                 if (!anyDeleted) {
-                    log.warn("No PostHog person matched the provided identifiers for user {}", user.getLogin());
+                    log.warn("No PostHog person matched provided identifiers: userLogin={}", user.getLogin());
                 }
             } catch (PosthogClientException exception) {
                 throw new ResponseStatusException(
@@ -107,7 +107,7 @@ public class AccountService {
             boolean anyDeleted = deletePosthogIdentities(user.orElse(null), keycloakUserId);
             if (!anyDeleted) {
                 log.warn(
-                    "No PostHog person matched the provided identifiers for user {} during account deletion",
+                    "No PostHog person matched provided identifiers during account deletion: userLogin={}",
                     user.map(User::getLogin).orElse("unknown")
                 );
             }

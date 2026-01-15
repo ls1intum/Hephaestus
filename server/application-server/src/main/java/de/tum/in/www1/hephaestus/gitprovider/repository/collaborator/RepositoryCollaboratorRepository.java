@@ -9,8 +9,8 @@ import org.springframework.data.repository.query.Param;
 /**
  * Repository for repository collaborator records.
  *
- * <p>All queries filter by repository ID which inherently carries workspace scope
- * through the Repository -> Organization -> Workspace.organization chain.
+ * <p>All queries filter by repository ID which inherently carries scope
+ * through the Repository -> Organization relationship chain.
  */
 public interface RepositoryCollaboratorRepository
     extends JpaRepository<RepositoryCollaborator, RepositoryCollaborator.Id> {

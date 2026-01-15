@@ -19,18 +19,6 @@ public interface IssueTypeRepository extends JpaRepository<IssueType, String> {
     )
     List<IssueType> findEnabledByOrganizationId(@Param("organizationId") long organizationId);
 
-    @Query(
-        """
-        SELECT it
-        FROM IssueType it
-        JOIN Workspace w ON w.organization = it.organization
-        WHERE w.id = :workspaceId
-        AND it.isEnabled = true
-        ORDER BY it.name ASC
-        """
-    )
-    List<IssueType> findEnabledByWorkspaceId(@Param("workspaceId") Long workspaceId);
-
     /**
      * Find all issue types for an organization (including disabled).
      * Used for cleanup of deleted issue types during sync.

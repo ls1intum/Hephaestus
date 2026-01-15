@@ -12,8 +12,28 @@ import org.springframework.lang.Nullable;
  * regardless of whether it came from a scheduled GraphQL sync or a webhook
  * event.
  *
- * @param workspaceId    The workspace this data belongs to
- * @param repository     The repository being processed
+ * <h2>Transaction Requirements</h2>
+ * <p>
+ * <b>Important:</b> The {@code repository} field contains a JPA entity reference.
+ * This context MUST only be used within an active transaction/session. Accessing
+ * lazy-loaded relationships outside a transaction will cause
+ * {@code LazyInitializationException}.
+ * <p>
+ * For event publishing across transaction boundaries, use
+ * {@link de.tum.in.www1.hephaestus.gitprovider.common.events.EventContext#from(ProcessingContext)}
+ * to create an immutable, serializable context that is safe for async handling.
+ *
+ * <h2>Future ETL Extraction</h2>
+ * <p>
+ * When extracting gitprovider as a standalone ETL component, this record should
+ * be refactored to remove the JPA entity dependency. Consider:
+ * <ul>
+ *   <li>Replace {@code Repository} with a {@code RepositoryRef} or ID reference</li>
+ *   <li>Create separate contexts for sync vs. event publishing</li>
+ * </ul>
+ *
+ * @param scopeId        The scope this data belongs to
+ * @param repository     The repository being processed (JPA entity - transaction required)
  * @param startedAt      When processing started
  * @param correlationId  Unique ID for distributed tracing - correlates all log
  *                       entries and events from a single webhook or sync operation
@@ -21,48 +41,39 @@ import org.springframework.lang.Nullable;
  * @param source         Whether data came from sync or webhook
  */
 public record ProcessingContext(
-    Long workspaceId,
+    Long scopeId,
     Repository repository,
     Instant startedAt,
     String correlationId,
     @Nullable String webhookAction,
-    Source source
+    DataSource source
 ) {
-    /**
-     * The source of the data being processed.
-     */
-    public enum Source {
-        /** Data from scheduled GraphQL synchronization. */
-        GRAPHQL_SYNC,
-        /** Data from a webhook event via NATS. */
-        WEBHOOK,
-    }
 
     /**
      * Creates a context for scheduled sync operations.
      */
-    public static ProcessingContext forSync(Long workspaceId, Repository repository) {
+    public static ProcessingContext forSync(Long scopeId, Repository repository) {
         return new ProcessingContext(
-            workspaceId,
+            scopeId,
             repository,
             Instant.now(),
             UUID.randomUUID().toString(),
             null,
-            Source.GRAPHQL_SYNC
+            DataSource.GRAPHQL_SYNC
         );
     }
 
     /**
      * Creates a context for webhook event processing.
      */
-    public static ProcessingContext forWebhook(Long workspaceId, Repository repository, String action) {
+    public static ProcessingContext forWebhook(Long scopeId, Repository repository, String action) {
         return new ProcessingContext(
-            workspaceId,
+            scopeId,
             repository,
             Instant.now(),
             UUID.randomUUID().toString(),
             action,
-            Source.WEBHOOK
+            DataSource.WEBHOOK
         );
     }
 
@@ -70,13 +81,13 @@ public record ProcessingContext(
      * Checks if this processing was triggered by a webhook.
      */
     public boolean isWebhook() {
-        return source == Source.WEBHOOK;
+        return source == DataSource.WEBHOOK;
     }
 
     /**
      * Checks if this processing was triggered by a scheduled sync.
      */
     public boolean isSync() {
-        return source == Source.GRAPHQL_SYNC;
+        return source == DataSource.GRAPHQL_SYNC;
     }
 }

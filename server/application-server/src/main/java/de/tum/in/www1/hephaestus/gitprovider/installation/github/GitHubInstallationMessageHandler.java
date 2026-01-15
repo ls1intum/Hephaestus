@@ -4,12 +4,14 @@ import de.tum.in.www1.hephaestus.gitprovider.common.NatsMessageDeserializer;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventAction;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventType;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
-import de.tum.in.www1.hephaestus.gitprovider.common.spi.WorkspaceProvisioningListener;
-import de.tum.in.www1.hephaestus.gitprovider.common.spi.WorkspaceProvisioningListener.AccountType;
-import de.tum.in.www1.hephaestus.gitprovider.common.spi.WorkspaceProvisioningListener.InstallationData;
+import de.tum.in.www1.hephaestus.gitprovider.common.spi.ProvisioningListener;
+import de.tum.in.www1.hephaestus.gitprovider.common.spi.ProvisioningListener.AccountType;
+import de.tum.in.www1.hephaestus.gitprovider.common.spi.ProvisioningListener.InstallationData;
 import de.tum.in.www1.hephaestus.gitprovider.installation.github.dto.GitHubInstallationEventDTO;
 import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationService;
 import de.tum.in.www1.hephaestus.gitprovider.repository.github.dto.GitHubRepositoryRefDTO;
+import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
+
 import java.util.Collections;
 import java.util.List;
 import org.slf4j.Logger;
@@ -18,18 +20,18 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Handles GitHub installation webhook events and provisions workspaces.
+ * Handles GitHub installation webhook events and provisions scopes.
  */
 @Component
 public class GitHubInstallationMessageHandler extends GitHubMessageHandler<GitHubInstallationEventDTO> {
 
     private static final Logger log = LoggerFactory.getLogger(GitHubInstallationMessageHandler.class);
 
-    private final WorkspaceProvisioningListener provisioningListener;
+    private final ProvisioningListener provisioningListener;
     private final OrganizationService organizationService;
 
     GitHubInstallationMessageHandler(
-        WorkspaceProvisioningListener provisioningListener,
+        ProvisioningListener provisioningListener,
         OrganizationService organizationService,
         NatsMessageDeserializer deserializer
     ) {
@@ -54,7 +56,7 @@ public class GitHubInstallationMessageHandler extends GitHubMessageHandler<GitHu
         var installation = event.installation();
 
         if (installation == null) {
-            log.warn("Received installation event with missing data");
+            log.warn("Received installation event with missing data: action={}", event.action());
             return;
         }
 
@@ -63,26 +65,28 @@ public class GitHubInstallationMessageHandler extends GitHubMessageHandler<GitHu
         Long installationId = installation.id();
 
         log.info(
-            "Received installation event: action={}, installation={}, account={}",
+            "Received installation event: action={}, installationId={}, accountLogin={}",
             event.action(),
             installationId,
-            accountLogin != null ? accountLogin : "unknown"
+            accountLogin != null ? sanitizeForLog(accountLogin) : "unknown"
         );
 
         GitHubEventAction.Installation action = event.actionType();
 
-        // Handle deletion early - no workspace provisioning needed
+        // Handle deletion early - no scope provisioning needed
         if (action == GitHubEventAction.Installation.DELETED) {
-            log.info("App uninstalled from account: {}", accountLogin);
+            log.info("Processed installation deletion: installationId={}, accountLogin={}", installationId, sanitizeForLog(accountLogin));
             provisioningListener.onInstallationDeleted(installationId);
             return;
         }
 
-        // Build installation data for workspace provisioning
+        // Build installation data for scope provisioning
         String repositorySelection = installation.repositorySelection();
         String avatarUrl = account != null ? account.avatarUrl() : null;
         Long accountId = account != null ? account.id() : null;
-        AccountType accountType = account != null ? AccountType.fromGitHubType(account.type()) : AccountType.USER;
+        AccountType accountType = account != null && "Organization".equalsIgnoreCase(account.type())
+            ? AccountType.ORGANIZATION
+            : AccountType.USER;
 
         // Extract repository names from the installation event payload
         // These are provided for "created" events with "selected" repository selection
@@ -111,7 +115,7 @@ public class GitHubInstallationMessageHandler extends GitHubMessageHandler<GitHu
         switch (action) {
             case SUSPEND -> provisioningListener.onInstallationSuspended(installationId);
             case UNSUSPEND, CREATED -> provisioningListener.onInstallationActivated(installationId);
-            default -> log.debug("Unhandled installation action: {}", event.action());
+            default -> log.debug("Skipped installation event: reason=unhandledAction, action={}, installationId={}", event.action(), installationId);
         }
     }
 }

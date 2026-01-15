@@ -1,5 +1,7 @@
 package de.tum.in.www1.hephaestus.gitprovider.issue.github;
 
+import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
+
 import de.tum.in.www1.hephaestus.gitprovider.common.NatsMessageDeserializer;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContextFactory;
@@ -45,15 +47,15 @@ public class GitHubIssueMessageHandler extends GitHubMessageHandler<GitHubIssueE
         GitHubIssueDTO issueDto = event.issue();
 
         if (issueDto == null) {
-            log.warn("Received issue event with missing issue data");
+            log.warn("Received issue event with missing data: action={}", event.action());
             return;
         }
 
         log.info(
-            "Received issue event: action={}, issue=#{}, repo={}",
+            "Received issue event: action={}, issueNumber={}, repoName={}",
             event.action(),
             issueDto.number(),
-            event.repository() != null ? event.repository().fullName() : "unknown"
+            event.repository() != null ? sanitizeForLog(event.repository().fullName()) : "unknown"
         );
 
         ProcessingContext context = contextFactory.forWebhookEvent(event).orElse(null);
@@ -101,7 +103,7 @@ public class GitHubIssueMessageHandler extends GitHubMessageHandler<GitHubIssueE
             }
             case GitHubEventAction.Issue.UNTYPED -> issueProcessor.processUntyped(issueDto, context);
             default -> {
-                log.debug("Unhandled issue action: {}", event.action());
+                log.debug("Skipped issue event: reason=unhandledAction, action={}", event.action());
                 issueProcessor.process(issueDto, context);
             }
         }

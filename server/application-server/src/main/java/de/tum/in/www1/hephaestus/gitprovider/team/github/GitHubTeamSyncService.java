@@ -85,18 +85,19 @@ public class GitHubTeamSyncService {
      * This method fetches all teams from the organization, processes them using
      * {@link GitHubTeamProcessor}, and also synchronizes team memberships.
      *
-     * @param workspaceId       the workspace ID for authentication
+     * @param scopeId       the scope ID for authentication
      * @param organizationLogin the GitHub organization login to sync teams for
      * @return number of teams synced
      */
     @Transactional
-    public int syncTeamsForOrganization(Long workspaceId, String organizationLogin) {
+    public int syncTeamsForOrganization(Long scopeId, String organizationLogin) {
         if (organizationLogin == null || organizationLogin.isBlank()) {
-            log.warn("Organization login is null or blank, cannot sync teams");
+            log.warn("Skipped team sync due to null or blank org login: scopeId={}", scopeId);
             return 0;
         }
+        String safeOrgLogin = sanitizeForLog(organizationLogin);
 
-        HttpGraphQlClient client = graphQlClientProvider.forWorkspace(workspaceId);
+        HttpGraphQlClient client = graphQlClientProvider.forScope(scopeId);
 
         try {
             Set<Long> syncedTeamIds = new HashSet<>();
@@ -109,9 +110,9 @@ public class GitHubTeamSyncService {
                 pageCount++;
                 if (pageCount >= MAX_PAGINATION_PAGES) {
                     log.warn(
-                        "Reached maximum pagination limit ({}) for organization {}, stopping",
-                        MAX_PAGINATION_PAGES,
-                        organizationLogin
+                        "Reached maximum pagination limit for teams: orgLogin={}, limit={}",
+                        safeOrgLogin,
+                        MAX_PAGINATION_PAGES
                     );
                     break;
                 }
@@ -147,10 +148,10 @@ public class GitHubTeamSyncService {
             // Remove teams that no longer exist in the organization
             removeDeletedTeams(organizationLogin, syncedTeamIds);
 
-            log.info("Synced {} teams for organization {}", totalSynced, organizationLogin);
+            log.info("Completed team sync: orgLogin={}, teamCount={}, scopeId={}", safeOrgLogin, totalSynced, scopeId);
             return totalSynced;
         } catch (Exception e) {
-            log.error("Error syncing teams for organization {}: {}", organizationLogin, e.getMessage(), e);
+            log.error("Failed to sync teams: orgLogin={}, scopeId={}", safeOrgLogin, scopeId, e);
             return 0;
         }
     }
@@ -209,7 +210,7 @@ public class GitHubTeamSyncService {
 
         if (membersPageInfo != null && Boolean.TRUE.equals(membersPageInfo.getHasNextPage())) {
             log.debug(
-                "Team {} has more than 100 members (totalCount={}), fetching additional pages",
+                "Fetching additional team members: teamName={}, totalCount={}",
                 team.getName(),
                 membersConnection.getTotalCount()
             );
@@ -254,8 +255,8 @@ public class GitHubTeamSyncService {
                 if (existingMembership != null) {
                     // Update role if changed
                     if (existingMembership.getRole() != role) {
-                        log.info(
-                            "Updating role for user {} in team {} from {} to {}",
+                        log.debug(
+                            "Updated team membership role: userLogin={}, teamName={}, oldRole={}, newRole={}",
                             sanitizeForLog(user.getLogin()),
                             sanitizeForLog(team.getName()),
                             existingMembership.getRole(),
@@ -269,7 +270,7 @@ public class GitHubTeamSyncService {
                     TeamMembership membership = new TeamMembership(team, user, role);
                     teamMembershipRepository.save(membership);
                     log.debug(
-                        "Created membership for user {} in team {} with role {}",
+                        "Created team membership: userLogin={}, teamName={}, role={}",
                         sanitizeForLog(user.getLogin()),
                         sanitizeForLog(team.getName()),
                         role
@@ -310,7 +311,7 @@ public class GitHubTeamSyncService {
 
         if (reposPageInfo != null && Boolean.TRUE.equals(reposPageInfo.getHasNextPage())) {
             log.debug(
-                "Team {} has more than 100 repositories (totalCount={}), fetching additional pages",
+                "Fetching additional team repositories: teamName={}, totalCount={}",
                 team.getName(),
                 reposConnection.getTotalCount()
             );
@@ -332,7 +333,7 @@ public class GitHubTeamSyncService {
 
             Long repoId = repoEdge.getNode().getDatabaseId().longValue();
 
-            // Skip unknown repos (not monitored by this workspace)
+            // Skip unknown repos (not monitored by this scope)
             if (!repositoryRepository.existsById(repoId)) {
                 continue;
             }
@@ -354,9 +355,9 @@ public class GitHubTeamSyncService {
 
         team.clearAndAddRepoPermissions(freshPermissions);
         log.debug(
-            "Synced {} repository permissions for team {}",
-            freshPermissions.size(),
-            sanitizeForLog(team.getName())
+            "Synced team repository permissions: teamName={}, count={}",
+            sanitizeForLog(team.getName()),
+            freshPermissions.size()
         );
     }
 
@@ -400,9 +401,9 @@ public class GitHubTeamSyncService {
             pageCount++;
             if (pageCount >= MAX_PAGINATION_PAGES) {
                 log.warn(
-                    "Reached maximum pagination limit ({}) for team {} members, stopping",
-                    MAX_PAGINATION_PAGES,
-                    teamSlug
+                    "Reached maximum pagination limit for team members: teamSlug={}, limit={}",
+                    teamSlug,
+                    MAX_PAGINATION_PAGES
                 );
                 break;
             }
@@ -455,9 +456,9 @@ public class GitHubTeamSyncService {
             pageCount++;
             if (pageCount >= MAX_PAGINATION_PAGES) {
                 log.warn(
-                    "Reached maximum pagination limit ({}) for team {} repositories, stopping",
-                    MAX_PAGINATION_PAGES,
-                    teamSlug
+                    "Reached maximum pagination limit for team repositories: teamSlug={}, limit={}",
+                    teamSlug,
+                    MAX_PAGINATION_PAGES
                 );
                 break;
             }
@@ -505,7 +506,7 @@ public class GitHubTeamSyncService {
         }
 
         if (removed > 0) {
-            log.debug("Removed {} stale memberships from team {}", removed, team.getName());
+            log.debug("Removed stale team memberships: teamName={}, membershipCount={}", team.getName(), removed);
         }
     }
 
@@ -527,7 +528,7 @@ public class GitHubTeamSyncService {
         }
 
         if (removed > 0) {
-            log.info("Deleted {} stale teams for organization {}", removed, organizationLogin);
+            log.info("Removed stale teams: orgLogin={}, teamCount={}", sanitizeForLog(organizationLogin), removed);
         }
     }
 

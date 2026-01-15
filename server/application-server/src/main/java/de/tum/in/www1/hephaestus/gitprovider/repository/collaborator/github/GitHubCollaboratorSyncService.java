@@ -58,28 +58,28 @@ public class GitHubCollaboratorSyncService {
     /**
      * Synchronizes all collaborators for a repository using GraphQL.
      *
-     * @param workspaceId  the workspace ID for authentication
+     * @param scopeId  the scope ID for authentication
      * @param repositoryId the repository ID to sync collaborators for
      * @return number of collaborators synced
      */
     @Transactional
-    public int syncCollaboratorsForRepository(Long workspaceId, Long repositoryId) {
+    public int syncCollaboratorsForRepository(Long scopeId, Long repositoryId) {
         Repository repository = repositoryRepository.findById(repositoryId).orElse(null);
         if (repository == null) {
-            log.warn("Repository {} not found, cannot sync collaborators", repositoryId);
+            log.warn("Skipped collaborator sync: reason=repository not found, repoId={}", repositoryId);
             return 0;
         }
 
         String safeNameWithOwner = sanitizeForLog(repository.getNameWithOwner());
         Optional<RepositoryOwnerAndName> parsedName = GitHubRepositoryNameParser.parse(repository.getNameWithOwner());
         if (parsedName.isEmpty()) {
-            log.warn("Invalid repository name format: {}", safeNameWithOwner);
+            log.warn("Skipped collaborator sync: reason=invalid repository name format, repoName={}", safeNameWithOwner);
             return 0;
         }
         String owner = parsedName.get().owner();
         String name = parsedName.get().name();
 
-        HttpGraphQlClient client = graphQlClientProvider.forWorkspace(workspaceId);
+        HttpGraphQlClient client = graphQlClientProvider.forScope(scopeId);
 
         try {
             int totalSynced = 0;
@@ -92,9 +92,9 @@ public class GitHubCollaboratorSyncService {
                 pageCount++;
                 if (pageCount >= MAX_PAGINATION_PAGES) {
                     log.warn(
-                        "Reached maximum pagination limit ({}) for repository {}, stopping",
-                        MAX_PAGINATION_PAGES,
-                        safeNameWithOwner
+                        "Reached maximum pagination limit for collaborators: repoName={}, limit={}",
+                        safeNameWithOwner,
+                        MAX_PAGINATION_PAGES
                     );
                     break;
                 }
@@ -144,14 +144,14 @@ public class GitHubCollaboratorSyncService {
             int removedCount = removeStaleCollaborators(repositoryId, syncedUserIds);
 
             log.info(
-                "Synced {} collaborators for repository {} (removed {} stale)",
-                totalSynced,
+                "Completed collaborator sync: repoName={}, collaboratorCount={}, removedCount={}",
                 safeNameWithOwner,
+                totalSynced,
                 removedCount
             );
             return totalSynced;
         } catch (Exception e) {
-            log.error("Error syncing collaborators for repository {}: {}", safeNameWithOwner, e.getMessage(), e);
+            log.error("Failed to sync collaborators: repoName={}", safeNameWithOwner, e);
             return 0;
         }
     }
@@ -211,9 +211,10 @@ public class GitHubCollaboratorSyncService {
                 collaboratorRepository.delete(existing);
                 removedCount++;
                 log.debug(
-                    "Removed stale collaborator: {} from repository {}",
-                    existing.getUser().getLogin(),
-                    repositoryId
+                    "Removed stale collaborator: repoId={}, userId={}, userLogin={}",
+                    repositoryId,
+                    existing.getUser().getId(),
+                    sanitizeForLog(existing.getUser().getLogin())
                 );
             }
         }

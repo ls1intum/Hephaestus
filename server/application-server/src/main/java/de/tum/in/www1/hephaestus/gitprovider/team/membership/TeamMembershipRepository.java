@@ -7,8 +7,8 @@ import org.springframework.stereotype.Repository;
 /**
  * Repository for team membership records.
  *
- * <p>Memberships are scoped through their team which carries workspace context through
- * the Team.organization -> Workspace.organization relationship.
+ * <p>Memberships are scoped through their team which carries scope through
+ * the Team.organization relationship.
  */
 @Repository
 public interface TeamMembershipRepository extends JpaRepository<TeamMembership, TeamMembership.Id> {

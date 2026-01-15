@@ -63,15 +63,15 @@ public class GitHubIssueCommentSyncService {
      * <p>
      * Uses streaming to avoid loading all issues into memory at once.
      *
-     * @param workspaceId  the workspace ID for authentication
+     * @param scopeId  the scope ID for authentication
      * @param repositoryId the repository ID to sync comments for
      * @return number of comments synced
      */
     @Transactional
-    public int syncForRepository(Long workspaceId, Long repositoryId) {
+    public int syncForRepository(Long scopeId, Long repositoryId) {
         Repository repository = repositoryRepository.findById(repositoryId).orElse(null);
         if (repository == null) {
-            log.warn("Repository {} not found, skipping comment sync", repositoryId);
+            log.warn("Repository not found, skipping comment sync: repoId={}", repositoryId);
             return 0;
         }
 
@@ -80,28 +80,32 @@ public class GitHubIssueCommentSyncService {
 
         try (Stream<Issue> issueStream = issueRepository.streamAllByRepository_Id(repositoryId)) {
             issueStream.forEach(issue -> {
-                totalSynced.addAndGet(syncForIssue(workspaceId, issue));
+                totalSynced.addAndGet(syncForIssue(scopeId, issue));
                 issueCount.incrementAndGet();
             });
         }
 
         String safeNameWithOwner = sanitizeForLog(repository.getNameWithOwner());
         if (issueCount.get() == 0) {
-            log.debug("No issues found for {}, skipping comment sync", safeNameWithOwner);
+            log.debug("No issues found, skipping comment sync: repoName={}", safeNameWithOwner);
             return 0;
         }
 
-        log.info("Synced {} comments for {} issues in {}", totalSynced.get(), issueCount.get(), safeNameWithOwner);
+        log.info("Completed comment sync: repoName={}, commentCount={}, issueCount={}", safeNameWithOwner, totalSynced.get(), issueCount.get());
         return totalSynced.get();
     }
 
     /**
      * Synchronizes all comments for a single issue.
+     *
+     * @param scopeId the scope ID for authentication
+     * @param issue the issue to sync comments for
+     * @return number of comments synced
      */
     @Transactional
-    public int syncForIssue(Long workspaceId, Issue issue) {
+    public int syncForIssue(Long scopeId, Issue issue) {
         if (issue == null || issue.getRepository() == null) {
-            log.warn("Issue or repository is null, skipping comment sync");
+            log.warn("Issue or repository is null, skipping comment sync: issueId={}", issue != null ? issue.getId() : "null");
             return 0;
         }
 
@@ -110,13 +114,13 @@ public class GitHubIssueCommentSyncService {
         String safeNameWithOwner = sanitizeForLog(nameWithOwner);
         Optional<RepositoryOwnerAndName> parsedName = GitHubRepositoryNameParser.parse(nameWithOwner);
         if (parsedName.isEmpty()) {
-            log.warn("Invalid repository name format: {}", safeNameWithOwner);
+            log.warn("Invalid repository name format: repoName={}", safeNameWithOwner);
             return 0;
         }
         RepositoryOwnerAndName ownerAndName = parsedName.get();
 
-        HttpGraphQlClient client = graphQlClientProvider.forWorkspace(workspaceId);
-        ProcessingContext context = ProcessingContext.forSync(workspaceId, repository);
+        HttpGraphQlClient client = graphQlClientProvider.forScope(scopeId);
+        ProcessingContext context = ProcessingContext.forSync(scopeId, repository);
 
         int totalSynced = 0;
         String cursor = null;
@@ -127,10 +131,10 @@ public class GitHubIssueCommentSyncService {
             pageCount++;
             if (pageCount >= MAX_PAGINATION_PAGES) {
                 log.warn(
-                    "Reached maximum pagination limit ({}) for issue #{} in {}, stopping",
-                    MAX_PAGINATION_PAGES,
+                    "Reached maximum pagination limit for comment sync: repoName={}, issueNumber={}, limit={}",
+                    safeNameWithOwner,
                     issue.getNumber(),
-                    safeNameWithOwner
+                    MAX_PAGINATION_PAGES
                 );
                 break;
             }
@@ -150,13 +154,13 @@ public class GitHubIssueCommentSyncService {
                     // Check if this is a NOT_FOUND error (issue deleted from GitHub)
                     if (isNotFoundError(response, "repository.issue")) {
                         log.debug(
-                            "Issue #{} in {} no longer exists on GitHub, skipping comment sync",
-                            issue.getNumber(),
-                            safeNameWithOwner
+                            "Issue no longer exists on GitHub, skipping comment sync: repoName={}, issueNumber={}",
+                            safeNameWithOwner,
+                            issue.getNumber()
                         );
                         return 0;
                     }
-                    log.warn("Invalid GraphQL response: {}", response != null ? response.getErrors() : "null");
+                    log.warn("Invalid GraphQL response for comment sync: repoName={}, issueNumber={}", safeNameWithOwner, issue.getNumber());
                     break;
                 }
 
@@ -186,33 +190,31 @@ public class GitHubIssueCommentSyncService {
                 if (isNotFoundError(e.getResponse(), "repository.issue")) {
                     // Log at DEBUG - deleted issues are expected during sync, not actionable
                     log.debug(
-                        "Issue #{} in {} no longer exists on GitHub, skipping comment sync",
-                        issue.getNumber(),
-                        safeNameWithOwner
+                        "Issue no longer exists on GitHub, skipping comment sync: repoName={}, issueNumber={}",
+                        safeNameWithOwner,
+                        issue.getNumber()
                     );
                     return 0;
                 }
                 log.error(
-                    "Error syncing comments for issue #{} in {}: {}",
-                    issue.getNumber(),
+                    "Failed to sync comments: repoName={}, issueNumber={}",
                     safeNameWithOwner,
-                    e.getMessage(),
+                    issue.getNumber(),
                     e
                 );
                 break;
             } catch (Exception e) {
                 log.error(
-                    "Error syncing comments for issue #{} in {}: {}",
-                    issue.getNumber(),
+                    "Failed to sync comments: repoName={}, issueNumber={}",
                     safeNameWithOwner,
-                    e.getMessage(),
+                    issue.getNumber(),
                     e
                 );
                 break;
             }
         }
 
-        log.debug("Synced {} comments for issue #{} in {}", totalSynced, issue.getNumber(), safeNameWithOwner);
+        log.debug("Completed comment sync for issue: repoName={}, issueNumber={}, commentCount={}", safeNameWithOwner, issue.getNumber(), totalSynced);
         return totalSynced;
     }
 }

@@ -82,14 +82,14 @@ public class LeaderboardCacheManager {
     public void registerKey(Long workspaceId, String cacheKey) {
         // Prevent unbounded growth - memory safety
         if (keysByWorkspace.size() >= MAX_TRACKED_WORKSPACES && !keysByWorkspace.containsKey(workspaceId)) {
-            log.warn("leaderboard.cache.workspace_limit_reached maxWorkspaces={}", MAX_TRACKED_WORKSPACES);
+            log.warn("Workspace limit reached for cache tracking: maxWorkspaces={}", MAX_TRACKED_WORKSPACES);
             return;
         }
 
         Set<String> keys = keysByWorkspace.computeIfAbsent(workspaceId, k -> ConcurrentHashMap.newKeySet());
         if (keys.size() >= MAX_KEYS_PER_WORKSPACE) {
             log.warn(
-                "leaderboard.cache.key_limit_reached workspaceId={} maxKeys={}",
+                "Key limit reached for cache tracking: scopeId={}, maxKeys={}",
                 workspaceId,
                 MAX_KEYS_PER_WORKSPACE
             );
@@ -111,13 +111,13 @@ public class LeaderboardCacheManager {
     public void evictWorkspace(Long workspaceId) {
         Cache cache = cacheManager.getCache(CACHE_NAME);
         if (cache == null) {
-            log.debug("Cache '{}' not found, skipping eviction", CACHE_NAME);
+            log.debug("Skipped eviction, cache not found: cacheName={}", CACHE_NAME);
             return;
         }
 
         Set<String> keys = keysByWorkspace.remove(workspaceId);
         if (keys == null || keys.isEmpty()) {
-            log.debug("No cached keys for workspace {}", workspaceId);
+            log.debug("Skipped eviction, no cached keys: scopeId={}", workspaceId);
             return;
         }
 
@@ -128,7 +128,7 @@ public class LeaderboardCacheManager {
         }
         cacheEvictionsCounter.increment();
         cacheKeyEvictedCounter.increment(evictedCount);
-        log.info("leaderboard.cache.evicted workspaceId={} keysEvicted={}", workspaceId, evictedCount);
+        log.info("Evicted leaderboard cache: scopeId={}, keysEvicted={}", workspaceId, evictedCount);
     }
 
     /**
@@ -141,7 +141,7 @@ public class LeaderboardCacheManager {
             cache.clear();
             keysByWorkspace.clear();
             cacheEvictAllCounter.increment();
-            log.info("leaderboard.cache.evict_all keysCleared={}", totalKeys);
+            log.info("Evicted all leaderboard cache: keysCleared={}", totalKeys);
         }
     }
 

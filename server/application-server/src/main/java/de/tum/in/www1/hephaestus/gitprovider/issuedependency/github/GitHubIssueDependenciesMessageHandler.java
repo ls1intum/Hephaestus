@@ -1,5 +1,7 @@
 package de.tum.in.www1.hephaestus.gitprovider.issuedependency.github;
 
+import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
+
 import de.tum.in.www1.hephaestus.gitprovider.common.NatsMessageDeserializer;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContextFactory;
@@ -28,7 +30,7 @@ import org.springframework.transaction.annotation.Transactional;
  * not appear in the GitHub App permissions/events configuration UI. This appears to be a
  * gap where GitHub shipped the "Blocked by" UI feature without corresponding webhook support.
  * <p>
- * <b>Current Workaround:</b> Use {@link GitHubIssueDependencySyncService#syncDependenciesForWorkspace}
+ * <b>Current Workaround:</b> Use {@link GitHubIssueDependencySyncService#syncDependenciesForScope}
  * for periodic GraphQL-based synchronization of blocking relationships.
  * <p>
  * <b>Status Tracking:</b>
@@ -82,16 +84,16 @@ public class GitHubIssueDependenciesMessageHandler extends GitHubMessageHandler<
         var blockingIssueDto = event.blockingIssue();
 
         if (blockedIssueDto == null || blockingIssueDto == null) {
-            log.warn("Received issue_dependencies event with missing data");
+            log.warn("Received issue_dependencies event with missing data: action={}", event.action());
             return;
         }
 
         log.info(
-            "Received issue_dependencies event: action={}, blocked=#{}, blocking=#{}, repo={}",
+            "Received issue_dependencies event: action={}, blockedIssueNumber={}, blockingIssueNumber={}, repoName={}",
             event.action(),
             blockedIssueDto.number(),
             blockingIssueDto.number(),
-            event.repository() != null ? event.repository().fullName() : "unknown"
+            event.repository() != null ? sanitizeForLog(event.repository().fullName()) : "unknown"
         );
 
         ProcessingContext context = contextFactory.forWebhookEvent(event).orElse(null);
@@ -118,7 +120,7 @@ public class GitHubIssueDependenciesMessageHandler extends GitHubMessageHandler<
                 blockingIssueId,
                 false
             );
-            default -> log.debug("Unhandled issue_dependencies action: {}", event.action());
+            default -> log.debug("Skipped issue_dependencies event: reason=unhandledAction, action={}", event.action());
         }
     }
 }

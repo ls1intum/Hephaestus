@@ -4,6 +4,7 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 import de.tum.in.www1.hephaestus.activity.scoring.ExperiencePointCalculator;
+import de.tum.in.www1.hephaestus.gitprovider.common.DataSource;
 import de.tum.in.www1.hephaestus.gitprovider.common.events.DomainEvent;
 import de.tum.in.www1.hephaestus.gitprovider.common.events.EventContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.events.EventPayload;
@@ -455,7 +456,7 @@ class ActivityEventListenerTest {
             Instant.now(),
             42L,
             repoRef,
-            EventContext.Source.WEBHOOK,
+            DataSource.WEBHOOK,
             null,
             UUID.randomUUID().toString()
         );

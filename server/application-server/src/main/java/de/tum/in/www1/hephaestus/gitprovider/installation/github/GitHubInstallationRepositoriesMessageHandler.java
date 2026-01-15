@@ -3,7 +3,7 @@ package de.tum.in.www1.hephaestus.gitprovider.installation.github;
 import de.tum.in.www1.hephaestus.gitprovider.common.NatsMessageDeserializer;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventType;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
-import de.tum.in.www1.hephaestus.gitprovider.common.spi.WorkspaceProvisioningListener;
+import de.tum.in.www1.hephaestus.gitprovider.common.spi.ProvisioningListener;
 import de.tum.in.www1.hephaestus.gitprovider.installation.github.dto.GitHubInstallationRepositoriesEventDTO;
 import de.tum.in.www1.hephaestus.gitprovider.repository.github.dto.GitHubRepositoryRefDTO;
 import java.util.List;
@@ -16,7 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
  * Handles GitHub installation_repositories webhook events.
  * <p>
  * When repositories are added or removed from a GitHub App installation,
- * this handler notifies the workspace module via SPI to update monitored repositories.
+ * this handler notifies the consuming module via SPI to update monitored repositories.
  */
 @Component
 public class GitHubInstallationRepositoriesMessageHandler
@@ -24,11 +24,11 @@ public class GitHubInstallationRepositoriesMessageHandler
 
     private static final Logger log = LoggerFactory.getLogger(GitHubInstallationRepositoriesMessageHandler.class);
 
-    private final WorkspaceProvisioningListener provisioningListener;
+    private final ProvisioningListener provisioningListener;
 
     GitHubInstallationRepositoriesMessageHandler(
         NatsMessageDeserializer deserializer,
-        WorkspaceProvisioningListener provisioningListener
+        ProvisioningListener provisioningListener
     ) {
         super(GitHubInstallationRepositoriesEventDTO.class, deserializer);
         this.provisioningListener = provisioningListener;
@@ -50,7 +50,7 @@ public class GitHubInstallationRepositoriesMessageHandler
         var installation = event.installation();
 
         if (installation == null) {
-            log.warn("Received installation_repositories event with missing data");
+            log.warn("Received installation_repositories event with missing data: action={}", event.action());
             return;
         }
 
@@ -60,7 +60,7 @@ public class GitHubInstallationRepositoriesMessageHandler
             : List.of();
 
         log.info(
-            "Received installation_repositories event: action={}, installation={}, added={}, removed={}",
+            "Received installation_repositories event: action={}, installationId={}, addedCount={}, removedCount={}",
             event.action(),
             installation.id(),
             added.size(),
@@ -69,18 +69,18 @@ public class GitHubInstallationRepositoriesMessageHandler
 
         long installationId = installation.id();
 
-        // Notify workspace module via SPI for added repositories
+        // Notify consuming module via SPI for added repositories
         if (!added.isEmpty()) {
             List<String> addedNames = added.stream().map(GitHubRepositoryRefDTO::fullName).toList();
-            log.info("Adding {} repositories to monitor for installation {}", addedNames.size(), installationId);
             provisioningListener.onRepositoriesAdded(installationId, addedNames);
+            log.info("Added repositories to installation: installationId={}, repoCount={}", installationId, addedNames.size());
         }
 
-        // Notify workspace module via SPI for removed repositories
+        // Notify consuming module via SPI for removed repositories
         if (!removed.isEmpty()) {
             List<String> removedNames = removed.stream().map(GitHubRepositoryRefDTO::fullName).toList();
-            log.info("Removing {} repositories from monitor for installation {}", removedNames.size(), installationId);
             provisioningListener.onRepositoriesRemoved(installationId, removedNames);
+            log.info("Removed repositories from installation: installationId={}, repoCount={}", installationId, removedNames.size());
         }
     }
 }

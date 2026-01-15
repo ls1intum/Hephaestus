@@ -7,7 +7,7 @@ import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientPr
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser.RepositoryOwnerAndName;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider;
-import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider.WorkspaceSyncMetadata;
+import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider.SyncMetadata;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHIssue;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHIssueConnection;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
@@ -49,7 +49,7 @@ import org.springframework.transaction.annotation.Transactional;
  * GitHub shipped the "Blocked by" UI without webhook/API event support
  * (see <a href="https://github.com/orgs/community/discussions/165749">
  * Community Discussion #165749</a>). Until webhooks become available,
- * use {@link #syncDependenciesForWorkspace} for bulk GraphQL sync.
+ * use {@link #syncDependenciesForScope} for bulk GraphQL sync.
  */
 @Service
 public class GitHubIssueDependencySyncService {
@@ -98,7 +98,7 @@ public class GitHubIssueDependencySyncService {
     @Transactional
     public void processIssueDependencyEvent(long blockedIssueId, long blockingIssueId, boolean isBlock) {
         log.info(
-            "Processing issue dependency event: blockedIssue={}, blockingIssue={}, isBlock={}",
+            "Processing issue dependency event: blockedIssueId={}, blockingIssueId={}, isBlock={}",
             blockedIssueId,
             blockingIssueId,
             isBlock
@@ -106,13 +106,13 @@ public class GitHubIssueDependencySyncService {
 
         Optional<Issue> blockedIssueOpt = issueRepository.findById(blockedIssueId);
         if (blockedIssueOpt.isEmpty()) {
-            log.debug("Blocked issue {} not found in database, skipping", blockedIssueId);
+            log.debug("Blocked issue not found in database, skipping: issueId={}", blockedIssueId);
             return;
         }
 
         Optional<Issue> blockingIssueOpt = issueRepository.findById(blockingIssueId);
         if (blockingIssueOpt.isEmpty()) {
-            log.debug("Blocking issue {} not found in database, skipping", blockingIssueId);
+            log.debug("Blocking issue not found in database, skipping: issueId={}", blockingIssueId);
             return;
         }
 
@@ -131,7 +131,7 @@ public class GitHubIssueDependencySyncService {
     // ═══════════════════════════════════════════════════════════════════════════
 
     /**
-     * Sync all issue dependencies for a workspace via GraphQL.
+     * Sync all issue dependencies for a scope via GraphQL.
      * <p>
      * This is the primary sync mechanism until issue_dependencies webhooks
      * become available in GitHub App settings.
@@ -140,42 +140,42 @@ public class GitHubIssueDependencySyncService {
      * level. GraphQL HTTP calls are made outside any transaction to avoid blocking
      * DB connections. Individual database writes use separate transactions.
      *
-     * @param workspaceId The workspace to sync
+     * @param scopeId The scope to sync
      * @return Total relationships synced, or -1 if skipped due to cooldown
      */
-    public int syncDependenciesForWorkspace(Long workspaceId) {
-        Optional<WorkspaceSyncMetadata> metadataOpt = syncTargetProvider.getWorkspaceSyncMetadata(workspaceId);
+    public int syncDependenciesForScope(Long scopeId) {
+        Optional<SyncMetadata> metadataOpt = syncTargetProvider.getSyncMetadata(scopeId);
         if (metadataOpt.isEmpty()) {
-            throw new IllegalArgumentException("Workspace not found: " + workspaceId);
+            throw new IllegalArgumentException("Scope not found: " + scopeId);
         }
 
-        WorkspaceSyncMetadata metadata = metadataOpt.get();
+        SyncMetadata metadata = metadataOpt.get();
         if (!metadata.needsIssueDependenciesSync(syncCooldownInMinutes)) {
             log.debug(
-                "Skipping issue dependencies sync for workspace '{}' due to cooldown (last sync: {})",
-                metadata.displayName(),
+                "Skipping issue dependencies sync due to cooldown: scopeId={}, lastSyncedAt={}",
+                scopeId,
                 metadata.issueDependenciesSyncedAt()
             );
             return -1;
         }
 
-        // Get repository names via SPI (workspace package implements this)
-        List<String> repositoryNames = syncTargetProvider.getRepositoryNamesForWorkspace(workspaceId);
+        // Get repository names via SPI (consuming module implements this)
+        List<String> repositoryNames = syncTargetProvider.getRepositoryNamesForScope(scopeId);
         if (repositoryNames.isEmpty()) {
-            log.debug("No repositories found for workspace {}", workspaceId);
+            log.debug("No repositories found for scope: scopeId={}", scopeId);
             // Still update timestamp to prevent repeated empty checks
-            updateSyncTimestamp(workspaceId);
+            updateSyncTimestamp(scopeId);
             return 0;
         }
 
-        HttpGraphQlClient client = graphQlClientProvider.forWorkspace(workspaceId);
+        HttpGraphQlClient client = graphQlClientProvider.forScope(scopeId);
         int totalSynced = 0;
-        int failedRepos = 0;
+        int failedRepoCount = 0;
 
         for (String repoNameWithOwner : repositoryNames) {
             Optional<Repository> repoOpt = repositoryRepository.findByNameWithOwner(repoNameWithOwner);
             if (repoOpt.isEmpty()) {
-                log.warn("Repository {} not found in database, skipping", sanitizeForLog(repoNameWithOwner));
+                log.warn("Repository not found in database, skipping: repoName={}", sanitizeForLog(repoNameWithOwner));
                 continue;
             }
 
@@ -183,21 +183,21 @@ public class GitHubIssueDependencySyncService {
                 int synced = syncRepositoryDependencies(client, repoOpt.get());
                 totalSynced += synced;
             } catch (Exception e) {
-                failedRepos++;
-                log.error("Error syncing dependencies for repository {}: {}", repoNameWithOwner, e.getMessage());
+                failedRepoCount++;
+                log.error("Failed to sync dependencies: repoName={}", sanitizeForLog(repoNameWithOwner), e);
             }
         }
 
         // Only update timestamp if at least some repos succeeded
-        if (failedRepos < repositoryNames.size()) {
-            updateSyncTimestamp(workspaceId);
+        if (failedRepoCount < repositoryNames.size()) {
+            updateSyncTimestamp(scopeId);
         }
 
         log.info(
-            "Synced {} issue dependency relationships for workspace {} ({} repos failed)",
+            "Completed issue dependency sync: scopeId={}, dependencyCount={}, failedRepoCount={}",
+            scopeId,
             totalSynced,
-            metadata.displayName(),
-            failedRepos
+            failedRepoCount
         );
         return totalSynced;
     }
@@ -206,9 +206,9 @@ public class GitHubIssueDependencySyncService {
      * Update the sync timestamp for issue dependencies.
      */
     @Transactional
-    public void updateSyncTimestamp(Long workspaceId) {
-        syncTargetProvider.updateWorkspaceSyncTimestamp(
-            workspaceId,
+    public void updateSyncTimestamp(Long scopeId) {
+        syncTargetProvider.updateScopeSyncTimestamp(
+            scopeId,
             SyncTargetProvider.SyncType.ISSUE_DEPENDENCIES,
             Instant.now()
         );
@@ -222,7 +222,7 @@ public class GitHubIssueDependencySyncService {
         String safeNameWithOwner = sanitizeForLog(repo.getNameWithOwner());
         Optional<RepositoryOwnerAndName> parsedName = GitHubRepositoryNameParser.parse(repo.getNameWithOwner());
         if (parsedName.isEmpty()) {
-            log.warn("Invalid repository name format: {}", safeNameWithOwner);
+            log.warn("Invalid repository name format: repoName={}", safeNameWithOwner);
             return 0;
         }
         String owner = parsedName.get().owner();
@@ -236,9 +236,9 @@ public class GitHubIssueDependencySyncService {
             pageCount++;
             if (pageCount >= MAX_PAGINATION_PAGES) {
                 log.warn(
-                    "Reached maximum pagination limit ({}) for repository {}, stopping",
-                    MAX_PAGINATION_PAGES,
-                    safeNameWithOwner
+                    "Reached maximum pagination limit for dependency sync: repoName={}, limit={}",
+                    safeNameWithOwner,
+                    MAX_PAGINATION_PAGES
                 );
                 break;
             }
@@ -255,7 +255,7 @@ public class GitHubIssueDependencySyncService {
                 .block(GRAPHQL_TIMEOUT);
 
             if (issueConnection == null || issueConnection.getNodes() == null) {
-                log.warn("No response from GraphQL for repository {}", safeNameWithOwner);
+                log.warn("No response from GraphQL for dependency sync: repoName={}", safeNameWithOwner);
                 break;
             }
 
@@ -369,7 +369,7 @@ public class GitHubIssueDependencySyncService {
     private void addBlockingRelationship(Issue blockedIssue, Issue blockingIssue) {
         if (blockedIssue.getBlockedBy().contains(blockingIssue)) {
             log.debug(
-                "Issue #{} is already blocked by #{}, skipping",
+                "Issue already blocked, skipping: blockedIssueNumber={}, blockingIssueNumber={}",
                 blockedIssue.getNumber(),
                 blockingIssue.getNumber()
             );
@@ -380,7 +380,7 @@ public class GitHubIssueDependencySyncService {
         issueRepository.save(blockedIssue);
 
         log.info(
-            "Added blocking relationship: #{} is now blocked by #{}",
+            "Added blocking relationship: blockedIssueNumber={}, blockingIssueNumber={}",
             blockedIssue.getNumber(),
             blockingIssue.getNumber()
         );
@@ -392,13 +392,13 @@ public class GitHubIssueDependencySyncService {
         if (removed) {
             issueRepository.save(blockedIssue);
             log.info(
-                "Removed blocking relationship: #{} is no longer blocked by #{}",
+                "Removed blocking relationship: blockedIssueNumber={}, blockingIssueNumber={}",
                 blockedIssue.getNumber(),
                 blockingIssue.getNumber()
             );
         } else {
             log.debug(
-                "Issue #{} was not blocked by #{}, nothing to remove",
+                "Issue was not blocked, nothing to remove: blockedIssueNumber={}, blockingIssueNumber={}",
                 blockedIssue.getNumber(),
                 blockingIssue.getNumber()
             );

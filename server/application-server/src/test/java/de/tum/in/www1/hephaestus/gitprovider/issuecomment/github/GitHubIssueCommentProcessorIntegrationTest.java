@@ -171,7 +171,7 @@ class GitHubIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
                 .satisfies(event -> {
                     assertThat(event.comment().id()).isEqualTo(TEST_COMMENT_ID);
                     assertThat(event.issueId()).isEqualTo(testIssue.getId());
-                    assertThat(event.context().workspaceId()).isEqualTo(testWorkspace.getId());
+                    assertThat(event.context().scopeId()).isEqualTo(testWorkspace.getId());
                 });
         }
 

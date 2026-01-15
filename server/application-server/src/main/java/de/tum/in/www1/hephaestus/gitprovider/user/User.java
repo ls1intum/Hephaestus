@@ -105,8 +105,8 @@ public class User extends BaseGitServiceEntity {
     @ToString.Exclude
     private Set<PullRequestReviewComment> reviewComments = new HashSet<>();
 
-    // Note: WorkspaceMembership is accessed via WorkspaceMembershipRepository, not via User entity.
-    // The relationship is unidirectional from WorkspaceMembership → User to maintain module separation.
+    // Note: Membership is accessed via the consuming module's repository, not via User entity.
+    // The relationship is unidirectional to maintain module separation.
 
     // Note: User preferences (notificationsEnabled, participateInResearch) are stored in
     // UserPreferences entity in the account module to maintain domain isolation.

@@ -74,15 +74,15 @@ public class GitHubPullRequestSyncService {
      * Reviews are fetched inline with PRs (first 10 per PR) to eliminate N+1 queries.
      * Only PRs with more than 10 reviews require additional API calls for pagination.
      *
-     * @param workspaceId  the workspace ID for authentication
+     * @param scopeId  the scope ID for authentication
      * @param repositoryId the repository ID to sync pull requests for
      * @return number of pull requests synced
      */
     @Transactional
-    public int syncForRepository(Long workspaceId, Long repositoryId) {
+    public int syncForRepository(Long scopeId, Long repositoryId) {
         Repository repository = repositoryRepository.findById(repositoryId).orElse(null);
         if (repository == null) {
-            log.warn("Repository {} not found, skipping pull request sync", repositoryId);
+            log.warn("Repository not found, skipping pull request sync: repoId={}", repositoryId);
             return 0;
         }
 
@@ -90,13 +90,13 @@ public class GitHubPullRequestSyncService {
         String safeNameWithOwner = sanitizeForLog(nameWithOwner);
         Optional<RepositoryOwnerAndName> parsedName = GitHubRepositoryNameParser.parse(nameWithOwner);
         if (parsedName.isEmpty()) {
-            log.warn("Invalid repository name format: {}", safeNameWithOwner);
+            log.warn("Invalid repository name format, skipping pull request sync: repoName={}", safeNameWithOwner);
             return 0;
         }
         RepositoryOwnerAndName ownerAndName = parsedName.get();
 
-        HttpGraphQlClient client = graphQlClientProvider.forWorkspace(workspaceId);
-        ProcessingContext context = ProcessingContext.forSync(workspaceId, repository);
+        HttpGraphQlClient client = graphQlClientProvider.forScope(scopeId);
+        ProcessingContext context = ProcessingContext.forSync(scopeId, repository);
 
         int totalPRsSynced = 0;
         int totalReviewsSynced = 0;
@@ -109,9 +109,9 @@ public class GitHubPullRequestSyncService {
             pageCount++;
             if (pageCount >= MAX_PAGINATION_PAGES) {
                 log.warn(
-                    "Reached maximum pagination limit ({}) for repository {}, stopping",
-                    MAX_PAGINATION_PAGES,
-                    safeNameWithOwner
+                    "Reached maximum pagination limit for pull requests: repoName={}, limit={}",
+                    safeNameWithOwner,
+                    MAX_PAGINATION_PAGES
                 );
                 break;
             }
@@ -127,7 +127,11 @@ public class GitHubPullRequestSyncService {
                     .block(GRAPHQL_TIMEOUT);
 
                 if (response == null || !response.isValid()) {
-                    log.warn("Invalid GraphQL response: {}", response != null ? response.getErrors() : "null");
+                    log.warn(
+                        "Invalid GraphQL response for pull requests: repoName={}, errors={}",
+                        safeNameWithOwner,
+                        response != null ? response.getErrors() : "null"
+                    );
                     break;
                 }
 
@@ -172,7 +176,7 @@ public class GitHubPullRequestSyncService {
                 hasMore = pageInfo != null && Boolean.TRUE.equals(pageInfo.getHasNextPage());
                 cursor = pageInfo != null ? pageInfo.getEndCursor() : null;
             } catch (Exception e) {
-                log.error("Error syncing pull requests for {}: {}", safeNameWithOwner, e.getMessage(), e);
+                log.error("Failed to sync pull requests: repoName={}", safeNameWithOwner, e);
                 break;
             }
         }
@@ -180,13 +184,13 @@ public class GitHubPullRequestSyncService {
         // Fetch remaining reviews for PRs with >10 reviews (using cursor for efficient continuation)
         if (!prsNeedingReviewPagination.isEmpty()) {
             log.debug(
-                "Fetching additional reviews for {} PRs with >10 reviews in {}",
-                prsNeedingReviewPagination.size(),
-                safeNameWithOwner
+                "Fetching additional reviews for pull requests with pagination: repoName={}, prCount={}",
+                safeNameWithOwner,
+                prsNeedingReviewPagination.size()
             );
             for (PullRequestWithReviewCursor prWithCursor : prsNeedingReviewPagination) {
                 int additionalReviews = reviewSyncService.syncRemainingReviews(
-                    workspaceId,
+                    scopeId,
                     prWithCursor.pullRequest(),
                     prWithCursor.reviewCursor()
                 );
@@ -195,10 +199,10 @@ public class GitHubPullRequestSyncService {
         }
 
         log.info(
-            "Synced {} pull requests and {} reviews for {} ({} PRs needed review pagination)",
+            "Completed pull request sync: repoName={}, prCount={}, reviewCount={}, prsWithPagination={}",
+            safeNameWithOwner,
             totalPRsSynced,
             totalReviewsSynced,
-            safeNameWithOwner,
             prsNeedingReviewPagination.size()
         );
         return totalPRsSynced;

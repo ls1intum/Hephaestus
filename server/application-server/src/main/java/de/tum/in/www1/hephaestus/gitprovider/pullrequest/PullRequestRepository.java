@@ -16,8 +16,8 @@ import org.springframework.stereotype.Repository;
 /**
  * Repository for PullRequest entities.
  *
- * <p>This repository contains only workspace-agnostic queries for the gitprovider domain.
- * Workspace-scoped queries (those that join with RepositoryToMonitor or other workspace
+ * <p>This repository contains only domain-agnostic queries for the gitprovider domain.
+ * Scope-filtered queries (those that join with RepositoryToMonitor or other consuming module
  * entities) belong in the consuming packages (leaderboard, profile, practices, etc.)
  * to maintain clean architecture boundaries.
  *
@@ -27,7 +27,7 @@ import org.springframework.stereotype.Repository;
 public interface PullRequestRepository extends JpaRepository<PullRequest, Long> {
     /**
      * Finds a PR by repository ID and number for sync operations.
-     * Repository ID inherently has workspace through Workspace.organization.
+     * Repository ID inherently has scope through Organization.
      */
     @Query(
         """
@@ -47,7 +47,7 @@ public interface PullRequestRepository extends JpaRepository<PullRequest, Long> 
 
     /**
      * Finds all synced PR numbers for a repository during sync operations.
-     * Repository ID inherently has workspace through Workspace.organization.
+     * Repository ID inherently has scope through Organization.
      */
     @Query(
         """
@@ -79,7 +79,7 @@ public interface PullRequestRepository extends JpaRepository<PullRequest, Long> 
 
     /**
      * Finds all pull requests belonging to a repository.
-     * Repository ID inherently has workspace through Workspace.organization.
+     * Repository ID inherently has scope through Organization.
      *
      * @param repositoryId the repository ID
      * @return list of pull requests for the repository
@@ -89,7 +89,7 @@ public interface PullRequestRepository extends JpaRepository<PullRequest, Long> 
     /**
      * Finds pull requests belonging to a repository with pagination.
      * Uses Slice for efficient batching without requiring a count query.
-     * Repository ID inherently has workspace through Workspace.organization.
+     * Repository ID inherently has scope through Organization.
      *
      * @param repositoryId the repository ID
      * @param pageable pagination parameters
@@ -99,7 +99,7 @@ public interface PullRequestRepository extends JpaRepository<PullRequest, Long> 
 
     /**
      * Streams all pull requests belonging to a repository.
-     * Repository ID inherently has workspace through Workspace.organization.
+     * Repository ID inherently has scope through Organization.
      * <p>
      * Must be used within a try-with-resources block to ensure the stream is closed
      * and the database connection is released. The calling method must be annotated

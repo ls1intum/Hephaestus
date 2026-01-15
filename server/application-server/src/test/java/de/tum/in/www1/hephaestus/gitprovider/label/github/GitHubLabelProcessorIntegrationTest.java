@@ -156,8 +156,8 @@ class GitHubLabelProcessorIntegrationTest extends BaseIntegrationTest {
                 .first()
                 .satisfies(event -> {
                     assertThat(event.label().id()).isEqualTo(labelId);
-                    assertThat(event.workspaceId()).isEqualTo(testWorkspace.getId());
-                    assertThat(event.repositoryId()).isEqualTo(TEST_REPO_ID);
+                    assertThat(event.context().scopeId()).isEqualTo(testWorkspace.getId());
+                    assertThat(event.context().repository().id()).isEqualTo(TEST_REPO_ID);
                 });
             assertThat(eventListener.getUpdatedEvents()).isEmpty();
         }
@@ -360,8 +360,8 @@ class GitHubLabelProcessorIntegrationTest extends BaseIntegrationTest {
                 .satisfies(event -> {
                     assertThat(event.labelId()).isEqualTo(labelId);
                     assertThat(event.labelName()).isEqualTo("to-delete");
-                    assertThat(event.workspaceId()).isEqualTo(testWorkspace.getId());
-                    assertThat(event.repositoryId()).isEqualTo(TEST_REPO_ID);
+                    assertThat(event.context().scopeId()).isEqualTo(testWorkspace.getId());
+                    assertThat(event.context().repository().id()).isEqualTo(TEST_REPO_ID);
                 });
         }
 

@@ -62,7 +62,7 @@ public class DeadLetterEventService {
     @Transactional
     public void discard(UUID id, String reason) {
         DeadLetterEvent event = findById(id);
-        log.info("Discarding dead letter {} with reason: {}", id, reason);
+        log.info("Discarding dead letter: deadLetterId={}, reason={}", id, reason);
         event.markDiscarded(reason);
         deadLetterRepository.save(event);
     }
@@ -85,7 +85,7 @@ public class DeadLetterEventService {
             return new RetryResult(false, "Dead letter is not in PENDING status");
         }
 
-        log.info("Retrying dead letter {}", id);
+        log.info("Retrying dead letter: deadLetterId={}", id);
 
         try {
             boolean success = activityEventService.record(
@@ -104,7 +104,7 @@ public class DeadLetterEventService {
             if (success) {
                 event.markResolved("Retry successful");
                 deadLetterRepository.save(event);
-                log.info("Dead letter {} successfully retried", id);
+                log.info("Retried dead letter successfully: deadLetterId={}", id);
                 return new RetryResult(true, "Event successfully recorded");
             } else {
                 // Duplicate means it was already recorded - treat as success
@@ -116,7 +116,7 @@ public class DeadLetterEventService {
             // Increment retry count on failure
             int newCount = event.incrementRetryCount();
             deadLetterRepository.save(event);
-            log.error("Failed to retry dead letter {}: {} (attempt {})", id, e.getMessage(), newCount);
+            log.error("Failed to retry dead letter: deadLetterId={}, retryCount={}", id, newCount, e);
             return new RetryResult(false, "Retry failed: " + e.getMessage());
         }
     }

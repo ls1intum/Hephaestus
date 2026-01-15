@@ -36,7 +36,7 @@ public class MailService {
     }
 
     public void sendBadPracticesDetectedInPullRequestEmail(BadPracticeNotificationData notificationData) {
-        log.info("Sending bad practice detected email to user: {}", notificationData.userLogin());
+        log.debug("Preparing bad practice email: userLogin={}", notificationData.userLogin());
         String email;
 
         if (notificationData.userEmail() != null && !notificationData.userEmail().isBlank()) {
@@ -51,7 +51,7 @@ public class MailService {
 
                 email = keyCloakUser.getEmail();
             } catch (Exception e) {
-                log.error("Failed to find user in Keycloak: {}", notificationData.userLogin(), e);
+                log.error("Failed to find user in Keycloak: userLogin={}", notificationData.userLogin(), e);
                 return;
             }
         }
@@ -64,7 +64,7 @@ public class MailService {
 
         if (notificationData.workspaceSlug() == null || notificationData.workspaceSlug().isBlank()) {
             log.warn(
-                "Skipping email send because workspace slug is missing for PR {}",
+                "Skipped bad practice email: reason=missingWorkspaceSlug, pullRequestNumber={}",
                 notificationData.pullRequestNumber()
             );
             return;

@@ -42,7 +42,7 @@ public abstract class GitHubMessageHandler<T> implements MessageHandler {
         String subject = msg.getSubject();
         String safeSubject = sanitizeForLog(subject);
         if (!subject.endsWith(eventKey)) {
-            log.error("Received message on unexpected subject: {}, expected to end with {}", safeSubject, eventKey);
+            log.error("Rejected message: reason=unexpectedSubject, subject={}, expectedSuffix={}", safeSubject, eventKey);
             return;
         }
 
@@ -50,9 +50,9 @@ public abstract class GitHubMessageHandler<T> implements MessageHandler {
             T eventPayload = deserializer.deserialize(msg, payloadType);
             handleEvent(eventPayload);
         } catch (IOException e) {
-            log.error("Failed to parse payload for subject {}: {}", safeSubject, e.getMessage(), e);
+            log.error("Failed to parse payload: subject={}", safeSubject, e);
         } catch (Exception e) {
-            log.error("Unexpected error while handling message for subject {}: {}", safeSubject, e.getMessage(), e);
+            log.error("Failed to handle message: subject={}", safeSubject, e);
         }
     }
 

@@ -43,7 +43,7 @@ import org.springframework.lang.NonNull;
  *   <li>{@link #teamRepoPermissions} – Team-level access permissions</li>
  * </ul>
  * <p>
- * <b>Sync Targets:</b> Repositories become sync targets when added to a workspace.
+ * <b>Sync Targets:</b> Repositories become sync targets when added to a scope.
  * The sync engine uses the {@code nameWithOwner} field to identify repositories.
  *
  * @see de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider.SyncTarget

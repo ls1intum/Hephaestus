@@ -161,12 +161,12 @@ public class BadPracticeEventListener {
         try {
             PullRequest pullRequest = pullRequestRepository.findByIdWithAssignees(pullRequestId).orElse(null);
             if (pullRequest == null) {
-                log.warn("PR #{} (id={}) not found in database, skipping detection", pullRequestNumber, pullRequestId);
+                log.warn("Skipped bad practice detection: reason=pullRequestNotFound, pullRequestNumber={}, pullRequestId={}", pullRequestNumber, pullRequestId);
                 return;
             }
             badPracticeDetectorScheduler.detectBadPracticeForPrWhenOpenedOrReadyForReviewEvent(pullRequest);
         } catch (Exception e) {
-            log.error("Error scheduling bad practice detection for PR #{}: {}", pullRequestNumber, e.getMessage(), e);
+            log.error("Failed to schedule bad practice detection: pullRequestNumber={}", pullRequestNumber, e);
         }
     }
 
@@ -178,13 +178,13 @@ public class BadPracticeEventListener {
         try {
             PullRequest pullRequest = pullRequestRepository.findByIdWithAssignees(pullRequestId).orElse(null);
             if (pullRequest == null) {
-                log.warn("PR #{} (id={}) not found in database, skipping detection", pullRequestNumber, pullRequestId);
+                log.warn("Skipped bad practice detection: reason=pullRequestNotFound, pullRequestNumber={}, pullRequestId={}", pullRequestNumber, pullRequestId);
                 return;
             }
             // Use the scheduler method that checks exact label names and runs immediately
             badPracticeDetectorScheduler.detectBadPracticeForPrIfReadyLabel(pullRequest, labelName);
         } catch (Exception e) {
-            log.error("Error triggering bad practice detection for PR #{}: {}", pullRequestNumber, e.getMessage(), e);
+            log.error("Failed to trigger bad practice detection: pullRequestNumber={}", pullRequestNumber, e);
         }
     }
 
@@ -195,17 +195,12 @@ public class BadPracticeEventListener {
         try {
             PullRequest pullRequest = pullRequestRepository.findByIdWithAssignees(pullRequestId).orElse(null);
             if (pullRequest == null) {
-                log.warn("PR #{} (id={}) not found in database, skipping detection", pullRequestNumber, pullRequestId);
+                log.warn("Skipped bad practice detection: reason=pullRequestNotFound, pullRequestNumber={}, pullRequestId={}", pullRequestNumber, pullRequestId);
                 return;
             }
             badPracticeDetectorScheduler.detectBadPracticeForPrIfClosedEvent(pullRequest);
         } catch (Exception e) {
-            log.error(
-                "Error triggering bad practice detection for closed PR #{}: {}",
-                pullRequestNumber,
-                e.getMessage(),
-                e
-            );
+            log.error("Failed to trigger closed PR detection: pullRequestNumber={}", pullRequestNumber, e);
         }
     }
 }
