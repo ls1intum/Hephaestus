@@ -92,6 +92,7 @@ public class WorkspaceLifecycleService {
         return workspace;
     }
 
+    @Transactional
     public Workspace suspendWorkspace(WorkspaceContext workspaceContext) {
         return suspendWorkspace(requireSlug(workspaceContext));
     }
@@ -125,6 +126,7 @@ public class WorkspaceLifecycleService {
         return workspace;
     }
 
+    @Transactional
     public Workspace resumeWorkspace(WorkspaceContext workspaceContext) {
         return resumeWorkspace(requireSlug(workspaceContext));
     }
@@ -211,6 +213,7 @@ public class WorkspaceLifecycleService {
         return workspace;
     }
 
+    @Transactional
     public Workspace purgeWorkspace(WorkspaceContext workspaceContext) {
         return purgeWorkspace(requireSlug(workspaceContext));
     }
@@ -245,6 +248,7 @@ public class WorkspaceLifecycleService {
         };
     }
 
+    @Transactional
     public Workspace updateStatus(WorkspaceContext workspaceContext, WorkspaceStatus targetStatus) {
         return updateStatus(requireSlug(workspaceContext), targetStatus);
     }

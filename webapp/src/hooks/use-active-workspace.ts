@@ -52,12 +52,14 @@ export function useActiveWorkspaceSlug() {
 	// Reset redirect tracking when location or workspaces change meaningfully
 	// Also reset when workspaces list changes (e.g., after server restart or query refetch)
 	const workspaceSlugs = workspaces.map((ws) => ws.workspaceSlug).join(",");
+	// biome-ignore lint/correctness/useExhaustiveDependencies: deps trigger re-run to reset flag
 	useEffect(() => {
 		hasAttemptedRedirect.current = false;
 	}, [slugFromPath, workspaceSlugs]);
 
 	// Check if the slug from the URL path is valid (exists in available workspaces)
-	const slugFromPathIsValid = slugFromPath != null && workspaces.some((ws) => ws.workspaceSlug === slugFromPath);
+	const slugFromPathIsValid =
+		slugFromPath != null && workspaces.some((ws) => ws.workspaceSlug === slugFromPath);
 
 	// Redirect to another workspace when current workspace becomes inaccessible
 	// This handles the case where a workspace becomes SUSPENDED/PURGED while the user is viewing it

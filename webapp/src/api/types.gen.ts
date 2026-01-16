@@ -816,7 +816,7 @@ export type UserInfo = {
      */
     id: number;
     /**
-     * League points earned by the user in the current workspace
+     * League points earned by the user in the current scope
      */
     leaguePoints?: number;
     /**

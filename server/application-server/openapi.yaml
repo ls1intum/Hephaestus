@@ -3370,7 +3370,7 @@ components:
         leaguePoints:
           type: integer
           format: int32
-          description: League points earned by the user in the current workspace
+          description: League points earned by the user in the current scope
           example: 150
         login:
           type: string
