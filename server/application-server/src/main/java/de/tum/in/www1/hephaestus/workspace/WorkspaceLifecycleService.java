@@ -2,7 +2,6 @@ package de.tum.in.www1.hephaestus.workspace;
 
 import static de.tum.in.www1.hephaestus.workspace.Workspace.WorkspaceStatus;
 
-import de.tum.in.www1.hephaestus.activity.ActivityEventRepository;
 import de.tum.in.www1.hephaestus.core.LoggingUtils;
 import de.tum.in.www1.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.in.www1.hephaestus.gitprovider.sync.NatsConsumerService;
@@ -11,6 +10,9 @@ import de.tum.in.www1.hephaestus.workspace.exception.WorkspaceLifecycleViolation
 import de.tum.in.www1.hephaestus.workspace.settings.WorkspaceTeamLabelFilterRepository;
 import de.tum.in.www1.hephaestus.workspace.settings.WorkspaceTeamRepositorySettingsRepository;
 import de.tum.in.www1.hephaestus.workspace.settings.WorkspaceTeamSettingsRepository;
+import de.tum.in.www1.hephaestus.workspace.spi.WorkspacePurgeContributor;
+import java.util.Comparator;
+import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -37,7 +39,9 @@ public class WorkspaceLifecycleService {
     private final WorkspaceTeamLabelFilterRepository workspaceTeamLabelFilterRepository;
     private final WorkspaceTeamRepositorySettingsRepository workspaceTeamRepositorySettingsRepository;
     private final WorkspaceSlugHistoryRepository workspaceSlugHistoryRepository;
-    private final ActivityEventRepository activityEventRepository;
+
+    // SPI for cross-module cleanup during purge
+    private final List<WorkspacePurgeContributor> purgeContributors;
 
     public WorkspaceLifecycleService(
         @Value("${nats.enabled}") boolean isNatsEnabled,
@@ -49,7 +53,7 @@ public class WorkspaceLifecycleService {
         WorkspaceTeamLabelFilterRepository workspaceTeamLabelFilterRepository,
         WorkspaceTeamRepositorySettingsRepository workspaceTeamRepositorySettingsRepository,
         WorkspaceSlugHistoryRepository workspaceSlugHistoryRepository,
-        ActivityEventRepository activityEventRepository
+        List<WorkspacePurgeContributor> purgeContributors
     ) {
         this.isNatsEnabled = isNatsEnabled;
         this.workspaceRepository = workspaceRepository;
@@ -60,7 +64,7 @@ public class WorkspaceLifecycleService {
         this.workspaceTeamLabelFilterRepository = workspaceTeamLabelFilterRepository;
         this.workspaceTeamRepositorySettingsRepository = workspaceTeamRepositorySettingsRepository;
         this.workspaceSlugHistoryRepository = workspaceSlugHistoryRepository;
-        this.activityEventRepository = activityEventRepository;
+        this.purgeContributors = purgeContributors;
     }
 
     /**
@@ -139,7 +143,7 @@ public class WorkspaceLifecycleService {
      *   <li><b>Stop NATS consumers</b> - Prevents race conditions during cleanup</li>
      *   <li><b>Delete workspace settings</b> - Team settings, label filters, repository settings</li>
      *   <li><b>Delete workspace memberships</b> - User-workspace associations</li>
-     *   <li><b>Delete activity events</b> - Leaderboard and activity data</li>
+     *   <li><b>Invoke purge contributors</b> - Module-specific cleanup via SPI (e.g., activity events)</li>
      *   <li><b>Delete repository monitors</b> - Monitored repository configuration</li>
      *   <li><b>Delete slug history</b> - URL redirect history</li>
      *   <li><b>Unlink organization</b> - Clear the organization association</li>
@@ -189,9 +193,13 @@ public class WorkspaceLifecycleService {
         workspaceMembershipRepository.deleteAllByWorkspaceId(workspaceId);
         log.debug("Deleted workspace memberships: workspaceId={}", workspaceId);
 
-        // Step 4: Delete activity events (can be large - consider batching for very large workspaces)
-        activityEventRepository.deleteAllByWorkspaceId(workspaceId);
-        log.debug("Deleted activity events: workspaceId={}", workspaceId);
+        // Step 4: Invoke purge contributors (e.g., activity events, leaderboard data)
+        // Contributors are sorted by order and handle their own module's cleanup
+        purgeContributors
+            .stream()
+            .sorted(Comparator.comparingInt(WorkspacePurgeContributor::getOrder))
+            .forEach(contributor -> contributor.deleteWorkspaceData(workspaceId));
+        log.debug("Invoked purge contributors: workspaceId={}, count={}", workspaceId, purgeContributors.size());
 
         // Step 5: Delete repository monitors
         // Note: The RepositoryToMonitor entities are also managed via Workspace.repositoriesToMonitor
