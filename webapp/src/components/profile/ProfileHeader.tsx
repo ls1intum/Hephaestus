@@ -10,7 +10,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 // Repository images for known repositories
 const REPO_IMAGES: Record<string, string> = {
 	"ls1intum/Hephaestus":
-		"https://github.com/ls1intum/Hephaestus/raw/refs/heads/develop/docs/images/hammer_bg.svg",
+		"https://raw.githubusercontent.com/ls1intum/Hephaestus/main/webapp/public/logo192.png",
 	"ls1intum/Artemis": "https://artemis.tum.de/public/images/logo.png",
 	"ls1intum/Athena":
 		"https://raw.githubusercontent.com/ls1intum/Athena/develop/playground/public/logo.png",
