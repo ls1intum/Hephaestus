@@ -84,6 +84,15 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public boolean isScopeActiveForSync(Long scopeId) {
+        return workspaceRepository
+            .findById(scopeId)
+            .map(ws -> ws.getStatus() == WorkspaceStatus.ACTIVE)
+            .orElse(false);
+    }
+
+    @Override
     @Transactional
     public void updateSyncTimestamp(Long syncTargetId, SyncType syncType, Instant syncedAt) {
         repositoryToMonitorRepository

@@ -52,6 +52,21 @@ public interface SyncTargetProvider extends SyncTimestampProvider, BackfillState
     List<SyncTarget> getSyncTargetsForScope(Long scopeId);
 
     /**
+     * Checks if a scope is active and eligible for synchronization.
+     * <p>
+     * A scope is active when its status allows sync operations (e.g., not SUSPENDED or PURGED).
+     * This check should be performed before initiating sync operations to avoid
+     * unnecessary API calls and errors for disabled scopes.
+     *
+     * @param scopeId the scope ID (must not be null)
+     * @return true if the scope is active and can be synced, false otherwise
+     */
+    default boolean isScopeActiveForSync(Long scopeId) {
+        // Default implementation assumes scope is active (backward compatibility)
+        return true;
+    }
+
+    /**
      * Gets repository nameWithOwner values for a scope's active sync targets.
      *
      * <p>This provides a lightweight alternative to fetching full Repository entities

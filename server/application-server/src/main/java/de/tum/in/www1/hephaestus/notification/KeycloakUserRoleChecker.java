@@ -70,8 +70,8 @@ public class KeycloakUserRoleChecker implements UserRoleChecker {
             return hasRole;
         } catch (ProcessingException | NotAuthorizedException e) {
             if (healthy.compareAndSet(true, false)) {
-                // Log without stack trace - this is expected when Keycloak is not configured
-                log.info("Disabled Keycloak role checks: reason=authenticationFailed, userLogin={}", username);
+                // Log without stack trace - connection/auth failures trigger fallback behavior
+                log.warn("Disabled Keycloak role checks: reason=authenticationFailed, userLogin={}", username);
             }
             return false;
         } catch (Exception e) {

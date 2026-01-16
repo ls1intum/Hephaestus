@@ -139,6 +139,12 @@ public class GitHubDataSyncService {
         String nameWithOwner = syncTarget.repositoryNameWithOwner();
         String safeNameWithOwner = sanitizeForLog(nameWithOwner);
 
+        // Check if scope is active before attempting sync
+        if (!syncTargetProvider.isScopeActiveForSync(scopeId)) {
+            log.debug("Skipped sync: reason=scopeNotActive, scopeId={}, repoName={}", scopeId, safeNameWithOwner);
+            return;
+        }
+
         Repository repository = repositoryRepository.findByNameWithOwner(nameWithOwner).orElse(null);
         if (repository == null) {
             log.debug("Skipped sync: reason=repositoryNotFound, scopeId={}, repoName={}", scopeId, safeNameWithOwner);
@@ -223,6 +229,12 @@ public class GitHubDataSyncService {
      * @param scopeId the scope ID
      */
     public void syncAllRepositories(Long scopeId) {
+        // Check if scope is active before attempting sync
+        if (!syncTargetProvider.isScopeActiveForSync(scopeId)) {
+            log.debug("Skipped scope sync: reason=scopeNotActive, scopeId={}", scopeId);
+            return;
+        }
+
         var syncTargets = syncTargetProvider.getSyncTargetsForScope(scopeId);
         if (syncTargets.isEmpty()) {
             log.warn("Skipped scope sync: reason=noSyncTargets, scopeId={}", scopeId);

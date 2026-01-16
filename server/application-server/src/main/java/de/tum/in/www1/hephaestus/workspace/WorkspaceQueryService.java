@@ -55,12 +55,12 @@ public class WorkspaceQueryService {
     }
 
     /**
-     * List all non-purged workspaces.
+     * List all active workspaces.
      *
-     * @return list of workspaces that are not purged
+     * @return list of workspaces that are active
      */
     public List<Workspace> findAll() {
-        return workspaceRepository.findByStatusNot(Workspace.WorkspaceStatus.PURGED);
+        return workspaceRepository.findByStatus(Workspace.WorkspaceStatus.ACTIVE);
     }
 
     /**
@@ -76,14 +76,15 @@ public class WorkspaceQueryService {
     /**
      * Returns workspaces a specific user can see: memberships + publicly viewable workspaces.
      * If the user is empty, only publicly viewable workspaces are returned.
+     * Only ACTIVE workspaces are included - SUSPENDED and PURGED workspaces are excluded.
      *
      * @param currentUser the user to check accessibility for
      * @return list of accessible workspaces
      */
     List<Workspace> findAccessibleWorkspaces(Optional<User> currentUser) {
-        // Always include public, non-purged workspaces
-        List<Workspace> publicWorkspaces = workspaceRepository.findByStatusNotAndIsPubliclyViewableTrue(
-            Workspace.WorkspaceStatus.PURGED
+        // Always include public, active workspaces
+        List<Workspace> publicWorkspaces = workspaceRepository.findByStatusAndIsPubliclyViewableTrue(
+            Workspace.WorkspaceStatus.ACTIVE
         );
 
         if (currentUser.isEmpty()) {
@@ -96,7 +97,9 @@ public class WorkspaceQueryService {
 
         List<Workspace> memberWorkspaces = workspaceIds.isEmpty()
             ? List.of()
-            : workspaceRepository.findAllById(workspaceIds);
+            : workspaceRepository.findAllById(workspaceIds).stream()
+                .filter(w -> w.getStatus() == Workspace.WorkspaceStatus.ACTIVE)
+                .toList();
 
         // Merge and de-duplicate by ID to avoid duplicate entities with different instances
         return Stream.concat(publicWorkspaces.stream(), memberWorkspaces.stream())

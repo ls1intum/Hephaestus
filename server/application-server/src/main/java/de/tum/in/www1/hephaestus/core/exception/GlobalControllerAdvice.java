@@ -17,6 +17,7 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.reactive.function.client.WebClientRequestException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 /**
@@ -110,6 +111,23 @@ public class GlobalControllerAdvice {
         problem.setTitle("Validation failed");
         problem.setProperty("errors", errors);
         return problem;
+    }
+
+    // ========================================================================
+    // EXTERNAL SERVICE EXCEPTIONS
+    // ========================================================================
+
+    @ExceptionHandler(WebClientRequestException.class)
+    ProblemDetail handleWebClientRequestException(WebClientRequestException exception) {
+        // All WebClient request failures (connection refused, DNS, timeout, etc.) are unexpected
+        // and warrant WARN level - environment-specific log filtering should be configured externally
+        log.warn("External service request failed: uri={}, reason={}", exception.getUri(), exception.getMessage());
+
+        return problem(
+            HttpStatus.SERVICE_UNAVAILABLE,
+            "Service unavailable",
+            "An upstream service is temporarily unavailable. Please try again later."
+        );
     }
 
     // ========================================================================
