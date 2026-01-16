@@ -113,5 +113,4 @@ public interface SyncTimestampProvider {
     default void updateTeamsSyncTimestamp(Long scopeId, Instant syncedAt) {
         // Default no-op - implementations MUST override to persist timestamps
     }
-
 }

@@ -109,7 +109,8 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
                     }
                     repositoryToMonitorRepository.save(rtm);
                 },
-                () -> log.debug("Skipped sync timestamp update: reason=syncTargetNotFound, syncTargetId={}", syncTargetId)
+                () ->
+                    log.debug("Skipped sync timestamp update: reason=syncTargetNotFound, syncTargetId={}", syncTargetId)
             );
     }
 
@@ -134,7 +135,8 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
                     }
                     workspaceRepository.save(ws);
                 },
-                () -> log.warn("Failed to update scope sync timestamp: reason=workspaceNotFound, workspaceId={}", scopeId)
+                () ->
+                    log.warn("Failed to update scope sync timestamp: reason=workspaceNotFound, workspaceId={}", scopeId)
             );
     }
 
@@ -165,9 +167,7 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
     @Override
     @Transactional(readOnly = true)
     public Optional<UserSyncState> getUserSyncState(Long scopeId) {
-        return workspaceRepository
-            .findById(scopeId)
-            .map(ws -> new UserSyncState(ws.getId(), ws.getUsersSyncedAt()));
+        return workspaceRepository.findById(scopeId).map(ws -> new UserSyncState(ws.getId(), ws.getUsersSyncedAt()));
     }
 
     @Override
@@ -180,7 +180,8 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
                     ws.setUsersSyncedAt(syncedAt);
                     workspaceRepository.save(ws);
                 },
-                () -> log.warn("Failed to update users sync timestamp: reason=workspaceNotFound, workspaceId={}", scopeId)
+                () ->
+                    log.warn("Failed to update users sync timestamp: reason=workspaceNotFound, workspaceId={}", scopeId)
             );
     }
 
@@ -211,7 +212,8 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
                     ws.setTeamsSyncedAt(syncedAt);
                     workspaceRepository.save(ws);
                 },
-                () -> log.warn("Failed to update teams sync timestamp: reason=workspaceNotFound, workspaceId={}", scopeId)
+                () ->
+                    log.warn("Failed to update teams sync timestamp: reason=workspaceNotFound, workspaceId={}", scopeId)
             );
     }
 
@@ -248,7 +250,11 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
                     }
                     repositoryToMonitorRepository.save(rtm);
                 },
-                () -> log.warn("Failed to update backfill state: reason=syncTargetNotFound, syncTargetId={}", syncTargetId)
+                () ->
+                    log.warn(
+                        "Failed to update backfill state: reason=syncTargetNotFound, syncTargetId={}",
+                        syncTargetId
+                    )
             );
     }
 
@@ -333,5 +339,4 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
             syncContext
         );
     }
-
 }

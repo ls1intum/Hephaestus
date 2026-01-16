@@ -18,7 +18,8 @@ public class WorkspaceContextResolverAdapter implements ScopeIdResolver {
     @Override
     public Optional<Long> findScopeIdByOrgLogin(String organizationLogin) {
         // First try to find by linked organization login
-        return workspaceRepository.findByOrganization_Login(organizationLogin)
+        return workspaceRepository
+            .findByOrganization_Login(organizationLogin)
             .or(() -> workspaceRepository.findByAccountLoginIgnoreCase(organizationLogin))
             .map(Workspace::getId);
     }

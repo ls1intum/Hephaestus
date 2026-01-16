@@ -71,7 +71,10 @@ public class GitHubMilestoneProcessor {
         ProcessingContext context
     ) {
         if (dto == null) {
-            log.warn("Skipped milestone processing: reason=nullDto, repoId={}", repository != null ? repository.getId() : null);
+            log.warn(
+                "Skipped milestone processing: reason=nullDto, repoId={}",
+                repository != null ? repository.getId() : null
+            );
             return null;
         }
 

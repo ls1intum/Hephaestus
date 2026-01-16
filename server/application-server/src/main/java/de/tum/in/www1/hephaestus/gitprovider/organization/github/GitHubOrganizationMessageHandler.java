@@ -1,5 +1,7 @@
 package de.tum.in.www1.hephaestus.gitprovider.organization.github;
 
+import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
+
 import de.tum.in.www1.hephaestus.gitprovider.common.NatsMessageDeserializer;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventAction;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventType;
@@ -9,8 +11,6 @@ import de.tum.in.www1.hephaestus.gitprovider.common.spi.OrganizationMembershipLi
 import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationMemberRole;
 import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationMembershipRepository;
 import de.tum.in.www1.hephaestus.gitprovider.organization.github.dto.GitHubOrganizationEventDTO;
-import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
-
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserProcessor;
 import java.util.List;
@@ -66,7 +66,12 @@ public class GitHubOrganizationMessageHandler extends GitHubMessageHandler<GitHu
             return;
         }
 
-        log.info("Received organization event: action={}, orgId={}, orgLogin={}", event.action(), orgDto.id(), sanitizeForLog(orgDto.login()));
+        log.info(
+            "Received organization event: action={}, orgId={}, orgLogin={}",
+            event.action(),
+            orgDto.id(),
+            sanitizeForLog(orgDto.login())
+        );
 
         switch (event.actionType()) {
             case GitHubEventAction.Organization.MEMBER_ADDED -> {
@@ -75,32 +80,41 @@ public class GitHubOrganizationMessageHandler extends GitHubMessageHandler<GitHu
                     User user = userProcessor.ensureExists(userDto);
                     OrganizationMemberRole role = parseRole(event.membership().role());
                     membershipRepository.upsertMembership(orgDto.id(), user.getId(), role);
-                    log.info("Added member to organization: orgId={}, orgLogin={}, userLogin={}, role={}", orgDto.id(), sanitizeForLog(orgDto.login()), sanitizeForLog(userDto.login()), role);
+                    log.info(
+                        "Added member to organization: orgId={}, orgLogin={}, userLogin={}, role={}",
+                        orgDto.id(),
+                        sanitizeForLog(orgDto.login()),
+                        sanitizeForLog(userDto.login()),
+                        role
+                    );
 
                     // Notify listeners about membership change
-                    membershipListener.onMemberAdded(new MembershipChangedEvent(
-                        orgDto.id(),
-                        orgDto.login(),
-                        userDto.id(),
-                        userDto.login(),
-                        event.membership().role()
-                    ));
+                    membershipListener.onMemberAdded(
+                        new MembershipChangedEvent(
+                            orgDto.id(),
+                            orgDto.login(),
+                            userDto.id(),
+                            userDto.login(),
+                            event.membership().role()
+                        )
+                    );
                 }
             }
             case GitHubEventAction.Organization.MEMBER_REMOVED -> {
                 if (event.membership() != null && event.membership().user() != null) {
                     var userDto = event.membership().user();
                     membershipRepository.deleteByOrganizationIdAndUserIdIn(orgDto.id(), List.of(userDto.id()));
-                    log.info("Removed member from organization: orgId={}, orgLogin={}, userLogin={}", orgDto.id(), sanitizeForLog(orgDto.login()), sanitizeForLog(userDto.login()));
+                    log.info(
+                        "Removed member from organization: orgId={}, orgLogin={}, userLogin={}",
+                        orgDto.id(),
+                        sanitizeForLog(orgDto.login()),
+                        sanitizeForLog(userDto.login())
+                    );
 
                     // Notify listeners about membership change
-                    membershipListener.onMemberRemoved(new MembershipChangedEvent(
-                        orgDto.id(),
-                        orgDto.login(),
-                        userDto.id(),
-                        userDto.login(),
-                        null
-                    ));
+                    membershipListener.onMemberRemoved(
+                        new MembershipChangedEvent(orgDto.id(), orgDto.login(), userDto.id(), userDto.login(), null)
+                    );
                 }
             }
             case GitHubEventAction.Organization.RENAMED -> organizationProcessor.rename(orgDto.id(), orgDto.login());

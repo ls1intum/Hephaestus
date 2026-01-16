@@ -64,7 +64,10 @@ public class GitHubLabelProcessor {
     @Transactional
     public Label process(GitHubLabelDTO dto, Repository repository, ProcessingContext context) {
         if (dto == null || dto.name() == null) {
-            log.warn("Skipped label processing: reason=nullOrMissingName, repoId={}", repository != null ? repository.getId() : null);
+            log.warn(
+                "Skipped label processing: reason=nullOrMissingName, repoId={}",
+                repository != null ? repository.getId() : null
+            );
             return null;
         }
 

@@ -97,9 +97,11 @@ public class WorkspaceQueryService {
 
         List<Workspace> memberWorkspaces = workspaceIds.isEmpty()
             ? List.of()
-            : workspaceRepository.findAllById(workspaceIds).stream()
-                .filter(w -> w.getStatus() == Workspace.WorkspaceStatus.ACTIVE)
-                .toList();
+            : workspaceRepository
+                  .findAllById(workspaceIds)
+                  .stream()
+                  .filter(w -> w.getStatus() == Workspace.WorkspaceStatus.ACTIVE)
+                  .toList();
 
         // Merge and de-duplicate by ID to avoid duplicate entities with different instances
         return Stream.concat(publicWorkspaces.stream(), memberWorkspaces.stream())

@@ -181,9 +181,7 @@ public class GitHubGraphQlClientProvider {
             .getPersonalAccessToken(scopeId)
             .filter(t -> !t.isBlank())
             .orElseThrow(() ->
-                new IllegalStateException(
-                    "Scope " + scopeId + " is configured for PAT access but no token is stored."
-                )
+                new IllegalStateException("Scope " + scopeId + " is configured for PAT access but no token is stored.")
             );
     }
 }

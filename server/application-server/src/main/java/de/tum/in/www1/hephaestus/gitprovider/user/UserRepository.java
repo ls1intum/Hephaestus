@@ -131,14 +131,14 @@ public interface UserRepository extends JpaRepository<User, Long> {
     @Modifying
     @Query(
         value = """
-            INSERT INTO "user" (id, login, name, avatar_url, html_url, type)
-            VALUES (:id, :login, :name, :avatarUrl, :htmlUrl, :type)
-            ON CONFLICT (id) DO UPDATE SET
-                login = EXCLUDED.login,
-                name = EXCLUDED.name,
-                avatar_url = EXCLUDED.avatar_url,
-                html_url = EXCLUDED.html_url
-            """,
+        INSERT INTO "user" (id, login, name, avatar_url, html_url, type)
+        VALUES (:id, :login, :name, :avatarUrl, :htmlUrl, :type)
+        ON CONFLICT (id) DO UPDATE SET
+            login = EXCLUDED.login,
+            name = EXCLUDED.name,
+            avatar_url = EXCLUDED.avatar_url,
+            html_url = EXCLUDED.html_url
+        """,
         nativeQuery = true
     )
     void upsert(

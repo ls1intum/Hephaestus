@@ -134,7 +134,11 @@ public class GitHubSubIssueSyncService {
 
         updateParentSummary(parentIssue, parentSummary);
 
-        log.info("Linked sub-issue to parent: subIssueNumber={}, parentIssueNumber={}", subIssue.getNumber(), parentIssue.getNumber());
+        log.info(
+            "Linked sub-issue to parent: subIssueNumber={}, parentIssueNumber={}",
+            subIssue.getNumber(),
+            parentIssue.getNumber()
+        );
     }
 
     private void unlinkSubIssueFromParent(
@@ -144,7 +148,11 @@ public class GitHubSubIssueSyncService {
     ) {
         Issue currentParent = subIssue.getParentIssue();
         if (currentParent != null) {
-            log.info("Unlinked sub-issue from parent: subIssueNumber={}, parentIssueNumber={}", subIssue.getNumber(), currentParent.getNumber());
+            log.info(
+                "Unlinked sub-issue from parent: subIssueNumber={}, parentIssueNumber={}",
+                subIssue.getNumber(),
+                currentParent.getNumber()
+            );
         }
 
         subIssue.setParentIssue(null);
@@ -225,7 +233,10 @@ public class GitHubSubIssueSyncService {
         for (String repoNameWithOwner : repositoryNames) {
             Optional<Repository> repoOpt = repositoryRepository.findByNameWithOwner(repoNameWithOwner);
             if (repoOpt.isEmpty()) {
-                log.debug("Skipped sub-issue sync: reason=repositoryNotFound, repoName={}", sanitizeForLog(repoNameWithOwner));
+                log.debug(
+                    "Skipped sub-issue sync: reason=repositoryNotFound, repoName={}",
+                    sanitizeForLog(repoNameWithOwner)
+                );
                 continue;
             }
 
@@ -254,17 +265,16 @@ public class GitHubSubIssueSyncService {
 
     @Transactional
     public void updateSyncTimestamp(Long scopeId) {
-        syncTargetProvider.updateScopeSyncTimestamp(
-            scopeId,
-            SyncTargetProvider.SyncType.SUB_ISSUES,
-            Instant.now()
-        );
+        syncTargetProvider.updateScopeSyncTimestamp(scopeId, SyncTargetProvider.SyncType.SUB_ISSUES, Instant.now());
     }
 
     private int syncSubIssuesForRepository(HttpGraphQlClient client, Repository repository) {
         Optional<RepositoryOwnerAndName> parsedName = GitHubRepositoryNameParser.parse(repository.getNameWithOwner());
         if (parsedName.isEmpty()) {
-            log.warn("Skipped sub-issue sync: reason=invalidNameFormat, repoName={}", sanitizeForLog(repository.getNameWithOwner()));
+            log.warn(
+                "Skipped sub-issue sync: reason=invalidNameFormat, repoName={}",
+                sanitizeForLog(repository.getNameWithOwner())
+            );
             return 0;
         }
         String owner = parsedName.get().owner();
@@ -312,11 +322,7 @@ public class GitHubSubIssueSyncService {
                 // Process each page in its own transaction
                 linkedCount += processIssueNodesInTransaction(issueConnection, repository);
             } catch (Exception e) {
-                log.error(
-                    "Failed to sync sub-issues: repoName={}",
-                    sanitizeForLog(repository.getNameWithOwner()),
-                    e
-                );
+                log.error("Failed to sync sub-issues: repoName={}", sanitizeForLog(repository.getNameWithOwner()), e);
                 break;
             }
         }

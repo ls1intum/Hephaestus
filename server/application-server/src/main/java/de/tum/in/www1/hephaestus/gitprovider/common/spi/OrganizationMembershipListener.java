@@ -10,7 +10,6 @@ package de.tum.in.www1.hephaestus.gitprovider.common.spi;
  * it defines, not on consuming module concepts.
  */
 public interface OrganizationMembershipListener {
-
     /**
      * Called when a member is added to an organization.
      *

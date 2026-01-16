@@ -73,11 +73,7 @@ public class LeaderboardController {
         @RequestParam LeaderboardMode mode
     ) {
         Workspace workspace = workspaceResolver.requireWorkspace(workspaceContext);
-        log.info(
-            "Received leaderboard request: workspaceId={}, mode={}",
-            workspace.getId(),
-            mode
-        );
+        log.info("Received leaderboard request: workspaceId={}, mode={}", workspace.getId(), mode);
         return ResponseEntity.ok(leaderboardService.createLeaderboard(workspace, after, before, team, sort, mode));
     }
 

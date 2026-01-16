@@ -195,10 +195,7 @@ public class SlackWeeklyLeaderboardTask implements Runnable {
         for (Workspace workspace : workspaces) {
             var topReviewers = getTop3SlackReviewers(workspace, after, before, Optional.ofNullable(team));
             if (topReviewers.isEmpty()) {
-                log.info(
-                    "Skipped Slack notification: reason=noQualifiedReviewers, workspaceId={}",
-                    workspace.getId()
-                );
+                log.info("Skipped Slack notification: reason=noQualifiedReviewers, workspaceId={}", workspace.getId());
                 continue;
             }
 
@@ -206,11 +203,7 @@ public class SlackWeeklyLeaderboardTask implements Runnable {
             try {
                 slackMessageService.sendMessage(channelId, blocks, "Weekly review highlights");
             } catch (IOException | SlackApiException e) {
-                log.error(
-                    "Failed to send scheduled Slack message: workspaceId={}",
-                    workspace.getId(),
-                    e
-                );
+                log.error("Failed to send scheduled Slack message: workspaceId={}", workspace.getId(), e);
             }
         }
     }

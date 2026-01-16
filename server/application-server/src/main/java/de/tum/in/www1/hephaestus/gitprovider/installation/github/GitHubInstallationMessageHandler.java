@@ -1,5 +1,7 @@
 package de.tum.in.www1.hephaestus.gitprovider.installation.github;
 
+import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
+
 import de.tum.in.www1.hephaestus.gitprovider.common.NatsMessageDeserializer;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventAction;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventType;
@@ -10,8 +12,6 @@ import de.tum.in.www1.hephaestus.gitprovider.common.spi.ProvisioningListener.Ins
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.ProvisioningListener.RepositorySnapshot;
 import de.tum.in.www1.hephaestus.gitprovider.installation.github.dto.GitHubInstallationEventDTO;
 import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationService;
-import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
-
 import java.util.Collections;
 import java.util.List;
 import org.slf4j.Logger;
@@ -75,7 +75,11 @@ public class GitHubInstallationMessageHandler extends GitHubMessageHandler<GitHu
 
         // Handle deletion early - no scope provisioning needed
         if (action == GitHubEventAction.Installation.DELETED) {
-            log.info("Processed installation deletion: installationId={}, accountLogin={}", installationId, sanitizeForLog(accountLogin));
+            log.info(
+                "Processed installation deletion: installationId={}, accountLogin={}",
+                installationId,
+                sanitizeForLog(accountLogin)
+            );
             provisioningListener.onInstallationDeleted(installationId);
             return;
         }
@@ -91,9 +95,11 @@ public class GitHubInstallationMessageHandler extends GitHubMessageHandler<GitHu
         // Extract repository snapshots from the installation event payload
         // These are provided for "created" events with "selected" repository selection
         List<RepositorySnapshot> repositories = event.repositories() != null
-            ? event.repositories().stream()
-                .map(ref -> new RepositorySnapshot(ref.id(), ref.fullName(), ref.name(), ref.isPrivate()))
-                .toList()
+            ? event
+                  .repositories()
+                  .stream()
+                  .map(ref -> new RepositorySnapshot(ref.id(), ref.fullName(), ref.name(), ref.isPrivate()))
+                  .toList()
             : Collections.emptyList();
 
         InstallationData installationData = new InstallationData(
@@ -117,7 +123,11 @@ public class GitHubInstallationMessageHandler extends GitHubMessageHandler<GitHu
         switch (action) {
             case SUSPEND -> provisioningListener.onInstallationSuspended(installationId);
             case UNSUSPEND, CREATED -> provisioningListener.onInstallationActivated(installationId);
-            default -> log.debug("Skipped installation event: reason=unhandledAction, action={}, installationId={}", event.action(), installationId);
+            default -> log.debug(
+                "Skipped installation event: reason=unhandledAction, action={}, installationId={}",
+                event.action(),
+                installationId
+            );
         }
     }
 }

@@ -91,7 +91,10 @@ public class GitHubPullRequestReviewCommentMessageHandler
                 prId,
                 context
             );
-            default -> log.debug("Skipped pull_request_review_comment event: reason=unhandledAction, action={}", event.action());
+            default -> log.debug(
+                "Skipped pull_request_review_comment event: reason=unhandledAction, action={}",
+                event.action()
+            );
         }
     }
 }

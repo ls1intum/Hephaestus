@@ -145,7 +145,10 @@ public class ResilienceConfig {
                 )
             )
             .onCallNotPermitted(event ->
-                log.warn("Circuit breaker rejected call: breakerName={}, reason=circuit_open", event.getCircuitBreakerName())
+                log.warn(
+                    "Circuit breaker rejected call: breakerName={}, reason=circuit_open",
+                    event.getCircuitBreakerName()
+                )
             );
     }
 

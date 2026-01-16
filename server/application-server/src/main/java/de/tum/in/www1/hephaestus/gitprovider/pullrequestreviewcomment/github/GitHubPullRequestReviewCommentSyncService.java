@@ -304,10 +304,7 @@ public class GitHubPullRequestReviewCommentSyncService {
      */
     private void fetchAllRemainingThreadComments(GHPullRequestReviewThread graphQlThread, String startCursor) {
         if (currentClient == null) {
-            log.warn(
-                "Skipped remaining thread comments: reason=noClientAvailable, threadId={}",
-                graphQlThread.getId()
-            );
+            log.warn("Skipped remaining thread comments: reason=noClientAvailable, threadId={}", graphQlThread.getId());
             return;
         }
 

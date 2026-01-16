@@ -118,10 +118,7 @@ public class WorkspaceActivationService {
             workspace.getGitProviderMode() == Workspace.GitProviderMode.PAT_ORG &&
             isBlank(workspace.getPersonalAccessToken())
         ) {
-            log.info(
-                "Skipped workspace activation: reason=patModeWithoutToken, workspaceId={}",
-                workspace.getId()
-            );
+            log.info("Skipped workspace activation: reason=patModeWithoutToken, workspaceId={}", workspace.getId());
             return true;
         }
         return false;

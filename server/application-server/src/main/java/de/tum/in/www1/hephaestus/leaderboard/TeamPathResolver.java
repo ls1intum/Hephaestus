@@ -178,10 +178,7 @@ public class TeamPathResolver {
                     return Optional.of(candidate);
                 }
             }
-            log.warn(
-                "Resolved ambiguous team path to first candidate: teamPath={}",
-                sanitizeForLog(path)
-            );
+            log.warn("Resolved ambiguous team path to first candidate: teamPath={}", sanitizeForLog(path));
         }
 
         Long anyId = currentByCandidate.keySet().stream().findFirst().orElse(null);

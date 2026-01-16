@@ -118,11 +118,7 @@ public class PosthogClient {
                 log.info("Requested PostHog deletion: personId={}", personId);
             }
 
-            log.info(
-                "Completed PostHog deletion request: distinctId={}, personCount={}",
-                distinctId,
-                personIds.size()
-            );
+            log.info("Completed PostHog deletion request: distinctId={}, personCount={}", distinctId, personIds.size());
             return true;
         } catch (RestClientException exception) {
             log.warn("Failed to delete PostHog data: distinctId={}", distinctId, exception);

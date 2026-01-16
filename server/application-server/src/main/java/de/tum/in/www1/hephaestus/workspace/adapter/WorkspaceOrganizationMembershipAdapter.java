@@ -68,10 +68,7 @@ public class WorkspaceOrganizationMembershipAdapter implements OrganizationMembe
         Optional<Workspace> workspaceOpt = findWorkspaceByOrgLogin(event.organizationLogin());
 
         if (workspaceOpt.isEmpty()) {
-            log.debug(
-                "Skipped member sync: reason=noWorkspaceForOrg, orgLogin={}",
-                event.organizationLogin()
-            );
+            log.debug("Skipped member sync: reason=noWorkspaceForOrg, orgLogin={}", event.organizationLogin());
             return;
         }
 
@@ -169,7 +166,11 @@ public class WorkspaceOrganizationMembershipAdapter implements OrganizationMembe
         );
 
         if (orgMemberships.isEmpty()) {
-            log.debug("Skipped workspace member sync: reason=noOrgMembersFound, workspaceId={}, organizationId={}", workspaceId, organizationId);
+            log.debug(
+                "Skipped workspace member sync: reason=noOrgMembersFound, workspaceId={}, organizationId={}",
+                workspaceId,
+                organizationId
+            );
             return 0;
         }
 

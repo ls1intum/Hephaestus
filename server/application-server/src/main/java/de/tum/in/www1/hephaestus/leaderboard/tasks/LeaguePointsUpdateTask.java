@@ -66,11 +66,7 @@ public class LeaguePointsUpdateTask implements Runnable {
             try {
                 updateLeaguePointsForWorkspace(workspace);
             } catch (Exception e) {
-                log.error(
-                    "Failed to update league points: workspaceId={}",
-                    workspace.getId(),
-                    e
-                );
+                log.error("Failed to update league points: workspaceId={}", workspace.getId(), e);
             }
         }
 

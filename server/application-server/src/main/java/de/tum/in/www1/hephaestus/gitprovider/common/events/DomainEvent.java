@@ -196,7 +196,9 @@ public final class DomainEvent {
     // ========================================================================
 
     /** All label-related events. */
-    public sealed interface LabelEvent extends Event, ContextualEvent permits LabelCreated, LabelUpdated, LabelDeleted {}
+    public sealed interface LabelEvent
+        extends Event, ContextualEvent
+        permits LabelCreated, LabelUpdated, LabelDeleted {}
 
     public record LabelCreated(EventPayload.LabelData label, EventContext context) implements LabelEvent {}
 
@@ -209,11 +211,15 @@ public final class DomainEvent {
     // ========================================================================
 
     /** All milestone-related events. */
-    public sealed interface MilestoneEvent extends Event, ContextualEvent permits MilestoneCreated, MilestoneUpdated, MilestoneDeleted {}
+    public sealed interface MilestoneEvent
+        extends Event, ContextualEvent
+        permits MilestoneCreated, MilestoneUpdated, MilestoneDeleted {}
 
-    public record MilestoneCreated(EventPayload.MilestoneData milestone, EventContext context) implements MilestoneEvent {}
+    public record MilestoneCreated(EventPayload.MilestoneData milestone, EventContext context) implements
+        MilestoneEvent {}
 
-    public record MilestoneUpdated(EventPayload.MilestoneData milestone, EventContext context) implements MilestoneEvent {}
+    public record MilestoneUpdated(EventPayload.MilestoneData milestone, EventContext context) implements
+        MilestoneEvent {}
 
     public record MilestoneDeleted(Long milestoneId, String title, EventContext context) implements MilestoneEvent {}
 
@@ -222,7 +228,9 @@ public final class DomainEvent {
     // ========================================================================
 
     /** All comment-related events. */
-    public sealed interface CommentEvent extends Event, ContextualEvent permits CommentCreated, CommentUpdated, CommentDeleted {
+    public sealed interface CommentEvent
+        extends Event, ContextualEvent
+        permits CommentCreated, CommentUpdated, CommentDeleted {
         Long issueId();
     }
 
@@ -242,7 +250,9 @@ public final class DomainEvent {
     // Pull Request Review Events
     // ========================================================================
 
-    public sealed interface ReviewEvent extends Event, ContextualEvent permits ReviewSubmitted, ReviewEdited, ReviewDismissed {
+    public sealed interface ReviewEvent
+        extends Event, ContextualEvent
+        permits ReviewSubmitted, ReviewEdited, ReviewDismissed {
         EventPayload.ReviewData review();
     }
 
@@ -286,7 +296,9 @@ public final class DomainEvent {
     // Pull Request Review Thread Events
     // ========================================================================
 
-    public sealed interface ReviewThreadEvent extends Event, ContextualEvent permits ReviewThreadResolved, ReviewThreadUnresolved {
+    public sealed interface ReviewThreadEvent
+        extends Event, ContextualEvent
+        permits ReviewThreadResolved, ReviewThreadUnresolved {
         EventPayload.ReviewThreadData thread();
     }
 

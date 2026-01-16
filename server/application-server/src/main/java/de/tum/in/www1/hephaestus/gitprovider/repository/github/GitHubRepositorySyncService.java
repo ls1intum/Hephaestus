@@ -64,7 +64,11 @@ public class GitHubRepositorySyncService {
         String safeNameWithOwner = sanitizeForLog(nameWithOwner);
         Optional<RepositoryOwnerAndName> parsedName = GitHubRepositoryNameParser.parse(nameWithOwner);
         if (parsedName.isEmpty()) {
-            log.warn("Skipped repository sync: reason=invalidNameFormat, scopeId={}, repoName={}", scopeId, safeNameWithOwner);
+            log.warn(
+                "Skipped repository sync: reason=invalidNameFormat, scopeId={}, repoName={}",
+                scopeId,
+                safeNameWithOwner
+            );
             return Optional.empty();
         }
         String repoOwner = parsedName.get().owner();
@@ -92,7 +96,11 @@ public class GitHubRepositorySyncService {
             // Use typed GraphQL model for type-safe parsing
             var repoData = response.field("repository").toEntity(GHRepository.class);
             if (repoData == null) {
-                log.warn("Skipped repository sync: reason=notFoundOnGitHub, scopeId={}, repoName={}", scopeId, safeNameWithOwner);
+                log.warn(
+                    "Skipped repository sync: reason=notFoundOnGitHub, scopeId={}, repoName={}",
+                    scopeId,
+                    safeNameWithOwner
+                );
                 return Optional.empty();
             }
 
@@ -103,7 +111,11 @@ public class GitHubRepositorySyncService {
             // Create or update repository using typed accessors
             Long githubDatabaseId = repoData.getDatabaseId() != null ? repoData.getDatabaseId().longValue() : null;
             if (githubDatabaseId == null) {
-                log.warn("Skipped repository sync: reason=missingDatabaseId, scopeId={}, repoName={}", scopeId, safeNameWithOwner);
+                log.warn(
+                    "Skipped repository sync: reason=missingDatabaseId, scopeId={}, repoName={}",
+                    scopeId,
+                    safeNameWithOwner
+                );
                 return Optional.empty();
             }
 
@@ -148,7 +160,12 @@ public class GitHubRepositorySyncService {
             repository.setLastSyncAt(Instant.now());
 
             repository = repositoryRepository.save(repository);
-            log.info("Synced repository: scopeId={}, repoId={}, repoName={}", scopeId, repository.getId(), safeNameWithOwner);
+            log.info(
+                "Synced repository: scopeId={}, repoId={}, repoName={}",
+                scopeId,
+                repository.getId(),
+                safeNameWithOwner
+            );
 
             return Optional.of(repository);
         } catch (InstallationNotFoundException e) {

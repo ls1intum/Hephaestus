@@ -337,7 +337,12 @@ public class WorkspaceTeamSettingsService {
         WorkspaceTeamLabelFilter filter = new WorkspaceTeamLabelFilter(workspace, team, label);
         WorkspaceTeamLabelFilter saved = labelFilterRepository.save(filter);
 
-        log.info("Added label filter: labelId={}, teamId={}, workspaceSlug={}", labelId, teamId, LoggingUtils.sanitizeForLog(workspace.getWorkspaceSlug()));
+        log.info(
+            "Added label filter: labelId={}, teamId={}, workspaceSlug={}",
+            labelId,
+            teamId,
+            LoggingUtils.sanitizeForLog(workspace.getWorkspaceSlug())
+        );
 
         return Optional.of(saved);
     }
@@ -395,7 +400,12 @@ public class WorkspaceTeamSettingsService {
 
         labelFilterRepository.deleteByWorkspaceIdAndTeamIdAndLabelId(workspace.getId(), teamId, labelId);
 
-        log.info("Removed label filter: labelId={}, teamId={}, workspaceSlug={}", labelId, teamId, LoggingUtils.sanitizeForLog(workspace.getWorkspaceSlug()));
+        log.info(
+            "Removed label filter: labelId={}, teamId={}, workspaceSlug={}",
+            labelId,
+            teamId,
+            LoggingUtils.sanitizeForLog(workspace.getWorkspaceSlug())
+        );
 
         return true;
     }
@@ -409,7 +419,11 @@ public class WorkspaceTeamSettingsService {
     @Transactional
     public void removeAllLabelFilters(Workspace workspace, Long teamId) {
         labelFilterRepository.deleteAllByWorkspaceIdAndTeamId(workspace.getId(), teamId);
-        log.info("Removed all label filters: teamId={}, workspaceSlug={}", teamId, LoggingUtils.sanitizeForLog(workspace.getWorkspaceSlug()));
+        log.info(
+            "Removed all label filters: teamId={}, workspaceSlug={}",
+            teamId,
+            LoggingUtils.sanitizeForLog(workspace.getWorkspaceSlug())
+        );
     }
 
     // ========================================================================

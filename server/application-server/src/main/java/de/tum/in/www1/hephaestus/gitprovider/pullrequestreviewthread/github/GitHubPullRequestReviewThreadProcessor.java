@@ -71,7 +71,11 @@ public class GitHubPullRequestReviewThreadProcessor {
                         )
                     );
                 }
-                log.info("Resolved thread: threadId={}, resolvedByLogin={}", threadId, resolvedBy != null ? resolvedBy.getLogin() : null);
+                log.info(
+                    "Resolved thread: threadId={}, resolvedByLogin={}",
+                    threadId,
+                    resolvedBy != null ? resolvedBy.getLogin() : null
+                );
                 return true;
             })
             .orElseGet(() -> {

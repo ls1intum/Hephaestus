@@ -101,7 +101,11 @@ public class MailBuilder {
         }
 
         if (!notificationsEnabled) {
-            log.warn("Skipped sending email: reason=notificationsDisabled, userLogin={}, template={}", recipientLogin, template);
+            log.warn(
+                "Skipped sending email: reason=notificationsDisabled, userLogin={}, template={}",
+                recipientLogin,
+                template
+            );
             return;
         }
         try {
@@ -137,7 +141,11 @@ public class MailBuilder {
             if (config.isEnabled()) {
                 mailSender.send(message);
             } else {
-                log.info("Skipped sending email: reason=mailDisabled, userLogin={}, template={}", recipientLogin, template);
+                log.info(
+                    "Skipped sending email: reason=mailDisabled, userLogin={}, template={}",
+                    recipientLogin,
+                    template
+                );
             }
         } catch (Exception exception) {
             log.warn("Failed to send email: userLogin={}, template={}", recipientLogin, template, exception);

@@ -593,7 +593,11 @@ public class NatsConsumerService {
             try {
                 installationConsumer.stop();
             } catch (Exception e) {
-                log.debug("Failed to stop installation consumer: consumerName={}", installationConsumer.consumerName, e);
+                log.debug(
+                    "Failed to stop installation consumer: consumerName={}",
+                    installationConsumer.consumerName,
+                    e
+                );
             }
             installationConsumer = null;
         }

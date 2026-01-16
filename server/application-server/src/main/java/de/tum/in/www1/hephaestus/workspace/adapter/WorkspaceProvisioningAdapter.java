@@ -120,7 +120,11 @@ public class WorkspaceProvisioningAdapter implements ProvisioningListener {
         for (String nameWithOwner : repositoryNames) {
             repositoryMonitorService.removeRepositoryMonitorForInstallation(installationId, nameWithOwner);
         }
-        log.info("Removed repositories from monitor: installationId={}, repoCount={}", installationId, repositoryNames.size());
+        log.info(
+            "Removed repositories from monitor: installationId={}, repoCount={}",
+            installationId,
+            repositoryNames.size()
+        );
     }
 
     @Override

@@ -3,8 +3,8 @@ package de.tum.in.www1.hephaestus.gitprovider.label.github;
 import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.*;
 
-import de.tum.in.www1.hephaestus.gitprovider.common.exception.InstallationNotFoundException;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
+import de.tum.in.www1.hephaestus.gitprovider.common.exception.InstallationNotFoundException;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser.RepositoryOwnerAndName;
@@ -162,7 +162,11 @@ public class GitHubLabelSyncService {
             if (!syncedNames.contains(existingLabel.getName())) {
                 labelRepository.delete(existingLabel);
                 removedCount++;
-                log.debug("Removed stale label: labelName={}, repoId={}", sanitizeForLog(existingLabel.getName()), repositoryId);
+                log.debug(
+                    "Removed stale label: labelName={}, repoId={}",
+                    sanitizeForLog(existingLabel.getName()),
+                    repositoryId
+                );
             }
         }
 

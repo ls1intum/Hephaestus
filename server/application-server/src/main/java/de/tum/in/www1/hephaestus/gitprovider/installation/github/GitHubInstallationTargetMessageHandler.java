@@ -1,12 +1,12 @@
 package de.tum.in.www1.hephaestus.gitprovider.installation.github;
 
+import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
+
 import de.tum.in.www1.hephaestus.gitprovider.common.NatsMessageDeserializer;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventAction;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventType;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.ProvisioningListener;
-import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
-
 import de.tum.in.www1.hephaestus.gitprovider.installation.github.dto.GitHubInstallationTargetEventDTO;
 import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationService;
 import org.slf4j.Logger;

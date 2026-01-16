@@ -100,12 +100,20 @@ public class BackfillStartupRunner implements ApplicationRunner {
                 ActivityEventBackfillService.BackfillEstimate estimate = backfillService.estimateBackfill(
                     workspace.getId()
                 );
-                log.info("Estimated backfill for workspace: scopeSlug={}, estimate={}", workspace.getWorkspaceSlug(), estimate.summary());
+                log.info(
+                    "Estimated backfill for workspace: scopeSlug={}, estimate={}",
+                    workspace.getWorkspaceSlug(),
+                    estimate.summary()
+                );
 
                 // Run the backfill
                 BackfillProgress progress = backfillService.backfillWorkspace(workspace.getId());
 
-                log.info("Completed backfill for workspace: scopeSlug={}, progress={}", workspace.getWorkspaceSlug(), progress.summary());
+                log.info(
+                    "Completed backfill for workspace: scopeSlug={}, progress={}",
+                    workspace.getWorkspaceSlug(),
+                    progress.summary()
+                );
             } catch (Exception e) {
                 log.error(
                     "Failed to backfill workspace: scopeSlug={}, scopeId={}",

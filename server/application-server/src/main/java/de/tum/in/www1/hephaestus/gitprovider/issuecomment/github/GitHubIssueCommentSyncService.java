@@ -6,8 +6,8 @@ import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncCons
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.GRAPHQL_TIMEOUT;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.MAX_PAGINATION_PAGES;
 
-import de.tum.in.www1.hephaestus.gitprovider.common.exception.InstallationNotFoundException;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
+import de.tum.in.www1.hephaestus.gitprovider.common.exception.InstallationNotFoundException;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser.RepositoryOwnerAndName;
@@ -92,7 +92,12 @@ public class GitHubIssueCommentSyncService {
             return 0;
         }
 
-        log.info("Completed comment sync: repoName={}, commentCount={}, issueCount={}", safeNameWithOwner, totalSynced.get(), issueCount.get());
+        log.info(
+            "Completed comment sync: repoName={}, commentCount={}, issueCount={}",
+            safeNameWithOwner,
+            totalSynced.get(),
+            issueCount.get()
+        );
         return totalSynced.get();
     }
 
@@ -106,7 +111,10 @@ public class GitHubIssueCommentSyncService {
     @Transactional
     public int syncForIssue(Long scopeId, Issue issue) {
         if (issue == null || issue.getRepository() == null) {
-            log.warn("Skipped comment sync: reason=issueOrRepositoryNull, issueId={}", issue != null ? issue.getId() : "null");
+            log.warn(
+                "Skipped comment sync: reason=issueOrRepositoryNull, issueId={}",
+                issue != null ? issue.getId() : "null"
+            );
             return 0;
         }
 
@@ -161,7 +169,11 @@ public class GitHubIssueCommentSyncService {
                         );
                         return 0;
                     }
-                    log.warn("Invalid GraphQL response for comment sync: repoName={}, issueNumber={}", safeNameWithOwner, issue.getNumber());
+                    log.warn(
+                        "Invalid GraphQL response for comment sync: repoName={}, issueNumber={}",
+                        safeNameWithOwner,
+                        issue.getNumber()
+                    );
                     break;
                 }
 
@@ -218,7 +230,12 @@ public class GitHubIssueCommentSyncService {
             }
         }
 
-        log.debug("Completed comment sync for issue: repoName={}, issueNumber={}, commentCount={}", safeNameWithOwner, issue.getNumber(), totalSynced);
+        log.debug(
+            "Completed comment sync for issue: repoName={}, issueNumber={}, commentCount={}",
+            safeNameWithOwner,
+            issue.getNumber(),
+            totalSynced
+        );
         return totalSynced;
     }
 }

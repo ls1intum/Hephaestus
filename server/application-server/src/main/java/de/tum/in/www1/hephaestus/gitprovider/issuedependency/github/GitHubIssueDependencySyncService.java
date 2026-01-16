@@ -175,7 +175,10 @@ public class GitHubIssueDependencySyncService {
         for (String repoNameWithOwner : repositoryNames) {
             Optional<Repository> repoOpt = repositoryRepository.findByNameWithOwner(repoNameWithOwner);
             if (repoOpt.isEmpty()) {
-                log.debug("Skipped dependency sync: reason=repositoryNotFound, repoName={}", sanitizeForLog(repoNameWithOwner));
+                log.debug(
+                    "Skipped dependency sync: reason=repositoryNotFound, repoName={}",
+                    sanitizeForLog(repoNameWithOwner)
+                );
                 continue;
             }
 

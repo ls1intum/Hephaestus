@@ -109,7 +109,11 @@ public class WorkspaceTeamLabelService {
             workspaceTeamSettingsService.addLabelFilterByName(workspace, teamId, repositoryId, label);
 
         if (filterOpt.isEmpty()) {
-            log.warn("Skipped label filter addition: reason=teamOrLabelNotFound, teamId={}, labelName={}", teamId, LoggingUtils.sanitizeForLog(label));
+            log.warn(
+                "Skipped label filter addition: reason=teamOrLabelNotFound, teamId={}, labelName={}",
+                teamId,
+                LoggingUtils.sanitizeForLog(label)
+            );
             return Optional.empty();
         }
 

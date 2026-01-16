@@ -64,25 +64,28 @@ public class GitHubUserProcessor {
         userRepository.upsert(userId, login, name, avatarUrl, htmlUrl, User.Type.USER.name());
 
         // Fetch the entity to update additional profile fields if needed
-        return userRepository.findById(userId).map(user -> {
-            boolean changed = false;
-            if (dto.email() != null && !dto.email().equals(user.getEmail())) {
-                user.setEmail(dto.email());
-                changed = true;
-            }
-            if (dto.createdAt() != null && !dto.createdAt().equals(user.getCreatedAt())) {
-                user.setCreatedAt(dto.createdAt());
-                changed = true;
-            }
-            if (dto.updatedAt() != null && !dto.updatedAt().equals(user.getUpdatedAt())) {
-                user.setUpdatedAt(dto.updatedAt());
-                changed = true;
-            }
-            if (changed) {
-                return userRepository.save(user);
-            }
-            return user;
-        }).orElse(null);
+        return userRepository
+            .findById(userId)
+            .map(user -> {
+                boolean changed = false;
+                if (dto.email() != null && !dto.email().equals(user.getEmail())) {
+                    user.setEmail(dto.email());
+                    changed = true;
+                }
+                if (dto.createdAt() != null && !dto.createdAt().equals(user.getCreatedAt())) {
+                    user.setCreatedAt(dto.createdAt());
+                    changed = true;
+                }
+                if (dto.updatedAt() != null && !dto.updatedAt().equals(user.getUpdatedAt())) {
+                    user.setUpdatedAt(dto.updatedAt());
+                    changed = true;
+                }
+                if (changed) {
+                    return userRepository.save(user);
+                }
+                return user;
+            })
+            .orElse(null);
     }
 
     /**

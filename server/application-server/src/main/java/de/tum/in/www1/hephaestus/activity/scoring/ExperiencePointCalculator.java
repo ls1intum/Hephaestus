@@ -156,7 +156,9 @@ public class ExperiencePointCalculator implements ExperiencePointStrategy {
             .stream()
             .filter(review -> review.getState() == PullRequestReview.State.APPROVED)
             .filter(review -> !isSelfReview(review))
-            .mapToDouble(review -> weightApproval * calculateCodeReviewBonus(review.getComments().size(), complexityScore))
+            .mapToDouble(
+                review -> weightApproval * calculateCodeReviewBonus(review.getComments().size(), complexityScore)
+            )
             .sum();
 
         double changesRequestedExperiencePoints = eligibleReviews
@@ -177,7 +179,9 @@ public class ExperiencePointCalculator implements ExperiencePointStrategy {
                     review.getState() == PullRequestReview.State.UNKNOWN
             )
             .filter(review -> !isSelfReview(review))
-            .mapToDouble(review -> weightComment * calculateCodeReviewBonus(review.getComments().size(), complexityScore))
+            .mapToDouble(
+                review -> weightComment * calculateCodeReviewBonus(review.getComments().size(), complexityScore)
+            )
             .sum();
 
         double issueCommentExperiencePoints = weightComment * issueCommentCount;
@@ -276,7 +280,10 @@ public class ExperiencePointCalculator implements ExperiencePointStrategy {
     public double calculateIssueCommentExperiencePoints(IssueComment issueComment) {
         Issue issue = issueComment.getIssue();
         if (issue == null) {
-            log.warn("Skipped XP calculation, issue comment has no associated issue: commentId={}", issueComment.getId());
+            log.warn(
+                "Skipped XP calculation, issue comment has no associated issue: commentId={}",
+                issueComment.getId()
+            );
             return 0;
         }
 

@@ -26,12 +26,7 @@ public interface ProvisioningListener {
      * Provider-agnostic snapshot of repository metadata from webhook payloads.
      * Contains the minimal information needed to create a Repository entity.
      */
-    record RepositorySnapshot(
-        long id,
-        String nameWithOwner,
-        String name,
-        boolean isPrivate
-    ) {}
+    record RepositorySnapshot(long id, String nameWithOwner, String name, boolean isPrivate) {}
 
     record InstallationData(
         Long installationId,
@@ -44,6 +39,6 @@ public interface ProvisioningListener {
 
     enum AccountType {
         ORGANIZATION,
-        USER
+        USER,
     }
 }

@@ -151,7 +151,11 @@ public class DeadLetterRetryScheduler implements HealthIndicator {
         for (DeadLetterEvent event : pending) {
             // Skip events that are too recent (respect backoff)
             if (event.getCreatedAt().isAfter(minCreatedAt)) {
-                log.debug("Skipped recent dead letter: deadLetterId={}, createdAt={}", event.getId(), event.getCreatedAt());
+                log.debug(
+                    "Skipped recent dead letter: deadLetterId={}, createdAt={}",
+                    event.getId(),
+                    event.getCreatedAt()
+                );
                 continue;
             }
 
@@ -183,11 +187,7 @@ public class DeadLetterRetryScheduler implements HealthIndicator {
             } else {
                 failedCount++;
                 failedCounter.increment();
-                log.warn(
-                    "Failed to retry dead letter: deadLetterId={}, reason={}",
-                    event.getId(),
-                    result.message()
-                );
+                log.warn("Failed to retry dead letter: deadLetterId={}, reason={}", event.getId(), result.message());
             }
         }
 

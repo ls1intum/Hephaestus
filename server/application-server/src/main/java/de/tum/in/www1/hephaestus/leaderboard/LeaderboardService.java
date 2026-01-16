@@ -369,12 +369,7 @@ public class LeaderboardService {
                 i + 1,
                 score,
                 null,
-                TeamInfoDTO.fromTeamWithScopeSettings(
-                    teamEntity,
-                    isHiddenInWorkspace,
-                    workspaceLabels,
-                    hiddenRepoIds
-                ),
+                TeamInfoDTO.fromTeamWithScopeSettings(teamEntity, isHiddenInWorkspace, workspaceLabels, hiddenRepoIds),
                 stats.reviewedPullRequests(),
                 stats.numberOfReviewedPRs(),
                 stats.numberOfApprovals(),

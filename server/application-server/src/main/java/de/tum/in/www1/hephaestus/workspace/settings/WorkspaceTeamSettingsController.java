@@ -283,7 +283,12 @@ public class WorkspaceTeamSettingsController {
         @PathVariable Long teamId,
         @PathVariable Long labelId
     ) {
-        log.info("Adding label filter: labelId={}, teamId={}, workspaceSlug={}", labelId, teamId, workspaceContext.slug());
+        log.info(
+            "Adding label filter: labelId={}, teamId={}, workspaceSlug={}",
+            labelId,
+            teamId,
+            workspaceContext.slug()
+        );
 
         Workspace workspace = workspaceResolver.requireWorkspace(workspaceContext);
 
@@ -311,7 +316,12 @@ public class WorkspaceTeamSettingsController {
         @PathVariable Long teamId,
         @PathVariable Long labelId
     ) {
-        log.info("Removing label filter: labelId={}, teamId={}, workspaceSlug={}", labelId, teamId, workspaceContext.slug());
+        log.info(
+            "Removing label filter: labelId={}, teamId={}, workspaceSlug={}",
+            labelId,
+            teamId,
+            workspaceContext.slug()
+        );
 
         Workspace workspace = workspaceResolver.requireWorkspace(workspaceContext);
 

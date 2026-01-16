@@ -3,8 +3,8 @@ package de.tum.in.www1.hephaestus.gitprovider.milestone.github;
 import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.*;
 
-import de.tum.in.www1.hephaestus.gitprovider.common.exception.InstallationNotFoundException;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
+import de.tum.in.www1.hephaestus.gitprovider.common.exception.InstallationNotFoundException;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser.RepositoryOwnerAndName;
@@ -131,7 +131,12 @@ public class GitHubMilestoneSyncService {
             // Remove milestones that no longer exist
             removeDeletedMilestones(repository.getId(), syncedNumbers, context);
 
-            log.info("Completed milestone sync: repoName={}, milestoneCount={}, scopeId={}", safeNameWithOwner, totalSynced, scopeId);
+            log.info(
+                "Completed milestone sync: repoName={}, milestoneCount={}, scopeId={}",
+                safeNameWithOwner,
+                totalSynced,
+                scopeId
+            );
             return totalSynced;
         } catch (InstallationNotFoundException e) {
             // Re-throw to abort the entire sync operation

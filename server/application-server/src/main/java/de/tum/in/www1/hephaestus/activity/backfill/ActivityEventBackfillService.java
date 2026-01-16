@@ -425,7 +425,11 @@ public class ActivityEventBackfillService {
                     Instant occurredAt = review.getSubmittedAt();
                     if (occurredAt == null) {
                         occurredAt = pr.getCreatedAt() != null ? pr.getCreatedAt() : Instant.now();
-                        log.debug("Using fallback timestamp for review: reviewId={}, fallbackTimestamp={}", review.getId(), occurredAt);
+                        log.debug(
+                            "Using fallback timestamp for review: reviewId={}, fallbackTimestamp={}",
+                            review.getId(),
+                            occurredAt
+                        );
                     }
 
                     // Record the primary review event

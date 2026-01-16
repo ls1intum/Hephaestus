@@ -5,9 +5,9 @@ import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
 import de.tum.in.www1.hephaestus.gitprovider.common.exception.InstallationNotFoundException;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncContextProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider.SyncSession;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider.SyncStatistics;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider.SyncTarget;
-import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider.SyncSession;
 import de.tum.in.www1.hephaestus.gitprovider.issuedependency.github.GitHubIssueDependencySyncService;
 import de.tum.in.www1.hephaestus.gitprovider.issuetype.github.GitHubIssueTypeSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.subissue.github.GitHubSubIssueSyncService;
@@ -126,7 +126,12 @@ public class GitHubDataSyncScheduler {
             // Set context for logging and isolation
             syncContextProvider.setContext(session.syncContext());
 
-            log.info("Starting scope sync: scopeId={}, scopeSlug={}, accountLogin={}", session.scopeId(), session.slug(), sanitizeForLog(session.accountLogin()));
+            log.info(
+                "Starting scope sync: scopeId={}, scopeSlug={}, accountLogin={}",
+                session.scopeId(),
+                session.slug(),
+                sanitizeForLog(session.accountLogin())
+            );
 
             // Wrap sync operations with context propagation for async threads
             Runnable syncTask = syncContextProvider.wrapWithContext(() -> {
@@ -190,7 +195,12 @@ public class GitHubDataSyncScheduler {
         } catch (InstallationNotFoundException e) {
             throw e;
         } catch (Exception e) {
-            log.error("Failed to sync issue dependencies: scopeId={}, scopeSlug={}", session.scopeId(), session.slug(), e);
+            log.error(
+                "Failed to sync issue dependencies: scopeId={}, scopeSlug={}",
+                session.scopeId(),
+                session.slug(),
+                e
+            );
         }
     }
 }

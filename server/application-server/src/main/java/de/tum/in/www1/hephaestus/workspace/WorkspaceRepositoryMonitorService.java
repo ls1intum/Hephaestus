@@ -322,7 +322,10 @@ public class WorkspaceRepositoryMonitorService {
      * @param snapshot       the repository snapshot from the webhook payload
      */
     @Transactional
-    public void ensureRepositoryAndMonitorFromSnapshot(long installationId, ProvisioningListener.RepositorySnapshot snapshot) {
+    public void ensureRepositoryAndMonitorFromSnapshot(
+        long installationId,
+        ProvisioningListener.RepositorySnapshot snapshot
+    ) {
         if (snapshot == null || isBlank(snapshot.nameWithOwner())) {
             return;
         }

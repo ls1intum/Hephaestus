@@ -72,18 +72,27 @@ public class GitHubInstallationRepositoriesMessageHandler
 
         // Notify consuming module via SPI for added repositories
         if (!added.isEmpty()) {
-            List<RepositorySnapshot> addedSnapshots = added.stream()
+            List<RepositorySnapshot> addedSnapshots = added
+                .stream()
                 .map(ref -> new RepositorySnapshot(ref.id(), ref.fullName(), ref.name(), ref.isPrivate()))
                 .toList();
             provisioningListener.onRepositoriesAdded(installationId, addedSnapshots);
-            log.info("Added repositories to installation: installationId={}, repoCount={}", installationId, addedSnapshots.size());
+            log.info(
+                "Added repositories to installation: installationId={}, repoCount={}",
+                installationId,
+                addedSnapshots.size()
+            );
         }
 
         // Notify consuming module via SPI for removed repositories
         if (!removed.isEmpty()) {
             List<String> removedNames = removed.stream().map(GitHubRepositoryRefDTO::fullName).toList();
             provisioningListener.onRepositoriesRemoved(installationId, removedNames);
-            log.info("Removed repositories from installation: installationId={}, repoCount={}", installationId, removedNames.size());
+            log.info(
+                "Removed repositories from installation: installationId={}, repoCount={}",
+                installationId,
+                removedNames.size()
+            );
         }
     }
 }

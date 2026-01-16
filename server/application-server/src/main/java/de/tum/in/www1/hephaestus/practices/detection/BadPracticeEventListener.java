@@ -161,7 +161,11 @@ public class BadPracticeEventListener {
         try {
             PullRequest pullRequest = pullRequestRepository.findByIdWithAssignees(pullRequestId).orElse(null);
             if (pullRequest == null) {
-                log.warn("Skipped bad practice detection: reason=pullRequestNotFound, prNumber={}, prId={}", pullRequestNumber, pullRequestId);
+                log.warn(
+                    "Skipped bad practice detection: reason=pullRequestNotFound, prNumber={}, prId={}",
+                    pullRequestNumber,
+                    pullRequestId
+                );
                 return;
             }
             badPracticeDetectorScheduler.detectBadPracticeForPrWhenOpenedOrReadyForReviewEvent(pullRequest);
@@ -178,7 +182,11 @@ public class BadPracticeEventListener {
         try {
             PullRequest pullRequest = pullRequestRepository.findByIdWithAssignees(pullRequestId).orElse(null);
             if (pullRequest == null) {
-                log.warn("Skipped bad practice detection: reason=pullRequestNotFound, prNumber={}, prId={}", pullRequestNumber, pullRequestId);
+                log.warn(
+                    "Skipped bad practice detection: reason=pullRequestNotFound, prNumber={}, prId={}",
+                    pullRequestNumber,
+                    pullRequestId
+                );
                 return;
             }
             // Use the scheduler method that checks exact label names and runs immediately
@@ -195,7 +203,11 @@ public class BadPracticeEventListener {
         try {
             PullRequest pullRequest = pullRequestRepository.findByIdWithAssignees(pullRequestId).orElse(null);
             if (pullRequest == null) {
-                log.warn("Skipped bad practice detection: reason=pullRequestNotFound, prNumber={}, prId={}", pullRequestNumber, pullRequestId);
+                log.warn(
+                    "Skipped bad practice detection: reason=pullRequestNotFound, prNumber={}, prId={}",
+                    pullRequestNumber,
+                    pullRequestId
+                );
                 return;
             }
             badPracticeDetectorScheduler.detectBadPracticeForPrIfClosedEvent(pullRequest);

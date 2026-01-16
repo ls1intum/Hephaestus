@@ -97,7 +97,12 @@ public class GitHubPullRequestReviewSyncService {
             return 0;
         }
 
-        log.info("Completed review sync: repoName={}, reviewCount={}, prCount={}", safeNameWithOwner, totalSynced.get(), prCount.get());
+        log.info(
+            "Completed review sync: repoName={}, reviewCount={}, prCount={}",
+            safeNameWithOwner,
+            totalSynced.get(),
+            prCount.get()
+        );
         return totalSynced.get();
     }
 
@@ -130,7 +135,10 @@ public class GitHubPullRequestReviewSyncService {
     @Transactional
     public int syncRemainingReviews(Long scopeId, PullRequest pullRequest, String startCursor) {
         if (pullRequest == null || pullRequest.getRepository() == null) {
-            log.warn("Skipped review sync: reason=prOrRepositoryNull, prId={}", pullRequest != null ? pullRequest.getId() : "null");
+            log.warn(
+                "Skipped review sync: reason=prOrRepositoryNull, prId={}",
+                pullRequest != null ? pullRequest.getId() : "null"
+            );
             return 0;
         }
 
@@ -252,7 +260,12 @@ public class GitHubPullRequestReviewSyncService {
             }
         }
 
-        log.debug("Completed review sync for pull request: repoName={}, prNumber={}, reviewCount={}", safeNameWithOwner, pullRequest.getNumber(), totalSynced);
+        log.debug(
+            "Completed review sync for pull request: repoName={}, prNumber={}, reviewCount={}",
+            safeNameWithOwner,
+            pullRequest.getNumber(),
+            totalSynced
+        );
         return totalSynced;
     }
 

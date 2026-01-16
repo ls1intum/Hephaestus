@@ -177,13 +177,12 @@ public class WorkspaceProvisioningService {
                 }
                 try {
                     workspaceMembershipService.createMembership(workspace, adminUser.getId(), WorkspaceRole.ADMIN);
-                    log.info("Added default admin to workspace: workspaceSlug={}, role=ADMIN", workspace.getWorkspaceSlug());
-                } catch (IllegalArgumentException ex) {
-                    log.debug(
-                        "Skipped default admin addition: workspaceSlug={}",
-                        workspace.getWorkspaceSlug(),
-                        ex
+                    log.info(
+                        "Added default admin to workspace: workspaceSlug={}, role=ADMIN",
+                        workspace.getWorkspaceSlug()
                     );
+                } catch (IllegalArgumentException ex) {
+                    log.debug("Skipped default admin addition: workspaceSlug={}", workspace.getWorkspaceSlug(), ex);
                 }
             });
     }
@@ -247,7 +246,10 @@ public class WorkspaceProvisioningService {
                 return;
             }
 
-            log.info("Ensured GitHub App installations reflected as workspaces: installationCount={}", installations.size());
+            log.info(
+                "Ensured GitHub App installations reflected as workspaces: installationCount={}",
+                installations.size()
+            );
 
             for (InstallationDto installation : installations) {
                 String accountLogin = installation.account() != null ? installation.account().login() : "<unknown>";
@@ -294,7 +296,12 @@ public class WorkspaceProvisioningService {
         long installationId = installation.id();
         RepositorySelection selection = convertRepositorySelection(installation.repositorySelection());
 
-        log.info("Ensured installation workspace: installationId={}, orgLogin={}, selection={}", installationId, login, selection);
+        log.info(
+            "Ensured installation workspace: installationId={}, orgLogin={}, selection={}",
+            installationId,
+            login,
+            selection
+        );
 
         var account = installation.account();
         ProvisioningListener.AccountType wsAccountType = "Organization".equalsIgnoreCase(accountType)
@@ -369,7 +376,11 @@ public class WorkspaceProvisioningService {
                 newUser.setHtmlUrl(userInfo.htmlUrl() != null ? userInfo.htmlUrl() : "");
                 newUser.setType(User.Type.USER);
                 newUser = userRepository.save(newUser);
-                log.info("Created user for PAT workspace bootstrap: userLogin={}, userId={}", newUser.getLogin(), newUser.getId());
+                log.info(
+                    "Created user for PAT workspace bootstrap: userLogin={}, userId={}",
+                    newUser.getLogin(),
+                    newUser.getId()
+                );
                 return newUser.getId();
             });
     }

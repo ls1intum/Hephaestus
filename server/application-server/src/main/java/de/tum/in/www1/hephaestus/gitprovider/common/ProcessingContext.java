@@ -48,7 +48,6 @@ public record ProcessingContext(
     @Nullable String webhookAction,
     DataSource source
 ) {
-
     /**
      * Creates a context for scheduled sync operations.
      */

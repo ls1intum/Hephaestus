@@ -496,9 +496,7 @@ public class WorkspaceInstallationService {
             user.setAvatarUrl(avatarUrl != null ? avatarUrl : "");
             user.setHtmlUrl("https://github.com/" + accountLogin);
             user.setType(
-                accountType == ProvisioningListener.AccountType.ORGANIZATION
-                    ? User.Type.ORGANIZATION
-                    : User.Type.USER
+                accountType == ProvisioningListener.AccountType.ORGANIZATION ? User.Type.ORGANIZATION : User.Type.USER
             );
 
             User saved = userRepository.save(user);

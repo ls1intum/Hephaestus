@@ -163,7 +163,10 @@ public class WorkspaceLifecycleService {
             .orElseThrow(() -> new EntityNotFoundException("Workspace", workspaceSlug));
 
         if (workspace.getStatus() == WorkspaceStatus.PURGED) {
-            log.debug("Skipped workspace purge: reason=alreadyPurged, workspaceSlug={}", LoggingUtils.sanitizeForLog(workspaceSlug));
+            log.debug(
+                "Skipped workspace purge: reason=alreadyPurged, workspaceSlug={}",
+                LoggingUtils.sanitizeForLog(workspaceSlug)
+            );
             return workspace;
         }
 

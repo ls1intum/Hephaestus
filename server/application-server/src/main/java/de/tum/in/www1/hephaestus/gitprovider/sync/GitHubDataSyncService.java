@@ -152,7 +152,12 @@ public class GitHubDataSyncService {
         }
 
         Long repositoryId = repository.getId();
-        log.info("Starting repository sync: scopeId={}, repoId={}, repoName={}", scopeId, repositoryId, safeNameWithOwner);
+        log.info(
+            "Starting repository sync: scopeId={}, repoId={}, repoName={}",
+            scopeId,
+            repositoryId,
+            safeNameWithOwner
+        );
 
         try {
             // Sync repository metadata first (ensures entity is up-to-date before syncing related data)
@@ -160,7 +165,11 @@ public class GitHubDataSyncService {
             if (syncedRepository.isPresent()) {
                 log.debug("Synced repository metadata: scopeId={}, repoId={}", scopeId, repositoryId);
             } else {
-                log.warn("Failed to sync repository metadata, continuing: scopeId={}, repoId={}", scopeId, repositoryId);
+                log.warn(
+                    "Failed to sync repository metadata, continuing: scopeId={}, repoId={}",
+                    scopeId,
+                    repositoryId
+                );
             }
 
             // Sync collaborators
@@ -188,11 +197,7 @@ public class GitHubDataSyncService {
             );
 
             // Update sync timestamp via SPI
-            syncTargetProvider.updateSyncTimestamp(
-                syncTarget.id(),
-                SyncType.ISSUES_AND_PULL_REQUESTS,
-                Instant.now()
-            );
+            syncTargetProvider.updateSyncTimestamp(syncTarget.id(), SyncType.ISSUES_AND_PULL_REQUESTS, Instant.now());
 
             log.info(
                 "Completed repository sync: scopeId={}, repoId={}, collaborators={}, labels={}, milestones={}, issues={}, issueComments={}, prs={}, prReviewComments={}",
@@ -383,11 +388,7 @@ public class GitHubDataSyncService {
         int count = collaboratorSyncService.syncCollaboratorsForRepository(scopeId, repositoryId);
 
         // Update sync timestamp
-        syncTargetProvider.updateSyncTimestamp(
-            syncTarget.id(),
-            SyncType.COLLABORATORS,
-            Instant.now()
-        );
+        syncTargetProvider.updateSyncTimestamp(syncTarget.id(), SyncType.COLLABORATORS, Instant.now());
 
         return count;
     }

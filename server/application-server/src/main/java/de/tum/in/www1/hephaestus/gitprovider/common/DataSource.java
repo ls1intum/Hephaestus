@@ -11,5 +11,5 @@ public enum DataSource {
     /** Data from scheduled GraphQL synchronization. */
     GRAPHQL_SYNC,
     /** Data from a webhook event via NATS. */
-    WEBHOOK
+    WEBHOOK,
 }

@@ -88,7 +88,10 @@ public class GitHubPullRequestReviewThreadMessageHandler
                 threadDto.id(),
                 context
             );
-            default -> log.debug("Skipped pull_request_review_thread event: reason=unhandledAction, action={}", event.action());
+            default -> log.debug(
+                "Skipped pull_request_review_thread event: reason=unhandledAction, action={}",
+                event.action()
+            );
         }
     }
 }

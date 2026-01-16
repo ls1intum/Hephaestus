@@ -133,7 +133,11 @@ public class WorkspaceContextFilter implements Filter {
             boolean allowNonActive = isStatusPath || (isBasePath && isReadRequest) || allowLifecycleDelete;
 
             if (workspace.getStatus() != WorkspaceStatus.ACTIVE && !allowNonActive) {
-                log.debug("Denied workspace access: reason=nonActiveStatus, workspaceSlug={}, status={}", safeSlug, workspace.getStatus());
+                log.debug(
+                    "Denied workspace access: reason=nonActiveStatus, workspaceSlug={}, status={}",
+                    safeSlug,
+                    workspace.getStatus()
+                );
                 sendWorkspaceNotFoundError(httpResponse, slug);
                 return;
             }
@@ -159,15 +163,17 @@ public class WorkspaceContextFilter implements Filter {
 
             // Overwrite detection: warn if context already set
             if (WorkspaceContextHolder.getContext() != null) {
-                log.warn(
-                    "Detected context leak: reason=contextAlreadySet, workspaceSlug={}",
-                    safeSlug
-                );
+                log.warn("Detected context leak: reason=contextAlreadySet, workspaceSlug={}", safeSlug);
             }
 
             WorkspaceContextHolder.setContext(context);
 
-            log.debug("Set workspace context: workspaceSlug={}, workspaceId={}, roles={}", safeSlug, context.id(), context.roles());
+            log.debug(
+                "Set workspace context: workspaceSlug={}, workspaceId={}, roles={}",
+                safeSlug,
+                context.id(),
+                context.roles()
+            );
 
             // Continue filter chain
             chain.doFilter(request, response);

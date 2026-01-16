@@ -42,7 +42,11 @@ public abstract class GitHubMessageHandler<T> implements MessageHandler {
         String subject = msg.getSubject();
         String safeSubject = sanitizeForLog(subject);
         if (!subject.endsWith(eventKey)) {
-            log.error("Rejected message: reason=unexpectedSubject, subject={}, expectedSuffix={}", safeSubject, eventKey);
+            log.error(
+                "Rejected message: reason=unexpectedSubject, subject={}, expectedSuffix={}",
+                safeSubject,
+                eventKey
+            );
             return;
         }
 

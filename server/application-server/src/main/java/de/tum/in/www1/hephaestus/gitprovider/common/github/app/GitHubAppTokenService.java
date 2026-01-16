@@ -3,11 +3,11 @@ package de.tum.in.www1.hephaestus.gitprovider.common.github.app;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.GITHUB_API_BASE_URL;
 
 import com.auth0.jwt.JWT;
-import de.tum.in.www1.hephaestus.gitprovider.common.exception.InstallationNotFoundException;
 import com.auth0.jwt.algorithms.Algorithm;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import de.tum.in.www1.hephaestus.gitprovider.common.exception.InstallationNotFoundException;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.UncheckedIOException;

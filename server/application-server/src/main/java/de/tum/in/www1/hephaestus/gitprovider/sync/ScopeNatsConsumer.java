@@ -139,7 +139,12 @@ public class ScopeNatsConsumer {
         // Subscribe to NATS - messages go to queue for sequential processing
         subscription = context.consume(this::enqueueMessage);
 
-        log.debug("Started consumer: consumerName={}, scopeId={}, subjectCount={}", consumerName, scopeId, currentSubjects.length);
+        log.debug(
+            "Started consumer: consumerName={}, scopeId={}, subjectCount={}",
+            consumerName,
+            scopeId,
+            currentSubjects.length
+        );
     }
 
     /**
@@ -203,7 +208,12 @@ public class ScopeNatsConsumer {
         }
         subscription = context.consume(this::enqueueMessage);
 
-        log.debug("Updated consumer subjects: consumerName={}, scopeId={}, subjectCount={}", consumerName, scopeId, newSubjects.length);
+        log.debug(
+            "Updated consumer subjects: consumerName={}, scopeId={}, subjectCount={}",
+            consumerName,
+            scopeId,
+            newSubjects.length
+        );
     }
 
     /**

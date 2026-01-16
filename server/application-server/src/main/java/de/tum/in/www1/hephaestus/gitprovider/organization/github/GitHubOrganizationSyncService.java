@@ -122,7 +122,12 @@ public class GitHubOrganizationSyncService {
             // Re-throw to abort the entire sync operation
             throw e;
         } catch (Exception e) {
-            log.error("Failed to sync organization: orgLogin={}, scopeId={}", sanitizeForLog(organizationLogin), scopeId, e);
+            log.error(
+                "Failed to sync organization: orgLogin={}, scopeId={}",
+                sanitizeForLog(organizationLogin),
+                scopeId,
+                e
+            );
             return null;
         }
     }
@@ -146,7 +151,11 @@ public class GitHubOrganizationSyncService {
     ) {
         var membersConnection = graphQlOrg.getMembersWithRole();
         if (membersConnection == null || membersConnection.getEdges() == null) {
-            log.debug("No members found for organization: orgId={}, orgLogin={}", organization.getGithubId(), sanitizeForLog(organization.getLogin()));
+            log.debug(
+                "No members found for organization: orgId={}, orgLogin={}",
+                organization.getGithubId(),
+                sanitizeForLog(organization.getLogin())
+            );
             return 0;
         }
 

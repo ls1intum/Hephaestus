@@ -31,10 +31,7 @@ public class ProcessingContextFactory {
     private final RepositoryRepository repositoryRepository;
     private final ScopeIdResolver scopeIdResolver;
 
-    public ProcessingContextFactory(
-        RepositoryRepository repositoryRepository,
-        ScopeIdResolver scopeIdResolver
-    ) {
+    public ProcessingContextFactory(RepositoryRepository repositoryRepository, ScopeIdResolver scopeIdResolver) {
         this.repositoryRepository = repositoryRepository;
         this.scopeIdResolver = scopeIdResolver;
     }
@@ -52,7 +49,11 @@ public class ProcessingContextFactory {
         Repository repository = repositoryRepository.findByNameWithOwner(repoFullName).orElse(null);
 
         if (repository == null) {
-            log.debug("Skipped webhook event: reason=repositoryNotFound, repoName={}, action={}", sanitizeForLog(repoFullName), event.action());
+            log.debug(
+                "Skipped webhook event: reason=repositoryNotFound, repoName={}, action={}",
+                sanitizeForLog(repoFullName),
+                event.action()
+            );
             return Optional.empty();
         }
 
