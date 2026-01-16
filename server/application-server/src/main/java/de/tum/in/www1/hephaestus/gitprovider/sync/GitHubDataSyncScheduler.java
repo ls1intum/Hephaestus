@@ -2,6 +2,7 @@ package de.tum.in.www1.hephaestus.gitprovider.sync;
 
 import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.exception.InstallationNotFoundException;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncContextProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider.SyncStatistics;
@@ -143,6 +144,13 @@ public class GitHubDataSyncScheduler {
 
             // Execute synchronously in the scheduler thread
             syncTask.run();
+        } catch (InstallationNotFoundException e) {
+            log.warn(
+                "Aborting scope sync: reason=installationDeleted, scopeId={}, scopeSlug={}, installationId={}",
+                session.scopeId(),
+                session.slug(),
+                e.getInstallationId()
+            );
         } catch (Exception e) {
             log.error("Failed to sync scope: scopeId={}, scopeSlug={}", session.scopeId(), session.slug(), e);
         } finally {
@@ -154,6 +162,8 @@ public class GitHubDataSyncScheduler {
         try {
             log.debug("Starting sub-issues sync: scopeId={}, scopeSlug={}", session.scopeId(), session.slug());
             subIssueSyncService.syncSubIssuesForScope(session.scopeId());
+        } catch (InstallationNotFoundException e) {
+            throw e;
         } catch (Exception e) {
             log.error("Failed to sync sub-issues: scopeId={}, scopeSlug={}", session.scopeId(), session.slug(), e);
         }
@@ -163,6 +173,8 @@ public class GitHubDataSyncScheduler {
         try {
             log.debug("Starting issue types sync: scopeId={}, scopeSlug={}", session.scopeId(), session.slug());
             issueTypeSyncService.syncIssueTypesForScope(session.scopeId());
+        } catch (InstallationNotFoundException e) {
+            throw e;
         } catch (Exception e) {
             log.error("Failed to sync issue types: scopeId={}, scopeSlug={}", session.scopeId(), session.slug(), e);
         }
@@ -175,6 +187,8 @@ public class GitHubDataSyncScheduler {
         try {
             log.debug("Starting issue dependencies sync: scopeId={}, scopeSlug={}", session.scopeId(), session.slug());
             issueDependencySyncService.syncDependenciesForScope(session.scopeId());
+        } catch (InstallationNotFoundException e) {
+            throw e;
         } catch (Exception e) {
             log.error("Failed to sync issue dependencies: scopeId={}, scopeSlug={}", session.scopeId(), session.slug(), e);
         }

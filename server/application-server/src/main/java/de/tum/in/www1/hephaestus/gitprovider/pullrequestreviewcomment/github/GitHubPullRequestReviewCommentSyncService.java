@@ -4,6 +4,7 @@ import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlErrorUtils.isNotFoundError;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.*;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.exception.InstallationNotFoundException;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser.RepositoryOwnerAndName;
@@ -97,7 +98,7 @@ public class GitHubPullRequestReviewCommentSyncService {
     public int syncCommentsForRepository(Long scopeId, Long repositoryId) {
         Repository repository = repositoryRepository.findById(repositoryId).orElse(null);
         if (repository == null) {
-            log.warn("Skipped review comment sync: reason=repositoryNotFound, repoId={}", repositoryId);
+            log.debug("Skipped review comment sync: reason=repositoryNotFound, repoId={}", repositoryId);
             return 0;
         }
 
@@ -209,6 +210,9 @@ public class GitHubPullRequestReviewCommentSyncService {
                 totalSynced
             );
             return totalSynced;
+        } catch (InstallationNotFoundException e) {
+            // Re-throw to abort the entire sync operation
+            throw e;
         } catch (FieldAccessException e) {
             // Check if this is a NOT_FOUND error (PR deleted from GitHub)
             if (isNotFoundError(e.getResponse(), "repository.pullRequest")) {
@@ -270,7 +274,7 @@ public class GitHubPullRequestReviewCommentSyncService {
         var firstComment = graphQlComments.get(0);
         Long threadId = extractDatabaseId(firstComment);
         if (threadId == null) {
-            log.warn("Skipped thread with missing databaseId on first comment: threadId={}", graphQlThread.getId());
+            log.warn("Skipped thread: reason=missingDatabaseIdOnFirstComment, threadId={}", graphQlThread.getId());
             return 0;
         }
 
@@ -301,7 +305,7 @@ public class GitHubPullRequestReviewCommentSyncService {
     private void fetchAllRemainingThreadComments(GHPullRequestReviewThread graphQlThread, String startCursor) {
         if (currentClient == null) {
             log.warn(
-                "No client available for nested pagination, skipping remaining comments: threadId={}",
+                "Skipped remaining thread comments: reason=noClientAvailable, threadId={}",
                 graphQlThread.getId()
             );
             return;

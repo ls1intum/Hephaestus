@@ -110,4 +110,14 @@ public interface WorkspaceTeamLabelFilterRepository
         """
     )
     void deleteAllByWorkspaceIdAndTeamId(@Param("workspaceId") Long workspaceId, @Param("teamId") Long teamId);
+
+    /**
+     * Deletes all label filters for a workspace.
+     * Used during workspace purge to clean up settings data.
+     *
+     * @param workspaceId the workspace ID
+     */
+    @Modifying
+    @Query("DELETE FROM WorkspaceTeamLabelFilter wtlf WHERE wtlf.workspace.id = :workspaceId")
+    void deleteAllByWorkspaceId(@Param("workspaceId") Long workspaceId);
 }

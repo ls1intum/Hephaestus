@@ -259,7 +259,7 @@ public class NatsConsumerService {
         if (existing == null) {
             // No consumer yet - don't start one here. Consumer will be started
             // during scope activation which happens after provisioning completes.
-            log.debug("Skipped consumer update: scopeId={}, reason=not yet created", scopeId);
+            log.debug("Skipped consumer update: reason=consumerNotYetCreated, scopeId={}", scopeId);
             return;
         }
 
@@ -548,8 +548,15 @@ public class NatsConsumerService {
 
         try {
             natsConnection.jetStreamManagement().deleteConsumer("github", consumerName);
+        } catch (io.nats.client.JetStreamApiException e) {
+            // Error code 10014 = consumer not found - this is expected during cleanup
+            if (e.getApiErrorCode() == 10014) {
+                log.debug("Skipped consumer cleanup: reason=consumerAlreadyDeleted, consumerName={}", consumerName);
+            } else {
+                log.debug("Failed to delete consumer: consumerName={}, error={}", consumerName, e.getMessage());
+            }
         } catch (Exception e) {
-            log.debug("Failed to delete consumer: consumerName={}", consumerName, e);
+            log.debug("Failed to delete consumer: consumerName={}, error={}", consumerName, e.getMessage());
         }
     }
 

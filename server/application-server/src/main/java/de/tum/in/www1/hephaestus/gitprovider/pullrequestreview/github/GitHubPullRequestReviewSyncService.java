@@ -77,7 +77,7 @@ public class GitHubPullRequestReviewSyncService {
     public int syncForRepository(Long scopeId, Long repositoryId) {
         Repository repository = repositoryRepository.findById(repositoryId).orElse(null);
         if (repository == null) {
-            log.warn("Skipped review sync: reason=repositoryNotFound, repoId={}", repositoryId);
+            log.debug("Skipped review sync: reason=repositoryNotFound, repoId={}", repositoryId);
             return 0;
         }
 
@@ -252,7 +252,7 @@ public class GitHubPullRequestReviewSyncService {
             }
         }
 
-        log.debug("Synced reviews for pull request: repoName={}, prNumber={}, reviewCount={}", safeNameWithOwner, pullRequest.getNumber(), totalSynced);
+        log.debug("Completed review sync for pull request: repoName={}, prNumber={}, reviewCount={}", safeNameWithOwner, pullRequest.getNumber(), totalSynced);
         return totalSynced;
     }
 

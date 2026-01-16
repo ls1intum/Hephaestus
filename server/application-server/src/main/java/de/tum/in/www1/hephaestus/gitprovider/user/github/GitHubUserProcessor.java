@@ -1,7 +1,5 @@
 package de.tum.in.www1.hephaestus.gitprovider.user.github;
 
-import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
-
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.github.dto.GitHubUserDTO;
@@ -39,8 +37,8 @@ public class GitHubUserProcessor {
     /**
      * Find an existing user or create a new one from the DTO.
      * <p>
-     * This method is idempotent - calling it multiple times with the same DTO
-     * will return the same user entity.
+     * This method is idempotent and thread-safe - calling it multiple times with the same DTO
+     * will return the same user entity. Uses PostgreSQL upsert to avoid race conditions.
      *
      * @param dto the GitHub user DTO
      * @return the User entity, or null if dto is null or has no ID
@@ -56,82 +54,35 @@ public class GitHubUserProcessor {
             log.debug("Skipped user processing: reason=missingDatabaseId, userLogin={}", dto.login());
             return null;
         }
-        return userRepository
-            .findById(userId)
-            .map(existing -> updateProfileFields(existing, dto))
-            .orElseGet(() -> {
-                User user = new User();
-                user.setId(userId);
-                user.setLogin(dto.login());
-                user.setAvatarUrl(dto.avatarUrl() != null ? dto.avatarUrl() : "");
-                // Use login as fallback for name if null (name is @NonNull)
-                user.setName(dto.name() != null ? dto.name() : dto.login());
-                user.setHtmlUrl(dto.htmlUrl() != null ? dto.htmlUrl() : "");
-                user.setType(User.Type.USER);
-                // Sync profile fields from DTO
-                syncProfileFieldsToUser(user, dto);
-                User saved = userRepository.save(user);
-                log.debug("Created user: userId={}, userLogin={}", saved.getId(), sanitizeForLog(saved.getLogin()));
-                return saved;
-            });
-    }
 
-    /**
-     * Updates profile fields on an existing user if the DTO has richer data.
-     * <p>
-     * Only updates fields that are non-null in the DTO to avoid overwriting
-     * existing data with null from minimal webhook payloads.
-     *
-     * @param existing the existing user entity
-     * @param dto the DTO with potentially updated profile data
-     * @return the updated user (saved if changed)
-     */
-    private User updateProfileFields(User existing, GitHubUserDTO dto) {
-        boolean changed = false;
+        String login = dto.login();
+        String name = dto.name() != null ? dto.name() : login;
+        String avatarUrl = dto.avatarUrl() != null ? dto.avatarUrl() : "";
+        String htmlUrl = dto.htmlUrl() != null ? dto.htmlUrl() : "";
 
-        // Update basic fields that might have changed
-        if (dto.avatarUrl() != null && !dto.avatarUrl().equals(existing.getAvatarUrl())) {
-            existing.setAvatarUrl(dto.avatarUrl());
-            changed = true;
-        }
-        if (dto.name() != null && !dto.name().equals(existing.getName())) {
-            existing.setName(dto.name());
-            changed = true;
-        }
+        // Use upsert for thread-safe concurrent inserts
+        userRepository.upsert(userId, login, name, avatarUrl, htmlUrl, User.Type.USER.name());
 
-        if (dto.email() != null && !dto.email().equals(existing.getEmail())) {
-            existing.setEmail(dto.email());
-            changed = true;
-        }
-        if (dto.createdAt() != null && !dto.createdAt().equals(existing.getCreatedAt())) {
-            existing.setCreatedAt(dto.createdAt());
-            changed = true;
-        }
-        if (dto.updatedAt() != null && !dto.updatedAt().equals(existing.getUpdatedAt())) {
-            existing.setUpdatedAt(dto.updatedAt());
-            changed = true;
-        }
-
-        if (changed) {
-            log.debug("Updated user: userId={}, userLogin={}", existing.getId(), sanitizeForLog(existing.getLogin()));
-            return userRepository.save(existing);
-        }
-        return existing;
-    }
-
-    /**
-     * Syncs profile fields from DTO to a new User entity.
-     */
-    private void syncProfileFieldsToUser(User user, GitHubUserDTO dto) {
-        if (dto.email() != null) {
-            user.setEmail(dto.email());
-        }
-        if (dto.createdAt() != null) {
-            user.setCreatedAt(dto.createdAt());
-        }
-        if (dto.updatedAt() != null) {
-            user.setUpdatedAt(dto.updatedAt());
-        }
+        // Fetch the entity to update additional profile fields if needed
+        return userRepository.findById(userId).map(user -> {
+            boolean changed = false;
+            if (dto.email() != null && !dto.email().equals(user.getEmail())) {
+                user.setEmail(dto.email());
+                changed = true;
+            }
+            if (dto.createdAt() != null && !dto.createdAt().equals(user.getCreatedAt())) {
+                user.setCreatedAt(dto.createdAt());
+                changed = true;
+            }
+            if (dto.updatedAt() != null && !dto.updatedAt().equals(user.getUpdatedAt())) {
+                user.setUpdatedAt(dto.updatedAt());
+                changed = true;
+            }
+            if (changed) {
+                return userRepository.save(user);
+            }
+            return user;
+        }).orElse(null);
     }
 
     /**

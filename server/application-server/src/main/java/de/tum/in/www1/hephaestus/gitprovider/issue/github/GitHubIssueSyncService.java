@@ -5,6 +5,7 @@ import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncCons
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.GRAPHQL_TIMEOUT;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.MAX_PAGINATION_PAGES;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.exception.InstallationNotFoundException;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser;
@@ -60,7 +61,7 @@ public class GitHubIssueSyncService {
     public int syncForRepository(Long scopeId, Long repositoryId) {
         Repository repository = repositoryRepository.findById(repositoryId).orElse(null);
         if (repository == null) {
-            log.warn("Skipped issue sync: reason=repositoryNotFound, repoId={}", repositoryId);
+            log.debug("Skipped issue sync: reason=repositoryNotFound, repoId={}", repositoryId);
             return 0;
         }
 
@@ -68,7 +69,7 @@ public class GitHubIssueSyncService {
         String safeNameWithOwner = sanitizeForLog(nameWithOwner);
         Optional<RepositoryOwnerAndName> parsedName = GitHubRepositoryNameParser.parse(nameWithOwner);
         if (parsedName.isEmpty()) {
-            log.warn("Invalid repository name format: repoName={}", safeNameWithOwner);
+            log.warn("Skipped issue sync: reason=invalidRepoNameFormat, repoName={}", safeNameWithOwner);
             return 0;
         }
         RepositoryOwnerAndName ownerAndName = parsedName.get();
@@ -104,7 +105,7 @@ public class GitHubIssueSyncService {
 
                 if (response == null || !response.isValid()) {
                     log.warn(
-                        "Invalid GraphQL response for issue sync: repoName={}, errors={}",
+                        "Received invalid GraphQL response: repoName={}, errors={}",
                         safeNameWithOwner,
                         response != null ? response.getErrors() : "null"
                     );
@@ -130,13 +131,16 @@ public class GitHubIssueSyncService {
                 GHPageInfo pageInfo = connection.getPageInfo();
                 hasMore = pageInfo != null && Boolean.TRUE.equals(pageInfo.getHasNextPage());
                 cursor = pageInfo != null ? pageInfo.getEndCursor() : null;
+            } catch (InstallationNotFoundException e) {
+                // Re-throw to abort the entire sync operation
+                throw e;
             } catch (Exception e) {
                 log.error("Failed to sync issues: repoName={}", safeNameWithOwner, e);
                 break;
             }
         }
 
-        log.info("Completed issue sync: repoName={}, issueCount={}", safeNameWithOwner, totalSynced);
+        log.info("Completed issue sync: repoName={}, issueCount={}, scopeId={}", safeNameWithOwner, totalSynced, scopeId);
         return totalSynced;
     }
 }

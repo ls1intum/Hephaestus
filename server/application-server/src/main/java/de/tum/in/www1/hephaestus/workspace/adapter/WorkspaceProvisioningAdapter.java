@@ -45,7 +45,7 @@ public class WorkspaceProvisioningAdapter implements ProvisioningListener {
 
         if (workspace == null) {
             log.warn(
-                "Skipped installation event, workspace could not be ensured: installationId={}",
+                "Skipped installation event: reason=workspaceCreationFailed, installationId={}",
                 installation.installationId()
             );
             return;
@@ -53,16 +53,17 @@ public class WorkspaceProvisioningAdapter implements ProvisioningListener {
 
         // Add initial repositories from the installation event
         // These are provided for "created" events with "selected" repository selection
-        if (installation.repositoryNames() != null && !installation.repositoryNames().isEmpty()) {
+        // Create Repository entities AND monitors from the webhook metadata
+        if (installation.repositories() != null && !installation.repositories().isEmpty()) {
             log.info(
-                "Added initial repositories: installationId={}, repoCount={}",
+                "Adding initial repositories: installationId={}, repoCount={}",
                 installation.installationId(),
-                installation.repositoryNames().size()
+                installation.repositories().size()
             );
-            for (String nameWithOwner : installation.repositoryNames()) {
-                repositoryMonitorService.ensureRepositoryMonitorForInstallation(
+            for (RepositorySnapshot snapshot : installation.repositories()) {
+                repositoryMonitorService.ensureRepositoryAndMonitorFromSnapshot(
                     installation.installationId(),
-                    nameWithOwner
+                    snapshot
                 );
             }
         }
@@ -89,20 +90,20 @@ public class WorkspaceProvisioningAdapter implements ProvisioningListener {
     }
 
     @Override
-    public void onRepositoriesAdded(Long installationId, List<String> repositoryNames) {
-        if (installationId == null || repositoryNames == null || repositoryNames.isEmpty()) {
+    public void onRepositoriesAdded(Long installationId, List<RepositorySnapshot> repositories) {
+        if (installationId == null || repositories == null || repositories.isEmpty()) {
             log.debug(
                 "Skipped repositories added event: reason=missingData, installationId={}, hasRepositories={}",
                 installationId,
-                repositoryNames != null && !repositoryNames.isEmpty()
+                repositories != null && !repositories.isEmpty()
             );
             return;
         }
 
-        for (String nameWithOwner : repositoryNames) {
-            repositoryMonitorService.ensureRepositoryMonitorForInstallation(installationId, nameWithOwner);
+        for (RepositorySnapshot snapshot : repositories) {
+            repositoryMonitorService.ensureRepositoryAndMonitorFromSnapshot(installationId, snapshot);
         }
-        log.info("Added repositories to monitor: installationId={}, repoCount={}", installationId, repositoryNames.size());
+        log.info("Added repositories to monitor: installationId={}, repoCount={}", installationId, repositories.size());
     }
 
     @Override
@@ -144,8 +145,10 @@ public class WorkspaceProvisioningAdapter implements ProvisioningListener {
             return;
         }
 
+        // Stop NATS consumer first to stop processing webhook events
+        workspaceInstallationService.stopNatsForInstallation(installationId);
         workspaceInstallationService.updateWorkspaceStatus(installationId, Workspace.WorkspaceStatus.SUSPENDED);
-        log.debug("Suspended installation: installationId={}", installationId);
+        log.info("Suspended installation: installationId={}", installationId);
     }
 
     @Override
@@ -155,8 +158,10 @@ public class WorkspaceProvisioningAdapter implements ProvisioningListener {
             return;
         }
 
+        // Update status first, then start NATS consumer to resume webhook processing
         workspaceInstallationService.updateWorkspaceStatus(installationId, Workspace.WorkspaceStatus.ACTIVE);
-        log.debug("Activated installation: installationId={}", installationId);
+        workspaceInstallationService.startNatsForInstallation(installationId);
+        log.info("Activated installation: installationId={}", installationId);
     }
 
     @Override

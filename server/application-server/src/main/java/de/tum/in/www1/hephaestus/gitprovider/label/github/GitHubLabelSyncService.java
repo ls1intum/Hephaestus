@@ -3,6 +3,7 @@ package de.tum.in.www1.hephaestus.gitprovider.label.github;
 import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.*;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.exception.InstallationNotFoundException;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser;
@@ -63,14 +64,14 @@ public class GitHubLabelSyncService {
     public int syncLabelsForRepository(Long scopeId, Long repositoryId) {
         Repository repository = repositoryRepository.findById(repositoryId).orElse(null);
         if (repository == null) {
-            log.warn("Skipped label sync: reason=repositoryNotFound, repoId={}", repositoryId);
+            log.debug("Skipped label sync: reason=repositoryNotFound, repoId={}", repositoryId);
             return 0;
         }
 
         String safeNameWithOwner = sanitizeForLog(repository.getNameWithOwner());
         Optional<RepositoryOwnerAndName> parsedName = GitHubRepositoryNameParser.parse(repository.getNameWithOwner());
         if (parsedName.isEmpty()) {
-            log.warn("Invalid repository name format: repoName={}", safeNameWithOwner);
+            log.warn("Skipped label sync: reason=invalidRepoNameFormat, repoName={}", safeNameWithOwner);
             return 0;
         }
         String owner = parsedName.get().owner();
@@ -136,6 +137,9 @@ public class GitHubLabelSyncService {
                 scopeId
             );
             return totalSynced;
+        } catch (InstallationNotFoundException e) {
+            // Re-throw to abort the entire sync operation
+            throw e;
         } catch (Exception e) {
             log.error("Failed to sync labels: repoName={}, scopeId={}", safeNameWithOwner, scopeId, e);
             return 0;
@@ -158,7 +162,7 @@ public class GitHubLabelSyncService {
             if (!syncedNames.contains(existingLabel.getName())) {
                 labelRepository.delete(existingLabel);
                 removedCount++;
-                log.debug("Removed stale label: labelName={}, repoId={}", existingLabel.getName(), repositoryId);
+                log.debug("Removed stale label: labelName={}, repoId={}", sanitizeForLog(existingLabel.getName()), repositoryId);
             }
         }
 

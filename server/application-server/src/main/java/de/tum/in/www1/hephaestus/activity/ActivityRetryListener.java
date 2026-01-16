@@ -63,9 +63,8 @@ public class ActivityRetryListener implements RetryListener {
         Throwable throwable
     ) {
         int totalAttempts = context.getRetryCount();
-        boolean exhausted = throwable != null;
 
-        if (exhausted) {
+        if (throwable != null) {
             log.error(
                 "Exhausted retries for activity event recording: totalAttempts={}, finalError={}",
                 totalAttempts,

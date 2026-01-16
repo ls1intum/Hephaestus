@@ -4,6 +4,9 @@ import de.tum.in.www1.hephaestus.core.WorkspaceAgnostic;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 /**
@@ -32,4 +35,14 @@ public interface RepositoryToMonitorRepository extends JpaRepository<RepositoryT
      * Used to determine if a repository can be safely deleted when removing a monitor.
      */
     long countByNameWithOwner(String nameWithOwner);
+
+    /**
+     * Deletes all repository monitors for a workspace.
+     * Used during workspace purge to clean up monitoring configuration.
+     *
+     * @param workspaceId the workspace ID
+     */
+    @Modifying
+    @Query("DELETE FROM RepositoryToMonitor rtm WHERE rtm.workspace.id = :workspaceId")
+    void deleteAllByWorkspaceId(@Param("workspaceId") Long workspaceId);
 }

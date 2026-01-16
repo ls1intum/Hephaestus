@@ -7,9 +7,9 @@ import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.ProvisioningListener;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.ProvisioningListener.AccountType;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.ProvisioningListener.InstallationData;
+import de.tum.in.www1.hephaestus.gitprovider.common.spi.ProvisioningListener.RepositorySnapshot;
 import de.tum.in.www1.hephaestus.gitprovider.installation.github.dto.GitHubInstallationEventDTO;
 import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationService;
-import de.tum.in.www1.hephaestus.gitprovider.repository.github.dto.GitHubRepositoryRefDTO;
 import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
 
 import java.util.Collections;
@@ -88,10 +88,12 @@ public class GitHubInstallationMessageHandler extends GitHubMessageHandler<GitHu
             ? AccountType.ORGANIZATION
             : AccountType.USER;
 
-        // Extract repository names from the installation event payload
+        // Extract repository snapshots from the installation event payload
         // These are provided for "created" events with "selected" repository selection
-        List<String> repositoryNames = event.repositories() != null
-            ? event.repositories().stream().map(GitHubRepositoryRefDTO::fullName).toList()
+        List<RepositorySnapshot> repositories = event.repositories() != null
+            ? event.repositories().stream()
+                .map(ref -> new RepositorySnapshot(ref.id(), ref.fullName(), ref.name(), ref.isPrivate()))
+                .toList()
             : Collections.emptyList();
 
         InstallationData installationData = new InstallationData(
@@ -100,7 +102,7 @@ public class GitHubInstallationMessageHandler extends GitHubMessageHandler<GitHu
             accountLogin,
             accountType,
             avatarUrl,
-            repositoryNames
+            repositories
         );
 
         provisioningListener.onInstallationCreated(installationData);

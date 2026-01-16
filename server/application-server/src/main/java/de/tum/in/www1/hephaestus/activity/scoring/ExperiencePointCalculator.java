@@ -156,18 +156,18 @@ public class ExperiencePointCalculator implements ExperiencePointStrategy {
             .stream()
             .filter(review -> review.getState() == PullRequestReview.State.APPROVED)
             .filter(review -> !isSelfReview(review))
-            .map(review -> weightApproval * calculateCodeReviewBonus(review.getComments().size(), complexityScore))
-            .reduce(0.0, Double::sum);
+            .mapToDouble(review -> weightApproval * calculateCodeReviewBonus(review.getComments().size(), complexityScore))
+            .sum();
 
         double changesRequestedExperiencePoints = eligibleReviews
             .stream()
             .filter(review -> review.getState() == PullRequestReview.State.CHANGES_REQUESTED)
             .filter(review -> !isSelfReview(review))
-            .map(
+            .mapToDouble(
                 review ->
                     weightChangesRequested * calculateCodeReviewBonus(review.getComments().size(), complexityScore)
             )
-            .reduce(0.0, Double::sum);
+            .sum();
 
         double commentExperiencePoints = eligibleReviews
             .stream()
@@ -177,8 +177,8 @@ public class ExperiencePointCalculator implements ExperiencePointStrategy {
                     review.getState() == PullRequestReview.State.UNKNOWN
             )
             .filter(review -> !isSelfReview(review))
-            .map(review -> weightComment * calculateCodeReviewBonus(review.getComments().size(), complexityScore))
-            .reduce(0.0, Double::sum);
+            .mapToDouble(review -> weightComment * calculateCodeReviewBonus(review.getComments().size(), complexityScore))
+            .sum();
 
         double issueCommentExperiencePoints = weightComment * issueCommentCount;
 

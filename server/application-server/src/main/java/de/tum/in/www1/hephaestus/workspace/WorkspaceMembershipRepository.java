@@ -90,4 +90,14 @@ public interface WorkspaceMembershipRepository extends JpaRepository<WorkspaceMe
         @Param("role") String role,
         @Param("leaguePoints") int leaguePoints
     );
+
+    /**
+     * Deletes all memberships for a workspace.
+     * Used during workspace purge to clean up membership data.
+     *
+     * @param workspaceId the workspace ID
+     */
+    @Modifying
+    @Query("DELETE FROM WorkspaceMembership wm WHERE wm.workspace.id = :workspaceId")
+    void deleteAllByWorkspaceId(@Param("workspaceId") Long workspaceId);
 }

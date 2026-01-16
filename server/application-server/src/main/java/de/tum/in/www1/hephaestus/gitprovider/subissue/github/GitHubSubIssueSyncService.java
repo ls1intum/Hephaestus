@@ -95,7 +95,7 @@ public class GitHubSubIssueSyncService {
         @Nullable SubIssuesSummaryDTO parentSummary
     ) {
         log.info(
-            "Processing sub-issue event: subIssueId={}, parentIssueId={}, isLink={}",
+            "Received sub-issue event: subIssueId={}, parentIssueId={}, isLink={}",
             subIssueId,
             parentIssueId,
             isLink
@@ -124,7 +124,7 @@ public class GitHubSubIssueSyncService {
     private void linkSubIssueToParent(Issue subIssue, long parentIssueId, @Nullable SubIssuesSummaryDTO parentSummary) {
         Optional<Issue> parentOpt = issueRepository.findById(parentIssueId);
         if (parentOpt.isEmpty()) {
-            log.debug("Skipped sub-issue link: reason=parentNotFound, issueId={}", parentIssueId);
+            log.debug("Skipped sub-issue link: reason=parentNotFound, parentIssueId={}", parentIssueId);
             return;
         }
 
@@ -144,7 +144,7 @@ public class GitHubSubIssueSyncService {
     ) {
         Issue currentParent = subIssue.getParentIssue();
         if (currentParent != null) {
-            log.info("Unlinking sub-issue from parent: subIssueNumber={}, parentIssueNumber={}", subIssue.getNumber(), currentParent.getNumber());
+            log.info("Unlinked sub-issue from parent: subIssueNumber={}, parentIssueNumber={}", subIssue.getNumber(), currentParent.getNumber());
         }
 
         subIssue.setParentIssue(null);
@@ -225,7 +225,7 @@ public class GitHubSubIssueSyncService {
         for (String repoNameWithOwner : repositoryNames) {
             Optional<Repository> repoOpt = repositoryRepository.findByNameWithOwner(repoNameWithOwner);
             if (repoOpt.isEmpty()) {
-                log.warn("Skipped sub-issue sync: reason=repositoryNotFound, repoName={}", sanitizeForLog(repoNameWithOwner));
+                log.debug("Skipped sub-issue sync: reason=repositoryNotFound, repoName={}", sanitizeForLog(repoNameWithOwner));
                 continue;
             }
 
@@ -264,7 +264,7 @@ public class GitHubSubIssueSyncService {
     private int syncSubIssuesForRepository(HttpGraphQlClient client, Repository repository) {
         Optional<RepositoryOwnerAndName> parsedName = GitHubRepositoryNameParser.parse(repository.getNameWithOwner());
         if (parsedName.isEmpty()) {
-            log.warn("Invalid repository name format: repoName={}", sanitizeForLog(repository.getNameWithOwner()));
+            log.warn("Skipped sub-issue sync: reason=invalidNameFormat, repoName={}", sanitizeForLog(repository.getNameWithOwner()));
             return 0;
         }
         String owner = parsedName.get().owner();
@@ -300,7 +300,7 @@ public class GitHubSubIssueSyncService {
 
                 if (issueConnection == null) {
                     log.warn(
-                        "No response from GraphQL for sub-issue sync: repoName={}",
+                        "Skipped sub-issue sync: reason=emptyGraphQLResponse, repoName={}",
                         sanitizeForLog(repository.getNameWithOwner())
                     );
                     break;
@@ -313,7 +313,7 @@ public class GitHubSubIssueSyncService {
                 linkedCount += processIssueNodesInTransaction(issueConnection, repository);
             } catch (Exception e) {
                 log.error(
-                    "Failed to sync sub-issues for repository: repoName={}",
+                    "Failed to sync sub-issues: repoName={}",
                     sanitizeForLog(repository.getNameWithOwner()),
                     e
                 );
@@ -367,10 +367,10 @@ public class GitHubSubIssueSyncService {
                 issueRepository.save(issue);
 
                 log.debug(
-                    "Linked issue to parent: issueNumber={}, parentNumber={}, repoName={}",
+                    "Linked issue to parent: issueNumber={}, parentIssueNumber={}, repoName={}",
                     issue.getNumber(),
                     parent.getNumber(),
-                    repository.getNameWithOwner()
+                    sanitizeForLog(repository.getNameWithOwner())
                 );
                 return 1;
             }
@@ -395,7 +395,7 @@ public class GitHubSubIssueSyncService {
                 issueRepository.save(issue);
 
                 log.debug(
-                    "Updated issue sub-issues summary: issueNumber={}, completed={}, total={}",
+                    "Updated issue sub-issues summary: issueNumber={}, completedCount={}, totalCount={}",
                     issue.getNumber(),
                     summary.getCompleted(),
                     summary.getTotal()

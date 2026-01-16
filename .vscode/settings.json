@@ -1,25 +1,23 @@
 {
-  "java.compile.nullAnalysis.mode": "automatic",
-  "java.configuration.updateBuildConfiguration": "interactive",
-  "java.completion.importOrder": ["#"],
-  "[java]": {
-    "editor.defaultFormatter": "esbenp.prettier-vscode"
-  },
-  "tailwindCSS.experimental.classRegex": [
-    "cva\\(([^)]*)\\)",
-    "[\"'`]([^\"'`]*).*?[\"'`]",
-    "cn\\(([^)]*)\\)",
-    "hlm\\(([^)]*)\\)",
-    "[\"'`]([^\"'`]*).*?[\"'`]"
-  ],
-  "editor.codeActionsOnSave": {
-    "source.fixAll": "explicit"
-  },
-  "files.associations": {
-    "*.graphql": "graphql",
-    "*.graphqls": "graphql"
-  },
-  "[graphql]": {
-    "editor.formatOnSave": true
-  }
+	"java.compile.nullAnalysis.mode": "automatic",
+	"java.configuration.updateBuildConfiguration": "interactive",
+	"java.completion.importOrder": ["#"],
+	"[java]": {
+		"editor.defaultFormatter": "esbenp.prettier-vscode"
+	},
+	"tailwindCSS.experimental.classRegex": [
+		"cva\\(([^)]*)\\)",
+		"[\"'`]([^\"'`]*).*?[\"'`]",
+		"cn\\(([^)]*)\\)",
+		"hlm\\(([^)]*)\\)",
+		"[\"'`]([^\"'`]*).*?[\"'`]"
+	],
+	"editor.codeActionsOnSave": {
+		"source.fixAll": "explicit"
+	},
+	"[python]": {
+		"editor.defaultFormatter": "ms-python.autopep8"
+	},
+	"python.testing.pytestArgs": ["."],
+	"python.testing.pytestEnabled": true
 }

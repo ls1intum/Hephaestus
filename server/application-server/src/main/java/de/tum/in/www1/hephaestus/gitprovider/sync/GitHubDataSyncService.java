@@ -2,6 +2,7 @@ package de.tum.in.www1.hephaestus.gitprovider.sync;
 
 import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.exception.InstallationNotFoundException;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.OrganizationMembershipListener;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.OrganizationMembershipListener.OrganizationSyncedEvent;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider;
@@ -140,7 +141,7 @@ public class GitHubDataSyncService {
 
         Repository repository = repositoryRepository.findByNameWithOwner(nameWithOwner).orElse(null);
         if (repository == null) {
-            log.warn("Skipped sync: reason=repositoryNotFound, scopeId={}, repoName={}", scopeId, safeNameWithOwner);
+            log.debug("Skipped sync: reason=repositoryNotFound, scopeId={}, repoName={}", scopeId, safeNameWithOwner);
             return;
         }
 
@@ -199,6 +200,9 @@ public class GitHubDataSyncService {
                 prsCount,
                 prReviewCommentsCount
             );
+        } catch (InstallationNotFoundException e) {
+            // Re-throw to abort the entire sync operation
+            throw e;
         } catch (Exception e) {
             log.error("Failed to sync repository: scopeId={}, repoId={}", scopeId, repositoryId, e);
         }
@@ -227,18 +231,26 @@ public class GitHubDataSyncService {
 
         log.info("Starting scope sync: scopeId={}, repoCount={}", scopeId, syncTargets.size());
 
-        // Sync organization and teams first (if applicable)
-        syncOrganizationAndTeams(scopeId);
+        try {
+            // Sync organization and teams first (if applicable)
+            syncOrganizationAndTeams(scopeId);
 
-        // Sync each repository
-        for (SyncTarget target : syncTargets) {
-            if (shouldSync(target)) {
-                syncSyncTarget(target);
+            // Sync each repository
+            for (SyncTarget target : syncTargets) {
+                if (shouldSync(target)) {
+                    syncSyncTarget(target);
+                }
             }
-        }
 
-        // Sync scope-level relationships (after all issues/PRs are synced)
-        syncScopeLevelRelationships(scopeId);
+            // Sync scope-level relationships (after all issues/PRs are synced)
+            syncScopeLevelRelationships(scopeId);
+        } catch (InstallationNotFoundException e) {
+            log.warn(
+                "Aborting scope sync: reason=installationDeleted, scopeId={}, installationId={}",
+                scopeId,
+                e.getInstallationId()
+            );
+        }
     }
 
     /**
@@ -282,6 +294,9 @@ public class GitHubDataSyncService {
             // Sync teams and team memberships
             int teamsCount = teamSyncService.syncTeamsForOrganization(scopeId, organizationLogin);
             log.debug("Synced teams: scopeId={}, orgLogin={}, teamCount={}", scopeId, safeOrgLogin, teamsCount);
+        } catch (InstallationNotFoundException e) {
+            // Re-throw to abort the entire sync operation
+            throw e;
         } catch (Exception e) {
             log.error("Failed to sync organization and teams: scopeId={}, orgLogin={}", scopeId, safeOrgLogin, e);
         }
@@ -309,6 +324,8 @@ public class GitHubDataSyncService {
             } else {
                 log.debug("Skipped issue dependencies sync: reason=cooldownActive, scopeId={}", scopeId);
             }
+        } catch (InstallationNotFoundException e) {
+            throw e;
         } catch (Exception e) {
             log.error("Failed to sync issue dependencies: scopeId={}", scopeId, e);
         }
@@ -321,6 +338,8 @@ public class GitHubDataSyncService {
             } else {
                 log.debug("Skipped sub-issues sync: reason=cooldownActive, scopeId={}", scopeId);
             }
+        } catch (InstallationNotFoundException e) {
+            throw e;
         } catch (Exception e) {
             log.error("Failed to sync sub-issues: scopeId={}", scopeId, e);
         }

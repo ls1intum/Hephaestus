@@ -98,7 +98,7 @@ public class GitHubIssueDependencySyncService {
     @Transactional
     public void processIssueDependencyEvent(long blockedIssueId, long blockingIssueId, boolean isBlock) {
         log.info(
-            "Processing issue dependency event: blockedIssueId={}, blockingIssueId={}, isBlock={}",
+            "Received issue dependency event: blockedIssueId={}, blockingIssueId={}, isBlock={}",
             blockedIssueId,
             blockingIssueId,
             isBlock
@@ -175,7 +175,7 @@ public class GitHubIssueDependencySyncService {
         for (String repoNameWithOwner : repositoryNames) {
             Optional<Repository> repoOpt = repositoryRepository.findByNameWithOwner(repoNameWithOwner);
             if (repoOpt.isEmpty()) {
-                log.warn("Skipped dependency sync: reason=repositoryNotFound, repoName={}", sanitizeForLog(repoNameWithOwner));
+                log.debug("Skipped dependency sync: reason=repositoryNotFound, repoName={}", sanitizeForLog(repoNameWithOwner));
                 continue;
             }
 
@@ -222,7 +222,7 @@ public class GitHubIssueDependencySyncService {
         String safeNameWithOwner = sanitizeForLog(repo.getNameWithOwner());
         Optional<RepositoryOwnerAndName> parsedName = GitHubRepositoryNameParser.parse(repo.getNameWithOwner());
         if (parsedName.isEmpty()) {
-            log.warn("Invalid repository name format: repoName={}", safeNameWithOwner);
+            log.warn("Skipped dependency sync: reason=invalidNameFormat, repoName={}", safeNameWithOwner);
             return 0;
         }
         String owner = parsedName.get().owner();
@@ -255,7 +255,7 @@ public class GitHubIssueDependencySyncService {
                 .block(GRAPHQL_TIMEOUT);
 
             if (issueConnection == null || issueConnection.getNodes() == null) {
-                log.warn("No response from GraphQL for dependency sync: repoName={}", safeNameWithOwner);
+                log.warn("Skipped dependency sync: reason=emptyGraphQLResponse, repoName={}", safeNameWithOwner);
                 break;
             }
 
@@ -398,7 +398,7 @@ public class GitHubIssueDependencySyncService {
             );
         } else {
             log.debug(
-                "Issue was not blocked, nothing to remove: blockedIssueNumber={}, blockingIssueNumber={}",
+                "Skipped removing blocking relationship: reason=notBlocked, blockedIssueNumber={}, blockingIssueNumber={}",
                 blockedIssue.getNumber(),
                 blockingIssue.getNumber()
             );

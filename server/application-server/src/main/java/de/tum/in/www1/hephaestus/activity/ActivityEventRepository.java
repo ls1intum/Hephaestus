@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -352,4 +353,14 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
     @WorkspaceAgnostic("System-wide integrity verification - admin operation")
     @Query(value = "SELECT * FROM activity_event ORDER BY RANDOM() LIMIT :limit", nativeQuery = true)
     List<ActivityEvent> findRandomSample(@Param("limit") int limit);
+
+    /**
+     * Deletes all activity events for a workspace.
+     * Used during workspace purge to clean up activity data.
+     *
+     * @param workspaceId the workspace ID
+     */
+    @Modifying
+    @Query(value = "DELETE FROM activity_event WHERE workspace_id = :workspaceId", nativeQuery = true)
+    void deleteAllByWorkspaceId(@Param("workspaceId") Long workspaceId);
 }

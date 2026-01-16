@@ -1,9 +1,0 @@
-# Eclipse JDT preferences for VS Code Java
-# Suppress warnings for unused private members (common in generated code)
-org.eclipse.jdt.core.compiler.problem.unusedPrivateMember=ignore
-org.eclipse.jdt.core.compiler.problem.unusedLocal=ignore
-org.eclipse.jdt.core.compiler.problem.unusedParameter=ignore
-org.eclipse.jdt.core.compiler.problem.unusedImport=warning
-org.eclipse.jdt.core.compiler.problem.deprecation=warning
-org.eclipse.jdt.core.compiler.problem.deprecationInDeprecatedCode=disabled
-org.eclipse.jdt.core.compiler.problem.deprecationWhenOverridingDeprecatedMethod=disabled

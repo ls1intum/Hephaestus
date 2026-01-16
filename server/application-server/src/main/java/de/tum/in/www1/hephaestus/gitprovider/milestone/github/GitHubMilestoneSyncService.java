@@ -3,6 +3,7 @@ package de.tum.in.www1.hephaestus.gitprovider.milestone.github;
 import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.*;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.exception.InstallationNotFoundException;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser;
@@ -65,14 +66,14 @@ public class GitHubMilestoneSyncService {
     public int syncMilestonesForRepository(Long scopeId, Long repositoryId) {
         Repository repository = repositoryRepository.findById(repositoryId).orElse(null);
         if (repository == null) {
-            log.warn("Skipped milestone sync: reason=repositoryNotFound, repoId={}", repositoryId);
+            log.debug("Skipped milestone sync: reason=repositoryNotFound, repoId={}", repositoryId);
             return 0;
         }
 
         String safeNameWithOwner = sanitizeForLog(repository.getNameWithOwner());
         Optional<RepositoryOwnerAndName> parsedName = GitHubRepositoryNameParser.parse(repository.getNameWithOwner());
         if (parsedName.isEmpty()) {
-            log.warn("Invalid repository name format: repoName={}", safeNameWithOwner);
+            log.warn("Skipped milestone sync: reason=invalidRepoNameFormat, repoName={}", safeNameWithOwner);
             return 0;
         }
         String owner = parsedName.get().owner();
@@ -132,6 +133,9 @@ public class GitHubMilestoneSyncService {
 
             log.info("Completed milestone sync: repoName={}, milestoneCount={}, scopeId={}", safeNameWithOwner, totalSynced, scopeId);
             return totalSynced;
+        } catch (InstallationNotFoundException e) {
+            // Re-throw to abort the entire sync operation
+            throw e;
         } catch (Exception e) {
             log.error("Failed to sync milestones: repoName={}, scopeId={}", safeNameWithOwner, scopeId, e);
             return 0;
@@ -148,7 +152,7 @@ public class GitHubMilestoneSyncService {
             }
         }
         if (removed > 0) {
-            log.info("Removed stale milestones: milestoneCount={}, repoId={}", removed, repositoryId);
+            log.info("Removed stale milestones: removedCount={}, repoId={}", removed, repositoryId);
         }
     }
 

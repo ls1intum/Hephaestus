@@ -4,6 +4,7 @@ import de.tum.in.www1.hephaestus.gitprovider.common.NatsMessageDeserializer;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventType;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.ProvisioningListener;
+import de.tum.in.www1.hephaestus.gitprovider.common.spi.ProvisioningListener.RepositorySnapshot;
 import de.tum.in.www1.hephaestus.gitprovider.installation.github.dto.GitHubInstallationRepositoriesEventDTO;
 import de.tum.in.www1.hephaestus.gitprovider.repository.github.dto.GitHubRepositoryRefDTO;
 import java.util.List;
@@ -71,9 +72,11 @@ public class GitHubInstallationRepositoriesMessageHandler
 
         // Notify consuming module via SPI for added repositories
         if (!added.isEmpty()) {
-            List<String> addedNames = added.stream().map(GitHubRepositoryRefDTO::fullName).toList();
-            provisioningListener.onRepositoriesAdded(installationId, addedNames);
-            log.info("Added repositories to installation: installationId={}, repoCount={}", installationId, addedNames.size());
+            List<RepositorySnapshot> addedSnapshots = added.stream()
+                .map(ref -> new RepositorySnapshot(ref.id(), ref.fullName(), ref.name(), ref.isPrivate()))
+                .toList();
+            provisioningListener.onRepositoriesAdded(installationId, addedSnapshots);
+            log.info("Added repositories to installation: installationId={}, repoCount={}", installationId, addedSnapshots.size());
         }
 
         // Notify consuming module via SPI for removed repositories

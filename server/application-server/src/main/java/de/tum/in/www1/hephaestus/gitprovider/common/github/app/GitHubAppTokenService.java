@@ -3,6 +3,7 @@ package de.tum.in.www1.hephaestus.gitprovider.common.github.app;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.GITHUB_API_BASE_URL;
 
 import com.auth0.jwt.JWT;
+import de.tum.in.www1.hephaestus.gitprovider.common.exception.InstallationNotFoundException;
 import com.auth0.jwt.algorithms.Algorithm;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.github.benmanes.caffeine.cache.Cache;
@@ -25,6 +26,7 @@ import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 
 /**
  * Service for generating GitHub App JWT tokens and installation access tokens.
@@ -113,8 +115,10 @@ public class GitHubAppTokenService {
 
     /**
      * Mint a fresh installation token via REST API.
+     *
+     * @throws InstallationNotFoundException if the installation no longer exists (404 from GitHub)
      */
-    private CachedToken fetchTokenWithExpiry(long installationId) {
+    private CachedToken fetchTokenWithExpiry(Long installationId) {
         try {
             String appJwt = generateAppJWT();
 
@@ -131,11 +135,28 @@ public class GitHubAppTokenService {
             }
 
             return new CachedToken(response.token(), response.expiresAt());
+        } catch (WebClientResponseException.NotFound e) {
+            // Installation was deleted or is inaccessible.
+            // NOTE: Do NOT call invalidate() here - this method is used as a cache loader
+            // and Caffeine does not allow recursive cache modifications during compute operations.
+            // The cache will not store the result when an exception is thrown.
+            // Invalidation happens in resolveToken() after the exception propagates out.
+            throw new InstallationNotFoundException(installationId, e);
+        } catch (InstallationNotFoundException e) {
+            // Re-throw without wrapping
+            throw e;
         } catch (Exception e) {
             throw new UncheckedIOException(
                 new IOException("GitHub error minting installation token for " + installationId, e)
             );
         }
+    }
+
+    /**
+     * Evict a cached installation token. Call this when the installation is known to be deleted.
+     */
+    public void evictInstallationToken(long installationId) {
+        installTokenCache.invalidate(installationId);
     }
 
     private CachedToken resolveToken(long installationId) {
@@ -144,7 +165,15 @@ public class GitHubAppTokenService {
             return cached;
         }
 
-        CachedToken fresh = installTokenCache.get(installationId, this::fetchTokenWithExpiry);
+        CachedToken fresh;
+        try {
+            fresh = installTokenCache.get(installationId, this::fetchTokenWithExpiry);
+        } catch (InstallationNotFoundException e) {
+            // Invalidate cache OUTSIDE the compute operation (safe here)
+            installTokenCache.invalidate(installationId);
+            throw e;
+        }
+
         if (fresh == null) {
             throw new IllegalStateException("Failed to mint installation token for " + installationId);
         }

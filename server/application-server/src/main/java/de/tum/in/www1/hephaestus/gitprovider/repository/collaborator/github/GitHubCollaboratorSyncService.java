@@ -3,6 +3,7 @@ package de.tum.in.www1.hephaestus.gitprovider.repository.collaborator.github;
 import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.*;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.exception.InstallationNotFoundException;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser.RepositoryOwnerAndName;
@@ -66,7 +67,7 @@ public class GitHubCollaboratorSyncService {
     public int syncCollaboratorsForRepository(Long scopeId, Long repositoryId) {
         Repository repository = repositoryRepository.findById(repositoryId).orElse(null);
         if (repository == null) {
-            log.warn("Skipped collaborator sync: reason=repositoryNotFound, repoId={}", repositoryId);
+            log.debug("Skipped collaborator sync: reason=repositoryNotFound, repoId={}", repositoryId);
             return 0;
         }
 
@@ -150,6 +151,9 @@ public class GitHubCollaboratorSyncService {
                 removedCount
             );
             return totalSynced;
+        } catch (InstallationNotFoundException e) {
+            // Re-throw to abort the entire sync operation
+            throw e;
         } catch (Exception e) {
             log.error("Failed to sync collaborators: repoName={}", safeNameWithOwner, e);
             return 0;

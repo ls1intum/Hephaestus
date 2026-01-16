@@ -248,6 +248,22 @@ public class WorkspaceInstallationService {
     }
 
     /**
+     * Start NATS consumer for a workspace tied to an installation.
+     * Used when an installation is activated (unsuspended) to resume webhook processing.
+     *
+     * @param installationId the GitHub App installation ID
+     */
+    public void startNatsForInstallation(long installationId) {
+        workspaceRepository
+            .findByInstallationId(installationId)
+            .ifPresent(workspace -> {
+                if (shouldUseNats(workspace)) {
+                    natsConsumerService.startConsumingScope(workspace.getId());
+                }
+            });
+    }
+
+    /**
      * Update workspace status for a given installation if the status differs.
      *
      * @param installationId the GitHub App installation ID

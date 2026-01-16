@@ -3,6 +3,7 @@ package de.tum.in.www1.hephaestus.workspace;
 import de.tum.in.www1.hephaestus.core.LoggingUtils;
 import de.tum.in.www1.hephaestus.core.WorkspaceAgnostic;
 import de.tum.in.www1.hephaestus.core.exception.EntityNotFoundException;
+import de.tum.in.www1.hephaestus.gitprovider.common.spi.ProvisioningListener;
 import de.tum.in.www1.hephaestus.gitprovider.installation.github.GitHubInstallationRepositoryEnumerationService;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
@@ -13,7 +14,6 @@ import de.tum.in.www1.hephaestus.workspace.exception.RepositoryAlreadyMonitoredE
 import de.tum.in.www1.hephaestus.workspace.exception.RepositoryManagementNotAllowedException;
 import java.time.Instant;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
@@ -309,6 +309,77 @@ public class WorkspaceRepositoryMonitorService {
     @Transactional
     public Optional<Workspace> removeAllRepositoriesFromMonitor(long installationId) {
         return removeAllRepositoriesFromMonitor(installationId, false);
+    }
+
+    /**
+     * Creates a Repository entity and corresponding RepositoryToMonitor from a provisioning snapshot.
+     * This is used during installation provisioning to create repositories from webhook metadata.
+     *
+     * <p>Idempotent: If the repository already exists, it will be updated with the snapshot data.
+     * If the monitor already exists, no duplicate will be created.
+     *
+     * @param installationId the GitHub App installation ID
+     * @param snapshot       the repository snapshot from the webhook payload
+     */
+    @Transactional
+    public void ensureRepositoryAndMonitorFromSnapshot(long installationId, ProvisioningListener.RepositorySnapshot snapshot) {
+        if (snapshot == null || isBlank(snapshot.nameWithOwner())) {
+            return;
+        }
+
+        // Create or update the Repository entity
+        ensureRepositoryFromProvisioningSnapshot(snapshot);
+
+        // Create the RepositoryToMonitor if it doesn't exist
+        ensureRepositoryMonitorForInstallation(installationId, snapshot.nameWithOwner());
+    }
+
+    /**
+     * Creates or updates a Repository entity from a provisioning snapshot.
+     *
+     * @param snapshot the repository snapshot from the SPI
+     */
+    private void ensureRepositoryFromProvisioningSnapshot(ProvisioningListener.RepositorySnapshot snapshot) {
+        if (snapshot == null || isBlank(snapshot.nameWithOwner())) {
+            return;
+        }
+
+        var existingRepo = repositoryRepository.findByNameWithOwner(snapshot.nameWithOwner());
+        if (existingRepo.isPresent()) {
+            // Repository already exists, update basic fields if needed
+            Repository repo = existingRepo.get();
+            boolean changed = false;
+
+            if (repo.getName() == null || !repo.getName().equals(snapshot.name())) {
+                repo.setName(snapshot.name());
+                changed = true;
+            }
+            if (repo.isPrivate() != snapshot.isPrivate()) {
+                repo.setPrivate(snapshot.isPrivate());
+                changed = true;
+            }
+
+            if (changed) {
+                repositoryRepository.save(repo);
+            }
+        } else {
+            // Create new repository with basic metadata from provisioning snapshot
+            Repository repo = new Repository();
+            repo.setId(snapshot.id());
+            repo.setNameWithOwner(snapshot.nameWithOwner());
+            repo.setName(snapshot.name());
+            repo.setPrivate(snapshot.isPrivate());
+            repo.setDefaultBranch("main"); // Will be updated by GraphQL sync
+            repo.setHtmlUrl("https://github.com/" + snapshot.nameWithOwner());
+            repo.setVisibility(snapshot.isPrivate() ? Repository.Visibility.PRIVATE : Repository.Visibility.PUBLIC);
+            repo.setPushedAt(Instant.now()); // Placeholder, will be updated by sync
+
+            repositoryRepository.save(repo);
+            log.debug(
+                "Created repository from provisioning snapshot: repoName={}",
+                LoggingUtils.sanitizeForLog(snapshot.nameWithOwner())
+            );
+        }
     }
 
     // ========================================================================

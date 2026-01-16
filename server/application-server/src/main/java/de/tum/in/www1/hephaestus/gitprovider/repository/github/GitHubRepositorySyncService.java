@@ -3,6 +3,7 @@ package de.tum.in.www1.hephaestus.gitprovider.repository.github;
 import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.*;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.exception.InstallationNotFoundException;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser.RepositoryOwnerAndName;
@@ -63,7 +64,7 @@ public class GitHubRepositorySyncService {
         String safeNameWithOwner = sanitizeForLog(nameWithOwner);
         Optional<RepositoryOwnerAndName> parsedName = GitHubRepositoryNameParser.parse(nameWithOwner);
         if (parsedName.isEmpty()) {
-            log.warn("Skipped repository sync: reason=invalid name format, repoName={}", safeNameWithOwner);
+            log.warn("Skipped repository sync: reason=invalidNameFormat, scopeId={}, repoName={}", scopeId, safeNameWithOwner);
             return Optional.empty();
         }
         String repoOwner = parsedName.get().owner();
@@ -80,7 +81,8 @@ public class GitHubRepositorySyncService {
 
             if (response == null || !response.isValid()) {
                 log.warn(
-                    "Failed to fetch repository: repoName={}, errors={}",
+                    "Failed to fetch repository: scopeId={}, repoName={}, errors={}",
+                    scopeId,
                     safeNameWithOwner,
                     response != null ? response.getErrors() : "null response"
                 );
@@ -90,7 +92,7 @@ public class GitHubRepositorySyncService {
             // Use typed GraphQL model for type-safe parsing
             var repoData = response.field("repository").toEntity(GHRepository.class);
             if (repoData == null) {
-                log.warn("Skipped repository sync: reason=not found on GitHub, repoName={}", safeNameWithOwner);
+                log.warn("Skipped repository sync: reason=notFoundOnGitHub, scopeId={}, repoName={}", scopeId, safeNameWithOwner);
                 return Optional.empty();
             }
 
@@ -101,7 +103,7 @@ public class GitHubRepositorySyncService {
             // Create or update repository using typed accessors
             Long githubDatabaseId = repoData.getDatabaseId() != null ? repoData.getDatabaseId().longValue() : null;
             if (githubDatabaseId == null) {
-                log.warn("Skipped repository sync: reason=missing databaseId, repoName={}", safeNameWithOwner);
+                log.warn("Skipped repository sync: reason=missingDatabaseId, scopeId={}, repoName={}", scopeId, safeNameWithOwner);
                 return Optional.empty();
             }
 
@@ -146,18 +148,21 @@ public class GitHubRepositorySyncService {
             repository.setLastSyncAt(Instant.now());
 
             repository = repositoryRepository.save(repository);
-            log.info("Synced repository: repoId={}, repoName={}", repository.getId(), safeNameWithOwner);
+            log.info("Synced repository: scopeId={}, repoId={}, repoName={}", scopeId, repository.getId(), safeNameWithOwner);
 
             return Optional.of(repository);
+        } catch (InstallationNotFoundException e) {
+            // Re-throw to abort the entire sync operation
+            throw e;
         } catch (Exception e) {
-            log.error("Failed to sync repository: repoName={}, scopeId={}", safeNameWithOwner, scopeId, e);
+            log.error("Failed to sync repository: scopeId={}, repoName={}", scopeId, safeNameWithOwner, e);
             return Optional.empty();
         }
     }
 
     /**
      * Ensures the organization exists, creating it if necessary.
-     * Uses typed GHRepositoryOwner model for type-safe access.
+     * Uses PostgreSQL upsert for thread-safe concurrent access.
      */
     @Nullable
     private Organization ensureOrganization(GHRepositoryOwner owner) {
@@ -175,25 +180,13 @@ public class GitHubRepositorySyncService {
 
             Long databaseId = dbId.longValue();
             String login = graphQlOrg.getLogin();
-            String name = graphQlOrg.getName();
+            String name = graphQlOrg.getName() != null ? graphQlOrg.getName() : login;
             String url = graphQlOrg.getUrl() != null ? graphQlOrg.getUrl().toString() : null;
             String avatarUrl = graphQlOrg.getAvatarUrl() != null ? graphQlOrg.getAvatarUrl().toString() : null;
 
-            Organization organization = organizationRepository
-                .findByGithubId(databaseId)
-                .orElseGet(() -> {
-                    Organization org = new Organization();
-                    org.setId(databaseId);
-                    org.setGithubId(databaseId);
-                    return org;
-                });
-
-            organization.setLogin(login);
-            organization.setName(name != null ? name : login);
-            organization.setHtmlUrl(url);
-            organization.setAvatarUrl(avatarUrl);
-
-            return organizationRepository.save(organization);
+            // Use upsert for thread-safe concurrent inserts
+            organizationRepository.upsert(databaseId, databaseId, login, name, avatarUrl, url);
+            return organizationRepository.findById(databaseId).orElse(null);
         } else if (owner instanceof GHUser graphQlUser) {
             // User repositories - create a "virtual" organization from the user
             Integer dbId = graphQlUser.getDatabaseId();
@@ -203,25 +196,13 @@ public class GitHubRepositorySyncService {
 
             Long databaseId = dbId.longValue();
             String login = graphQlUser.getLogin();
-            String name = graphQlUser.getName();
+            String name = graphQlUser.getName() != null ? graphQlUser.getName() : login;
             String url = graphQlUser.getUrl() != null ? graphQlUser.getUrl().toString() : null;
             String avatarUrl = graphQlUser.getAvatarUrl() != null ? graphQlUser.getAvatarUrl().toString() : null;
 
-            Organization organization = organizationRepository
-                .findByGithubId(databaseId)
-                .orElseGet(() -> {
-                    Organization org = new Organization();
-                    org.setId(databaseId);
-                    org.setGithubId(databaseId);
-                    return org;
-                });
-
-            organization.setLogin(login);
-            organization.setName(name != null ? name : login);
-            organization.setHtmlUrl(url);
-            organization.setAvatarUrl(avatarUrl);
-
-            return organizationRepository.save(organization);
+            // Use upsert for thread-safe concurrent inserts
+            organizationRepository.upsert(databaseId, databaseId, login, name, avatarUrl, url);
+            return organizationRepository.findById(databaseId).orElse(null);
         }
 
         return null;

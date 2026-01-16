@@ -3,6 +3,7 @@ package de.tum.in.www1.hephaestus.gitprovider.team.github;
 import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.*;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.exception.InstallationNotFoundException;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHRepositoryPermission;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHTeam;
@@ -92,7 +93,7 @@ public class GitHubTeamSyncService {
     @Transactional
     public int syncTeamsForOrganization(Long scopeId, String organizationLogin) {
         if (organizationLogin == null || organizationLogin.isBlank()) {
-            log.warn("Skipped team sync due to null or blank org login: scopeId={}", scopeId);
+            log.warn("Skipped team sync: reason=missingOrgLogin, scopeId={}", scopeId);
             return 0;
         }
         String safeOrgLogin = sanitizeForLog(organizationLogin);
@@ -150,6 +151,9 @@ public class GitHubTeamSyncService {
 
             log.info("Completed team sync: orgLogin={}, teamCount={}, scopeId={}", safeOrgLogin, totalSynced, scopeId);
             return totalSynced;
+        } catch (InstallationNotFoundException e) {
+            // Re-throw to abort the entire sync operation
+            throw e;
         } catch (Exception e) {
             log.error("Failed to sync teams: orgLogin={}, scopeId={}", safeOrgLogin, scopeId, e);
             return 0;
@@ -210,8 +214,8 @@ public class GitHubTeamSyncService {
 
         if (membersPageInfo != null && Boolean.TRUE.equals(membersPageInfo.getHasNextPage())) {
             log.debug(
-                "Fetching additional team members: teamName={}, totalCount={}",
-                team.getName(),
+                "Fetching additional team members: teamSlug={}, totalCount={}",
+                sanitizeForLog(graphQlTeam.getSlug()),
                 membersConnection.getTotalCount()
             );
             List<GHTeamMemberEdge> additionalMemberEdges = fetchAllTeamMemberEdges(
@@ -311,8 +315,8 @@ public class GitHubTeamSyncService {
 
         if (reposPageInfo != null && Boolean.TRUE.equals(reposPageInfo.getHasNextPage())) {
             log.debug(
-                "Fetching additional team repositories: teamName={}, totalCount={}",
-                team.getName(),
+                "Fetching additional team repositories: teamSlug={}, totalCount={}",
+                sanitizeForLog(graphQlTeam.getSlug()),
                 reposConnection.getTotalCount()
             );
             List<GHTeamRepositoryEdge> additionalRepoEdges = fetchAllTeamRepositoryEdges(

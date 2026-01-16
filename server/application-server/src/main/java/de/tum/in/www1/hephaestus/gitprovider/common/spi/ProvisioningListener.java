@@ -10,7 +10,7 @@ public interface ProvisioningListener {
 
     void onInstallationDeleted(Long installationId);
 
-    void onRepositoriesAdded(Long installationId, List<String> repositoryNames);
+    void onRepositoriesAdded(Long installationId, List<RepositorySnapshot> repositories);
 
     void onRepositoriesRemoved(Long installationId, List<String> repositoryNames);
 
@@ -22,13 +22,24 @@ public interface ProvisioningListener {
 
     void onRepositorySelectionChanged(Long installationId, String selection);
 
+    /**
+     * Provider-agnostic snapshot of repository metadata from webhook payloads.
+     * Contains the minimal information needed to create a Repository entity.
+     */
+    record RepositorySnapshot(
+        long id,
+        String nameWithOwner,
+        String name,
+        boolean isPrivate
+    ) {}
+
     record InstallationData(
         Long installationId,
         Long accountId,
         String accountLogin,
         AccountType accountType,
         String avatarUrl,
-        List<String> repositoryNames
+        List<RepositorySnapshot> repositories
     ) {}
 
     enum AccountType {

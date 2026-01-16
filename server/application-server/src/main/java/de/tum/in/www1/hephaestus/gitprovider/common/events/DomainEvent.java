@@ -83,20 +83,18 @@ public final class DomainEvent {
         EventPayload.IssueData issue();
     }
 
-    public record IssueCreated(EventPayload.IssueData issue, EventContext context) implements
-        IssueEvent, ContextualEvent {}
+    public record IssueCreated(EventPayload.IssueData issue, EventContext context) implements IssueEvent {}
 
     public record IssueUpdated(EventPayload.IssueData issue, Set<String> changedFields, EventContext context) implements
-        IssueEvent, ContextualEvent {}
+        IssueEvent {}
 
     public record IssueClosed(
         EventPayload.IssueData issue,
         @Nullable String stateReason,
         EventContext context
-    ) implements IssueEvent, ContextualEvent {}
+    ) implements IssueEvent {}
 
-    public record IssueReopened(EventPayload.IssueData issue, EventContext context) implements
-        IssueEvent, ContextualEvent {}
+    public record IssueReopened(EventPayload.IssueData issue, EventContext context) implements IssueEvent {}
 
     /** Deleted event is separate - entity no longer exists, only ID available. */
     public record IssueDeleted(Long issueId, EventContext context) implements IssueEvent {
@@ -110,25 +108,25 @@ public final class DomainEvent {
         EventPayload.IssueData issue,
         EventPayload.LabelData label,
         EventContext context
-    ) implements IssueEvent, ContextualEvent {}
+    ) implements IssueEvent {}
 
     public record IssueUnlabeled(
         EventPayload.IssueData issue,
         EventPayload.LabelData label,
         EventContext context
-    ) implements IssueEvent, ContextualEvent {}
+    ) implements IssueEvent {}
 
     public record IssueTyped(
         EventPayload.IssueData issue,
         EventPayload.IssueTypeData issueType,
         EventContext context
-    ) implements IssueEvent, ContextualEvent {}
+    ) implements IssueEvent {}
 
     public record IssueUntyped(
         EventPayload.IssueData issue,
         @Nullable EventPayload.IssueTypeData previousType,
         EventContext context
-    ) implements IssueEvent, ContextualEvent {}
+    ) implements IssueEvent {}
 
     // ========================================================================
     // Pull Request Events
@@ -152,46 +150,46 @@ public final class DomainEvent {
     }
 
     public record PullRequestCreated(EventPayload.PullRequestData pullRequest, EventContext context) implements
-        PullRequestEvent, ContextualEvent {}
+        PullRequestEvent {}
 
     public record PullRequestUpdated(
         EventPayload.PullRequestData pullRequest,
         Set<String> changedFields,
         EventContext context
-    ) implements PullRequestEvent, ContextualEvent {}
+    ) implements PullRequestEvent {}
 
     public record PullRequestClosed(
         EventPayload.PullRequestData pullRequest,
         boolean wasMerged,
         EventContext context
-    ) implements PullRequestEvent, ContextualEvent {}
+    ) implements PullRequestEvent {}
 
     public record PullRequestMerged(EventPayload.PullRequestData pullRequest, EventContext context) implements
-        PullRequestEvent, ContextualEvent {}
+        PullRequestEvent {}
 
     public record PullRequestReopened(EventPayload.PullRequestData pullRequest, EventContext context) implements
-        PullRequestEvent, ContextualEvent {}
+        PullRequestEvent {}
 
     public record PullRequestLabeled(
         EventPayload.PullRequestData pullRequest,
         EventPayload.LabelData label,
         EventContext context
-    ) implements PullRequestEvent, ContextualEvent {}
+    ) implements PullRequestEvent {}
 
     public record PullRequestUnlabeled(
         EventPayload.PullRequestData pullRequest,
         EventPayload.LabelData label,
         EventContext context
-    ) implements PullRequestEvent, ContextualEvent {}
+    ) implements PullRequestEvent {}
 
     public record PullRequestReady(EventPayload.PullRequestData pullRequest, EventContext context) implements
-        PullRequestEvent, ContextualEvent {}
+        PullRequestEvent {}
 
     public record PullRequestDrafted(EventPayload.PullRequestData pullRequest, EventContext context) implements
-        PullRequestEvent, ContextualEvent {}
+        PullRequestEvent {}
 
     public record PullRequestSynchronized(EventPayload.PullRequestData pullRequest, EventContext context) implements
-        PullRequestEvent, ContextualEvent {}
+        PullRequestEvent {}
 
     // ========================================================================
     // Label Events
@@ -229,17 +227,16 @@ public final class DomainEvent {
     }
 
     public record CommentCreated(EventPayload.CommentData comment, Long issueId, EventContext context) implements
-        CommentEvent, ContextualEvent {}
+        CommentEvent {}
 
     public record CommentUpdated(
         EventPayload.CommentData comment,
         Long issueId,
         Set<String> changedFields,
         EventContext context
-    ) implements CommentEvent, ContextualEvent {}
+    ) implements CommentEvent {}
 
-    public record CommentDeleted(Long commentId, Long issueId, EventContext context) implements
-        CommentEvent, ContextualEvent {}
+    public record CommentDeleted(Long commentId, Long issueId, EventContext context) implements CommentEvent {}
 
     // ========================================================================
     // Pull Request Review Events
@@ -249,17 +246,15 @@ public final class DomainEvent {
         EventPayload.ReviewData review();
     }
 
-    public record ReviewSubmitted(EventPayload.ReviewData review, EventContext context) implements
-        ReviewEvent, ContextualEvent {}
+    public record ReviewSubmitted(EventPayload.ReviewData review, EventContext context) implements ReviewEvent {}
 
     public record ReviewEdited(
         EventPayload.ReviewData review,
         Set<String> changedFields,
         EventContext context
-    ) implements ReviewEvent, ContextualEvent {}
+    ) implements ReviewEvent {}
 
-    public record ReviewDismissed(EventPayload.ReviewData review, EventContext context) implements
-        ReviewEvent, ContextualEvent {}
+    public record ReviewDismissed(EventPayload.ReviewData review, EventContext context) implements ReviewEvent {}
 
     // ========================================================================
     // Pull Request Review Comment Events
@@ -275,17 +270,17 @@ public final class DomainEvent {
         EventPayload.ReviewCommentData comment,
         Long pullRequestId,
         EventContext context
-    ) implements ReviewCommentEvent, ContextualEvent {}
+    ) implements ReviewCommentEvent {}
 
     public record ReviewCommentEdited(
         EventPayload.ReviewCommentData comment,
         Long pullRequestId,
         Set<String> changedFields,
         EventContext context
-    ) implements ReviewCommentEvent, ContextualEvent {}
+    ) implements ReviewCommentEvent {}
 
     public record ReviewCommentDeleted(Long commentId, Long pullRequestId, EventContext context) implements
-        ReviewCommentEvent, ContextualEvent {}
+        ReviewCommentEvent {}
 
     // ========================================================================
     // Pull Request Review Thread Events
@@ -296,10 +291,10 @@ public final class DomainEvent {
     }
 
     public record ReviewThreadResolved(EventPayload.ReviewThreadData thread, EventContext context) implements
-        ReviewThreadEvent, ContextualEvent {}
+        ReviewThreadEvent {}
 
     public record ReviewThreadUnresolved(EventPayload.ReviewThreadData thread, EventContext context) implements
-        ReviewThreadEvent, ContextualEvent {}
+        ReviewThreadEvent {}
 
     // ========================================================================
     // Team Events
@@ -309,7 +304,7 @@ public final class DomainEvent {
         Long teamId();
     }
 
-    public record TeamCreated(EventPayload.TeamData team, EventContext context) implements TeamEvent, ContextualEvent {
+    public record TeamCreated(EventPayload.TeamData team, EventContext context) implements TeamEvent {
         @Override
         public Long teamId() {
             return team.id();
@@ -317,15 +312,14 @@ public final class DomainEvent {
     }
 
     public record TeamUpdated(EventPayload.TeamData team, Set<String> changedFields, EventContext context) implements
-        TeamEvent, ContextualEvent {
+        TeamEvent {
         @Override
         public Long teamId() {
             return team.id();
         }
     }
 
-    public record TeamDeleted(Long teamId, String teamName, EventContext context) implements
-        TeamEvent, ContextualEvent {
+    public record TeamDeleted(Long teamId, String teamName, EventContext context) implements TeamEvent {
         @Override
         public Long teamId() {
             return teamId;

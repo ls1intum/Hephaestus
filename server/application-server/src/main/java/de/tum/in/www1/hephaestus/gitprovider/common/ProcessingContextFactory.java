@@ -52,7 +52,7 @@ public class ProcessingContextFactory {
         Repository repository = repositoryRepository.findByNameWithOwner(repoFullName).orElse(null);
 
         if (repository == null) {
-            log.warn("Skipped webhook event: reason=repositoryNotFound, repoName={}, action={}", sanitizeForLog(repoFullName), event.action());
+            log.debug("Skipped webhook event: reason=repositoryNotFound, repoName={}, action={}", sanitizeForLog(repoFullName), event.action());
             return Optional.empty();
         }
 

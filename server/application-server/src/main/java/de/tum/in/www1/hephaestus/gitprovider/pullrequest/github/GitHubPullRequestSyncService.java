@@ -5,6 +5,7 @@ import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncCons
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.GRAPHQL_TIMEOUT;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.MAX_PAGINATION_PAGES;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.exception.InstallationNotFoundException;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser;
@@ -82,7 +83,7 @@ public class GitHubPullRequestSyncService {
     public int syncForRepository(Long scopeId, Long repositoryId) {
         Repository repository = repositoryRepository.findById(repositoryId).orElse(null);
         if (repository == null) {
-            log.warn("Skipped pull request sync: reason=repositoryNotFound, repoId={}", repositoryId);
+            log.debug("Skipped pull request sync: reason=repositoryNotFound, repoId={}", repositoryId);
             return 0;
         }
 
@@ -175,6 +176,9 @@ public class GitHubPullRequestSyncService {
                 GHPageInfo pageInfo = connection.getPageInfo();
                 hasMore = pageInfo != null && Boolean.TRUE.equals(pageInfo.getHasNextPage());
                 cursor = pageInfo != null ? pageInfo.getEndCursor() : null;
+            } catch (InstallationNotFoundException e) {
+                // Re-throw to abort the entire sync operation
+                throw e;
             } catch (Exception e) {
                 log.error("Failed to sync pull requests: repoName={}", safeNameWithOwner, e);
                 break;
@@ -184,7 +188,7 @@ public class GitHubPullRequestSyncService {
         // Fetch remaining reviews for PRs with >10 reviews (using cursor for efficient continuation)
         if (!prsNeedingReviewPagination.isEmpty()) {
             log.debug(
-                "Fetching additional reviews for pull requests with pagination: repoName={}, prCount={}",
+                "Starting additional review fetch for PRs with pagination: repoName={}, prCount={}",
                 safeNameWithOwner,
                 prsNeedingReviewPagination.size()
             );

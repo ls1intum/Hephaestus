@@ -367,6 +367,17 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-aop</artifactId>
         </dependency>
+        <!--
+            Netty native DNS resolver for macOS Apple Silicon (M1/M2/M3).
+            Resolves: "Unable to load io.netty.resolver.dns.macos.MacOSDnsServerAddressStreamProvider"
+            The x86_64 classifier is already included transitively via reactor-netty.
+            Version managed by Spring Boot's netty-bom.
+        -->
+        <dependency>
+            <groupId>io.netty</groupId>
+            <artifactId>netty-resolver-dns-native-macos</artifactId>
+            <classifier>osx-aarch_64</classifier>
+        </dependency>
     </dependencies>
     <dependencyManagement>
         <dependencies>

@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -115,4 +116,37 @@ public interface UserRepository extends JpaRepository<User, Long> {
         """
     )
     List<User> findAllByLoginLowerIn(@Param("logins") Set<String> logins);
+
+    /**
+     * Upsert a user using PostgreSQL ON CONFLICT.
+     * This is thread-safe for concurrent inserts of the same user.
+     *
+     * @param id the primary key (GitHub database ID)
+     * @param login the user login
+     * @param name the display name
+     * @param avatarUrl the avatar URL
+     * @param htmlUrl the HTML URL
+     * @param type the user type (USER, BOT, ORGANIZATION)
+     */
+    @Modifying
+    @Query(
+        value = """
+            INSERT INTO "user" (id, login, name, avatar_url, html_url, type)
+            VALUES (:id, :login, :name, :avatarUrl, :htmlUrl, :type)
+            ON CONFLICT (id) DO UPDATE SET
+                login = EXCLUDED.login,
+                name = EXCLUDED.name,
+                avatar_url = EXCLUDED.avatar_url,
+                html_url = EXCLUDED.html_url
+            """,
+        nativeQuery = true
+    )
+    void upsert(
+        @Param("id") Long id,
+        @Param("login") String login,
+        @Param("name") String name,
+        @Param("avatarUrl") String avatarUrl,
+        @Param("htmlUrl") String htmlUrl,
+        @Param("type") String type
+    );
 }
