@@ -6,6 +6,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { LevelBar } from "./LevelBar";
 
 // Repository images for known repositories
 const REPO_IMAGES: Record<string, string> = {
@@ -22,6 +23,9 @@ export interface ProfileHeaderProps {
 	contributedRepositories?: RepositoryInfo[];
 	leaguePoints?: number;
 	isLoading: boolean;
+	level?: number;
+	currentXP?: number;
+	xpNeeded?: number;
 }
 
 export function ProfileHeader({
@@ -30,6 +34,9 @@ export function ProfileHeader({
 	contributedRepositories = [],
 	leaguePoints = 0,
 	isLoading,
+	level = 1,
+	currentXP = 0,
+	xpNeeded = 100,
 }: ProfileHeaderProps) {
 	// Format the first contribution date if available
 	const formattedFirstContribution = firstContribution
@@ -42,14 +49,14 @@ export function ProfileHeader({
 	};
 	return (
 		<div className="flex items-center justify-between mx-8">
-			<div className="flex gap-8 items-center">
+			<div className="flex gap-8 items-center w-full">
 				{/* Avatar with loading skeleton */}
 				{isLoading ? (
-					<Avatar className="w-24 h-24 ring-2 ring-neutral-100 dark:ring-neutral-800">
+					<Avatar className="w-24 h-24 ring-2 ring-neutral-100 dark:ring-neutral-800 shrink-0">
 						<Skeleton className="h-full w-full rounded-full" />
 					</Avatar>
 				) : (
-					<Avatar className="w-24 h-24 ring-2 ring-neutral-100 dark:ring-neutral-800">
+					<Avatar className="w-24 h-24 ring-2 ring-neutral-100 dark:ring-neutral-800 shrink-0">
 						<AvatarImage src={user?.avatarUrl} alt={`${user?.login}'s avatar`} />
 						<AvatarFallback>{user?.login?.slice(0, 2)?.toUpperCase()}</AvatarFallback>
 					</Avatar>
@@ -57,7 +64,7 @@ export function ProfileHeader({
 
 				{/* User information with loading skeletons */}
 				{isLoading ? (
-					<div className="flex flex-col gap-2">
+					<div className="flex flex-col gap-2 w-full max-w-xl">
 						<Skeleton className="h-8 w-48" />
 						<Skeleton className="h-5 w-64" />
 						<Skeleton className="h-5 w-80" />
@@ -67,27 +74,32 @@ export function ProfileHeader({
 						</div>
 					</div>
 				) : user ? (
-					<div className="flex flex-col gap-1">
-						{/* User name */}
-						<h1 className="text-2xl md:text-3xl font-bold leading-6">{user.name}</h1>
+					<div className="flex flex-col gap-3 w-full max-w-xl">
+						<div className="flex flex-col gap-1">
+							{/* User name */}
+							<h1 className="text-2xl md:text-3xl font-bold leading-6">{user.name}</h1>
 
-						{/* GitHub profile link */}
-						<a
-							className="md:text-lg font-medium text-muted-foreground mb-1 hover:text-github-accent-foreground"
-							href={user.htmlUrl}
-							target="_blank"
-							rel="noopener noreferrer"
-						>
-							github.com/{user.login}
-						</a>
+							{/* GitHub profile link */}
+							<a
+								className="md:text-lg font-medium text-muted-foreground mb-1 hover:text-github-accent-foreground"
+								href={user.htmlUrl}
+								target="_blank"
+								rel="noopener noreferrer"
+							>
+								github.com/{user.login}
+							</a>
 
-						{/* First contribution */}
-						{formattedFirstContribution && (
-							<div className="flex items-center gap-1 md:gap-2 text-muted-foreground font-medium text-sm md:text-base">
-								<ClockIcon size={16} className="overflow-visible" />
-								<span>Contributing since {formattedFirstContribution}</span>
-							</div>
-						)}
+							{/* First contribution */}
+							{formattedFirstContribution && (
+								<div className="flex items-center gap-1 md:gap-2 text-muted-foreground font-medium text-sm md:text-base">
+									<ClockIcon size={16} className="overflow-visible" />
+									<span>Contributing since {formattedFirstContribution}</span>
+								</div>
+							)}
+						</div>
+
+						{/* Level Bar - Integrated under user info */}
+						<LevelBar level={level} currentXP={currentXP} xpNeeded={xpNeeded} />
 
 						{/* Contributed repositories */}
 						{contributedRepositories.length > 0 && (
@@ -115,7 +127,7 @@ export function ProfileHeader({
 			</div>
 
 			{/* League information */}
-			<div className="flex flex-col justify-center items-center gap-2">
+			<div className="flex flex-col justify-center items-center gap-2 shrink-0">
 				{isLoading ? (
 					<>
 						<Skeleton className="size-28 rounded-full" />

@@ -17,6 +17,9 @@ interface ProfileProps {
 	onTimeframeChange?: (afterDate: string, beforeDate?: string) => void;
 	/** Leaderboard schedule for proper week calculations */
 	schedule?: LeaderboardSchedule;
+	level: number;
+	currentXP: number;
+	xpNeeded: number;
 }
 
 export function ProfilePage({
@@ -30,6 +33,9 @@ export function ProfilePage({
 	before,
 	onTimeframeChange,
 	schedule,
+	level,
+	currentXP,
+	xpNeeded,
 }: ProfileProps) {
 	if (error) {
 		return (
@@ -51,6 +57,9 @@ export function ProfilePage({
 				contributedRepositories={profileData?.contributedRepositories}
 				leaguePoints={profileData?.userInfo?.leaguePoints}
 				isLoading={isLoading}
+				level={level}
+				currentXP={currentXP}
+				xpNeeded={xpNeeded}
 			/>
 			<ProfileContent
 				reviewActivity={profileData?.reviewActivity}
