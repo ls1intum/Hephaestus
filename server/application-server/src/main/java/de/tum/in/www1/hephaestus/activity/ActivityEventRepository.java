@@ -257,24 +257,6 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
         return findByActorWithLimit(actorId, since, 100);
     }
 
-    /**
-     * Email attribution: get event chain by correlation ID.
-     * Limited to 100 events per correlation chain (safety bound).
-     *
-     * <p>Workspace-agnostic: Correlation IDs are globally unique UUIDs. Events in the
-     * same correlation chain belong to the same workspace by design.
-     */
-    @WorkspaceAgnostic("Correlation IDs are globally unique - workspace implicit in the chain")
-    @Query(
-        """
-        SELECT e FROM ActivityEvent e
-        WHERE e.correlationId = :correlationId
-        ORDER BY e.occurredAt ASC
-        LIMIT 100
-        """
-    )
-    List<ActivityEvent> findByCorrelationId(@Param("correlationId") UUID correlationId);
-
     // ========================================================================
     // Profile XP Lookups
     // ========================================================================

@@ -13,15 +13,12 @@ import java.time.Instant;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.core.env.Environment;
 import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.dao.TransientDataAccessException;
 
 /**
  * Unit tests for ActivityEventService.
@@ -34,9 +31,6 @@ class ActivityEventServiceTest {
     private ActivityEventRepository eventRepository;
 
     @Mock
-    private DeadLetterEventRepository deadLetterRepository;
-
-    @Mock
     private WorkspaceRepository workspaceRepository;
 
     @Mock
@@ -44,9 +38,6 @@ class ActivityEventServiceTest {
 
     @Mock
     private LeaderboardCacheManager cacheManager;
-
-    @Mock
-    private Environment environment;
 
     private MeterRegistry meterRegistry;
     private ActivityEventService service;
@@ -58,12 +49,10 @@ class ActivityEventServiceTest {
         lenient().when(xpProperties.getMaxXpPerEvent()).thenReturn(1000.0);
         service = new ActivityEventService(
             eventRepository,
-            deadLetterRepository,
             workspaceRepository,
             xpProperties,
             cacheManager,
-            meterRegistry,
-            environment
+            meterRegistry
         );
     }
 
@@ -87,8 +76,7 @@ class ActivityEventServiceTest {
             null,
             ActivityTargetType.PULL_REQUEST,
             100L,
-            1.0,
-            SourceSystem.GITHUB
+            1.0
         );
 
         // Assert
@@ -119,8 +107,7 @@ class ActivityEventServiceTest {
             null,
             ActivityTargetType.PULL_REQUEST,
             100L,
-            1.0,
-            SourceSystem.GITHUB
+            1.0
         );
 
         // Assert
@@ -161,8 +148,7 @@ class ActivityEventServiceTest {
             null,
             ActivityTargetType.PULL_REQUEST,
             100L,
-            1.0,
-            SourceSystem.GITHUB
+            1.0
         );
 
         // Assert
@@ -186,8 +172,7 @@ class ActivityEventServiceTest {
             null,
             ActivityTargetType.PULL_REQUEST,
             100L,
-            1.0,
-            SourceSystem.GITHUB
+            1.0
         );
 
         // Assert
@@ -219,8 +204,7 @@ class ActivityEventServiceTest {
             null,
             ActivityTargetType.PULL_REQUEST,
             100L,
-            -50.0, // negative XP
-            SourceSystem.GITHUB
+            -50.0 // negative XP
         );
 
         // Assert
@@ -252,91 +236,11 @@ class ActivityEventServiceTest {
             null,
             ActivityTargetType.PULL_REQUEST,
             100L,
-            9999.0, // excessive XP
-            SourceSystem.GITHUB
+            9999.0 // excessive XP
         );
 
         // Assert
         assertThat(result).isTrue();
         verify(eventRepository).save(any(ActivityEvent.class));
-    }
-
-    @Nested
-    @DisplayName("Dead Letter Handling")
-    class DeadLetterHandling {
-
-        @Test
-        @DisplayName("recoverFromTransientError persists dead letter event")
-        void recoverFromTransientError_persistsDeadLetter() {
-            // Arrange
-            TransientDataAccessException error = new TransientDataAccessException("Connection lost") {};
-            when(deadLetterRepository.save(any(DeadLetterEvent.class))).thenAnswer(inv -> inv.getArgument(0));
-
-            // Act
-            boolean result = service.recoverFromTransientError(
-                error,
-                1L,
-                ActivityEventType.PULL_REQUEST_OPENED,
-                Instant.now(),
-                null,
-                null,
-                ActivityTargetType.PULL_REQUEST,
-                100L,
-                5.0,
-                SourceSystem.GITHUB,
-                null
-            );
-
-            // Assert
-            assertThat(result).isFalse();
-            verify(deadLetterRepository).save(
-                argThat(deadLetter -> {
-                    assertThat(deadLetter.getWorkspaceId()).isEqualTo(1L);
-                    assertThat(deadLetter.getEventType()).isEqualTo(ActivityEventType.PULL_REQUEST_OPENED);
-                    assertThat(deadLetter.getTargetId()).isEqualTo(100L);
-                    assertThat(deadLetter.getXp()).isEqualTo(5.0);
-                    assertThat(deadLetter.getStatus()).isEqualTo(DeadLetterEvent.Status.PENDING);
-                    assertThat(deadLetter.getErrorMessage()).contains("Connection lost");
-                    // Error type contains the exception class - may be anonymous class name
-                    assertThat(deadLetter.getErrorType()).isNotNull();
-                    return true;
-                })
-            );
-            assertThat(meterRegistry.counter("activity.events.failed").count()).isEqualTo(1.0);
-            assertThat(meterRegistry.counter("activity.dead_letters.persisted").count()).isEqualTo(1.0);
-        }
-
-        @Test
-        @DisplayName("recoverFromTransientError handles dead letter persistence failure gracefully")
-        void recoverFromTransientError_persistenceFailure_logsButDoesNotThrow() {
-            // Arrange
-            TransientDataAccessException originalError = new TransientDataAccessException("Original error") {};
-            when(deadLetterRepository.save(any(DeadLetterEvent.class))).thenThrow(
-                new RuntimeException("Dead letter persistence failed")
-            );
-
-            // Act - should not throw
-            boolean result = service.recoverFromTransientError(
-                originalError,
-                1L,
-                ActivityEventType.PULL_REQUEST_OPENED,
-                Instant.now(),
-                null,
-                null,
-                ActivityTargetType.PULL_REQUEST,
-                100L,
-                5.0,
-                SourceSystem.GITHUB,
-                null
-            );
-
-            // Assert
-            assertThat(result).isFalse();
-            verify(deadLetterRepository).save(any(DeadLetterEvent.class));
-            // Failed counter should still be incremented
-            assertThat(meterRegistry.counter("activity.events.failed").count()).isEqualTo(1.0);
-            // But persisted counter should NOT be incremented since it failed
-            assertThat(meterRegistry.counter("activity.dead_letters.persisted").count()).isEqualTo(0.0);
-        }
     }
 }

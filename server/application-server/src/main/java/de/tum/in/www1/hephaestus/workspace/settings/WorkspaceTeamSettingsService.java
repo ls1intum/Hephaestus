@@ -10,8 +10,13 @@ import de.tum.in.www1.hephaestus.gitprovider.team.Team;
 import de.tum.in.www1.hephaestus.gitprovider.team.TeamRepository;
 import de.tum.in.www1.hephaestus.workspace.Workspace;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceRepository;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -214,6 +219,34 @@ public class WorkspaceTeamSettingsService {
     }
 
     /**
+     * Gets hidden repository IDs grouped by team for multiple teams in a workspace.
+     *
+     * <p>This batch method fetches all hidden repository settings for the specified teams
+     * in a single database query, avoiding N+1 query patterns when processing multiple teams.
+     *
+     * @param workspaceId the workspace ID
+     * @param teamIds the set of team IDs to check
+     * @return map of team ID to set of hidden repository IDs for that team
+     */
+    @Transactional(readOnly = true)
+    public Map<Long, Set<Long>> getHiddenRepositoryIdsByTeamsMap(Long workspaceId, Set<Long> teamIds) {
+        if (teamIds == null || teamIds.isEmpty()) {
+            return Map.of();
+        }
+
+        List<WorkspaceTeamRepositorySettings> settings =
+            repositorySettingsRepository.findHiddenRepositorySettingsByWorkspaceAndTeams(workspaceId, teamIds);
+
+        Map<Long, Set<Long>> result = new HashMap<>();
+        for (WorkspaceTeamRepositorySettings setting : settings) {
+            Long teamId = setting.getTeam().getId();
+            Long repoId = setting.getRepository().getId();
+            result.computeIfAbsent(teamId, k -> new HashSet<>()).add(repoId);
+        }
+        return result;
+    }
+
+    /**
      * Updates the contribution visibility of a repository for a team in a workspace.
      *
      * @param workspace the workspace
@@ -280,6 +313,33 @@ public class WorkspaceTeamSettingsService {
     @Transactional(readOnly = true)
     public Set<Label> getTeamLabelFilters(Long workspaceId, Long teamId) {
         return labelFilterRepository.findLabelsByWorkspaceAndTeam(workspaceId, teamId);
+    }
+
+    /**
+     * Gets label filters grouped by team for multiple teams in a workspace.
+     *
+     * <p>This batch method fetches all label filter associations for the specified teams
+     * in a single database query, avoiding N+1 query patterns when processing multiple teams.
+     *
+     * @param workspaceId the workspace ID
+     * @param teamIds the set of team IDs to fetch label filters for
+     * @return map of team ID to set of labels configured as filters for that team
+     */
+    @Transactional(readOnly = true)
+    public Map<Long, Set<Label>> getTeamLabelFiltersForTeams(Long workspaceId, Set<Long> teamIds) {
+        if (teamIds == null || teamIds.isEmpty()) {
+            return Map.of();
+        }
+
+        List<WorkspaceTeamLabelFilter> filters =
+            labelFilterRepository.findByWorkspaceIdAndTeamIds(workspaceId, teamIds);
+
+        return filters.stream().collect(
+            Collectors.groupingBy(
+                filter -> filter.getTeam().getId(),
+                Collectors.mapping(WorkspaceTeamLabelFilter::getLabel, Collectors.toSet())
+            )
+        );
     }
 
     /**

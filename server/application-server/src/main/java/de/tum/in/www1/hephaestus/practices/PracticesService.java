@@ -16,7 +16,9 @@ import de.tum.in.www1.hephaestus.practices.model.PullRequestBadPracticeDTO;
 import de.tum.in.www1.hephaestus.practices.model.PullRequestBadPracticeState;
 import de.tum.in.www1.hephaestus.practices.model.PullRequestWithBadPracticesDTO;
 import de.tum.in.www1.hephaestus.workspace.Workspace;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
@@ -72,7 +74,23 @@ public class PracticesService {
             workspace.getId()
         );
 
-        return pullRequests.stream().map(this::buildPullRequestWithBadPractices).collect(Collectors.toList());
+        if (pullRequests.isEmpty()) {
+            return List.of();
+        }
+
+        // Batch fetch all detections and bad practices to avoid N+1 queries
+        Set<Long> prIds = pullRequests.stream()
+            .map(PullRequest::getId)
+            .collect(Collectors.toSet());
+
+        Map<Long, BadPracticeDetection> detectionsMap =
+            detectionRepository.findMostRecentByPullRequestIdsAsMap(prIds);
+        Map<Long, List<PullRequestBadPractice>> badPracticesMap =
+            badPracticeRepository.findByPullRequestIdsAsMap(prIds);
+
+        return pullRequests.stream()
+            .map(pr -> buildPullRequestWithBadPractices(pr, detectionsMap, badPracticesMap))
+            .collect(Collectors.toList());
     }
 
     /**
@@ -180,9 +198,38 @@ public class PracticesService {
     // Private helper methods
     // ══════════════════════════════════════════════════════════════════════════
 
+    /**
+     * Builds a DTO for a single pull request by fetching its detection and bad practices.
+     * Used for single PR lookups where batch fetching is not needed.
+     */
     private PullRequestWithBadPracticesDTO buildPullRequestWithBadPractices(PullRequest pr) {
         BadPracticeDetection lastDetection = detectionRepository.findMostRecentByPullRequestId(pr.getId());
+        List<PullRequestBadPractice> allBadPractices = badPracticeRepository.findByPullRequestId(pr.getId());
+        return buildPullRequestWithBadPracticesDTO(pr, lastDetection, allBadPractices);
+    }
 
+    /**
+     * Builds a DTO for a pull request using pre-fetched detection and bad practices maps.
+     * Used for batch operations to avoid N+1 queries.
+     */
+    private PullRequestWithBadPracticesDTO buildPullRequestWithBadPractices(
+        PullRequest pr,
+        Map<Long, BadPracticeDetection> detectionsMap,
+        Map<Long, List<PullRequestBadPractice>> badPracticesMap
+    ) {
+        BadPracticeDetection lastDetection = detectionsMap.get(pr.getId());
+        List<PullRequestBadPractice> allBadPractices = badPracticesMap.getOrDefault(pr.getId(), Collections.emptyList());
+        return buildPullRequestWithBadPracticesDTO(pr, lastDetection, allBadPractices);
+    }
+
+    /**
+     * Core logic for building the DTO from a pull request, its detection, and bad practices.
+     */
+    private PullRequestWithBadPracticesDTO buildPullRequestWithBadPracticesDTO(
+        PullRequest pr,
+        BadPracticeDetection lastDetection,
+        List<PullRequestBadPractice> allBadPractices
+    ) {
         List<PullRequestBadPracticeDTO> badPractices = lastDetection == null
             ? List.of()
             : lastDetection
@@ -193,8 +240,7 @@ public class PracticesService {
 
         List<String> badPracticeTitles = badPractices.stream().map(PullRequestBadPracticeDTO::title).toList();
 
-        List<PullRequestBadPracticeDTO> oldBadPractices = badPracticeRepository
-            .findByPullRequestId(pr.getId())
+        List<PullRequestBadPracticeDTO> oldBadPractices = allBadPractices
             .stream()
             .filter(badPractice -> !badPracticeTitles.contains(badPractice.getTitle()))
             .map(PullRequestBadPracticeDTO::fromPullRequestBadPractice)

@@ -37,17 +37,10 @@ export const activityEvent = pgTable(
 		targetType: varchar("target_type", { length: 32 }),
 		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
 		targetId: bigint("target_id", { mode: "number" }),
-		sourceSystem: varchar("source_system", { length: 32 }).notNull(),
-		correlationId: uuid("correlation_id"),
 		xp: doublePrecision().default(0).notNull(),
-		payload: jsonb(),
 		ingestedAt: timestamp("ingested_at", { withTimezone: true, mode: "string" })
 			.defaultNow()
 			.notNull(),
-		schemaVersion: integer("schema_version").default(1).notNull(),
-		triggerContext: varchar("trigger_context", { length: 64 }),
-		contentHash: varchar("content_hash", { length: 64 }),
-		formulaVersion: integer("formula_version").default(1).notNull(),
 	},
 	(table) => [
 		index("idx_activity_event_actor_occurred").using(
@@ -60,7 +53,6 @@ export const activityEvent = pgTable(
 			table.actorId.asc().nullsLast(),
 			table.occurredAt.asc().nullsLast(),
 		),
-		index("idx_activity_event_correlation").using("btree", table.correlationId.asc().nullsLast()),
 		index("idx_activity_event_leaderboard").using(
 			"btree",
 			table.workspaceId.asc().nullsLast(),
@@ -78,10 +70,6 @@ export const activityEvent = pgTable(
 			"btree",
 			table.targetId.asc().nullsLast(),
 			table.targetType.asc().nullsLast(),
-		),
-		index("idx_activity_event_trigger_context").using(
-			"btree",
-			table.triggerContext.asc().nullsLast(),
 		),
 		index("idx_activity_event_type_time").using(
 			"btree",
@@ -275,57 +263,6 @@ export const chatThread = pgTable(
 			name: "fk_chat_thread_workspace",
 		}).onDelete("cascade"),
 		unique("uc_chat_threadselected_leaf_message_id_col").on(table.selectedLeafMessageId),
-	],
-);
-
-export const deadLetterEvent = pgTable(
-	"dead_letter_event",
-	{
-		id: uuid().primaryKey().notNull(),
-		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
-		workspaceId: bigint("workspace_id", { mode: "number" }).notNull(),
-		eventType: varchar("event_type", { length: 64 }).notNull(),
-		occurredAt: timestamp("occurred_at", { withTimezone: true, mode: "string" }).notNull(),
-		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
-		actorId: bigint("actor_id", { mode: "number" }),
-		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
-		repositoryId: bigint("repository_id", { mode: "number" }),
-		targetType: varchar("target_type", { length: 32 }),
-		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
-		targetId: bigint("target_id", { mode: "number" }),
-		xp: doublePrecision().notNull(),
-		sourceSystem: varchar("source_system", { length: 32 }).notNull(),
-		payload: jsonb(),
-		errorMessage: varchar("error_message", { length: 2000 }).notNull(),
-		errorType: varchar("error_type", { length: 256 }),
-		stackTrace: text("stack_trace"),
-		retryCount: integer("retry_count").default(0).notNull(),
-		status: varchar({ length: 16 }).default("PENDING").notNull(),
-		createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }).notNull(),
-		updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" }),
-		resolvedAt: timestamp("resolved_at", { withTimezone: true, mode: "string" }),
-		resolutionNotes: varchar("resolution_notes", { length: 1000 }),
-	},
-	(table) => [
-		index("idx_dead_letter_event_type").using(
-			"btree",
-			table.eventType.asc().nullsLast(),
-			table.createdAt.desc().nullsFirst(),
-		),
-		index("idx_dead_letter_status_created").using(
-			"btree",
-			table.status.asc().nullsLast(),
-			table.createdAt.asc().nullsLast(),
-		),
-		index("idx_dead_letter_workspace_created").using(
-			"btree",
-			table.workspaceId.asc().nullsLast(),
-			table.createdAt.desc().nullsFirst(),
-		),
-		check(
-			"chk_dead_letter_status",
-			sql`(status)::text = ANY ((ARRAY['PENDING'::character varying, 'RESOLVED'::character varying, 'DISCARDED'::character varying])::text[])`,
-		),
 	],
 );
 

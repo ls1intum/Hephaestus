@@ -122,8 +122,7 @@ class ActivityEventListenerTest {
                 eq(testRepository),
                 eq(ActivityTargetType.PULL_REQUEST),
                 eq(1L),
-                eq(ExperiencePointCalculator.XP_PULL_REQUEST_OPENED),
-                eq(SourceSystem.GITHUB)
+                eq(ExperiencePointCalculator.XP_PULL_REQUEST_OPENED)
             );
             // Verify no findById was called (N+1 fix)
             verify(userRepository).getReferenceById(100L);
@@ -167,8 +166,7 @@ class ActivityEventListenerTest {
                 eq(testRepository),
                 eq(ActivityTargetType.PULL_REQUEST),
                 eq(2L),
-                eq(ExperiencePointCalculator.XP_PULL_REQUEST_MERGED),
-                eq(SourceSystem.GITHUB)
+                eq(ExperiencePointCalculator.XP_PULL_REQUEST_MERGED)
             );
         }
     }
@@ -195,8 +193,7 @@ class ActivityEventListenerTest {
                 eq(testRepository),
                 eq(ActivityTargetType.PULL_REQUEST),
                 eq(3L),
-                eq(0.0),
-                eq(SourceSystem.GITHUB)
+                eq(0.0)
             );
         }
 
@@ -236,8 +233,7 @@ class ActivityEventListenerTest {
                 eq(testRepository),
                 eq(ActivityTargetType.PULL_REQUEST),
                 eq(5L),
-                eq(0.0),
-                eq(SourceSystem.GITHUB)
+                eq(0.0)
             );
         }
     }
@@ -263,8 +259,7 @@ class ActivityEventListenerTest {
                 eq(testRepository),
                 eq(ActivityTargetType.PULL_REQUEST),
                 eq(6L),
-                eq(0.5), // XP from mock
-                eq(SourceSystem.GITHUB)
+                eq(0.5) // XP from mock
             );
         }
     }
@@ -296,8 +291,7 @@ class ActivityEventListenerTest {
                 eq(testRepository),
                 eq(ActivityTargetType.REVIEW),
                 eq(5L),
-                eq(7.5),
-                eq(SourceSystem.GITHUB)
+                eq(7.5)
             );
         }
 
@@ -337,8 +331,7 @@ class ActivityEventListenerTest {
                 eq(testRepository),
                 eq(ActivityTargetType.ISSUE),
                 eq(10L),
-                eq(0.25), // XP from mock
-                eq(SourceSystem.GITHUB)
+                eq(0.25) // XP from mock
             );
         }
 
@@ -377,8 +370,7 @@ class ActivityEventListenerTest {
                 eq(testRepository),
                 eq(ActivityTargetType.ISSUE),
                 eq(12L),
-                eq(0.0),
-                eq(SourceSystem.GITHUB)
+                eq(0.0)
             );
         }
 

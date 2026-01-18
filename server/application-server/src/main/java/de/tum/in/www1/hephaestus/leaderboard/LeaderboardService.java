@@ -176,16 +176,23 @@ public class LeaderboardService {
         Set<Long> actorIds = activityData.keySet();
 
         List<PullRequestReview> reviews;
-        if (team.isPresent() && !teamIds.isEmpty()) {
-            reviews = leaderboardReviewQueryRepository.findAllInTimeframeOfTeams(after, before, teamIds, workspaceId);
+        if (actorIds.isEmpty()) {
+            reviews = Collections.emptyList();
+        } else if (team.isPresent() && !teamIds.isEmpty()) {
+            reviews = leaderboardReviewQueryRepository.findAllInTimeframeByActorsOfTeams(
+                after,
+                before,
+                actorIds,
+                teamIds,
+                workspaceId
+            );
         } else {
-            reviews = leaderboardReviewQueryRepository.findAllInTimeframe(after, before, workspaceId);
+            reviews = leaderboardReviewQueryRepository.findAllInTimeframeByActors(after, before, actorIds, workspaceId);
         }
 
         Map<Long, List<PullRequestReview>> reviewsByUserId = reviews
             .stream()
             .filter(r -> r.getAuthor() != null && r.getAuthor().getId() != null)
-            .filter(r -> actorIds.contains(r.getAuthor().getId()))
             .collect(Collectors.groupingBy(r -> r.getAuthor().getId()));
 
         // ========================================================================
@@ -349,21 +356,25 @@ public class LeaderboardService {
 
         List<LeaderboardEntryDTO> result = new ArrayList<>();
         Long workspaceId = workspace.getId();
+
+        // Batch fetch all team settings to avoid N+1 queries
+        Set<Long> allTeamIds = sorted.stream()
+            .map(entry -> entry.getKey().getId())
+            .collect(Collectors.toSet());
+        Map<Long, Set<Label>> labelFiltersByTeam =
+            workspaceTeamSettingsService.getTeamLabelFiltersForTeams(workspaceId, allTeamIds);
+        Map<Long, Set<Long>> hiddenRepoIdsByTeam =
+            workspaceTeamSettingsService.getHiddenRepositoryIdsByTeamsMap(workspaceId, allTeamIds);
+
         for (int i = 0; i < sorted.size(); i++) {
             Team teamEntity = sorted.get(i).getKey();
             TeamStats stats = sorted.get(i).getValue();
             int score = sort == LeaderboardSortType.SCORE ? stats.score() : stats.leaguePoints();
 
-            // Get workspace-scoped settings for this team
+            // Get workspace-scoped settings for this team from pre-fetched maps
             boolean isHiddenInWorkspace = hiddenTeamIds.contains(teamEntity.getId());
-            Set<Label> workspaceLabels = workspaceTeamSettingsService.getTeamLabelFilters(
-                workspaceId,
-                teamEntity.getId()
-            );
-            Set<Long> hiddenRepoIds = workspaceTeamSettingsService.getHiddenRepositoryIdsByTeams(
-                workspaceId,
-                Set.of(teamEntity.getId())
-            );
+            Set<Label> workspaceLabels = labelFiltersByTeam.getOrDefault(teamEntity.getId(), Set.of());
+            Set<Long> hiddenRepoIds = hiddenRepoIdsByTeam.getOrDefault(teamEntity.getId(), Set.of());
 
             LeaderboardEntryDTO entry = new LeaderboardEntryDTO(
                 i + 1,

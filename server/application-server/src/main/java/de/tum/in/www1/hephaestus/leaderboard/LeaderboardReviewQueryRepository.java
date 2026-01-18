@@ -21,12 +21,13 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface LeaderboardReviewQueryRepository extends JpaRepository<PullRequestReview, Long> {
     /**
-     * Finds all reviews in a timeframe for a workspace, scoped to repositories monitored by the workspace.
+     * Finds all reviews in a timeframe for specific actors, scoped to repositories monitored by the workspace.
      *
      * @param after start of timeframe (inclusive)
      * @param before end of timeframe (inclusive)
+     * @param actorIds the user IDs to filter by
      * @param workspaceId the workspace to scope to
-     * @return reviews in the timeframe for monitored repositories
+     * @return reviews in the timeframe for monitored repositories by the specified actors
      */
     @Query(
         value = """
@@ -35,32 +36,32 @@ public interface LeaderboardReviewQueryRepository extends JpaRepository<PullRequ
         LEFT JOIN FETCH prr.author
         LEFT JOIN FETCH prr.pullRequest pr
         LEFT JOIN FETCH pr.repository r
-        LEFT JOIN FETCH prr.comments
         JOIN RepositoryToMonitor rtm ON rtm.nameWithOwner = r.nameWithOwner
-        WHERE
-            prr.submittedAt BETWEEN :after AND :before
-            AND prr.author.type = 'USER'
+        WHERE prr.submittedAt BETWEEN :after AND :before
+            AND prr.author.id IN :actorIds
             AND rtm.workspace.id = :workspaceId
         ORDER BY prr.submittedAt DESC
         """
     )
-    List<PullRequestReview> findAllInTimeframe(
+    List<PullRequestReview> findAllInTimeframeByActors(
         @Param("after") Instant after,
         @Param("before") Instant before,
+        @Param("actorIds") Collection<Long> actorIds,
         @Param("workspaceId") Long workspaceId
     );
 
     /**
-     * Finds all reviews in a timeframe for specific teams, excluding hidden repositories.
+     * Finds all reviews in a timeframe for specific actors and teams, excluding hidden repositories.
      *
      * <p>This query joins with WorkspaceTeamRepositorySettings to exclude repositories
      * that are marked as hidden from contributions for the specified teams.
      *
      * @param after start of timeframe (inclusive)
      * @param before end of timeframe (inclusive)
-     * @param teamIds the team IDs to filter by
+     * @param actorIds the user IDs to filter by
+     * @param teamIds the team IDs to filter by (for repository visibility)
      * @param workspaceId the workspace to scope to
-     * @return reviews in the timeframe for team members, excluding hidden repositories
+     * @return reviews in the timeframe for the specified actors, excluding hidden repositories
      */
     @Query(
         value = """
@@ -69,11 +70,9 @@ public interface LeaderboardReviewQueryRepository extends JpaRepository<PullRequ
         LEFT JOIN FETCH prr.author
         LEFT JOIN FETCH prr.pullRequest pr
         LEFT JOIN FETCH pr.repository r
-        LEFT JOIN FETCH prr.comments
         JOIN RepositoryToMonitor rtm ON rtm.nameWithOwner = r.nameWithOwner
-        WHERE
-            prr.submittedAt BETWEEN :after AND :before
-            AND prr.author.type = 'USER'
+        WHERE prr.submittedAt BETWEEN :after AND :before
+            AND prr.author.id IN :actorIds
             AND rtm.workspace.id = :workspaceId
             AND NOT EXISTS (
                 SELECT 1
@@ -83,18 +82,13 @@ public interface LeaderboardReviewQueryRepository extends JpaRepository<PullRequ
                 AND wtrs.team.id IN :teamIds
                 AND wtrs.hiddenFromContributions = true
             )
-            AND EXISTS (
-                SELECT 1
-                FROM TeamMembership tm
-                WHERE tm.team.id IN :teamIds
-                AND tm.user = prr.author
-            )
         ORDER BY prr.submittedAt DESC
         """
     )
-    List<PullRequestReview> findAllInTimeframeOfTeams(
+    List<PullRequestReview> findAllInTimeframeByActorsOfTeams(
         @Param("after") Instant after,
         @Param("before") Instant before,
+        @Param("actorIds") Collection<Long> actorIds,
         @Param("teamIds") Collection<Long> teamIds,
         @Param("workspaceId") Long workspaceId
     );

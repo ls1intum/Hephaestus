@@ -1850,4 +1850,145 @@
         <addPrimaryKey columnNames="team_id, workspace_id" constraintName="workspace_team_settingsPK" tableName="workspace_team_settings"/>
     </changeSet>
 
+    <!-- ==================== SECTION 35: Activity Event Table Simplification ==================== -->
+    <!--
+    Remove unused columns from activity_event table.
+    The activity ledger serves as XP source of truth for leaderboard/profile.
+    Display data is always hydrated from source tables (PRs, reviews, etc).
+
+    Removed columns:
+    - source_system: Was GITHUB-only, never used for multi-provider support
+    - schema_version: Migration versioning not needed for stable schema
+    - content_hash: Change detection never implemented
+    - correlation_id: Email/notification tracking not implemented
+    - trigger_context: Webhook vs backfill distinction not needed
+    - formula_version: XP formula versioning not needed
+    - payload: JSON storage unused, hydration from source tables preferred
+    -->
+
+    <changeSet id="1768900000000-1-drop-activity-event-correlation-idx" author="FelixTJDietrich">
+        <preConditions onFail="MARK_RAN">
+            <indexExists indexName="idx_activity_event_correlation"/>
+        </preConditions>
+        <comment>Drop correlation_id index before dropping the column</comment>
+        <dropIndex tableName="activity_event" indexName="idx_activity_event_correlation"/>
+    </changeSet>
+
+    <changeSet id="1768900000000-2-drop-activity-event-trigger-context-idx" author="FelixTJDietrich">
+        <preConditions onFail="MARK_RAN">
+            <indexExists indexName="idx_activity_event_trigger_context"/>
+        </preConditions>
+        <comment>Drop trigger_context index before dropping the column</comment>
+        <dropIndex tableName="activity_event" indexName="idx_activity_event_trigger_context"/>
+    </changeSet>
+
+    <changeSet id="1768900000000-3-drop-activity-event-source-system" author="FelixTJDietrich">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="activity_event" columnName="source_system"/>
+        </preConditions>
+        <comment>Drop unused source_system column (was GITHUB-only)</comment>
+        <dropColumn tableName="activity_event" columnName="source_system"/>
+    </changeSet>
+
+    <changeSet id="1768900000000-4-drop-activity-event-schema-version" author="FelixTJDietrich">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="activity_event" columnName="schema_version"/>
+        </preConditions>
+        <comment>Drop unused schema_version column</comment>
+        <dropColumn tableName="activity_event" columnName="schema_version"/>
+    </changeSet>
+
+    <changeSet id="1768900000000-5-drop-activity-event-content-hash" author="FelixTJDietrich">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="activity_event" columnName="content_hash"/>
+        </preConditions>
+        <comment>Drop unused content_hash column</comment>
+        <dropColumn tableName="activity_event" columnName="content_hash"/>
+    </changeSet>
+
+    <changeSet id="1768900000000-6-drop-activity-event-correlation-id" author="FelixTJDietrich">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="activity_event" columnName="correlation_id"/>
+        </preConditions>
+        <comment>Drop unused correlation_id column</comment>
+        <dropColumn tableName="activity_event" columnName="correlation_id"/>
+    </changeSet>
+
+    <changeSet id="1768900000000-7-drop-activity-event-trigger-context" author="FelixTJDietrich">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="activity_event" columnName="trigger_context"/>
+        </preConditions>
+        <comment>Drop unused trigger_context column</comment>
+        <dropColumn tableName="activity_event" columnName="trigger_context"/>
+    </changeSet>
+
+    <changeSet id="1768900000000-8-drop-activity-event-formula-version" author="FelixTJDietrich">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="activity_event" columnName="formula_version"/>
+        </preConditions>
+        <comment>Drop unused formula_version column</comment>
+        <dropColumn tableName="activity_event" columnName="formula_version"/>
+    </changeSet>
+
+    <changeSet id="1768900000000-9-drop-activity-event-payload" author="FelixTJDietrich">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="activity_event" columnName="payload"/>
+        </preConditions>
+        <comment>Drop unused payload column (hydration from source tables preferred)</comment>
+        <dropColumn tableName="activity_event" columnName="payload"/>
+    </changeSet>
+
+    <changeSet id="1768900000000-10-add-activity-event-xp-lookup-idx" author="FelixTJDietrich">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <indexExists indexName="idx_activity_event_xp_lookup"/>
+            </not>
+        </preConditions>
+        <comment>Add index for profile XP lookup queries (workspace_id, target_type, target_id)</comment>
+        <createIndex tableName="activity_event" indexName="idx_activity_event_xp_lookup">
+            <column name="workspace_id"/>
+            <column name="target_type"/>
+            <column name="target_id"/>
+        </createIndex>
+    </changeSet>
+
+    <!-- Dead Letter Event Simplification -->
+
+    <changeSet id="1768900000000-11-drop-dead-letter-source-system" author="FelixTJDietrich">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="dead_letter_event" columnName="source_system"/>
+        </preConditions>
+        <comment>Drop unused source_system column from dead_letter_event</comment>
+        <dropColumn tableName="dead_letter_event" columnName="source_system"/>
+    </changeSet>
+
+    <changeSet id="1768900000000-12-drop-dead-letter-payload" author="FelixTJDietrich">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="dead_letter_event" columnName="payload"/>
+        </preConditions>
+        <comment>Drop unused payload column from dead_letter_event</comment>
+        <dropColumn tableName="dead_letter_event" columnName="payload"/>
+    </changeSet>
+
+    <!-- ==================== SECTION: Remove Dead Letter Event Table ==================== -->
+    <!-- Dead letter functionality has been removed from the codebase -->
+
+    <changeSet id="1769000000000-1-drop-dead-letter-indexes" author="FelixTJDietrich">
+        <preConditions onFail="MARK_RAN">
+            <tableExists tableName="dead_letter_event"/>
+        </preConditions>
+        <comment>Drop indexes on dead_letter_event table before dropping table</comment>
+        <dropIndex tableName="dead_letter_event" indexName="idx_dead_letter_status_created"/>
+        <dropIndex tableName="dead_letter_event" indexName="idx_dead_letter_workspace_created"/>
+        <dropIndex tableName="dead_letter_event" indexName="idx_dead_letter_event_type"/>
+    </changeSet>
+
+    <changeSet id="1769000000000-2-drop-dead-letter-table" author="FelixTJDietrich">
+        <preConditions onFail="MARK_RAN">
+            <tableExists tableName="dead_letter_event"/>
+        </preConditions>
+        <comment>Drop dead_letter_event table - functionality removed from codebase</comment>
+        <dropTable tableName="dead_letter_event"/>
+    </changeSet>
+
 </databaseChangeLog>

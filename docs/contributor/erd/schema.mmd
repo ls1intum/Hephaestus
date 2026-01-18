@@ -79,29 +79,6 @@ erDiagram
         BIGINT workspace_id FK "NOT NULL"
     }
 
-    DeadLetterEvent {
-        UUID id PK
-        BIGINT workspace_id "NOT NULL"
-        VARCHAR(64) event_type "NOT NULL"
-        TIMESTAMPTZ occurred_at "NOT NULL"
-        BIGINT actor_id
-        BIGINT repository_id
-        VARCHAR(32) target_type
-        BIGINT target_id
-        DOUBLE xp "NOT NULL"
-        VARCHAR(32) source_system "NOT NULL"
-        JSONB payload
-        VARCHAR(2000) error_message "NOT NULL"
-        VARCHAR(256) error_type
-        TEXT stack_trace
-        INTEGER retry_count "NOT NULL"
-        VARCHAR(16) status "NOT NULL"
-        TIMESTAMPTZ created_at "NOT NULL"
-        TIMESTAMPTZ updated_at
-        TIMESTAMPTZ resolved_at
-        VARCHAR(1000) resolution_notes
-    }
-
     Document {
         UUID id PK
         INTEGER version_number PK

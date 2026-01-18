@@ -114,8 +114,7 @@ public class ActivityEventListener {
                 repositoryRepository.getReferenceById(pr.repository().id()),
                 ActivityTargetType.PULL_REQUEST,
                 pr.id(),
-                xpCalc.getXpPullRequestOpened(),
-                mapSource(event.context().source())
+                xpCalc.getXpPullRequestOpened()
             )
         );
     }
@@ -147,8 +146,7 @@ public class ActivityEventListener {
                 repositoryRepository.getReferenceById(pr.repository().id()),
                 ActivityTargetType.PULL_REQUEST,
                 pr.id(),
-                xpCalc.getXpPullRequestMerged(),
-                mapSource(event.context().source())
+                xpCalc.getXpPullRequestMerged()
             )
         );
     }
@@ -181,8 +179,7 @@ public class ActivityEventListener {
                 repositoryRepository.getReferenceById(pr.repository().id()),
                 ActivityTargetType.PULL_REQUEST,
                 pr.id(),
-                0.0,
-                mapSource(event.context().source())
+                0.0
             )
         );
     }
@@ -208,8 +205,7 @@ public class ActivityEventListener {
                 repositoryRepository.getReferenceById(pr.repository().id()),
                 ActivityTargetType.PULL_REQUEST,
                 pr.id(),
-                0.0, // Reopening is lifecycle tracking, no XP reward
-                mapSource(event.context().source())
+                0.0 // Reopening is lifecycle tracking, no XP reward
             )
         );
     }
@@ -235,8 +231,7 @@ public class ActivityEventListener {
                 repositoryRepository.getReferenceById(pr.repository().id()),
                 ActivityTargetType.PULL_REQUEST,
                 pr.id(),
-                xpCalc.getXpPullRequestReady(),
-                mapSource(event.context().source())
+                xpCalc.getXpPullRequestReady()
             )
         );
     }
@@ -275,8 +270,7 @@ public class ActivityEventListener {
                 repositoryRepository.getReferenceById(reviewData.repositoryId()),
                 ActivityTargetType.REVIEW,
                 reviewData.id(),
-                xp,
-                mapSource(event.context().source())
+                xp
             )
         );
     }
@@ -310,8 +304,7 @@ public class ActivityEventListener {
                 repositoryRepository.getReferenceById(reviewData.repositoryId()),
                 ActivityTargetType.REVIEW,
                 reviewData.id(),
-                xpAdjustment,
-                mapSource(event.context().source())
+                xpAdjustment
             )
         );
     }
@@ -360,8 +353,7 @@ public class ActivityEventListener {
                 repositoryRepository.getReferenceById(reviewData.repositoryId()),
                 ActivityTargetType.REVIEW,
                 reviewData.id(),
-                xp,
-                mapSource(event.context().source())
+                xp
             )
         );
     }
@@ -402,8 +394,7 @@ public class ActivityEventListener {
                 repositoryRepository.getReferenceById(commentData.repositoryId()),
                 ActivityTargetType.ISSUE_COMMENT,
                 commentData.id(),
-                finalXp,
-                mapSource(event.context().source())
+                finalXp
             )
         );
     }
@@ -434,8 +425,7 @@ public class ActivityEventListener {
                 repositoryRepository.getReferenceById(commentData.repositoryId()),
                 ActivityTargetType.REVIEW_COMMENT,
                 commentData.id(),
-                xpCalc.getXpReviewComment(),
-                mapSource(event.context().source())
+                xpCalc.getXpReviewComment()
             )
         );
     }
@@ -465,8 +455,7 @@ public class ActivityEventListener {
                 repositoryRepository.getReferenceById(issueData.repository().id()),
                 ActivityTargetType.ISSUE,
                 issueData.id(),
-                xpCalc.getXpIssueCreated(),
-                mapSource(event.context().source())
+                xpCalc.getXpIssueCreated()
             )
         );
     }
@@ -500,8 +489,7 @@ public class ActivityEventListener {
                 repositoryRepository.getReferenceById(issueData.repository().id()),
                 ActivityTargetType.ISSUE,
                 issueData.id(),
-                0.0, // Issue closure is lifecycle tracking, no XP reward
-                mapSource(event.context().source())
+                0.0 // Issue closure is lifecycle tracking, no XP reward
             )
         );
     }
@@ -517,17 +505,5 @@ public class ActivityEventListener {
             return ActivityEventType.REVIEW_UNKNOWN;
         }
         return ActivityEventType.REVIEW_COMMENTED;
-    }
-
-    /**
-     * Map event context source to SourceSystem.
-     * Defaults to SYSTEM if source is null.
-     */
-    private SourceSystem mapSource(de.tum.in.www1.hephaestus.gitprovider.common.DataSource source) {
-        if (source == null) {
-            return SourceSystem.SYSTEM;
-        }
-        // All data sources from gitprovider are GitHub data
-        return SourceSystem.GITHUB;
     }
 }

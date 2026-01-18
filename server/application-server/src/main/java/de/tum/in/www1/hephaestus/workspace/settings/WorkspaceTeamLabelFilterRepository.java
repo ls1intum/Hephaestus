@@ -74,6 +74,30 @@ public interface WorkspaceTeamLabelFilterRepository
     Set<Long> findTeamIdsWithLabelFilters(@Param("workspaceId") Long workspaceId);
 
     /**
+     * Finds all label filters for multiple teams in a workspace.
+     *
+     * <p>This batch query retrieves all label filter associations for the specified teams
+     * in a single database query, avoiding N+1 query patterns when processing multiple teams.
+     *
+     * @param workspaceId the workspace ID
+     * @param teamIds the set of team IDs to fetch label filters for
+     * @return list of label filters for the specified teams in the workspace
+     */
+    @Query(
+        """
+        SELECT wtlf
+        FROM WorkspaceTeamLabelFilter wtlf
+        JOIN FETCH wtlf.label
+        WHERE wtlf.workspace.id = :workspaceId
+          AND wtlf.team.id IN :teamIds
+        """
+    )
+    List<WorkspaceTeamLabelFilter> findByWorkspaceIdAndTeamIds(
+        @Param("workspaceId") Long workspaceId,
+        @Param("teamIds") Set<Long> teamIds
+    );
+
+    /**
      * Deletes a specific label filter by its composite key components.
      *
      * @param workspaceId the workspace ID
