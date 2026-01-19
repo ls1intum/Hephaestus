@@ -37,7 +37,7 @@
     "@ai-sdk/devtools": "0.0.2",
     "@ai-sdk/openai": "3.0.1",
     "@ai-sdk/provider": "3.0.0",
-    "@hono/node-server": "1.19.7",
+    "@hono/node-server": "1.19.9",
     "@hono/zod-openapi": "1.2.0",
     "@hono/zod-validator": "0.7.6",
     "@langfuse/client": "4.5.1",

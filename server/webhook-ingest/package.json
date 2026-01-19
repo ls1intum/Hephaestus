@@ -19,7 +19,7 @@
     "validate": "npm run typecheck && npm run lint && npm run test"
   },
   "dependencies": {
-    "@hono/node-server": "1.19.7",
+    "@hono/node-server": "1.19.9",
     "@nats-io/jetstream": "3.3.0",
     "@nats-io/nats-core": "3.3.0",
     "@nats-io/transport-node": "3.3.0",
