@@ -3,6 +3,7 @@ package de.tum.in.www1.hephaestus.gitprovider.user;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import io.swagger.v3.oas.annotations.media.Schema;
 import org.springframework.lang.NonNull;
+import org.springframework.lang.Nullable;
 
 /**
  * Information about a user from the git provider.
@@ -33,11 +34,16 @@ public record UserInfoDTO(
      */
     @Schema(description = "League points earned by the user in the current scope", example = "150") int leaguePoints
 ) {
-    public static UserInfoDTO fromUser(User user) {
+    @Nullable
+    public static UserInfoDTO fromUser(@Nullable User user) {
         return fromUser(user, 0);
     }
 
-    public static UserInfoDTO fromUser(User user, int leaguePoints) {
+    @Nullable
+    public static UserInfoDTO fromUser(@Nullable User user, int leaguePoints) {
+        if (user == null) {
+            return null;
+        }
         return new UserInfoDTO(
             user.getId(),
             user.getLogin(),

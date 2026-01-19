@@ -63,10 +63,10 @@ query GetPullRequestReviewComments($owner: String!, $name: String!, $number: Int
                             state
                             url
 
-                            # Author - supports both User and Bot types
+                            # Author - supports User, Bot, Mannequin, and Organization types
                             author {
+                                __typename
                                 ... on User {
-                                    __typename
                                     id
                                     databaseId
                                     login
@@ -76,7 +76,18 @@ query GetPullRequestReviewComments($owner: String!, $name: String!, $number: Int
                                     createdAt
                                 }
                                 ... on Bot {
-                                    __typename
+                                    id
+                                    databaseId
+                                    login
+                                    avatarUrl
+                                }
+                                ... on Mannequin {
+                                    id
+                                    databaseId
+                                    login
+                                    avatarUrl
+                                }
+                                ... on Organization {
                                     id
                                     databaseId
                                     login

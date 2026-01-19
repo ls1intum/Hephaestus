@@ -172,13 +172,16 @@ public class GitHubGraphQlRateLimitTracker {
             resetAt.set(resetTime.toInstant());
         }
 
+        // Calculate actual used points (limit - remaining is more reliable than getUsed())
+        int actualUsed = newLimit > 0 ? newLimit - newRemaining : 0;
+
         // Log based on severity
         if (newRemaining < CRITICAL_THRESHOLD) {
             log.error(
                 "CRITICAL: GitHub GraphQL rate limit nearly exhausted: remaining={}, limit={}, used={}, cost={}, resetAt={}",
                 newRemaining,
                 newLimit,
-                newUsed,
+                actualUsed,
                 cost,
                 resetTime
             );
@@ -187,19 +190,12 @@ public class GitHubGraphQlRateLimitTracker {
                 "GitHub GraphQL rate limit low: remaining={}, limit={}, used={}, cost={}, resetAt={}",
                 newRemaining,
                 newLimit,
-                newUsed,
+                actualUsed,
                 cost,
                 resetTime
             );
-        } else {
-            log.debug(
-                "GitHub GraphQL rate limit: remaining={}, limit={}, cost={}, usagePercent={}%",
-                newRemaining,
-                newLimit,
-                cost,
-                String.format("%.1f", (100.0 * newUsed) / newLimit)
-            );
         }
+        // Normal operations: only log at TRACE to avoid spam
     }
 
     /**

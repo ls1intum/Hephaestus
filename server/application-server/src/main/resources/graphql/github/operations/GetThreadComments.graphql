@@ -36,10 +36,10 @@ query GetThreadComments($threadId: ID!, $first: Int!, $after: String) {
                     url
                     authorAssociation
 
-                    # Comment author - supports both User and Bot types
+                    # Comment author - supports User, Bot, Mannequin, and Organization types
                     author {
+                        __typename
                         ... on User {
-                            __typename
                             id
                             databaseId
                             login
@@ -49,7 +49,18 @@ query GetThreadComments($threadId: ID!, $first: Int!, $after: String) {
                             createdAt
                         }
                         ... on Bot {
-                            __typename
+                            id
+                            databaseId
+                            login
+                            avatarUrl
+                        }
+                        ... on Mannequin {
+                            id
+                            databaseId
+                            login
+                            avatarUrl
+                        }
+                        ... on Organization {
                             id
                             databaseId
                             login

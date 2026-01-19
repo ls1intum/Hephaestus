@@ -6,6 +6,7 @@ import de.tum.in.www1.hephaestus.gitprovider.issue.Issue.State;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryInfoDTO;
 import io.swagger.v3.oas.annotations.media.Schema;
 import org.springframework.lang.NonNull;
+import org.springframework.lang.Nullable;
 
 @JsonInclude(JsonInclude.Include.NON_EMPTY)
 @Schema(description = "Basic information about a pull request")
@@ -19,7 +20,11 @@ public record PullRequestBaseInfoDTO(
     @Schema(description = "Repository the pull request belongs to") RepositoryInfoDTO repository,
     @NonNull @Schema(description = "URL to the pull request on the git provider") String htmlUrl
 ) {
-    public static PullRequestBaseInfoDTO fromPullRequest(PullRequest pullRequest) {
+    @Nullable
+    public static PullRequestBaseInfoDTO fromPullRequest(@Nullable PullRequest pullRequest) {
+        if (pullRequest == null) {
+            return null;
+        }
         return new PullRequestBaseInfoDTO(
             pullRequest.getId(),
             pullRequest.getNumber(),
@@ -32,7 +37,11 @@ public record PullRequestBaseInfoDTO(
         );
     }
 
-    public static PullRequestBaseInfoDTO fromIssue(Issue issue) {
+    @Nullable
+    public static PullRequestBaseInfoDTO fromIssue(@Nullable Issue issue) {
+        if (issue == null) {
+            return null;
+        }
         return new PullRequestBaseInfoDTO(
             issue.getId(),
             issue.getNumber(),

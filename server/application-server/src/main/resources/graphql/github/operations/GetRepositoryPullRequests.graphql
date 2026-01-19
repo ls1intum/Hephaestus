@@ -80,6 +80,18 @@ query GetRepositoryPullRequests(
                         login
                         avatarUrl
                     }
+                    ... on Mannequin {
+                        id
+                        databaseId
+                        login
+                        avatarUrl
+                    }
+                    ... on Organization {
+                        id
+                        databaseId
+                        login
+                        avatarUrl
+                    }
                 }
 
                 # Merged by
@@ -93,6 +105,18 @@ query GetRepositoryPullRequests(
                         createdAt
                     }
                     ... on Bot {
+                        id
+                        databaseId
+                        login
+                        avatarUrl
+                    }
+                    ... on Mannequin {
+                        id
+                        databaseId
+                        login
+                        avatarUrl
+                    }
+                    ... on Organization {
                         id
                         databaseId
                         login
@@ -112,7 +136,7 @@ query GetRepositoryPullRequests(
                     }
                 }
 
-                # Requested reviewers
+                # Requested reviewers (RequestedReviewer union: User, Team, Mannequin, Bot)
                 reviewRequests(first: 20) {
                     nodes {
                         requestedReviewer {
@@ -124,7 +148,19 @@ query GetRepositoryPullRequests(
                                 avatarUrl
                                 createdAt
                             }
+                            ... on Team {
+                                id
+                                databaseId
+                                name
+                                slug
+                            }
                             ... on Bot {
+                                id
+                                databaseId
+                                login
+                                avatarUrl
+                            }
+                            ... on Mannequin {
                                 id
                                 databaseId
                                 login
@@ -192,6 +228,18 @@ query GetRepositoryPullRequests(
                                 login
                                 avatarUrl
                             }
+                            ... on Mannequin {
+                                id
+                                databaseId
+                                login
+                                avatarUrl
+                            }
+                            ... on Organization {
+                                id
+                                databaseId
+                                login
+                                avatarUrl
+                            }
                         }
                     }
                 }
@@ -253,8 +301,8 @@ query GetRepositoryPullRequests(
 
                                 # Comment author
                                 author {
+                                    __typename
                                     ... on User {
-                                        __typename
                                         id
                                         databaseId
                                         login
@@ -264,7 +312,18 @@ query GetRepositoryPullRequests(
                                         createdAt
                                     }
                                     ... on Bot {
-                                        __typename
+                                        id
+                                        databaseId
+                                        login
+                                        avatarUrl
+                                    }
+                                    ... on Mannequin {
+                                        id
+                                        databaseId
+                                        login
+                                        avatarUrl
+                                    }
+                                    ... on Organization {
                                         id
                                         databaseId
                                         login

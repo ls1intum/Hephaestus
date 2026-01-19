@@ -4,11 +4,13 @@ import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.events.DomainEvent;
 import de.tum.in.www1.hephaestus.gitprovider.common.events.EventContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.events.EventPayload;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.BaseGitHubProcessor;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReview;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReviewRepository;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.github.dto.GitHubPullRequestReviewEventDTO;
+import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import java.util.Set;
 import org.slf4j.Logger;
@@ -21,13 +23,12 @@ import org.springframework.transaction.annotation.Transactional;
  * Processor for GitHub pull request reviews.
  */
 @Service
-public class GitHubPullRequestReviewProcessor {
+public class GitHubPullRequestReviewProcessor extends BaseGitHubProcessor {
 
     private static final Logger log = LoggerFactory.getLogger(GitHubPullRequestReviewProcessor.class);
 
     private final PullRequestReviewRepository reviewRepository;
     private final PullRequestRepository prRepository;
-    private final UserRepository userRepository;
     private final ApplicationEventPublisher eventPublisher;
 
     public GitHubPullRequestReviewProcessor(
@@ -36,9 +37,9 @@ public class GitHubPullRequestReviewProcessor {
         UserRepository userRepository,
         ApplicationEventPublisher eventPublisher
     ) {
+        super(userRepository, null, null);
         this.reviewRepository = reviewRepository;
         this.prRepository = prRepository;
-        this.userRepository = userRepository;
         this.eventPublisher = eventPublisher;
     }
 
@@ -76,12 +77,12 @@ public class GitHubPullRequestReviewProcessor {
                 review.setDismissed(true);
                 review = reviewRepository.save(review);
                 if (context != null) {
-                    eventPublisher.publishEvent(
-                        new DomainEvent.ReviewDismissed(
-                            EventPayload.ReviewData.from(review),
-                            EventContext.from(context)
-                        )
-                    );
+                    EventPayload.ReviewData.from(review)
+                        .ifPresent(reviewData ->
+                            eventPublisher.publishEvent(
+                                new DomainEvent.ReviewDismissed(reviewData, EventContext.from(context))
+                            )
+                        );
                 }
                 log.debug("Dismissed review: reviewId={}", reviewId);
             });
@@ -99,13 +100,16 @@ public class GitHubPullRequestReviewProcessor {
         }
         PullRequestReview saved = reviewRepository.save(review);
         if (context != null) {
-            eventPublisher.publishEvent(
-                new DomainEvent.ReviewEdited(
-                    EventPayload.ReviewData.from(saved),
-                    Set.of("body", "state"),
-                    EventContext.from(context)
-                )
-            );
+            EventPayload.ReviewData.from(saved)
+                .ifPresent(reviewData ->
+                    eventPublisher.publishEvent(
+                        new DomainEvent.ReviewEdited(
+                            reviewData,
+                            Set.of("body", "state"),
+                            EventContext.from(context)
+                        )
+                    )
+                );
         }
         log.debug("Updated review: reviewId={}", dto.id());
         return saved;
@@ -126,15 +130,21 @@ public class GitHubPullRequestReviewProcessor {
         review.setPullRequest(pr);
         review.setCommitId(dto.commitId());
 
-        if (dto.author() != null && dto.author().getDatabaseId() != null) {
-            userRepository.findById(dto.author().getDatabaseId()).ifPresent(review::setAuthor);
+        if (dto.author() != null) {
+            User author = findOrCreateUser(dto.author());
+            if (author != null) {
+                review.setAuthor(author);
+            }
         }
 
         PullRequestReview saved = reviewRepository.save(review);
         if (context != null) {
-            eventPublisher.publishEvent(
-                new DomainEvent.ReviewSubmitted(EventPayload.ReviewData.from(saved), EventContext.from(context))
-            );
+            EventPayload.ReviewData.from(saved)
+                .ifPresent(reviewData ->
+                    eventPublisher.publishEvent(
+                        new DomainEvent.ReviewSubmitted(reviewData, EventContext.from(context))
+                    )
+                );
         }
         log.debug("Created review: reviewId={}", dto.id());
         return saved;

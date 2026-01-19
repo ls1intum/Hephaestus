@@ -97,8 +97,8 @@ public class ActivityEventListener {
             return;
         }
         if (pr.authorId() == null || pr.createdAt() == null) {
-            log.warn(
-                "PR created event missing required data: prId={}, authorId={}, createdAt={}",
+            log.debug(
+                "Skipping PR created event (author may be deleted): prId={}, authorId={}, createdAt={}",
                 pr.id(),
                 pr.authorId(),
                 pr.createdAt()
@@ -129,7 +129,7 @@ public class ActivityEventListener {
         // For merged PRs, prefer mergedBy, fall back to author
         Long awardeeId = pr.mergedById() != null ? pr.mergedById() : pr.authorId();
         if (awardeeId == null) {
-            log.warn("PR merged event missing awardee: prId={}", pr.id());
+            log.debug("Skipping PR merged event (awardee may be deleted): prId={}", pr.id());
             return;
         }
         Instant occurredAt = pr.mergedAt() != null ? pr.mergedAt() : pr.updatedAt();
@@ -162,7 +162,7 @@ public class ActivityEventListener {
             return;
         }
         if (pr.authorId() == null) {
-            log.warn("PR closed event missing authorId: prId={}", pr.id());
+            log.debug("Skipping PR closed event (author may be deleted): prId={}", pr.id());
             return;
         }
         Instant occurredAt = pr.closedAt() != null ? pr.closedAt() : pr.updatedAt();
@@ -192,7 +192,7 @@ public class ActivityEventListener {
             return;
         }
         if (pr.authorId() == null) {
-            log.warn("PR reopened event missing authorId: prId={}", pr.id());
+            log.debug("Skipping PR reopened event (author may be deleted): prId={}", pr.id());
             return;
         }
         Instant occurredAt = pr.updatedAt() != null ? pr.updatedAt() : Instant.now();
@@ -218,7 +218,7 @@ public class ActivityEventListener {
             return;
         }
         if (pr.authorId() == null) {
-            log.warn("PR ready event missing authorId: prId={}", pr.id());
+            log.debug("Skipping PR ready event (author may be deleted): prId={}", pr.id());
             return;
         }
         Instant occurredAt = pr.updatedAt() != null ? pr.updatedAt() : Instant.now();
@@ -244,8 +244,8 @@ public class ActivityEventListener {
             return;
         }
         if (reviewData.authorId() == null || reviewData.repositoryId() == null) {
-            log.warn(
-                "Review submitted event missing required data: reviewId={}, authorId={}, repositoryId={}",
+            log.debug(
+                "Skipping review submitted event (author may be deleted): reviewId={}, authorId={}, repositoryId={}",
                 reviewData.id(),
                 reviewData.authorId(),
                 reviewData.repositoryId()
@@ -283,8 +283,8 @@ public class ActivityEventListener {
             return;
         }
         if (reviewData.authorId() == null || reviewData.repositoryId() == null) {
-            log.warn(
-                "Review dismissed event missing required data: reviewId={}, authorId={}, repositoryId={}",
+            log.debug(
+                "Skipping review dismissed event (author may be deleted): reviewId={}, authorId={}, repositoryId={}",
                 reviewData.id(),
                 reviewData.authorId(),
                 reviewData.repositoryId()
@@ -327,8 +327,8 @@ public class ActivityEventListener {
             return;
         }
         if (reviewData.authorId() == null || reviewData.repositoryId() == null) {
-            log.warn(
-                "Review edited event missing required data: reviewId={}, authorId={}, repositoryId={}",
+            log.debug(
+                "Skipping review edited event (author may be deleted): reviewId={}, authorId={}, repositoryId={}",
                 reviewData.id(),
                 reviewData.authorId(),
                 reviewData.repositoryId()
@@ -366,8 +366,8 @@ public class ActivityEventListener {
             return;
         }
         if (commentData.authorId() == null || commentData.repositoryId() == null) {
-            log.warn(
-                "Comment created event missing required data: commentId={}, authorId={}, repositoryId={}",
+            log.debug(
+                "Skipping comment created event (author may be deleted): commentId={}, authorId={}, repositoryId={}",
                 commentData.id(),
                 commentData.authorId(),
                 commentData.repositoryId()
@@ -407,8 +407,8 @@ public class ActivityEventListener {
             return;
         }
         if (commentData.authorId() == null || commentData.repositoryId() == null) {
-            log.warn(
-                "Review comment created event missing required data: commentId={}, authorId={}, repositoryId={}",
+            log.debug(
+                "Skipping review comment created event (author may be deleted): commentId={}, authorId={}, repositoryId={}",
                 commentData.id(),
                 commentData.authorId(),
                 commentData.repositoryId()
@@ -442,7 +442,7 @@ public class ActivityEventListener {
             return;
         }
         if (issueData.authorId() == null) {
-            log.warn("Issue created event missing authorId: issueId={}", issueData.id());
+            log.debug("Skipping issue created event (author may be deleted): issueId={}", issueData.id());
             return;
         }
         Instant occurredAt = issueData.createdAt() != null ? issueData.createdAt() : Instant.now();
@@ -472,7 +472,7 @@ public class ActivityEventListener {
             return;
         }
         if (issueData.authorId() == null) {
-            log.warn("Issue closed event missing authorId: issueId={}", issueData.id());
+            log.debug("Skipping issue closed event (author may be deleted): issueId={}", issueData.id());
             return;
         }
         Instant occurredAt = issueData.closedAt() != null ? issueData.closedAt() : issueData.updatedAt();

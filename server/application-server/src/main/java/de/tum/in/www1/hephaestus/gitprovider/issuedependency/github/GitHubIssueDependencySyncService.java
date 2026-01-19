@@ -334,8 +334,15 @@ public class GitHubIssueDependencySyncService {
                 break;
             }
 
-            hasNextPage = issueConnection.getPageInfo().getHasNextPage();
-            after = issueConnection.getPageInfo().getEndCursor();
+            var pageInfo = issueConnection.getPageInfo();
+            if (pageInfo == null) {
+                log.debug(
+                    "Received null pageInfo during dependency sync: repoName={}",
+                    safeNameWithOwner
+                );
+            }
+            hasNextPage = pageInfo != null && Boolean.TRUE.equals(pageInfo.getHasNextPage());
+            after = pageInfo != null ? pageInfo.getEndCursor() : null;
 
             // Process each page in its own transaction (call through proxy for @Transactional to work)
             totalSynced += self.processIssueDependenciesPage(issueConnection);

@@ -52,6 +52,18 @@ query GetReviewComments($reviewId: ID!, $first: Int!, $after: String) {
                             login
                             avatarUrl
                         }
+                        ... on Mannequin {
+                            id
+                            databaseId
+                            login
+                            avatarUrl
+                        }
+                        ... on Organization {
+                            id
+                            databaseId
+                            login
+                            avatarUrl
+                        }
                     }
                 }
             }

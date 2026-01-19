@@ -48,6 +48,18 @@ query GetPullRequestReviews($owner: String!, $name: String!, $number: Int!, $fir
                             login
                             avatarUrl
                         }
+                        ... on Mannequin {
+                            id
+                            databaseId
+                            login
+                            avatarUrl
+                        }
+                        ... on Organization {
+                            id
+                            databaseId
+                            login
+                            avatarUrl
+                        }
                     }
 
                     # Comments in review
@@ -80,6 +92,18 @@ query GetPullRequestReviews($owner: String!, $name: String!, $number: Int!, $fir
                                     createdAt
                                 }
                                 ... on Bot {
+                                    id
+                                    databaseId
+                                    login
+                                    avatarUrl
+                                }
+                                ... on Mannequin {
+                                    id
+                                    databaseId
+                                    login
+                                    avatarUrl
+                                }
+                                ... on Organization {
                                     id
                                     databaseId
                                     login

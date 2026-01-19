@@ -6,6 +6,7 @@ import de.tum.in.www1.hephaestus.gitprovider.team.permission.TeamRepositoryPermi
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.List;
 import org.springframework.lang.NonNull;
+import org.springframework.lang.Nullable;
 
 /**
  * Information about a git repository.
@@ -38,13 +39,19 @@ public record RepositoryInfoDTO(
     @Schema(description = "Whether contributions from this repository are hidden from leaderboard calculations")
     Boolean hiddenFromContributions
 ) {
-    public static RepositoryInfoDTO fromRepository(Repository repository) {
+    @Nullable
+    public static RepositoryInfoDTO fromRepository(@Nullable Repository repository) {
+        if (repository == null) {
+            return null;
+        }
         // Avoid circular references by setting the nested repository reference in LabelInfoDTO to null
-        final List<LabelInfoDTO> labelDtos = repository
-            .getLabels()
-            .stream()
-            .map(l -> new LabelInfoDTO(l.getId(), l.getName(), l.getColor(), null))
-            .toList();
+        final List<LabelInfoDTO> labelDtos = repository.getLabels() != null
+            ? repository
+                .getLabels()
+                .stream()
+                .map(l -> new LabelInfoDTO(l.getId(), l.getName(), l.getColor(), null))
+                .toList()
+            : List.of();
 
         return new RepositoryInfoDTO(
             repository.getId(),
@@ -65,19 +72,28 @@ public record RepositoryInfoDTO(
      *
      * @param permission the team repository permission
      * @param hiddenFromContributions whether this repository is hidden from contributions in the scope
-     * @return the DTO with scope-specific settings applied
+     * @return the DTO with scope-specific settings applied, or null if permission or repository is null
      */
+    @Nullable
     public static RepositoryInfoDTO fromPermissionWithScopeSettings(
-        TeamRepositoryPermission permission,
+        @Nullable TeamRepositoryPermission permission,
         boolean hiddenFromContributions
     ) {
+        if (permission == null) {
+            return null;
+        }
         final Repository repository = permission.getRepository();
+        if (repository == null) {
+            return null;
+        }
         // Avoid circular references by setting the nested repository reference in LabelInfoDTO to null
-        final List<LabelInfoDTO> labelDtos = repository
-            .getLabels()
-            .stream()
-            .map(l -> new LabelInfoDTO(l.getId(), l.getName(), l.getColor(), null))
-            .toList();
+        final List<LabelInfoDTO> labelDtos = repository.getLabels() != null
+            ? repository
+                .getLabels()
+                .stream()
+                .map(l -> new LabelInfoDTO(l.getId(), l.getName(), l.getColor(), null))
+                .toList()
+            : List.of();
 
         return new RepositoryInfoDTO(
             repository.getId(),

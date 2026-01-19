@@ -10,6 +10,7 @@ import java.time.Instant;
 import java.util.Comparator;
 import java.util.List;
 import org.springframework.lang.NonNull;
+import org.springframework.lang.Nullable;
 
 @JsonInclude(JsonInclude.Include.NON_EMPTY)
 @Schema(description = "Detailed information about a pull request")
@@ -33,7 +34,29 @@ public record PullRequestInfoDTO(
     @Schema(description = "Timestamp when the pull request was created") Instant createdAt,
     @Schema(description = "Timestamp when the pull request was last updated") Instant updatedAt
 ) {
-    public static PullRequestInfoDTO fromPullRequest(PullRequest pullRequest) {
+    @Nullable
+    public static PullRequestInfoDTO fromPullRequest(@Nullable PullRequest pullRequest) {
+        if (pullRequest == null) {
+            return null;
+        }
+        final List<LabelInfoDTO> labelDtos = pullRequest.getLabels() != null
+            ? pullRequest
+                .getLabels()
+                .stream()
+                .map(LabelInfoDTO::fromLabel)
+                .sorted(Comparator.comparing(LabelInfoDTO::name))
+                .toList()
+            : List.of();
+        final List<UserInfoDTO> assigneeDtos = pullRequest.getAssignees() != null
+            ? pullRequest
+                .getAssignees()
+                .stream()
+                .map(UserInfoDTO::fromUser)
+                .filter(u -> u != null)
+                .sorted(Comparator.comparing(UserInfoDTO::login))
+                .toList()
+            : List.of();
+
         return new PullRequestInfoDTO(
             pullRequest.getId(),
             pullRequest.getNumber(),
@@ -43,18 +66,8 @@ public record PullRequestInfoDTO(
             pullRequest.isMerged(),
             pullRequest.getCommentsCount(),
             UserInfoDTO.fromUser(pullRequest.getAuthor()),
-            pullRequest
-                .getLabels()
-                .stream()
-                .map(LabelInfoDTO::fromLabel)
-                .sorted(Comparator.comparing(LabelInfoDTO::name))
-                .toList(),
-            pullRequest
-                .getAssignees()
-                .stream()
-                .map(UserInfoDTO::fromUser)
-                .sorted(Comparator.comparing(UserInfoDTO::login))
-                .toList(),
+            labelDtos,
+            assigneeDtos,
             RepositoryInfoDTO.fromRepository(pullRequest.getRepository()),
             pullRequest.getAdditions(),
             pullRequest.getDeletions(),

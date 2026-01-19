@@ -12,6 +12,9 @@ import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewthread.PullRequest
 import de.tum.in.www1.hephaestus.gitprovider.team.Team;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import java.time.Instant;
+import java.util.Optional;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.lang.NonNull;
 import org.springframework.lang.Nullable;
 
@@ -20,6 +23,8 @@ import org.springframework.lang.Nullable;
  * These records are safe for async handling - no lazy-loaded relationships.
  */
 public final class EventPayload {
+
+    private static final Logger log = LoggerFactory.getLogger(EventPayload.class);
 
     private EventPayload() {}
 
@@ -211,17 +216,27 @@ public final class EventPayload {
         @Nullable Instant submittedAt,
         @Nullable Long repositoryId
     ) {
-        public static ReviewData from(PullRequestReview review) {
-            return new ReviewData(
-                review.getId(),
-                review.getBody(),
-                review.getState(),
-                review.isDismissed(),
-                review.getHtmlUrl(),
-                review.getAuthor() != null ? review.getAuthor().getId() : null,
-                review.getPullRequest().getId(),
-                review.getSubmittedAt(),
-                review.getPullRequest().getRepository() != null ? review.getPullRequest().getRepository().getId() : null
+        public static Optional<ReviewData> from(PullRequestReview review) {
+            PullRequest pr = review.getPullRequest();
+            if (pr == null) {
+                log.debug(
+                    "Cannot create ReviewData: pullRequest is null for reviewId={}",
+                    review.getId()
+                );
+                return Optional.empty();
+            }
+            return Optional.of(
+                new ReviewData(
+                    review.getId(),
+                    review.getBody(),
+                    review.getState(),
+                    review.isDismissed(),
+                    review.getHtmlUrl(),
+                    review.getAuthor() != null ? review.getAuthor().getId() : null,
+                    pr.getId(),
+                    review.getSubmittedAt(),
+                    pr.getRepository() != null ? pr.getRepository().getId() : null
+                )
             );
         }
     }
@@ -272,13 +287,23 @@ public final class EventPayload {
         @Nullable Integer line,
         @NonNull Long pullRequestId
     ) {
-        public static ReviewThreadData from(PullRequestReviewThread thread) {
-            return new ReviewThreadData(
-                thread.getId(),
-                thread.getState(),
-                thread.getPath(),
-                thread.getLine(),
-                thread.getPullRequest().getId()
+        public static Optional<ReviewThreadData> from(PullRequestReviewThread thread) {
+            PullRequest pr = thread.getPullRequest();
+            if (pr == null) {
+                log.debug(
+                    "Cannot create ReviewThreadData: pullRequest is null for threadId={}",
+                    thread.getId()
+                );
+                return Optional.empty();
+            }
+            return Optional.of(
+                new ReviewThreadData(
+                    thread.getId(),
+                    thread.getState(),
+                    thread.getPath(),
+                    thread.getLine(),
+                    pr.getId()
+                )
             );
         }
     }

@@ -391,8 +391,15 @@ public class GitHubSubIssueSyncService {
                     break;
                 }
 
-                hasNextPage = issueConnection.getPageInfo().getHasNextPage();
-                cursor = issueConnection.getPageInfo().getEndCursor();
+                var pageInfo = issueConnection.getPageInfo();
+                if (pageInfo == null) {
+                    log.debug(
+                        "Received null pageInfo during sub-issue sync: repoName={}",
+                        sanitizeForLog(repository.getNameWithOwner())
+                    );
+                }
+                hasNextPage = pageInfo != null && Boolean.TRUE.equals(pageInfo.getHasNextPage());
+                cursor = pageInfo != null ? pageInfo.getEndCursor() : null;
 
                 // Process each page in its own transaction
                 linkedCount += processIssueNodesInTransaction(issueConnection, repository);

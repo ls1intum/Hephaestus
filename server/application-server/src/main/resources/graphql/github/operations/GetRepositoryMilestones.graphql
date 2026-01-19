@@ -54,6 +54,18 @@ query GetRepositoryMilestones(
                         login
                         avatarUrl
                     }
+                    ... on Mannequin {
+                        id
+                        databaseId
+                        login
+                        avatarUrl
+                    }
+                    ... on Organization {
+                        id
+                        databaseId
+                        login
+                        avatarUrl
+                    }
                 }
             }
         }

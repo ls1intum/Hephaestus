@@ -14,7 +14,6 @@ import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncProperties;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser.RepositoryOwnerAndName;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHMilestone;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHMilestoneConnection;
-import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHMilestoneState;
 import de.tum.in.www1.hephaestus.gitprovider.milestone.Milestone;
 import de.tum.in.www1.hephaestus.gitprovider.milestone.MilestoneRepository;
 import de.tum.in.www1.hephaestus.gitprovider.milestone.github.dto.GitHubMilestoneDTO;
@@ -241,15 +240,5 @@ public class GitHubMilestoneSyncService {
      */
     private GitHubMilestoneDTO convertToDTO(GHMilestone graphQlMilestone) {
         return GitHubMilestoneDTO.fromMilestone(graphQlMilestone);
-    }
-
-    private Milestone.State convertState(GHMilestoneState graphQlState) {
-        if (graphQlState == null) {
-            return Milestone.State.OPEN;
-        }
-        return switch (graphQlState) {
-            case CLOSED -> Milestone.State.CLOSED;
-            case OPEN -> Milestone.State.OPEN;
-        };
     }
 }

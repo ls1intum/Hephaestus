@@ -41,6 +41,18 @@ query GetIssueComments($owner: String!, $name: String!, $number: Int!, $first: I
                             login
                             avatarUrl
                         }
+                        ... on Mannequin {
+                            id
+                            databaseId
+                            login
+                            avatarUrl
+                        }
+                        ... on Organization {
+                            id
+                            databaseId
+                            login
+                            avatarUrl
+                        }
                     }
 
                     authorAssociation
