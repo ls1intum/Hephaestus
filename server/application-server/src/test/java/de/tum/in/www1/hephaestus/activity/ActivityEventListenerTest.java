@@ -434,7 +434,7 @@ class ActivityEventListenerTest {
     }
 
     private EventPayload.ReviewData createReviewData(PullRequestReview review) {
-        return EventPayload.ReviewData.from(review);
+        return EventPayload.ReviewData.from(review).orElseThrow();
     }
 
     private EventPayload.IssueData createIssueData(Issue issue) {
