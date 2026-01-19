@@ -11,8 +11,8 @@ import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassi
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier.ClassificationResult;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser;
-import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncProperties;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser.RepositoryOwnerAndName;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncProperties;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHIssueCommentConnection;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHPageInfo;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;

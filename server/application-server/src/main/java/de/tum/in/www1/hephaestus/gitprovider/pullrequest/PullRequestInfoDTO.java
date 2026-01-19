@@ -41,20 +41,20 @@ public record PullRequestInfoDTO(
         }
         final List<LabelInfoDTO> labelDtos = pullRequest.getLabels() != null
             ? pullRequest
-                .getLabels()
-                .stream()
-                .map(LabelInfoDTO::fromLabel)
-                .sorted(Comparator.comparing(LabelInfoDTO::name))
-                .toList()
+                  .getLabels()
+                  .stream()
+                  .map(LabelInfoDTO::fromLabel)
+                  .sorted(Comparator.comparing(LabelInfoDTO::name))
+                  .toList()
             : List.of();
         final List<UserInfoDTO> assigneeDtos = pullRequest.getAssignees() != null
             ? pullRequest
-                .getAssignees()
-                .stream()
-                .map(UserInfoDTO::fromUser)
-                .filter(u -> u != null)
-                .sorted(Comparator.comparing(UserInfoDTO::login))
-                .toList()
+                  .getAssignees()
+                  .stream()
+                  .map(UserInfoDTO::fromUser)
+                  .filter(u -> u != null)
+                  .sorted(Comparator.comparing(UserInfoDTO::login))
+                  .toList()
             : List.of();
 
         return new PullRequestInfoDTO(

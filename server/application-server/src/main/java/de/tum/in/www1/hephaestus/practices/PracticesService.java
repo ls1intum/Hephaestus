@@ -79,16 +79,15 @@ public class PracticesService {
         }
 
         // Batch fetch all detections and bad practices to avoid N+1 queries
-        Set<Long> prIds = pullRequests.stream()
-            .map(PullRequest::getId)
-            .collect(Collectors.toSet());
+        Set<Long> prIds = pullRequests.stream().map(PullRequest::getId).collect(Collectors.toSet());
 
-        Map<Long, BadPracticeDetection> detectionsMap =
-            detectionRepository.findMostRecentByPullRequestIdsAsMap(prIds);
-        Map<Long, List<PullRequestBadPractice>> badPracticesMap =
-            badPracticeRepository.findByPullRequestIdsAsMap(prIds);
+        Map<Long, BadPracticeDetection> detectionsMap = detectionRepository.findMostRecentByPullRequestIdsAsMap(prIds);
+        Map<Long, List<PullRequestBadPractice>> badPracticesMap = badPracticeRepository.findByPullRequestIdsAsMap(
+            prIds
+        );
 
-        return pullRequests.stream()
+        return pullRequests
+            .stream()
             .map(pr -> buildPullRequestWithBadPractices(pr, detectionsMap, badPracticesMap))
             .collect(Collectors.toList());
     }
@@ -218,7 +217,10 @@ public class PracticesService {
         Map<Long, List<PullRequestBadPractice>> badPracticesMap
     ) {
         BadPracticeDetection lastDetection = detectionsMap.get(pr.getId());
-        List<PullRequestBadPractice> allBadPractices = badPracticesMap.getOrDefault(pr.getId(), Collections.emptyList());
+        List<PullRequestBadPractice> allBadPractices = badPracticesMap.getOrDefault(
+            pr.getId(),
+            Collections.emptyList()
+        );
         return buildPullRequestWithBadPracticesDTO(pr, lastDetection, allBadPractices);
     }
 

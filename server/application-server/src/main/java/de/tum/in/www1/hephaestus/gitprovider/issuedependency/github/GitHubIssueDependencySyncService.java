@@ -336,10 +336,7 @@ public class GitHubIssueDependencySyncService {
 
             var pageInfo = issueConnection.getPageInfo();
             if (pageInfo == null) {
-                log.debug(
-                    "Received null pageInfo during dependency sync: repoName={}",
-                    safeNameWithOwner
-                );
+                log.debug("Received null pageInfo during dependency sync: repoName={}", safeNameWithOwner);
             }
             hasNextPage = pageInfo != null && Boolean.TRUE.equals(pageInfo.getHasNextPage());
             after = pageInfo != null ? pageInfo.getEndCursor() : null;

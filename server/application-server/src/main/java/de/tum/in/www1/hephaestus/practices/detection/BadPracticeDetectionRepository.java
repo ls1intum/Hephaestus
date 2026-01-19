@@ -79,10 +79,8 @@ public interface BadPracticeDetectionRepository extends JpaRepository<BadPractic
         if (pullRequestIds.isEmpty()) {
             return Map.of();
         }
-        return findMostRecentByPullRequestIds(pullRequestIds).stream()
-            .collect(Collectors.toMap(
-                detection -> detection.getPullRequest().getId(),
-                detection -> detection
-            ));
+        return findMostRecentByPullRequestIds(pullRequestIds)
+            .stream()
+            .collect(Collectors.toMap(detection -> detection.getPullRequest().getId(), detection -> detection));
     }
 }

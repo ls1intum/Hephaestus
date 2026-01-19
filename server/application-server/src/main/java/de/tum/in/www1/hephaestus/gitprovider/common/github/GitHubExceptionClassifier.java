@@ -97,7 +97,7 @@ public class GitHubExceptionClassifier {
         /**
          * Unclassified exception - requires investigation.
          */
-        UNKNOWN
+        UNKNOWN,
     }
 
     /**
@@ -247,10 +247,7 @@ public class GitHubExceptionClassifier {
             switch (type) {
                 case "NOT_FOUND" -> {
                     notFoundCounter.increment();
-                    return ClassificationResult.of(
-                        Category.NOT_FOUND,
-                        "GraphQL NOT_FOUND: " + error.getMessage()
-                    );
+                    return ClassificationResult.of(Category.NOT_FOUND, "GraphQL NOT_FOUND: " + error.getMessage());
                 }
                 case "FORBIDDEN" -> {
                     // Check if it's a rate limit error
@@ -263,17 +260,11 @@ public class GitHubExceptionClassifier {
                         );
                     }
                     authErrorCounter.increment();
-                    return ClassificationResult.of(
-                        Category.AUTH_ERROR,
-                        "GraphQL FORBIDDEN: " + message
-                    );
+                    return ClassificationResult.of(Category.AUTH_ERROR, "GraphQL FORBIDDEN: " + message);
                 }
                 case "UNAUTHORIZED" -> {
                     authErrorCounter.increment();
-                    return ClassificationResult.of(
-                        Category.AUTH_ERROR,
-                        "GraphQL UNAUTHORIZED: " + error.getMessage()
-                    );
+                    return ClassificationResult.of(Category.AUTH_ERROR, "GraphQL UNAUTHORIZED: " + error.getMessage());
                 }
                 default -> {
                     // Continue checking other errors
@@ -283,10 +274,7 @@ public class GitHubExceptionClassifier {
 
         // Default for unrecognized errors
         unknownCounter.increment();
-        return ClassificationResult.of(
-            Category.UNKNOWN,
-            "Unclassified GraphQL error: " + errors.get(0).getMessage()
-        );
+        return ClassificationResult.of(Category.UNKNOWN, "Unclassified GraphQL error: " + errors.get(0).getMessage());
     }
 
     /**
@@ -299,11 +287,12 @@ public class GitHubExceptionClassifier {
 
         // Unwrap common wrapper exceptions
         Throwable cause = e;
-        if (e.getCause() != null && (
-            e instanceof RuntimeException ||
-            e.getClass().getName().contains("CompletionException") ||
-            e.getClass().getName().contains("ExecutionException")
-        )) {
+        if (
+            e.getCause() != null &&
+            (e instanceof RuntimeException ||
+                e.getClass().getName().contains("CompletionException") ||
+                e.getClass().getName().contains("ExecutionException"))
+        ) {
             cause = e.getCause();
         }
 
@@ -319,10 +308,7 @@ public class GitHubExceptionClassifier {
 
         // Check for timeout exceptions
         if (isTimeoutException(cause)) {
-            return ClassificationResult.of(
-                Category.RETRYABLE,
-                "Timeout: " + cause.getMessage()
-            );
+            return ClassificationResult.of(Category.RETRYABLE, "Timeout: " + cause.getMessage());
         }
 
         // Check for network/IO exceptions
@@ -332,10 +318,7 @@ public class GitHubExceptionClassifier {
 
         // Check for IOException (may indicate network issues)
         if (cause instanceof IOException) {
-            return ClassificationResult.of(
-                Category.RETRYABLE,
-                "IO error: " + cause.getMessage()
-            );
+            return ClassificationResult.of(Category.RETRYABLE, "IO error: " + cause.getMessage());
         }
 
         // Default: unknown
@@ -415,20 +398,24 @@ public class GitHubExceptionClassifier {
         }
         // Check for reactor/netty timeout exceptions
         String className = e.getClass().getName();
-        return className.contains("TimeoutException") ||
-               className.contains("ReadTimeoutException") ||
-               className.contains("WriteTimeoutException");
+        return (
+            className.contains("TimeoutException") ||
+            className.contains("ReadTimeoutException") ||
+            className.contains("WriteTimeoutException")
+        );
     }
 
     /**
      * Checks if the exception indicates a network error.
      */
     private boolean isNetworkException(Throwable e) {
-        return e instanceof ConnectException ||
-               e instanceof SocketException ||
-               e instanceof UnknownHostException ||
-               e.getClass().getName().contains("ConnectionException") ||
-               e.getClass().getName().contains("ConnectionReset");
+        return (
+            e instanceof ConnectException ||
+            e instanceof SocketException ||
+            e instanceof UnknownHostException ||
+            e.getClass().getName().contains("ConnectionException") ||
+            e.getClass().getName().contains("ConnectionReset")
+        );
     }
 
     /**
@@ -452,10 +439,12 @@ public class GitHubExceptionClassifier {
         String body = e.getResponseBodyAsString();
         if (body != null) {
             String lowerBody = body.toLowerCase();
-            return lowerBody.contains("rate limit") ||
-                   lowerBody.contains("ratelimit") ||
-                   lowerBody.contains("abuse") ||
-                   lowerBody.contains("secondary rate");
+            return (
+                lowerBody.contains("rate limit") ||
+                lowerBody.contains("ratelimit") ||
+                lowerBody.contains("abuse") ||
+                lowerBody.contains("secondary rate")
+            );
         }
 
         return false;

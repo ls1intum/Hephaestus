@@ -31,12 +31,7 @@ public record EmbeddedCommentsDTO(
         }
 
         List<GitHubCommentDTO> comments = connection.getNodes() != null
-            ? connection
-                  .getNodes()
-                  .stream()
-                  .map(GitHubCommentDTO::fromIssueComment)
-                  .filter(Objects::nonNull)
-                  .toList()
+            ? connection.getNodes().stream().map(GitHubCommentDTO::fromIssueComment).filter(Objects::nonNull).toList()
             : Collections.emptyList();
 
         boolean hasNextPage =

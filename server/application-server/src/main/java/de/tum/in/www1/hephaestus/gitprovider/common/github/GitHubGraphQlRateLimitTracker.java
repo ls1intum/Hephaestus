@@ -241,11 +241,7 @@ public class GitHubGraphQlRateLimitTracker {
 
         if (currentRemaining >= CRITICAL_THRESHOLD) {
             // Low but not critical - just log and continue
-            log.info(
-                "Rate limit low but continuing: remaining={}, threshold={}",
-                currentRemaining,
-                lowThreshold.get()
-            );
+            log.info("Rate limit low but continuing: remaining={}, threshold={}", currentRemaining, lowThreshold.get());
             return false;
         }
 

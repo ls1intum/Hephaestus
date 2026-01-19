@@ -1,8 +1,8 @@
 package de.tum.in.www1.hephaestus.gitprovider.pullrequest.github;
 
 import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
-import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.PR_SYNC_PAGE_SIZE;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.MAX_PAGINATION_PAGES;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.PR_SYNC_PAGE_SIZE;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.exception.InstallationNotFoundException;
@@ -14,13 +14,12 @@ import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientPr
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser.RepositoryOwnerAndName;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncProperties;
-import de.tum.in.www1.hephaestus.monitoring.MonitoringProperties;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.BackfillStateProvider;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHPageInfo;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHPullRequestConnection;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
-import de.tum.in.www1.hephaestus.gitprovider.pullrequest.github.dto.EmbeddedReviewsDTO;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.github.dto.EmbeddedReviewThreadsDTO;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequest.github.dto.EmbeddedReviewsDTO;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.github.dto.GitHubReviewThreadDTO;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.github.dto.PullRequestWithReviewThreads;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.github.GitHubPullRequestReviewProcessor;
@@ -29,6 +28,7 @@ import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.github.dto.GitHub
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.github.GitHubPullRequestReviewCommentSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
+import de.tum.in.www1.hephaestus.monitoring.MonitoringProperties;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.OffsetDateTime;
@@ -230,11 +230,7 @@ public class GitHubPullRequestSyncService {
         if (syncProperties.isIncrementalSyncEnabled()) {
             if (lastSyncTimestamp != null) {
                 effectiveSyncTimestamp = lastSyncTimestamp;
-                log.info(
-                    "Starting incremental PR sync: repoName={}, since={}",
-                    safeNameWithOwner,
-                    lastSyncTimestamp
-                );
+                log.info("Starting incremental PR sync: repoName={}, since={}", safeNameWithOwner, lastSyncTimestamp);
             } else {
                 // First sync - use configured timeframe as fallback to limit initial data fetch
                 effectiveSyncTimestamp = OffsetDateTime.now(ZoneOffset.UTC)
@@ -560,7 +556,9 @@ public class GitHubPullRequestSyncService {
         int reviewCommentsSynced = 0;
 
         for (var graphQlPullRequest : connection.getNodes()) {
-            PullRequestWithReviewThreads prWithReviews = PullRequestWithReviewThreads.fromPullRequest(graphQlPullRequest);
+            PullRequestWithReviewThreads prWithReviews = PullRequestWithReviewThreads.fromPullRequest(
+                graphQlPullRequest
+            );
             if (prWithReviews == null || prWithReviews.pullRequest() == null) {
                 continue;
             }
@@ -582,9 +580,7 @@ public class GitHubPullRequestSyncService {
 
             // Track PRs that need additional review pagination (with cursor for efficient continuation)
             if (embeddedReviews.needsPagination()) {
-                prsNeedingReviewPagination.add(
-                    new PullRequestWithReviewCursor(entity, embeddedReviews.endCursor())
-                );
+                prsNeedingReviewPagination.add(new PullRequestWithReviewCursor(entity, embeddedReviews.endCursor()));
             }
 
             // Process embedded review threads and their comments
@@ -596,9 +592,7 @@ public class GitHubPullRequestSyncService {
 
             // Track PRs that need additional thread pagination (with cursor for efficient continuation)
             if (embeddedThreads.needsPagination()) {
-                prsNeedingThreadPagination.add(
-                    new PullRequestWithThreadCursor(entity, embeddedThreads.endCursor())
-                );
+                prsNeedingThreadPagination.add(new PullRequestWithThreadCursor(entity, embeddedThreads.endCursor()));
             }
         }
 
@@ -613,9 +607,7 @@ public class GitHubPullRequestSyncService {
      * to avoid Spring proxy issues with self-invocation.
      */
     private void persistCursorCheckpoint(Long syncTargetId, String cursor) {
-        TransactionTemplate requiresNewTemplate = new TransactionTemplate(
-            transactionTemplate.getTransactionManager()
-        );
+        TransactionTemplate requiresNewTemplate = new TransactionTemplate(transactionTemplate.getTransactionManager());
         requiresNewTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
         requiresNewTemplate.executeWithoutResult(status -> {
             backfillStateProvider.updatePullRequestSyncCursor(syncTargetId, cursor);
@@ -631,9 +623,7 @@ public class GitHubPullRequestSyncService {
      * to avoid Spring proxy issues with self-invocation.
      */
     private void clearCursorCheckpoint(Long syncTargetId) {
-        TransactionTemplate requiresNewTemplate = new TransactionTemplate(
-            transactionTemplate.getTransactionManager()
-        );
+        TransactionTemplate requiresNewTemplate = new TransactionTemplate(transactionTemplate.getTransactionManager());
         requiresNewTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
         requiresNewTemplate.executeWithoutResult(status -> {
             backfillStateProvider.updatePullRequestSyncCursor(syncTargetId, null);

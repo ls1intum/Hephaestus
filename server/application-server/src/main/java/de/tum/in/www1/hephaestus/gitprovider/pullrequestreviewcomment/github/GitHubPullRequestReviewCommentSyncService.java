@@ -275,11 +275,7 @@ public class GitHubPullRequestReviewCommentSyncService {
      * @param scopeId     the scope ID for authentication (used for nested comment pagination)
      * @return number of comments synced from this thread
      */
-    public int processThread(
-        GitHubReviewThreadDTO threadDto,
-        PullRequest pullRequest,
-        Long scopeId
-    ) {
+    public int processThread(GitHubReviewThreadDTO threadDto, PullRequest pullRequest, Long scopeId) {
         if (threadDto == null) {
             return 0;
         }
@@ -313,7 +309,12 @@ public class GitHubPullRequestReviewCommentSyncService {
         var commentsPageInfo = commentsConnection.getPageInfo();
         if (commentsPageInfo != null && Boolean.TRUE.equals(commentsPageInfo.getHasNextPage())) {
             // Fetch all remaining comments using pagination
-            fetchAllRemainingThreadComments(threadDto.nodeId(), commentsConnection, commentsPageInfo.getEndCursor(), client);
+            fetchAllRemainingThreadComments(
+                threadDto.nodeId(),
+                commentsConnection,
+                commentsPageInfo.getEndCursor(),
+                client
+            );
         }
 
         var graphQlComments = commentsConnection.getNodes();
@@ -591,7 +592,12 @@ public class GitHubPullRequestReviewCommentSyncService {
         var commentsPageInfo = commentsConnection.getPageInfo();
         if (commentsPageInfo != null && Boolean.TRUE.equals(commentsPageInfo.getHasNextPage())) {
             // Fetch all remaining comments using pagination
-            fetchAllRemainingThreadComments(graphQlThread.getId(), commentsConnection, commentsPageInfo.getEndCursor(), client);
+            fetchAllRemainingThreadComments(
+                graphQlThread.getId(),
+                commentsConnection,
+                commentsPageInfo.getEndCursor(),
+                client
+            );
         }
 
         var graphQlComments = commentsConnection.getNodes();
@@ -608,7 +614,12 @@ public class GitHubPullRequestReviewCommentSyncService {
         }
 
         // Create or update the thread, passing the first comment to set timestamps
-        PullRequestReviewThread thread = getOrCreateThreadFromGraphQl(threadId, graphQlThread, pullRequest, firstComment);
+        PullRequestReviewThread thread = getOrCreateThreadFromGraphQl(
+            threadId,
+            graphQlThread,
+            pullRequest,
+            firstComment
+        );
 
         int synced = 0;
         PullRequestReviewComment rootComment = null;

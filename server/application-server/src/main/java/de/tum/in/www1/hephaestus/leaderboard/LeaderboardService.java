@@ -358,13 +358,18 @@ public class LeaderboardService {
         Long workspaceId = workspace.getId();
 
         // Batch fetch all team settings to avoid N+1 queries
-        Set<Long> allTeamIds = sorted.stream()
+        Set<Long> allTeamIds = sorted
+            .stream()
             .map(entry -> entry.getKey().getId())
             .collect(Collectors.toSet());
-        Map<Long, Set<Label>> labelFiltersByTeam =
-            workspaceTeamSettingsService.getTeamLabelFiltersForTeams(workspaceId, allTeamIds);
-        Map<Long, Set<Long>> hiddenRepoIdsByTeam =
-            workspaceTeamSettingsService.getHiddenRepositoryIdsByTeamsMap(workspaceId, allTeamIds);
+        Map<Long, Set<Label>> labelFiltersByTeam = workspaceTeamSettingsService.getTeamLabelFiltersForTeams(
+            workspaceId,
+            allTeamIds
+        );
+        Map<Long, Set<Long>> hiddenRepoIdsByTeam = workspaceTeamSettingsService.getHiddenRepositoryIdsByTeamsMap(
+            workspaceId,
+            allTeamIds
+        );
 
         for (int i = 0; i < sorted.size(); i++) {
             Team teamEntity = sorted.get(i).getKey();

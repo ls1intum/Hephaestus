@@ -418,8 +418,9 @@ class GitHubExceptionClassifierTest {
 
             classifier.classify(exception);
 
-            assertThat(meterRegistry.counter("github.sync.errors.total", "category", "retryable").count())
-                .isEqualTo(1.0);
+            assertThat(meterRegistry.counter("github.sync.errors.total", "category", "retryable").count()).isEqualTo(
+                1.0
+            );
         }
 
         @Test
@@ -429,8 +430,9 @@ class GitHubExceptionClassifierTest {
 
             classifier.classify(exception);
 
-            assertThat(meterRegistry.counter("github.sync.errors.total", "category", "rate_limited").count())
-                .isEqualTo(1.0);
+            assertThat(meterRegistry.counter("github.sync.errors.total", "category", "rate_limited").count()).isEqualTo(
+                1.0
+            );
         }
 
         @Test
@@ -440,8 +442,9 @@ class GitHubExceptionClassifierTest {
 
             classifier.classify(exception);
 
-            assertThat(meterRegistry.counter("github.sync.errors.total", "category", "not_found").count())
-                .isEqualTo(1.0);
+            assertThat(meterRegistry.counter("github.sync.errors.total", "category", "not_found").count()).isEqualTo(
+                1.0
+            );
         }
 
         @Test
@@ -451,8 +454,9 @@ class GitHubExceptionClassifierTest {
 
             classifier.classify(exception);
 
-            assertThat(meterRegistry.counter("github.sync.errors.total", "category", "auth_error").count())
-                .isEqualTo(1.0);
+            assertThat(meterRegistry.counter("github.sync.errors.total", "category", "auth_error").count()).isEqualTo(
+                1.0
+            );
         }
 
         @Test
@@ -462,8 +466,9 @@ class GitHubExceptionClassifierTest {
 
             classifier.classify(exception);
 
-            assertThat(meterRegistry.counter("github.sync.errors.total", "category", "client_error").count())
-                .isEqualTo(1.0);
+            assertThat(meterRegistry.counter("github.sync.errors.total", "category", "client_error").count()).isEqualTo(
+                1.0
+            );
         }
 
         @Test
@@ -473,21 +478,14 @@ class GitHubExceptionClassifierTest {
 
             classifier.classify(exception);
 
-            assertThat(meterRegistry.counter("github.sync.errors.total", "category", "unknown").count())
-                .isEqualTo(1.0);
+            assertThat(meterRegistry.counter("github.sync.errors.total", "category", "unknown").count()).isEqualTo(1.0);
         }
     }
 
     // Helper methods for creating test exceptions
 
     private WebClientResponseException createWebClientResponseException(int statusCode, String statusText) {
-        return WebClientResponseException.create(
-            statusCode,
-            statusText,
-            HttpHeaders.EMPTY,
-            new byte[0],
-            null
-        );
+        return WebClientResponseException.create(statusCode, statusText, HttpHeaders.EMPTY, new byte[0], null);
     }
 
     private WebClientResponseException createWebClientResponseExceptionWithBody(
@@ -495,13 +493,7 @@ class GitHubExceptionClassifierTest {
         String statusText,
         String body
     ) {
-        return WebClientResponseException.create(
-            statusCode,
-            statusText,
-            HttpHeaders.EMPTY,
-            body.getBytes(),
-            null
-        );
+        return WebClientResponseException.create(statusCode, statusText, HttpHeaders.EMPTY, body.getBytes(), null);
     }
 
     private WebClientResponseException createWebClientResponseExceptionWithHeaders(
@@ -509,12 +501,6 @@ class GitHubExceptionClassifierTest {
         String statusText,
         HttpHeaders headers
     ) {
-        return WebClientResponseException.create(
-            statusCode,
-            statusText,
-            headers,
-            new byte[0],
-            null
-        );
+        return WebClientResponseException.create(statusCode, statusText, headers, new byte[0], null);
     }
 }

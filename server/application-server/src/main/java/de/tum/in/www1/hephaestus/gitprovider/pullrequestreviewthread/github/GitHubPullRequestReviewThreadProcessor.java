@@ -64,12 +64,11 @@ public class GitHubPullRequestReviewThreadProcessor {
                 }
                 thread = threadRepository.save(thread);
                 if (context != null) {
-                    EventPayload.ReviewThreadData.from(thread)
-                        .ifPresent(threadData ->
-                            eventPublisher.publishEvent(
-                                new DomainEvent.ReviewThreadResolved(threadData, EventContext.from(context))
-                            )
-                        );
+                    EventPayload.ReviewThreadData.from(thread).ifPresent(threadData ->
+                        eventPublisher.publishEvent(
+                            new DomainEvent.ReviewThreadResolved(threadData, EventContext.from(context))
+                        )
+                    );
                 }
                 log.info(
                     "Resolved thread: threadId={}, resolvedByLogin={}",
@@ -106,12 +105,11 @@ public class GitHubPullRequestReviewThreadProcessor {
                 thread.setResolvedBy(null);
                 thread = threadRepository.save(thread);
                 if (context != null) {
-                    EventPayload.ReviewThreadData.from(thread)
-                        .ifPresent(threadData ->
-                            eventPublisher.publishEvent(
-                                new DomainEvent.ReviewThreadUnresolved(threadData, EventContext.from(context))
-                            )
-                        );
+                    EventPayload.ReviewThreadData.from(thread).ifPresent(threadData ->
+                        eventPublisher.publishEvent(
+                            new DomainEvent.ReviewThreadUnresolved(threadData, EventContext.from(context))
+                        )
+                    );
                 }
                 log.info("Unresolved thread: threadId={}", threadId);
                 return true;

@@ -20,7 +20,6 @@ import org.springframework.lang.Nullable;
  * by event consumers without carrying the JPA entity.
  */
 public record RepositoryRef(@NonNull Long id, @NonNull String nameWithOwner, @NonNull String defaultBranch) {
-
     private static final Logger log = LoggerFactory.getLogger(RepositoryRef.class);
 
     /**

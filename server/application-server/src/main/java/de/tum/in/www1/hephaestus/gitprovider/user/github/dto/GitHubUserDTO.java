@@ -60,7 +60,24 @@ public record GitHubUserDTO(
         String name,
         String email
     ) {
-        this(id, databaseId, login, avatarUrl, htmlUrl, name, email, null, null, null, null, null, null, null, null, User.Type.USER);
+        this(
+            id,
+            databaseId,
+            login,
+            avatarUrl,
+            htmlUrl,
+            name,
+            email,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            User.Type.USER
+        );
     }
 
     /**
@@ -76,7 +93,24 @@ public record GitHubUserDTO(
         String email,
         User.Type type
     ) {
-        this(id, databaseId, login, avatarUrl, htmlUrl, name, email, null, null, null, null, null, null, null, null, type);
+        this(
+            id,
+            databaseId,
+            login,
+            avatarUrl,
+            htmlUrl,
+            name,
+            email,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            type
+        );
     }
 
     /**

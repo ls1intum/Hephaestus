@@ -115,13 +115,14 @@ public class GitHubOrganizationSyncService {
 
             // Check if we should pause due to rate limiting
             if (graphQlClientProvider.isRateLimitCritical()) {
-                log.warn("Aborting organization sync due to critical rate limit: orgLogin={}", sanitizeForLog(organizationLogin));
+                log.warn(
+                    "Aborting organization sync due to critical rate limit: orgLogin={}",
+                    sanitizeForLog(organizationLogin)
+                );
                 return null;
             }
 
-            GHOrganization graphQlOrg = graphQlResponse
-                .field("organization")
-                .toEntity(GHOrganization.class);
+            GHOrganization graphQlOrg = graphQlResponse.field("organization").toEntity(GHOrganization.class);
 
             if (graphQlOrg == null) {
                 log.warn("Skipped organization sync: reason=notFound, orgLogin={}", sanitizeForLog(organizationLogin));

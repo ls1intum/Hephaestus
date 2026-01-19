@@ -81,9 +81,8 @@ public interface PullRequestBadPracticeRepository extends JpaRepository<PullRequ
         if (pullRequestIds.isEmpty()) {
             return Map.of();
         }
-        return findByPullRequestIds(pullRequestIds).stream()
-            .collect(Collectors.groupingBy(
-                badPractice -> badPractice.getPullRequest().getId()
-            ));
+        return findByPullRequestIds(pullRequestIds)
+            .stream()
+            .collect(Collectors.groupingBy(badPractice -> badPractice.getPullRequest().getId()));
     }
 }

@@ -66,5 +66,4 @@ public final class GitHubSyncConstants {
      * If this limit is reached, a warning is logged and the loop exits gracefully.
      */
     public static final int MAX_PAGINATION_PAGES = 1000;
-
 }

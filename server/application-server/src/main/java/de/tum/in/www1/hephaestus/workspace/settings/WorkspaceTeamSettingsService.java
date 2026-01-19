@@ -331,15 +331,19 @@ public class WorkspaceTeamSettingsService {
             return Map.of();
         }
 
-        List<WorkspaceTeamLabelFilter> filters =
-            labelFilterRepository.findByWorkspaceIdAndTeamIds(workspaceId, teamIds);
-
-        return filters.stream().collect(
-            Collectors.groupingBy(
-                filter -> filter.getTeam().getId(),
-                Collectors.mapping(WorkspaceTeamLabelFilter::getLabel, Collectors.toSet())
-            )
+        List<WorkspaceTeamLabelFilter> filters = labelFilterRepository.findByWorkspaceIdAndTeamIds(
+            workspaceId,
+            teamIds
         );
+
+        return filters
+            .stream()
+            .collect(
+                Collectors.groupingBy(
+                    filter -> filter.getTeam().getId(),
+                    Collectors.mapping(WorkspaceTeamLabelFilter::getLabel, Collectors.toSet())
+                )
+            );
     }
 
     /**

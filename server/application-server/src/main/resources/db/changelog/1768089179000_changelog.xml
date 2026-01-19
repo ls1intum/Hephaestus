@@ -1991,4 +1991,26 @@
         <dropTable tableName="dead_letter_event"/>
     </changeSet>
 
+    <!-- ==================== SECTION 35: Fix Bot User Types ==================== -->
+    <!--
+        Fix misclassified bot users.
+
+        Bot accounts (e.g., github-actions[bot], dependabot[bot], coderabbitai[bot])
+        were incorrectly stored with type 'USER' instead of 'BOT' due to a bug
+        where the type information from GraphQL responses was not being propagated
+        to the user creation logic.
+
+        This migration identifies bot accounts by their login pattern (ending in [bot])
+        and updates their type to 'BOT'.
+    -->
+    <changeSet id="1768773474000-fix-bot-user-types" author="system">
+        <comment>Update misclassified bot users to have type BOT</comment>
+        <sql>
+            UPDATE "user"
+            SET type = 'BOT'
+            WHERE login LIKE '%[bot]'
+            AND type != 'BOT';
+        </sql>
+    </changeSet>
+
 </databaseChangeLog>

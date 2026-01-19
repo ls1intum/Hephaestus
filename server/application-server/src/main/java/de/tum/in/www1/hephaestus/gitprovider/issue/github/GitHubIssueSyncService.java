@@ -14,7 +14,6 @@ import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientPr
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser.RepositoryOwnerAndName;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncProperties;
-import de.tum.in.www1.hephaestus.monitoring.MonitoringProperties;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.BackfillStateProvider;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHIssueConnection;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHPageInfo;
@@ -26,6 +25,7 @@ import de.tum.in.www1.hephaestus.gitprovider.issuecomment.github.GitHubIssueComm
 import de.tum.in.www1.hephaestus.gitprovider.issuecomment.github.dto.GitHubIssueCommentEventDTO.GitHubCommentDTO;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
+import de.tum.in.www1.hephaestus.monitoring.MonitoringProperties;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.OffsetDateTime;
@@ -203,11 +203,7 @@ public class GitHubIssueSyncService {
         if (syncProperties.isIncrementalSyncEnabled()) {
             if (lastSyncTimestamp != null) {
                 sinceDateTime = lastSyncTimestamp.atOffset(ZoneOffset.UTC);
-                log.info(
-                    "Starting incremental issue sync: repoName={}, since={}",
-                    safeNameWithOwner,
-                    sinceDateTime
-                );
+                log.info("Starting incremental issue sync: repoName={}, since={}", safeNameWithOwner, sinceDateTime);
             } else {
                 // First sync - use configured timeframe as fallback to limit initial data fetch
                 sinceDateTime = OffsetDateTime.now(ZoneOffset.UTC).minusDays(monitoringProperties.getTimeframe());
@@ -375,7 +371,10 @@ public class GitHubIssueSyncService {
                                 Thread.sleep(waitMs);
                             } catch (InterruptedException ie) {
                                 Thread.currentThread().interrupt();
-                                log.warn("Issue sync interrupted during rate limit wait: repoName={}", safeNameWithOwner);
+                                log.warn(
+                                    "Issue sync interrupted during rate limit wait: repoName={}",
+                                    safeNameWithOwner
+                                );
                                 break;
                             }
                             continue; // Retry the same page
@@ -505,9 +504,7 @@ public class GitHubIssueSyncService {
 
             // Track issues that need additional comment pagination (with cursor for efficient continuation)
             if (embeddedComments.needsPagination()) {
-                issuesNeedingPagination.add(
-                    new IssueWithCommentCursor(entity, embeddedComments.endCursor())
-                );
+                issuesNeedingPagination.add(new IssueWithCommentCursor(entity, embeddedComments.endCursor()));
             }
         }
 
@@ -522,9 +519,7 @@ public class GitHubIssueSyncService {
      * to avoid Spring proxy issues with self-invocation.
      */
     private void persistCursorCheckpoint(Long syncTargetId, String cursor) {
-        TransactionTemplate requiresNewTemplate = new TransactionTemplate(
-            transactionTemplate.getTransactionManager()
-        );
+        TransactionTemplate requiresNewTemplate = new TransactionTemplate(transactionTemplate.getTransactionManager());
         requiresNewTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
         requiresNewTemplate.executeWithoutResult(status -> {
             backfillStateProvider.updateIssueSyncCursor(syncTargetId, cursor);
@@ -540,9 +535,7 @@ public class GitHubIssueSyncService {
      * to avoid Spring proxy issues with self-invocation.
      */
     private void clearCursorCheckpoint(Long syncTargetId) {
-        TransactionTemplate requiresNewTemplate = new TransactionTemplate(
-            transactionTemplate.getTransactionManager()
-        );
+        TransactionTemplate requiresNewTemplate = new TransactionTemplate(transactionTemplate.getTransactionManager());
         requiresNewTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
         requiresNewTemplate.executeWithoutResult(status -> {
             backfillStateProvider.updateIssueSyncCursor(syncTargetId, null);

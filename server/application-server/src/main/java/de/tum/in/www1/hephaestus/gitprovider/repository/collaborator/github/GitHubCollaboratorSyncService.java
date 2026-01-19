@@ -9,8 +9,8 @@ import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassi
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier.ClassificationResult;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser;
-import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncProperties;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser.RepositoryOwnerAndName;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncProperties;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHRepositoryCollaboratorConnection;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHRepositoryCollaboratorEdge;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHRepositoryPermission;
@@ -134,10 +134,7 @@ public class GitHubCollaboratorSyncService {
 
                 // Check if we should pause due to rate limiting
                 if (graphQlClientProvider.isRateLimitCritical()) {
-                    log.warn(
-                        "Aborting collaborator sync due to critical rate limit: repoName={}",
-                        safeNameWithOwner
-                    );
+                    log.warn("Aborting collaborator sync due to critical rate limit: repoName={}", safeNameWithOwner);
                     break;
                 }
 

@@ -10,8 +10,8 @@ import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassi
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier.ClassificationResult;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser;
-import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncProperties;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser.RepositoryOwnerAndName;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncProperties;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHLabelConnection;
 import de.tum.in.www1.hephaestus.gitprovider.label.Label;
 import de.tum.in.www1.hephaestus.gitprovider.label.LabelRepository;
@@ -132,10 +132,7 @@ public class GitHubLabelSyncService {
 
                 // Check if we should pause due to rate limiting
                 if (graphQlClientProvider.isRateLimitCritical()) {
-                    log.warn(
-                        "Aborting label sync due to critical rate limit: repoName={}",
-                        safeNameWithOwner
-                    );
+                    log.warn("Aborting label sync due to critical rate limit: repoName={}", safeNameWithOwner);
                     break;
                 }
 

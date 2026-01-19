@@ -256,10 +256,7 @@ public class GitHubPullRequestReviewSyncService {
                 hasMore = pageInfo != null && Boolean.TRUE.equals(pageInfo.getHasNextPage());
                 cursor = pageInfo != null ? pageInfo.getEndCursor() : null;
             } catch (InstallationNotFoundException e) {
-                log.warn(
-                    "Installation not found for repository {}, skipping review sync",
-                    safeNameWithOwner
-                );
+                log.warn("Installation not found for repository {}, skipping review sync", safeNameWithOwner);
                 return 0;
             } catch (FieldAccessException e) {
                 // Check if this is a NOT_FOUND error (PR deleted from GitHub)

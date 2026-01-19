@@ -219,10 +219,7 @@ public final class EventPayload {
         public static Optional<ReviewData> from(PullRequestReview review) {
             PullRequest pr = review.getPullRequest();
             if (pr == null) {
-                log.debug(
-                    "Cannot create ReviewData: pullRequest is null for reviewId={}",
-                    review.getId()
-                );
+                log.debug("Cannot create ReviewData: pullRequest is null for reviewId={}", review.getId());
                 return Optional.empty();
             }
             return Optional.of(
@@ -290,20 +287,11 @@ public final class EventPayload {
         public static Optional<ReviewThreadData> from(PullRequestReviewThread thread) {
             PullRequest pr = thread.getPullRequest();
             if (pr == null) {
-                log.debug(
-                    "Cannot create ReviewThreadData: pullRequest is null for threadId={}",
-                    thread.getId()
-                );
+                log.debug("Cannot create ReviewThreadData: pullRequest is null for threadId={}", thread.getId());
                 return Optional.empty();
             }
             return Optional.of(
-                new ReviewThreadData(
-                    thread.getId(),
-                    thread.getState(),
-                    thread.getPath(),
-                    thread.getLine(),
-                    pr.getId()
-                )
+                new ReviewThreadData(thread.getId(), thread.getState(), thread.getPath(), thread.getLine(), pr.getId())
             );
         }
     }

@@ -33,11 +33,11 @@ public record EmbeddedReviewThreadsDTO(
 
         List<GitHubReviewThreadDTO> threads = connection.getNodes() != null
             ? connection
-                .getNodes()
-                .stream()
-                .map(GitHubReviewThreadDTO::fromReviewThread)
-                .filter(Objects::nonNull)
-                .toList()
+                  .getNodes()
+                  .stream()
+                  .map(GitHubReviewThreadDTO::fromReviewThread)
+                  .filter(Objects::nonNull)
+                  .toList()
             : Collections.emptyList();
 
         boolean hasNextPage =

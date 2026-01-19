@@ -77,12 +77,11 @@ public class GitHubPullRequestReviewProcessor extends BaseGitHubProcessor {
                 review.setDismissed(true);
                 review = reviewRepository.save(review);
                 if (context != null) {
-                    EventPayload.ReviewData.from(review)
-                        .ifPresent(reviewData ->
-                            eventPublisher.publishEvent(
-                                new DomainEvent.ReviewDismissed(reviewData, EventContext.from(context))
-                            )
-                        );
+                    EventPayload.ReviewData.from(review).ifPresent(reviewData ->
+                        eventPublisher.publishEvent(
+                            new DomainEvent.ReviewDismissed(reviewData, EventContext.from(context))
+                        )
+                    );
                 }
                 log.debug("Dismissed review: reviewId={}", reviewId);
             });
@@ -100,16 +99,11 @@ public class GitHubPullRequestReviewProcessor extends BaseGitHubProcessor {
         }
         PullRequestReview saved = reviewRepository.save(review);
         if (context != null) {
-            EventPayload.ReviewData.from(saved)
-                .ifPresent(reviewData ->
-                    eventPublisher.publishEvent(
-                        new DomainEvent.ReviewEdited(
-                            reviewData,
-                            Set.of("body", "state"),
-                            EventContext.from(context)
-                        )
-                    )
-                );
+            EventPayload.ReviewData.from(saved).ifPresent(reviewData ->
+                eventPublisher.publishEvent(
+                    new DomainEvent.ReviewEdited(reviewData, Set.of("body", "state"), EventContext.from(context))
+                )
+            );
         }
         log.debug("Updated review: reviewId={}", dto.id());
         return saved;
@@ -139,12 +133,9 @@ public class GitHubPullRequestReviewProcessor extends BaseGitHubProcessor {
 
         PullRequestReview saved = reviewRepository.save(review);
         if (context != null) {
-            EventPayload.ReviewData.from(saved)
-                .ifPresent(reviewData ->
-                    eventPublisher.publishEvent(
-                        new DomainEvent.ReviewSubmitted(reviewData, EventContext.from(context))
-                    )
-                );
+            EventPayload.ReviewData.from(saved).ifPresent(reviewData ->
+                eventPublisher.publishEvent(new DomainEvent.ReviewSubmitted(reviewData, EventContext.from(context)))
+            );
         }
         log.debug("Created review: reviewId={}", dto.id());
         return saved;
