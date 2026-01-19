@@ -282,13 +282,13 @@ public class GitHubDataSyncService {
     /**
      * Syncs all repositories for a scope using GraphQL.
      * <p>
-     * This method orchestrates:
+     * This method orchestrates the sync in the correct order:
      * <ol>
-     *   <li>Organization sync (if organization exists)</li>
-     *   <li>Team sync (if organization exists)</li>
-     *   <li>Per-repository syncs (labels, milestones, issues, PRs, comments)</li>
-     *   <li>Scope-level issue dependencies sync</li>
-     *   <li>Scope-level sub-issues sync</li>
+     *   <li>Organization + memberships (users must exist first)</li>
+     *   <li>Per-repository syncs (creates repository records)</li>
+     *   <li>Teams + team repository permissions (requires repos to exist)</li>
+     *   <li>Issue dependencies (requires issues to exist)</li>
+     *   <li>Sub-issues (requires issues to exist)</li>
      * </ol>
      *
      * @param scopeId the scope ID
@@ -309,15 +309,18 @@ public class GitHubDataSyncService {
         log.info("Starting scope sync: scopeId={}, repoCount={}", scopeId, syncTargets.size());
 
         try {
-            // Sync organization and teams first (if applicable)
-            syncOrganizationAndTeams(scopeId);
+            // Sync organization and memberships first (users need to exist for later syncs)
+            syncOrganizationAndMemberships(scopeId);
 
-            // Sync each repository
+            // Sync each repository (creates repository records)
             for (SyncTarget target : syncTargets) {
                 if (shouldSync(target)) {
                     syncSyncTarget(target);
                 }
             }
+
+            // Sync teams AFTER repositories exist (team repo permissions need repos to exist)
+            syncTeams(scopeId);
 
             // Sync scope-level relationships (after all issues/PRs are synced)
             syncScopeLevelRelationships(scopeId);
@@ -331,15 +334,15 @@ public class GitHubDataSyncService {
     }
 
     /**
-     * Syncs organization and teams for a scope.
+     * Syncs organization information and memberships for a scope.
      * <p>
-     * Organization sync includes memberships.
-     * Team sync includes team memberships.
-     * After org sync, scope members are synced from organization members.
+     * This must run BEFORE repositories are synced so users exist for later syncs.
+     * Teams are synced separately via {@link #syncTeams(Long)} AFTER repositories
+     * exist, because team repository permissions need repository records.
      *
      * @param scopeId the scope ID
      */
-    private void syncOrganizationAndTeams(Long scopeId) {
+    private void syncOrganizationAndMemberships(Long scopeId) {
         Optional<SyncMetadata> metadataOpt = syncTargetProvider.getSyncMetadata(scopeId);
         if (metadataOpt.isEmpty()) {
             log.debug("Skipped organization sync: reason=noMetadata, scopeId={}", scopeId);
@@ -367,12 +370,7 @@ public class GitHubDataSyncService {
                     new OrganizationSyncedEvent(organization.getId(), organizationLogin)
                 );
             }
-
-            // Sync teams and team memberships
-            int teamsCount = teamSyncService.syncTeamsForOrganization(scopeId, organizationLogin);
-            log.debug("Synced teams: scopeId={}, orgLogin={}, teamCount={}", scopeId, safeOrgLogin, teamsCount);
         } catch (InstallationNotFoundException e) {
-            // Re-throw to abort the entire sync operation
             throw e;
         } catch (Exception e) {
             ClassificationResult classification = exceptionClassifier.classifyWithDetails(e);
@@ -390,7 +388,63 @@ public class GitHubDataSyncService {
                     classification.message()
                 );
                 default -> log.error(
-                    "Failed to sync organization and teams: scopeId={}, orgLogin={}, error={}",
+                    "Failed to sync organization: scopeId={}, orgLogin={}, error={}",
+                    scopeId,
+                    safeOrgLogin,
+                    classification.message(),
+                    e
+                );
+            }
+        }
+    }
+
+    /**
+     * Syncs teams, team memberships, and team repository permissions for a scope.
+     * <p>
+     * This must run AFTER repositories are synced because team repository
+     * permissions require repository records to exist in the database.
+     *
+     * @param scopeId the scope ID
+     */
+    private void syncTeams(Long scopeId) {
+        Optional<SyncMetadata> metadataOpt = syncTargetProvider.getSyncMetadata(scopeId);
+        if (metadataOpt.isEmpty()) {
+            log.debug("Skipped team sync: reason=noMetadata, scopeId={}", scopeId);
+            return;
+        }
+
+        SyncMetadata metadata = metadataOpt.get();
+        String organizationLogin = metadata.organizationLogin();
+
+        if (organizationLogin == null || organizationLogin.isBlank()) {
+            log.debug("Skipped team sync: reason=noOrgLogin, scopeId={}", scopeId);
+            return;
+        }
+
+        String safeOrgLogin = sanitizeForLog(organizationLogin);
+
+        try {
+            int teamsCount = teamSyncService.syncTeamsForOrganization(scopeId, organizationLogin);
+            log.debug("Synced teams: scopeId={}, orgLogin={}, teamCount={}", scopeId, safeOrgLogin, teamsCount);
+        } catch (InstallationNotFoundException e) {
+            throw e;
+        } catch (Exception e) {
+            ClassificationResult classification = exceptionClassifier.classifyWithDetails(e);
+            switch (classification.category()) {
+                case AUTH_ERROR -> log.error(
+                    "Team sync failed - auth error: scopeId={}, orgLogin={}, error={}",
+                    scopeId,
+                    safeOrgLogin,
+                    classification.message()
+                );
+                case RATE_LIMITED -> log.warn(
+                    "Team sync failed - rate limited: scopeId={}, orgLogin={}, error={}",
+                    scopeId,
+                    safeOrgLogin,
+                    classification.message()
+                );
+                default -> log.error(
+                    "Failed to sync teams: scopeId={}, orgLogin={}, error={}",
                     scopeId,
                     safeOrgLogin,
                     classification.message(),
