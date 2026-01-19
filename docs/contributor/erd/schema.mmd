@@ -19,15 +19,8 @@ erDiagram
         BIGINT repository_id FK
         VARCHAR(32) target_type
         BIGINT target_id
-        VARCHAR(32) source_system "NOT NULL"
-        UUID correlation_id
         DOUBLE xp "NOT NULL"
-        JSONB payload
         TIMESTAMPTZ ingested_at "NOT NULL"
-        INTEGER schema_version "NOT NULL"
-        VARCHAR(64) trigger_context
-        VARCHAR(64) content_hash
-        INTEGER formula_version "NOT NULL"
     }
 
     BadPracticeDetection {
@@ -320,6 +313,8 @@ erDiagram
         INTEGER backfill_high_water_mark
         TIMESTAMPTZ backfill_last_run_at
         TIMESTAMPTZ collaborators_synced_at
+        VARCHAR(255) issue_sync_cursor
+        VARCHAR(255) pull_request_sync_cursor
     }
 
     Team {

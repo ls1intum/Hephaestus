@@ -108,49 +108,11 @@ export type CreateWorkspaceRequest = {
     workspaceSlug: string;
 };
 
-export type DeadLetterDetail = {
-    createdAt?: Date;
-    errorMessage?: string;
-    errorType?: string;
-    eventType?: 'pull_request.opened' | 'pull_request.merged' | 'pull_request.closed' | 'pull_request.reopened' | 'pull_request.ready' | 'review.approved' | 'review.changes_requested' | 'review.commented' | 'review.unknown' | 'review.dismissed' | 'review.edited' | 'comment.created' | 'review_comment.created' | 'issue.created' | 'issue.closed';
-    id?: string;
-    resolvedAt?: Date;
-    retryCount?: number;
-    sourceSystem?: string;
-    status?: 'PENDING' | 'RESOLVED' | 'DISCARDED';
-    targetId?: number;
-    targetType?: string;
-    workspaceId?: number;
-    xp?: number;
-};
-
-export type DeadLetterStats = {
-    byEventType?: {
-        [key: string]: number;
-    };
-    discarded?: number;
-    pending?: number;
-    resolved?: number;
-};
-
-export type DeadLetterSummary = {
-    createdAt?: Date;
-    errorType?: string;
-    eventType?: 'pull_request.opened' | 'pull_request.merged' | 'pull_request.closed' | 'pull_request.reopened' | 'pull_request.ready' | 'review.approved' | 'review.changes_requested' | 'review.commented' | 'review.unknown' | 'review.dismissed' | 'review.edited' | 'comment.created' | 'review_comment.created' | 'issue.created' | 'issue.closed';
-    id?: string;
-    retryCount?: number;
-    targetId?: number;
-};
-
 /**
  * Response for detection operations
  */
 export type DetectionResult = {
     result?: 'BAD_PRACTICES_DETECTED' | 'NO_BAD_PRACTICES_DETECTED' | 'ERROR_NO_UPDATE_ON_PULLREQUEST';
-};
-
-export type DiscardReason = {
-    reason: string;
 };
 
 export type Document = {
@@ -575,11 +537,6 @@ export type RepositoryInfo = {
      * Full name including owner (e.g., 'owner/repo')
      */
     nameWithOwner: string;
-};
-
-export type RetryResult = {
-    message?: string;
-    success?: boolean;
 };
 
 export type StreamPart = {
@@ -1041,117 +998,6 @@ export type WorkspaceTeamSettings = {
      */
     workspaceId: number;
 };
-
-export type GetPendingData = {
-    body?: never;
-    path?: never;
-    query?: {
-        limit?: number;
-    };
-    url: '/api/admin/dead-letters/pending';
-};
-
-export type GetPendingResponses = {
-    /**
-     * List of pending dead letters
-     */
-    200: Array<DeadLetterSummary>;
-};
-
-export type GetPendingResponse = GetPendingResponses[keyof GetPendingResponses];
-
-export type GetStatsData = {
-    body?: never;
-    path?: never;
-    query?: never;
-    url: '/api/admin/dead-letters/stats';
-};
-
-export type GetStatsResponses = {
-    /**
-     * Statistics
-     */
-    200: DeadLetterStats;
-};
-
-export type GetStatsResponse = GetStatsResponses[keyof GetStatsResponses];
-
-export type GetByIdData = {
-    body?: never;
-    path: {
-        id: string;
-    };
-    query?: never;
-    url: '/api/admin/dead-letters/{id}';
-};
-
-export type GetByIdErrors = {
-    /**
-     * Dead letter not found
-     */
-    404: DeadLetterDetail;
-};
-
-export type GetByIdError = GetByIdErrors[keyof GetByIdErrors];
-
-export type GetByIdResponses = {
-    /**
-     * Dead letter details
-     */
-    200: DeadLetterDetail;
-};
-
-export type GetByIdResponse = GetByIdResponses[keyof GetByIdResponses];
-
-export type DiscardData = {
-    body: DiscardReason;
-    path: {
-        id: string;
-    };
-    query?: never;
-    url: '/api/admin/dead-letters/{id}/discard';
-};
-
-export type DiscardErrors = {
-    /**
-     * Dead letter not found
-     */
-    404: unknown;
-};
-
-export type DiscardResponses = {
-    /**
-     * Dead letter discarded
-     */
-    200: unknown;
-};
-
-export type RetryData = {
-    body?: never;
-    path: {
-        id: string;
-    };
-    query?: never;
-    url: '/api/admin/dead-letters/{id}/retry';
-};
-
-export type RetryErrors = {
-    /**
-     * Dead letter not found
-     */
-    404: RetryResult;
-};
-
-export type RetryError = RetryErrors[keyof RetryErrors];
-
-export type RetryResponses = {
-    /**
-     * Retry result
-     */
-    200: RetryResult;
-};
-
-export type RetryResponse = RetryResponses[keyof RetryResponses];
 
 export type ListGlobalContributorsData = {
     body?: never;

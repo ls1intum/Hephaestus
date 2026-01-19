@@ -92,6 +92,12 @@ export const activityEvent = pgTable(
 			table.workspaceId.asc().nullsLast(),
 			table.occurredAt.asc().nullsLast(),
 		),
+		index("idx_activity_event_xp_lookup").using(
+			"btree",
+			table.workspaceId.asc().nullsLast(),
+			table.targetType.asc().nullsLast(),
+			table.targetId.asc().nullsLast(),
+		),
 		foreignKey({
 			columns: [table.workspaceId],
 			foreignColumns: [workspace.id],
@@ -920,6 +926,8 @@ export const repositoryToMonitor = pgTable(
 			withTimezone: true,
 			mode: "string",
 		}),
+		issueSyncCursor: varchar("issue_sync_cursor", { length: 255 }),
+		pullRequestSyncCursor: varchar("pull_request_sync_cursor", { length: 255 }),
 	},
 	(table) => [
 		foreignKey({
