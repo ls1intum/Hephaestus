@@ -9,3 +9,4 @@ storybook-static
 
 # Test results (CI)
 test-results/
+/public/manifest-dev.json
