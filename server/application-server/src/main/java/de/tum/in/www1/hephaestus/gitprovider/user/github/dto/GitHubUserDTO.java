@@ -11,6 +11,7 @@ import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHEnterpriseUs
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHMannequin;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHOrganization;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHUser;
+import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import java.time.Instant;
 import org.springframework.lang.Nullable;
 
@@ -42,11 +43,13 @@ public record GitHubUserDTO(
     @JsonProperty("following") Integer following,
     // Timestamp fields - populated from full user fetch via GraphQL
     @JsonProperty("created_at") Instant createdAt,
-    @JsonProperty("updated_at") Instant updatedAt
+    @JsonProperty("updated_at") Instant updatedAt,
+    // User type - determined from GitHub API type field or GraphQL __typename
+    @JsonProperty("type") User.Type type
 ) {
     /**
-     * Compact constructor for backward compatibility with minimal user references.
-     * Profile fields default to null.
+     * Compact constructor for minimal user references.
+     * Profile fields default to null, type defaults to USER.
      */
     public GitHubUserDTO(
         Long id,
@@ -57,7 +60,23 @@ public record GitHubUserDTO(
         String name,
         String email
     ) {
-        this(id, databaseId, login, avatarUrl, htmlUrl, name, email, null, null, null, null, null, null, null, null);
+        this(id, databaseId, login, avatarUrl, htmlUrl, name, email, null, null, null, null, null, null, null, null, User.Type.USER);
+    }
+
+    /**
+     * Constructor with type for creating user DTOs with explicit type information.
+     */
+    public GitHubUserDTO(
+        Long id,
+        Long databaseId,
+        String login,
+        String avatarUrl,
+        String htmlUrl,
+        String name,
+        String email,
+        User.Type type
+    ) {
+        this(id, databaseId, login, avatarUrl, htmlUrl, name, email, null, null, null, null, null, null, null, null, type);
     }
 
     /**
@@ -121,7 +140,9 @@ public record GitHubUserDTO(
             user.getFollowing() != null ? user.getFollowing().getTotalCount() : null,
             // Timestamp fields
             toInstant(user.getCreatedAt()),
-            toInstant(user.getUpdatedAt())
+            toInstant(user.getUpdatedAt()),
+            // User type
+            User.Type.USER
         );
     }
 
@@ -140,12 +161,14 @@ public record GitHubUserDTO(
             uriToString(bot.getAvatarUrl()),
             uriToString(bot.getUrl()),
             null,
-            null
+            null,
+            User.Type.BOT
         );
     }
 
     /**
      * Creates a GitHubUserDTO from a GraphQL GHMannequin model.
+     * Mannequins are placeholder accounts for imported data, treated as USER type.
      */
     @Nullable
     public static GitHubUserDTO fromMannequin(@Nullable GHMannequin mannequin) {
@@ -159,7 +182,8 @@ public record GitHubUserDTO(
             uriToString(mannequin.getAvatarUrl()),
             uriToString(mannequin.getUrl()),
             null,
-            mannequin.getEmail()
+            mannequin.getEmail(),
+            User.Type.USER
         );
     }
 
@@ -178,12 +202,14 @@ public record GitHubUserDTO(
             uriToString(org.getAvatarUrl()),
             null,
             org.getName(),
-            org.getEmail()
+            org.getEmail(),
+            User.Type.ORGANIZATION
         );
     }
 
     /**
      * Creates a GitHubUserDTO from a GraphQL GHEnterpriseUserAccount model.
+     * Enterprise user accounts are treated as USER type.
      */
     @Nullable
     public static GitHubUserDTO fromEnterpriseUserAccount(@Nullable GHEnterpriseUserAccount enterprise) {
@@ -197,12 +223,14 @@ public record GitHubUserDTO(
             uriToString(enterprise.getAvatarUrl()),
             uriToString(enterprise.getUrl()),
             enterprise.getName(),
-            null
+            null,
+            User.Type.USER
         );
     }
 
     /**
      * Fallback factory for GHActor interface when concrete type is unknown.
+     * Defaults to USER type when the specific actor type cannot be determined.
      */
     private static GitHubUserDTO fromActorBase(GHActor actor) {
         return new GitHubUserDTO(
@@ -212,7 +240,37 @@ public record GitHubUserDTO(
             uriToString(actor.getAvatarUrl()),
             uriToString(actor.getUrl()),
             null,
-            null
+            null,
+            User.Type.USER
         );
+    }
+
+    /**
+     * Determines the User.Type from GitHub's REST API type string.
+     * <p>
+     * GitHub REST API returns "User", "Bot", or "Organization" in the type field.
+     * This method converts these strings to the corresponding User.Type enum.
+     *
+     * @param gitHubType the type string from GitHub REST API (may be null)
+     * @return the corresponding User.Type, defaults to USER if null or unknown
+     */
+    public static User.Type parseGitHubType(@Nullable String gitHubType) {
+        if (gitHubType == null) {
+            return User.Type.USER;
+        }
+        return switch (gitHubType.toLowerCase()) {
+            case "bot" -> User.Type.BOT;
+            case "organization" -> User.Type.ORGANIZATION;
+            default -> User.Type.USER;
+        };
+    }
+
+    /**
+     * Returns the effective type, using parseGitHubType logic if type is null.
+     * This is useful when the DTO was created from webhook data where the type
+     * field may need to be parsed from a string.
+     */
+    public User.Type getEffectiveType() {
+        return type != null ? type : User.Type.USER;
     }
 }

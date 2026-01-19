@@ -6,6 +6,7 @@
 query GetPullRequestReviewComments($owner: String!, $name: String!, $number: Int!, $first: Int!, $after: String) {
     rateLimit {
         cost
+        limit
         remaining
         resetAt
     }
@@ -60,6 +61,7 @@ query GetPullRequestReviewComments($owner: String!, $name: String!, $number: Int
                             createdAt
                             updatedAt
                             state
+                            url
 
                             # Author - supports both User and Bot types
                             author {
@@ -71,6 +73,7 @@ query GetPullRequestReviewComments($owner: String!, $name: String!, $number: Int
                                     avatarUrl
                                     name
                                     email
+                                    createdAt
                                 }
                                 ... on Bot {
                                     __typename

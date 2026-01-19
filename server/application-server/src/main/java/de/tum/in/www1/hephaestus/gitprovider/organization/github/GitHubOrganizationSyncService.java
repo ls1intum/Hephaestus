@@ -1,12 +1,14 @@
 package de.tum.in.www1.hephaestus.gitprovider.organization.github;
 
 import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
-import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.GRAPHQL_TIMEOUT;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.LARGE_PAGE_SIZE;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.MAX_PAGINATION_PAGES;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.exception.InstallationNotFoundException;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier.ClassificationResult;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncProperties;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHOrganization;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHOrganizationMemberConnection;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHOrganizationMemberEdge;
@@ -27,6 +29,7 @@ import java.util.List;
 import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.graphql.client.ClientGraphQlResponse;
 import org.springframework.graphql.client.HttpGraphQlClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -52,17 +55,23 @@ public class GitHubOrganizationSyncService {
     private final GitHubOrganizationProcessor organizationProcessor;
     private final GitHubUserProcessor userProcessor;
     private final OrganizationMembershipRepository organizationMembershipRepository;
+    private final GitHubSyncProperties syncProperties;
+    private final GitHubExceptionClassifier exceptionClassifier;
 
     public GitHubOrganizationSyncService(
         GitHubGraphQlClientProvider graphQlClientProvider,
         GitHubOrganizationProcessor organizationProcessor,
         GitHubUserProcessor userProcessor,
-        OrganizationMembershipRepository organizationMembershipRepository
+        OrganizationMembershipRepository organizationMembershipRepository,
+        GitHubSyncProperties syncProperties,
+        GitHubExceptionClassifier exceptionClassifier
     ) {
         this.graphQlClientProvider = graphQlClientProvider;
         this.organizationProcessor = organizationProcessor;
         this.userProcessor = userProcessor;
         this.organizationMembershipRepository = organizationMembershipRepository;
+        this.syncProperties = syncProperties;
+        this.exceptionClassifier = exceptionClassifier;
     }
 
     /**
@@ -86,12 +95,33 @@ public class GitHubOrganizationSyncService {
         HttpGraphQlClient client = graphQlClientProvider.forScope(scopeId);
 
         try {
-            GHOrganization graphQlOrg = client
+            ClientGraphQlResponse graphQlResponse = client
                 .documentName(GET_ORGANIZATION_DOCUMENT)
                 .variable("login", organizationLogin)
-                .retrieve("organization")
-                .toEntity(GHOrganization.class)
-                .block(GRAPHQL_TIMEOUT);
+                .execute()
+                .block(syncProperties.getGraphqlTimeout());
+
+            if (graphQlResponse == null || !graphQlResponse.isValid()) {
+                log.warn(
+                    "Received invalid GraphQL response: orgLogin={}, errors={}",
+                    sanitizeForLog(organizationLogin),
+                    graphQlResponse != null ? graphQlResponse.getErrors() : "null"
+                );
+                return null;
+            }
+
+            // Track rate limit from response
+            graphQlClientProvider.trackRateLimit(graphQlResponse);
+
+            // Check if we should pause due to rate limiting
+            if (graphQlClientProvider.isRateLimitCritical()) {
+                log.warn("Aborting organization sync due to critical rate limit: orgLogin={}", sanitizeForLog(organizationLogin));
+                return null;
+            }
+
+            GHOrganization graphQlOrg = graphQlResponse
+                .field("organization")
+                .toEntity(GHOrganization.class);
 
             if (graphQlOrg == null) {
                 log.warn("Skipped organization sync: reason=notFound, orgLogin={}", sanitizeForLog(organizationLogin));
@@ -122,12 +152,43 @@ public class GitHubOrganizationSyncService {
             // Re-throw to abort the entire sync operation
             throw e;
         } catch (Exception e) {
-            log.error(
-                "Failed to sync organization: orgLogin={}, scopeId={}",
-                sanitizeForLog(organizationLogin),
-                scopeId,
-                e
-            );
+            ClassificationResult classification = exceptionClassifier.classifyWithDetails(e);
+            switch (classification.category()) {
+                case RATE_LIMITED -> log.warn(
+                    "Rate limited during organization sync: orgLogin={}, scopeId={}, message={}",
+                    sanitizeForLog(organizationLogin),
+                    scopeId,
+                    classification.message()
+                );
+                case NOT_FOUND -> log.warn(
+                    "Resource not found during organization sync: orgLogin={}, scopeId={}, message={}",
+                    sanitizeForLog(organizationLogin),
+                    scopeId,
+                    classification.message()
+                );
+                case AUTH_ERROR -> {
+                    log.error(
+                        "Authentication error during organization sync: orgLogin={}, scopeId={}, message={}",
+                        sanitizeForLog(organizationLogin),
+                        scopeId,
+                        classification.message()
+                    );
+                    throw e;
+                }
+                case RETRYABLE -> log.warn(
+                    "Retryable error during organization sync: orgLogin={}, scopeId={}, message={}",
+                    sanitizeForLog(organizationLogin),
+                    scopeId,
+                    classification.message()
+                );
+                default -> log.error(
+                    "Unexpected error during organization sync: orgLogin={}, scopeId={}, message={}",
+                    sanitizeForLog(organizationLogin),
+                    scopeId,
+                    classification.message(),
+                    e
+                );
+            }
             return null;
         }
     }
@@ -177,14 +238,38 @@ public class GitHubOrganizationSyncService {
                 break;
             }
 
-            GHOrganizationMemberConnection nextPage = client
+            ClientGraphQlResponse graphQlResponse = client
                 .documentName(GET_ORGANIZATION_MEMBERS_DOCUMENT)
                 .variable("login", organization.getLogin())
                 .variable("first", LARGE_PAGE_SIZE)
                 .variable("after", cursor)
-                .retrieve("organization.membersWithRole")
-                .toEntity(GHOrganizationMemberConnection.class)
-                .block(GRAPHQL_TIMEOUT);
+                .execute()
+                .block(syncProperties.getGraphqlTimeout());
+
+            if (graphQlResponse == null || !graphQlResponse.isValid()) {
+                log.warn(
+                    "Received invalid GraphQL response for members: orgLogin={}, errors={}",
+                    sanitizeForLog(organization.getLogin()),
+                    graphQlResponse != null ? graphQlResponse.getErrors() : "null"
+                );
+                break;
+            }
+
+            // Track rate limit from response
+            graphQlClientProvider.trackRateLimit(graphQlResponse);
+
+            // Check if we should pause due to rate limiting
+            if (graphQlClientProvider.isRateLimitCritical()) {
+                log.warn(
+                    "Aborting organization members sync due to critical rate limit: orgLogin={}",
+                    sanitizeForLog(organization.getLogin())
+                );
+                break;
+            }
+
+            GHOrganizationMemberConnection nextPage = graphQlResponse
+                .field("organization.membersWithRole")
+                .toEntity(GHOrganizationMemberConnection.class);
 
             if (nextPage == null || nextPage.getEdges() == null) {
                 break;
@@ -281,13 +366,19 @@ public class GitHubOrganizationSyncService {
 
         String htmlUrl = graphQlOrg.getUrl() != null ? graphQlOrg.getUrl().toString() : null;
 
+        Instant createdAt = graphQlOrg.getCreatedAt() != null ? graphQlOrg.getCreatedAt().toInstant() : null;
+
+        Instant updatedAt = graphQlOrg.getUpdatedAt() != null ? graphQlOrg.getUpdatedAt().toInstant() : null;
+
         return new GitHubOrganizationEventDTO.GitHubOrganizationDTO(
             databaseId,
             graphQlOrg.getId(),
             graphQlOrg.getLogin(),
             graphQlOrg.getDescription(),
             avatarUrl,
-            htmlUrl
+            htmlUrl,
+            createdAt,
+            updatedAt
         );
     }
 

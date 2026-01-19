@@ -2,6 +2,7 @@ package de.tum.in.www1.hephaestus.workspace;
 
 import de.tum.in.www1.hephaestus.gitprovider.sync.GitHubDataSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.sync.NatsConsumerService;
+import de.tum.in.www1.hephaestus.monitoring.MonitoringProperties;
 import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContextHolder;
 import java.util.ArrayList;
@@ -31,7 +32,7 @@ public class WorkspaceActivationService {
 
     // Configuration
     private final boolean isNatsEnabled;
-    private final boolean runMonitoringOnStartup;
+    private final MonitoringProperties monitoringProperties;
 
     // Core repository
     private final WorkspaceRepository workspaceRepository;
@@ -48,7 +49,7 @@ public class WorkspaceActivationService {
 
     public WorkspaceActivationService(
         @Value("${nats.enabled}") boolean isNatsEnabled,
-        @Value("${monitoring.run-on-startup}") boolean runMonitoringOnStartup,
+        MonitoringProperties monitoringProperties,
         WorkspaceRepository workspaceRepository,
         NatsConsumerService natsConsumerService,
         WorkspaceScopeFilter workspaceScopeFilter,
@@ -56,7 +57,7 @@ public class WorkspaceActivationService {
         @Qualifier("monitoringExecutor") AsyncTaskExecutor monitoringExecutor
     ) {
         this.isNatsEnabled = isNatsEnabled;
-        this.runMonitoringOnStartup = runMonitoringOnStartup;
+        this.monitoringProperties = monitoringProperties;
         this.workspaceRepository = workspaceRepository;
         this.natsConsumerService = natsConsumerService;
         this.workspaceScopeFilter = workspaceScopeFilter;
@@ -137,7 +138,7 @@ public class WorkspaceActivationService {
             return;
         }
 
-        if (runMonitoringOnStartup) {
+        if (monitoringProperties.isRunOnStartup()) {
             log.info("Starting monitoring on startup: workspaceId={}", workspace.getId());
 
             // Set workspace context for the sync operations (enables proper logging via

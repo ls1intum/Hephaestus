@@ -4,6 +4,7 @@
 query GetOrganization($login: String!) {
     rateLimit {
         cost
+        limit
         remaining
         resetAt
     }

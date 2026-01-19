@@ -5,14 +5,17 @@ import de.tum.in.www1.hephaestus.gitprovider.common.github.app.GitHubAppTokenSer
 import de.tum.in.www1.hephaestus.gitprovider.common.github.app.GitHubAppTokenService.InstallationToken;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.AuthMode;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.InstallationTokenProvider;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHRateLimit;
 import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.graphql.client.ClientGraphQlResponse;
 import org.springframework.graphql.client.HttpGraphQlClient;
 import org.springframework.http.HttpHeaders;
+import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
 
 /**
@@ -62,17 +65,20 @@ public class GitHubGraphQlClientProvider {
     private final InstallationTokenProvider tokenProvider;
     private final GitHubAppTokenService appTokens;
     private final CircuitBreaker circuitBreaker;
+    private final GitHubGraphQlRateLimitTracker rateLimitTracker;
 
     public GitHubGraphQlClientProvider(
         HttpGraphQlClient gitHubGraphQlClient,
         InstallationTokenProvider tokenProvider,
         GitHubAppTokenService appTokens,
-        @Qualifier("githubGraphQlCircuitBreaker") CircuitBreaker circuitBreaker
+        @Qualifier("githubGraphQlCircuitBreaker") CircuitBreaker circuitBreaker,
+        GitHubGraphQlRateLimitTracker rateLimitTracker
     ) {
         this.baseClient = gitHubGraphQlClient;
         this.tokenProvider = tokenProvider;
         this.appTokens = appTokens;
         this.circuitBreaker = circuitBreaker;
+        this.rateLimitTracker = rateLimitTracker;
     }
 
     /**
@@ -164,6 +170,58 @@ public class GitHubGraphQlClientProvider {
      */
     public HttpGraphQlClient withToken(String token) {
         return baseClient.mutate().header(HttpHeaders.AUTHORIZATION, "Bearer " + token).build();
+    }
+
+    // ========================================================================
+    // Rate Limit Tracking
+    // ========================================================================
+
+    /**
+     * Updates the rate limit tracker from a GraphQL response.
+     * <p>
+     * Call this method after every GraphQL query execution to keep the
+     * rate limit tracking up to date. The rate limit data is extracted
+     * from the "rateLimit" field in the response.
+     *
+     * @param response the GraphQL response containing rate limit data
+     * @return the extracted rate limit info, or null if not present
+     */
+    @Nullable
+    public GHRateLimit trackRateLimit(@Nullable ClientGraphQlResponse response) {
+        return rateLimitTracker.updateFromResponse(response);
+    }
+
+    /**
+     * Gets the rate limit tracker for advanced rate limit management.
+     *
+     * @return the rate limit tracker instance
+     */
+    public GitHubGraphQlRateLimitTracker getRateLimitTracker() {
+        return rateLimitTracker;
+    }
+
+    /**
+     * Checks if the rate limit is critically low and waits if necessary.
+     * <p>
+     * This method should be called before making GraphQL requests in loops
+     * to proactively avoid hitting the rate limit.
+     *
+     * @return true if the method waited, false if no waiting was needed
+     * @throws InterruptedException if the thread is interrupted while waiting
+     */
+    public boolean waitIfRateLimitLow() throws InterruptedException {
+        return rateLimitTracker.waitIfNeeded();
+    }
+
+    /**
+     * Checks if the rate limit is at a critical level.
+     * <p>
+     * Use this to decide whether to abort a sync operation early.
+     *
+     * @return true if rate limit is critically low
+     */
+    public boolean isRateLimitCritical() {
+        return rateLimitTracker.isCritical();
     }
 
     private String getToken(Long scopeId) {

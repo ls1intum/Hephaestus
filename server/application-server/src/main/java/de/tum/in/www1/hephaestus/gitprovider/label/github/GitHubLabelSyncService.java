@@ -1,12 +1,16 @@
 package de.tum.in.www1.hephaestus.gitprovider.label.github;
 
 import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
-import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.*;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.LARGE_PAGE_SIZE;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.MAX_PAGINATION_PAGES;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.exception.InstallationNotFoundException;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier.ClassificationResult;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncProperties;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser.RepositoryOwnerAndName;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHLabelConnection;
 import de.tum.in.www1.hephaestus.gitprovider.label.Label;
@@ -20,6 +24,7 @@ import java.util.Optional;
 import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.graphql.client.ClientGraphQlResponse;
 import org.springframework.graphql.client.HttpGraphQlClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -40,17 +45,23 @@ public class GitHubLabelSyncService {
     private final GitHubGraphQlClientProvider graphQlClientProvider;
     private final GitHubLabelProcessor labelProcessor;
     private final LabelRepository labelRepository;
+    private final GitHubSyncProperties syncProperties;
+    private final GitHubExceptionClassifier exceptionClassifier;
 
     public GitHubLabelSyncService(
         RepositoryRepository repositoryRepository,
         GitHubGraphQlClientProvider graphQlClientProvider,
         GitHubLabelProcessor labelProcessor,
-        LabelRepository labelRepository
+        LabelRepository labelRepository,
+        GitHubSyncProperties syncProperties,
+        GitHubExceptionClassifier exceptionClassifier
     ) {
         this.repositoryRepository = repositoryRepository;
         this.graphQlClientProvider = graphQlClientProvider;
         this.labelProcessor = labelProcessor;
         this.labelRepository = labelRepository;
+        this.syncProperties = syncProperties;
+        this.exceptionClassifier = exceptionClassifier;
     }
 
     /**
@@ -98,15 +109,39 @@ public class GitHubLabelSyncService {
                     break;
                 }
 
-                GHLabelConnection response = client
+                ClientGraphQlResponse graphQlResponse = client
                     .documentName(GET_LABELS_DOCUMENT)
                     .variable("owner", owner)
                     .variable("name", name)
                     .variable("first", LARGE_PAGE_SIZE)
                     .variable("after", cursor)
-                    .retrieve("repository.labels")
-                    .toEntity(GHLabelConnection.class)
-                    .block(GRAPHQL_TIMEOUT);
+                    .execute()
+                    .block(syncProperties.getGraphqlTimeout());
+
+                if (graphQlResponse == null || !graphQlResponse.isValid()) {
+                    log.warn(
+                        "Received invalid GraphQL response: repoName={}, errors={}",
+                        safeNameWithOwner,
+                        graphQlResponse != null ? graphQlResponse.getErrors() : "null"
+                    );
+                    break;
+                }
+
+                // Track rate limit from response
+                graphQlClientProvider.trackRateLimit(graphQlResponse);
+
+                // Check if we should pause due to rate limiting
+                if (graphQlClientProvider.isRateLimitCritical()) {
+                    log.warn(
+                        "Aborting label sync due to critical rate limit: repoName={}",
+                        safeNameWithOwner
+                    );
+                    break;
+                }
+
+                GHLabelConnection response = graphQlResponse
+                    .field("repository.labels")
+                    .toEntity(GHLabelConnection.class);
 
                 if (response == null || response.getNodes() == null) {
                     break;
@@ -141,7 +176,43 @@ public class GitHubLabelSyncService {
             // Re-throw to abort the entire sync operation
             throw e;
         } catch (Exception e) {
-            log.error("Failed to sync labels: repoName={}, scopeId={}", safeNameWithOwner, scopeId, e);
+            ClassificationResult classification = exceptionClassifier.classifyWithDetails(e);
+            switch (classification.category()) {
+                case RATE_LIMITED -> log.warn(
+                    "Rate limited during label sync: repoName={}, scopeId={}, message={}",
+                    safeNameWithOwner,
+                    scopeId,
+                    classification.message()
+                );
+                case NOT_FOUND -> log.warn(
+                    "Resource not found during label sync: repoName={}, scopeId={}, message={}",
+                    safeNameWithOwner,
+                    scopeId,
+                    classification.message()
+                );
+                case AUTH_ERROR -> {
+                    log.error(
+                        "Authentication error during label sync: repoName={}, scopeId={}, message={}",
+                        safeNameWithOwner,
+                        scopeId,
+                        classification.message()
+                    );
+                    throw e;
+                }
+                case RETRYABLE -> log.warn(
+                    "Retryable error during label sync: repoName={}, scopeId={}, message={}",
+                    safeNameWithOwner,
+                    scopeId,
+                    classification.message()
+                );
+                default -> log.error(
+                    "Unexpected error during label sync: repoName={}, scopeId={}, message={}",
+                    safeNameWithOwner,
+                    scopeId,
+                    classification.message(),
+                    e
+                );
+            }
             return 0;
         }
     }

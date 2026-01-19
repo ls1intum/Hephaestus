@@ -1,6 +1,10 @@
 package de.tum.in.www1.hephaestus.leaderboard.tasks;
 
-import static com.slack.api.model.block.Blocks.*;
+import static com.slack.api.model.block.Blocks.asBlocks;
+import static com.slack.api.model.block.Blocks.context;
+import static com.slack.api.model.block.Blocks.divider;
+import static com.slack.api.model.block.Blocks.header;
+import static com.slack.api.model.block.Blocks.section;
 import static com.slack.api.model.block.composition.BlockCompositions.markdownText;
 import static com.slack.api.model.block.composition.BlockCompositions.plainText;
 

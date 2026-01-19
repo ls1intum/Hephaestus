@@ -25,7 +25,9 @@ public record GitHubMilestoneDTO(
     @JsonProperty("due_on") Instant dueOn,
     @JsonProperty("html_url") String htmlUrl,
     @JsonProperty("open_issues") Integer openIssuesCount,
-    @JsonProperty("closed_issues") Integer closedIssuesCount
+    @JsonProperty("closed_issues") Integer closedIssuesCount,
+    @JsonProperty("created_at") Instant createdAt,
+    @JsonProperty("updated_at") Instant updatedAt
 ) {
     // ========== STATIC FACTORY METHODS FOR GRAPHQL RESPONSES ==========
 
@@ -46,7 +48,9 @@ public record GitHubMilestoneDTO(
             toInstant(milestone.getDueOn()),
             uriToString(milestone.getUrl()),
             milestone.getOpenIssueCount(),
-            milestone.getClosedIssueCount()
+            milestone.getClosedIssueCount(),
+            toInstant(milestone.getCreatedAt()),
+            toInstant(milestone.getUpdatedAt())
         );
     }
 

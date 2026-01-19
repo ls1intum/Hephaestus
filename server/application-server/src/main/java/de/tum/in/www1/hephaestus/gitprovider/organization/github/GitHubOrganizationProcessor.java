@@ -69,6 +69,12 @@ public class GitHubOrganizationProcessor {
         if (dto.htmlUrl() != null) {
             organization.setHtmlUrl(dto.htmlUrl());
         }
+        if (dto.createdAt() != null) {
+            organization.setCreatedAt(dto.createdAt());
+        }
+        if (dto.updatedAt() != null) {
+            organization.setUpdatedAt(dto.updatedAt());
+        }
 
         Organization saved = organizationRepository.save(organization);
         if (isNew) {

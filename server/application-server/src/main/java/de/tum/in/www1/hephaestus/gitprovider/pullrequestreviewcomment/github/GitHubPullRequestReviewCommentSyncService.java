@@ -2,12 +2,17 @@ package de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.github;
 
 import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlErrorUtils.isNotFoundError;
-import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.*;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.DEFAULT_PAGE_SIZE;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.LARGE_PAGE_SIZE;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.MAX_PAGINATION_PAGES;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.exception.InstallationNotFoundException;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier.ClassificationResult;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser.RepositoryOwnerAndName;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncProperties;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHActor;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHCommentAuthorAssociation;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHDiffSide;
@@ -18,21 +23,18 @@ import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHPullRequestR
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHPullRequestReviewThreadConnection;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHUser;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
-import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequest.github.dto.GitHubReviewThreadDTO;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.PullRequestReviewComment;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.github.dto.GitHubPullRequestReviewCommentEventDTO.GitHubReviewCommentDTO;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewthread.PullRequestReviewThread;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewthread.PullRequestReviewThreadRepository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
-import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserProcessor;
 import de.tum.in.www1.hephaestus.gitprovider.user.github.dto.GitHubUserDTO;
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.stream.Stream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.graphql.client.ClientGraphQlResponse;
@@ -48,9 +50,19 @@ import org.springframework.transaction.annotation.Transactional;
  * and uses GitHubPullRequestReviewCommentProcessor for persistence. It supports syncing
  * comments for a single PR or all PRs in a repository.
  * <p>
+ * <b>Note:</b> Most review threads and comments are fetched inline with PRs via
+ * GetRepositoryPullRequests query. This service is primarily used to:
+ * <ul>
+ *   <li>Process thread data from the embedded response</li>
+ *   <li>Fetch remaining threads for PRs that have more than 10 (embedded limit)</li>
+ *   <li>Handle standalone comment sync when PRs aren't involved</li>
+ * </ul>
+ * <p>
  * <b>Threading Model:</b> GraphQL provides explicit thread structure via reviewThreads,
  * which is more accurate than the synthetic threading from webhooks. This service
  * creates/updates threads based on GraphQL data and associates comments with them.
+ *
+ * @see de.tum.in.www1.hephaestus.gitprovider.pullrequest.github.GitHubPullRequestSyncService
  */
 @SuppressWarnings("deprecation")
 @Service
@@ -60,72 +72,27 @@ public class GitHubPullRequestReviewCommentSyncService {
     private static final String GET_PR_REVIEW_COMMENTS_DOCUMENT = "GetPullRequestReviewComments";
     private static final String GET_THREAD_COMMENTS_DOCUMENT = "GetThreadComments";
 
-    private final RepositoryRepository repositoryRepository;
-    private final PullRequestRepository pullRequestRepository;
     private final PullRequestReviewThreadRepository threadRepository;
     private final GitHubGraphQlClientProvider graphQlClientProvider;
     private final GitHubPullRequestReviewCommentProcessor commentProcessor;
     private final GitHubUserProcessor userProcessor;
-    // Store client reference for nested pagination
-    private HttpGraphQlClient currentClient;
+    private final GitHubSyncProperties syncProperties;
+    private final GitHubExceptionClassifier exceptionClassifier;
 
     public GitHubPullRequestReviewCommentSyncService(
-        RepositoryRepository repositoryRepository,
-        PullRequestRepository pullRequestRepository,
         PullRequestReviewThreadRepository threadRepository,
         GitHubGraphQlClientProvider graphQlClientProvider,
         GitHubPullRequestReviewCommentProcessor commentProcessor,
-        GitHubUserProcessor userProcessor
+        GitHubUserProcessor userProcessor,
+        GitHubSyncProperties syncProperties,
+        GitHubExceptionClassifier exceptionClassifier
     ) {
-        this.repositoryRepository = repositoryRepository;
-        this.pullRequestRepository = pullRequestRepository;
         this.threadRepository = threadRepository;
         this.graphQlClientProvider = graphQlClientProvider;
         this.commentProcessor = commentProcessor;
         this.userProcessor = userProcessor;
-    }
-
-    /**
-     * Synchronizes all review comments for all pull requests in a repository using GraphQL.
-     * <p>
-     * Uses streaming to avoid loading all pull requests into memory at once.
-     *
-     * @param scopeId  the scope ID for authentication
-     * @param repositoryId the repository ID to sync comments for
-     * @return number of comments synced
-     */
-    @Transactional
-    public int syncCommentsForRepository(Long scopeId, Long repositoryId) {
-        Repository repository = repositoryRepository.findById(repositoryId).orElse(null);
-        if (repository == null) {
-            log.debug("Skipped review comment sync: reason=repositoryNotFound, repoId={}", repositoryId);
-            return 0;
-        }
-
-        String safeRepoName = sanitizeForLog(repository.getNameWithOwner());
-        AtomicInteger totalSynced = new AtomicInteger(0);
-        AtomicInteger prCount = new AtomicInteger(0);
-
-        try (Stream<PullRequest> prStream = pullRequestRepository.streamAllByRepository_Id(repositoryId)) {
-            prStream.forEach(pullRequest -> {
-                int synced = syncCommentsForPullRequest(scopeId, pullRequest);
-                totalSynced.addAndGet(synced);
-                prCount.incrementAndGet();
-            });
-        }
-
-        if (prCount.get() == 0) {
-            log.debug("Skipped review comment sync: reason=noPullRequestsFound, repoName={}", safeRepoName);
-            return 0;
-        }
-
-        log.info(
-            "Completed review comment sync: repoName={}, commentCount={}, prCount={}",
-            safeRepoName,
-            totalSynced.get(),
-            prCount.get()
-        );
-        return totalSynced.get();
+        this.syncProperties = syncProperties;
+        this.exceptionClassifier = exceptionClassifier;
     }
 
     /**
@@ -158,7 +125,6 @@ public class GitHubPullRequestReviewCommentSyncService {
         String name = parsedName.get().name();
 
         HttpGraphQlClient client = graphQlClientProvider.forScope(scopeId);
-        this.currentClient = client; // Store for nested pagination
 
         try {
             int totalSynced = 0;
@@ -178,23 +144,49 @@ public class GitHubPullRequestReviewCommentSyncService {
                     break;
                 }
 
-                GHPullRequestReviewThreadConnection response = client
+                ClientGraphQlResponse graphQlResponse = client
                     .documentName(GET_PR_REVIEW_COMMENTS_DOCUMENT)
                     .variable("owner", owner)
                     .variable("name", name)
                     .variable("number", pullRequest.getNumber())
                     .variable("first", DEFAULT_PAGE_SIZE)
                     .variable("after", cursor)
-                    .retrieve("repository.pullRequest.reviewThreads")
-                    .toEntity(GHPullRequestReviewThreadConnection.class)
-                    .block(EXTENDED_GRAPHQL_TIMEOUT);
+                    .execute()
+                    .block(syncProperties.getExtendedGraphqlTimeout());
+
+                if (graphQlResponse == null || !graphQlResponse.isValid()) {
+                    log.warn(
+                        "Received invalid GraphQL response: repoName={}, prNumber={}, errors={}",
+                        safeNameWithOwner,
+                        pullRequest.getNumber(),
+                        graphQlResponse != null ? graphQlResponse.getErrors() : "null"
+                    );
+                    break;
+                }
+
+                // Track rate limit from response
+                graphQlClientProvider.trackRateLimit(graphQlResponse);
+
+                // Check if we should pause due to rate limiting
+                if (graphQlClientProvider.isRateLimitCritical()) {
+                    log.warn(
+                        "Aborting review comment sync due to critical rate limit: repoName={}, prNumber={}",
+                        safeNameWithOwner,
+                        pullRequest.getNumber()
+                    );
+                    break;
+                }
+
+                GHPullRequestReviewThreadConnection response = graphQlResponse
+                    .field("repository.pullRequest.reviewThreads")
+                    .toEntity(GHPullRequestReviewThreadConnection.class);
 
                 if (response == null || response.getNodes() == null) {
                     break;
                 }
 
                 for (var graphQlThread : response.getNodes()) {
-                    int synced = processThread(graphQlThread, pullRequest);
+                    int synced = processThreadInternal(graphQlThread, pullRequest, client);
                     totalSynced += synced;
                 }
 
@@ -231,24 +223,361 @@ public class GitHubPullRequestReviewCommentSyncService {
             );
             return 0;
         } catch (Exception e) {
-            log.error(
-                "Failed to sync review comments: repoName={}, prNumber={}",
-                safeNameWithOwner,
-                pullRequest.getNumber(),
-                e
-            );
+            ClassificationResult classification = exceptionClassifier.classifyWithDetails(e);
+            switch (classification.category()) {
+                case RATE_LIMITED -> log.warn(
+                    "Rate limited during review comment sync: repoName={}, prNumber={}, message={}",
+                    safeNameWithOwner,
+                    pullRequest.getNumber(),
+                    classification.message()
+                );
+                case NOT_FOUND -> log.warn(
+                    "Resource not found during review comment sync: repoName={}, prNumber={}, message={}",
+                    safeNameWithOwner,
+                    pullRequest.getNumber(),
+                    classification.message()
+                );
+                case AUTH_ERROR -> {
+                    log.error(
+                        "Authentication error during review comment sync: repoName={}, prNumber={}, message={}",
+                        safeNameWithOwner,
+                        pullRequest.getNumber(),
+                        classification.message()
+                    );
+                    throw e;
+                }
+                case RETRYABLE -> log.warn(
+                    "Retryable error during review comment sync: repoName={}, prNumber={}, message={}",
+                    safeNameWithOwner,
+                    pullRequest.getNumber(),
+                    classification.message()
+                );
+                default -> log.error(
+                    "Unexpected error during review comment sync: repoName={}, prNumber={}, message={}",
+                    safeNameWithOwner,
+                    pullRequest.getNumber(),
+                    classification.message(),
+                    e
+                );
+            }
             return 0;
         }
     }
 
     /**
-     * Processes a GraphQL review thread and its comments.
+     * Processes a review thread DTO and its comments.
+     * <p>
+     * Called from GitHubPullRequestSyncService when processing threads embedded in the PR response.
+     * The DTO wraps the thread data and its comments connection for processing.
+     *
+     * @param threadDto   the review thread DTO
+     * @param pullRequest the pull request the thread belongs to
+     * @param scopeId     the scope ID for authentication (used for nested comment pagination)
+     * @return number of comments synced from this thread
+     */
+    public int processThread(
+        GitHubReviewThreadDTO threadDto,
+        PullRequest pullRequest,
+        Long scopeId
+    ) {
+        if (threadDto == null) {
+            return 0;
+        }
+        HttpGraphQlClient client = graphQlClientProvider.forScope(scopeId);
+        return processThreadFromDto(threadDto, pullRequest, client);
+    }
+
+    /**
+     * Internal method to process a review thread DTO with an existing client.
+     *
+     * @param threadDto   the review thread DTO
+     * @param pullRequest the pull request the thread belongs to
+     * @param client      the GraphQL client to use for nested pagination
+     * @return number of comments synced from this thread
+     */
+    private int processThreadFromDto(
+        GitHubReviewThreadDTO threadDto,
+        PullRequest pullRequest,
+        HttpGraphQlClient client
+    ) {
+        if (threadDto == null) {
+            return 0;
+        }
+
+        GHPullRequestReviewCommentConnection commentsConnection = threadDto.commentsConnection();
+        if (commentsConnection == null || commentsConnection.getNodes() == null) {
+            return 0;
+        }
+
+        // Handle nested pagination for thread comments
+        var commentsPageInfo = commentsConnection.getPageInfo();
+        if (commentsPageInfo != null && Boolean.TRUE.equals(commentsPageInfo.getHasNextPage())) {
+            // Fetch all remaining comments using pagination
+            fetchAllRemainingThreadComments(threadDto.nodeId(), commentsConnection, commentsPageInfo.getEndCursor(), client);
+        }
+
+        var graphQlComments = commentsConnection.getNodes();
+        if (graphQlComments.isEmpty()) {
+            return 0;
+        }
+
+        // Get the first comment to determine the thread ID (use its databaseId as thread ID)
+        var firstComment = graphQlComments.get(0);
+        Long threadId = extractDatabaseId(firstComment);
+        if (threadId == null) {
+            log.warn("Skipped thread: reason=missingDatabaseIdOnFirstComment, threadId={}", threadDto.nodeId());
+            return 0;
+        }
+
+        // Create or update the thread, passing the first comment to set timestamps
+        PullRequestReviewThread thread = getOrCreateThreadFromDto(threadId, threadDto, pullRequest, firstComment);
+
+        int synced = 0;
+        PullRequestReviewComment rootComment = null;
+        for (var graphQlComment : graphQlComments) {
+            GitHubReviewCommentDTO dto = convertToDTO(graphQlComment, thread);
+            if (dto != null) {
+                PullRequestReviewComment comment = commentProcessor.processCreated(dto, pullRequest.getId());
+                if (comment != null) {
+                    synced++;
+                    // Track the first (root) comment
+                    if (rootComment == null) {
+                        rootComment = comment;
+                    }
+                }
+            }
+        }
+
+        // Set the root comment on the thread if not already set
+        if (rootComment != null && thread.getRootComment() == null) {
+            thread.setRootComment(rootComment);
+            threadRepository.save(thread);
+        }
+
+        return synced;
+    }
+
+    /**
+     * Fetches all remaining comments for a thread when the initial query hit the pagination limit.
+     * This method modifies the commentsConnection's nodes list in place by adding all fetched comments.
+     *
+     * @param threadNodeId       the node ID of the thread (for pagination queries)
+     * @param commentsConnection the existing comments connection to update
+     * @param startCursor        the cursor to start fetching from
+     * @param client             the GraphQL client to use for fetching
+     */
+    private void fetchAllRemainingThreadComments(
+        String threadNodeId,
+        GHPullRequestReviewCommentConnection commentsConnection,
+        String startCursor,
+        HttpGraphQlClient client
+    ) {
+        if (commentsConnection == null || commentsConnection.getNodes() == null) {
+            return;
+        }
+
+        // Create a mutable list to collect all comments
+        List<GHPullRequestReviewComment> allComments = new ArrayList<>(commentsConnection.getNodes());
+
+        String cursor = startCursor;
+        boolean hasMore = true;
+        int fetchedPages = 0;
+
+        while (hasMore) {
+            fetchedPages++;
+            if (fetchedPages > MAX_PAGINATION_PAGES) {
+                log.warn(
+                    "Reached maximum pagination limit for thread comments: threadId={}, limit={}",
+                    threadNodeId,
+                    MAX_PAGINATION_PAGES
+                );
+                break;
+            }
+
+            try {
+                ClientGraphQlResponse response = client
+                    .documentName(GET_THREAD_COMMENTS_DOCUMENT)
+                    .variable("threadId", threadNodeId)
+                    .variable("first", LARGE_PAGE_SIZE)
+                    .variable("after", cursor)
+                    .execute()
+                    .block(syncProperties.getGraphqlTimeout());
+
+                if (response == null || !response.isValid()) {
+                    log.warn(
+                        "Invalid GraphQL response for thread comments: threadId={}, errors={}",
+                        threadNodeId,
+                        response != null ? response.getErrors() : "null"
+                    );
+                    break;
+                }
+
+                // Track rate limit from response
+                graphQlClientProvider.trackRateLimit(response);
+
+                // Check if we should pause due to rate limiting
+                if (graphQlClientProvider.isRateLimitCritical()) {
+                    log.warn("Aborting thread comments fetch due to critical rate limit: threadId={}", threadNodeId);
+                    break;
+                }
+
+                GHPullRequestReviewCommentConnection fetchedConnection = response
+                    .field("node.comments")
+                    .toEntity(GHPullRequestReviewCommentConnection.class);
+
+                if (fetchedConnection == null || fetchedConnection.getNodes() == null) {
+                    break;
+                }
+
+                allComments.addAll(fetchedConnection.getNodes());
+
+                GHPageInfo pageInfo = fetchedConnection.getPageInfo();
+                hasMore = pageInfo != null && Boolean.TRUE.equals(pageInfo.getHasNextPage());
+                cursor = pageInfo != null ? pageInfo.getEndCursor() : null;
+            } catch (Exception e) {
+                ClassificationResult classification = exceptionClassifier.classifyWithDetails(e);
+                switch (classification.category()) {
+                    case RATE_LIMITED -> log.warn(
+                        "Rate limited during thread comments fetch: threadId={}, message={}",
+                        threadNodeId,
+                        classification.message()
+                    );
+                    case NOT_FOUND -> log.warn(
+                        "Resource not found during thread comments fetch: threadId={}, message={}",
+                        threadNodeId,
+                        classification.message()
+                    );
+                    case AUTH_ERROR -> {
+                        log.error(
+                            "Authentication error during thread comments fetch: threadId={}, message={}",
+                            threadNodeId,
+                            classification.message()
+                        );
+                        throw e;
+                    }
+                    case RETRYABLE -> log.warn(
+                        "Retryable error during thread comments fetch: threadId={}, message={}",
+                        threadNodeId,
+                        classification.message()
+                    );
+                    default -> log.error(
+                        "Unexpected error during thread comments fetch: threadId={}, message={}",
+                        threadNodeId,
+                        classification.message(),
+                        e
+                    );
+                }
+                break;
+            }
+        }
+
+        // Update the connection's comments with the complete list
+        commentsConnection.setNodes(allComments);
+
+        if (fetchedPages > 0) {
+            log.debug(
+                "Fetched additional thread comments: threadId={}, pageCount={}, totalComments={}",
+                threadNodeId,
+                fetchedPages,
+                allComments.size()
+            );
+        }
+    }
+
+    /**
+     * Gets or creates a thread based on DTO data.
+     * <p>
+     * Since PullRequestReviewThread in GitHub's GraphQL API doesn't have timestamp fields,
+     * we derive the thread's createdAt and updatedAt from the first (root) comment's timestamps.
+     *
+     * @param threadId     the thread ID (first comment's databaseId)
+     * @param threadDto    the thread DTO data
+     * @param pullRequest  the pull request the thread belongs to
+     * @param firstComment the first comment in the thread (used for timestamps)
+     * @return the created or existing thread
+     */
+    private PullRequestReviewThread getOrCreateThreadFromDto(
+        Long threadId,
+        GitHubReviewThreadDTO threadDto,
+        PullRequest pullRequest,
+        GHPullRequestReviewComment firstComment
+    ) {
+        return threadRepository
+            .findById(threadId)
+            .orElseGet(() -> {
+                PullRequestReviewThread thread = new PullRequestReviewThread();
+                thread.setId(threadId);
+                thread.setNodeId(threadDto.nodeId());
+                thread.setPullRequest(pullRequest);
+                thread.setPath(threadDto.path());
+                thread.setLine(threadDto.line());
+                thread.setStartLine(threadDto.startLine());
+                thread.setSide(mapDiffSideString(threadDto.diffSide()));
+                thread.setStartSide(mapDiffSideString(threadDto.startDiffSide()));
+                thread.setOutdated(threadDto.isOutdated());
+                thread.setCollapsed(threadDto.isCollapsed());
+
+                // Set timestamps from the first (root) comment
+                // PullRequestReviewThread doesn't have its own timestamps in GitHub API,
+                // so we use the first comment's timestamps as a proxy
+                if (firstComment != null) {
+                    if (firstComment.getCreatedAt() != null) {
+                        thread.setCreatedAt(firstComment.getCreatedAt().toInstant());
+                    }
+                    if (firstComment.getUpdatedAt() != null) {
+                        thread.setUpdatedAt(firstComment.getUpdatedAt().toInstant());
+                    }
+                }
+
+                // Map resolved state and resolvedBy user
+                if (threadDto.isResolved()) {
+                    thread.setState(PullRequestReviewThread.State.RESOLVED);
+                    // Set resolvedBy user if available (already converted to DTO)
+                    GitHubUserDTO resolvedByDto = threadDto.resolvedBy();
+                    if (resolvedByDto != null) {
+                        de.tum.in.www1.hephaestus.gitprovider.user.User resolvedBy = userProcessor.ensureExists(
+                            resolvedByDto
+                        );
+                        thread.setResolvedBy(resolvedBy);
+                    }
+                } else {
+                    thread.setState(PullRequestReviewThread.State.UNRESOLVED);
+                }
+
+                return threadRepository.save(thread);
+            });
+    }
+
+    /**
+     * Maps a diff side string to the entity Side enum.
+     */
+    private PullRequestReviewComment.Side mapDiffSideString(String diffSide) {
+        if (diffSide == null) {
+            return null;
+        }
+        return switch (diffSide) {
+            case "LEFT" -> PullRequestReviewComment.Side.LEFT;
+            case "RIGHT" -> PullRequestReviewComment.Side.RIGHT;
+            default -> null;
+        };
+    }
+
+    /**
+     * Internal method to process a raw GraphQL review thread with an existing client.
+     * <p>
+     * This method is used internally by methods that fetch threads directly from GraphQL API
+     * (syncCommentsForPullRequest, syncRemainingThreads) and need to process raw GraphQL types.
      *
      * @param graphQlThread the GraphQL review thread
      * @param pullRequest   the pull request the thread belongs to
+     * @param client        the GraphQL client to use for nested pagination
      * @return number of comments synced from this thread
      */
-    private int processThread(GHPullRequestReviewThread graphQlThread, PullRequest pullRequest) {
+    private int processThreadInternal(
+        GHPullRequestReviewThread graphQlThread,
+        PullRequest pullRequest,
+        HttpGraphQlClient client
+    ) {
         if (graphQlThread == null) {
             return 0;
         }
@@ -262,7 +591,7 @@ public class GitHubPullRequestReviewCommentSyncService {
         var commentsPageInfo = commentsConnection.getPageInfo();
         if (commentsPageInfo != null && Boolean.TRUE.equals(commentsPageInfo.getHasNextPage())) {
             // Fetch all remaining comments using pagination
-            fetchAllRemainingThreadComments(graphQlThread, commentsPageInfo.getEndCursor());
+            fetchAllRemainingThreadComments(graphQlThread.getId(), commentsConnection, commentsPageInfo.getEndCursor(), client);
         }
 
         var graphQlComments = commentsConnection.getNodes();
@@ -278,117 +607,50 @@ public class GitHubPullRequestReviewCommentSyncService {
             return 0;
         }
 
-        // Create or update the thread
-        PullRequestReviewThread thread = getOrCreateThread(threadId, graphQlThread, pullRequest);
+        // Create or update the thread, passing the first comment to set timestamps
+        PullRequestReviewThread thread = getOrCreateThreadFromGraphQl(threadId, graphQlThread, pullRequest, firstComment);
 
         int synced = 0;
+        PullRequestReviewComment rootComment = null;
         for (var graphQlComment : graphQlComments) {
             GitHubReviewCommentDTO dto = convertToDTO(graphQlComment, thread);
             if (dto != null) {
                 PullRequestReviewComment comment = commentProcessor.processCreated(dto, pullRequest.getId());
                 if (comment != null) {
                     synced++;
+                    // Track the first (root) comment
+                    if (rootComment == null) {
+                        rootComment = comment;
+                    }
                 }
             }
+        }
+
+        // Set the root comment on the thread if not already set
+        if (rootComment != null && thread.getRootComment() == null) {
+            thread.setRootComment(rootComment);
+            threadRepository.save(thread);
         }
 
         return synced;
     }
 
     /**
-     * Fetches all remaining comments for a thread when the initial query hit the pagination limit.
-     * This method modifies the graphQlThread's comments list in place by adding all fetched comments.
+     * Gets or creates a thread based on raw GraphQL data.
+     * <p>
+     * Used internally when processing threads fetched directly from GraphQL API.
      *
-     * @param graphQlThread the thread to fetch remaining comments for
-     * @param startCursor   the cursor to start fetching from
+     * @param threadId      the thread ID (first comment's databaseId)
+     * @param graphQlThread the GraphQL thread data
+     * @param pullRequest   the pull request the thread belongs to
+     * @param firstComment  the first comment in the thread (used for timestamps)
+     * @return the created or existing thread
      */
-    private void fetchAllRemainingThreadComments(GHPullRequestReviewThread graphQlThread, String startCursor) {
-        if (currentClient == null) {
-            log.warn("Skipped remaining thread comments: reason=noClientAvailable, threadId={}", graphQlThread.getId());
-            return;
-        }
-
-        String threadId = graphQlThread.getId();
-        GHPullRequestReviewCommentConnection existingComments = graphQlThread.getComments();
-        if (existingComments == null || existingComments.getNodes() == null) {
-            return;
-        }
-
-        // Create a mutable list to collect all comments
-        List<GHPullRequestReviewComment> allComments = new ArrayList<>(existingComments.getNodes());
-
-        String cursor = startCursor;
-        boolean hasMore = true;
-        int fetchedPages = 0;
-
-        while (hasMore) {
-            fetchedPages++;
-            if (fetchedPages > MAX_PAGINATION_PAGES) {
-                log.warn(
-                    "Reached maximum pagination limit for thread comments: threadId={}, limit={}",
-                    threadId,
-                    MAX_PAGINATION_PAGES
-                );
-                break;
-            }
-
-            try {
-                ClientGraphQlResponse response = currentClient
-                    .documentName(GET_THREAD_COMMENTS_DOCUMENT)
-                    .variable("threadId", threadId)
-                    .variable("first", LARGE_PAGE_SIZE)
-                    .variable("after", cursor)
-                    .execute()
-                    .block(GRAPHQL_TIMEOUT);
-
-                if (response == null || !response.isValid()) {
-                    log.warn(
-                        "Invalid GraphQL response for thread comments: threadId={}, errors={}",
-                        threadId,
-                        response != null ? response.getErrors() : "null"
-                    );
-                    break;
-                }
-
-                GHPullRequestReviewCommentConnection commentsConnection = response
-                    .field("node.comments")
-                    .toEntity(GHPullRequestReviewCommentConnection.class);
-
-                if (commentsConnection == null || commentsConnection.getNodes() == null) {
-                    break;
-                }
-
-                allComments.addAll(commentsConnection.getNodes());
-
-                GHPageInfo pageInfo = commentsConnection.getPageInfo();
-                hasMore = pageInfo != null && Boolean.TRUE.equals(pageInfo.getHasNextPage());
-                cursor = pageInfo != null ? pageInfo.getEndCursor() : null;
-            } catch (Exception e) {
-                log.error("Failed to fetch thread comments: threadId={}", threadId, e);
-                break;
-            }
-        }
-
-        // Update the thread's comments with the complete list
-        existingComments.setNodes(allComments);
-
-        if (fetchedPages > 0) {
-            log.debug(
-                "Fetched additional thread comments: threadId={}, pageCount={}, totalComments={}",
-                threadId,
-                fetchedPages,
-                allComments.size()
-            );
-        }
-    }
-
-    /**
-     * Gets or creates a thread based on GraphQL data.
-     */
-    private PullRequestReviewThread getOrCreateThread(
+    private PullRequestReviewThread getOrCreateThreadFromGraphQl(
         Long threadId,
         GHPullRequestReviewThread graphQlThread,
-        PullRequest pullRequest
+        PullRequest pullRequest,
+        GHPullRequestReviewComment firstComment
     ) {
         return threadRepository
             .findById(threadId)
@@ -405,13 +667,22 @@ public class GitHubPullRequestReviewCommentSyncService {
                 thread.setOutdated(graphQlThread.getIsOutdated());
                 thread.setCollapsed(graphQlThread.getIsCollapsed());
 
+                // Set timestamps from the first (root) comment
+                if (firstComment != null) {
+                    if (firstComment.getCreatedAt() != null) {
+                        thread.setCreatedAt(firstComment.getCreatedAt().toInstant());
+                    }
+                    if (firstComment.getUpdatedAt() != null) {
+                        thread.setUpdatedAt(firstComment.getUpdatedAt().toInstant());
+                    }
+                }
+
                 // Map resolved state and resolvedBy user
                 if (graphQlThread.getIsResolved()) {
                     thread.setState(PullRequestReviewThread.State.RESOLVED);
-                    // Set resolvedBy user if available
                     GHUser graphQlResolvedBy = graphQlThread.getResolvedBy();
                     if (graphQlResolvedBy != null) {
-                        GitHubUserDTO resolvedByDto = convertGraphQlUserToDto(graphQlResolvedBy);
+                        GitHubUserDTO resolvedByDto = GitHubUserDTO.fromUser(graphQlResolvedBy);
                         de.tum.in.www1.hephaestus.gitprovider.user.User resolvedBy = userProcessor.ensureExists(
                             resolvedByDto
                         );
@@ -423,24 +694,6 @@ public class GitHubPullRequestReviewCommentSyncService {
 
                 return threadRepository.save(thread);
             });
-    }
-
-    /**
-     * Converts a GraphQL GHUser to a GitHubUserDTO.
-     */
-    private GitHubUserDTO convertGraphQlUserToDto(GHUser graphQlUser) {
-        if (graphQlUser == null) {
-            return null;
-        }
-        return new GitHubUserDTO(
-            null, // nodeId
-            graphQlUser.getDatabaseId() != null ? graphQlUser.getDatabaseId().longValue() : null,
-            graphQlUser.getLogin(),
-            graphQlUser.getAvatarUrl() != null ? graphQlUser.getAvatarUrl().toString() : null,
-            null, // htmlUrl
-            graphQlUser.getName(),
-            graphQlUser.getEmail()
-        );
     }
 
     /**
@@ -536,13 +789,16 @@ public class GitHubPullRequestReviewCommentSyncService {
         // GraphQL comment doesn't have direct side field, use thread's side
         String side = (thread != null && thread.getSide() != null) ? thread.getSide().name() : null;
 
+        // Extract htmlUrl from GraphQL url field
+        String htmlUrl = graphQlComment.getUrl() != null ? graphQlComment.getUrl().toString() : null;
+
         return new GitHubReviewCommentDTO(
             databaseId, // id
             graphQlComment.getId(), // nodeId
             graphQlComment.getDiffHunk(), // diffHunk
             graphQlComment.getPath(), // path
             graphQlComment.getBody(), // body
-            null, // htmlUrl - not directly available in GraphQL, would need resourcePath
+            htmlUrl, // htmlUrl - from GraphQL url field
             author, // author
             graphQlComment.getCreatedAt() != null ? graphQlComment.getCreatedAt().toInstant() : null, // createdAt
             graphQlComment.getUpdatedAt() != null ? graphQlComment.getUpdatedAt().toInstant() : null, // updatedAt
@@ -584,5 +840,184 @@ public class GitHubPullRequestReviewCommentSyncService {
             case LEFT -> PullRequestReviewComment.Side.LEFT;
             case RIGHT -> PullRequestReviewComment.Side.RIGHT;
         };
+    }
+
+    /**
+     * Synchronizes remaining review threads for a pull request, starting from the given cursor.
+     * <p>
+     * This method is called by GitHubPullRequestSyncService when a PR has more than 10 review threads
+     * (the embedded limit in GetRepositoryPullRequests query). It continues pagination from where
+     * the embedded threads left off, avoiding re-fetching already synced threads.
+     *
+     * @param scopeId     the scope ID for authentication
+     * @param pullRequest the pull request to fetch remaining threads for
+     * @param startCursor the pagination cursor to start from (from embedded threads)
+     * @return number of additional comments synced
+     */
+    @Transactional
+    public int syncRemainingThreads(Long scopeId, PullRequest pullRequest, String startCursor) {
+        if (pullRequest == null) {
+            log.warn("Skipped remaining thread sync: reason=prIsNull");
+            return 0;
+        }
+
+        Repository repository = pullRequest.getRepository();
+        if (repository == null) {
+            log.warn("Skipped remaining thread sync: reason=prHasNoRepository, prId={}", pullRequest.getId());
+            return 0;
+        }
+
+        String safeNameWithOwner = sanitizeForLog(repository.getNameWithOwner());
+        Optional<RepositoryOwnerAndName> parsedName = GitHubRepositoryNameParser.parse(repository.getNameWithOwner());
+        if (parsedName.isEmpty()) {
+            log.warn("Skipped remaining thread sync: reason=invalidRepoNameFormat, repoName={}", safeNameWithOwner);
+            return 0;
+        }
+        String owner = parsedName.get().owner();
+        String name = parsedName.get().name();
+
+        HttpGraphQlClient client = graphQlClientProvider.forScope(scopeId);
+
+        log.debug(
+            "Starting remaining thread sync: repoName={}, prNumber={}, startCursor={}",
+            safeNameWithOwner,
+            pullRequest.getNumber(),
+            startCursor != null ? startCursor.substring(0, Math.min(20, startCursor.length())) + "..." : "null"
+        );
+
+        try {
+            int totalSynced = 0;
+            String cursor = startCursor;
+            boolean hasNextPage = true;
+            int pageCount = 0;
+
+            while (hasNextPage) {
+                pageCount++;
+                if (pageCount >= MAX_PAGINATION_PAGES) {
+                    log.warn(
+                        "Reached maximum pagination limit for remaining thread sync: repoName={}, prNumber={}, limit={}",
+                        safeNameWithOwner,
+                        pullRequest.getNumber(),
+                        MAX_PAGINATION_PAGES
+                    );
+                    break;
+                }
+
+                ClientGraphQlResponse graphQlResponse = client
+                    .documentName(GET_PR_REVIEW_COMMENTS_DOCUMENT)
+                    .variable("owner", owner)
+                    .variable("name", name)
+                    .variable("number", pullRequest.getNumber())
+                    .variable("first", DEFAULT_PAGE_SIZE)
+                    .variable("after", cursor)
+                    .execute()
+                    .block(syncProperties.getExtendedGraphqlTimeout());
+
+                if (graphQlResponse == null || !graphQlResponse.isValid()) {
+                    log.warn(
+                        "Received invalid GraphQL response: repoName={}, prNumber={}, errors={}",
+                        safeNameWithOwner,
+                        pullRequest.getNumber(),
+                        graphQlResponse != null ? graphQlResponse.getErrors() : "null"
+                    );
+                    break;
+                }
+
+                // Track rate limit from response
+                graphQlClientProvider.trackRateLimit(graphQlResponse);
+
+                // Check if we should pause due to rate limiting
+                if (graphQlClientProvider.isRateLimitCritical()) {
+                    log.warn(
+                        "Aborting remaining thread sync due to critical rate limit: repoName={}, prNumber={}",
+                        safeNameWithOwner,
+                        pullRequest.getNumber()
+                    );
+                    break;
+                }
+
+                GHPullRequestReviewThreadConnection response = graphQlResponse
+                    .field("repository.pullRequest.reviewThreads")
+                    .toEntity(GHPullRequestReviewThreadConnection.class);
+
+                if (response == null || response.getNodes() == null) {
+                    break;
+                }
+
+                for (var graphQlThread : response.getNodes()) {
+                    int synced = processThreadInternal(graphQlThread, pullRequest, client);
+                    totalSynced += synced;
+                }
+
+                var pageInfo = response.getPageInfo();
+                hasNextPage = pageInfo != null && Boolean.TRUE.equals(pageInfo.getHasNextPage());
+                cursor = pageInfo != null ? pageInfo.getEndCursor() : null;
+            }
+
+            log.debug(
+                "Completed remaining thread sync: repoName={}, prNumber={}, additionalComments={}",
+                safeNameWithOwner,
+                pullRequest.getNumber(),
+                totalSynced
+            );
+            return totalSynced;
+        } catch (InstallationNotFoundException e) {
+            throw e;
+        } catch (FieldAccessException e) {
+            if (isNotFoundError(e.getResponse(), "repository.pullRequest")) {
+                log.debug(
+                    "Skipped remaining thread sync: reason=prDeletedFromGitHub, repoName={}, prNumber={}",
+                    safeNameWithOwner,
+                    pullRequest.getNumber()
+                );
+                return 0;
+            }
+            log.error(
+                "Failed to sync remaining threads: repoName={}, prNumber={}",
+                safeNameWithOwner,
+                pullRequest.getNumber(),
+                e
+            );
+            return 0;
+        } catch (Exception e) {
+            ClassificationResult classification = exceptionClassifier.classifyWithDetails(e);
+            switch (classification.category()) {
+                case RATE_LIMITED -> log.warn(
+                    "Rate limited during remaining thread sync: repoName={}, prNumber={}, message={}",
+                    safeNameWithOwner,
+                    pullRequest.getNumber(),
+                    classification.message()
+                );
+                case NOT_FOUND -> log.warn(
+                    "Resource not found during remaining thread sync: repoName={}, prNumber={}, message={}",
+                    safeNameWithOwner,
+                    pullRequest.getNumber(),
+                    classification.message()
+                );
+                case AUTH_ERROR -> {
+                    log.error(
+                        "Authentication error during remaining thread sync: repoName={}, prNumber={}, message={}",
+                        safeNameWithOwner,
+                        pullRequest.getNumber(),
+                        classification.message()
+                    );
+                    throw e;
+                }
+                case RETRYABLE -> log.warn(
+                    "Retryable error during remaining thread sync: repoName={}, prNumber={}, message={}",
+                    safeNameWithOwner,
+                    pullRequest.getNumber(),
+                    classification.message()
+                );
+                default -> log.error(
+                    "Unexpected error during remaining thread sync: repoName={}, prNumber={}, message={}",
+                    safeNameWithOwner,
+                    pullRequest.getNumber(),
+                    classification.message(),
+                    e
+                );
+            }
+            return 0;
+        }
     }
 }

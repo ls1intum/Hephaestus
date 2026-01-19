@@ -77,8 +77,8 @@ public abstract class BaseGitHubProcessor {
                 } else {
                     user.setHtmlUrl("https://github.com/" + dto.login());
                 }
-                // Default type to USER
-                user.setType(User.Type.USER);
+                // Set type from DTO (BOT, USER, or ORGANIZATION)
+                user.setType(dto.getEffectiveType());
                 return userRepository.save(user);
             });
     }

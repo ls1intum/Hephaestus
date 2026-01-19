@@ -129,6 +129,13 @@ public class GitHubMilestoneProcessor {
         if (dto.closedIssuesCount() != null) {
             milestone.setClosedIssuesCount(dto.closedIssuesCount());
         }
+        // Set timestamps if provided
+        if (dto.createdAt() != null) {
+            milestone.setCreatedAt(dto.createdAt());
+        }
+        if (dto.updatedAt() != null) {
+            milestone.setUpdatedAt(dto.updatedAt());
+        }
         milestone.setRepository(repository);
 
         // Set creator if provided

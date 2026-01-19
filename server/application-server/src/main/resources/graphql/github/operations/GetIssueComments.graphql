@@ -5,6 +5,7 @@
 query GetIssueComments($owner: String!, $name: String!, $number: Int!, $first: Int!, $after: String) {
     rateLimit {
         cost
+        limit
         remaining
         resetAt
     }
@@ -32,6 +33,7 @@ query GetIssueComments($owner: String!, $name: String!, $number: Int!, $first: I
                             databaseId
                             login
                             avatarUrl
+                            createdAt
                         }
                         ... on Bot {
                             id

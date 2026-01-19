@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.8.xsd">
+
+    <!--
+        Fix misclassified bot users.
+
+        Bot accounts (e.g., github-actions[bot], dependabot[bot], coderabbitai[bot])
+        were incorrectly stored with type 'USER' instead of 'BOT' due to a bug
+        where the type information from GraphQL responses was not being propagated
+        to the user creation logic.
+
+        This migration identifies bot accounts by their login pattern (ending in [bot])
+        and updates their type to 'BOT'.
+    -->
+    <changeSet id="1768773474000-fix-bot-user-types" author="system">
+        <comment>Update misclassified bot users to have type BOT</comment>
+        <sql>
+            UPDATE "user"
+            SET type = 'BOT'
+            WHERE login LIKE '%[bot]'
+            AND type != 'BOT';
+        </sql>
+    </changeSet>
+
+</databaseChangeLog>

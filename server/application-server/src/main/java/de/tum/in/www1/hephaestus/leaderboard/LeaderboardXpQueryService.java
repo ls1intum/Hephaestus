@@ -1,7 +1,6 @@
 package de.tum.in.www1.hephaestus.leaderboard;
 
 import static java.util.function.Function.identity;
-import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toMap;
 import static java.util.stream.Collectors.toSet;
 
@@ -18,7 +17,6 @@ import java.util.Map;
 import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -49,22 +47,6 @@ public class LeaderboardXpQueryService {
     }
 
     /**
-     * Builds a deterministic cache key from team IDs.
-     *
-     * <p>This method is called via SpEL from the @Cacheable annotation to ensure
-     * consistent cache keys regardless of Set implementation.
-     *
-     * @param teamIds the team IDs to create a key from
-     * @return sorted, comma-joined string of team IDs (empty string if empty)
-     */
-    public String buildTeamIdsCacheKey(Set<Long> teamIds) {
-        if (teamIds == null || teamIds.isEmpty()) {
-            return "";
-        }
-        return teamIds.stream().sorted().map(String::valueOf).collect(joining(","));
-    }
-
-    /**
      * Get XP totals for all actors in a workspace timeframe.
      *
      * @param workspaceId the workspace
@@ -80,25 +62,13 @@ public class LeaderboardXpQueryService {
     /**
      * Get XP totals for actors in specific teams.
      *
-     * <p>Results are cached for 60 seconds (TTL) to reduce database load on hot leaderboard queries.
-     * The cache is also eagerly evicted when new activity events are recorded via
-     * {@link de.tum.in.www1.hephaestus.activity.ActivityEventService}.
-     *
-     * <p>Cache metrics (hits, misses, evictions, size) are exposed via Micrometer
-     * under the {@code cache.*} namespace with tag {@code cache=leaderboardXp}.
-     *
      * @param workspaceId the workspace
      * @param since start of timeframe (inclusive)
      * @param until end of timeframe (exclusive)
      * @param teamIds team IDs to filter by (empty = all teams)
      * @return map of actor ID to XP data
-     * @see de.tum.in.www1.hephaestus.config.CacheConfig
      */
     @Transactional(readOnly = true)
-    @Cacheable(
-        value = "leaderboardXp",
-        key = "#workspaceId + '_' + #since.toEpochMilli() + '_' + #until.toEpochMilli() + '_' + #root.target.buildTeamIdsCacheKey(#teamIds)"
-    )
     public Map<Long, LeaderboardUserXp> getLeaderboardData(
         Long workspaceId,
         Instant since,

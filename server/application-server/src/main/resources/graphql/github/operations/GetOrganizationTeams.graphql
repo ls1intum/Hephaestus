@@ -4,6 +4,7 @@
 query GetOrganizationTeams($login: String!, $first: Int!, $after: String) {
     rateLimit {
         cost
+        limit
         remaining
         resetAt
     }

@@ -6,6 +6,7 @@
 query GetReviewComments($reviewId: ID!, $first: Int!, $after: String) {
     rateLimit {
         cost
+        limit
         remaining
         resetAt
     }
@@ -31,6 +32,7 @@ query GetReviewComments($reviewId: ID!, $first: Int!, $after: String) {
                     createdAt
                     updatedAt
                     state
+                    url
                     authorAssociation
 
                     # Comment author
@@ -42,6 +44,7 @@ query GetReviewComments($reviewId: ID!, $first: Int!, $after: String) {
                             login
                             avatarUrl
                             name
+                            createdAt
                         }
                         ... on Bot {
                             id

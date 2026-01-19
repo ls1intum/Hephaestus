@@ -2,6 +2,7 @@ package de.tum.in.www1.hephaestus.gitprovider.sync;
 
 import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.github.ExponentialBackoff;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandlerRegistry;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.NatsSubscriptionProvider;
@@ -170,6 +171,7 @@ public class NatsConsumerService {
 
     private void connectWithRetry() {
         Options options = buildNatsOptions();
+        int attempt = 0;
 
         while (!shuttingDown.get()) {
             try {
@@ -181,8 +183,16 @@ public class NatsConsumerService {
                 Thread.currentThread().interrupt();
                 return;
             } catch (IOException e) {
-                log.error("Failed to connect to NATS: server={}", natsServer, e);
-                backoffBeforeRetry();
+                long delayMs = ExponentialBackoff.calculateDelay(attempt);
+                log.error(
+                    "Failed to connect to NATS: server={}, attempt={}, nextRetryDelayMs={}",
+                    natsServer,
+                    attempt,
+                    delayMs,
+                    e
+                );
+                backoffBeforeRetry(attempt);
+                attempt++;
             }
         }
     }
@@ -560,9 +570,18 @@ public class NatsConsumerService {
         }
     }
 
-    private void backoffBeforeRetry() {
+    /**
+     * Sleeps using exponential backoff with jitter before retrying a failed operation.
+     * <p>
+     * Uses the formula: {@code wait_time = min(base_delay * 2^attempt + random(0, 1000), max_delay)}
+     * <p>
+     * This prevents thundering herd issues when multiple instances retry simultaneously.
+     *
+     * @param attempt the current retry attempt number (0-based)
+     */
+    private void backoffBeforeRetry(int attempt) {
         try {
-            Thread.sleep(reconnectDelaySeconds * 1000L);
+            ExponentialBackoff.sleep(attempt);
         } catch (InterruptedException interrupted) {
             Thread.currentThread().interrupt();
         }

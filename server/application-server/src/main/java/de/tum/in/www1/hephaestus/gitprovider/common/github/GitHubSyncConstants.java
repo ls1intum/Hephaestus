@@ -1,7 +1,5 @@
 package de.tum.in.www1.hephaestus.gitprovider.common.github;
 
-import java.time.Duration;
-
 /**
  * Constants used across GitHub synchronization services.
  * <p>
@@ -35,10 +33,22 @@ public final class GitHubSyncConstants {
     /**
      * Default page size for GraphQL queries (100 items per page).
      * <p>
-     * Used for most sync operations like issues, pull requests, and comments.
+     * Used for most sync operations like issues and comments.
      * GitHub API allows up to 100 items per page, so we use the maximum to minimize API calls.
      */
     public static final int DEFAULT_PAGE_SIZE = 100;
+
+    /**
+     * Page size for pull request sync GraphQL queries.
+     * <p>
+     * Uses a smaller page size (25) because the PR query has triple-nested pagination:
+     * pullRequests -> reviewThreads -> comments, which creates exponential data volume.
+     * With 100 PRs, the worst case is 100 x 10 threads x 10 comments = 10,000 review comments
+     * per query, causing GitHub API timeouts (502 errors) on large repositories.
+     * <p>
+     * With 25 PRs per page: 25 x 10 x 10 = 2,500 review comments - much more manageable.
+     */
+    public static final int PR_SYNC_PAGE_SIZE = 25;
 
     /**
      * Large page size for GraphQL queries (100 items per page).
@@ -57,18 +67,4 @@ public final class GitHubSyncConstants {
      */
     public static final int MAX_PAGINATION_PAGES = 1000;
 
-    /**
-     * Default timeout for GraphQL operations.
-     * <p>
-     * Used when blocking on reactive GraphQL client responses.
-     */
-    public static final Duration GRAPHQL_TIMEOUT = Duration.ofSeconds(30);
-
-    /**
-     * Extended timeout for complex GraphQL operations.
-     * <p>
-     * Used for operations that may take longer, such as syncing review comments
-     * with nested thread structures.
-     */
-    public static final Duration EXTENDED_GRAPHQL_TIMEOUT = Duration.ofSeconds(60);
 }

@@ -3,13 +3,16 @@ package de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.github;
 import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlErrorUtils.isNotFoundError;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.DEFAULT_PAGE_SIZE;
-import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.GRAPHQL_TIMEOUT;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.LARGE_PAGE_SIZE;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.MAX_PAGINATION_PAGES;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.exception.InstallationNotFoundException;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier.ClassificationResult;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser.RepositoryOwnerAndName;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncProperties;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHPageInfo;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHPullRequestReview;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHPullRequestReviewComment;
@@ -51,17 +54,23 @@ public class GitHubPullRequestReviewSyncService {
     private final PullRequestRepository pullRequestRepository;
     private final GitHubGraphQlClientProvider graphQlClientProvider;
     private final GitHubPullRequestReviewProcessor reviewProcessor;
+    private final GitHubSyncProperties syncProperties;
+    private final GitHubExceptionClassifier exceptionClassifier;
 
     public GitHubPullRequestReviewSyncService(
         RepositoryRepository repositoryRepository,
         PullRequestRepository pullRequestRepository,
         GitHubGraphQlClientProvider graphQlClientProvider,
-        GitHubPullRequestReviewProcessor reviewProcessor
+        GitHubPullRequestReviewProcessor reviewProcessor,
+        GitHubSyncProperties syncProperties,
+        GitHubExceptionClassifier exceptionClassifier
     ) {
         this.repositoryRepository = repositoryRepository;
         this.pullRequestRepository = pullRequestRepository;
         this.graphQlClientProvider = graphQlClientProvider;
         this.reviewProcessor = reviewProcessor;
+        this.syncProperties = syncProperties;
+        this.exceptionClassifier = exceptionClassifier;
     }
 
     /**
@@ -180,7 +189,7 @@ public class GitHubPullRequestReviewSyncService {
                     .variable("first", DEFAULT_PAGE_SIZE)
                     .variable("after", cursor)
                     .execute()
-                    .block(GRAPHQL_TIMEOUT);
+                    .block(syncProperties.getGraphqlTimeout());
 
                 if (response == null || !response.isValid()) {
                     // Check if this is a NOT_FOUND error (PR deleted from GitHub)
@@ -197,6 +206,20 @@ public class GitHubPullRequestReviewSyncService {
                         safeNameWithOwner,
                         pullRequest.getNumber(),
                         response != null ? response.getErrors() : "null"
+                    );
+                    break;
+                }
+
+                // Track rate limit from response
+                graphQlClientProvider.trackRateLimit(response);
+
+                // Check if we should pause due to rate limiting
+                if (graphQlClientProvider.isRateLimitCritical()) {
+                    log.warn(
+                        "Aborting review sync due to critical rate limit: repoName={}, prNumber={}, pageCount={}",
+                        safeNameWithOwner,
+                        pullRequest.getNumber(),
+                        pageCount
                     );
                     break;
                 }
@@ -232,6 +255,12 @@ public class GitHubPullRequestReviewSyncService {
                 GHPageInfo pageInfo = connection.getPageInfo();
                 hasMore = pageInfo != null && Boolean.TRUE.equals(pageInfo.getHasNextPage());
                 cursor = pageInfo != null ? pageInfo.getEndCursor() : null;
+            } catch (InstallationNotFoundException e) {
+                log.warn(
+                    "Installation not found for repository {}, skipping review sync",
+                    safeNameWithOwner
+                );
+                return 0;
             } catch (FieldAccessException e) {
                 // Check if this is a NOT_FOUND error (PR deleted from GitHub)
                 if (isNotFoundError(e.getResponse(), "repository.pullRequest")) {
@@ -250,12 +279,43 @@ public class GitHubPullRequestReviewSyncService {
                 );
                 break;
             } catch (Exception e) {
-                log.error(
-                    "Failed to sync reviews: repoName={}, prNumber={}",
-                    safeNameWithOwner,
-                    pullRequest.getNumber(),
-                    e
-                );
+                ClassificationResult classification = exceptionClassifier.classifyWithDetails(e);
+                switch (classification.category()) {
+                    case RATE_LIMITED -> log.warn(
+                        "Rate limited during review sync: repoName={}, prNumber={}, message={}",
+                        safeNameWithOwner,
+                        pullRequest.getNumber(),
+                        classification.message()
+                    );
+                    case NOT_FOUND -> log.warn(
+                        "Resource not found during review sync: repoName={}, prNumber={}, message={}",
+                        safeNameWithOwner,
+                        pullRequest.getNumber(),
+                        classification.message()
+                    );
+                    case AUTH_ERROR -> {
+                        log.error(
+                            "Authentication error during review sync: repoName={}, prNumber={}, message={}",
+                            safeNameWithOwner,
+                            pullRequest.getNumber(),
+                            classification.message()
+                        );
+                        throw e;
+                    }
+                    case RETRYABLE -> log.warn(
+                        "Retryable error during review sync: repoName={}, prNumber={}, message={}",
+                        safeNameWithOwner,
+                        pullRequest.getNumber(),
+                        classification.message()
+                    );
+                    default -> log.error(
+                        "Unexpected error during review sync: repoName={}, prNumber={}, message={}",
+                        safeNameWithOwner,
+                        pullRequest.getNumber(),
+                        classification.message(),
+                        e
+                    );
+                }
                 break;
             }
         }
@@ -313,7 +373,7 @@ public class GitHubPullRequestReviewSyncService {
                     .variable("first", LARGE_PAGE_SIZE)
                     .variable("after", cursor)
                     .execute()
-                    .block(GRAPHQL_TIMEOUT);
+                    .block(syncProperties.getGraphqlTimeout());
 
                 if (response == null || !response.isValid()) {
                     log.warn(
@@ -321,6 +381,15 @@ public class GitHubPullRequestReviewSyncService {
                         reviewId,
                         response != null ? response.getErrors() : "null"
                     );
+                    break;
+                }
+
+                // Track rate limit from response
+                graphQlClientProvider.trackRateLimit(response);
+
+                // Check if we should pause due to rate limiting
+                if (graphQlClientProvider.isRateLimitCritical()) {
+                    log.warn("Aborting review comments fetch due to critical rate limit: reviewId={}", reviewId);
                     break;
                 }
 
@@ -338,7 +407,38 @@ public class GitHubPullRequestReviewSyncService {
                 hasMore = pageInfo != null && Boolean.TRUE.equals(pageInfo.getHasNextPage());
                 cursor = pageInfo != null ? pageInfo.getEndCursor() : null;
             } catch (Exception e) {
-                log.error("Failed to fetch additional review comments: reviewId={}", reviewId, e);
+                ClassificationResult classification = exceptionClassifier.classifyWithDetails(e);
+                switch (classification.category()) {
+                    case RATE_LIMITED -> log.warn(
+                        "Rate limited during review comments fetch: reviewId={}, message={}",
+                        reviewId,
+                        classification.message()
+                    );
+                    case NOT_FOUND -> log.warn(
+                        "Resource not found during review comments fetch: reviewId={}, message={}",
+                        reviewId,
+                        classification.message()
+                    );
+                    case AUTH_ERROR -> {
+                        log.error(
+                            "Authentication error during review comments fetch: reviewId={}, message={}",
+                            reviewId,
+                            classification.message()
+                        );
+                        throw e;
+                    }
+                    case RETRYABLE -> log.warn(
+                        "Retryable error during review comments fetch: reviewId={}, message={}",
+                        reviewId,
+                        classification.message()
+                    );
+                    default -> log.error(
+                        "Unexpected error during review comments fetch: reviewId={}, message={}",
+                        reviewId,
+                        classification.message(),
+                        e
+                    );
+                }
                 break;
             }
         }

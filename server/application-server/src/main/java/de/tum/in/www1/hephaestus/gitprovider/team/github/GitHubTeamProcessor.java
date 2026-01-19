@@ -68,6 +68,12 @@ public class GitHubTeamProcessor {
         if (dto.privacy() != null) {
             team.setPrivacy(mapPrivacy(dto.privacy()));
         }
+        if (dto.createdAt() != null) {
+            team.setCreatedAt(dto.createdAt());
+        }
+        if (dto.updatedAt() != null) {
+            team.setUpdatedAt(dto.updatedAt());
+        }
         if (isNew && orgLogin != null) {
             team.setOrganization(orgLogin);
         }

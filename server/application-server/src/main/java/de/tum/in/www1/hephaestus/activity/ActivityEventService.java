@@ -28,7 +28,6 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <p>Idempotent via unique constraint on event_key.
  * Retries transient database errors up to 3 times with exponential backoff.
- * Evicts leaderboard cache on successful writes to ensure freshness.
  *
  * <h3>Security Model</h3>
  * <p><strong>INTERNAL API - NOT FOR DIRECT CONTROLLER USE.</strong>
@@ -58,7 +57,6 @@ public class ActivityEventService {
     private final ActivityEventRepository eventRepository;
     private final WorkspaceRepository workspaceRepository;
     private final ExperiencePointProperties xpProperties;
-    private final LeaderboardCacheManager cacheManager;
     private final Counter eventsRecordedCounter;
     private final Counter eventsDuplicateCounter;
     private final Counter eventsFailedCounter;
@@ -73,13 +71,11 @@ public class ActivityEventService {
         ActivityEventRepository eventRepository,
         WorkspaceRepository workspaceRepository,
         ExperiencePointProperties xpProperties,
-        LeaderboardCacheManager cacheManager,
         MeterRegistry meterRegistry
     ) {
         this.eventRepository = eventRepository;
         this.workspaceRepository = workspaceRepository;
         this.xpProperties = xpProperties;
-        this.cacheManager = cacheManager;
         this.eventsRecordedCounter = Counter.builder("activity.events.recorded")
             .description("Number of activity events recorded")
             .register(meterRegistry);
@@ -120,8 +116,6 @@ public class ActivityEventService {
      * <p>This method is idempotent: duplicate events (same event_key) are silently ignored.
      *
      * <p>Retries up to 3 times on transient database errors with exponential backoff.
-     *
-     * <p>Evicts the leaderboard cache on successful writes to ensure real-time accuracy.
      *
      * @return true if recorded successfully, false if:
      *         <ul>
@@ -203,9 +197,6 @@ public class ActivityEventService {
 
             eventsRecordedCounter.increment();
             xpDistribution.record(roundedXp);
-
-            // Evict cache only for this workspace (granular invalidation)
-            cacheManager.evictWorkspace(workspaceId);
 
             // Structured logging with trace context
             log.info(

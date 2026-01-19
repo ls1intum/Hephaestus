@@ -264,6 +264,42 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
         repositoryToMonitorRepository.deleteById(syncTargetId);
     }
 
+    @Override
+    @Transactional
+    public void updateIssueSyncCursor(Long syncTargetId, String cursor) {
+        repositoryToMonitorRepository
+            .findById(syncTargetId)
+            .ifPresentOrElse(
+                rtm -> {
+                    rtm.setIssueSyncCursor(cursor);
+                    repositoryToMonitorRepository.save(rtm);
+                },
+                () ->
+                    log.warn(
+                        "Failed to update issue sync cursor: reason=syncTargetNotFound, syncTargetId={}",
+                        syncTargetId
+                    )
+            );
+    }
+
+    @Override
+    @Transactional
+    public void updatePullRequestSyncCursor(Long syncTargetId, String cursor) {
+        repositoryToMonitorRepository
+            .findById(syncTargetId)
+            .ifPresentOrElse(
+                rtm -> {
+                    rtm.setPullRequestSyncCursor(cursor);
+                    repositoryToMonitorRepository.save(rtm);
+                },
+                () ->
+                    log.warn(
+                        "Failed to update PR sync cursor: reason=syncTargetNotFound, syncTargetId={}",
+                        syncTargetId
+                    )
+            );
+    }
+
     // ═══════════════════════════════════════════════════════════════════════════
     // SYNC SESSIONS
     // ═══════════════════════════════════════════════════════════════════════════

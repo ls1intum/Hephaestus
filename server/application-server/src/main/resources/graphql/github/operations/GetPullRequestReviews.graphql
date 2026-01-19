@@ -5,6 +5,7 @@
 query GetPullRequestReviews($owner: String!, $name: String!, $number: Int!, $first: Int!, $after: String) {
     rateLimit {
         cost
+        limit
         remaining
         resetAt
     }
@@ -39,6 +40,7 @@ query GetPullRequestReviews($owner: String!, $name: String!, $number: Int!, $fir
                             databaseId
                             login
                             avatarUrl
+                            createdAt
                         }
                         ... on Bot {
                             id
@@ -75,6 +77,7 @@ query GetPullRequestReviews($owner: String!, $name: String!, $number: Int!, $fir
                                     databaseId
                                     login
                                     avatarUrl
+                                    createdAt
                                 }
                                 ... on Bot {
                                     id

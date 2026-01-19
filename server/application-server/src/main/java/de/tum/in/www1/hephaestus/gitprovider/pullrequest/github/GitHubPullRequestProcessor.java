@@ -18,6 +18,7 @@ import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.github.dto.GitHubUserDTO;
+import java.time.Instant;
 import java.util.HashSet;
 import java.util.Objects;
 import java.util.Optional;
@@ -84,6 +85,7 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
 
         if (isNew) {
             pr = createPullRequest(dto, context.repository());
+            pr.setLastSyncAt(Instant.now());
             pr = pullRequestRepository.save(pr);
             eventPublisher.publishEvent(
                 new DomainEvent.PullRequestCreated(EventPayload.PullRequestData.from(pr), EventContext.from(context))
@@ -92,6 +94,7 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
         } else {
             pr = existingOpt.get();
             Set<String> changedFields = updatePullRequest(dto, pr, context.repository());
+            pr.setLastSyncAt(Instant.now());
             pr = pullRequestRepository.save(pr);
 
             if (!changedFields.isEmpty()) {

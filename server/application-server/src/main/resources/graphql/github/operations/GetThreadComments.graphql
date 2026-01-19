@@ -7,6 +7,7 @@
 query GetThreadComments($threadId: ID!, $first: Int!, $after: String) {
     rateLimit {
         cost
+        limit
         remaining
         resetAt
     }
@@ -32,6 +33,7 @@ query GetThreadComments($threadId: ID!, $first: Int!, $after: String) {
                     createdAt
                     updatedAt
                     state
+                    url
                     authorAssociation
 
                     # Comment author - supports both User and Bot types
@@ -44,6 +46,7 @@ query GetThreadComments($threadId: ID!, $first: Int!, $after: String) {
                             avatarUrl
                             name
                             email
+                            createdAt
                         }
                         ... on Bot {
                             __typename

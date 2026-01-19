@@ -120,7 +120,8 @@ public class GitHubPullRequestReviewProcessor {
         review.setId(dto.id());
         review.setBody(dto.body());
         review.setState(mapState(dto.state()));
-        review.setSubmittedAt(dto.submittedAt());
+        // Use submittedAt from DTO, fallback to PR createdAt (review can't predate PR)
+        review.setSubmittedAt(dto.submittedAt() != null ? dto.submittedAt() : pr.getCreatedAt());
         review.setHtmlUrl(dto.htmlUrl() != null ? dto.htmlUrl() : "");
         review.setPullRequest(pr);
         review.setCommitId(dto.commitId());

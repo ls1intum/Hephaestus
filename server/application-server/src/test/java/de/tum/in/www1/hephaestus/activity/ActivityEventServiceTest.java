@@ -36,9 +36,6 @@ class ActivityEventServiceTest {
     @Mock
     private ExperiencePointProperties xpProperties;
 
-    @Mock
-    private LeaderboardCacheManager cacheManager;
-
     private MeterRegistry meterRegistry;
     private ActivityEventService service;
 
@@ -51,7 +48,6 @@ class ActivityEventServiceTest {
             eventRepository,
             workspaceRepository,
             xpProperties,
-            cacheManager,
             meterRegistry
         );
     }

@@ -1,12 +1,16 @@
 package de.tum.in.www1.hephaestus.gitprovider.milestone.github;
 
 import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
-import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.*;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.LARGE_PAGE_SIZE;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.MAX_PAGINATION_PAGES;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.exception.InstallationNotFoundException;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier.ClassificationResult;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncProperties;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser.RepositoryOwnerAndName;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHMilestone;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHMilestoneConnection;
@@ -16,12 +20,14 @@ import de.tum.in.www1.hephaestus.gitprovider.milestone.MilestoneRepository;
 import de.tum.in.www1.hephaestus.gitprovider.milestone.github.dto.GitHubMilestoneDTO;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
+import de.tum.in.www1.hephaestus.gitprovider.user.github.dto.GitHubUserDTO;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.graphql.client.ClientGraphQlResponse;
 import org.springframework.graphql.client.HttpGraphQlClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -42,17 +48,23 @@ public class GitHubMilestoneSyncService {
     private final RepositoryRepository repositoryRepository;
     private final GitHubGraphQlClientProvider graphQlClientProvider;
     private final GitHubMilestoneProcessor milestoneProcessor;
+    private final GitHubSyncProperties syncProperties;
+    private final GitHubExceptionClassifier exceptionClassifier;
 
     public GitHubMilestoneSyncService(
         MilestoneRepository milestoneRepository,
         RepositoryRepository repositoryRepository,
         GitHubGraphQlClientProvider graphQlClientProvider,
-        GitHubMilestoneProcessor milestoneProcessor
+        GitHubMilestoneProcessor milestoneProcessor,
+        GitHubSyncProperties syncProperties,
+        GitHubExceptionClassifier exceptionClassifier
     ) {
         this.milestoneRepository = milestoneRepository;
         this.repositoryRepository = repositoryRepository;
         this.graphQlClientProvider = graphQlClientProvider;
         this.milestoneProcessor = milestoneProcessor;
+        this.syncProperties = syncProperties;
+        this.exceptionClassifier = exceptionClassifier;
     }
 
     /**
@@ -100,15 +112,39 @@ public class GitHubMilestoneSyncService {
                     break;
                 }
 
-                GHMilestoneConnection response = client
+                ClientGraphQlResponse graphQlResponse = client
                     .documentName(GET_MILESTONES_DOCUMENT)
                     .variable("owner", owner)
                     .variable("name", name)
                     .variable("first", LARGE_PAGE_SIZE)
                     .variable("after", cursor)
-                    .retrieve("repository.milestones")
-                    .toEntity(GHMilestoneConnection.class)
-                    .block(GRAPHQL_TIMEOUT);
+                    .execute()
+                    .block(syncProperties.getGraphqlTimeout());
+
+                if (graphQlResponse == null || !graphQlResponse.isValid()) {
+                    log.warn(
+                        "Received invalid GraphQL response: repoName={}, errors={}",
+                        safeNameWithOwner,
+                        graphQlResponse != null ? graphQlResponse.getErrors() : "null"
+                    );
+                    break;
+                }
+
+                // Track rate limit from response
+                graphQlClientProvider.trackRateLimit(graphQlResponse);
+
+                // Check if we should pause due to rate limiting
+                if (graphQlClientProvider.isRateLimitCritical()) {
+                    log.warn(
+                        "Aborting milestone sync due to critical rate limit: repoName={}",
+                        safeNameWithOwner
+                    );
+                    break;
+                }
+
+                GHMilestoneConnection response = graphQlResponse
+                    .field("repository.milestones")
+                    .toEntity(GHMilestoneConnection.class);
 
                 if (response == null || response.getNodes() == null) {
                     break;
@@ -116,7 +152,8 @@ public class GitHubMilestoneSyncService {
 
                 for (var graphQlMilestone : response.getNodes()) {
                     GitHubMilestoneDTO dto = convertToDTO(graphQlMilestone);
-                    Milestone milestone = milestoneProcessor.process(dto, repository, null, context);
+                    GitHubUserDTO creatorDto = GitHubUserDTO.fromActor(graphQlMilestone.getCreator());
+                    Milestone milestone = milestoneProcessor.process(dto, repository, creatorDto, context);
                     if (milestone != null) {
                         syncedNumbers.add(milestone.getNumber());
                         totalSynced++;
@@ -142,7 +179,43 @@ public class GitHubMilestoneSyncService {
             // Re-throw to abort the entire sync operation
             throw e;
         } catch (Exception e) {
-            log.error("Failed to sync milestones: repoName={}, scopeId={}", safeNameWithOwner, scopeId, e);
+            ClassificationResult classification = exceptionClassifier.classifyWithDetails(e);
+            switch (classification.category()) {
+                case RATE_LIMITED -> log.warn(
+                    "Rate limited during milestone sync: repoName={}, scopeId={}, message={}",
+                    safeNameWithOwner,
+                    scopeId,
+                    classification.message()
+                );
+                case NOT_FOUND -> log.warn(
+                    "Resource not found during milestone sync: repoName={}, scopeId={}, message={}",
+                    safeNameWithOwner,
+                    scopeId,
+                    classification.message()
+                );
+                case AUTH_ERROR -> {
+                    log.error(
+                        "Authentication error during milestone sync: repoName={}, scopeId={}, message={}",
+                        safeNameWithOwner,
+                        scopeId,
+                        classification.message()
+                    );
+                    throw e;
+                }
+                case RETRYABLE -> log.warn(
+                    "Retryable error during milestone sync: repoName={}, scopeId={}, message={}",
+                    safeNameWithOwner,
+                    scopeId,
+                    classification.message()
+                );
+                default -> log.error(
+                    "Unexpected error during milestone sync: repoName={}, scopeId={}, message={}",
+                    safeNameWithOwner,
+                    scopeId,
+                    classification.message(),
+                    e
+                );
+            }
             return 0;
         }
     }
@@ -167,17 +240,7 @@ public class GitHubMilestoneSyncService {
      * The processor handles this by using number-based lookup as fallback.
      */
     private GitHubMilestoneDTO convertToDTO(GHMilestone graphQlMilestone) {
-        return new GitHubMilestoneDTO(
-            null, // id - GraphQL doesn't expose databaseId for milestones
-            graphQlMilestone.getNumber(),
-            graphQlMilestone.getTitle(),
-            graphQlMilestone.getDescription(),
-            convertState(graphQlMilestone.getState()).name().toLowerCase(),
-            graphQlMilestone.getDueOn() != null ? graphQlMilestone.getDueOn().toInstant() : null,
-            graphQlMilestone.getUrl() != null ? graphQlMilestone.getUrl().toString() : null,
-            graphQlMilestone.getOpenIssueCount(),
-            graphQlMilestone.getClosedIssueCount()
-        );
+        return GitHubMilestoneDTO.fromMilestone(graphQlMilestone);
     }
 
     private Milestone.State convertState(GHMilestoneState graphQlState) {

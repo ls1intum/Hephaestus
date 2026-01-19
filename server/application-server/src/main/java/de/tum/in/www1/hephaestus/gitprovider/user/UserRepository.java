@@ -120,6 +120,10 @@ public interface UserRepository extends JpaRepository<User, Long> {
     /**
      * Upsert a user using PostgreSQL ON CONFLICT.
      * This is thread-safe for concurrent inserts of the same user.
+     * <p>
+     * The type field is also updated on conflict to ensure that misclassified
+     * users (e.g., bots stored as USER) get corrected when seen again with
+     * proper type information.
      *
      * @param id the primary key (GitHub database ID)
      * @param login the user login
@@ -137,7 +141,8 @@ public interface UserRepository extends JpaRepository<User, Long> {
             login = EXCLUDED.login,
             name = EXCLUDED.name,
             avatar_url = EXCLUDED.avatar_url,
-            html_url = EXCLUDED.html_url
+            html_url = EXCLUDED.html_url,
+            type = EXCLUDED.type
         """,
         nativeQuery = true
     )
