@@ -1,40 +1,40 @@
-import type {Meta, StoryObj} from "@storybook/react";
-import {LevelBar} from "./LevelBar";
+import type { Meta, StoryObj } from "@storybook/react";
+import { LevelBar } from "./LevelBar";
 
 /**
  * Visual indicator of a user's progression level and experience points (XP).
  * Displays current level, numeric XP progress, and a graphical bar.
  */
 const meta = {
-    component: LevelBar,
-    parameters: {
-        layout: "centered",
-        docs: {
-            description: {
-                component:
-                    "A progress bar component specialized for displaying user level and experience points.",
-            },
-        },
-    },
-    argTypes: {
-        level: {
-            description: "The current level of the user",
-            control: {type: "number", min: 1},
-        },
-        currentXP: {
-            description: "Current experience points earned in this level",
-            control: {type: "number", min: 0},
-        },
-        xpNeeded: {
-            description: "Total experience points needed to reach the next level",
-            control: {type: "number", min: 1},
-        },
-        className: {
-            description: "Additional CSS classes for styling",
-            control: "text",
-        },
-    },
-    tags: ["autodocs"],
+	component: LevelBar,
+	parameters: {
+		layout: "centered",
+		docs: {
+			description: {
+				component:
+					"A progress bar component specialized for displaying user level and experience points.",
+			},
+		},
+	},
+	argTypes: {
+		level: {
+			description: "The current level of the user",
+			control: { type: "number", min: 1 },
+		},
+		currentXP: {
+			description: "Current experience points earned in this level",
+			control: { type: "number", min: 0 },
+		},
+		xpNeeded: {
+			description: "Total experience points needed to reach the next level",
+			control: { type: "number", min: 1 },
+		},
+		className: {
+			description: "Additional CSS classes for styling",
+			control: "text",
+		},
+	},
+	tags: ["autodocs"],
 } satisfies Meta<typeof LevelBar>;
 
 export default meta;
@@ -45,22 +45,22 @@ type Story = StoryObj<typeof meta>;
  * Represents a "Neophyte Smith" just starting their journey.
  */
 export const Default: Story = {
-    args: {
-        level: 1,
-        currentXP: 150,
-        xpNeeded: 1000,
-    },
+	args: {
+		level: 1,
+		currentXP: 150,
+		xpNeeded: 1000,
+	},
 };
 
 /**
  * An edge case where the user has zero experience in the current level.
  */
 export const Empty: Story = {
-    args: {
-        level: 1,
-        currentXP: 0,
-        xpNeeded: 1000,
-    },
+	args: {
+		level: 1,
+		currentXP: 0,
+		xpNeeded: 1000,
+	},
 };
 
 /**
@@ -68,11 +68,11 @@ export const Empty: Story = {
  * Represents a "Cyclops Apprentice" gaining momentum.
  */
 export const HalfFull: Story = {
-    args: {
-        level: 5,
-        currentXP: 2500,
-        xpNeeded: 5000,
-    },
+	args: {
+		level: 5,
+		currentXP: 2500,
+		xpNeeded: 5000,
+	},
 };
 
 /**
@@ -80,11 +80,11 @@ export const HalfFull: Story = {
  * Represents a "Technomancer Adept" ready to ascend.
  */
 export const AlmostComplete: Story = {
-    args: {
-        level: 10,
-        currentXP: 9800,
-        xpNeeded: 10000,
-    },
+	args: {
+		level: 10,
+		currentXP: 9800,
+		xpNeeded: 10000,
+	},
 };
 
 /**
@@ -92,9 +92,9 @@ export const AlmostComplete: Story = {
  * Represents an "Olympian Architect" with significant experience.
  */
 export const HighLevel: Story = {
-    args: {
-        level: 99,
-        currentXP: 99999,
-        xpNeeded: 100000,
-    },
+	args: {
+		level: 99,
+		currentXP: 99999,
+		xpNeeded: 100000,
+	},
 };

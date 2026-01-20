@@ -102,26 +102,26 @@ export function ProfileHeader({
 						<LevelBar level={level} currentXP={currentXP} xpNeeded={xpNeeded} />
 
 						{/* Contributed repositories */}
-						{contributedRepositories.length > 0 && (
-							<div className="flex items-center gap-2 mt-1">
-								{contributedRepositories.map((repository) => (
-									<Tooltip key={repository.id}>
-										<TooltipTrigger asChild>
-											<Button variant="outline" size="icon" className="size-10 p-1" asChild>
-												<a href={repository.htmlUrl} target="_blank" rel="noopener noreferrer">
-													<img
-														src={getRepositoryImage(repository.nameWithOwner)}
-														alt={repository.name}
-														className="size-full object-contain"
-													/>
-												</a>
-											</Button>
-										</TooltipTrigger>
-										<TooltipContent>{repository.nameWithOwner}</TooltipContent>
-									</Tooltip>
-								))}
-							</div>
-						)}
+						{/*{contributedRepositories.length > 0 && (*/}
+						{/*	<div className="flex items-center gap-2 mt-1">*/}
+						{/*		{contributedRepositories.map((repository) => (*/}
+						{/*			<Tooltip key={repository.id}>*/}
+						{/*				<TooltipTrigger asChild>*/}
+						{/*					<Button variant="outline" size="icon" className="size-10 p-1" asChild>*/}
+						{/*						<a href={repository.htmlUrl} target="_blank" rel="noopener noreferrer">*/}
+						{/*							<img*/}
+						{/*								src={getRepositoryImage(repository.nameWithOwner)}*/}
+						{/*								alt={repository.name}*/}
+						{/*								className="size-full object-contain"*/}
+						{/*							/>*/}
+						{/*						</a>*/}
+						{/*					</Button>*/}
+						{/*				</TooltipTrigger>*/}
+						{/*				<TooltipContent>{repository.nameWithOwner}</TooltipContent>*/}
+						{/*			</Tooltip>*/}
+						{/*		))}*/}
+						{/*	</div>*/}
+						{/*)}*/}
 					</div>
 				) : null}
 			</div>
