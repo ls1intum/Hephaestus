@@ -86,10 +86,13 @@ public abstract class BaseGitHubProcessor {
     /**
      * Find an existing label or create a new one from the DTO.
      * <p>
-     * Tries ID-based lookup first (webhooks provide ID), then falls back to
-     * name-based lookup (GraphQL doesn't provide numeric ID). If creating a new
-     * label without an ID, generates a deterministic negative ID to avoid
-     * collision with real GitHub IDs.
+     * CRITICAL: Always looks up by repository + name FIRST because this is the unique
+     * constraint (uq_label_repository_name). This handles the case where GraphQL sync
+     * created a label with a deterministic ID, then a webhook arrives with the actual
+     * GitHub databaseId. Looking up by the webhook's ID would miss the existing entity.
+     * <p>
+     * NEVER changes the ID of an existing (managed) entity - Hibernate will throw
+     * "identifier of an instance was altered" exception.
      */
     @Nullable
     protected Label findOrCreateLabel(GitHubLabelDTO dto, Repository repository) {
@@ -97,23 +100,30 @@ public abstract class BaseGitHubProcessor {
             return null;
         }
 
-        // Try ID-based lookup first (webhooks provide ID), then name-based (GraphQL doesn't)
-        Optional<Label> existingOpt;
-        if (dto.id() != null) {
+        // ALWAYS check by unique key (repository_id + name) FIRST - this is the constraint we enforce.
+        // This handles the case where GraphQL sync created a label with a deterministic ID,
+        // then a webhook arrives with the actual GitHub databaseId.
+        Optional<Label> existingOpt = labelRepository.findByRepositoryIdAndName(repository.getId(), dto.name());
+
+        // Fall back to ID lookup if name lookup didn't find it (handles label renames)
+        if (existingOpt.isEmpty() && dto.id() != null) {
             existingOpt = labelRepository.findById(dto.id());
-        } else {
-            existingOpt = labelRepository.findByRepositoryIdAndName(repository.getId(), dto.name());
         }
 
-        return existingOpt.orElseGet(() -> {
-            Label label = new Label();
-            // Use provided ID or generate deterministic one
-            label.setId(dto.id() != null ? dto.id() : generateDeterministicLabelId(repository.getId(), dto.name()));
-            label.setName(dto.name());
-            label.setColor(dto.color());
-            label.setRepository(repository);
-            return labelRepository.save(label);
-        });
+        if (existingOpt.isPresent()) {
+            // Return existing label - NEVER modify its ID
+            return existingOpt.get();
+        }
+
+        // Create new label
+        Label label = new Label();
+        // Use provided ID or generate deterministic one for new labels only
+        Long labelId = dto.id() != null ? dto.id() : generateDeterministicLabelId(repository.getId(), dto.name());
+        label.setId(labelId);
+        label.setName(dto.name());
+        label.setColor(dto.color());
+        label.setRepository(repository);
+        return labelRepository.save(label);
     }
 
     /**
@@ -137,11 +147,12 @@ public abstract class BaseGitHubProcessor {
         if (dto == null || dto.id() == null) {
             return null;
         }
+        Long milestoneId = dto.id();
         return milestoneRepository
-            .findById(dto.id())
+            .findById(milestoneId)
             .orElseGet(() -> {
                 Milestone milestone = new Milestone();
-                milestone.setId(dto.id());
+                milestone.setId(milestoneId);
                 milestone.setNumber(dto.number());
                 milestone.setTitle(dto.title());
                 milestone.setDueOn(dto.dueOn());

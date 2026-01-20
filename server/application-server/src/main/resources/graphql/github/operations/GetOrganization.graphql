@@ -27,6 +27,7 @@ query GetOrganization($login: String!) {
             totalCount
             pageInfo {
                 hasNextPage
+                endCursor
             }
             edges {
                 role

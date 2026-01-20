@@ -63,6 +63,8 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
                 ws
                     .getRepositoriesToMonitor()
                     .stream()
+                    // Apply repository filter to respect monitoring configuration (e.g., dev environment limits)
+                    .filter(workspaceScopeFilter::isRepositoryAllowed)
                     .map(rtm -> SyncTargetFactory.create(ws, rtm))
             )
             .toList();
@@ -77,6 +79,8 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
                 ws
                     .getRepositoriesToMonitor()
                     .stream()
+                    // Apply repository filter to respect monitoring configuration (e.g., dev environment limits)
+                    .filter(workspaceScopeFilter::isRepositoryAllowed)
                     .map(rtm -> SyncTargetFactory.create(ws, rtm))
                     .toList()
             )
@@ -194,6 +198,8 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
                 var orgNames = ws
                     .getRepositoriesToMonitor()
                     .stream()
+                    // Apply repository filter to derive org names only from allowed repositories
+                    .filter(workspaceScopeFilter::isRepositoryAllowed)
                     .map(RepositoryToMonitor::getNameWithOwner)
                     .map(s -> s.split("/")[0])
                     .distinct()

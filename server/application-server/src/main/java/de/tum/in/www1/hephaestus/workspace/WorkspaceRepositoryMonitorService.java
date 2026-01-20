@@ -24,6 +24,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -340,49 +341,52 @@ public class WorkspaceRepositoryMonitorService {
     /**
      * Creates or updates a Repository entity from a provisioning snapshot.
      *
+     * <p>Idempotent: If a duplicate key violation occurs (e.g., from NATS message replay),
+     * we simply look up the existing repository and return it. This is expected behavior
+     * with ephemeral consumers that replay messages on restart.
+     *
      * @param snapshot the repository snapshot from the SPI
+     * @return the Repository entity (newly created or already existing)
      */
-    private void ensureRepositoryFromProvisioningSnapshot(ProvisioningListener.RepositorySnapshot snapshot) {
+    private Repository ensureRepositoryFromProvisioningSnapshot(ProvisioningListener.RepositorySnapshot snapshot) {
         if (snapshot == null || isBlank(snapshot.nameWithOwner())) {
-            return;
+            return null;
         }
 
-        var existingRepo = repositoryRepository.findByNameWithOwner(snapshot.nameWithOwner());
-        if (existingRepo.isPresent()) {
-            // Repository already exists, update basic fields if needed
-            Repository repo = existingRepo.get();
-            boolean changed = false;
-
-            if (repo.getName() == null || !repo.getName().equals(snapshot.name())) {
-                repo.setName(snapshot.name());
-                changed = true;
-            }
-            if (repo.isPrivate() != snapshot.isPrivate()) {
-                repo.setPrivate(snapshot.isPrivate());
-                changed = true;
-            }
-
-            if (changed) {
-                repositoryRepository.save(repo);
-            }
-        } else {
-            // Create new repository with basic metadata from provisioning snapshot
-            Repository repo = new Repository();
-            repo.setId(snapshot.id());
-            repo.setNameWithOwner(snapshot.nameWithOwner());
-            repo.setName(snapshot.name());
-            repo.setPrivate(snapshot.isPrivate());
-            repo.setDefaultBranch("main"); // Will be updated by GraphQL sync
-            repo.setHtmlUrl("https://github.com/" + snapshot.nameWithOwner());
-            repo.setVisibility(snapshot.isPrivate() ? Repository.Visibility.PRIVATE : Repository.Visibility.PUBLIC);
-            repo.setPushedAt(Instant.now()); // Placeholder, will be updated by sync
-
-            repositoryRepository.save(repo);
+        // Check by business key FIRST - avoids constraint violation in replay scenarios
+        // (after DataIntegrityViolationException, the transaction is poisoned and recovery queries fail)
+        Optional<Repository> existingByName = repositoryRepository.findByNameWithOwner(snapshot.nameWithOwner());
+        if (existingByName.isPresent()) {
             log.debug(
-                "Created repository from provisioning snapshot: repoName={}",
+                "Repository already exists (idempotent): repoName={}",
                 LoggingUtils.sanitizeForLog(snapshot.nameWithOwner())
             );
+            return existingByName.get();
         }
+
+        // Not found by name, try by ID (might have different nameWithOwner)
+        Repository repository = repositoryRepository.findById(snapshot.id()).orElseGet(Repository::new);
+
+        repository.setId(snapshot.id());
+        repository.setName(snapshot.name());
+        repository.setNameWithOwner(snapshot.nameWithOwner());
+        repository.setHtmlUrl("https://github.com/" + snapshot.nameWithOwner());
+        repository.setDefaultBranch("main"); // Will be updated by GraphQL sync
+        repository.setVisibility(
+            snapshot.isPrivate() ? Repository.Visibility.PRIVATE : Repository.Visibility.PUBLIC
+        );
+        repository.setPrivate(snapshot.isPrivate());
+        repository.setArchived(false); // Will be updated by GraphQL sync
+        repository.setDisabled(false); // Will be updated by GraphQL sync
+        repository.setPushedAt(Instant.now()); // Placeholder, will be updated by sync
+
+        repository = repositoryRepository.save(repository);
+        log.debug(
+            "Saved repository from provisioning snapshot: repoName={}",
+            LoggingUtils.sanitizeForLog(snapshot.nameWithOwner())
+        );
+
+        return repository;
     }
 
     // ========================================================================
@@ -424,7 +428,22 @@ public class WorkspaceRepositoryMonitorService {
             return;
         }
 
-        Set<String> desiredRepositories = snapshots
+        // Filter snapshots BEFORE processing to avoid creating Repository entities for filtered repos
+        List<GitHubInstallationRepositoryEnumerationService.InstallationRepositorySnapshot> allowedSnapshots = snapshots
+            .stream()
+            .filter(s -> workspaceScopeFilter.isRepositoryAllowed(s.nameWithOwner()))
+            .toList();
+
+        if (allowedSnapshots.size() < snapshots.size()) {
+            log.debug(
+                "Filtered repositories during enumeration: allowed={}, total={}, installationId={}",
+                allowedSnapshots.size(),
+                snapshots.size(),
+                installationId
+            );
+        }
+
+        Set<String> desiredRepositories = allowedSnapshots
             .stream()
             .map(snapshot -> snapshot.nameWithOwner())
             .filter(name -> !isBlank(name))
@@ -435,11 +454,12 @@ public class WorkspaceRepositoryMonitorService {
             protectedRepositories
                 .stream()
                 .filter(name -> !isBlank(name))
+                .filter(name -> workspaceScopeFilter.isRepositoryAllowed(name))
                 .map(name -> name.toLowerCase(Locale.ENGLISH))
                 .forEach(desiredRepositories::add);
         }
 
-        snapshots.forEach(snapshot -> {
+        allowedSnapshots.forEach(snapshot -> {
             // Create or update Repository entity from installation payload
             ensureRepositoryFromSnapshot(snapshot);
             ensureRepositoryMonitorForInstallation(installationId, snapshot.nameWithOwner(), deferSync);
@@ -514,7 +534,8 @@ public class WorkspaceRepositoryMonitorService {
      *                  when activation will sync all repositories in bulk)
      */
     private void persistRepositoryMonitor(Workspace workspace, RepositoryToMonitor monitor, boolean deferSync) {
-        repositoryToMonitorRepository.save(monitor);
+        // Use saveAndFlush to force immediate constraint check so callers can catch DataIntegrityViolationException
+        repositoryToMonitorRepository.saveAndFlush(monitor);
         workspace.getRepositoriesToMonitor().add(monitor);
         workspaceRepository.save(workspace);
         boolean repositoryAllowed = workspaceScopeFilter.isRepositoryAllowed(monitor);
@@ -549,6 +570,13 @@ public class WorkspaceRepositoryMonitorService {
         }
     }
 
+    /**
+     * Idempotently ensures a repository monitor exists for a workspace.
+     *
+     * <p>Handles race conditions from NATS message replay by catching duplicate key
+     * violations. If another thread/message already created the monitor, we simply
+     * return success - that's the idempotent behavior we want.
+     */
     private Optional<Workspace> ensureRepositoryMonitorInternal(
         Workspace workspace,
         String nameWithOwner,
@@ -558,14 +586,27 @@ public class WorkspaceRepositoryMonitorService {
             return Optional.ofNullable(workspace);
         }
 
+        // Fast path: check if already exists (covers most replay cases)
         if (repositoryToMonitorRepository.existsByWorkspaceIdAndNameWithOwner(workspace.getId(), nameWithOwner)) {
             return Optional.of(workspace);
         }
 
+        // Slow path: create new monitor with idempotent handling for race conditions
         RepositoryToMonitor monitor = new RepositoryToMonitor();
         monitor.setNameWithOwner(nameWithOwner);
         monitor.setWorkspace(workspace);
-        persistRepositoryMonitor(workspace, monitor, deferSync);
+
+        try {
+            persistRepositoryMonitor(workspace, monitor, deferSync);
+        } catch (DataIntegrityViolationException e) {
+            // Another message already created this monitor - we're idempotent, this is fine
+            log.debug(
+                "Repository monitor already exists (idempotent): repoName={}, workspaceId={}",
+                LoggingUtils.sanitizeForLog(nameWithOwner),
+                workspace.getId()
+            );
+        }
+
         return Optional.of(workspace);
     }
 
@@ -585,51 +626,54 @@ public class WorkspaceRepositoryMonitorService {
      * <p>Note: Repositories are global entities (gitprovider is workspace-agnostic).
      * The workspace-repository association is managed through RepositoryToMonitor.
      *
+     * <p>Idempotent: If a duplicate key violation occurs (e.g., from NATS message replay),
+     * we simply look up the existing repository and return it. This is expected behavior
+     * with ephemeral consumers that replay messages on restart.
+     *
      * @param snapshot the installation repository snapshot
+     * @return the Repository entity (newly created or already existing)
      */
-    private void ensureRepositoryFromSnapshot(
+    private Repository ensureRepositoryFromSnapshot(
         GitHubInstallationRepositoryEnumerationService.InstallationRepositorySnapshot snapshot
     ) {
         if (snapshot == null || isBlank(snapshot.nameWithOwner())) {
-            return;
+            return null;
         }
 
-        var existingRepo = repositoryRepository.findByNameWithOwner(snapshot.nameWithOwner());
-        if (existingRepo.isPresent()) {
-            // Repository already exists, update basic fields if needed
-            Repository repo = existingRepo.get();
-            boolean changed = false;
-
-            if (repo.getName() == null || !repo.getName().equals(snapshot.name())) {
-                repo.setName(snapshot.name());
-                changed = true;
-            }
-            if (repo.isPrivate() != snapshot.isPrivate()) {
-                repo.setPrivate(snapshot.isPrivate());
-                changed = true;
-            }
-
-            if (changed) {
-                repositoryRepository.save(repo);
-            }
-        } else {
-            // Create new repository with basic metadata from installation payload
-            Repository repo = new Repository();
-            repo.setId(snapshot.id());
-            repo.setNameWithOwner(snapshot.nameWithOwner());
-            repo.setName(snapshot.name());
-            repo.setPrivate(snapshot.isPrivate());
-            repo.setDefaultBranch("main"); // Will be updated by GraphQL sync
-            repo.setHtmlUrl("https://github.com/" + snapshot.nameWithOwner());
-            repo.setVisibility(snapshot.isPrivate() ? Repository.Visibility.PRIVATE : Repository.Visibility.PUBLIC);
-            repo.setPushedAt(Instant.now()); // Placeholder, will be updated by sync
-
-            repositoryRepository.save(repo);
+        // Check by business key FIRST - avoids constraint violation in replay scenarios
+        // (after DataIntegrityViolationException, the transaction is poisoned and recovery queries fail)
+        Optional<Repository> existingByName = repositoryRepository.findByNameWithOwner(snapshot.nameWithOwner());
+        if (existingByName.isPresent()) {
             log.debug(
-                "Created repository from installation snapshot: repoName={}",
+                "Repository already exists (idempotent): repoName={}",
                 LoggingUtils.sanitizeForLog(snapshot.nameWithOwner())
             );
+            return existingByName.get();
         }
+
+        // Not found by name, try by ID (might have different nameWithOwner)
+        Repository repository = repositoryRepository.findById(snapshot.id()).orElseGet(Repository::new);
+
+        repository.setId(snapshot.id());
+        repository.setName(snapshot.name());
+        repository.setNameWithOwner(snapshot.nameWithOwner());
+        repository.setHtmlUrl("https://github.com/" + snapshot.nameWithOwner());
+        repository.setDefaultBranch("main"); // Will be updated by GraphQL sync
+        repository.setVisibility(
+            snapshot.isPrivate() ? Repository.Visibility.PRIVATE : Repository.Visibility.PUBLIC
+        );
+        repository.setPrivate(snapshot.isPrivate());
+        repository.setArchived(false); // Will be updated by GraphQL sync
+        repository.setDisabled(false); // Will be updated by GraphQL sync
+        repository.setPushedAt(Instant.now()); // Placeholder, will be updated by sync
+
+        repository = repositoryRepository.save(repository);
+        log.debug(
+            "Saved repository from installation snapshot: repoName={}",
+            LoggingUtils.sanitizeForLog(snapshot.nameWithOwner())
+        );
+
+        return repository;
     }
 
     private Workspace requireWorkspace(String slug) {

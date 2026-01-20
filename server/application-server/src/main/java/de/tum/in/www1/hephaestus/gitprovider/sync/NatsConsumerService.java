@@ -8,6 +8,7 @@ import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandlerR
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.NatsSubscriptionProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.NatsSubscriptionProvider.NatsSubscriptionInfo;
 import de.tum.in.www1.hephaestus.gitprovider.sync.exception.NatsConnectionException;
+import de.tum.in.www1.hephaestus.workspace.WorkspacesInitializedEvent;
 import io.nats.client.Connection;
 import io.nats.client.ConsumerContext;
 import io.nats.client.ErrorListener;
@@ -71,9 +72,22 @@ import org.springframework.stereotype.Service;
  * <h2>Lifecycle</h2>
  * <ol>
  *   <li>{@code init()} - Called on ApplicationReadyEvent, establishes NATS connection</li>
+ *   <li>{@code onWorkspacesInitialized()} - Called after workspace provisioning, starts installation consumer</li>
  *   <li>{@code startConsumingScope()} - Creates consumer for a scope (idempotent)</li>
  *   <li>{@code stopConsumingScope()} - Removes consumer for a scope</li>
  *   <li>{@code shutdown()} - Called on @PreDestroy, graceful cleanup of all resources</li>
+ * </ol>
+ *
+ * <h2>Startup Sequencing</h2>
+ * The installation consumer only needs workspace entities to exist - it does NOT need
+ * the full GraphQL sync to complete. Installation events provision new workspaces or
+ * add/remove repositories, which are independent of the repository content sync.
+ * <ol>
+ *   <li>Application starts, NATS connection established</li>
+ *   <li>WorkspaceStartupListener provisions workspaces (creates/loads from database)</li>
+ *   <li>WorkspaceStartupListener publishes {@link WorkspacesInitializedEvent}</li>
+ *   <li>This service receives the event and starts the installation consumer</li>
+ *   <li>WorkspaceActivationService runs full GraphQL sync (in parallel with installation consumer)</li>
  * </ol>
  *
  * <h2>Configuration</h2>
@@ -90,6 +104,7 @@ import org.springframework.stereotype.Service;
  * </ul>
  *
  * @see ScopeNatsConsumer
+ * @see WorkspacesInitializedEvent
  */
 @Order(1)
 @Service
@@ -152,6 +167,14 @@ public class NatsConsumerService {
         this.requestTimeoutSeconds = requestTimeoutSeconds;
     }
 
+    /**
+     * Initializes NATS connection on application startup.
+     * <p>
+     * The installation consumer is NOT started here - it waits for the
+     * {@link WorkspacesInitializedEvent} which fires after workspace provisioning
+     * but before the full GraphQL sync. This allows installation events to be
+     * processed immediately after workspaces are loaded.
+     */
     @EventListener(ApplicationReadyEvent.class)
     public void init() {
         if (!isNatsEnabled) {
@@ -161,6 +184,47 @@ public class NatsConsumerService {
 
         validateConfigurations();
         connectWithRetry();
+        log.info("NATS connection established, waiting for workspaces to be initialized");
+    }
+
+    /**
+     * Starts the installation consumer after workspaces are initialized.
+     * <p>
+     * Installation events only need workspace entities to exist - they do NOT need
+     * the full repository sync to complete. This allows installation events to be
+     * processed immediately after startup.
+     *
+     * @param event the workspaces initialized event
+     */
+    @EventListener(WorkspacesInitializedEvent.class)
+    public void onWorkspacesInitialized(WorkspacesInitializedEvent event) {
+        if (!isNatsEnabled) {
+            return;
+        }
+
+        log.info(
+            "Workspaces initialized, starting installation consumer: workspaceCount={}",
+            event.workspaceCount()
+        );
+        startInstallationConsumer();
+    }
+
+    /**
+     * Starts the installation consumer for processing installation-level webhook events.
+     */
+    private void startInstallationConsumer() {
+        if (shuttingDown.get()) {
+            return;
+        }
+
+        virtualThreadExecutor.submit(() -> {
+            try {
+                ensureNatsConnectionEstablished();
+                setupInstallationConsumer();
+            } catch (Exception e) {
+                log.error("Failed to start installation consumer", e);
+            }
+        });
     }
 
     private void validateConfigurations() {
@@ -176,7 +240,6 @@ public class NatsConsumerService {
         while (!shuttingDown.get()) {
             try {
                 natsConnection = Nats.connect(options);
-                setupInstallationConsumer();
                 log.info("Established NATS connection: server={}", natsServer);
                 return;
             } catch (InterruptedException interrupted) {

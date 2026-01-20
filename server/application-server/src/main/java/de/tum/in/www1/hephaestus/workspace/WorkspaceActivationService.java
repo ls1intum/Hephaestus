@@ -71,8 +71,12 @@ public class WorkspaceActivationService {
     }
 
     /**
-     * Prepare every workspace and start monitoring/sync routines for those that are
-     * ready.
+     * Prepare every workspace and start monitoring/sync routines for those that are ready.
+     * <p>
+     * This method runs the full GraphQL sync for each workspace, including repositories,
+     * issues, PRs, and other entities. The installation consumer has already been started
+     * by the time this runs (it only needs workspaces to exist, not the full sync).
+     * <p>
      * Intended to run after provisioning so the workspace catalog is populated.
      */
     public void activateAllWorkspaces() {
@@ -89,12 +93,23 @@ public class WorkspaceActivationService {
 
         Set<String> organizationConsumersStarted = ConcurrentHashMap.newKeySet();
 
-        // Activate all workspaces in parallel for scalability.
-        // Each workspace's monitoring runs independently and can sync repos
-        // concurrently.
-        List<CompletableFuture<Void>> activationFutures = prepared
+        // Filter workspaces that will be activated
+        List<Workspace> workspacesToActivate = prepared
             .stream()
             .filter(workspace -> !shouldSkipActivation(workspace))
+            .toList();
+
+        if (workspacesToActivate.isEmpty()) {
+            log.info("No workspaces to activate after filtering");
+            return;
+        }
+
+        log.info("Activating workspaces: count={}", workspacesToActivate.size());
+
+        // Activate all workspaces in parallel for scalability.
+        // Each workspace's monitoring runs independently and can sync repos concurrently.
+        List<CompletableFuture<Void>> activationFutures = workspacesToActivate
+            .stream()
             .map(workspace ->
                 CompletableFuture.runAsync(
                     () -> activateWorkspace(workspace, organizationConsumersStarted),
@@ -103,12 +118,15 @@ public class WorkspaceActivationService {
             )
             .toList();
 
-        // Wait for all workspace activations to complete (non-blocking to main thread
-        // but ensures all are started before the method returns)
-        CompletableFuture.allOf(activationFutures.toArray(CompletableFuture[]::new)).exceptionally(ex -> {
-            log.error("Failed to activate workspaces", ex);
-            return null;
-        });
+        // Log completion status (non-blocking)
+        CompletableFuture.allOf(activationFutures.toArray(CompletableFuture[]::new))
+            .whenComplete((result, ex) -> {
+                if (ex != null) {
+                    log.error("Failed to activate some workspaces", ex);
+                } else {
+                    log.info("Completed workspace activations: count={}", workspacesToActivate.size());
+                }
+            });
     }
 
     /**

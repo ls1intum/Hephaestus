@@ -5,6 +5,7 @@ import de.tum.in.www1.hephaestus.workspace.RepositorySelection;
 import de.tum.in.www1.hephaestus.workspace.Workspace;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceInstallationService;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceRepositoryMonitorService;
+import de.tum.in.www1.hephaestus.workspace.WorkspaceScopeFilter;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -17,19 +18,32 @@ public class WorkspaceProvisioningAdapter implements ProvisioningListener {
 
     private final WorkspaceInstallationService workspaceInstallationService;
     private final WorkspaceRepositoryMonitorService repositoryMonitorService;
+    private final WorkspaceScopeFilter workspaceScopeFilter;
 
     public WorkspaceProvisioningAdapter(
         WorkspaceInstallationService workspaceInstallationService,
-        WorkspaceRepositoryMonitorService repositoryMonitorService
+        WorkspaceRepositoryMonitorService repositoryMonitorService,
+        WorkspaceScopeFilter workspaceScopeFilter
     ) {
         this.workspaceInstallationService = workspaceInstallationService;
         this.repositoryMonitorService = repositoryMonitorService;
+        this.workspaceScopeFilter = workspaceScopeFilter;
     }
 
     @Override
     public void onInstallationCreated(InstallationData installation) {
         if (installation == null) {
             log.warn("Skipped workspace provisioning: reason=nullInstallationData");
+            return;
+        }
+
+        // Check organization filter BEFORE creating workspace
+        if (!workspaceScopeFilter.isOrganizationAllowed(installation.accountLogin())) {
+            log.debug(
+                "Skipped workspace provisioning: reason=organizationFiltered, accountLogin={}, installationId={}",
+                installation.accountLogin(),
+                installation.installationId()
+            );
             return;
         }
 
@@ -55,16 +69,34 @@ public class WorkspaceProvisioningAdapter implements ProvisioningListener {
         // These are provided for "created" events with "selected" repository selection
         // Create Repository entities AND monitors from the webhook metadata
         if (installation.repositories() != null && !installation.repositories().isEmpty()) {
-            log.info(
-                "Adding initial repositories: installationId={}, repoCount={}",
-                installation.installationId(),
-                installation.repositories().size()
-            );
-            for (RepositorySnapshot snapshot : installation.repositories()) {
-                repositoryMonitorService.ensureRepositoryAndMonitorFromSnapshot(
+            // Filter repositories based on workspace scope configuration before creating entities
+            List<RepositorySnapshot> allowedRepos = installation
+                .repositories()
+                .stream()
+                .filter(r -> workspaceScopeFilter.isRepositoryAllowed(r.nameWithOwner()))
+                .toList();
+
+            if (allowedRepos.size() < installation.repositories().size()) {
+                log.debug(
+                    "Filtered initial repositories by scope: installationId={}, allowed={}, total={}",
                     installation.installationId(),
-                    snapshot
+                    allowedRepos.size(),
+                    installation.repositories().size()
                 );
+            }
+
+            if (!allowedRepos.isEmpty()) {
+                log.info(
+                    "Adding initial repositories: installationId={}, repoCount={}",
+                    installation.installationId(),
+                    allowedRepos.size()
+                );
+                for (RepositorySnapshot snapshot : allowedRepos) {
+                    repositoryMonitorService.ensureRepositoryAndMonitorFromSnapshot(
+                        installation.installationId(),
+                        snapshot
+                    );
+                }
             }
         }
     }
@@ -100,10 +132,30 @@ public class WorkspaceProvisioningAdapter implements ProvisioningListener {
             return;
         }
 
-        for (RepositorySnapshot snapshot : repositories) {
+        // Filter repositories based on workspace scope configuration before creating entities
+        List<RepositorySnapshot> allowedRepos = repositories
+            .stream()
+            .filter(r -> workspaceScopeFilter.isRepositoryAllowed(r.nameWithOwner()))
+            .toList();
+
+        if (allowedRepos.size() < repositories.size()) {
+            log.debug(
+                "Filtered repositories by scope: installationId={}, allowed={}, total={}",
+                installationId,
+                allowedRepos.size(),
+                repositories.size()
+            );
+        }
+
+        if (allowedRepos.isEmpty()) {
+            log.debug("No repositories to add after filtering: installationId={}", installationId);
+            return;
+        }
+
+        for (RepositorySnapshot snapshot : allowedRepos) {
             repositoryMonitorService.ensureRepositoryAndMonitorFromSnapshot(installationId, snapshot);
         }
-        log.info("Added repositories to monitor: installationId={}, repoCount={}", installationId, repositories.size());
+        log.info("Added repositories to monitor: installationId={}, repoCount={}", installationId, allowedRepos.size());
     }
 
     @Override

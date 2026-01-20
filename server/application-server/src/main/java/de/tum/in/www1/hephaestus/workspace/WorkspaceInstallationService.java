@@ -227,6 +227,18 @@ public class WorkspaceInstallationService {
             workspace.setInstallationLinkedAt(Instant.now());
         }
 
+        // Reactivate workspace if it was previously purged or suspended
+        // This handles the case where an installation is deleted and then recreated
+        if (workspace.getStatus() != Workspace.WorkspaceStatus.ACTIVE) {
+            log.info(
+                "Reactivated workspace from installation: workspaceId={}, previousStatus={}, installationId={}",
+                workspace.getId(),
+                workspace.getStatus(),
+                installationId
+            );
+            workspace.setStatus(Workspace.WorkspaceStatus.ACTIVE);
+        }
+
         return workspaceRepository.save(workspace);
     }
 

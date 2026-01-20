@@ -55,8 +55,10 @@ public abstract class GitHubMessageHandler<T> implements MessageHandler {
             handleEvent(eventPayload);
         } catch (IOException e) {
             log.error("Failed to parse payload: subject={}", safeSubject, e);
+            throw new RuntimeException("Payload parsing failed for subject: " + safeSubject, e);
         } catch (Exception e) {
             log.error("Failed to handle message: subject={}", safeSubject, e);
+            throw e;
         }
     }
 

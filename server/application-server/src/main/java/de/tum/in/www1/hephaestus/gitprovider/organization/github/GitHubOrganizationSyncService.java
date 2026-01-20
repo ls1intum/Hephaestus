@@ -221,14 +221,33 @@ public class GitHubOrganizationSyncService {
             return 0;
         }
 
-        // Collect all members with pagination
+        // Collect all members with pagination, using a Set to track seen user IDs for deduplication
         List<GHOrganizationMemberEdge> allMembers = new ArrayList<>(membersConnection.getEdges());
+        Set<Long> seenUserDatabaseIds = new HashSet<>();
+        for (GHOrganizationMemberEdge edge : membersConnection.getEdges()) {
+            if (edge != null && edge.getNode() != null && edge.getNode().getDatabaseId() != null) {
+                seenUserDatabaseIds.add(edge.getNode().getDatabaseId().longValue());
+            }
+        }
+
         GHPageInfo pageInfo = membersConnection.getPageInfo();
         String cursor = pageInfo != null ? pageInfo.getEndCursor() : null;
         int pageCount = 0;
+        int latestTotalCount = membersConnection.getTotalCount();
 
         // Paginate through all remaining members if there are more pages
         while (pageInfo != null && Boolean.TRUE.equals(pageInfo.getHasNextPage())) {
+            // Safety check: if cursor is null but hasNextPage is true, we have a problem
+            // This would cause re-fetching from the beginning, leading to duplicates
+            if (cursor == null) {
+                log.warn(
+                    "Missing pagination cursor while hasNextPage=true: orgLogin={}, pageCount={}. "
+                        + "This indicates a bug - check that GetOrganization.graphql includes endCursor in pageInfo.",
+                    sanitizeForLog(organization.getLogin()),
+                    pageCount
+                );
+                break;
+            }
             pageCount++;
             if (pageCount >= MAX_PAGINATION_PAGES) {
                 log.warn(
@@ -276,17 +295,30 @@ public class GitHubOrganizationSyncService {
                 break;
             }
 
-            allMembers.addAll(nextPage.getEdges());
+            // Add only members we haven't seen yet (deduplication safety)
+            for (GHOrganizationMemberEdge edge : nextPage.getEdges()) {
+                if (edge != null && edge.getNode() != null && edge.getNode().getDatabaseId() != null) {
+                    Long databaseId = edge.getNode().getDatabaseId().longValue();
+                    if (seenUserDatabaseIds.add(databaseId)) {
+                        allMembers.add(edge);
+                    }
+                }
+            }
+
+            // Track latest totalCount from pagination (may change if members join/leave during sync)
+            latestTotalCount = nextPage.getTotalCount();
+
             pageInfo = nextPage.getPageInfo();
             cursor = pageInfo != null ? pageInfo.getEndCursor() : null;
         }
 
         log.debug(
-            "Fetched organization members: orgId={}, orgLogin={}, fetchedCount={}, totalCount={}",
+            "Fetched organization members: orgId={}, orgLogin={}, fetchedCount={}, totalCount={}, pages={}",
             organization.getGithubId(),
             sanitizeForLog(organization.getLogin()),
             allMembers.size(),
-            membersConnection.getTotalCount()
+            latestTotalCount,
+            pageCount + 1
         );
 
         Set<Long> syncedUserIds = new HashSet<>();

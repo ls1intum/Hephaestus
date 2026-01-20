@@ -51,7 +51,7 @@ public class GitHubPullRequestReviewThreadProcessor {
     @Transactional
     public boolean resolve(Long threadId, User resolvedBy, ProcessingContext context) {
         if (threadId == null) {
-            log.warn("Skipped thread resolve: reason=nullThreadId");
+            log.debug("Skipped thread resolve: reason=nullThreadId");
             return false;
         }
 
@@ -94,7 +94,7 @@ public class GitHubPullRequestReviewThreadProcessor {
     @Transactional
     public boolean unresolve(Long threadId, ProcessingContext context) {
         if (threadId == null) {
-            log.warn("Skipped thread unresolve: reason=nullThreadId");
+            log.debug("Skipped thread unresolve: reason=nullThreadId");
             return false;
         }
 

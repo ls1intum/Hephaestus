@@ -8,6 +8,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToMany;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.Objects;
@@ -19,7 +20,10 @@ import lombok.Setter;
 import lombok.ToString;
 
 @Entity
-@Table(name = "label")
+@Table(
+    name = "label",
+    uniqueConstraints = @UniqueConstraint(name = "uq_label_repository_name", columnNames = { "repository_id", "name" })
+)
 @Getter
 @Setter
 @NoArgsConstructor

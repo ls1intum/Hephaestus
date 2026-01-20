@@ -18,6 +18,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.Set;
@@ -49,7 +50,12 @@ import org.springframework.lang.NonNull;
  * @see de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider.SyncTarget
  */
 @Entity
-@Table(name = "repository")
+@Table(
+    name = "repository",
+    uniqueConstraints = {
+        @UniqueConstraint(name = "uq_repository_name_with_owner", columnNames = "name_with_owner")
+    }
+)
 @Getter
 @Setter
 @NoArgsConstructor

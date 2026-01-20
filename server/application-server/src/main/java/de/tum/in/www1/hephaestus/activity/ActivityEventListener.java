@@ -13,6 +13,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
@@ -237,6 +239,7 @@ public class ActivityEventListener {
     }
 
     @Async
+    @Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = true)
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onReviewSubmitted(DomainEvent.ReviewSubmitted event) {
         var reviewData = event.review();
@@ -320,6 +323,7 @@ public class ActivityEventListener {
      * maintaining an immutable audit trail of all review activity.
      */
     @Async
+    @Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = true)
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onReviewEdited(DomainEvent.ReviewEdited event) {
         var reviewData = event.review();
@@ -359,6 +363,7 @@ public class ActivityEventListener {
     }
 
     @Async
+    @Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = true)
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onCommentCreated(DomainEvent.CommentCreated event) {
         var commentData = event.comment();

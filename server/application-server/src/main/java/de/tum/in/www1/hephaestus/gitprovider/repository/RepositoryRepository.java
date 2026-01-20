@@ -27,4 +27,5 @@ public interface RepositoryRepository extends JpaRepository<Repository, Long> {
      * Used during installation operations for org login renames.
      */
     List<Repository> findByNameWithOwnerStartingWithIgnoreCase(String prefix);
+
 }

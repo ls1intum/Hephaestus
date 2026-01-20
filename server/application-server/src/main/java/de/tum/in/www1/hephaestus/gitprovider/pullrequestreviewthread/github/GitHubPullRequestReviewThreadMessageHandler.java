@@ -61,11 +61,14 @@ public class GitHubPullRequestReviewThreadMessageHandler
             return;
         }
 
+        // Thread ID is the first comment's database ID (see GitHubPullRequestReviewCommentSyncService)
+        Long threadId = threadDto.getFirstCommentId();
+
         log.info(
             "Received pull_request_review_thread event: action={}, prNumber={}, threadId={}, repoName={}",
             event.action(),
             prDto.number(),
-            threadDto.id(),
+            threadId,
             event.repository() != null ? sanitizeForLog(event.repository().fullName()) : "unknown"
         );
 
@@ -80,14 +83,33 @@ public class GitHubPullRequestReviewThreadMessageHandler
         // Delegate thread state changes to processor
         switch (event.actionType()) {
             case GitHubEventAction.PullRequestReviewThread.RESOLVED -> {
+                // Thread ID is derived from the first comment. If no comments exist, we cannot process.
+                if (threadId == null) {
+                    log.warn(
+                        "Skipped pull_request_review_thread event: reason=noCommentsInThread, action={}, prNumber={}, repoName={}",
+                        event.action(),
+                        prDto.number(),
+                        event.repository() != null ? sanitizeForLog(event.repository().fullName()) : "unknown"
+                    );
+                    return;
+                }
                 // Ensure the sender (who resolved the thread) exists
                 User resolvedBy = userProcessor.ensureExists(event.sender());
-                threadProcessor.resolve(threadDto.id(), resolvedBy, context);
+                threadProcessor.resolve(threadId, resolvedBy, context);
             }
-            case GitHubEventAction.PullRequestReviewThread.UNRESOLVED -> threadProcessor.unresolve(
-                threadDto.id(),
-                context
-            );
+            case GitHubEventAction.PullRequestReviewThread.UNRESOLVED -> {
+                // Thread ID is derived from the first comment. If no comments exist, we cannot process.
+                if (threadId == null) {
+                    log.warn(
+                        "Skipped pull_request_review_thread event: reason=noCommentsInThread, action={}, prNumber={}, repoName={}",
+                        event.action(),
+                        prDto.number(),
+                        event.repository() != null ? sanitizeForLog(event.repository().fullName()) : "unknown"
+                    );
+                    return;
+                }
+                threadProcessor.unresolve(threadId, context);
+            }
             default -> log.debug(
                 "Skipped pull_request_review_thread event: reason=unhandledAction, action={}",
                 event.action()

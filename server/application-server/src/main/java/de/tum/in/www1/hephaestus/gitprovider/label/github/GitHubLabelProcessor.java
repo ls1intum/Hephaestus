@@ -14,6 +14,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -61,7 +62,7 @@ public class GitHubLabelProcessor {
      * @param context processing context with scope information
      * @return the persisted Label entity
      */
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public Label process(GitHubLabelDTO dto, Repository repository, ProcessingContext context) {
         if (dto == null || dto.name() == null) {
             log.warn(
@@ -71,12 +72,14 @@ public class GitHubLabelProcessor {
             return null;
         }
 
-        // Find existing label: prefer ID lookup (from webhooks), fall back to name lookup (for GraphQL)
-        Optional<Label> existingOpt;
-        if (dto.id() != null) {
+        // Always check by unique key (repository_id + name) FIRST - this is the constraint we enforce.
+        // This handles the case where GraphQL sync created a label with a deterministic ID,
+        // then NATS replay sends a webhook with the actual GitHub databaseId.
+        Optional<Label> existingOpt = labelRepository.findByRepositoryIdAndName(repository.getId(), dto.name());
+
+        // Fall back to ID lookup if name lookup didn't find it (handles label renames)
+        if (existingOpt.isEmpty() && dto.id() != null) {
             existingOpt = labelRepository.findById(dto.id());
-        } else {
-            existingOpt = labelRepository.findByRepositoryIdAndName(repository.getId(), dto.name());
         }
         boolean isNew = existingOpt.isEmpty();
 
@@ -84,11 +87,15 @@ public class GitHubLabelProcessor {
 
         // Set or update fields
         // For labels, all fields including description are always updated (null values are allowed)
-        if (dto.id() != null) {
-            label.setId(dto.id());
-        } else if (isNew) {
-            // Generate deterministic ID for new labels from GraphQL (which doesn't provide databaseId)
-            label.setId(generateDeterministicId(repository.getId(), dto.name()));
+        // CRITICAL: NEVER change the ID of an existing (managed) entity - Hibernate will throw
+        // "identifier of an instance was altered" exception. Only set ID for NEW entities.
+        if (isNew) {
+            if (dto.id() != null) {
+                label.setId(dto.id());
+            } else {
+                // Generate deterministic ID for new labels from GraphQL (which doesn't provide databaseId)
+                label.setId(generateDeterministicId(repository.getId(), dto.name()));
+            }
         }
         label.setName(dto.name()); // name is always required
         if (dto.color() != null) {
