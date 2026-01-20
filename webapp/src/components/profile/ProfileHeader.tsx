@@ -6,7 +6,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { LevelBar } from "./LevelBar";
+import { XpProgress } from "./XpProgress.tsx";
 
 // Repository images for known repositories
 const REPO_IMAGES: Record<string, string> = {
@@ -99,7 +99,7 @@ export function ProfileHeader({
 						</div>
 
 						{/* Level Bar - Integrated under user info */}
-						<LevelBar level={level} currentXP={currentXP} xpNeeded={xpNeeded} />
+						<XpProgress level={level} currentXP={currentXP} xpNeeded={xpNeeded} />
 
 						{/* Contributed repositories */}
 						{/*{contributedRepositories.length > 0 && (*/}
