@@ -58,6 +58,9 @@ export interface TestFixtures {
 /**
  * Create minimal required test data (workspace, user).
  * Uses raw SQL to bypass foreign key setup complexity.
+ *
+ * Verifies inserts succeeded to avoid silent failures that can cause
+ * FK constraint errors later in tests.
  */
 export async function createTestFixtures(): Promise<TestFixtures> {
 	// Use crypto.getRandomValues for better randomness (not security-critical, but good practice)
@@ -65,25 +68,54 @@ export async function createTestFixtures(): Promise<TestFixtures> {
 	const id = Date.now() + (randomValue % 1000);
 	const workspaceId = id;
 	const userId = id + 1;
+	const workspaceSlug = `test-ws-${id}`;
+	const userLogin = `test-user-${id}`;
 
 	// Insert workspace - using actual schema columns
-	await db.execute(sql`
+	// Use RETURNING to verify the insert succeeded
+	const workspaceResult = await db.execute(sql`
 		INSERT INTO workspace (id, created_at, updated_at, display_name, slug, account_type, status)
-		VALUES (${workspaceId}, NOW(), NOW(), ${"Test Workspace"}, ${`test-ws-${id}`}, 'USER', 'ACTIVE')
+		VALUES (${workspaceId}, NOW(), NOW(), ${"Test Workspace"}, ${workspaceSlug}, 'USER', 'ACTIVE')
 		ON CONFLICT (id) DO NOTHING
+		RETURNING id
 	`);
+
+	// If ON CONFLICT triggered, the row wasn't inserted - verify it exists
+	if (workspaceResult.rowCount === 0) {
+		const existingWorkspace = await db.execute(
+			sql`SELECT id FROM workspace WHERE id = ${workspaceId}`,
+		);
+		if (existingWorkspace.rowCount === 0) {
+			throw new Error(
+				`Failed to create test workspace: ID ${workspaceId} conflicts but no row found. ` +
+					`This may indicate a unique constraint violation on another column (e.g., slug).`,
+			);
+		}
+	}
 
 	// Insert user - include all NOT NULL columns
 	// Note: notifications_enabled and participate_in_research moved to user_preferences table
-	await db.execute(sql`
+	const userResult = await db.execute(sql`
 		INSERT INTO "user" (id, created_at, updated_at, login, name, type)
-		VALUES (${userId}, NOW(), NOW(), ${`test-user-${id}`}, 'Test User', 'USER')
+		VALUES (${userId}, NOW(), NOW(), ${userLogin}, 'Test User', 'USER')
 		ON CONFLICT (id) DO NOTHING
+		RETURNING id
 	`);
+
+	// If ON CONFLICT triggered, verify the user exists
+	if (userResult.rowCount === 0) {
+		const existingUser = await db.execute(sql`SELECT id FROM "user" WHERE id = ${userId}`);
+		if (existingUser.rowCount === 0) {
+			throw new Error(
+				`Failed to create test user: ID ${userId} conflicts but no row found. ` +
+					`This may indicate a unique constraint violation on another column.`,
+			);
+		}
+	}
 
 	return {
 		workspace: { id: workspaceId, name: "Test Workspace" },
-		user: { id: userId, login: `test-user-${id}`, name: "Test User" },
+		user: { id: userId, login: userLogin, name: "Test User" },
 	};
 }
 
