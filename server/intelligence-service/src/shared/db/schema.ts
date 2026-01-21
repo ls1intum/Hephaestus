@@ -550,6 +550,7 @@ export const label = pgTable(
 			foreignColumns: [repository.id],
 			name: "fk2951edbl9g9y8ee1q97e2ff75",
 		}),
+		unique("uq_label_repository_name").on(table.name, table.repositoryId),
 	],
 );
 
@@ -867,6 +868,7 @@ export const repository = pgTable(
 			foreignColumns: [organization.id],
 			name: "fk_repository_organization",
 		}),
+		unique("uq_repository_name_with_owner").on(table.nameWithOwner),
 	],
 );
 

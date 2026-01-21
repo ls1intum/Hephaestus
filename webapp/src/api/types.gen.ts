@@ -338,9 +338,9 @@ export type PullRequestBaseInfo = {
      */
     repository?: RepositoryInfo;
     /**
-     * Current state of the pull request (OPEN, CLOSED)
+     * Current state of the pull request (OPEN, CLOSED, MERGED)
      */
-    state: 'OPEN' | 'CLOSED';
+    state: 'OPEN' | 'CLOSED' | 'MERGED';
     /**
      * Title of the pull request
      */
@@ -412,9 +412,9 @@ export type PullRequestInfo = {
      */
     repository?: RepositoryInfo;
     /**
-     * Current state of the pull request (OPEN, CLOSED)
+     * Current state of the pull request (OPEN, CLOSED, MERGED)
      */
-    state: 'OPEN' | 'CLOSED';
+    state: 'OPEN' | 'CLOSED' | 'MERGED';
     /**
      * Title of the pull request
      */
@@ -484,7 +484,7 @@ export type PullRequestWithBadPractices = {
     /**
      * Current state of the pull request (OPEN, CLOSED)
      */
-    state: 'OPEN' | 'CLOSED';
+    state: 'OPEN' | 'CLOSED' | 'MERGED';
     /**
      * Title of the pull request
      */
