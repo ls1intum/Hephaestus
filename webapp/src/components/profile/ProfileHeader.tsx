@@ -2,9 +2,12 @@ import { ClockIcon } from "@primer/octicons-react";
 import { format } from "date-fns";
 import type { RepositoryInfo, UserInfo } from "@/api/types.gen";
 import { LeagueIcon } from "@/components/leaderboard/LeagueIcon";
+import { getLeagueTier } from "@/components/leaderboard/utils.ts";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
-import { XpProgress } from "./XpProgress.tsx";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils.ts";
+import { XpProgress } from "./XpProgress";
 
 export interface ProfileHeaderProps {
 	user?: UserInfo;
@@ -20,7 +23,6 @@ export interface ProfileHeaderProps {
 export function ProfileHeader({
 	user,
 	firstContribution,
-	contributedRepositories: _contributedRepositories = [],
 	leaguePoints = 0,
 	isLoading,
 	level = 1,
@@ -31,25 +33,48 @@ export function ProfileHeader({
 	const formattedFirstContribution = firstContribution
 		? format(firstContribution, "MMMM do, yyyy")
 		: undefined;
+	const rawTier = getLeagueTier(leaguePoints);
+	const leagueTier = !rawTier || rawTier === "none" ? "bronze" : rawTier;
 
 	return (
 		<div className="flex items-center justify-between mx-8">
 			<div className="flex gap-6 items-center w-full">
-				{/* Avatar and Level Badge Column */}
-				<div className="flex flex-col items-center gap-4 shrink-0">
+				{/* Game-style Avatar Frame with Level Bubble */}
+				<div className="relative shrink-0">
 					{isLoading ? (
-						<Avatar className="w-24 h-24 ring-2 ring-neutral-100 dark:ring-neutral-800 shrink-0">
+						<Avatar className="w-24 h-24">
 							<Skeleton className="h-full w-full rounded-full" />
 						</Avatar>
 					) : (
-						<Avatar className="w-24 h-24 ring-2 ring-neutral-100 dark:ring-neutral-800 shrink-0">
+						<Avatar className="w-24 h-24 border-2 border-background">
 							<AvatarImage src={user?.avatarUrl} alt={`${user?.login}'s avatar`} />
 							<AvatarFallback>{user?.login?.slice(0, 2)?.toUpperCase()}</AvatarFallback>
 						</Avatar>
 					)}
+
+					{/* Level Bubble (Bronze league style) */}
+					{isLoading ? (
+						<Skeleton className="absolute -bottom-1 -right-1 flex h-9 w-9 items-center justify-center rounded-full border-background" />
+					) : (
+						<Tooltip>
+							<TooltipTrigger asChild>
+								<div
+									className={cn(
+										"absolute -bottom-1 -right-1 flex h-9 w-9 items-center justify-center rounded-full  border-2 border-background text-primary-foreground font-black text-sm z-10",
+										`bg-league-${leagueTier}`,
+									)}
+								>
+									{level}
+								</div>
+							</TooltipTrigger>
+							<TooltipContent side="bottom">
+								<p>LEVEL</p>
+							</TooltipContent>
+						</Tooltip>
+					)}
 				</div>
 
-				{/* User information with loading skeletons */}
+				{/* User information HUD */}
 				{isLoading ? (
 					<div className="flex flex-col gap-2 w-full max-w-xl">
 						<Skeleton className="h-8 w-48" />

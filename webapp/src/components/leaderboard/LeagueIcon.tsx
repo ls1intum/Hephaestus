@@ -47,7 +47,7 @@ export function LeagueIcon({
 					)}
 				</div>
 			</TooltipTrigger>
-			<TooltipContent>
+			<TooltipContent className="top-full left-1/2 -translate-x-1/2 m-2">
 				<p>{label} League</p>
 			</TooltipContent>
 		</Tooltip>

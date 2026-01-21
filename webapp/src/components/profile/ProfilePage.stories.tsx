@@ -288,15 +288,16 @@ export const ErrorState: Story = {
  */
 export const Empty: Story = {
 	args: {
-		isLoading: false,
-		error: false,
-		username: "emptydoe",
-		currUserIsDashboardUser: true,
-		workspaceSlug: "aet",
-		after: defaultAfter,
-		before: defaultBefore,
-		onTimeframeChange: fn(),
-		profileData: {
+        isLoading: false,
+        error: false,
+        username: "emptydoe",
+        currUserIsDashboardUser: true,
+        workspaceSlug: "aet",
+        after: defaultAfter,
+        before: defaultBefore,
+        onTimeframeChange: fn(),
+
+        profileData: {
 			userInfo: {
 				id: 3,
 				login: "emptydoe",
@@ -310,5 +311,7 @@ export const Empty: Story = {
 			reviewActivity: [],
 			openPullRequests: [],
 		},
-	},
+
+        currentXP: 0
+    },
 };

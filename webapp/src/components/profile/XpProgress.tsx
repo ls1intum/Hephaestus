@@ -43,27 +43,32 @@ export function XpProgress({
 	const percentage = xpNeeded > 0 ? Math.min(100, Math.max(0, (currentXP / xpNeeded) * 100)) : 0;
 
 	return (
-		<div className={cn("flex items-center gap-4 w-full", className)}>
-			{/* Level Badge */}
-			{showBadge && <LevelBadge level={level} />}
+		<div className={cn("w-full", className)}>
+			{/* Level Badge - Optional legacy support */}
+			{showBadge && <LevelBadge level={level} className="mb-2" />}
 
-			{/* Progress Section */}
-			<div className="flex flex-col gap-1.5 flex-1 justify-center">
-				<div className="flex justify-between w-full items-end">
-					<div>
-						<span className="text-xs font-bold text-foreground tracking-wide uppercase">
-							Level {level}
-						</span>
-						<span className="m-1">-</span>
-						<span className="text-xs font-bold text-foreground tracking-wide uppercase">
-							Developer
-						</span>
-					</div>
-					<span className="text-xs font-medium text-muted-foreground">
-						{currentXP} <span className="text-muted-foreground/50">/</span> {xpNeeded} XP
+			{/* Game-style Status Bar */}
+			<div className="flex flex-col gap-1">
+				<div className="flex justify-between items-end px-1">
+					<span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+						Developer
+					</span>
+					<span className="text-xs font-mono font-medium text-muted-foreground">
+						{currentXP} / {xpNeeded} XP
 					</span>
 				</div>
-				<Progress className="h-3" value={percentage} />
+
+				{/* Bar Container with "metallic" look */}
+				<div className="relative h-5 w-full bg-secondary/80 rounded-sm border border-border/50 shadow-inner overflow-hidden">
+					{/* Animated Gloss Effect */}
+					<div className="absolute inset-0 z-10 bg-linear-to-b from-white/10 to-transparent pointer-events-none" />
+
+					<Progress
+						className="h-full w-full rounded-none bg-transparent"
+						indicatorClassName="bg-gradient-to-r from-primary/80 to-primary rounded-none transition-all duration-500"
+						value={percentage}
+					/>
+				</div>
 			</div>
 		</div>
 	);

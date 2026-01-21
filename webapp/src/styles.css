@@ -338,3 +338,6 @@ code {
 @utility debug-* {
 	outline: 1px solid --value(--color-*);
 }
+@utility debug-red { @apply debug-red-500 }
+@utility debug-green { @apply debug-green-500 }
+@utility debug-blue { @apply debug-blue-500 }
