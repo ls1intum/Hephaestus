@@ -5,9 +5,9 @@ import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.ExponentialBackoff;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandlerRegistry;
+import de.tum.in.www1.hephaestus.core.event.WorkspacesInitializedEvent;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.NatsSubscriptionProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.NatsSubscriptionProvider.NatsSubscriptionInfo;
-import de.tum.in.www1.hephaestus.gitprovider.common.spi.WorkspaceInitializationListener;
 import de.tum.in.www1.hephaestus.gitprovider.sync.exception.NatsConnectionException;
 import io.nats.client.Connection;
 import io.nats.client.ConsumerContext;
@@ -85,8 +85,8 @@ import org.springframework.stereotype.Service;
  * <ol>
  *   <li>Application starts, NATS connection established</li>
  *   <li>WorkspaceStartupListener provisions workspaces (creates/loads from database)</li>
- *   <li>Workspace module calls {@link WorkspaceInitializationListener#onWorkspacesInitialized(int)}</li>
- *   <li>This service starts the installation consumer</li>
+ *   <li>WorkspaceStartupListener publishes {@link WorkspacesInitializedEvent}</li>
+ *   <li>This service receives the event and starts the installation consumer</li>
  *   <li>WorkspaceActivationService runs full GraphQL sync (in parallel with installation consumer)</li>
  * </ol>
  *
@@ -107,7 +107,7 @@ import org.springframework.stereotype.Service;
  */
 @Order(1)
 @Service
-public class NatsConsumerService implements WorkspaceInitializationListener {
+public class NatsConsumerService {
 
     private static final Logger log = LoggerFactory.getLogger(NatsConsumerService.class);
 
@@ -193,15 +193,15 @@ public class NatsConsumerService implements WorkspaceInitializationListener {
      * the full repository sync to complete. This allows installation events to be
      * processed immediately after startup.
      *
-     * @param workspaceCount number of workspaces that were initialized
+     * @param event the workspaces initialized event
      */
-    @Override
-    public void onWorkspacesInitialized(int workspaceCount) {
+    @EventListener(WorkspacesInitializedEvent.class)
+    public void onWorkspacesInitialized(WorkspacesInitializedEvent event) {
         if (!isNatsEnabled) {
             return;
         }
 
-        log.info("Workspaces initialized, starting installation consumer: workspaceCount={}", workspaceCount);
+        log.info("Workspaces initialized, starting installation consumer: workspaceCount={}", event.workspaceCount());
         startInstallationConsumer();
     }
 
