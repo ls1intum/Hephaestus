@@ -4,6 +4,7 @@ import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.exception.InstallationNotFoundException;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier;
+import de.tum.in.www1.hephaestus.gitprovider.sync.exception.SyncInterruptedException;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier.Category;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier.ClassificationResult;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.app.GitHubAppTokenService;
@@ -294,7 +295,7 @@ public class GitHubDataSyncService {
                             Thread.sleep(waitTime.toMillis());
                         } catch (InterruptedException ie) {
                             Thread.currentThread().interrupt();
-                            throw new RuntimeException("Sync interrupted while waiting for rate limit", ie);
+                            throw new SyncInterruptedException("Sync interrupted while waiting for rate limit", ie);
                         }
                     }
                 }

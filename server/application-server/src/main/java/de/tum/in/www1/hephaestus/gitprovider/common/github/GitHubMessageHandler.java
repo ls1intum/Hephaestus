@@ -3,6 +3,7 @@ package de.tum.in.www1.hephaestus.gitprovider.common.github;
 import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.NatsMessageDeserializer;
+import de.tum.in.www1.hephaestus.gitprovider.common.exception.PayloadParsingException;
 import io.nats.client.Message;
 import io.nats.client.MessageHandler;
 import java.io.IOException;
@@ -55,7 +56,7 @@ public abstract class GitHubMessageHandler<T> implements MessageHandler {
             handleEvent(eventPayload);
         } catch (IOException e) {
             log.error("Failed to parse payload: subject={}", safeSubject, e);
-            throw new RuntimeException("Payload parsing failed for subject: " + safeSubject, e);
+            throw new PayloadParsingException("Payload parsing failed for subject: " + safeSubject, e);
         } catch (Exception e) {
             log.error("Failed to handle message: subject={}", safeSubject, e);
             throw e;
