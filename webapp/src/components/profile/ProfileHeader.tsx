@@ -4,7 +4,7 @@ import type { RepositoryInfo, UserInfo } from "@/api/types.gen";
 import { LeagueIcon } from "@/components/leaderboard/LeagueIcon";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
-import { LevelBadge, XpProgress } from "./XpProgress.tsx";
+import { XpProgress } from "./XpProgress.tsx";
 
 export interface ProfileHeaderProps {
 	user?: UserInfo;
@@ -34,24 +34,18 @@ export function ProfileHeader({
 
 	return (
 		<div className="flex items-center justify-between mx-8">
-			<div className="flex gap-8 items-center w-full">
+			<div className="flex gap-6 items-center w-full">
 				{/* Avatar and Level Badge Column */}
 				<div className="flex flex-col items-center gap-4 shrink-0">
 					{isLoading ? (
-						<>
-							<Avatar className="w-24 h-24 ring-2 ring-neutral-100 dark:ring-neutral-800 shrink-0">
-								<Skeleton className="h-full w-full rounded-full" />
-							</Avatar>
-							<Skeleton className="h-18 w-18 rounded-xl" />
-						</>
+						<Avatar className="w-24 h-24 ring-2 ring-neutral-100 dark:ring-neutral-800 shrink-0">
+							<Skeleton className="h-full w-full rounded-full" />
+						</Avatar>
 					) : (
-						<>
-							<Avatar className="w-24 h-24 ring-2 ring-neutral-100 dark:ring-neutral-800 shrink-0">
-								<AvatarImage src={user?.avatarUrl} alt={`${user?.login}'s avatar`} />
-								<AvatarFallback>{user?.login?.slice(0, 2)?.toUpperCase()}</AvatarFallback>
-							</Avatar>
-							<LevelBadge level={level} />
-						</>
+						<Avatar className="w-24 h-24 ring-2 ring-neutral-100 dark:ring-neutral-800 shrink-0">
+							<AvatarImage src={user?.avatarUrl} alt={`${user?.login}'s avatar`} />
+							<AvatarFallback>{user?.login?.slice(0, 2)?.toUpperCase()}</AvatarFallback>
+						</Avatar>
 					)}
 				</div>
 

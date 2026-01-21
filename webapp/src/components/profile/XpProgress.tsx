@@ -49,7 +49,16 @@ export function XpProgress({
 
 			{/* Progress Section */}
 			<div className="flex flex-col gap-1.5 flex-1 justify-center">
-				<div className="flex justify-end w-full">
+				<div className="flex justify-between w-full items-end">
+					<div>
+						<span className="text-xs font-bold text-foreground tracking-wide uppercase">
+							Level {level}
+						</span>
+						<span className="m-1">-</span>
+						<span className="text-xs font-bold text-foreground tracking-wide uppercase">
+							Developer
+						</span>
+					</div>
 					<span className="text-xs font-medium text-muted-foreground">
 						{currentXP} <span className="text-muted-foreground/50">/</span> {xpNeeded} XP
 					</span>
