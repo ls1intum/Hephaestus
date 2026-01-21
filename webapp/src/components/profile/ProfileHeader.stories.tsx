@@ -51,17 +51,20 @@ type Story = StoryObj<typeof meta>;
  */
 export const Default: Story = {
 	args: {
-		isLoading: false,
-		user: {
+        isLoading: false,
+
+        user: {
 			id: 1,
 			login: "johndoe",
 			name: "John Doe",
 			avatarUrl: "https://github.com/github.png",
 			htmlUrl: "https://github.com/johndoe",
 		},
-		leaguePoints: 1450,
-		firstContribution: new Date("2022-05-15T00:00:00Z"),
-		contributedRepositories: [
+
+        leaguePoints: 1450,
+        firstContribution: new Date("2022-05-15T00:00:00Z"),
+
+        contributedRepositories: [
 			{
 				id: 1,
 				name: "Hephaestus",
@@ -79,7 +82,11 @@ export const Default: Story = {
 				hiddenFromContributions: false,
 			},
 		],
-	},
+
+        level: 1,
+        currentXP: 80,
+        xpNeeded: 100
+    },
 };
 
 /**
@@ -94,18 +101,23 @@ export const Loading: Story = {
 
 export const NoRepositories: Story = {
 	args: {
-		isLoading: false,
-		user: {
+        isLoading: false,
+
+        user: {
 			id: 1,
 			login: "janedoe",
 			name: "Jane Doe",
 			avatarUrl: "https://github.com/octocat.png",
 			htmlUrl: "https://github.com/janedoe",
 		},
-		leaguePoints: 750,
-		firstContribution: new Date("2023-01-10T00:00:00Z"),
-		contributedRepositories: [],
-	},
+
+        leaguePoints: 750,
+        firstContribution: new Date("2023-01-10T00:00:00Z"),
+        contributedRepositories: [],
+        level: 1,
+        currentXP: 15,
+        xpNeeded: 100
+    },
 };
 
 export const BronzeLeague: Story = {
