@@ -17,7 +17,7 @@ import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserProcessor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Handles GitHub member webhook events (repository collaborator changes).
@@ -35,9 +35,10 @@ public class GitHubMemberMessageHandler extends GitHubMessageHandler<GitHubMembe
         ProcessingContextFactory contextFactory,
         GitHubUserProcessor userProcessor,
         RepositoryCollaboratorRepository collaboratorRepository,
-        NatsMessageDeserializer deserializer
+        NatsMessageDeserializer deserializer,
+        TransactionTemplate transactionTemplate
     ) {
-        super(GitHubMemberEventDTO.class, deserializer);
+        super(GitHubMemberEventDTO.class, deserializer, transactionTemplate);
         this.contextFactory = contextFactory;
         this.userProcessor = userProcessor;
         this.collaboratorRepository = collaboratorRepository;
@@ -49,7 +50,6 @@ public class GitHubMemberMessageHandler extends GitHubMessageHandler<GitHubMembe
     }
 
     @Override
-    @Transactional
     protected void handleEvent(GitHubMemberEventDTO event) {
         var memberDto = event.member();
 

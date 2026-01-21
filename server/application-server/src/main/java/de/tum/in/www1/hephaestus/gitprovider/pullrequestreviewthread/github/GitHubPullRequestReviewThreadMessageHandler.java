@@ -15,7 +15,7 @@ import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserProcessor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Handles GitHub pull_request_review_thread webhook events.
@@ -36,9 +36,10 @@ public class GitHubPullRequestReviewThreadMessageHandler
         GitHubPullRequestProcessor prProcessor,
         GitHubPullRequestReviewThreadProcessor threadProcessor,
         GitHubUserProcessor userProcessor,
-        NatsMessageDeserializer deserializer
+        NatsMessageDeserializer deserializer,
+        TransactionTemplate transactionTemplate
     ) {
-        super(GitHubPullRequestReviewThreadEventDTO.class, deserializer);
+        super(GitHubPullRequestReviewThreadEventDTO.class, deserializer, transactionTemplate);
         this.contextFactory = contextFactory;
         this.prProcessor = prProcessor;
         this.threadProcessor = threadProcessor;
@@ -51,7 +52,6 @@ public class GitHubPullRequestReviewThreadMessageHandler
     }
 
     @Override
-    @Transactional
     protected void handleEvent(GitHubPullRequestReviewThreadEventDTO event) {
         var threadDto = event.thread();
         var prDto = event.pullRequest();

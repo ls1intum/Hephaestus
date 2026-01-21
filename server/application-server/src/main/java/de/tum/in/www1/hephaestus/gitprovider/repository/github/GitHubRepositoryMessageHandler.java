@@ -14,7 +14,7 @@ import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Handles GitHub repository webhook events (deleted, archived, renamed, etc.).
@@ -41,9 +41,10 @@ public class GitHubRepositoryMessageHandler extends GitHubMessageHandler<GitHubR
     GitHubRepositoryMessageHandler(
         ProvisioningListener provisioningListener,
         RepositoryRepository repositoryRepository,
-        NatsMessageDeserializer deserializer
+        NatsMessageDeserializer deserializer,
+        TransactionTemplate transactionTemplate
     ) {
-        super(GitHubRepositoryEventDTO.class, deserializer);
+        super(GitHubRepositoryEventDTO.class, deserializer, transactionTemplate);
         this.provisioningListener = provisioningListener;
         this.repositoryRepository = repositoryRepository;
     }
@@ -59,7 +60,6 @@ public class GitHubRepositoryMessageHandler extends GitHubMessageHandler<GitHubR
     }
 
     @Override
-    @Transactional
     protected void handleEvent(GitHubRepositoryEventDTO event) {
         var repositoryRef = event.repository();
 

@@ -3,6 +3,7 @@ package de.tum.in.www1.hephaestus.practices.detection;
 import de.tum.in.www1.hephaestus.core.WorkspaceAgnostic;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -30,7 +31,11 @@ public class PullRequestTemplateGetter {
     private static final String TEMPLATE_URL =
         "https://raw.githubusercontent.com/%s/main/.github/PULL_REQUEST_TEMPLATE.md";
 
-    private final RestTemplate restTemplate = new RestTemplate();
+    private final RestTemplate restTemplate;
+
+    public PullRequestTemplateGetter(@Qualifier("gitHubRawRestTemplate") RestTemplate restTemplate) {
+        this.restTemplate = restTemplate;
+    }
 
     @Cacheable(value = "pullRequestTemplates")
     public String getPullRequestTemplate(String nameWithOwner) {

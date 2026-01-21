@@ -13,7 +13,7 @@ import de.tum.in.www1.hephaestus.gitprovider.label.github.dto.GitHubLabelEventDT
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Handles GitHub label webhook events.
@@ -29,9 +29,10 @@ public class GitHubLabelMessageHandler extends GitHubMessageHandler<GitHubLabelE
     GitHubLabelMessageHandler(
         ProcessingContextFactory contextFactory,
         GitHubLabelProcessor labelProcessor,
-        NatsMessageDeserializer deserializer
+        NatsMessageDeserializer deserializer,
+        TransactionTemplate transactionTemplate
     ) {
-        super(GitHubLabelEventDTO.class, deserializer);
+        super(GitHubLabelEventDTO.class, deserializer, transactionTemplate);
         this.contextFactory = contextFactory;
         this.labelProcessor = labelProcessor;
     }
@@ -42,7 +43,6 @@ public class GitHubLabelMessageHandler extends GitHubMessageHandler<GitHubLabelE
     }
 
     @Override
-    @Transactional
     protected void handleEvent(GitHubLabelEventDTO event) {
         GitHubLabelDTO labelDto = event.label();
 

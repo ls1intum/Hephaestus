@@ -11,6 +11,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Activity event repository with leaderboard aggregation queries.
@@ -343,6 +344,7 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
      * @param workspaceId the workspace ID
      */
     @Modifying
+    @Transactional
     @Query(value = "DELETE FROM activity_event WHERE workspace_id = :workspaceId", nativeQuery = true)
     void deleteAllByWorkspaceId(@Param("workspaceId") Long workspaceId);
 }

@@ -12,7 +12,7 @@ import de.tum.in.www1.hephaestus.gitprovider.team.github.dto.GitHubTeamEventDTO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Handles GitHub team webhook events.
@@ -28,9 +28,10 @@ public class GitHubTeamMessageHandler extends GitHubMessageHandler<GitHubTeamEve
     GitHubTeamMessageHandler(
         GitHubTeamProcessor teamProcessor,
         ScopeIdResolver scopeIdResolver,
-        NatsMessageDeserializer deserializer
+        NatsMessageDeserializer deserializer,
+        TransactionTemplate transactionTemplate
     ) {
-        super(GitHubTeamEventDTO.class, deserializer);
+        super(GitHubTeamEventDTO.class, deserializer, transactionTemplate);
         this.teamProcessor = teamProcessor;
         this.scopeIdResolver = scopeIdResolver;
     }
@@ -46,7 +47,6 @@ public class GitHubTeamMessageHandler extends GitHubMessageHandler<GitHubTeamEve
     }
 
     @Override
-    @Transactional
     protected void handleEvent(GitHubTeamEventDTO event) {
         var teamDto = event.team();
 

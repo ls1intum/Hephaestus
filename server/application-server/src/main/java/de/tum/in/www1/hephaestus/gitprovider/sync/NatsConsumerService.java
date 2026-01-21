@@ -111,6 +111,25 @@ public class NatsConsumerService {
 
     private static final Logger log = LoggerFactory.getLogger(NatsConsumerService.class);
 
+    /**
+     * Maximum number of redelivery attempts before giving up on a message.
+     * After this many attempts, the message is acknowledged and logged as a poison message.
+     * This prevents infinite redelivery loops for messages that consistently fail.
+     */
+    private static final int MAX_REDELIVERY_ATTEMPTS = 10;
+
+    /**
+     * Base delay for NAK backoff in milliseconds.
+     * First retry waits ~2s, second ~4s, etc. up to MAX_NAK_DELAY_MS.
+     */
+    private static final long NAK_BASE_DELAY_MS = 2000;
+
+    /**
+     * Maximum NAK delay cap in milliseconds (5 minutes).
+     * Prevents excessively long delays that could cause message timeout.
+     */
+    private static final long MAX_NAK_DELAY_MS = 300_000;
+
     /** Lock for NATS connection creation to prevent race conditions. */
     private final Object connectionLock = new Object();
 
@@ -551,6 +570,7 @@ public class NatsConsumerService {
 
     private void handleMessage(Message msg) {
         if (shuttingDown.get()) {
+            // During shutdown, NAK immediately so another consumer can pick it up
             msg.nak();
             return;
         }
@@ -572,7 +592,62 @@ public class NatsConsumerService {
             if (!shuttingDown.get()) {
                 log.error("Failed to process message: subject={}", sanitizeForLog(msg.getSubject()), e);
             }
-            msg.nak();
+            nakWithBackoff(msg);
+        }
+    }
+
+    /**
+     * NAKs a message with exponential backoff delay based on redelivery count.
+     * <p>
+     * This prevents redelivery storms where a failing message is immediately
+     * redelivered hundreds of times. The delay grows exponentially with each
+     * retry attempt: ~2s, ~4s, ~8s, ~16s, ~32s, ~64s, up to 5 minutes max.
+     * <p>
+     * If the message has been redelivered {@link #MAX_REDELIVERY_ATTEMPTS} times,
+     * it is acknowledged and logged as a poison message to prevent infinite loops.
+     *
+     * @param msg the NATS message to NAK
+     */
+    private void nakWithBackoff(Message msg) {
+        try {
+            var metadata = msg.metaData();
+            long deliveredCount = metadata != null ? metadata.deliveredCount() : 1;
+
+            // Check if this is a poison message that keeps failing
+            if (deliveredCount >= MAX_REDELIVERY_ATTEMPTS) {
+                log.error(
+                    "Poison message detected, giving up after {} attempts: subject={}, streamSeq={}",
+                    deliveredCount,
+                    sanitizeForLog(msg.getSubject()),
+                    metadata != null ? metadata.streamSequence() : "unknown"
+                );
+                // ACK the message to remove it from the queue - it's not recoverable
+                msg.ack();
+                return;
+            }
+
+            // Calculate exponential backoff based on delivery count
+            // deliveredCount is 1-based, so use (deliveredCount - 1) as attempt number
+            int attempt = (int) Math.min(deliveredCount - 1, Integer.MAX_VALUE);
+            long delayMs = ExponentialBackoff.calculateDelay(attempt, NAK_BASE_DELAY_MS, MAX_NAK_DELAY_MS, 1000);
+
+            log.debug(
+                "NAKing message with backoff: subject={}, attempt={}, delayMs={}",
+                sanitizeForLog(msg.getSubject()),
+                deliveredCount,
+                delayMs
+            );
+
+            msg.nakWithDelay(Duration.ofMillis(delayMs));
+        } catch (Exception e) {
+            // If we can't NAK with delay (e.g., connection closed), fall back to immediate NAK
+            log.debug("Failed to NAK with delay, using immediate NAK: error={}", e.getMessage());
+            try {
+                msg.nak();
+            } catch (Exception nakError) {
+                // Message will be redelivered after ack timeout - nothing more we can do
+                log.trace("Failed to NAK message: error={}", nakError.getMessage());
+            }
         }
     }
 

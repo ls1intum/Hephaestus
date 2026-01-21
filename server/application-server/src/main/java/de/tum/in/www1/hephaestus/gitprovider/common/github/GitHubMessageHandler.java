@@ -11,6 +11,7 @@ import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Base class for GitHub webhook message handlers.
@@ -30,10 +31,24 @@ public abstract class GitHubMessageHandler<T> implements MessageHandler {
 
     private final Class<T> payloadType;
     private final NatsMessageDeserializer deserializer;
+    private final TransactionTemplate transactionTemplate;
 
-    protected GitHubMessageHandler(Class<T> payloadType, NatsMessageDeserializer deserializer) {
+    /**
+     * Constructor for message handlers.
+     * <p>
+     * IMPORTANT: The TransactionTemplate is required because Spring AOP proxy-based
+     * @Transactional DOES NOT WORK for internal method calls (self-invocation).
+     * When onMessage() calls handleEvent(), it bypasses the proxy entirely.
+     * Using TransactionTemplate ensures the transaction boundary is correctly applied.
+     */
+    protected GitHubMessageHandler(
+        Class<T> payloadType,
+        NatsMessageDeserializer deserializer,
+        TransactionTemplate transactionTemplate
+    ) {
         this.payloadType = payloadType;
         this.deserializer = deserializer;
+        this.transactionTemplate = transactionTemplate;
     }
 
     @Override
@@ -53,14 +68,16 @@ public abstract class GitHubMessageHandler<T> implements MessageHandler {
 
         try {
             T eventPayload = deserializer.deserialize(msg, payloadType);
-            handleEvent(eventPayload);
+            // CRITICAL: Use TransactionTemplate to wrap handleEvent() in a transaction.
+            // Spring AOP @Transactional does NOT work for self-invocation (this.handleEvent()).
+            // Without this, all @Modifying JPA queries will fail with TransactionRequiredException.
+            transactionTemplate.executeWithoutResult(status -> handleEvent(eventPayload));
         } catch (IOException e) {
             log.error("Failed to parse payload: subject={}", safeSubject, e);
             throw new PayloadParsingException("Payload parsing failed for subject: " + safeSubject, e);
-        } catch (Exception e) {
-            log.error("Failed to handle message: subject={}", safeSubject, e);
-            throw e;
         }
+        // Note: Other exceptions are NOT logged here to avoid duplicate logging.
+        // NatsConsumerService.handleMessage() will catch and log the error.
     }
 
     /**

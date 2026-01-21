@@ -13,7 +13,7 @@ import de.tum.in.www1.hephaestus.gitprovider.issuecomment.github.dto.GitHubIssue
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Handles GitHub issue_comment webhook events.
@@ -31,9 +31,10 @@ public class GitHubIssueCommentMessageHandler extends GitHubMessageHandler<GitHu
         ProcessingContextFactory contextFactory,
         GitHubIssueProcessor issueProcessor,
         GitHubIssueCommentProcessor commentProcessor,
-        NatsMessageDeserializer deserializer
+        NatsMessageDeserializer deserializer,
+        TransactionTemplate transactionTemplate
     ) {
-        super(GitHubIssueCommentEventDTO.class, deserializer);
+        super(GitHubIssueCommentEventDTO.class, deserializer, transactionTemplate);
         this.contextFactory = contextFactory;
         this.issueProcessor = issueProcessor;
         this.commentProcessor = commentProcessor;
@@ -45,7 +46,6 @@ public class GitHubIssueCommentMessageHandler extends GitHubMessageHandler<GitHu
     }
 
     @Override
-    @Transactional
     protected void handleEvent(GitHubIssueCommentEventDTO event) {
         var commentDto = event.comment();
         var issueDto = event.issue();

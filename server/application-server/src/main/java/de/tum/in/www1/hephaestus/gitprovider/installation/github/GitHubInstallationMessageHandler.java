@@ -19,7 +19,7 @@ import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Handles GitHub installation webhook events and provisions scopes.
@@ -37,9 +37,10 @@ public class GitHubInstallationMessageHandler extends GitHubMessageHandler<GitHu
         ProvisioningListener provisioningListener,
         OrganizationService organizationService,
         GitHubAppTokenService gitHubAppTokenService,
-        NatsMessageDeserializer deserializer
+        NatsMessageDeserializer deserializer,
+        TransactionTemplate transactionTemplate
     ) {
-        super(GitHubInstallationEventDTO.class, deserializer);
+        super(GitHubInstallationEventDTO.class, deserializer, transactionTemplate);
         this.provisioningListener = provisioningListener;
         this.organizationService = organizationService;
         this.gitHubAppTokenService = gitHubAppTokenService;
@@ -56,7 +57,6 @@ public class GitHubInstallationMessageHandler extends GitHubMessageHandler<GitHu
     }
 
     @Override
-    @Transactional
     protected void handleEvent(GitHubInstallationEventDTO event) {
         var installation = event.installation();
 

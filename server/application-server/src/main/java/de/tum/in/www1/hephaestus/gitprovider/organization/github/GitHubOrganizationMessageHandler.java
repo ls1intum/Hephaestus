@@ -17,7 +17,7 @@ import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Handles GitHub organization webhook events.
@@ -37,9 +37,10 @@ public class GitHubOrganizationMessageHandler extends GitHubMessageHandler<GitHu
         GitHubUserProcessor userProcessor,
         OrganizationMembershipRepository membershipRepository,
         OrganizationMembershipListener membershipListener,
-        NatsMessageDeserializer deserializer
+        NatsMessageDeserializer deserializer,
+        TransactionTemplate transactionTemplate
     ) {
-        super(GitHubOrganizationEventDTO.class, deserializer);
+        super(GitHubOrganizationEventDTO.class, deserializer, transactionTemplate);
         this.organizationProcessor = organizationProcessor;
         this.userProcessor = userProcessor;
         this.membershipRepository = membershipRepository;
@@ -57,7 +58,6 @@ public class GitHubOrganizationMessageHandler extends GitHubMessageHandler<GitHu
     }
 
     @Override
-    @Transactional
     protected void handleEvent(GitHubOrganizationEventDTO event) {
         var orgDto = event.organization();
 
