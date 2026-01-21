@@ -42,7 +42,7 @@ export function ProfileHeader({
 							<Avatar className="w-24 h-24 ring-2 ring-neutral-100 dark:ring-neutral-800 shrink-0">
 								<Skeleton className="h-full w-full rounded-full" />
 							</Avatar>
-							<Skeleton className="h-[4.5rem] w-18 rounded-xl" />
+							<Skeleton className="h-18 w-18 rounded-xl" />
 						</>
 					) : (
 						<>

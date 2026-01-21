@@ -10,7 +10,7 @@ export function LevelBadge({ level, className }: LevelBadgeProps) {
 	return (
 		<div
 			className={cn(
-				"flex flex-col items-center justify-center min-w-18 p-3 rounded-xl bg-secondary/50 border border-border/50 backdrop-blur-sm shadow-md",
+				"flex flex-col items-center justify-center min-w-18 p-3 rounded-xl bg-secondary/10 backdrop-blur-sm",
 				className,
 			)}
 		>
