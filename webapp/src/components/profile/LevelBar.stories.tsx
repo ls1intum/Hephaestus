@@ -1,12 +1,12 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { LevelBar } from "./LevelBar";
+import { XpProgress } from "./XpProgress.tsx";
 
 /**
  * Visual indicator of a user's progression level and experience points (XP).
  * Displays current level, numeric XP progress, and a graphical bar.
  */
 const meta = {
-	component: LevelBar,
+	component: XpProgress,
 	parameters: {
 		layout: "centered",
 		docs: {
@@ -35,7 +35,7 @@ const meta = {
 		},
 	},
 	tags: ["autodocs"],
-} satisfies Meta<typeof LevelBar>;
+} satisfies Meta<typeof XpProgress>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;

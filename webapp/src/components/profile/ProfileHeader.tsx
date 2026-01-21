@@ -3,19 +3,8 @@ import { format } from "date-fns";
 import type { RepositoryInfo, UserInfo } from "@/api/types.gen";
 import { LeagueIcon } from "@/components/leaderboard/LeagueIcon";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { LevelBar } from "./LevelBar";
-
-// Repository images for known repositories
-const REPO_IMAGES: Record<string, string> = {
-	"ls1intum/Hephaestus":
-		"https://raw.githubusercontent.com/ls1intum/Hephaestus/main/webapp/public/logo192.png",
-	"ls1intum/Artemis": "https://artemis.tum.de/public/images/logo.png",
-	"ls1intum/Athena":
-		"https://raw.githubusercontent.com/ls1intum/Athena/develop/playground/public/logo.png",
-};
+import { LevelBadge, XpProgress } from "./XpProgress.tsx";
 
 export interface ProfileHeaderProps {
 	user?: UserInfo;
@@ -31,7 +20,7 @@ export interface ProfileHeaderProps {
 export function ProfileHeader({
 	user,
 	firstContribution,
-	contributedRepositories = [],
+	contributedRepositories: _contributedRepositories = [],
 	leaguePoints = 0,
 	isLoading,
 	level = 1,
@@ -43,24 +32,28 @@ export function ProfileHeader({
 		? format(firstContribution, "MMMM do, yyyy")
 		: undefined;
 
-	// Function to get repository image based on nameWithOwner
-	const getRepositoryImage = (nameWithOwner: string) => {
-		return REPO_IMAGES[nameWithOwner] || `https://github.com/${nameWithOwner.split("/")[0]}.png`;
-	};
 	return (
 		<div className="flex items-center justify-between mx-8">
 			<div className="flex gap-8 items-center w-full">
-				{/* Avatar with loading skeleton */}
-				{isLoading ? (
-					<Avatar className="w-24 h-24 ring-2 ring-neutral-100 dark:ring-neutral-800 shrink-0">
-						<Skeleton className="h-full w-full rounded-full" />
-					</Avatar>
-				) : (
-					<Avatar className="w-24 h-24 ring-2 ring-neutral-100 dark:ring-neutral-800 shrink-0">
-						<AvatarImage src={user?.avatarUrl} alt={`${user?.login}'s avatar`} />
-						<AvatarFallback>{user?.login?.slice(0, 2)?.toUpperCase()}</AvatarFallback>
-					</Avatar>
-				)}
+				{/* Avatar and Level Badge Column */}
+				<div className="flex flex-col items-center gap-4 shrink-0">
+					{isLoading ? (
+						<>
+							<Avatar className="w-24 h-24 ring-2 ring-neutral-100 dark:ring-neutral-800 shrink-0">
+								<Skeleton className="h-full w-full rounded-full" />
+							</Avatar>
+							<Skeleton className="h-[4.5rem] w-18 rounded-xl" />
+						</>
+					) : (
+						<>
+							<Avatar className="w-24 h-24 ring-2 ring-neutral-100 dark:ring-neutral-800 shrink-0">
+								<AvatarImage src={user?.avatarUrl} alt={`${user?.login}'s avatar`} />
+								<AvatarFallback>{user?.login?.slice(0, 2)?.toUpperCase()}</AvatarFallback>
+							</Avatar>
+							<LevelBadge level={level} />
+						</>
+					)}
+				</div>
 
 				{/* User information with loading skeletons */}
 				{isLoading ? (
@@ -68,10 +61,7 @@ export function ProfileHeader({
 						<Skeleton className="h-8 w-48" />
 						<Skeleton className="h-5 w-64" />
 						<Skeleton className="h-5 w-80" />
-						<div className="flex items-center gap-2">
-							<Skeleton className="size-10" />
-							<Skeleton className="size-10" />
-						</div>
+						<Skeleton className="h-12 w-full max-w-sm mt-2" />
 					</div>
 				) : user ? (
 					<div className="flex flex-col gap-3 w-full max-w-xl">
@@ -99,29 +89,13 @@ export function ProfileHeader({
 						</div>
 
 						{/* Level Bar - Integrated under user info */}
-						<LevelBar level={level} currentXP={currentXP} xpNeeded={xpNeeded} />
-
-						{/* Contributed repositories */}
-						{/*{contributedRepositories.length > 0 && (*/}
-						{/*	<div className="flex items-center gap-2 mt-1">*/}
-						{/*		{contributedRepositories.map((repository) => (*/}
-						{/*			<Tooltip key={repository.id}>*/}
-						{/*				<TooltipTrigger asChild>*/}
-						{/*					<Button variant="outline" size="icon" className="size-10 p-1" asChild>*/}
-						{/*						<a href={repository.htmlUrl} target="_blank" rel="noopener noreferrer">*/}
-						{/*							<img*/}
-						{/*								src={getRepositoryImage(repository.nameWithOwner)}*/}
-						{/*								alt={repository.name}*/}
-						{/*								className="size-full object-contain"*/}
-						{/*							/>*/}
-						{/*						</a>*/}
-						{/*					</Button>*/}
-						{/*				</TooltipTrigger>*/}
-						{/*				<TooltipContent>{repository.nameWithOwner}</TooltipContent>*/}
-						{/*			</Tooltip>*/}
-						{/*		))}*/}
-						{/*	</div>*/}
-						{/*)}*/}
+						<XpProgress
+							className="max-w-sm"
+							level={level}
+							currentXP={currentXP}
+							xpNeeded={xpNeeded}
+							showBadge={false}
+						/>
 					</div>
 				) : null}
 			</div>
