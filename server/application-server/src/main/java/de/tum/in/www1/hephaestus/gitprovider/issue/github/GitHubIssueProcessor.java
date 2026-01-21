@@ -399,13 +399,14 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
 
     /**
      * Converts a GitHub API state string to Issue.State enum.
+     * Note: Issues cannot be MERGED - only PRs can. This only handles OPEN/CLOSED.
      */
     private Issue.State convertState(String state) {
         if (state == null) {
             return Issue.State.OPEN;
         }
         return switch (state.toUpperCase()) {
-            case "CLOSED", "MERGED" -> Issue.State.CLOSED;
+            case "CLOSED" -> Issue.State.CLOSED;
             default -> Issue.State.OPEN;
         };
     }

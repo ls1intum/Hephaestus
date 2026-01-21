@@ -6,6 +6,7 @@ import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import io.github.resilience4j.ratelimiter.RateLimiter;
 import io.github.resilience4j.ratelimiter.RateLimiterConfig;
 import io.github.resilience4j.ratelimiter.RateLimiterRegistry;
+import de.tum.in.www1.hephaestus.gitprovider.common.exception.InstallationSuspendedException;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.concurrent.TimeoutException;
@@ -96,7 +97,11 @@ public class ResilienceConfig {
                 WebClientResponseException.class
             )
             // Don't record these as failures (they're client errors, not service failures)
-            .ignoreExceptions(IllegalArgumentException.class, IllegalStateException.class)
+            .ignoreExceptions(
+                IllegalArgumentException.class,
+                IllegalStateException.class,
+                InstallationSuspendedException.class
+            )
             .build();
 
         CircuitBreakerRegistry registry = CircuitBreakerRegistry.of(defaultConfig);

@@ -27,9 +27,10 @@ import org.springframework.transaction.annotation.Transactional;
  * persists them, and publishes appropriate domain events.
  * <p>
  * <b>Note on Milestone IDs:</b>
- * GitHub's GraphQL API does not expose databaseId for milestones.
- * This processor supports both ID-based lookup (for webhook events which provide databaseId)
- * and number-based lookup (for GraphQL sync where only number is reliably available).
+ * GitHub's GraphQL API does not expose databaseId for milestones, while webhooks do.
+ * To avoid duplicates, this processor always uses number-based lookup within a repository
+ * (milestone numbers are unique per repository). When the real GitHub databaseId is available
+ * from webhooks, it updates the entity ID accordingly.
  */
 @Service
 public class GitHubMilestoneProcessor {
@@ -52,10 +53,13 @@ public class GitHubMilestoneProcessor {
 
     /**
      * Process a GitHub milestone DTO and persist it as a Milestone entity.
-     * Uses ID-based lookup when id is available (webhooks), otherwise falls back to number-based lookup.
      * <p>
-     * For new milestones from GraphQL (which doesn't provide databaseId), a deterministic ID is generated
-     * from the repository ID and milestone number to ensure consistency.
+     * <b>IMPORTANT:</b> Always uses number-based lookup within the repository to find existing milestones.
+     * This ensures that milestones created via webhooks (with real GitHub databaseId) and milestones
+     * synced via GraphQL (which doesn't provide databaseId) are treated as the same entity.
+     * <p>
+     * When the real GitHub databaseId is available (from webhooks), it will be used as the entity ID
+     * and will replace any previously generated deterministic ID.
      *
      * @param dto the GitHub milestone DTO
      * @param repository the repository this milestone belongs to
@@ -78,29 +82,48 @@ public class GitHubMilestoneProcessor {
             return null;
         }
 
-        // Find existing milestone: prefer ID lookup (from webhooks), fall back to number lookup (for GraphQL)
-        Optional<Milestone> existingOpt;
-        if (dto.id() != null) {
-            existingOpt = milestoneRepository.findById(dto.id());
-        } else if (dto.number() > 0) {
-            existingOpt = milestoneRepository.findByNumberAndRepositoryId(dto.number(), repository.getId());
-        } else {
-            log.warn("Skipped milestone processing: reason=missingIdAndNumber, repoId={}", repository.getId());
+        if (dto.number() <= 0) {
+            log.warn("Skipped milestone processing: reason=invalidNumber, repoId={}", repository.getId());
             return null;
         }
+
+        // Always look up by number within the repository to avoid duplicates.
+        // The milestone number is unique within a repository and is the canonical identifier.
+        Optional<Milestone> existingOpt = milestoneRepository.findByNumberAndRepositoryId(
+            dto.number(),
+            repository.getId()
+        );
         boolean isNew = existingOpt.isEmpty();
 
         Milestone milestone = existingOpt.orElseGet(Milestone::new);
 
-        // Set or update fields
-        // For existing entities, only update non-null DTO values (preserve existing data)
-        // For new entities, set all fields
+        // Handle ID assignment:
+        // - If we have the real GitHub databaseId (from webhooks), always use it
+        // - If existing milestone has a different ID (e.g., generated deterministic ID),
+        //   delete it and create new with the real ID (Hibernate doesn't allow changing entity IDs)
+        // - For new milestones without databaseId (GraphQL), generate a deterministic ID
         if (dto.id() != null) {
+            // We have the real GitHub databaseId
+            if (!isNew && !dto.id().equals(milestone.getId())) {
+                // Existing milestone has a different ID (likely a generated deterministic ID).
+                // Hibernate doesn't allow changing entity IDs, so we must delete and recreate.
+                log.info(
+                    "Migrating milestone from generated to real ID: oldId={}, newId={}, milestoneNumber={}",
+                    milestone.getId(),
+                    dto.id(),
+                    dto.number()
+                );
+                milestoneRepository.delete(milestone);
+                milestoneRepository.flush();
+                milestone = new Milestone();
+                isNew = true;
+            }
             milestone.setId(dto.id());
         } else if (isNew) {
-            // Generate deterministic ID for new milestones from GraphQL (which doesn't provide databaseId)
+            // New milestone from GraphQL (no databaseId) - generate deterministic ID
             milestone.setId(generateDeterministicId(repository.getId(), dto.number()));
         }
+        // else: existing milestone, keep its current ID (whether real or generated)
         if (dto.number() > 0) {
             milestone.setNumber(dto.number());
         }

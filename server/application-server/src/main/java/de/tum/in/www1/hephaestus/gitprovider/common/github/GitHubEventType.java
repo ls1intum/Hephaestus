@@ -18,6 +18,7 @@ package de.tum.in.www1.hephaestus.gitprovider.common.github;
  */
 public enum GitHubEventType {
     // Repository events
+    REPOSITORY("repository"),
     ISSUES("issues"),
     ISSUE_COMMENT("issue_comment"),
     PULL_REQUEST("pull_request"),

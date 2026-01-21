@@ -14,4 +14,15 @@ public interface InstallationTokenProvider {
 
     /** Get authentication mode for a scope. */
     AuthMode getAuthMode(Long scopeId);
+
+    /**
+     * Check if the scope is active and eligible for API operations.
+     * Returns false for suspended or purged scopes to prevent wasted API calls.
+     *
+     * @param scopeId the scope to check
+     * @return true if active, false if suspended/purged/not found
+     */
+    default boolean isScopeActive(Long scopeId) {
+        return true; // Default: assume active for backward compatibility
+    }
 }

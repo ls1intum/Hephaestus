@@ -468,6 +468,7 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
         return switch (state.toUpperCase()) {
             case "OPEN" -> Issue.State.OPEN;
             case "CLOSED" -> Issue.State.CLOSED;
+            case "MERGED" -> Issue.State.MERGED;
             default -> Issue.State.OPEN;
         };
     }

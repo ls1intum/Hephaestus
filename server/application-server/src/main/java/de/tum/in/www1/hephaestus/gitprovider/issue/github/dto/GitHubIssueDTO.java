@@ -47,8 +47,26 @@ public record GitHubIssueDTO(
     @JsonProperty("labels") List<GitHubLabelDTO> labels,
     @JsonProperty("milestone") GitHubMilestoneDTO milestone,
     @JsonProperty("type") GitHubIssueTypeDTO issueType,
-    @JsonProperty("repository") GitHubRepositoryRefDTO repository
+    @JsonProperty("repository") GitHubRepositoryRefDTO repository,
+    @JsonProperty("pull_request") PullRequestRef pullRequest
 ) {
+    /**
+     * Returns true if this issue is actually a pull request.
+     * GitHub REST API includes a pull_request field when the issue is a PR.
+     */
+    public boolean isPullRequest() {
+        return pullRequest != null;
+    }
+
+    /**
+     * Minimal reference to indicate this issue is a pull request.
+     * GitHub REST API includes this field in issue webhooks when the issue is actually a PR.
+     */
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record PullRequestRef(
+        @JsonProperty("url") String url,
+        @JsonProperty("html_url") String htmlUrl
+    ) {}
     /**
      * Get the database ID, preferring databaseId over id for GraphQL responses.
      */
@@ -90,7 +108,8 @@ public record GitHubIssueDTO(
             GitHubLabelDTO.fromLabelConnection(issue.getLabels()),
             GitHubMilestoneDTO.fromMilestone(issue.getMilestone()),
             GitHubIssueTypeDTO.fromIssueType(issue.getIssueType()),
-            null
+            null, // repository
+            null  // pullRequest - GraphQL issues are never PRs
         );
     }
 

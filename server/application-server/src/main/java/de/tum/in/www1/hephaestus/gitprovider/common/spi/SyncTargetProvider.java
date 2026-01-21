@@ -88,6 +88,16 @@ public interface SyncTargetProvider extends SyncTimestampProvider, BackfillState
      */
     void updateSyncTimestamp(Long syncTargetId, SyncType syncType, Instant syncedAt);
 
+    /**
+     * Removes a sync target from the system.
+     * <p>
+     * This is called when a repository no longer exists on GitHub (NOT_FOUND)
+     * to stop perpetual sync retries for a deleted repository.
+     *
+     * @param syncTargetId the sync target ID to remove (must not be null)
+     */
+    void removeSyncTarget(Long syncTargetId);
+
     // ═══════════════════════════════════════════════════════════════════════════
     // SYNC SESSIONS
     // ═══════════════════════════════════════════════════════════════════════════

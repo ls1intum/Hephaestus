@@ -1,7 +1,10 @@
 package de.tum.in.www1.hephaestus.workspace;
 
 import de.tum.in.www1.hephaestus.core.LoggingUtils;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.app.GitHubAppTokenService;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.ProvisioningListener;
+import de.tum.in.www1.hephaestus.gitprovider.organization.Organization;
+import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationService;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.gitprovider.sync.NatsConsumerService;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
@@ -35,6 +38,8 @@ public class WorkspaceInstallationService {
     private final WorkspaceSlugService workspaceSlugService;
     private final WorkspaceMembershipService workspaceMembershipService;
     private final NatsConsumerService natsConsumerService;
+    private final GitHubAppTokenService gitHubAppTokenService;
+    private final OrganizationService organizationService;
 
     public WorkspaceInstallationService(
         @Value("${nats.enabled}") boolean isNatsEnabled,
@@ -44,7 +49,9 @@ public class WorkspaceInstallationService {
         UserRepository userRepository,
         WorkspaceSlugService workspaceSlugService,
         WorkspaceMembershipService workspaceMembershipService,
-        NatsConsumerService natsConsumerService
+        NatsConsumerService natsConsumerService,
+        GitHubAppTokenService gitHubAppTokenService,
+        OrganizationService organizationService
     ) {
         this.isNatsEnabled = isNatsEnabled;
         this.workspaceRepository = workspaceRepository;
@@ -54,6 +61,8 @@ public class WorkspaceInstallationService {
         this.workspaceSlugService = workspaceSlugService;
         this.workspaceMembershipService = workspaceMembershipService;
         this.natsConsumerService = natsConsumerService;
+        this.gitHubAppTokenService = gitHubAppTokenService;
+        this.organizationService = organizationService;
     }
 
     /**
@@ -117,6 +126,17 @@ public class WorkspaceInstallationService {
         String avatarUrl,
         RepositorySelection repositorySelection
     ) {
+        // Check if installation is suspended BEFORE any reactivation logic.
+        // This prevents NATS replay of old "created" events from reactivating suspended workspaces
+        // and triggering hundreds of failed repository syncs.
+        if (gitHubAppTokenService.isInstallationMarkedSuspended(installationId)) {
+            log.info(
+                "Skipped workspace reactivation: reason=installationSuspended, installationId={}",
+                installationId
+            );
+            return null;
+        }
+
         // First check if an installation-backed workspace already exists for this
         // installation ID
         Workspace workspace = workspaceRepository.findByInstallationId(installationId).orElse(null);
@@ -237,6 +257,19 @@ public class WorkspaceInstallationService {
                 installationId
             );
             workspace.setStatus(Workspace.WorkspaceStatus.ACTIVE);
+        }
+
+        // Create Organization entity BEFORE repositories are created
+        // This ensures repositories created during provisioning have organization_id set
+        if (accountType == ProvisioningListener.AccountType.ORGANIZATION && accountId != null) {
+            Organization org = organizationService.upsertIdentity(accountId, accountLogin);
+            workspace.setOrganization(org);
+            log.debug(
+                "Linked organization to workspace: orgId={}, orgLogin={}, workspaceId={}",
+                org.getId(),
+                LoggingUtils.sanitizeForLog(org.getLogin()),
+                workspace.getId()
+            );
         }
 
         return workspaceRepository.save(workspace);

@@ -13,7 +13,6 @@ import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientPr
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser.RepositoryOwnerAndName;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncProperties;
-import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHActor;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHCommentAuthorAssociation;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHDiffSide;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHPageInfo;
@@ -751,20 +750,8 @@ public class GitHubPullRequestReviewCommentSyncService {
             return null;
         }
 
-        // Convert author
-        GitHubUserDTO author = null;
-        GHActor graphQlAuthor = graphQlComment.getAuthor();
-        if (graphQlAuthor instanceof GHUser graphQlUser) {
-            author = new GitHubUserDTO(
-                null, // id (node_id)
-                graphQlUser.getDatabaseId() != null ? graphQlUser.getDatabaseId().longValue() : null, // databaseId
-                graphQlUser.getLogin(), // login
-                graphQlUser.getAvatarUrl() != null ? graphQlUser.getAvatarUrl().toString() : null, // avatarUrl
-                null, // htmlUrl
-                graphQlUser.getName(), // name
-                graphQlUser.getEmail() // email
-            );
-        }
+        // Convert author - use fromActor to handle all GHActor types (User, Bot, Mannequin, Organization)
+        GitHubUserDTO author = GitHubUserDTO.fromActor(graphQlComment.getAuthor());
 
         // Convert author association
         String authorAssociation = convertAuthorAssociation(graphQlComment.getAuthorAssociation());

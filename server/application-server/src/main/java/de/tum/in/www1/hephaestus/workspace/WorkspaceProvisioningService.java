@@ -8,6 +8,7 @@ import de.tum.in.www1.hephaestus.gitprovider.common.spi.ProvisioningListener;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceMembership.WorkspaceRole;
+import java.time.Instant;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -272,6 +273,21 @@ public class WorkspaceProvisioningService {
             return;
         }
 
+        // Check if installation is suspended - don't waste cycles on suspended installations
+        if (installation.suspendedAt() != null) {
+            log.info("Skipped installation sync: reason=suspended, installationId={}", installation.id());
+            gitHubAppTokenService.markInstallationSuspended(installation.id());
+            // If workspace exists, ensure it's marked suspended
+            workspaceRepository.findByInstallationId(installation.id()).ifPresent(ws -> {
+                if (ws.getStatus() != Workspace.WorkspaceStatus.SUSPENDED) {
+                    workspaceInstallationService.updateWorkspaceStatus(installation.id(), Workspace.WorkspaceStatus.SUSPENDED);
+                }
+            });
+            return;
+        }
+        // Mark active in memory for fast fail-fast checks
+        gitHubAppTokenService.markInstallationActive(installation.id());
+
         String login = installation.account().login();
 
         if (workspaceScopeFilter.isActive() && !workspaceScopeFilter.isOrganizationAllowed(login)) {
@@ -284,14 +300,8 @@ public class WorkspaceProvisioningService {
         }
 
         String accountType = installation.account().type();
-        if (!"Organization".equalsIgnoreCase(accountType)) {
-            log.info(
-                "Skipped installation sync: reason=unsupportedAccountType, installationId={}, accountType={}",
-                installation.id(),
-                accountType
-            );
-            return;
-        }
+        // User accounts are now supported - Teams features will be unavailable but all other
+        // features work normally. The organization field will be null for user-type workspaces.
 
         long installationId = installation.id();
         RepositorySelection selection = convertRepositorySelection(installation.repositorySelection());
@@ -402,7 +412,8 @@ public class WorkspaceProvisioningService {
     private record InstallationDto(
         long id,
         AccountDto account,
-        @JsonProperty("repository_selection") String repositorySelection
+        @JsonProperty("repository_selection") String repositorySelection,
+        @JsonProperty("suspended_at") Instant suspendedAt
     ) {}
 
     private record AccountDto(Long id, String login, String type, @JsonProperty("avatar_url") String avatarUrl) {}

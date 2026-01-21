@@ -18,6 +18,7 @@ import org.springframework.graphql.ResponseError;
 import org.springframework.graphql.client.ClientGraphQlResponse;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
+import de.tum.in.www1.hephaestus.gitprovider.common.exception.InstallationSuspendedException;
 import org.springframework.web.reactive.function.client.WebClientRequestException;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 
@@ -296,6 +297,14 @@ public class GitHubExceptionClassifier {
             cause = e.getCause();
         }
 
+        // Suspended installation - this is an auth error, not retryable
+        if (cause instanceof InstallationSuspendedException suspended) {
+            return ClassificationResult.of(
+                Category.AUTH_ERROR,
+                "Installation " + suspended.getInstallationId() + " is suspended"
+            );
+        }
+
         // Check for WebClient response exceptions (HTTP errors)
         if (cause instanceof WebClientResponseException responseException) {
             return classifyHttpStatus(responseException);
@@ -319,6 +328,24 @@ public class GitHubExceptionClassifier {
         // Check for IOException (may indicate network issues)
         if (cause instanceof IOException) {
             return ClassificationResult.of(Category.RETRYABLE, "IO error: " + cause.getMessage());
+        }
+
+        // Check for suspended in message (legacy IllegalStateException)
+        String message = cause.getMessage();
+        if (message != null && message.toLowerCase().contains("suspended")) {
+            return ClassificationResult.of(Category.AUTH_ERROR, "Installation suspended: " + message);
+        }
+
+        // Check for FieldAccessException from Spring GraphQL - extract error type from message
+        if (cause.getClass().getSimpleName().equals("FieldAccessException") && message != null) {
+            // GraphQL NOT_FOUND errors (e.g., "Could not resolve to a Repository")
+            if (message.contains("NOT_FOUND") || message.contains("Could not resolve")) {
+                return ClassificationResult.of(Category.NOT_FOUND, "GraphQL resource not found: " + message);
+            }
+            // GraphQL FORBIDDEN errors
+            if (message.contains("FORBIDDEN") || message.contains("forbidden")) {
+                return ClassificationResult.of(Category.AUTH_ERROR, "GraphQL forbidden: " + message);
+            }
         }
 
         // Default: unknown

@@ -225,6 +225,11 @@ public class GitHubGraphQlClientProvider {
     }
 
     private String getToken(Long scopeId) {
+        // Fail fast for suspended/inactive scopes - don't waste API calls
+        if (!tokenProvider.isScopeActive(scopeId)) {
+            throw new IllegalStateException("Scope " + scopeId + " is not active (suspended or purged). Refusing to mint token.");
+        }
+
         AuthMode authMode = tokenProvider.getAuthMode(scopeId);
 
         if (authMode == AuthMode.GITHUB_APP) {

@@ -130,9 +130,19 @@ public class WorkspaceActivationService {
     }
 
     /**
-     * Checks if a workspace should skip activation based on its configuration.
+     * Checks if a workspace should skip activation based on its configuration and status.
      */
     private boolean shouldSkipActivation(Workspace workspace) {
+        // Skip non-active workspaces (SUSPENDED, PURGED) - don't waste cycles on dead workspaces
+        if (workspace.getStatus() != Workspace.WorkspaceStatus.ACTIVE) {
+            log.info(
+                "Skipped workspace activation: reason=notActive, workspaceId={}, status={}",
+                workspace.getId(),
+                workspace.getStatus()
+            );
+            return true;
+        }
+
         if (
             workspace.getGitProviderMode() == Workspace.GitProviderMode.PAT_ORG &&
             isBlank(workspace.getPersonalAccessToken())
@@ -151,6 +161,16 @@ public class WorkspaceActivationService {
      *                                     (currently unused but kept for future multi-org support)
      */
     public void activateWorkspace(Workspace workspace, Set<String> organizationConsumersStarted) {
+        // Early exit for non-active workspaces - don't waste cycles
+        if (workspace.getStatus() != Workspace.WorkspaceStatus.ACTIVE) {
+            log.debug(
+                "Skipped workspace activation: reason=notActive, workspaceId={}, status={}",
+                workspace.getId(),
+                workspace.getStatus()
+            );
+            return;
+        }
+
         if (!workspaceScopeFilter.isWorkspaceAllowed(workspace)) {
             log.info("Skipped workspace activation: reason=filteredByScope, workspaceId={}", workspace.getId());
             return;

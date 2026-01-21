@@ -4,6 +4,8 @@ import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.exception.InstallationNotFoundException;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.app.GitHubAppTokenService;
+import de.tum.in.www1.hephaestus.gitprovider.common.spi.InstallationTokenProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier.Category;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier.ClassificationResult;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.OrganizationMembershipListener;
@@ -25,6 +27,7 @@ import de.tum.in.www1.hephaestus.gitprovider.repository.github.GitHubRepositoryS
 import de.tum.in.www1.hephaestus.gitprovider.subissue.github.GitHubSubIssueSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.team.github.GitHubTeamSyncService;
 import de.tum.in.www1.hephaestus.monitoring.MonitoringProperties;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
 import org.slf4j.Logger;
@@ -79,6 +82,8 @@ public class GitHubDataSyncService {
     private final GitHubRepositorySyncService repositorySyncService;
     private final GitHubCollaboratorSyncService collaboratorSyncService;
     private final GitHubExceptionClassifier exceptionClassifier;
+    private final InstallationTokenProvider tokenProvider;
+    private final GitHubAppTokenService gitHubAppTokenService;
 
     private final AsyncTaskExecutor monitoringExecutor;
 
@@ -98,6 +103,8 @@ public class GitHubDataSyncService {
         GitHubRepositorySyncService repositorySyncService,
         GitHubCollaboratorSyncService collaboratorSyncService,
         GitHubExceptionClassifier exceptionClassifier,
+        InstallationTokenProvider tokenProvider,
+        GitHubAppTokenService gitHubAppTokenService,
         @Qualifier("monitoringExecutor") AsyncTaskExecutor monitoringExecutor
     ) {
         this.monitoringProperties = monitoringProperties;
@@ -115,6 +122,8 @@ public class GitHubDataSyncService {
         this.repositorySyncService = repositorySyncService;
         this.collaboratorSyncService = collaboratorSyncService;
         this.exceptionClassifier = exceptionClassifier;
+        this.tokenProvider = tokenProvider;
+        this.gitHubAppTokenService = gitHubAppTokenService;
         this.monitoringExecutor = monitoringExecutor;
     }
 
@@ -161,6 +170,8 @@ public class GitHubDataSyncService {
                     scopeId,
                     safeNameWithOwner
                 );
+                // Repository doesn't exist on GitHub - remove sync target to stop perpetual retries
+                syncTargetProvider.removeSyncTarget(syncTarget.id());
                 return;
             }
             repository = syncedRepository.get();
@@ -244,24 +255,49 @@ public class GitHubDataSyncService {
             Category category = classification.category();
 
             switch (category) {
-                case NOT_FOUND -> log.warn(
-                    "Repository sync skipped - resource not found: scopeId={}, repoId={}, error={}",
-                    scopeId,
-                    repositoryId,
-                    classification.message()
-                );
+                case NOT_FOUND -> {
+                    log.warn(
+                        "Repository sync skipped - resource not found, cleaning up orphan: scopeId={}, repoId={}, repoName={}, error={}",
+                        scopeId,
+                        repositoryId,
+                        safeNameWithOwner,
+                        classification.message()
+                    );
+                    // Clean up the orphaned repository to prevent permanent sync errors
+                    // The repository no longer exists on GitHub, so delete it locally
+                    cleanupOrphanedRepository(repositoryId, safeNameWithOwner);
+                    // Also remove the sync target to stop perpetual retries
+                    syncTargetProvider.removeSyncTarget(syncTarget.id());
+                }
                 case AUTH_ERROR -> log.error(
                     "Repository sync failed - authentication error: scopeId={}, repoId={}, error={}",
                     scopeId,
                     repositoryId,
                     classification.message()
                 );
-                case RATE_LIMITED -> log.warn(
-                    "Repository sync failed - rate limited: scopeId={}, repoId={}, error={}",
-                    scopeId,
-                    repositoryId,
-                    classification.message()
-                );
+                case RATE_LIMITED -> {
+                    log.warn(
+                        "Repository sync failed - rate limited: scopeId={}, repoId={}, error={}",
+                        scopeId,
+                        repositoryId,
+                        classification.message()
+                    );
+                    // Honor the rate limit - wait before continuing
+                    Duration waitTime = classification.suggestedWait();
+                    if (waitTime != null && !waitTime.isZero()) {
+                        log.info(
+                            "Pausing sync for rate limit: scopeId={}, waitSeconds={}",
+                            scopeId,
+                            waitTime.getSeconds()
+                        );
+                        try {
+                            Thread.sleep(waitTime.toMillis());
+                        } catch (InterruptedException ie) {
+                            Thread.currentThread().interrupt();
+                            throw new RuntimeException("Sync interrupted while waiting for rate limit", ie);
+                        }
+                    }
+                }
                 case RETRYABLE -> log.warn(
                     "Repository sync failed - transient error: scopeId={}, repoId={}, error={}",
                     scopeId,
@@ -294,6 +330,17 @@ public class GitHubDataSyncService {
      * @param scopeId the scope ID
      */
     public void syncAllRepositories(Long scopeId) {
+        // Fail-fast for suspended installations - don't spawn ANY threads
+        Long installationId = tokenProvider.getInstallationId(scopeId).orElse(null);
+        if (installationId != null && gitHubAppTokenService.isInstallationMarkedSuspended(installationId)) {
+            log.info(
+                "Skipped all repository syncs: reason=installationSuspended, scopeId={}, installationId={}",
+                scopeId,
+                installationId
+            );
+            return;
+        }
+
         // Check if scope is active before attempting sync
         if (!syncTargetProvider.isScopeActiveForSync(scopeId)) {
             log.debug("Skipped scope sync: reason=scopeNotActive, scopeId={}", scopeId);
@@ -314,6 +361,11 @@ public class GitHubDataSyncService {
 
             // Sync each repository (creates repository records)
             for (SyncTarget target : syncTargets) {
+                // Check if installation became suspended mid-sync - abort remaining syncs
+                if (installationId != null && gitHubAppTokenService.isInstallationMarkedSuspended(installationId)) {
+                    log.info("Aborting remaining syncs: reason=installationSuspended, scopeId={}", scopeId);
+                    break;
+                }
                 if (shouldSync(target)) {
                     syncSyncTarget(target);
                 }
@@ -369,6 +421,7 @@ public class GitHubDataSyncService {
                 organizationMembershipListener.onOrganizationMembershipsSynced(
                     new OrganizationSyncedEvent(organization.getId(), organizationLogin)
                 );
+                syncTargetProvider.updateUsersSyncTimestamp(scopeId, Instant.now());
             }
         } catch (InstallationNotFoundException e) {
             throw e;
@@ -426,6 +479,7 @@ public class GitHubDataSyncService {
         try {
             int teamsCount = teamSyncService.syncTeamsForOrganization(scopeId, organizationLogin);
             log.debug("Synced teams: scopeId={}, orgLogin={}, teamCount={}", scopeId, safeOrgLogin, teamsCount);
+            syncTargetProvider.updateTeamsSyncTimestamp(scopeId, Instant.now());
         } catch (InstallationNotFoundException e) {
             throw e;
         } catch (Exception e) {
@@ -549,5 +603,34 @@ public class GitHubDataSyncService {
         return target
             .lastIssuesAndPullRequestsSyncedAt()
             .isBefore(Instant.now().minusSeconds(monitoringProperties.getSyncCooldownInMinutes() * 60L));
+    }
+
+    /**
+     * Cleans up an orphaned repository that no longer exists on GitHub.
+     * <p>
+     * This method is called when a sync fails with NOT_FOUND, indicating the repository
+     * has been deleted from GitHub. We delete it locally to prevent permanent sync errors.
+     *
+     * @param repositoryId the repository ID
+     * @param safeNameWithOwner sanitized name for logging
+     */
+    private void cleanupOrphanedRepository(Long repositoryId, String safeNameWithOwner) {
+        try {
+            repositoryRepository.findById(repositoryId).ifPresent(repository -> {
+                repositoryRepository.delete(repository);
+                log.info(
+                    "Deleted orphaned repository after NOT_FOUND: repoId={}, repoName={}",
+                    repositoryId,
+                    safeNameWithOwner
+                );
+            });
+        } catch (Exception cleanupException) {
+            log.warn(
+                "Failed to cleanup orphaned repository: repoId={}, repoName={}, error={}",
+                repositoryId,
+                safeNameWithOwner,
+                cleanupException.getMessage()
+            );
+        }
     }
 }

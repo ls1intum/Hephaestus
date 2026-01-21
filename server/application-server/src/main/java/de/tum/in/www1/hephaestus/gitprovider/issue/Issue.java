@@ -191,6 +191,8 @@ public class Issue extends BaseGitServiceEntity {
     public enum State {
         OPEN,
         CLOSED,
+        /** Pull request was merged. Only applicable to PullRequest entities, never to Issues. */
+        MERGED,
     }
 
     /**

@@ -8,6 +8,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import de.tum.in.www1.hephaestus.gitprovider.common.exception.InstallationNotFoundException;
+import de.tum.in.www1.hephaestus.gitprovider.common.exception.InstallationSuspendedException;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -21,6 +22,8 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.Date;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
@@ -56,6 +59,10 @@ public class GitHubAppTokenService {
         .expireAfterWrite(Duration.ofMinutes(55))
         .maximumSize(10000)
         .build();
+
+    // Track suspended installations to fail fast without calling GitHub.
+    // This is an in-memory set that all threads see immediately, bypassing DB transaction isolation.
+    private final Set<Long> suspendedInstallations = ConcurrentHashMap.newKeySet();
 
     public GitHubAppTokenService(
         @Value("${github.app.id}") long appId,
@@ -117,8 +124,14 @@ public class GitHubAppTokenService {
      * Mint a fresh installation token via REST API.
      *
      * @throws InstallationNotFoundException if the installation no longer exists (404 from GitHub)
+     * @throws IllegalStateException if the installation is marked as suspended
      */
     private CachedToken fetchTokenWithExpiry(Long installationId) {
+        // Fail fast for suspended installations - don't waste API calls
+        if (suspendedInstallations.contains(installationId)) {
+            throw new InstallationSuspendedException(installationId);
+        }
+
         try {
             String appJwt = generateAppJWT();
 
@@ -142,6 +155,11 @@ public class GitHubAppTokenService {
             // The cache will not store the result when an exception is thrown.
             // Invalidation happens in resolveToken() after the exception propagates out.
             throw new InstallationNotFoundException(installationId, e);
+        } catch (WebClientResponseException.Forbidden e) {
+            // 403 means suspended - mark it and fail fast
+            suspendedInstallations.add(installationId);
+            installTokenCache.invalidate(installationId);
+            throw new InstallationSuspendedException(installationId, e);
         } catch (InstallationNotFoundException e) {
             // Re-throw without wrapping
             throw e;
@@ -157,6 +175,30 @@ public class GitHubAppTokenService {
      */
     public void evictInstallationToken(long installationId) {
         installTokenCache.invalidate(installationId);
+    }
+
+    /**
+     * Mark an installation as suspended. Token minting will fail fast for suspended installations.
+     * Call this when receiving a suspend event to immediately block all threads from hitting GitHub.
+     */
+    public void markInstallationSuspended(long installationId) {
+        suspendedInstallations.add(installationId);
+        installTokenCache.invalidate(installationId); // Also evict any cached token
+    }
+
+    /**
+     * Mark an installation as active (not suspended). Token minting will proceed normally.
+     * Call this when receiving an unsuspend event or when installation is created.
+     */
+    public void markInstallationActive(long installationId) {
+        suspendedInstallations.remove(installationId);
+    }
+
+    /**
+     * Check if an installation is marked as suspended in memory.
+     */
+    public boolean isInstallationMarkedSuspended(long installationId) {
+        return suspendedInstallations.contains(installationId);
     }
 
     private CachedToken resolveToken(long installationId) {
@@ -337,6 +379,54 @@ public class GitHubAppTokenService {
         }
     }
 
+    // ============ Installation Status Verification ============
+
+    /**
+     * Verify the current status of an installation via GitHub REST API.
+     * Uses App JWT authentication (not installation token) so it works even for suspended installations.
+     *
+     * @param installationId the installation to check
+     * @return true if the installation is currently suspended, false if active
+     * @throws InstallationNotFoundException if the installation no longer exists
+     */
+    public boolean isInstallationSuspended(long installationId) {
+        if (!isConfigured()) {
+            throw new IllegalStateException("GitHub App credentials not configured.");
+        }
+
+        try {
+            String appJwt = generateAppJWT();
+
+            InstallationStatusResponse response = webClient
+                .get()
+                .uri("/app/installations/{installationId}", installationId)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + appJwt)
+                .retrieve()
+                .bodyToMono(InstallationStatusResponse.class)
+                .block();
+
+            if (response == null) {
+                throw new IllegalStateException("Empty response from GitHub for installation " + installationId);
+            }
+
+            return response.suspendedAt() != null;
+        } catch (WebClientResponseException.NotFound e) {
+            throw new InstallationNotFoundException(installationId, e);
+        } catch (InstallationNotFoundException e) {
+            throw e;
+        } catch (WebClientResponseException e) {
+            // Other HTTP errors (403 Forbidden, 500 Internal Server Error, etc.)
+            throw new UncheckedIOException(
+                new IOException("GitHub API error checking installation status for " + installationId + ": " + e.getStatusCode(), e)
+            );
+        } catch (RuntimeException e) {
+            // Network errors, timeouts, or other transient issues
+            throw new UncheckedIOException(
+                new IOException("GitHub error checking installation status for " + installationId, e)
+            );
+        }
+    }
+
     // ============ DTOs ============
 
     public record InstallationToken(String token, Instant expiresAt) {}
@@ -344,4 +434,10 @@ public class GitHubAppTokenService {
     private record CachedToken(String token, Instant expiresAt) {}
 
     private record InstallationTokenResponse(String token, @JsonProperty("expires_at") Instant expiresAt) {}
+
+    private record InstallationStatusResponse(
+        Long id,
+        @JsonProperty("suspended_at") Instant suspendedAt,
+        @JsonProperty("suspended_by") Object suspendedBy
+    ) {}
 }
