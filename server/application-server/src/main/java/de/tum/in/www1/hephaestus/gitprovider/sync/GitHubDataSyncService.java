@@ -16,6 +16,7 @@ import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider.SyncT
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider.SyncType;
 import de.tum.in.www1.hephaestus.gitprovider.issue.github.GitHubIssueSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.issuedependency.github.GitHubIssueDependencySyncService;
+import de.tum.in.www1.hephaestus.gitprovider.issuetype.github.GitHubIssueTypeSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.label.github.GitHubLabelSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.milestone.github.GitHubMilestoneSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.organization.github.GitHubOrganizationSyncService;
@@ -76,6 +77,7 @@ public class GitHubDataSyncService {
     private final GitHubMilestoneSyncService milestoneSyncService;
     private final GitHubIssueSyncService issueSyncService;
     private final GitHubIssueDependencySyncService issueDependencySyncService;
+    private final GitHubIssueTypeSyncService issueTypeSyncService;
     private final GitHubSubIssueSyncService subIssueSyncService;
     private final GitHubPullRequestSyncService pullRequestSyncService;
     private final GitHubTeamSyncService teamSyncService;
@@ -97,6 +99,7 @@ public class GitHubDataSyncService {
         GitHubMilestoneSyncService milestoneSyncService,
         GitHubIssueSyncService issueSyncService,
         GitHubIssueDependencySyncService issueDependencySyncService,
+        GitHubIssueTypeSyncService issueTypeSyncService,
         GitHubSubIssueSyncService subIssueSyncService,
         GitHubPullRequestSyncService pullRequestSyncService,
         GitHubTeamSyncService teamSyncService,
@@ -116,6 +119,7 @@ public class GitHubDataSyncService {
         this.milestoneSyncService = milestoneSyncService;
         this.issueSyncService = issueSyncService;
         this.issueDependencySyncService = issueDependencySyncService;
+        this.issueTypeSyncService = issueTypeSyncService;
         this.subIssueSyncService = subIssueSyncService;
         this.pullRequestSyncService = pullRequestSyncService;
         this.teamSyncService = teamSyncService;
@@ -514,6 +518,7 @@ public class GitHubDataSyncService {
      * <p>
      * This includes:
      * <ul>
+     *   <li>Issue types (organization-level issue type definitions)</li>
      *   <li>Issue dependencies (blocked_by relationships)</li>
      *   <li>Sub-issues (parent-child relationships)</li>
      * </ul>
@@ -523,6 +528,27 @@ public class GitHubDataSyncService {
      * @param scopeId the scope ID
      */
     private void syncScopeLevelRelationships(Long scopeId) {
+        try {
+            // Sync issue types (has internal cooldown check)
+            int issueTypesCount = issueTypeSyncService.syncIssueTypesForScope(scopeId);
+            if (issueTypesCount >= 0) {
+                log.debug("Synced issue types: scopeId={}, issueTypeCount={}", scopeId, issueTypesCount);
+            } else {
+                log.debug("Skipped issue types sync: reason=cooldownActive, scopeId={}", scopeId);
+            }
+        } catch (InstallationNotFoundException e) {
+            throw e;
+        } catch (Exception e) {
+            ClassificationResult classification = exceptionClassifier.classifyWithDetails(e);
+            log.error(
+                "Failed to sync issue types: scopeId={}, category={}, error={}",
+                scopeId,
+                classification.category(),
+                classification.message(),
+                e
+            );
+        }
+
         try {
             // Sync issue dependencies (has internal cooldown check)
             int dependenciesCount = issueDependencySyncService.syncDependenciesForScope(scopeId);

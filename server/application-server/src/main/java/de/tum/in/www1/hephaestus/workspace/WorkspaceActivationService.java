@@ -186,7 +186,7 @@ public class WorkspaceActivationService {
                 // Use the central sync orchestrator which handles:
                 // 1. Organization and teams sync (via GraphQL)
                 // 2. Per-repository syncs (labels, milestones, issues, PRs, comments)
-                // 3. Workspace-level relationships (issue dependencies, sub-issues)
+                // 3. Workspace-level relationships (issue types, issue dependencies, sub-issues)
                 getGitHubDataSyncService().syncAllRepositories(workspace.getId());
 
                 log.info("Completed monitoring on startup: workspaceId={}", workspace.getId());
