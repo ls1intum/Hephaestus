@@ -3,11 +3,11 @@ package de.tum.in.www1.hephaestus.gitprovider.installation.github;
 import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.NatsMessageDeserializer;
+import de.tum.in.www1.hephaestus.gitprovider.common.exception.InstallationNotFoundException;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventAction;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventType;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.app.GitHubAppTokenService;
-import de.tum.in.www1.hephaestus.gitprovider.common.exception.InstallationNotFoundException;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.ProvisioningListener;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.ProvisioningListener.AccountType;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.ProvisioningListener.InstallationData;
@@ -91,8 +91,7 @@ public class GitHubInstallationMessageHandler extends GitHubMessageHandler<GitHu
 
         // For SUSPEND/UNSUSPEND: verify via API FIRST, then update status only
         // Don't do full provisioning - just check current state and sync it
-        if (action == GitHubEventAction.Installation.SUSPEND ||
-            action == GitHubEventAction.Installation.UNSUSPEND) {
+        if (action == GitHubEventAction.Installation.SUSPEND || action == GitHubEventAction.Installation.UNSUSPEND) {
             verifyAndUpdateInstallationStatus(installationId);
             return;
         }
@@ -183,18 +182,12 @@ public class GitHubInstallationMessageHandler extends GitHubMessageHandler<GitHu
             boolean isSuspended = gitHubAppTokenService.isInstallationSuspended(installationId);
 
             if (isSuspended) {
-                log.info(
-                    "Verified installation status via API: installationId={}, status=SUSPENDED",
-                    installationId
-                );
+                log.info("Verified installation status via API: installationId={}, status=SUSPENDED", installationId);
                 // Mark in-memory FIRST to immediately block all running threads from minting tokens
                 gitHubAppTokenService.markInstallationSuspended(installationId);
                 provisioningListener.onInstallationSuspended(installationId);
             } else {
-                log.info(
-                    "Verified installation status via API: installationId={}, status=ACTIVE",
-                    installationId
-                );
+                log.info("Verified installation status via API: installationId={}, status=ACTIVE", installationId);
                 // Clear in-memory suspension flag
                 gitHubAppTokenService.markInstallationActive(installationId);
                 provisioningListener.onInstallationActivated(installationId);

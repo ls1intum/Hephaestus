@@ -241,8 +241,8 @@ public class GitHubOrganizationSyncService {
             // This would cause re-fetching from the beginning, leading to duplicates
             if (cursor == null) {
                 log.warn(
-                    "Missing pagination cursor while hasNextPage=true: orgLogin={}, pageCount={}. "
-                        + "This indicates a bug - check that GetOrganization.graphql includes endCursor in pageInfo.",
+                    "Missing pagination cursor while hasNextPage=true: orgLogin={}, pageCount={}. " +
+                        "This indicates a bug - check that GetOrganization.graphql includes endCursor in pageInfo.",
                     sanitizeForLog(organization.getLogin()),
                     pageCount
                 );

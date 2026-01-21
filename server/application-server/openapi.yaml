@@ -2602,10 +2602,11 @@ components:
           description: Repository the pull request belongs to
         state:
           type: string
-          description: "Current state of the pull request (OPEN, CLOSED)"
+          description: "Current state of the pull request (OPEN, CLOSED, MERGED)"
           enum:
           - OPEN
           - CLOSED
+          - MERGED
         title:
           type: string
           description: Title of the pull request
@@ -2684,10 +2685,11 @@ components:
           description: Repository the pull request belongs to
         state:
           type: string
-          description: "Current state of the pull request (OPEN, CLOSED)"
+          description: "Current state of the pull request (OPEN, CLOSED, MERGED)"
           enum:
           - OPEN
           - CLOSED
+          - MERGED
         title:
           type: string
           description: Title of the pull request
@@ -2769,6 +2771,7 @@ components:
           enum:
           - OPEN
           - CLOSED
+          - MERGED
         title:
           type: string
           description: Title of the pull request

@@ -63,10 +63,8 @@ public record GitHubIssueDTO(
      * GitHub REST API includes this field in issue webhooks when the issue is actually a PR.
      */
     @JsonIgnoreProperties(ignoreUnknown = true)
-    public record PullRequestRef(
-        @JsonProperty("url") String url,
-        @JsonProperty("html_url") String htmlUrl
-    ) {}
+    public record PullRequestRef(@JsonProperty("url") String url, @JsonProperty("html_url") String htmlUrl) {}
+
     /**
      * Get the database ID, preferring databaseId over id for GraphQL responses.
      */
@@ -109,7 +107,7 @@ public record GitHubIssueDTO(
             GitHubMilestoneDTO.fromMilestone(issue.getMilestone()),
             GitHubIssueTypeDTO.fromIssueType(issue.getIssueType()),
             null, // repository
-            null  // pullRequest - GraphQL issues are never PRs
+            null // pullRequest - GraphQL issues are never PRs
         );
     }
 

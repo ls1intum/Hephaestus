@@ -101,14 +101,16 @@ class KeycloakUserRoleCheckerTest extends BaseUnitTest {
 
     private void setupAuthFailure() {
         resetMocks();
-        when(usersResource.searchByUsername(anyString(), anyBoolean()))
-            .thenThrow(new NotAuthorizedException("Auth failed"));
+        when(usersResource.searchByUsername(anyString(), anyBoolean())).thenThrow(
+            new NotAuthorizedException("Auth failed")
+        );
     }
 
     private void setupConnectionFailure() {
         resetMocks();
-        when(usersResource.searchByUsername(anyString(), anyBoolean()))
-            .thenThrow(new ProcessingException("Connection refused"));
+        when(usersResource.searchByUsername(anyString(), anyBoolean())).thenThrow(
+            new ProcessingException("Connection refused")
+        );
     }
 
     @Nested
@@ -395,6 +397,7 @@ class KeycloakUserRoleCheckerTest extends BaseUnitTest {
      * Mutable clock for testing time-dependent behavior.
      */
     private static class MutableClock extends Clock {
+
         private Instant instant;
 
         MutableClock(Instant initial) {

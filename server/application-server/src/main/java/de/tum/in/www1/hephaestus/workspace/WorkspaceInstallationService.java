@@ -130,10 +130,7 @@ public class WorkspaceInstallationService {
         // This prevents NATS replay of old "created" events from reactivating suspended workspaces
         // and triggering hundreds of failed repository syncs.
         if (gitHubAppTokenService.isInstallationMarkedSuspended(installationId)) {
-            log.info(
-                "Skipped workspace reactivation: reason=installationSuspended, installationId={}",
-                installationId
-            );
+            log.info("Skipped workspace reactivation: reason=installationSuspended, installationId={}", installationId);
             return null;
         }
 

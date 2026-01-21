@@ -163,8 +163,8 @@ erDiagram
         BIGINT id PK
         VARCHAR(255) color
         VARCHAR(255) description
-        VARCHAR(255) name
-        BIGINT repository_id FK
+        VARCHAR(255) name UK
+        BIGINT repository_id FK,UK
         TIMESTAMPTZ last_sync_at
         TIMESTAMPTZ created_at
         TIMESTAMPTZ updated_at
@@ -288,7 +288,7 @@ erDiagram
         BOOLEAN is_disabled "NOT NULL"
         BOOLEAN is_private "NOT NULL"
         VARCHAR(255) name
-        VARCHAR(150) name_with_owner
+        VARCHAR(150) name_with_owner UK
         TIMESTAMPTZ pushed_at
         VARCHAR(255) visibility
         BIGINT organization_id FK
@@ -433,6 +433,7 @@ erDiagram
     Workspace ||--|| ActivityEvent : has
     ChatMessage ||--|| ChatMessagePart : has
     ChatMessage ||--|| ChatThread : references
+    Repository ||--|| Label : labeled
     PullRequestReviewComment ||--|| PullRequestReviewThread : reviewed
     User ||--|| UserPreference : has
     Organization ||--|| Workspace : has
@@ -459,7 +460,6 @@ erDiagram
     User ||--o{ IssueComment : commented_on
     Issue ||--o{ IssueComment : commented_on
     Organization ||--o{ IssueType : has
-    Repository ||--o{ Label : labeled
     User ||--o{ Milestone : created_by
     Repository ||--o{ Milestone : has
     BadPracticeDetection ||--o{ PullRequestBadPractice : has

@@ -43,7 +43,7 @@ public class KeycloakUserRoleChecker implements UserRoleChecker {
     enum CircuitState {
         CLOSED,
         OPEN,
-        HALF_OPEN
+        HALF_OPEN,
     }
 
     // Circuit breaker configuration
@@ -59,11 +59,7 @@ public class KeycloakUserRoleChecker implements UserRoleChecker {
     private final AtomicInteger consecutiveFailures = new AtomicInteger(0);
     private final AtomicReference<Instant> lastFailureTime = new AtomicReference<>(Instant.MIN);
 
-    public KeycloakUserRoleChecker(
-        Keycloak keycloak,
-        @Value("${keycloak.realm}") String realm,
-        Clock clock
-    ) {
+    public KeycloakUserRoleChecker(Keycloak keycloak, @Value("${keycloak.realm}") String realm, Clock clock) {
         this.keycloak = keycloak;
         this.realm = realm;
         this.clock = clock;

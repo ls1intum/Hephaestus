@@ -52,9 +52,7 @@ import org.springframework.lang.NonNull;
 @Entity
 @Table(
     name = "repository",
-    uniqueConstraints = {
-        @UniqueConstraint(name = "uq_repository_name_with_owner", columnNames = "name_with_owner")
-    }
+    uniqueConstraints = { @UniqueConstraint(name = "uq_repository_name_with_owner", columnNames = "name_with_owner") }
 )
 @Getter
 @Setter

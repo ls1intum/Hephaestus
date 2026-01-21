@@ -278,11 +278,16 @@ public class WorkspaceProvisioningService {
             log.info("Skipped installation sync: reason=suspended, installationId={}", installation.id());
             gitHubAppTokenService.markInstallationSuspended(installation.id());
             // If workspace exists, ensure it's marked suspended
-            workspaceRepository.findByInstallationId(installation.id()).ifPresent(ws -> {
-                if (ws.getStatus() != Workspace.WorkspaceStatus.SUSPENDED) {
-                    workspaceInstallationService.updateWorkspaceStatus(installation.id(), Workspace.WorkspaceStatus.SUSPENDED);
-                }
-            });
+            workspaceRepository
+                .findByInstallationId(installation.id())
+                .ifPresent(ws -> {
+                    if (ws.getStatus() != Workspace.WorkspaceStatus.SUSPENDED) {
+                        workspaceInstallationService.updateWorkspaceStatus(
+                            installation.id(),
+                            Workspace.WorkspaceStatus.SUSPENDED
+                        );
+                    }
+                });
             return;
         }
         // Mark active in memory for fast fail-fast checks
@@ -300,9 +305,6 @@ public class WorkspaceProvisioningService {
         }
 
         String accountType = installation.account().type();
-        // User accounts are now supported - Teams features will be unavailable but all other
-        // features work normally. The organization field will be null for user-type workspaces.
-
         long installationId = installation.id();
         RepositorySelection selection = convertRepositorySelection(installation.repositorySelection());
 

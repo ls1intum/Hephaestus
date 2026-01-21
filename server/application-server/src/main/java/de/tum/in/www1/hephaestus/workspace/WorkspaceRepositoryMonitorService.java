@@ -388,10 +388,7 @@ public class WorkspaceRepositoryMonitorService {
         // Check if installation is suspended BEFORE adding repos and triggering syncs.
         // This prevents NATS replay of old "created" events from triggering hundreds of failed syncs.
         if (gitHubAppTokenService.isInstallationMarkedSuspended(installationId)) {
-            log.info(
-                "Skipped repository enumeration: reason=installationSuspended, installationId={}",
-                installationId
-            );
+            log.info("Skipped repository enumeration: reason=installationSuspended, installationId={}", installationId);
             return;
         }
 

@@ -119,14 +119,13 @@ public class WorkspaceActivationService {
             .toList();
 
         // Log completion status (non-blocking)
-        CompletableFuture.allOf(activationFutures.toArray(CompletableFuture[]::new))
-            .whenComplete((result, ex) -> {
-                if (ex != null) {
-                    log.error("Failed to activate some workspaces", ex);
-                } else {
-                    log.info("Completed workspace activations: count={}", workspacesToActivate.size());
-                }
-            });
+        CompletableFuture.allOf(activationFutures.toArray(CompletableFuture[]::new)).whenComplete((result, ex) -> {
+            if (ex != null) {
+                log.error("Failed to activate some workspaces", ex);
+            } else {
+                log.info("Completed workspace activations: count={}", workspacesToActivate.size());
+            }
+        });
     }
 
     /**

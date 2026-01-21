@@ -24,15 +24,11 @@ public record GitHubRepositoryEventDTO(
     @JsonProperty("sender") GitHubUserDTO sender,
     @JsonProperty("installation") InstallationRef installation
 ) implements GitHubWebhookEvent {
-
     /**
      * Reference to the GitHub App installation.
      */
     @JsonIgnoreProperties(ignoreUnknown = true)
-    public record InstallationRef(
-        @JsonProperty("id") Long id,
-        @JsonProperty("node_id") String nodeId
-    ) {}
+    public record InstallationRef(@JsonProperty("id") Long id, @JsonProperty("node_id") String nodeId) {}
 
     @Override
     public GitHubEventAction.Repository actionType() {
@@ -57,25 +53,19 @@ public record GitHubRepositoryEventDTO(
          * Repository-level changes (e.g., name change on rename).
          */
         @JsonIgnoreProperties(ignoreUnknown = true)
-        public record RepositoryChanges(
-            @JsonProperty("name") NameChange name
-        ) {}
+        public record RepositoryChanges(@JsonProperty("name") NameChange name) {}
 
         /**
          * Owner-level changes (e.g., login change on transfer).
          */
         @JsonIgnoreProperties(ignoreUnknown = true)
-        public record OwnerChanges(
-            @JsonProperty("from") Map<String, Object> from
-        ) {}
+        public record OwnerChanges(@JsonProperty("from") Map<String, Object> from) {}
 
         /**
          * Name change details.
          */
         @JsonIgnoreProperties(ignoreUnknown = true)
-        public record NameChange(
-            @JsonProperty("from") String from
-        ) {}
+        public record NameChange(@JsonProperty("from") String from) {}
     }
 
     /**

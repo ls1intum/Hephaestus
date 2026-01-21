@@ -4,10 +4,10 @@ import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.exception.InstallationNotFoundException;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier;
-import de.tum.in.www1.hephaestus.gitprovider.common.github.app.GitHubAppTokenService;
-import de.tum.in.www1.hephaestus.gitprovider.common.spi.InstallationTokenProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier.Category;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier.ClassificationResult;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.app.GitHubAppTokenService;
+import de.tum.in.www1.hephaestus.gitprovider.common.spi.InstallationTokenProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.OrganizationMembershipListener;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.OrganizationMembershipListener.OrganizationSyncedEvent;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider;
@@ -616,14 +616,16 @@ public class GitHubDataSyncService {
      */
     private void cleanupOrphanedRepository(Long repositoryId, String safeNameWithOwner) {
         try {
-            repositoryRepository.findById(repositoryId).ifPresent(repository -> {
-                repositoryRepository.delete(repository);
-                log.info(
-                    "Deleted orphaned repository after NOT_FOUND: repoId={}, repoName={}",
-                    repositoryId,
-                    safeNameWithOwner
-                );
-            });
+            repositoryRepository
+                .findById(repositoryId)
+                .ifPresent(repository -> {
+                    repositoryRepository.delete(repository);
+                    log.info(
+                        "Deleted orphaned repository after NOT_FOUND: repoId={}, repoName={}",
+                        repositoryId,
+                        safeNameWithOwner
+                    );
+                });
         } catch (Exception cleanupException) {
             log.warn(
                 "Failed to cleanup orphaned repository: repoId={}, repoName={}, error={}",

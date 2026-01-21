@@ -66,7 +66,5 @@ public record GitHubPullRequestReviewThreadEventDTO(
      * DTO for a comment within the thread. We only need the ID field for thread identification.
      */
     @JsonIgnoreProperties(ignoreUnknown = true)
-    public record GitHubThreadCommentDTO(
-        @JsonProperty("id") Long id
-    ) {}
+    public record GitHubThreadCommentDTO(@JsonProperty("id") Long id) {}
 }

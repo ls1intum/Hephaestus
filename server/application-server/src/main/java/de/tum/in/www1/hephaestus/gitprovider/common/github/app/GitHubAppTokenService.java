@@ -417,7 +417,10 @@ public class GitHubAppTokenService {
         } catch (WebClientResponseException e) {
             // Other HTTP errors (403 Forbidden, 500 Internal Server Error, etc.)
             throw new UncheckedIOException(
-                new IOException("GitHub API error checking installation status for " + installationId + ": " + e.getStatusCode(), e)
+                new IOException(
+                    "GitHub API error checking installation status for " + installationId + ": " + e.getStatusCode(),
+                    e
+                )
             );
         } catch (RuntimeException e) {
             // Network errors, timeouts, or other transient issues

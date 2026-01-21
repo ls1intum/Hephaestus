@@ -1,12 +1,12 @@
 package de.tum.in.www1.hephaestus.config;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.exception.InstallationSuspendedException;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import io.github.resilience4j.ratelimiter.RateLimiter;
 import io.github.resilience4j.ratelimiter.RateLimiterConfig;
 import io.github.resilience4j.ratelimiter.RateLimiterRegistry;
-import de.tum.in.www1.hephaestus.gitprovider.common.exception.InstallationSuspendedException;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.concurrent.TimeoutException;

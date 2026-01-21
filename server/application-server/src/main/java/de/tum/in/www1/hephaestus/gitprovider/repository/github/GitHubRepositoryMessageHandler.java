@@ -105,10 +105,7 @@ public class GitHubRepositoryMessageHandler extends GitHubMessageHandler<GitHubR
         var installation = event.installation();
 
         if (installation == null || installation.id() == null) {
-            log.warn(
-                "Cannot clean up deleted repository - missing installation ID: repoName={}",
-                safeFullName
-            );
+            log.warn("Cannot clean up deleted repository - missing installation ID: repoName={}", safeFullName);
             // Still try to delete the repository directly if we can find it
             deleteRepositoryByName(fullName, safeFullName);
             return;
@@ -116,53 +113,46 @@ public class GitHubRepositoryMessageHandler extends GitHubMessageHandler<GitHubR
 
         Long installationId = installation.id();
 
-        log.info(
-            "Processing repository deletion: repoName={}, installationId={}",
-            safeFullName,
-            installationId
-        );
+        log.info("Processing repository deletion: repoName={}, installationId={}", safeFullName, installationId);
 
         // Use the ProvisioningListener SPI to properly clean up monitors AND repository
         // This triggers onRepositoriesRemoved which will remove monitors and orphaned repos
         provisioningListener.onRepositoriesRemoved(installationId, List.of(fullName));
 
-        log.info(
-            "Completed repository deletion cleanup: repoName={}, installationId={}",
-            safeFullName,
-            installationId
-        );
+        log.info("Completed repository deletion cleanup: repoName={}, installationId={}", safeFullName, installationId);
     }
 
     /**
      * Fallback deletion when installation ID is not available.
      */
     private void deleteRepositoryByName(String fullName, String safeFullName) {
-        repositoryRepository.findByNameWithOwner(fullName).ifPresent(repository -> {
-            repositoryRepository.delete(repository);
-            log.info("Deleted repository directly: repoName={}", safeFullName);
-        });
+        repositoryRepository
+            .findByNameWithOwner(fullName)
+            .ifPresent(repository -> {
+                repositoryRepository.delete(repository);
+                log.info("Deleted repository directly: repoName={}", safeFullName);
+            });
     }
 
     /**
      * Handles repository archive/unarchive by updating the archived flag.
      */
     private void handleRepositoryArchived(String fullName, String safeFullName, boolean archived) {
-        repositoryRepository.findByNameWithOwner(fullName).ifPresentOrElse(
-            repository -> {
-                repository.setArchived(archived);
-                repositoryRepository.save(repository);
-                log.info(
-                    "Updated repository archived status: repoName={}, archived={}",
-                    safeFullName,
-                    archived
-                );
-            },
-            () -> log.debug(
-                "Repository not found locally for archive update: repoName={}, archived={}",
-                safeFullName,
-                archived
-            )
-        );
+        repositoryRepository
+            .findByNameWithOwner(fullName)
+            .ifPresentOrElse(
+                repository -> {
+                    repository.setArchived(archived);
+                    repositoryRepository.save(repository);
+                    log.info("Updated repository archived status: repoName={}, archived={}", safeFullName, archived);
+                },
+                () ->
+                    log.debug(
+                        "Repository not found locally for archive update: repoName={}, archived={}",
+                        safeFullName,
+                        archived
+                    )
+            );
     }
 
     /**
@@ -174,56 +164,53 @@ public class GitHubRepositoryMessageHandler extends GitHubMessageHandler<GitHubR
         String newName = event.repository().name();
 
         if (oldFullName == null) {
-            log.warn(
-                "Cannot process repository rename - missing old name in changes: newRepoName={}",
-                safeNewFullName
-            );
+            log.warn("Cannot process repository rename - missing old name in changes: newRepoName={}", safeNewFullName);
             return;
         }
 
         String safeOldFullName = sanitizeForLog(oldFullName);
 
-        repositoryRepository.findByNameWithOwner(oldFullName).ifPresentOrElse(
-            repository -> {
-                repository.setName(newName);
-                repository.setNameWithOwner(newFullName);
-                repository.setHtmlUrl("https://github.com/" + newFullName);
-                repositoryRepository.save(repository);
-                log.info(
-                    "Renamed repository: oldName={}, newName={}",
-                    safeOldFullName,
-                    safeNewFullName
-                );
-            },
-            () -> log.debug(
-                "Repository not found locally for rename: oldName={}, newName={}",
-                safeOldFullName,
-                safeNewFullName
-            )
-        );
+        repositoryRepository
+            .findByNameWithOwner(oldFullName)
+            .ifPresentOrElse(
+                repository -> {
+                    repository.setName(newName);
+                    repository.setNameWithOwner(newFullName);
+                    repository.setHtmlUrl("https://github.com/" + newFullName);
+                    repositoryRepository.save(repository);
+                    log.info("Renamed repository: oldName={}, newName={}", safeOldFullName, safeNewFullName);
+                },
+                () ->
+                    log.debug(
+                        "Repository not found locally for rename: oldName={}, newName={}",
+                        safeOldFullName,
+                        safeNewFullName
+                    )
+            );
     }
 
     /**
      * Handles visibility changes (privatized/publicized).
      */
     private void handleVisibilityChanged(String fullName, String safeFullName, boolean isPrivate) {
-        repositoryRepository.findByNameWithOwner(fullName).ifPresentOrElse(
-            repository -> {
-                repository.setVisibility(
-                    isPrivate ? Repository.Visibility.PRIVATE : Repository.Visibility.PUBLIC
-                );
-                repositoryRepository.save(repository);
-                log.info(
-                    "Updated repository visibility: repoName={}, visibility={}",
-                    safeFullName,
-                    isPrivate ? "PRIVATE" : "PUBLIC"
-                );
-            },
-            () -> log.debug(
-                "Repository not found locally for visibility update: repoName={}, private={}",
-                safeFullName,
-                isPrivate
-            )
-        );
+        repositoryRepository
+            .findByNameWithOwner(fullName)
+            .ifPresentOrElse(
+                repository -> {
+                    repository.setVisibility(isPrivate ? Repository.Visibility.PRIVATE : Repository.Visibility.PUBLIC);
+                    repositoryRepository.save(repository);
+                    log.info(
+                        "Updated repository visibility: repoName={}, visibility={}",
+                        safeFullName,
+                        isPrivate ? "PRIVATE" : "PUBLIC"
+                    );
+                },
+                () ->
+                    log.debug(
+                        "Repository not found locally for visibility update: repoName={}, private={}",
+                        safeFullName,
+                        isPrivate
+                    )
+            );
     }
 }

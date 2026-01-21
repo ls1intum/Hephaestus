@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.gitprovider.common.github;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.exception.InstallationSuspendedException;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.io.IOException;
@@ -18,7 +19,6 @@ import org.springframework.graphql.ResponseError;
 import org.springframework.graphql.client.ClientGraphQlResponse;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
-import de.tum.in.www1.hephaestus.gitprovider.common.exception.InstallationSuspendedException;
 import org.springframework.web.reactive.function.client.WebClientRequestException;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 

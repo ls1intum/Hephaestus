@@ -202,10 +202,7 @@ public class NatsConsumerService {
             return;
         }
 
-        log.info(
-            "Workspaces initialized, starting installation consumer: workspaceCount={}",
-            event.workspaceCount()
-        );
+        log.info("Workspaces initialized, starting installation consumer: workspaceCount={}", event.workspaceCount());
         startInstallationConsumer();
     }
 
