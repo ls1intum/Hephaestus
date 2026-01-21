@@ -334,3 +334,7 @@ code {
 		animation: none !important;
 	}
 }
+
+@utility debug-* {
+	outline: 1px solid --value(--color-*);
+}
