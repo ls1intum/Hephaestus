@@ -4,7 +4,6 @@ import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.exception.InstallationNotFoundException;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier;
-import de.tum.in.www1.hephaestus.gitprovider.sync.exception.SyncInterruptedException;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier.Category;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier.ClassificationResult;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.app.GitHubAppTokenService;
@@ -26,6 +25,7 @@ import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.collaborator.github.GitHubCollaboratorSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.repository.github.GitHubRepositorySyncService;
 import de.tum.in.www1.hephaestus.gitprovider.subissue.github.GitHubSubIssueSyncService;
+import de.tum.in.www1.hephaestus.gitprovider.sync.exception.SyncInterruptedException;
 import de.tum.in.www1.hephaestus.gitprovider.team.github.GitHubTeamSyncService;
 import de.tum.in.www1.hephaestus.monitoring.MonitoringProperties;
 import java.time.Duration;

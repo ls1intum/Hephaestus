@@ -2,10 +2,10 @@ package de.tum.in.www1.hephaestus.gitprovider.sync;
 
 import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
 
+import de.tum.in.www1.hephaestus.core.event.WorkspacesInitializedEvent;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.ExponentialBackoff;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandlerRegistry;
-import de.tum.in.www1.hephaestus.core.event.WorkspacesInitializedEvent;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.NatsSubscriptionProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.NatsSubscriptionProvider.NatsSubscriptionInfo;
 import de.tum.in.www1.hephaestus.gitprovider.sync.exception.NatsConnectionException;
