@@ -216,7 +216,16 @@ public class WorkspaceLifecycleService {
         // Step 7: Unlink organization (don't delete - Organization is a shared entity)
         workspace.setOrganization(null);
 
-        // Step 8: Mark workspace as PURGED (terminal state)
+        // Step 8: Clear sync timestamps for clean slate on potential reactivation
+        // This ensures that if the workspace is ever reactivated, sync will fetch fresh data
+        workspace.setUsersSyncedAt(null);
+        workspace.setTeamsSyncedAt(null);
+        workspace.setMembersSyncedAt(null);
+        workspace.setSubIssuesSyncedAt(null);
+        workspace.setIssueTypesSyncedAt(null);
+        workspace.setIssueDependenciesSyncedAt(null);
+
+        // Step 9: Mark workspace as PURGED (terminal state)
         workspace.setStatus(WorkspaceStatus.PURGED);
         workspace = workspaceRepository.save(workspace);
 
