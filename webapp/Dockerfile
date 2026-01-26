@@ -1,5 +1,5 @@
 # Stage 1: Build
-FROM node:22-alpine AS build
+FROM node:22-alpine@sha256:a9cd9bac76cf2396abf14ff0d1c3671a8175fe577ce350e62ab0fc1678050176 AS build
 WORKDIR /app
 
 # Copy package.json for dependency installation
@@ -26,7 +26,7 @@ RUN ln -s /app/node_modules /server/intelligence-service/node_modules
 RUN npm run build
 
 # Stage 2: Serve
-FROM nginx:stable-alpine
+FROM nginx:stable-alpine@sha256:67cbbcc757a6ce913b33e515b020cfd3923897ad883c452903b1e3487a95a570
 
 # Bake git metadata into the image using build arguments provided by Coolify
 ARG COOLIFY_BRANCH
