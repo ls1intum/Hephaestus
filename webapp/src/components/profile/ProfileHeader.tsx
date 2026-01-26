@@ -29,6 +29,7 @@ export function ProfileHeader({
   isLoading,
 }: ProfileHeaderProps) {
   // Calculate level stats from total XP (leaguePoints)
+  // TODO: This should use the totalXp and NOT the league points
   const { level, currentLevelXP, xpNeeded } = XpSystem.getLevelProgress(
     leaguePoints || 0,
   );
@@ -119,6 +120,7 @@ export function ProfileHeader({
             </div>
 
             {/* Level Bar - Integrated under user info */}
+            {/*TODO This should not take in the leaguePoints but the totalXP*/}
             <XpProgress
               className="max-w-sm"
               level={level}
