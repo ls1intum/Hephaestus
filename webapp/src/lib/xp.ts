@@ -1,6 +1,9 @@
 export const XpSystem = {
   BASE_XP: 100,
 
+  // TODO: Reconsider to use a divider of 2 or similar to flatten the quadratic curve a little.
+  // TODO: The current one could be too steep.
+
   /**
    * Calculates the level from total XP using a quadratic curve.
    * Formula: Level = floor(sqrt(totalXP / 100)) + 1
