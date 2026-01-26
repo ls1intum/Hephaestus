@@ -6,30 +6,30 @@ import { ProfileContent } from "./ProfileContent";
 import { ProfileHeader } from "./ProfileHeader";
 
 interface ProfileProps {
-	profileData?: Profile;
-	isLoading: boolean;
-	error: boolean;
-	username: string;
-	currUserIsDashboardUser: boolean;
-	workspaceSlug: string;
-	after?: string;
-	before?: string;
-	onTimeframeChange?: (afterDate: string, beforeDate?: string) => void;
-	/** Leaderboard schedule for proper week calculations */
-	schedule?: LeaderboardSchedule;
+  profileData?: Profile;
+  isLoading: boolean;
+  error: boolean;
+  username: string;
+  currUserIsDashboardUser: boolean;
+  workspaceSlug: string;
+  after?: string;
+  before?: string;
+  onTimeframeChange?: (afterDate: string, beforeDate?: string) => void;
+  /** Leaderboard schedule for proper week calculations */
+  schedule?: LeaderboardSchedule;
 }
 
 export function ProfilePage({
-	profileData,
-	isLoading,
-	error,
-	username,
-	currUserIsDashboardUser,
-	workspaceSlug,
-	after,
-	before,
-	onTimeframeChange,
-	schedule,
+  profileData,
+  isLoading,
+  error,
+  username,
+  currUserIsDashboardUser,
+  workspaceSlug,
+  after,
+  before,
+  onTimeframeChange,
+  schedule,
 }: ProfileProps) {
 	if (error) {
 		return (
@@ -43,30 +43,28 @@ export function ProfilePage({
 		);
 	}
 
-	return (
-		<div className="pt-4 flex flex-col gap-8">
-			<ProfileHeader
-				user={profileData?.userInfo}
-				firstContribution={profileData?.firstContribution}
-				contributedRepositories={profileData?.contributedRepositories}
-				leaguePoints={profileData?.userInfo?.leaguePoints}
-				isLoading={isLoading}
-			/>
-			<ProfileContent
-				reviewActivity={profileData?.reviewActivity}
-				openPullRequests={profileData?.openPullRequests}
-				activityStats={profileData?.activityStats}
-				reviewedPullRequests={profileData?.reviewedPullRequests}
-				isLoading={isLoading}
-				username={username}
-				displayName={profileData?.userInfo?.name}
-				currUserIsDashboardUser={currUserIsDashboardUser}
-				workspaceSlug={workspaceSlug}
-				afterDate={after}
-				beforeDate={before}
-				onTimeframeChange={onTimeframeChange}
-				schedule={schedule}
-			/>
-		</div>
-	);
+  return (
+    <div className="pt-4 flex flex-col gap-8">
+      <ProfileHeader
+        user={profileData?.userInfo}
+        firstContribution={profileData?.firstContribution}
+        contributedRepositories={profileData?.contributedRepositories}
+        leaguePoints={profileData?.userInfo?.leaguePoints}
+        isLoading={isLoading}
+      />
+      <ProfileContent
+        reviewActivity={profileData?.reviewActivity}
+        openPullRequests={profileData?.openPullRequests}
+        isLoading={isLoading}
+        username={username}
+        displayName={profileData?.userInfo?.name}
+        currUserIsDashboardUser={currUserIsDashboardUser}
+        workspaceSlug={workspaceSlug}
+        afterDate={after}
+        beforeDate={before}
+        onTimeframeChange={onTimeframeChange}
+        schedule={schedule}
+      />
+    </div>
+  );
 }
