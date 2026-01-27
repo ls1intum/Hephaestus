@@ -12,6 +12,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Repository for {@link WorkspaceMembership} entities.
@@ -76,6 +77,7 @@ public interface WorkspaceMembershipRepository extends JpaRepository<WorkspaceMe
      * Atomically inserts a membership if absent (race-condition safe).
      */
     @Modifying
+    @Transactional
     @Query(
         value = """
         INSERT INTO workspace_membership (workspace_id, user_id, role, league_points, created_at)
@@ -98,6 +100,7 @@ public interface WorkspaceMembershipRepository extends JpaRepository<WorkspaceMe
      * @param workspaceId the workspace ID
      */
     @Modifying
+    @Transactional
     @Query("DELETE FROM WorkspaceMembership wm WHERE wm.workspace.id = :workspaceId")
     void deleteAllByWorkspaceId(@Param("workspaceId") Long workspaceId);
 }

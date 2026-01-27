@@ -20,6 +20,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -52,7 +53,7 @@ public class WorkspaceMembershipService {
         this.entityManager = entityManager;
     }
 
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public Map<Long, Integer> getLeaguePointsSnapshot(Collection<User> users, Long workspaceId) {
         if (users == null || users.isEmpty()) {
             return Collections.emptyMap();

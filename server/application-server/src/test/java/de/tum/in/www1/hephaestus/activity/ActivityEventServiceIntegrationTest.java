@@ -12,7 +12,6 @@ import de.tum.in.www1.hephaestus.workspace.Workspace;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceRepository;
 import java.time.Instant;
 import java.util.List;
-import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -103,7 +102,6 @@ class ActivityEventServiceIntegrationTest extends BaseIntegrationTest {
         @DisplayName("persists event with all fields correctly")
         void persistsEventWithAllFields() {
             Instant occurredAt = Instant.parse("2024-01-15T10:30:00Z");
-            Map<String, Object> payload = Map.of("prNumber", 42, "title", "Test PR");
 
             boolean result = activityEventService.record(
                 testWorkspace.getId(),
@@ -113,9 +111,7 @@ class ActivityEventServiceIntegrationTest extends BaseIntegrationTest {
                 testRepository,
                 ActivityTargetType.PULL_REQUEST,
                 100L,
-                1.5,
-                SourceSystem.GITHUB,
-                payload
+                1.5
             );
 
             assertThat(result).isTrue();
@@ -132,9 +128,6 @@ class ActivityEventServiceIntegrationTest extends BaseIntegrationTest {
             assertThat(event.getTargetType()).isEqualTo(ActivityTargetType.PULL_REQUEST.getValue());
             assertThat(event.getTargetId()).isEqualTo(100L);
             assertThat(event.getXp()).isEqualTo(1.5);
-            assertThat(event.getSourceSystem()).isEqualTo(SourceSystem.GITHUB.getValue());
-            assertThat(event.getPayload()).containsEntry("prNumber", 42);
-            assertThat(event.getSchemaVersion()).isEqualTo(ActivityEventService.CURRENT_SCHEMA_VERSION);
         }
 
         @Test
@@ -148,8 +141,7 @@ class ActivityEventServiceIntegrationTest extends BaseIntegrationTest {
                 null, // No repository
                 ActivityTargetType.ISSUE,
                 200L,
-                0.0,
-                SourceSystem.SYSTEM
+                0.0
             );
 
             assertThat(result).isTrue();
@@ -179,8 +171,7 @@ class ActivityEventServiceIntegrationTest extends BaseIntegrationTest {
                 testRepository,
                 ActivityTargetType.PULL_REQUEST,
                 100L,
-                1.0,
-                SourceSystem.GITHUB
+                1.0
             );
 
             // Second record with same key - should be rejected
@@ -192,8 +183,7 @@ class ActivityEventServiceIntegrationTest extends BaseIntegrationTest {
                 testRepository,
                 ActivityTargetType.PULL_REQUEST,
                 100L,
-                1.0,
-                SourceSystem.GITHUB
+                1.0
             );
 
             assertThat(first).isTrue();
@@ -215,8 +205,7 @@ class ActivityEventServiceIntegrationTest extends BaseIntegrationTest {
                 testRepository,
                 ActivityTargetType.REVIEW,
                 100L,
-                2.0,
-                SourceSystem.GITHUB
+                2.0
             );
 
             boolean second = activityEventService.record(
@@ -227,8 +216,7 @@ class ActivityEventServiceIntegrationTest extends BaseIntegrationTest {
                 testRepository,
                 ActivityTargetType.REVIEW,
                 100L,
-                2.5,
-                SourceSystem.GITHUB
+                2.5
             );
 
             assertThat(first).isTrue();
@@ -252,8 +240,7 @@ class ActivityEventServiceIntegrationTest extends BaseIntegrationTest {
                 testRepository,
                 ActivityTargetType.PULL_REQUEST,
                 100L,
-                -50.0,
-                SourceSystem.GITHUB
+                -50.0
             );
 
             List<ActivityEvent> events = activityEventRepository.findAll();
@@ -272,8 +259,7 @@ class ActivityEventServiceIntegrationTest extends BaseIntegrationTest {
                 testRepository,
                 ActivityTargetType.REVIEW,
                 100L,
-                3.14159, // Should be rounded to 3.14
-                SourceSystem.GITHUB
+                3.14159 // Should be rounded to 3.14
             );
 
             List<ActivityEvent> events = activityEventRepository.findAll();
@@ -292,8 +278,7 @@ class ActivityEventServiceIntegrationTest extends BaseIntegrationTest {
                 testRepository,
                 ActivityTargetType.REVIEW,
                 101L, // Different target to avoid duplicate
-                2.555, // Should round UP to 2.56 (HALF_UP)
-                SourceSystem.GITHUB
+                2.555 // Should round UP to 2.56 (HALF_UP)
             );
 
             List<ActivityEvent> events = activityEventRepository.findAll();
@@ -317,8 +302,7 @@ class ActivityEventServiceIntegrationTest extends BaseIntegrationTest {
                 testRepository,
                 ActivityTargetType.PULL_REQUEST,
                 100L,
-                1.0,
-                SourceSystem.GITHUB
+                1.0
             );
 
             assertThat(result).isFalse();
@@ -343,8 +327,7 @@ class ActivityEventServiceIntegrationTest extends BaseIntegrationTest {
                 testRepository,
                 ActivityTargetType.PULL_REQUEST,
                 42L,
-                1.0,
-                SourceSystem.GITHUB
+                1.0
             );
 
             List<ActivityEvent> events = activityEventRepository.findAll();

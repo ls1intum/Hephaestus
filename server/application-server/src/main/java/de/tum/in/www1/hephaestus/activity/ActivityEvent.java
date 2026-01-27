@@ -3,34 +3,26 @@ package de.tum.in.www1.hephaestus.activity;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.workspace.Workspace;
-import io.hypersistence.utils.hibernate.type.json.JsonType;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.PositiveOrZero;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
-import java.util.HexFormat;
-import java.util.Map;
 import java.util.UUID;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.Immutable;
-import org.hibernate.annotations.Type;
 
 /**
  * Minimal immutable activity event - the Stripe/Square approach.
  *
- * <p>One table. 11 columns. No OCEL/CloudEvents/ActivityStreams complexity.
+ * <p>One table. Minimal columns. No OCEL/CloudEvents/ActivityStreams complexity.
  *
  * <p>Supports:
  * <ul>
  *   <li>Leaderboard: COUNT(*) GROUP BY actor_id, event_type</li>
  *   <li>Mentor context: SELECT * WHERE actor_id = ? ORDER BY occurred_at DESC</li>
- *   <li>Email attribution: WHERE correlation_id = ? for notification→click→action chains</li>
  *   <li>DX Core 4: Maps to Speed (lead time), Effectiveness (review cycle), Quality metrics</li>
  * </ul>
  *
@@ -43,7 +35,7 @@ import org.hibernate.annotations.Type;
  *   <li>workspace_id + occurred_at: Leaderboard aggregations with time range</li>
  *   <li>actor_id + occurred_at: User activity feed (mentor context)</li>
  *   <li>workspace_id + actor_id + occurred_at: Combined workspace + user queries</li>
- *   <li>correlation_id: Email attribution chain lookups</li>
+ *   <li>workspace_id + target_type + target_id: XP lookup for profile hydration</li>
  * </ul>
  *
  * <h3>Immutability</h3>
@@ -67,8 +59,8 @@ import org.hibernate.annotations.Type;
             name = "idx_activity_event_workspace_actor_occurred",
             columnList = "workspace_id, actor_id, occurred_at DESC"
         ),
-        // Attribution queries: correlation chain lookups
-        @Index(name = "idx_activity_event_correlation", columnList = "correlation_id"),
+        // XP lookup for profile hydration: batch load XP by target
+        @Index(name = "idx_activity_event_xp_lookup", columnList = "workspace_id, target_type, target_id"),
     }
 )
 @Getter
@@ -119,27 +111,6 @@ public class ActivityEvent {
     @Column(name = "target_id")
     private Long targetId;
 
-    /** Source of this event: github, mentor, notification, system */
-    @NotNull
-    @Column(name = "source_system", length = 32, nullable = false)
-    private String sourceSystem;
-
-    /** Groups related events: notification.sent → notification.clicked → pr.opened */
-    @Column(name = "correlation_id")
-    private UUID correlationId;
-
-    /**
-     * Context explaining why this event was recorded.
-     *
-     * <p>Examples: "webhook", "sync", "backfill", "manual_correction", "scheduled"
-     *
-     * <p>This field completes the audit trail (WHO, WHAT, WHEN, WHERE, WHY) by
-     * documenting the trigger/source of the event, enabling forensic analysis
-     * of event chains during incident investigations.
-     */
-    @Column(name = "trigger_context", length = 64)
-    private String triggerContext;
-
     /**
      * XP points earned for this activity (computed at event time).
      *
@@ -158,66 +129,10 @@ public class ActivityEvent {
     @Column(name = "xp", nullable = false)
     private double xp = 0.0;
 
-    /** Everything else goes here - ONLY for truly variable metadata (titles, paths, etc.) */
-    @Type(JsonType.class)
-    @Column(name = "payload", columnDefinition = "jsonb")
-    private Map<String, Object> payload;
-
     /** When we persisted to the database */
     @NotNull
     @Column(name = "ingested_at", nullable = false)
     private Instant ingestedAt;
-
-    /**
-     * Schema version for forward compatibility and event evolution.
-     *
-     * <p><strong>When to increment:</strong>
-     * <ul>
-     *   <li>Event structure changes (new required fields, field renames)</li>
-     *   <li>XP calculation formula changes (to distinguish old vs new scoring)</li>
-     *   <li>Payload format changes (new required keys, changed semantics)</li>
-     * </ul>
-     *
-     * <p><strong>Migration pattern:</strong> Use {@link ActivityEventService#migrateToCurrentVersion}
-     * to upgrade events from older schema versions when processing historical data.
-     *
-     * @see ActivityEventService#CURRENT_SCHEMA_VERSION
-     * @see ActivityEventService#migrateToCurrentVersion(ActivityEvent)
-     */
-    @Builder.Default
-    @Column(name = "schema_version", nullable = false)
-    private int schemaVersion = 1;
-
-    /**
-     * XP formula version used for this event.
-     *
-     * <p>This tracks which version of the XP calculation formula was used
-     * when computing the XP value. This enables:
-     * <ul>
-     *   <li>Historical accuracy: Explain why old events have specific XP</li>
-     *   <li>Audit trail: Track formula changes over time</li>
-     *   <li>Recalculation: Optionally recompute XP with new formula</li>
-     * </ul>
-     *
-     * <p>Formula versions:
-     * <ul>
-     *   <li>1 = Original harmonic mean formula</li>
-     *   <li>2 = Future updates (document changes here)</li>
-     * </ul>
-     */
-    @Builder.Default
-    @Column(name = "formula_version", nullable = false)
-    private int formulaVersion = 1;
-
-    /**
-     * SHA-256 hash of event content for tamper detection.
-     *
-     * <p>Computed from: eventKey + eventType + occurredAt + targetId + xp + schemaVersion.
-     * This provides an audit trail integrity guarantee - any modification to
-     * event content would invalidate the hash.
-     */
-    @Column(name = "content_hash", length = 64)
-    private String contentHash;
 
     @PrePersist
     protected void onCreate() {
@@ -227,47 +142,6 @@ public class ActivityEvent {
         if (ingestedAt == null) {
             ingestedAt = Instant.now();
         }
-        if (contentHash == null) {
-            contentHash = computeContentHash();
-        }
-    }
-
-    /**
-     * Compute SHA-256 hash of event content for integrity verification.
-     *
-     * @return hex-encoded SHA-256 hash of event content
-     */
-    private String computeContentHash() {
-        String content = String.format(
-            "%s|%s|%s|%s|%.2f|%d|%d",
-            eventKey,
-            eventType != null ? eventType.getValue() : "",
-            occurredAt != null ? occurredAt.toEpochMilli() : 0,
-            targetId != null ? targetId : 0,
-            xp,
-            schemaVersion,
-            formulaVersion
-        );
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] hash = digest.digest(content.getBytes(StandardCharsets.UTF_8));
-            return HexFormat.of().formatHex(hash);
-        } catch (NoSuchAlgorithmException e) {
-            // SHA-256 is guaranteed to be available in all Java implementations
-            throw new IllegalStateException("SHA-256 not available", e);
-        }
-    }
-
-    /**
-     * Verify the integrity of this event by comparing stored hash with computed hash.
-     *
-     * @return true if the event content has not been tampered with
-     */
-    public boolean verifyIntegrity() {
-        if (contentHash == null) {
-            return false;
-        }
-        return contentHash.equals(computeContentHash());
     }
 
     /**
@@ -284,5 +158,20 @@ public class ActivityEvent {
      */
     public static String buildKey(ActivityEventType type, Long targetId, Instant timestamp) {
         return String.format("%s:%d:%d", type.getValue(), targetId, timestamp.toEpochMilli());
+    }
+
+    /**
+     * Verify the integrity of this activity event.
+     *
+     * <p><strong>Note:</strong> Content hash verification was removed as part of schema
+     * simplification (content_hash column dropped). This method is a stub that always
+     * returns true until integrity verification is re-implemented if needed.
+     *
+     * @return true (integrity verification not currently implemented)
+     */
+    public boolean verifyIntegrity() {
+        // Content hash verification was removed - see changelog 1768900000000-5
+        // Always return true until re-implemented
+        return true;
     }
 }

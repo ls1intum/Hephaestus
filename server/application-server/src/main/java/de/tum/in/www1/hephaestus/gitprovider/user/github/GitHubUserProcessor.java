@@ -59,9 +59,10 @@ public class GitHubUserProcessor {
         String name = dto.name() != null ? dto.name() : login;
         String avatarUrl = dto.avatarUrl() != null ? dto.avatarUrl() : "";
         String htmlUrl = dto.htmlUrl() != null ? dto.htmlUrl() : "";
+        User.Type userType = dto.getEffectiveType();
 
         // Use upsert for thread-safe concurrent inserts
-        userRepository.upsert(userId, login, name, avatarUrl, htmlUrl, User.Type.USER.name());
+        userRepository.upsert(userId, login, name, avatarUrl, htmlUrl, userType.name());
 
         // Fetch the entity to update additional profile fields if needed
         return userRepository

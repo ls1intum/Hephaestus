@@ -61,4 +61,42 @@ public interface BackfillStateProvider {
     default void removeSyncTarget(Long syncTargetId) {
         // Default no-op - implementations MUST override to remove targets
     }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // PAGINATION CURSOR PERSISTENCE
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /**
+     * Updates the pagination cursor for issue sync.
+     * <p>
+     * This allows sync to resume from where it left off if interrupted mid-pagination.
+     * The cursor should be persisted within the same transaction as the synced data
+     * to ensure consistency.
+     * <p>
+     * <b>Important:</b> The default implementation is a no-op. Implementations
+     * MUST override this method to persist cursor state for reliable resumption.
+     *
+     * @param syncTargetId the sync target ID
+     * @param cursor       the GraphQL pagination cursor, or null to clear (sync complete)
+     */
+    default void updateIssueSyncCursor(Long syncTargetId, String cursor) {
+        // Default no-op - implementations MUST override to persist cursor
+    }
+
+    /**
+     * Updates the pagination cursor for pull request sync.
+     * <p>
+     * This allows sync to resume from where it left off if interrupted mid-pagination.
+     * The cursor should be persisted within the same transaction as the synced data
+     * to ensure consistency.
+     * <p>
+     * <b>Important:</b> The default implementation is a no-op. Implementations
+     * MUST override this method to persist cursor state for reliable resumption.
+     *
+     * @param syncTargetId the sync target ID
+     * @param cursor       the GraphQL pagination cursor, or null to clear (sync complete)
+     */
+    default void updatePullRequestSyncCursor(Long syncTargetId, String cursor) {
+        // Default no-op - implementations MUST override to persist cursor
+    }
 }

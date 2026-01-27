@@ -112,32 +112,6 @@ public interface PullRequestRepository extends JpaRepository<PullRequest, Long> 
     Stream<PullRequest> streamAllByRepository_Id(Long repositoryId);
 
     /**
-     * Finds all pull requests belonging to a repository with reviews and their comments eagerly fetched.
-     * Used by backfill operations to avoid LazyInitializationException when accessing
-     * reviews and their comments after EntityManager.clear().
-     *
-     * <p>The XP calculator needs review.comments.size() for bonus calculation, so we must
-     * fetch both the reviews and their comments in the same query.
-     *
-     * @param repositoryId the repository ID
-     * @return list of pull requests with reviews and comments for the repository
-     * @deprecated Use {@link #findByRepositoryIdWithReviews(Long, Pageable)} for batch processing
-     *             to avoid memory issues with large datasets.
-     */
-    @Deprecated
-    @Query(
-        """
-        SELECT DISTINCT p
-        FROM PullRequest p
-        LEFT JOIN FETCH p.reviews r
-        LEFT JOIN FETCH r.comments
-        LEFT JOIN FETCH p.repository
-        WHERE p.repository.id = :repositoryId
-        """
-    )
-    List<PullRequest> findAllByRepositoryIdWithReviews(@Param("repositoryId") Long repositoryId);
-
-    /**
      * Finds pull requests belonging to a repository with reviews and their comments eagerly fetched,
      * with pagination support. Uses a two-query approach to avoid Hibernate's
      * "HHH90003004: firstResult/maxResults specified with collection fetch" warning.
@@ -161,29 +135,6 @@ public interface PullRequestRepository extends JpaRepository<PullRequest, Long> 
         """
     )
     Slice<PullRequest> findByRepositoryIdWithReviews(@Param("repositoryId") Long repositoryId, Pageable pageable);
-
-    /**
-     * Finds all pull requests belonging to a repository with review comments eagerly fetched.
-     * Used by backfill operations to avoid LazyInitializationException when accessing
-     * reviewComments after EntityManager.clear().
-     *
-     * @param repositoryId the repository ID
-     * @return list of pull requests with review comments for the repository
-     * @deprecated Use {@link #findByRepositoryIdWithReviewComments(Long, Pageable)} for batch processing
-     *             to avoid memory issues with large datasets.
-     */
-    @Deprecated
-    @Query(
-        """
-        SELECT DISTINCT p
-        FROM PullRequest p
-        LEFT JOIN FETCH p.reviewComments rc
-        LEFT JOIN FETCH rc.author
-        LEFT JOIN FETCH p.repository
-        WHERE p.repository.id = :repositoryId
-        """
-    )
-    List<PullRequest> findAllByRepositoryIdWithReviewComments(@Param("repositoryId") Long repositoryId);
 
     /**
      * Finds pull requests belonging to a repository with review comments eagerly fetched,

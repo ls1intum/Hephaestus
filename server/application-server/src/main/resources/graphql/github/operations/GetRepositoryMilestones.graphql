@@ -10,6 +10,7 @@ query GetRepositoryMilestones(
 ) {
     rateLimit {
         cost
+        limit
         remaining
         resetAt
     }
@@ -45,8 +46,21 @@ query GetRepositoryMilestones(
                         databaseId
                         login
                         avatarUrl
+                        createdAt
                     }
                     ... on Bot {
+                        id
+                        databaseId
+                        login
+                        avatarUrl
+                    }
+                    ... on Mannequin {
+                        id
+                        databaseId
+                        login
+                        avatarUrl
+                    }
+                    ... on Organization {
                         id
                         databaseId
                         login

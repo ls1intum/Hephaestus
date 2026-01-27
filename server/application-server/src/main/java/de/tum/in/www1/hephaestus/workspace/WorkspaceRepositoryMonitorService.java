@@ -3,6 +3,7 @@ package de.tum.in.www1.hephaestus.workspace;
 import de.tum.in.www1.hephaestus.core.LoggingUtils;
 import de.tum.in.www1.hephaestus.core.WorkspaceAgnostic;
 import de.tum.in.www1.hephaestus.core.exception.EntityNotFoundException;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.app.GitHubAppTokenService;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.ProvisioningListener;
 import de.tum.in.www1.hephaestus.gitprovider.installation.github.GitHubInstallationRepositoryEnumerationService;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
@@ -24,6 +25,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -53,6 +55,7 @@ public class WorkspaceRepositoryMonitorService {
     private final NatsConsumerService natsConsumerService;
     private final GitHubInstallationRepositoryEnumerationService installationRepositoryEnumerator;
     private final WorkspaceScopeFilter workspaceScopeFilter;
+    private final GitHubAppTokenService gitHubAppTokenService;
 
     // Lazy-loaded dependencies (to break circular references)
     private final ObjectProvider<GitHubDataSyncService> gitHubDataSyncServiceProvider;
@@ -65,6 +68,7 @@ public class WorkspaceRepositoryMonitorService {
         NatsConsumerService natsConsumerService,
         GitHubInstallationRepositoryEnumerationService installationRepositoryEnumerator,
         WorkspaceScopeFilter workspaceScopeFilter,
+        GitHubAppTokenService gitHubAppTokenService,
         ObjectProvider<GitHubDataSyncService> gitHubDataSyncServiceProvider
     ) {
         this.isNatsEnabled = isNatsEnabled;
@@ -74,6 +78,7 @@ public class WorkspaceRepositoryMonitorService {
         this.natsConsumerService = natsConsumerService;
         this.installationRepositoryEnumerator = installationRepositoryEnumerator;
         this.workspaceScopeFilter = workspaceScopeFilter;
+        this.gitHubAppTokenService = gitHubAppTokenService;
         this.gitHubDataSyncServiceProvider = gitHubDataSyncServiceProvider;
     }
 
@@ -245,6 +250,17 @@ public class WorkspaceRepositoryMonitorService {
         String nameWithOwner,
         boolean deferSync
     ) {
+        // Check if installation is suspended BEFORE adding repo monitor.
+        // This prevents NATS replay from adding repos to suspended installations.
+        if (gitHubAppTokenService.isInstallationMarkedSuspended(installationId)) {
+            log.debug(
+                "Skipped repository monitor: reason=installationSuspended, installationId={}, repoName={}",
+                installationId,
+                LoggingUtils.sanitizeForLog(nameWithOwner)
+            );
+            return Optional.empty();
+        }
+
         var workspaceOpt = workspaceRepository.findByInstallationId(installationId);
         if (workspaceOpt.isEmpty() || isBlank(nameWithOwner)) {
             return workspaceOpt;
@@ -275,7 +291,13 @@ public class WorkspaceRepositoryMonitorService {
         }
 
         RepositoryToMonitor monitor = monitorOpt.get();
-        return removeRepositoryMonitorInternal(workspace, monitor);
+        var result = removeRepositoryMonitorInternal(workspace, monitor);
+
+        // Also delete the Repository entity if no other workspace is monitoring it
+        // This prevents orphan repos that cause permanent sync errors
+        deleteRepositoryIfOrphaned(nameWithOwner);
+
+        return result;
     }
 
     /**
@@ -330,59 +352,18 @@ public class WorkspaceRepositoryMonitorService {
             return;
         }
 
-        // Create or update the Repository entity
-        ensureRepositoryFromProvisioningSnapshot(snapshot);
-
-        // Create the RepositoryToMonitor if it doesn't exist
-        ensureRepositoryMonitorForInstallation(installationId, snapshot.nameWithOwner());
-    }
-
-    /**
-     * Creates or updates a Repository entity from a provisioning snapshot.
-     *
-     * @param snapshot the repository snapshot from the SPI
-     */
-    private void ensureRepositoryFromProvisioningSnapshot(ProvisioningListener.RepositorySnapshot snapshot) {
-        if (snapshot == null || isBlank(snapshot.nameWithOwner())) {
+        var workspaceOpt = workspaceRepository.findByInstallationId(installationId);
+        if (workspaceOpt.isEmpty()) {
             return;
         }
 
-        var existingRepo = repositoryRepository.findByNameWithOwner(snapshot.nameWithOwner());
-        if (existingRepo.isPresent()) {
-            // Repository already exists, update basic fields if needed
-            Repository repo = existingRepo.get();
-            boolean changed = false;
+        Workspace workspace = workspaceOpt.get();
 
-            if (repo.getName() == null || !repo.getName().equals(snapshot.name())) {
-                repo.setName(snapshot.name());
-                changed = true;
-            }
-            if (repo.isPrivate() != snapshot.isPrivate()) {
-                repo.setPrivate(snapshot.isPrivate());
-                changed = true;
-            }
+        // Create or update the Repository entity with organization linking
+        ensureRepositoryFromProvisioningSnapshot(workspace, snapshot);
 
-            if (changed) {
-                repositoryRepository.save(repo);
-            }
-        } else {
-            // Create new repository with basic metadata from provisioning snapshot
-            Repository repo = new Repository();
-            repo.setId(snapshot.id());
-            repo.setNameWithOwner(snapshot.nameWithOwner());
-            repo.setName(snapshot.name());
-            repo.setPrivate(snapshot.isPrivate());
-            repo.setDefaultBranch("main"); // Will be updated by GraphQL sync
-            repo.setHtmlUrl("https://github.com/" + snapshot.nameWithOwner());
-            repo.setVisibility(snapshot.isPrivate() ? Repository.Visibility.PRIVATE : Repository.Visibility.PUBLIC);
-            repo.setPushedAt(Instant.now()); // Placeholder, will be updated by sync
-
-            repositoryRepository.save(repo);
-            log.debug(
-                "Created repository from provisioning snapshot: repoName={}",
-                LoggingUtils.sanitizeForLog(snapshot.nameWithOwner())
-            );
-        }
+        // Create the RepositoryToMonitor if it doesn't exist
+        ensureRepositoryMonitorForInstallation(installationId, snapshot.nameWithOwner());
     }
 
     // ========================================================================
@@ -404,6 +385,13 @@ public class WorkspaceRepositoryMonitorService {
         Collection<String> protectedRepositories,
         boolean deferSync
     ) {
+        // Check if installation is suspended BEFORE adding repos and triggering syncs.
+        // This prevents NATS replay of old "created" events from triggering hundreds of failed syncs.
+        if (gitHubAppTokenService.isInstallationMarkedSuspended(installationId)) {
+            log.info("Skipped repository enumeration: reason=installationSuspended, installationId={}", installationId);
+            return;
+        }
+
         var workspaceOpt = workspaceRepository.findByInstallationId(installationId);
         if (workspaceOpt.isEmpty()) {
             return;
@@ -424,7 +412,22 @@ public class WorkspaceRepositoryMonitorService {
             return;
         }
 
-        Set<String> desiredRepositories = snapshots
+        // Filter snapshots BEFORE processing to avoid creating Repository entities for filtered repos
+        List<GitHubInstallationRepositoryEnumerationService.InstallationRepositorySnapshot> allowedSnapshots = snapshots
+            .stream()
+            .filter(s -> workspaceScopeFilter.isRepositoryAllowed(s.nameWithOwner()))
+            .toList();
+
+        if (allowedSnapshots.size() < snapshots.size()) {
+            log.debug(
+                "Filtered repositories during enumeration: allowed={}, total={}, installationId={}",
+                allowedSnapshots.size(),
+                snapshots.size(),
+                installationId
+            );
+        }
+
+        Set<String> desiredRepositories = allowedSnapshots
             .stream()
             .map(snapshot -> snapshot.nameWithOwner())
             .filter(name -> !isBlank(name))
@@ -435,13 +438,15 @@ public class WorkspaceRepositoryMonitorService {
             protectedRepositories
                 .stream()
                 .filter(name -> !isBlank(name))
+                .filter(name -> workspaceScopeFilter.isRepositoryAllowed(name))
                 .map(name -> name.toLowerCase(Locale.ENGLISH))
                 .forEach(desiredRepositories::add);
         }
 
-        snapshots.forEach(snapshot -> {
-            // Create or update Repository entity from installation payload
-            ensureRepositoryFromSnapshot(snapshot);
+        allowedSnapshots.forEach(snapshot -> {
+            // Create or update Repository entity with organization linking
+            ensureRepositoryFromSnapshot(workspace, snapshot);
+            // Create the RepositoryToMonitor if it doesn't exist
             ensureRepositoryMonitorForInstallation(installationId, snapshot.nameWithOwner(), deferSync);
         });
 
@@ -514,7 +519,8 @@ public class WorkspaceRepositoryMonitorService {
      *                  when activation will sync all repositories in bulk)
      */
     private void persistRepositoryMonitor(Workspace workspace, RepositoryToMonitor monitor, boolean deferSync) {
-        repositoryToMonitorRepository.save(monitor);
+        // Use saveAndFlush to force immediate constraint check so callers can catch DataIntegrityViolationException
+        repositoryToMonitorRepository.saveAndFlush(monitor);
         workspace.getRepositoriesToMonitor().add(monitor);
         workspaceRepository.save(workspace);
         boolean repositoryAllowed = workspaceScopeFilter.isRepositoryAllowed(monitor);
@@ -549,6 +555,13 @@ public class WorkspaceRepositoryMonitorService {
         }
     }
 
+    /**
+     * Idempotently ensures a repository monitor exists for a workspace.
+     *
+     * <p>Handles race conditions from NATS message replay by catching duplicate key
+     * violations. If another thread/message already created the monitor, we simply
+     * return success - that's the idempotent behavior we want.
+     */
     private Optional<Workspace> ensureRepositoryMonitorInternal(
         Workspace workspace,
         String nameWithOwner,
@@ -558,14 +571,27 @@ public class WorkspaceRepositoryMonitorService {
             return Optional.ofNullable(workspace);
         }
 
+        // Fast path: check if already exists (covers most replay cases)
         if (repositoryToMonitorRepository.existsByWorkspaceIdAndNameWithOwner(workspace.getId(), nameWithOwner)) {
             return Optional.of(workspace);
         }
 
+        // Slow path: create new monitor with idempotent handling for race conditions
         RepositoryToMonitor monitor = new RepositoryToMonitor();
         monitor.setNameWithOwner(nameWithOwner);
         monitor.setWorkspace(workspace);
-        persistRepositoryMonitor(workspace, monitor, deferSync);
+
+        try {
+            persistRepositoryMonitor(workspace, monitor, deferSync);
+        } catch (DataIntegrityViolationException e) {
+            // Another message already created this monitor - we're idempotent, this is fine
+            log.debug(
+                "Repository monitor already exists (idempotent): repoName={}, workspaceId={}",
+                LoggingUtils.sanitizeForLog(nameWithOwner),
+                workspace.getId()
+            );
+        }
+
         return Optional.of(workspace);
     }
 
@@ -585,9 +611,14 @@ public class WorkspaceRepositoryMonitorService {
      * <p>Note: Repositories are global entities (gitprovider is workspace-agnostic).
      * The workspace-repository association is managed through RepositoryToMonitor.
      *
-     * @param snapshot the installation repository snapshot
+     * <p>The organization is obtained from the workspace to ensure repositories from
+     * organization installations have the proper organization_id set.
+     *
+     * @param workspace the workspace (used to get the organization)
+     * @param snapshot  the installation repository snapshot
      */
     private void ensureRepositoryFromSnapshot(
+        Workspace workspace,
         GitHubInstallationRepositoryEnumerationService.InstallationRepositorySnapshot snapshot
     ) {
         if (snapshot == null || isBlank(snapshot.nameWithOwner())) {
@@ -608,6 +639,11 @@ public class WorkspaceRepositoryMonitorService {
                 repo.setPrivate(snapshot.isPrivate());
                 changed = true;
             }
+            // Link organization if not already set and workspace has one
+            if (repo.getOrganization() == null && workspace.getOrganization() != null) {
+                repo.setOrganization(workspace.getOrganization());
+                changed = true;
+            }
 
             if (changed) {
                 repositoryRepository.save(repo);
@@ -624,10 +660,79 @@ public class WorkspaceRepositoryMonitorService {
             repo.setVisibility(snapshot.isPrivate() ? Repository.Visibility.PRIVATE : Repository.Visibility.PUBLIC);
             repo.setPushedAt(Instant.now()); // Placeholder, will be updated by sync
 
+            // Link organization from workspace (null for USER type accounts, which is OK)
+            repo.setOrganization(workspace.getOrganization());
+
             repositoryRepository.save(repo);
             log.debug(
-                "Created repository from installation snapshot: repoName={}",
-                LoggingUtils.sanitizeForLog(snapshot.nameWithOwner())
+                "Created repository from installation snapshot: repoName={}, orgId={}",
+                LoggingUtils.sanitizeForLog(snapshot.nameWithOwner()),
+                workspace.getOrganization() != null ? workspace.getOrganization().getId() : null
+            );
+        }
+    }
+
+    /**
+     * Creates or updates a Repository entity from a provisioning snapshot.
+     * This is used during installation provisioning to create repositories from webhook metadata.
+     *
+     * <p>The organization is obtained from the workspace to ensure repositories from
+     * organization installations have the proper organization_id set.
+     *
+     * @param workspace the workspace (used to get the organization)
+     * @param snapshot  the repository snapshot from the SPI
+     */
+    private void ensureRepositoryFromProvisioningSnapshot(
+        Workspace workspace,
+        ProvisioningListener.RepositorySnapshot snapshot
+    ) {
+        if (snapshot == null || isBlank(snapshot.nameWithOwner())) {
+            return;
+        }
+
+        var existingRepo = repositoryRepository.findByNameWithOwner(snapshot.nameWithOwner());
+        if (existingRepo.isPresent()) {
+            // Repository already exists, update basic fields if needed
+            Repository repo = existingRepo.get();
+            boolean changed = false;
+
+            if (repo.getName() == null || !repo.getName().equals(snapshot.name())) {
+                repo.setName(snapshot.name());
+                changed = true;
+            }
+            if (repo.isPrivate() != snapshot.isPrivate()) {
+                repo.setPrivate(snapshot.isPrivate());
+                changed = true;
+            }
+            // Link organization if not already set and workspace has one
+            if (repo.getOrganization() == null && workspace.getOrganization() != null) {
+                repo.setOrganization(workspace.getOrganization());
+                changed = true;
+            }
+
+            if (changed) {
+                repositoryRepository.save(repo);
+            }
+        } else {
+            // Create new repository with basic metadata from provisioning snapshot
+            Repository repo = new Repository();
+            repo.setId(snapshot.id());
+            repo.setNameWithOwner(snapshot.nameWithOwner());
+            repo.setName(snapshot.name());
+            repo.setPrivate(snapshot.isPrivate());
+            repo.setDefaultBranch("main"); // Will be updated by GraphQL sync
+            repo.setHtmlUrl("https://github.com/" + snapshot.nameWithOwner());
+            repo.setVisibility(snapshot.isPrivate() ? Repository.Visibility.PRIVATE : Repository.Visibility.PUBLIC);
+            repo.setPushedAt(Instant.now()); // Placeholder, will be updated by sync
+
+            // Link organization from workspace (null for USER type accounts, which is OK)
+            repo.setOrganization(workspace.getOrganization());
+
+            repositoryRepository.save(repo);
+            log.debug(
+                "Created repository from provisioning snapshot: repoName={}, orgId={}",
+                LoggingUtils.sanitizeForLog(snapshot.nameWithOwner()),
+                workspace.getOrganization() != null ? workspace.getOrganization().getId() : null
             );
         }
     }

@@ -4,6 +4,7 @@
 query GetOrganization($login: String!) {
     rateLimit {
         cost
+        limit
         remaining
         resetAt
     }
@@ -26,6 +27,7 @@ query GetOrganization($login: String!) {
             totalCount
             pageInfo {
                 hasNextPage
+                endCursor
             }
             edges {
                 role

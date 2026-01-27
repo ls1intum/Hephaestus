@@ -156,7 +156,9 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
                 Instant.parse("2025-11-30T08:00:00Z"),
                 "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/milestone/3",
                 0,
-                0
+                0,
+                Instant.now(),
+                Instant.now()
             );
 
             // When
@@ -213,7 +215,9 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
                 Instant.parse("2026-01-14T08:00:00Z"),
                 "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/milestone/3",
                 0,
-                0
+                0,
+                Instant.now(),
+                Instant.now()
             );
 
             // When
@@ -259,7 +263,9 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
                 null,
                 "https://example.com",
                 0,
-                0
+                0,
+                Instant.now(),
+                Instant.now()
             );
 
             // When
@@ -298,7 +304,9 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
                 null,
                 "https://example.com",
                 0,
-                0
+                0,
+                Instant.now(),
+                Instant.now()
             );
 
             // When
@@ -326,7 +334,9 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
                 null,
                 "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/milestone/5",
                 0,
-                0
+                0,
+                Instant.now(),
+                Instant.now()
             );
 
             // When
@@ -351,7 +361,9 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
                 null, // null dueOn
                 "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/milestone/6",
                 0,
-                0
+                0,
+                Instant.now(),
+                Instant.now()
             );
 
             // When
@@ -376,7 +388,9 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
                 null,
                 "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/milestone/7",
                 0,
-                0
+                0,
+                Instant.now(),
+                Instant.now()
             );
 
             // When - process twice
@@ -404,7 +418,9 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
                 null,
                 "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/milestone/8",
                 0,
-                0
+                0,
+                Instant.now(),
+                Instant.now()
             );
 
             // When
@@ -431,7 +447,9 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
                 null,
                 "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/milestone/9",
                 0,
-                0
+                0,
+                Instant.now(),
+                Instant.now()
             );
             GitHubUserDTO newCreator = new GitHubUserDTO(
                 newUserId,
@@ -468,7 +486,9 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
                 null,
                 "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/milestone/10",
                 0,
-                0
+                0,
+                Instant.now(),
+                Instant.now()
             );
 
             // When
@@ -493,7 +513,9 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
                 null,
                 "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/milestone/11",
                 0,
-                0
+                0,
+                Instant.now(),
+                Instant.now()
             );
 
             // When
@@ -517,7 +539,9 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
                 null,
                 "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/milestone/12",
                 0,
-                0
+                0,
+                Instant.now(),
+                Instant.now()
             );
 
             // When

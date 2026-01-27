@@ -11,6 +11,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Activity event repository with leaderboard aggregation queries.
@@ -257,24 +258,6 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
         return findByActorWithLimit(actorId, since, 100);
     }
 
-    /**
-     * Email attribution: get event chain by correlation ID.
-     * Limited to 100 events per correlation chain (safety bound).
-     *
-     * <p>Workspace-agnostic: Correlation IDs are globally unique UUIDs. Events in the
-     * same correlation chain belong to the same workspace by design.
-     */
-    @WorkspaceAgnostic("Correlation IDs are globally unique - workspace implicit in the chain")
-    @Query(
-        """
-        SELECT e FROM ActivityEvent e
-        WHERE e.correlationId = :correlationId
-        ORDER BY e.occurredAt ASC
-        LIMIT 100
-        """
-    )
-    List<ActivityEvent> findByCorrelationId(@Param("correlationId") UUID correlationId);
-
     // ========================================================================
     // Profile XP Lookups
     // ========================================================================
@@ -361,6 +344,7 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
      * @param workspaceId the workspace ID
      */
     @Modifying
+    @Transactional
     @Query(value = "DELETE FROM activity_event WHERE workspace_id = :workspaceId", nativeQuery = true)
     void deleteAllByWorkspaceId(@Param("workspaceId") Long workspaceId);
 }

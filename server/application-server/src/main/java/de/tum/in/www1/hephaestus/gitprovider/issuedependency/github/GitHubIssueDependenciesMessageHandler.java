@@ -13,7 +13,7 @@ import de.tum.in.www1.hephaestus.gitprovider.issuedependency.github.dto.GitHubIs
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Handles GitHub {@code issue_dependencies} webhook events.
@@ -64,9 +64,10 @@ public class GitHubIssueDependenciesMessageHandler extends GitHubMessageHandler<
         ProcessingContextFactory contextFactory,
         GitHubIssueProcessor issueProcessor,
         GitHubIssueDependencySyncService issueDependencySyncService,
-        NatsMessageDeserializer deserializer
+        NatsMessageDeserializer deserializer,
+        TransactionTemplate transactionTemplate
     ) {
-        super(GitHubIssueDependenciesEventDTO.class, deserializer);
+        super(GitHubIssueDependenciesEventDTO.class, deserializer, transactionTemplate);
         this.contextFactory = contextFactory;
         this.issueProcessor = issueProcessor;
         this.issueDependencySyncService = issueDependencySyncService;
@@ -78,7 +79,6 @@ public class GitHubIssueDependenciesMessageHandler extends GitHubMessageHandler<
     }
 
     @Override
-    @Transactional
     protected void handleEvent(GitHubIssueDependenciesEventDTO event) {
         var blockedIssueDto = event.blockedIssue();
         var blockingIssueDto = event.blockingIssue();

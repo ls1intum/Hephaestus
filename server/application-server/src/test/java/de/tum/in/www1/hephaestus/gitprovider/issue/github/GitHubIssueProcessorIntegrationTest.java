@@ -179,7 +179,8 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
             null, // labels
             null, // milestone
             null, // issueType
-            null // repository
+            null, // repository
+            null // pullRequest
         );
     }
 
@@ -214,7 +215,8 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
                 null,
                 null,
                 null,
-                null
+                null,
+                null // pullRequest
             );
 
             // When
@@ -251,7 +253,8 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
                 null,
                 null,
                 null,
-                null
+                null,
+                null // pullRequest
             );
 
             // Verify the fallback works
@@ -290,7 +293,8 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
                 null,
                 null,
                 null,
-                null
+                null,
+                null // pullRequest
             );
 
             // Verify fallback returns null
@@ -409,7 +413,8 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
                 null,
                 null,
                 null,
-                null
+                null,
+                null // pullRequest
             );
 
             // When
@@ -444,7 +449,8 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
                 null,
                 null,
                 null,
-                null
+                null,
+                null // pullRequest
             );
 
             // When
@@ -482,7 +488,8 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
                 List.of(labelDto),
                 null,
                 null,
-                null
+                null,
+                null // pullRequest
             );
 
             // When
@@ -529,7 +536,8 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
                 null,
                 null,
                 null,
-                null
+                null,
+                null // pullRequest
             );
 
             // When
@@ -556,7 +564,9 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
                 Instant.parse("2025-12-31T08:00:00Z"),
                 "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/milestone/2",
                 0,
-                0
+                0,
+                Instant.now(),
+                Instant.now()
             );
             GitHubIssueDTO dto = new GitHubIssueDTO(
                 issueId,
@@ -578,7 +588,8 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
                 null,
                 milestoneDto,
                 null,
-                null
+                null,
+                null // pullRequest
             );
 
             // When
@@ -634,7 +645,8 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
                 null,
                 null,
                 null,
-                null
+                null,
+                null // pullRequest
             );
 
             // When
@@ -694,7 +706,8 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
                 null,
                 null,
                 null,
-                null
+                null,
+                null // pullRequest
             );
 
             // When
@@ -754,7 +767,9 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
                 null,
                 "https://example.com/milestone/2",
                 0,
-                0
+                0,
+                Instant.now(),
+                Instant.now()
             );
             GitHubIssueDTO dto = new GitHubIssueDTO(
                 issueId,
@@ -776,7 +791,8 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
                 null,
                 milestoneDto,
                 null,
-                null
+                null,
+                null // pullRequest
             );
 
             // When
@@ -837,7 +853,8 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
                 null,
                 null,
                 null,
-                null
+                null,
+                null // pullRequest
             );
 
             // When
@@ -882,7 +899,8 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
                 null,
                 null,
                 null,
-                null
+                null,
+                null // pullRequest
             );
 
             // When
@@ -938,7 +956,8 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
                 null,
                 null,
                 null,
-                null
+                null,
+                null // pullRequest
             );
 
             // When
@@ -978,7 +997,8 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
                 null,
                 null,
                 null,
-                null
+                null,
+                null // pullRequest
             );
 
             // When
@@ -1055,7 +1075,8 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
                 List.of(labelDto),
                 null,
                 null,
-                null
+                null,
+                null // pullRequest
             );
             processor.process(issueDto, createContext());
 
@@ -1225,7 +1246,8 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
                 null,
                 null,
                 null,
-                null
+                null,
+                null // pullRequest
             );
 
             // When/Then - should not throw
@@ -1263,7 +1285,8 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
                 null,
                 null,
                 null,
-                null
+                null,
+                null // pullRequest
             );
 
             Issue result = processor.process(nullIdDto, createContext());
@@ -1297,7 +1320,8 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
                 null,
                 null,
                 null,
-                null
+                null,
+                null // pullRequest
             );
 
             // When
@@ -1332,7 +1356,8 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
                 null,
                 null,
                 null,
-                null
+                null,
+                null // pullRequest
             );
 
             // When
@@ -1367,7 +1392,8 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
                 null,
                 null,
                 null,
-                null
+                null,
+                null // pullRequest
             );
 
             // When
@@ -1402,7 +1428,8 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
                 null,
                 null,
                 null,
-                null
+                null,
+                null // pullRequest
             );
 
             // When
@@ -1437,7 +1464,8 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
                 List.of(), // empty labels
                 null,
                 null,
-                null
+                null,
+                null // pullRequest
             );
 
             // When

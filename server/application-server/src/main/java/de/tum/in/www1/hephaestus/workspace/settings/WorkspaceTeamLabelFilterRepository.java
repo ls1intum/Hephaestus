@@ -9,6 +9,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Repository for {@link WorkspaceTeamLabelFilter} entities.
@@ -74,6 +75,30 @@ public interface WorkspaceTeamLabelFilterRepository
     Set<Long> findTeamIdsWithLabelFilters(@Param("workspaceId") Long workspaceId);
 
     /**
+     * Finds all label filters for multiple teams in a workspace.
+     *
+     * <p>This batch query retrieves all label filter associations for the specified teams
+     * in a single database query, avoiding N+1 query patterns when processing multiple teams.
+     *
+     * @param workspaceId the workspace ID
+     * @param teamIds the set of team IDs to fetch label filters for
+     * @return list of label filters for the specified teams in the workspace
+     */
+    @Query(
+        """
+        SELECT wtlf
+        FROM WorkspaceTeamLabelFilter wtlf
+        JOIN FETCH wtlf.label
+        WHERE wtlf.workspace.id = :workspaceId
+          AND wtlf.team.id IN :teamIds
+        """
+    )
+    List<WorkspaceTeamLabelFilter> findByWorkspaceIdAndTeamIds(
+        @Param("workspaceId") Long workspaceId,
+        @Param("teamIds") Set<Long> teamIds
+    );
+
+    /**
      * Deletes a specific label filter by its composite key components.
      *
      * @param workspaceId the workspace ID
@@ -81,6 +106,7 @@ public interface WorkspaceTeamLabelFilterRepository
      * @param labelId the label ID
      */
     @Modifying
+    @Transactional
     @Query(
         """
         DELETE FROM WorkspaceTeamLabelFilter wtlf
@@ -102,6 +128,7 @@ public interface WorkspaceTeamLabelFilterRepository
      * @param teamId the team ID
      */
     @Modifying
+    @Transactional
     @Query(
         """
         DELETE FROM WorkspaceTeamLabelFilter wtlf
@@ -118,6 +145,7 @@ public interface WorkspaceTeamLabelFilterRepository
      * @param workspaceId the workspace ID
      */
     @Modifying
+    @Transactional
     @Query("DELETE FROM WorkspaceTeamLabelFilter wtlf WHERE wtlf.workspace.id = :workspaceId")
     void deleteAllByWorkspaceId(@Param("workspaceId") Long workspaceId);
 }

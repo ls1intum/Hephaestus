@@ -19,7 +19,6 @@ import org.springframework.context.annotation.Configuration;
  * <ul>
  *   <li>{@code contributors} - Contributor list cache (1 hour TTL, also evicted by CacheScheduler)</li>
  *   <li>{@code pullRequestTemplates} - PR template cache (1 hour TTL)</li>
- *   <li>{@code leaderboardXp} - Leaderboard XP aggregation cache (60 second TTL, also evicted on activity events)</li>
  * </ul>
  *
  * <p>All caches expose metrics via Micrometer:
@@ -32,9 +31,6 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class CacheConfig {
 
-    /** TTL for leaderboard cache in seconds. */
-    private static final long LEADERBOARD_CACHE_TTL_SECONDS = 60;
-
     /** TTL for long-lived caches (contributors, PR templates) in seconds. */
     private static final long LONG_CACHE_TTL_SECONDS = 3600; // 1 hour
 
@@ -44,9 +40,6 @@ public class CacheConfig {
     @Bean
     public CacheManager cacheManager(MeterRegistry meterRegistry) {
         SimpleCacheManager cacheManager = new SimpleCacheManager();
-
-        // Leaderboard cache: 60 second TTL for hot queries, also evicted on writes
-        CaffeineCache leaderboardXpCache = buildCache("leaderboardXp", LEADERBOARD_CACHE_TTL_SECONDS, meterRegistry);
 
         // Contributors cache: 1 hour TTL, also evicted by CacheScheduler
         CaffeineCache contributorsCache = buildCache("contributors", LONG_CACHE_TTL_SECONDS, meterRegistry);
@@ -58,7 +51,7 @@ public class CacheConfig {
             meterRegistry
         );
 
-        cacheManager.setCaches(Arrays.asList(leaderboardXpCache, contributorsCache, pullRequestTemplatesCache));
+        cacheManager.setCaches(Arrays.asList(contributorsCache, pullRequestTemplatesCache));
 
         return cacheManager;
     }

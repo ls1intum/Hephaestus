@@ -2,6 +2,8 @@ package de.tum.in.www1.hephaestus.gitprovider.sync;
 
 import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
 
+import de.tum.in.www1.hephaestus.core.event.WorkspacesInitializedEvent;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.ExponentialBackoff;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandlerRegistry;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.NatsSubscriptionProvider;
@@ -70,9 +72,22 @@ import org.springframework.stereotype.Service;
  * <h2>Lifecycle</h2>
  * <ol>
  *   <li>{@code init()} - Called on ApplicationReadyEvent, establishes NATS connection</li>
+ *   <li>{@code onWorkspacesInitialized()} - Called after workspace provisioning, starts installation consumer</li>
  *   <li>{@code startConsumingScope()} - Creates consumer for a scope (idempotent)</li>
  *   <li>{@code stopConsumingScope()} - Removes consumer for a scope</li>
  *   <li>{@code shutdown()} - Called on @PreDestroy, graceful cleanup of all resources</li>
+ * </ol>
+ *
+ * <h2>Startup Sequencing</h2>
+ * The installation consumer only needs workspace entities to exist - it does NOT need
+ * the full GraphQL sync to complete. Installation events provision new workspaces or
+ * add/remove repositories, which are independent of the repository content sync.
+ * <ol>
+ *   <li>Application starts, NATS connection established</li>
+ *   <li>WorkspaceStartupListener provisions workspaces (creates/loads from database)</li>
+ *   <li>WorkspaceStartupListener publishes {@link WorkspacesInitializedEvent}</li>
+ *   <li>This service receives the event and starts the installation consumer</li>
+ *   <li>WorkspaceActivationService runs full GraphQL sync (in parallel with installation consumer)</li>
  * </ol>
  *
  * <h2>Configuration</h2>
@@ -95,6 +110,25 @@ import org.springframework.stereotype.Service;
 public class NatsConsumerService {
 
     private static final Logger log = LoggerFactory.getLogger(NatsConsumerService.class);
+
+    /**
+     * Maximum number of redelivery attempts before giving up on a message.
+     * After this many attempts, the message is acknowledged and logged as a poison message.
+     * This prevents infinite redelivery loops for messages that consistently fail.
+     */
+    private static final int MAX_REDELIVERY_ATTEMPTS = 10;
+
+    /**
+     * Base delay for NAK backoff in milliseconds.
+     * First retry waits ~2s, second ~4s, etc. up to MAX_NAK_DELAY_MS.
+     */
+    private static final long NAK_BASE_DELAY_MS = 2000;
+
+    /**
+     * Maximum NAK delay cap in milliseconds (5 minutes).
+     * Prevents excessively long delays that could cause message timeout.
+     */
+    private static final long MAX_NAK_DELAY_MS = 300_000;
 
     /** Lock for NATS connection creation to prevent race conditions. */
     private final Object connectionLock = new Object();
@@ -151,6 +185,14 @@ public class NatsConsumerService {
         this.requestTimeoutSeconds = requestTimeoutSeconds;
     }
 
+    /**
+     * Initializes NATS connection on application startup.
+     * <p>
+     * The installation consumer is NOT started here - it waits for the
+     * {@link WorkspacesInitializedEvent} which fires after workspace provisioning
+     * but before the full GraphQL sync. This allows installation events to be
+     * processed immediately after workspaces are loaded.
+     */
     @EventListener(ApplicationReadyEvent.class)
     public void init() {
         if (!isNatsEnabled) {
@@ -160,6 +202,44 @@ public class NatsConsumerService {
 
         validateConfigurations();
         connectWithRetry();
+        log.info("NATS connection established, waiting for workspaces to be initialized");
+    }
+
+    /**
+     * Starts the installation consumer after workspaces are initialized.
+     * <p>
+     * Installation events only need workspace entities to exist - they do NOT need
+     * the full repository sync to complete. This allows installation events to be
+     * processed immediately after startup.
+     *
+     * @param event the workspaces initialized event
+     */
+    @EventListener(WorkspacesInitializedEvent.class)
+    public void onWorkspacesInitialized(WorkspacesInitializedEvent event) {
+        if (!isNatsEnabled) {
+            return;
+        }
+
+        log.info("Workspaces initialized, starting installation consumer: workspaceCount={}", event.workspaceCount());
+        startInstallationConsumer();
+    }
+
+    /**
+     * Starts the installation consumer for processing installation-level webhook events.
+     */
+    private void startInstallationConsumer() {
+        if (shuttingDown.get()) {
+            return;
+        }
+
+        virtualThreadExecutor.submit(() -> {
+            try {
+                ensureNatsConnectionEstablished();
+                setupInstallationConsumer();
+            } catch (Exception e) {
+                log.error("Failed to start installation consumer", e);
+            }
+        });
     }
 
     private void validateConfigurations() {
@@ -170,19 +250,27 @@ public class NatsConsumerService {
 
     private void connectWithRetry() {
         Options options = buildNatsOptions();
+        int attempt = 0;
 
         while (!shuttingDown.get()) {
             try {
                 natsConnection = Nats.connect(options);
-                setupInstallationConsumer();
                 log.info("Established NATS connection: server={}", natsServer);
                 return;
             } catch (InterruptedException interrupted) {
                 Thread.currentThread().interrupt();
                 return;
             } catch (IOException e) {
-                log.error("Failed to connect to NATS: server={}", natsServer, e);
-                backoffBeforeRetry();
+                long delayMs = ExponentialBackoff.calculateDelay(attempt);
+                log.error(
+                    "Failed to connect to NATS: server={}, attempt={}, nextRetryDelayMs={}",
+                    natsServer,
+                    attempt,
+                    delayMs,
+                    e
+                );
+                backoffBeforeRetry(attempt);
+                attempt++;
             }
         }
     }
@@ -482,6 +570,7 @@ public class NatsConsumerService {
 
     private void handleMessage(Message msg) {
         if (shuttingDown.get()) {
+            // During shutdown, NAK immediately so another consumer can pick it up
             msg.nak();
             return;
         }
@@ -503,7 +592,62 @@ public class NatsConsumerService {
             if (!shuttingDown.get()) {
                 log.error("Failed to process message: subject={}", sanitizeForLog(msg.getSubject()), e);
             }
-            msg.nak();
+            nakWithBackoff(msg);
+        }
+    }
+
+    /**
+     * NAKs a message with exponential backoff delay based on redelivery count.
+     * <p>
+     * This prevents redelivery storms where a failing message is immediately
+     * redelivered hundreds of times. The delay grows exponentially with each
+     * retry attempt: ~2s, ~4s, ~8s, ~16s, ~32s, ~64s, up to 5 minutes max.
+     * <p>
+     * If the message has been redelivered {@link #MAX_REDELIVERY_ATTEMPTS} times,
+     * it is acknowledged and logged as a poison message to prevent infinite loops.
+     *
+     * @param msg the NATS message to NAK
+     */
+    private void nakWithBackoff(Message msg) {
+        try {
+            var metadata = msg.metaData();
+            long deliveredCount = metadata != null ? metadata.deliveredCount() : 1;
+
+            // Check if this is a poison message that keeps failing
+            if (deliveredCount >= MAX_REDELIVERY_ATTEMPTS) {
+                log.error(
+                    "Poison message detected, giving up after {} attempts: subject={}, streamSeq={}",
+                    deliveredCount,
+                    sanitizeForLog(msg.getSubject()),
+                    metadata != null ? metadata.streamSequence() : "unknown"
+                );
+                // ACK the message to remove it from the queue - it's not recoverable
+                msg.ack();
+                return;
+            }
+
+            // Calculate exponential backoff based on delivery count
+            // deliveredCount is 1-based, so use (deliveredCount - 1) as attempt number
+            int attempt = (int) Math.min(deliveredCount - 1, Integer.MAX_VALUE);
+            long delayMs = ExponentialBackoff.calculateDelay(attempt, NAK_BASE_DELAY_MS, MAX_NAK_DELAY_MS, 1000);
+
+            log.debug(
+                "NAKing message with backoff: subject={}, attempt={}, delayMs={}",
+                sanitizeForLog(msg.getSubject()),
+                deliveredCount,
+                delayMs
+            );
+
+            msg.nakWithDelay(Duration.ofMillis(delayMs));
+        } catch (Exception e) {
+            // If we can't NAK with delay (e.g., connection closed), fall back to immediate NAK
+            log.debug("Failed to NAK with delay, using immediate NAK: error={}", e.getMessage());
+            try {
+                msg.nak();
+            } catch (Exception nakError) {
+                // Message will be redelivered after ack timeout - nothing more we can do
+                log.trace("Failed to NAK message: error={}", nakError.getMessage());
+            }
         }
     }
 
@@ -560,9 +704,18 @@ public class NatsConsumerService {
         }
     }
 
-    private void backoffBeforeRetry() {
+    /**
+     * Sleeps using exponential backoff with jitter before retrying a failed operation.
+     * <p>
+     * Uses the formula: {@code wait_time = min(base_delay * 2^attempt + random(0, 1000), max_delay)}
+     * <p>
+     * This prevents thundering herd issues when multiple instances retry simultaneously.
+     *
+     * @param attempt the current retry attempt number (0-based)
+     */
+    private void backoffBeforeRetry(int attempt) {
         try {
-            Thread.sleep(reconnectDelaySeconds * 1000L);
+            ExponentialBackoff.sleep(attempt);
         } catch (InterruptedException interrupted) {
             Thread.currentThread().interrupt();
         }

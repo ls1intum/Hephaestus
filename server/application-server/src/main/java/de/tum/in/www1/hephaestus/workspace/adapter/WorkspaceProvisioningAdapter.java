@@ -1,13 +1,19 @@
 package de.tum.in.www1.hephaestus.workspace.adapter;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.ProvisioningListener;
+import de.tum.in.www1.hephaestus.gitprovider.sync.GitHubDataSyncService;
 import de.tum.in.www1.hephaestus.workspace.RepositorySelection;
 import de.tum.in.www1.hephaestus.workspace.Workspace;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceInstallationService;
+import de.tum.in.www1.hephaestus.workspace.WorkspaceRepository;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceRepositoryMonitorService;
+import de.tum.in.www1.hephaestus.workspace.WorkspaceScopeFilter;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.core.task.AsyncTaskExecutor;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -17,19 +23,48 @@ public class WorkspaceProvisioningAdapter implements ProvisioningListener {
 
     private final WorkspaceInstallationService workspaceInstallationService;
     private final WorkspaceRepositoryMonitorService repositoryMonitorService;
+    private final WorkspaceScopeFilter workspaceScopeFilter;
+    private final WorkspaceRepository workspaceRepository;
+
+    // Lazy-loaded to break circular reference with GitHubDataSyncService
+    private final ObjectProvider<GitHubDataSyncService> gitHubDataSyncServiceProvider;
+    private final AsyncTaskExecutor monitoringExecutor;
 
     public WorkspaceProvisioningAdapter(
         WorkspaceInstallationService workspaceInstallationService,
-        WorkspaceRepositoryMonitorService repositoryMonitorService
+        WorkspaceRepositoryMonitorService repositoryMonitorService,
+        WorkspaceScopeFilter workspaceScopeFilter,
+        WorkspaceRepository workspaceRepository,
+        ObjectProvider<GitHubDataSyncService> gitHubDataSyncServiceProvider,
+        @Qualifier("monitoringExecutor") AsyncTaskExecutor monitoringExecutor
     ) {
         this.workspaceInstallationService = workspaceInstallationService;
         this.repositoryMonitorService = repositoryMonitorService;
+        this.workspaceScopeFilter = workspaceScopeFilter;
+        this.workspaceRepository = workspaceRepository;
+        this.gitHubDataSyncServiceProvider = gitHubDataSyncServiceProvider;
+        this.monitoringExecutor = monitoringExecutor;
+    }
+
+    /** Lazy accessor for GitHubDataSyncService to break circular dependency. */
+    private GitHubDataSyncService getGitHubDataSyncService() {
+        return gitHubDataSyncServiceProvider.getObject();
     }
 
     @Override
     public void onInstallationCreated(InstallationData installation) {
         if (installation == null) {
             log.warn("Skipped workspace provisioning: reason=nullInstallationData");
+            return;
+        }
+
+        // Check organization filter BEFORE creating workspace
+        if (!workspaceScopeFilter.isOrganizationAllowed(installation.accountLogin())) {
+            log.debug(
+                "Skipped workspace provisioning: reason=organizationFiltered, accountLogin={}, installationId={}",
+                installation.accountLogin(),
+                installation.installationId()
+            );
             return;
         }
 
@@ -55,16 +90,34 @@ public class WorkspaceProvisioningAdapter implements ProvisioningListener {
         // These are provided for "created" events with "selected" repository selection
         // Create Repository entities AND monitors from the webhook metadata
         if (installation.repositories() != null && !installation.repositories().isEmpty()) {
-            log.info(
-                "Adding initial repositories: installationId={}, repoCount={}",
-                installation.installationId(),
-                installation.repositories().size()
-            );
-            for (RepositorySnapshot snapshot : installation.repositories()) {
-                repositoryMonitorService.ensureRepositoryAndMonitorFromSnapshot(
+            // Filter repositories based on workspace scope configuration before creating entities
+            List<RepositorySnapshot> allowedRepos = installation
+                .repositories()
+                .stream()
+                .filter(r -> workspaceScopeFilter.isRepositoryAllowed(r.nameWithOwner()))
+                .toList();
+
+            if (allowedRepos.size() < installation.repositories().size()) {
+                log.debug(
+                    "Filtered initial repositories by scope: installationId={}, allowed={}, total={}",
                     installation.installationId(),
-                    snapshot
+                    allowedRepos.size(),
+                    installation.repositories().size()
                 );
+            }
+
+            if (!allowedRepos.isEmpty()) {
+                log.info(
+                    "Adding initial repositories: installationId={}, repoCount={}",
+                    installation.installationId(),
+                    allowedRepos.size()
+                );
+                for (RepositorySnapshot snapshot : allowedRepos) {
+                    repositoryMonitorService.ensureRepositoryAndMonitorFromSnapshot(
+                        installation.installationId(),
+                        snapshot
+                    );
+                }
             }
         }
     }
@@ -100,10 +153,30 @@ public class WorkspaceProvisioningAdapter implements ProvisioningListener {
             return;
         }
 
-        for (RepositorySnapshot snapshot : repositories) {
+        // Filter repositories based on workspace scope configuration before creating entities
+        List<RepositorySnapshot> allowedRepos = repositories
+            .stream()
+            .filter(r -> workspaceScopeFilter.isRepositoryAllowed(r.nameWithOwner()))
+            .toList();
+
+        if (allowedRepos.size() < repositories.size()) {
+            log.debug(
+                "Filtered repositories by scope: installationId={}, allowed={}, total={}",
+                installationId,
+                allowedRepos.size(),
+                repositories.size()
+            );
+        }
+
+        if (allowedRepos.isEmpty()) {
+            log.debug("No repositories to add after filtering: installationId={}", installationId);
+            return;
+        }
+
+        for (RepositorySnapshot snapshot : allowedRepos) {
             repositoryMonitorService.ensureRepositoryAndMonitorFromSnapshot(installationId, snapshot);
         }
-        log.info("Added repositories to monitor: installationId={}, repoCount={}", installationId, repositories.size());
+        log.info("Added repositories to monitor: installationId={}, repoCount={}", installationId, allowedRepos.size());
     }
 
     @Override
@@ -162,8 +235,42 @@ public class WorkspaceProvisioningAdapter implements ProvisioningListener {
             return;
         }
 
-        // Update status first, then start NATS consumer to resume webhook processing
+        // Update status first
         workspaceInstallationService.updateWorkspaceStatus(installationId, Workspace.WorkspaceStatus.ACTIVE);
+
+        // Trigger initial sync asynchronously before starting NATS consumer
+        // This ensures all entities exist before NATS starts processing webhook events
+        workspaceRepository
+            .findByInstallationId(installationId)
+            .ifPresent(workspace -> {
+                log.info(
+                    "Triggering initial sync for activated installation: installationId={}, workspaceId={}",
+                    installationId,
+                    workspace.getId()
+                );
+
+                // Run sync asynchronously to avoid blocking webhook processing
+                Long workspaceId = workspace.getId();
+                monitoringExecutor.execute(() -> {
+                    try {
+                        getGitHubDataSyncService().syncAllRepositories(workspaceId);
+                        log.info(
+                            "Completed initial sync for activated installation: installationId={}, workspaceId={}",
+                            installationId,
+                            workspaceId
+                        );
+                    } catch (Exception e) {
+                        log.error(
+                            "Failed initial sync for activated installation: installationId={}, workspaceId={}",
+                            installationId,
+                            workspaceId,
+                            e
+                        );
+                    }
+                });
+            });
+
+        // Start NATS consumer to resume webhook processing
         workspaceInstallationService.startNatsForInstallation(installationId);
         log.info("Activated installation: installationId={}", installationId);
     }

@@ -21,7 +21,7 @@ export interface IssueCardProps {
 	htmlUrl?: string;
 	repositoryName?: string;
 	createdAt?: Date;
-	state?: "OPEN" | "CLOSED";
+	state?: "OPEN" | "CLOSED" | "MERGED";
 	isDraft?: boolean;
 	isMerged?: boolean;
 	pullRequestLabels?: LabelInfo[];

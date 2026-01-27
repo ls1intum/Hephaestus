@@ -9,6 +9,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Repository for {@link WorkspaceTeamSettings} entities.
@@ -78,6 +79,7 @@ public interface WorkspaceTeamSettingsRepository
      * @param workspaceId the workspace ID
      */
     @Modifying
+    @Transactional
     @Query("DELETE FROM WorkspaceTeamSettings wts WHERE wts.workspace.id = :workspaceId")
     void deleteAllByWorkspaceId(@Param("workspaceId") Long workspaceId);
 }

@@ -4,7 +4,6 @@ import de.tum.in.www1.hephaestus.activity.ActivityEventService;
 import de.tum.in.www1.hephaestus.activity.ActivityEventType;
 import de.tum.in.www1.hephaestus.activity.ActivityRepositoryQueryRepository;
 import de.tum.in.www1.hephaestus.activity.ActivityTargetType;
-import de.tum.in.www1.hephaestus.activity.SourceSystem;
 import de.tum.in.www1.hephaestus.activity.scoring.ExperiencePointCalculator;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.issue.IssueRepository;
@@ -38,7 +37,7 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <h3>Idempotency</h3>
  * <p>All backfill operations are idempotent - running them multiple times will not create
- * duplicate events because the underlying {@link ActivityEventService#recordWithContext}
+ * duplicate events because the underlying {@link ActivityEventService#record}
  * relies on a unique constraint on the event_key (type:targetId:timestamp).
  *
  * <h3>Batch Processing</h3>
@@ -92,7 +91,7 @@ import org.springframework.transaction.annotation.Transactional;
  *   <tr><td>Issue</td><td>1-2 (created, closed)</td><td>~500/sec</td></tr>
  * </table>
  *
- * @see ActivityEventService#recordWithContext
+ * @see ActivityEventService#record
  * @see BackfillProgress
  * @see BackfillStartupRunner Automatic backfill on application startup
  */
@@ -100,9 +99,6 @@ import org.springframework.transaction.annotation.Transactional;
 public class ActivityEventBackfillService {
 
     private static final Logger log = LoggerFactory.getLogger(ActivityEventBackfillService.class);
-
-    /** Trigger context used for all backfilled events */
-    public static final String TRIGGER_CONTEXT_BACKFILL = "backfill";
 
     /**
      * Default batch size for processing entities.
@@ -335,7 +331,7 @@ public class ActivityEventBackfillService {
         Instant occurredAt,
         double xp
     ) {
-        return activityEventService.recordWithContext(
+        return activityEventService.record(
             workspaceId,
             eventType,
             occurredAt,
@@ -343,10 +339,7 @@ public class ActivityEventBackfillService {
             pr.getRepository(),
             ActivityTargetType.PULL_REQUEST,
             pr.getId(),
-            xp,
-            SourceSystem.GITHUB,
-            null,
-            TRIGGER_CONTEXT_BACKFILL
+            xp
         );
     }
 
@@ -433,7 +426,7 @@ public class ActivityEventBackfillService {
                     }
 
                     // Record the primary review event
-                    boolean recorded = activityEventService.recordWithContext(
+                    boolean recorded = activityEventService.record(
                         workspaceId,
                         mapReviewState(review.getState()),
                         occurredAt,
@@ -441,10 +434,7 @@ public class ActivityEventBackfillService {
                         pr.getRepository(),
                         ActivityTargetType.REVIEW,
                         review.getId(),
-                        xp,
-                        SourceSystem.GITHUB,
-                        null,
-                        TRIGGER_CONTEXT_BACKFILL
+                        xp
                     );
                     if (recorded) {
                         progress.incrementCreated();
@@ -454,7 +444,7 @@ public class ActivityEventBackfillService {
                     if (review.isDismissed()) {
                         // Use submitted timestamp + 1ms for dismissal to ensure unique event key
                         Instant dismissedAt = occurredAt.plusMillis(1);
-                        boolean dismissRecorded = activityEventService.recordWithContext(
+                        boolean dismissRecorded = activityEventService.record(
                             workspaceId,
                             ActivityEventType.REVIEW_DISMISSED,
                             dismissedAt,
@@ -462,10 +452,7 @@ public class ActivityEventBackfillService {
                             pr.getRepository(),
                             ActivityTargetType.REVIEW,
                             review.getId(),
-                            0.0, // Dismissals don't affect XP retroactively
-                            SourceSystem.GITHUB,
-                            null,
-                            TRIGGER_CONTEXT_BACKFILL
+                            0.0 // Dismissals don't affect XP retroactively
                         );
                         if (dismissRecorded) {
                             progress.incrementCreated();
@@ -572,7 +559,7 @@ public class ActivityEventBackfillService {
 
             Instant occurredAt = comment.getCreatedAt() != null ? comment.getCreatedAt() : Instant.now();
 
-            boolean recorded = activityEventService.recordWithContext(
+            boolean recorded = activityEventService.record(
                 workspaceId,
                 ActivityEventType.COMMENT_CREATED,
                 occurredAt,
@@ -580,10 +567,7 @@ public class ActivityEventBackfillService {
                 comment.getIssue().getRepository(),
                 ActivityTargetType.ISSUE_COMMENT,
                 comment.getId(),
-                xp,
-                SourceSystem.GITHUB,
-                null,
-                TRIGGER_CONTEXT_BACKFILL
+                xp
             );
             if (recorded) {
                 progress.incrementCreated();
@@ -676,7 +660,7 @@ public class ActivityEventBackfillService {
 
             Instant occurredAt = comment.getCreatedAt() != null ? comment.getCreatedAt() : Instant.now();
 
-            boolean recorded = activityEventService.recordWithContext(
+            boolean recorded = activityEventService.record(
                 workspaceId,
                 ActivityEventType.REVIEW_COMMENT_CREATED,
                 occurredAt,
@@ -684,10 +668,7 @@ public class ActivityEventBackfillService {
                 comment.getPullRequest().getRepository(),
                 ActivityTargetType.REVIEW_COMMENT,
                 comment.getId(),
-                xp,
-                SourceSystem.GITHUB,
-                null,
-                TRIGGER_CONTEXT_BACKFILL
+                xp
             );
             if (recorded) {
                 progress.incrementCreated();
@@ -762,7 +743,7 @@ public class ActivityEventBackfillService {
             try {
                 // Record ISSUE_CREATED
                 if (issue.getCreatedAt() != null) {
-                    boolean recorded = activityEventService.recordWithContext(
+                    boolean recorded = activityEventService.record(
                         workspaceId,
                         ActivityEventType.ISSUE_CREATED,
                         issue.getCreatedAt(),
@@ -770,10 +751,7 @@ public class ActivityEventBackfillService {
                         issue.getRepository(),
                         ActivityTargetType.ISSUE,
                         issue.getId(),
-                        xpCalculator.calculateIssueCreatedExperiencePoints(issue),
-                        SourceSystem.GITHUB,
-                        null,
-                        TRIGGER_CONTEXT_BACKFILL
+                        xpCalculator.calculateIssueCreatedExperiencePoints(issue)
                     );
                     if (recorded) {
                         progress.incrementCreated();
@@ -782,7 +760,7 @@ public class ActivityEventBackfillService {
 
                 // Record ISSUE_CLOSED (if closed)
                 if (issue.getState() == Issue.State.CLOSED && issue.getClosedAt() != null) {
-                    boolean recorded = activityEventService.recordWithContext(
+                    boolean recorded = activityEventService.record(
                         workspaceId,
                         ActivityEventType.ISSUE_CLOSED,
                         issue.getClosedAt(),
@@ -790,10 +768,7 @@ public class ActivityEventBackfillService {
                         issue.getRepository(),
                         ActivityTargetType.ISSUE,
                         issue.getId(),
-                        0.0, // Issue closure is lifecycle tracking, no XP
-                        SourceSystem.GITHUB,
-                        null,
-                        TRIGGER_CONTEXT_BACKFILL
+                        0.0 // Issue closure is lifecycle tracking, no XP
                     );
                     if (recorded) {
                         progress.incrementCreated();

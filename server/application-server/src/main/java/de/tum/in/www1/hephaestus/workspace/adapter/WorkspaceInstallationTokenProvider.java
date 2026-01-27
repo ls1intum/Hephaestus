@@ -48,4 +48,12 @@ public class WorkspaceInstallationTokenProvider implements InstallationTokenProv
                 return AuthMode.GITHUB_APP;
             });
     }
+
+    @Override
+    public boolean isScopeActive(Long scopeId) {
+        return workspaceRepository
+            .findById(scopeId)
+            .map(ws -> ws.getStatus() == Workspace.WorkspaceStatus.ACTIVE)
+            .orElse(false);
+    }
 }

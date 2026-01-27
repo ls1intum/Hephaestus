@@ -13,7 +13,7 @@ import de.tum.in.www1.hephaestus.gitprovider.issuecomment.github.dto.GitHubIssue
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Handles GitHub issue_comment webhook events.
@@ -31,9 +31,10 @@ public class GitHubIssueCommentMessageHandler extends GitHubMessageHandler<GitHu
         ProcessingContextFactory contextFactory,
         GitHubIssueProcessor issueProcessor,
         GitHubIssueCommentProcessor commentProcessor,
-        NatsMessageDeserializer deserializer
+        NatsMessageDeserializer deserializer,
+        TransactionTemplate transactionTemplate
     ) {
-        super(GitHubIssueCommentEventDTO.class, deserializer);
+        super(GitHubIssueCommentEventDTO.class, deserializer, transactionTemplate);
         this.contextFactory = contextFactory;
         this.issueProcessor = issueProcessor;
         this.commentProcessor = commentProcessor;
@@ -45,7 +46,6 @@ public class GitHubIssueCommentMessageHandler extends GitHubMessageHandler<GitHu
     }
 
     @Override
-    @Transactional
     protected void handleEvent(GitHubIssueCommentEventDTO event) {
         var commentDto = event.comment();
         var issueDto = event.issue();
@@ -68,8 +68,20 @@ public class GitHubIssueCommentMessageHandler extends GitHubMessageHandler<GitHu
             return;
         }
 
-        // Ensure issue exists
-        issueProcessor.process(issueDto, context);
+        // Only process as Issue if it's not a PR.
+        // GitHub fires issue_comment events for both issues AND pull requests.
+        // For PRs, the issue payload contains a pull_request field.
+        // PRs are already synced via pull_request webhooks, so we skip issue processing
+        // to avoid creating duplicate ISSUE records for what should be PULL_REQUEST.
+        if (!issueDto.isPullRequest()) {
+            issueProcessor.process(issueDto, context);
+        } else {
+            log.debug(
+                "Skipped issue processing for PR comment: issueNumber={}, repoName={}",
+                issueDto.number(),
+                event.repository() != null ? sanitizeForLog(event.repository().fullName()) : "unknown"
+            );
+        }
 
         // Handle comment action
         if (event.actionType() == GitHubEventAction.IssueComment.DELETED) {

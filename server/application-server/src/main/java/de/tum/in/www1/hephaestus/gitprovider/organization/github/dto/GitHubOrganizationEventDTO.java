@@ -6,6 +6,7 @@ import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventAction;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubWebhookEvent;
 import de.tum.in.www1.hephaestus.gitprovider.repository.github.dto.GitHubRepositoryRefDTO;
 import de.tum.in.www1.hephaestus.gitprovider.user.github.dto.GitHubUserDTO;
+import java.time.Instant;
 
 /**
  * DTO for GitHub organization webhook events.
@@ -37,7 +38,9 @@ public record GitHubOrganizationEventDTO(
         @JsonProperty("login") String login,
         @JsonProperty("description") String description,
         @JsonProperty("avatar_url") String avatarUrl,
-        @JsonProperty("html_url") String htmlUrl
+        @JsonProperty("html_url") String htmlUrl,
+        @JsonProperty("created_at") Instant createdAt,
+        @JsonProperty("updated_at") Instant updatedAt
     ) {}
 
     /**

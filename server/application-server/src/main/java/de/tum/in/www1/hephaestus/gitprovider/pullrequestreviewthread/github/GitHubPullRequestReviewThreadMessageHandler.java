@@ -15,7 +15,7 @@ import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserProcessor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Handles GitHub pull_request_review_thread webhook events.
@@ -36,9 +36,10 @@ public class GitHubPullRequestReviewThreadMessageHandler
         GitHubPullRequestProcessor prProcessor,
         GitHubPullRequestReviewThreadProcessor threadProcessor,
         GitHubUserProcessor userProcessor,
-        NatsMessageDeserializer deserializer
+        NatsMessageDeserializer deserializer,
+        TransactionTemplate transactionTemplate
     ) {
-        super(GitHubPullRequestReviewThreadEventDTO.class, deserializer);
+        super(GitHubPullRequestReviewThreadEventDTO.class, deserializer, transactionTemplate);
         this.contextFactory = contextFactory;
         this.prProcessor = prProcessor;
         this.threadProcessor = threadProcessor;
@@ -51,7 +52,6 @@ public class GitHubPullRequestReviewThreadMessageHandler
     }
 
     @Override
-    @Transactional
     protected void handleEvent(GitHubPullRequestReviewThreadEventDTO event) {
         var threadDto = event.thread();
         var prDto = event.pullRequest();
@@ -61,11 +61,14 @@ public class GitHubPullRequestReviewThreadMessageHandler
             return;
         }
 
+        // Thread ID is the first comment's database ID (see GitHubPullRequestReviewCommentSyncService)
+        Long threadId = threadDto.getFirstCommentId();
+
         log.info(
             "Received pull_request_review_thread event: action={}, prNumber={}, threadId={}, repoName={}",
             event.action(),
             prDto.number(),
-            threadDto.id(),
+            threadId,
             event.repository() != null ? sanitizeForLog(event.repository().fullName()) : "unknown"
         );
 
@@ -80,14 +83,33 @@ public class GitHubPullRequestReviewThreadMessageHandler
         // Delegate thread state changes to processor
         switch (event.actionType()) {
             case GitHubEventAction.PullRequestReviewThread.RESOLVED -> {
+                // Thread ID is derived from the first comment. If no comments exist, we cannot process.
+                if (threadId == null) {
+                    log.warn(
+                        "Skipped pull_request_review_thread event: reason=noCommentsInThread, action={}, prNumber={}, repoName={}",
+                        event.action(),
+                        prDto.number(),
+                        event.repository() != null ? sanitizeForLog(event.repository().fullName()) : "unknown"
+                    );
+                    return;
+                }
                 // Ensure the sender (who resolved the thread) exists
                 User resolvedBy = userProcessor.ensureExists(event.sender());
-                threadProcessor.resolve(threadDto.id(), resolvedBy, context);
+                threadProcessor.resolve(threadId, resolvedBy, context);
             }
-            case GitHubEventAction.PullRequestReviewThread.UNRESOLVED -> threadProcessor.unresolve(
-                threadDto.id(),
-                context
-            );
+            case GitHubEventAction.PullRequestReviewThread.UNRESOLVED -> {
+                // Thread ID is derived from the first comment. If no comments exist, we cannot process.
+                if (threadId == null) {
+                    log.warn(
+                        "Skipped pull_request_review_thread event: reason=noCommentsInThread, action={}, prNumber={}, repoName={}",
+                        event.action(),
+                        prDto.number(),
+                        event.repository() != null ? sanitizeForLog(event.repository().fullName()) : "unknown"
+                    );
+                    return;
+                }
+                threadProcessor.unresolve(threadId, context);
+            }
             default -> log.debug(
                 "Skipped pull_request_review_thread event: reason=unhandledAction, action={}",
                 event.action()

@@ -51,7 +51,7 @@ public class GitHubPullRequestReviewThreadProcessor {
     @Transactional
     public boolean resolve(Long threadId, User resolvedBy, ProcessingContext context) {
         if (threadId == null) {
-            log.warn("Skipped thread resolve: reason=nullThreadId");
+            log.debug("Skipped thread resolve: reason=nullThreadId");
             return false;
         }
 
@@ -64,10 +64,9 @@ public class GitHubPullRequestReviewThreadProcessor {
                 }
                 thread = threadRepository.save(thread);
                 if (context != null) {
-                    eventPublisher.publishEvent(
-                        new DomainEvent.ReviewThreadResolved(
-                            EventPayload.ReviewThreadData.from(thread),
-                            EventContext.from(context)
+                    EventPayload.ReviewThreadData.from(thread).ifPresent(threadData ->
+                        eventPublisher.publishEvent(
+                            new DomainEvent.ReviewThreadResolved(threadData, EventContext.from(context))
                         )
                     );
                 }
@@ -95,7 +94,7 @@ public class GitHubPullRequestReviewThreadProcessor {
     @Transactional
     public boolean unresolve(Long threadId, ProcessingContext context) {
         if (threadId == null) {
-            log.warn("Skipped thread unresolve: reason=nullThreadId");
+            log.debug("Skipped thread unresolve: reason=nullThreadId");
             return false;
         }
 
@@ -106,10 +105,9 @@ public class GitHubPullRequestReviewThreadProcessor {
                 thread.setResolvedBy(null);
                 thread = threadRepository.save(thread);
                 if (context != null) {
-                    eventPublisher.publishEvent(
-                        new DomainEvent.ReviewThreadUnresolved(
-                            EventPayload.ReviewThreadData.from(thread),
-                            EventContext.from(context)
+                    EventPayload.ReviewThreadData.from(thread).ifPresent(threadData ->
+                        eventPublisher.publishEvent(
+                            new DomainEvent.ReviewThreadUnresolved(threadData, EventContext.from(context))
                         )
                     );
                 }

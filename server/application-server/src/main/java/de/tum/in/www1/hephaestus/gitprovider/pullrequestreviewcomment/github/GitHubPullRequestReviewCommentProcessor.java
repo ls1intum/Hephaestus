@@ -13,7 +13,8 @@ import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.PullReques
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.github.dto.GitHubPullRequestReviewCommentEventDTO;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewthread.PullRequestReviewThread;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewthread.PullRequestReviewThreadRepository;
-import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
+import de.tum.in.www1.hephaestus.gitprovider.user.User;
+import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserProcessor;
 import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -33,7 +34,7 @@ public class GitHubPullRequestReviewCommentProcessor {
     private final PullRequestRepository prRepository;
     private final PullRequestReviewRepository reviewRepository;
     private final PullRequestReviewThreadRepository threadRepository;
-    private final UserRepository userRepository;
+    private final GitHubUserProcessor userProcessor;
     private final ApplicationEventPublisher eventPublisher;
 
     public GitHubPullRequestReviewCommentProcessor(
@@ -41,14 +42,14 @@ public class GitHubPullRequestReviewCommentProcessor {
         PullRequestRepository prRepository,
         PullRequestReviewRepository reviewRepository,
         PullRequestReviewThreadRepository threadRepository,
-        UserRepository userRepository,
+        GitHubUserProcessor userProcessor,
         ApplicationEventPublisher eventPublisher
     ) {
         this.commentRepository = commentRepository;
         this.prRepository = prRepository;
         this.reviewRepository = reviewRepository;
         this.threadRepository = threadRepository;
-        this.userRepository = userRepository;
+        this.userProcessor = userProcessor;
         this.eventPublisher = eventPublisher;
     }
 
@@ -177,9 +178,12 @@ public class GitHubPullRequestReviewCommentProcessor {
             reviewRepository.findById(dto.reviewId()).ifPresent(comment::setReview);
         }
 
-        // Link author if present
-        if (dto.author() != null && dto.author().getDatabaseId() != null) {
-            userRepository.findById(dto.author().getDatabaseId()).ifPresent(comment::setAuthor);
+        // Link author if present - ensure user exists (create if needed)
+        if (dto.author() != null) {
+            User author = userProcessor.ensureExists(dto.author());
+            if (author != null) {
+                comment.setAuthor(author);
+            }
         }
 
         // Link to parent comment if this is a reply

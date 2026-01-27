@@ -1,5 +1,6 @@
 # GraphQL query for fetching repository pull requests with all fields
 # Used by GraphQL-based sync services
+# Review threads and comments are embedded inline to avoid N+1 queries
 
 query GetRepositoryPullRequests(
     $owner: String!
@@ -10,6 +11,7 @@ query GetRepositoryPullRequests(
 ) {
     rateLimit {
         cost
+        limit
         remaining
         resetAt
     }
@@ -70,8 +72,21 @@ query GetRepositoryPullRequests(
                         avatarUrl
                         name
                         email
+                        createdAt
                     }
                     ... on Bot {
+                        id
+                        databaseId
+                        login
+                        avatarUrl
+                    }
+                    ... on Mannequin {
+                        id
+                        databaseId
+                        login
+                        avatarUrl
+                    }
+                    ... on Organization {
                         id
                         databaseId
                         login
@@ -87,8 +102,21 @@ query GetRepositoryPullRequests(
                         databaseId
                         login
                         avatarUrl
+                        createdAt
                     }
                     ... on Bot {
+                        id
+                        databaseId
+                        login
+                        avatarUrl
+                    }
+                    ... on Mannequin {
+                        id
+                        databaseId
+                        login
+                        avatarUrl
+                    }
+                    ... on Organization {
                         id
                         databaseId
                         login
@@ -104,10 +132,11 @@ query GetRepositoryPullRequests(
                         login
                         avatarUrl
                         name
+                        createdAt
                     }
                 }
 
-                # Requested reviewers
+                # Requested reviewers (RequestedReviewer union: User, Team, Mannequin, Bot)
                 reviewRequests(first: 20) {
                     nodes {
                         requestedReviewer {
@@ -117,8 +146,21 @@ query GetRepositoryPullRequests(
                                 databaseId
                                 login
                                 avatarUrl
+                                createdAt
+                            }
+                            ... on Team {
+                                id
+                                databaseId
+                                name
+                                slug
                             }
                             ... on Bot {
+                                id
+                                databaseId
+                                login
+                                avatarUrl
+                            }
+                            ... on Mannequin {
                                 id
                                 databaseId
                                 login
@@ -178,12 +220,128 @@ query GetRepositoryPullRequests(
                                 databaseId
                                 login
                                 avatarUrl
+                                createdAt
                             }
                             ... on Bot {
                                 id
                                 databaseId
                                 login
                                 avatarUrl
+                            }
+                            ... on Mannequin {
+                                id
+                                databaseId
+                                login
+                                avatarUrl
+                            }
+                            ... on Organization {
+                                id
+                                databaseId
+                                login
+                                avatarUrl
+                            }
+                        }
+                    }
+                }
+
+                # Review threads (embedded to avoid N+1 queries)
+                # Most PRs have <10 threads; pagination handled by GetPullRequestReviewComments for PRs with more
+                reviewThreads(first: 10) {
+                    totalCount
+                    pageInfo {
+                        hasNextPage
+                        endCursor
+                    }
+                    nodes {
+                        id
+                        path
+                        line
+                        startLine
+                        originalLine
+                        originalStartLine
+                        diffSide
+                        startDiffSide
+                        isResolved
+                        isOutdated
+                        isCollapsed
+
+                        # User who resolved the thread
+                        resolvedBy {
+                            id
+                            databaseId
+                            login
+                            avatarUrl
+                            name
+                            email
+                            createdAt
+                        }
+
+                        # Comments in thread (first 10)
+                        comments(first: 10) {
+                            totalCount
+                            pageInfo {
+                                hasNextPage
+                                endCursor
+                            }
+                            nodes {
+                                id
+                                fullDatabaseId
+                                body
+                                path
+                                line
+                                originalLine
+                                startLine
+                                originalStartLine
+                                diffHunk
+                                createdAt
+                                updatedAt
+                                state
+                                url
+                                authorAssociation
+
+                                # Comment author
+                                author {
+                                    __typename
+                                    ... on User {
+                                        id
+                                        databaseId
+                                        login
+                                        avatarUrl
+                                        name
+                                        email
+                                        createdAt
+                                    }
+                                    ... on Bot {
+                                        id
+                                        databaseId
+                                        login
+                                        avatarUrl
+                                    }
+                                    ... on Mannequin {
+                                        id
+                                        databaseId
+                                        login
+                                        avatarUrl
+                                    }
+                                    ... on Organization {
+                                        id
+                                        databaseId
+                                        login
+                                        avatarUrl
+                                    }
+                                }
+
+                                # Reply to (for threading)
+                                replyTo {
+                                    id
+                                    fullDatabaseId
+                                }
+
+                                # Associated review
+                                pullRequestReview {
+                                    id
+                                    fullDatabaseId
+                                }
                             }
                         }
                     }

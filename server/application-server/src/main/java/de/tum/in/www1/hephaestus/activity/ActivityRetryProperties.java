@@ -32,7 +32,7 @@ public class ActivityRetryProperties {
 
     /**
      * Maximum number of retry attempts for transient database errors.
-     * After this many failures, the event is sent to the dead letter store.
+     * After this many failures, the event is logged as failed.
      */
     private int maxAttempts = 3;
 

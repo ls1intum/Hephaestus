@@ -131,13 +131,14 @@ class GitHubPullRequestReviewThreadMessageHandlerIntegrationTest extends BaseInt
         // Create the PR that the thread belongs to
         createTestPullRequest(event.pullRequest().getDatabaseId(), event.pullRequest().number());
 
-        // Note: GitHub thread webhooks don't include numeric thread ID, only node_id
-        // We use a synthetic thread ID for testing (e.g., based on first comment ID)
-        Long syntheticThreadId = 2494208170L; // First comment ID from fixture
+        // The thread ID is derived from the first comment's ID in the webhook payload.
+        // This matches how threads are stored during sync (first comment's databaseId = thread ID).
+        Long threadId = event.thread().getFirstCommentId();
+        assertThat(threadId).isEqualTo(2494208170L); // First comment ID from fixture
 
         // Create the thread in UNRESOLVED state first
         PullRequestReviewThread thread = new PullRequestReviewThread();
-        thread.setId(syntheticThreadId);
+        thread.setId(threadId);
         thread.setNodeId(event.thread().nodeId());
         thread.setPullRequest(testPullRequest);
         thread.setState(PullRequestReviewThread.State.UNRESOLVED);
@@ -148,18 +149,19 @@ class GitHubPullRequestReviewThreadMessageHandlerIntegrationTest extends BaseInt
         threadRepository.save(thread);
 
         // Verify initial state
-        assertThat(threadRepository.findById(syntheticThreadId))
+        assertThat(threadRepository.findById(threadId))
             .isPresent()
             .get()
             .satisfies(t -> assertThat(t.getState()).isEqualTo(PullRequestReviewThread.State.UNRESOLVED));
 
-        // When - the handler should gracefully handle null thread ID in webhook
-        // (GitHub doesn't send numeric thread ID, only node_id)
+        // When
         handler.handleEvent(event);
 
-        // Then - event processed without error (thread state not changed since webhook has no numeric ID)
-        assertThat(event.action()).isEqualTo("resolved");
-        // Note: With proper GraphQL integration, thread state would be updated via node_id lookup
+        // Then - thread should be resolved
+        assertThat(threadRepository.findById(threadId))
+            .isPresent()
+            .get()
+            .satisfies(t -> assertThat(t.getState()).isEqualTo(PullRequestReviewThread.State.RESOLVED));
     }
 
     @Test
@@ -171,11 +173,36 @@ class GitHubPullRequestReviewThreadMessageHandlerIntegrationTest extends BaseInt
         // Create the PR that the thread belongs to
         createTestPullRequest(event.pullRequest().getDatabaseId(), event.pullRequest().number());
 
-        // When - the handler should gracefully handle null thread ID in webhook
+        // The thread ID is derived from the first comment's ID in the webhook payload.
+        Long threadId = event.thread().getFirstCommentId();
+        assertThat(threadId).isEqualTo(2494208170L); // First comment ID from fixture
+
+        // Create the thread in RESOLVED state first
+        PullRequestReviewThread thread = new PullRequestReviewThread();
+        thread.setId(threadId);
+        thread.setNodeId(event.thread().nodeId());
+        thread.setPullRequest(testPullRequest);
+        thread.setState(PullRequestReviewThread.State.RESOLVED);
+        thread.setPath(event.thread().path());
+        thread.setLine(event.thread().line());
+        thread.setCreatedAt(Instant.now());
+        thread.setUpdatedAt(Instant.now());
+        threadRepository.save(thread);
+
+        // Verify initial state
+        assertThat(threadRepository.findById(threadId))
+            .isPresent()
+            .get()
+            .satisfies(t -> assertThat(t.getState()).isEqualTo(PullRequestReviewThread.State.RESOLVED));
+
+        // When
         handler.handleEvent(event);
 
-        // Then - event processed without error
-        assertThat(event.action()).isEqualTo("unresolved");
+        // Then - thread should be unresolved
+        assertThat(threadRepository.findById(threadId))
+            .isPresent()
+            .get()
+            .satisfies(t -> assertThat(t.getState()).isEqualTo(PullRequestReviewThread.State.UNRESOLVED));
     }
 
     @Test

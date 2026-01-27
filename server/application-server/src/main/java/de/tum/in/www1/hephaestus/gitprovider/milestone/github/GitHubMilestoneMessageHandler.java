@@ -13,7 +13,7 @@ import de.tum.in.www1.hephaestus.gitprovider.milestone.github.dto.GitHubMileston
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Handles GitHub milestone webhook events.
@@ -29,9 +29,10 @@ public class GitHubMilestoneMessageHandler extends GitHubMessageHandler<GitHubMi
     GitHubMilestoneMessageHandler(
         ProcessingContextFactory contextFactory,
         GitHubMilestoneProcessor milestoneProcessor,
-        NatsMessageDeserializer deserializer
+        NatsMessageDeserializer deserializer,
+        TransactionTemplate transactionTemplate
     ) {
-        super(GitHubMilestoneEventDTO.class, deserializer);
+        super(GitHubMilestoneEventDTO.class, deserializer, transactionTemplate);
         this.contextFactory = contextFactory;
         this.milestoneProcessor = milestoneProcessor;
     }
@@ -42,7 +43,6 @@ public class GitHubMilestoneMessageHandler extends GitHubMessageHandler<GitHubMi
     }
 
     @Override
-    @Transactional
     protected void handleEvent(GitHubMilestoneEventDTO event) {
         GitHubMilestoneDTO milestoneDto = event.milestone();
 

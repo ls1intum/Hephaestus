@@ -3,6 +3,7 @@ package de.tum.in.www1.hephaestus.workspace;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.github.app.GitHubAppTokenService;
 import de.tum.in.www1.hephaestus.gitprovider.installation.github.GitHubInstallationRepositoryEnumerationService;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.testconfig.BaseIntegrationTest;
@@ -34,9 +35,15 @@ class WorkspaceRepositoryCoverageIntegrationTest extends BaseIntegrationTest {
     @MockitoBean
     private GitHubInstallationRepositoryEnumerationService repositoryEnumerator;
 
+    @Autowired
+    private GitHubAppTokenService gitHubAppTokenService;
+
     @BeforeEach
     void setup() {
         databaseTestUtils.cleanDatabase();
+        // Clear any suspended installation state from previous tests
+        // This prevents test pollution when async syncs mark installations as suspended
+        gitHubAppTokenService.markInstallationActive(INSTALLATION_ID);
     }
 
     @Test
@@ -52,7 +59,9 @@ class WorkspaceRepositoryCoverageIntegrationTest extends BaseIntegrationTest {
             )
         );
 
-        workspaceRepositoryMonitorService.ensureAllInstallationRepositoriesCovered(INSTALLATION_ID, null, false);
+        // Use deferSync=true to prevent async syncs from running during test
+        // Async syncs can mark installations as suspended on 403 errors, affecting subsequent calls
+        workspaceRepositoryMonitorService.ensureAllInstallationRepositoriesCovered(INSTALLATION_ID, null, true);
 
         List<RepositoryToMonitor> monitors = repositoryToMonitorRepository.findByWorkspaceId(workspace.getId());
         assertThat(monitors)
@@ -72,7 +81,8 @@ class WorkspaceRepositoryCoverageIntegrationTest extends BaseIntegrationTest {
             List.of(snapshot(3L, "HephaestusTest/HelloWorld", "HelloWorld", true))
         );
 
-        workspaceRepositoryMonitorService.ensureAllInstallationRepositoriesCovered(INSTALLATION_ID, null, false);
+        // Use deferSync=true to prevent async syncs from running during test
+        workspaceRepositoryMonitorService.ensureAllInstallationRepositoriesCovered(INSTALLATION_ID, null, true);
 
         List<RepositoryToMonitor> monitors = repositoryToMonitorRepository.findByWorkspaceId(workspace.getId());
         assertThat(monitors)

@@ -1,5 +1,8 @@
 package de.tum.in.www1.hephaestus.gitprovider.user;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.annotation.JsonValue;
 import de.tum.in.www1.hephaestus.gitprovider.common.BaseGitServiceEntity;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.issuecomment.IssueComment;
@@ -112,10 +115,24 @@ public class User extends BaseGitServiceEntity {
     // UserPreferences entity in the account module to maintain domain isolation.
     // The gitprovider module should only contain data from the Git provider.
 
+    @JsonFormat(with = JsonFormat.Feature.ACCEPT_CASE_INSENSITIVE_VALUES)
     public enum Type {
         USER,
         ORGANIZATION,
-        BOT,
+        BOT;
+
+        @JsonCreator
+        public static Type fromString(String value) {
+            if (value == null) {
+                return null;
+            }
+            return Type.valueOf(value.toUpperCase());
+        }
+
+        @JsonValue
+        public String toValue() {
+            return name();
+        }
     }
 
     public void addTeam(Team team) {

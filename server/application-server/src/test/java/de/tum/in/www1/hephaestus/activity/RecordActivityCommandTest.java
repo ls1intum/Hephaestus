@@ -30,7 +30,6 @@ class RecordActivityCommandTest {
             Instant occurredAt = Instant.parse("2025-01-01T12:00:00Z");
             Long targetId = 100L;
             double xp = 5.0;
-            SourceSystem source = SourceSystem.GITHUB;
 
             // When
             var command = RecordActivityCommand.builder()
@@ -42,8 +41,6 @@ class RecordActivityCommandTest {
                 .targetType(ActivityTargetType.REVIEW)
                 .targetId(targetId)
                 .xp(xp)
-                .sourceSystem(source)
-                .payload(null)
                 .build();
 
             // Then
@@ -55,8 +52,6 @@ class RecordActivityCommandTest {
             assertThat(command.targetType()).isEqualTo(ActivityTargetType.REVIEW);
             assertThat(command.targetId()).isEqualTo(targetId);
             assertThat(command.xp()).isEqualTo(xp);
-            assertThat(command.sourceSystem()).isEqualTo(source);
-            assertThat(command.payload()).isNull();
         }
 
         @Test
@@ -70,7 +65,6 @@ class RecordActivityCommandTest {
                 .targetType(ActivityTargetType.REVIEW)
                 .targetId(100L)
                 .xp(0.0)
-                .sourceSystem(SourceSystem.SYSTEM)
                 .build();
 
             // Then
@@ -83,7 +77,7 @@ class RecordActivityCommandTest {
     class SimpleFactoryTests {
 
         @Test
-        @DisplayName("should create command without repository and payload")
+        @DisplayName("should create command without repository")
         void shouldCreateSimpleCommand() {
             // When
             var command = RecordActivityCommand.simple(
@@ -93,13 +87,11 @@ class RecordActivityCommandTest {
                 null,
                 ActivityTargetType.PULL_REQUEST,
                 100L,
-                2.0,
-                SourceSystem.GITHUB
+                2.0
             );
 
             // Then
             assertThat(command.repository()).isNull();
-            assertThat(command.payload()).isNull();
             assertThat(command.xp()).isEqualTo(2.0);
         }
     }
@@ -120,7 +112,6 @@ class RecordActivityCommandTest {
                 .targetType(ActivityTargetType.PULL_REQUEST)
                 .targetId(100L)
                 .xp(5.0)
-                .sourceSystem(SourceSystem.GITHUB)
                 .build();
 
             var command2 = RecordActivityCommand.builder()
@@ -130,7 +121,6 @@ class RecordActivityCommandTest {
                 .targetType(ActivityTargetType.PULL_REQUEST)
                 .targetId(100L)
                 .xp(5.0)
-                .sourceSystem(SourceSystem.GITHUB)
                 .build();
 
             // Then

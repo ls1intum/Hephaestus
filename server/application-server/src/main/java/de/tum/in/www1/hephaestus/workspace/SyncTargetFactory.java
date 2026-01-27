@@ -39,7 +39,9 @@ public final class SyncTargetFactory {
             rtm.getRepositorySyncedAt(),
             rtm.getBackfillHighWaterMark(),
             rtm.getBackfillCheckpoint(),
-            rtm.getBackfillLastRunAt()
+            rtm.getBackfillLastRunAt(),
+            rtm.getIssueSyncCursor(),
+            rtm.getPullRequestSyncCursor()
         );
     }
 }

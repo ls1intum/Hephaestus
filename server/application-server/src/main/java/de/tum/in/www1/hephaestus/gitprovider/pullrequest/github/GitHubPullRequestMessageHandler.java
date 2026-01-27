@@ -13,7 +13,7 @@ import de.tum.in.www1.hephaestus.gitprovider.pullrequest.github.dto.GitHubPullRe
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Handles all GitHub pull request webhook events.
@@ -29,9 +29,10 @@ public class GitHubPullRequestMessageHandler extends GitHubMessageHandler<GitHub
     public GitHubPullRequestMessageHandler(
         ProcessingContextFactory contextFactory,
         GitHubPullRequestProcessor prProcessor,
-        NatsMessageDeserializer deserializer
+        NatsMessageDeserializer deserializer,
+        TransactionTemplate transactionTemplate
     ) {
-        super(GitHubPullRequestEventDTO.class, deserializer);
+        super(GitHubPullRequestEventDTO.class, deserializer, transactionTemplate);
         this.contextFactory = contextFactory;
         this.prProcessor = prProcessor;
     }
@@ -42,7 +43,6 @@ public class GitHubPullRequestMessageHandler extends GitHubMessageHandler<GitHub
     }
 
     @Override
-    @Transactional
     protected void handleEvent(GitHubPullRequestEventDTO event) {
         GitHubPullRequestDTO prDto = event.pullRequest();
 

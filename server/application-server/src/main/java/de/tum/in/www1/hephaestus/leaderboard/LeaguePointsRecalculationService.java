@@ -19,6 +19,7 @@ import java.util.Objects;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Service responsible for recalculating league points for all members of a workspace.
@@ -57,6 +58,7 @@ public class LeaguePointsRecalculationService implements LeaguePointsRecalculato
     }
 
     @Override
+    @Transactional
     public void recalculate(Workspace workspace) {
         if (workspace == null || workspace.getId() == null) {
             log.warn("Skipped league points recalculation: reason=missingWorkspace");

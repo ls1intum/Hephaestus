@@ -1,6 +1,18 @@
 package de.tum.in.www1.hephaestus.leaderboard;
 
-import static de.tum.in.www1.hephaestus.shared.LeaguePointsConstants.*;
+import static de.tum.in.www1.hephaestus.shared.LeaguePointsConstants.DECAY_FACTOR;
+import static de.tum.in.www1.hephaestus.shared.LeaguePointsConstants.DECAY_MINIMUM;
+import static de.tum.in.www1.hephaestus.shared.LeaguePointsConstants.K_FACTOR_HIGH_POINTS;
+import static de.tum.in.www1.hephaestus.shared.LeaguePointsConstants.K_FACTOR_LOW_POINTS;
+import static de.tum.in.www1.hephaestus.shared.LeaguePointsConstants.K_FACTOR_MEDIUM_POINTS;
+import static de.tum.in.www1.hephaestus.shared.LeaguePointsConstants.K_FACTOR_NEW_PLAYER;
+import static de.tum.in.www1.hephaestus.shared.LeaguePointsConstants.NEW_PLAYER_THRESHOLD_SECONDS;
+import static de.tum.in.www1.hephaestus.shared.LeaguePointsConstants.PERFORMANCE_SCORE_MULTIPLIER;
+import static de.tum.in.www1.hephaestus.shared.LeaguePointsConstants.PLACEMENT_BONUS_PER_POSITION;
+import static de.tum.in.www1.hephaestus.shared.LeaguePointsConstants.PLACEMENT_BONUS_THRESHOLD;
+import static de.tum.in.www1.hephaestus.shared.LeaguePointsConstants.POINTS_DEFAULT;
+import static de.tum.in.www1.hephaestus.shared.LeaguePointsConstants.POINTS_THRESHOLD_HIGH;
+import static de.tum.in.www1.hephaestus.shared.LeaguePointsConstants.POINTS_THRESHOLD_LOW;
 
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;

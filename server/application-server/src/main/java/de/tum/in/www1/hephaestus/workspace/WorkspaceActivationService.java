@@ -2,6 +2,7 @@ package de.tum.in.www1.hephaestus.workspace;
 
 import de.tum.in.www1.hephaestus.gitprovider.sync.GitHubDataSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.sync.NatsConsumerService;
+import de.tum.in.www1.hephaestus.monitoring.MonitoringProperties;
 import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContextHolder;
 import java.util.ArrayList;
@@ -31,7 +32,7 @@ public class WorkspaceActivationService {
 
     // Configuration
     private final boolean isNatsEnabled;
-    private final boolean runMonitoringOnStartup;
+    private final MonitoringProperties monitoringProperties;
 
     // Core repository
     private final WorkspaceRepository workspaceRepository;
@@ -48,7 +49,7 @@ public class WorkspaceActivationService {
 
     public WorkspaceActivationService(
         @Value("${nats.enabled}") boolean isNatsEnabled,
-        @Value("${monitoring.run-on-startup}") boolean runMonitoringOnStartup,
+        MonitoringProperties monitoringProperties,
         WorkspaceRepository workspaceRepository,
         NatsConsumerService natsConsumerService,
         WorkspaceScopeFilter workspaceScopeFilter,
@@ -56,7 +57,7 @@ public class WorkspaceActivationService {
         @Qualifier("monitoringExecutor") AsyncTaskExecutor monitoringExecutor
     ) {
         this.isNatsEnabled = isNatsEnabled;
-        this.runMonitoringOnStartup = runMonitoringOnStartup;
+        this.monitoringProperties = monitoringProperties;
         this.workspaceRepository = workspaceRepository;
         this.natsConsumerService = natsConsumerService;
         this.workspaceScopeFilter = workspaceScopeFilter;
@@ -70,8 +71,12 @@ public class WorkspaceActivationService {
     }
 
     /**
-     * Prepare every workspace and start monitoring/sync routines for those that are
-     * ready.
+     * Prepare every workspace and start monitoring/sync routines for those that are ready.
+     * <p>
+     * This method runs the full GraphQL sync for each workspace, including repositories,
+     * issues, PRs, and other entities. The installation consumer has already been started
+     * by the time this runs (it only needs workspaces to exist, not the full sync).
+     * <p>
      * Intended to run after provisioning so the workspace catalog is populated.
      */
     public void activateAllWorkspaces() {
@@ -88,12 +93,23 @@ public class WorkspaceActivationService {
 
         Set<String> organizationConsumersStarted = ConcurrentHashMap.newKeySet();
 
-        // Activate all workspaces in parallel for scalability.
-        // Each workspace's monitoring runs independently and can sync repos
-        // concurrently.
-        List<CompletableFuture<Void>> activationFutures = prepared
+        // Filter workspaces that will be activated
+        List<Workspace> workspacesToActivate = prepared
             .stream()
             .filter(workspace -> !shouldSkipActivation(workspace))
+            .toList();
+
+        if (workspacesToActivate.isEmpty()) {
+            log.info("No workspaces to activate after filtering");
+            return;
+        }
+
+        log.info("Activating workspaces: count={}", workspacesToActivate.size());
+
+        // Activate all workspaces in parallel for scalability.
+        // Each workspace's monitoring runs independently and can sync repos concurrently.
+        List<CompletableFuture<Void>> activationFutures = workspacesToActivate
+            .stream()
             .map(workspace ->
                 CompletableFuture.runAsync(
                     () -> activateWorkspace(workspace, organizationConsumersStarted),
@@ -102,18 +118,30 @@ public class WorkspaceActivationService {
             )
             .toList();
 
-        // Wait for all workspace activations to complete (non-blocking to main thread
-        // but ensures all are started before the method returns)
-        CompletableFuture.allOf(activationFutures.toArray(CompletableFuture[]::new)).exceptionally(ex -> {
-            log.error("Failed to activate workspaces", ex);
-            return null;
+        // Log completion status (non-blocking)
+        CompletableFuture.allOf(activationFutures.toArray(CompletableFuture[]::new)).whenComplete((result, ex) -> {
+            if (ex != null) {
+                log.error("Failed to activate some workspaces", ex);
+            } else {
+                log.info("Completed workspace activations: count={}", workspacesToActivate.size());
+            }
         });
     }
 
     /**
-     * Checks if a workspace should skip activation based on its configuration.
+     * Checks if a workspace should skip activation based on its configuration and status.
      */
     private boolean shouldSkipActivation(Workspace workspace) {
+        // Skip non-active workspaces (SUSPENDED, PURGED) - don't waste cycles on dead workspaces
+        if (workspace.getStatus() != Workspace.WorkspaceStatus.ACTIVE) {
+            log.info(
+                "Skipped workspace activation: reason=notActive, workspaceId={}, status={}",
+                workspace.getId(),
+                workspace.getStatus()
+            );
+            return true;
+        }
+
         if (
             workspace.getGitProviderMode() == Workspace.GitProviderMode.PAT_ORG &&
             isBlank(workspace.getPersonalAccessToken())
@@ -132,12 +160,22 @@ public class WorkspaceActivationService {
      *                                     (currently unused but kept for future multi-org support)
      */
     public void activateWorkspace(Workspace workspace, Set<String> organizationConsumersStarted) {
+        // Early exit for non-active workspaces - don't waste cycles
+        if (workspace.getStatus() != Workspace.WorkspaceStatus.ACTIVE) {
+            log.debug(
+                "Skipped workspace activation: reason=notActive, workspaceId={}, status={}",
+                workspace.getId(),
+                workspace.getStatus()
+            );
+            return;
+        }
+
         if (!workspaceScopeFilter.isWorkspaceAllowed(workspace)) {
             log.info("Skipped workspace activation: reason=filteredByScope, workspaceId={}", workspace.getId());
             return;
         }
 
-        if (runMonitoringOnStartup) {
+        if (monitoringProperties.isRunOnStartup()) {
             log.info("Starting monitoring on startup: workspaceId={}", workspace.getId());
 
             // Set workspace context for the sync operations (enables proper logging via
@@ -148,7 +186,7 @@ public class WorkspaceActivationService {
                 // Use the central sync orchestrator which handles:
                 // 1. Organization and teams sync (via GraphQL)
                 // 2. Per-repository syncs (labels, milestones, issues, PRs, comments)
-                // 3. Workspace-level relationships (issue dependencies, sub-issues)
+                // 3. Workspace-level relationships (issue types, issue dependencies, sub-issues)
                 getGitHubDataSyncService().syncAllRepositories(workspace.getId());
 
                 log.info("Completed monitoring on startup: workspaceId={}", workspace.getId());

@@ -10,6 +10,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.transaction.annotation.Transactional;
 
 public interface UserRepository extends JpaRepository<User, Long> {
     @Query(
@@ -120,6 +121,10 @@ public interface UserRepository extends JpaRepository<User, Long> {
     /**
      * Upsert a user using PostgreSQL ON CONFLICT.
      * This is thread-safe for concurrent inserts of the same user.
+     * <p>
+     * The type field is also updated on conflict to ensure that misclassified
+     * users (e.g., bots stored as USER) get corrected when seen again with
+     * proper type information.
      *
      * @param id the primary key (GitHub database ID)
      * @param login the user login
@@ -129,6 +134,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
      * @param type the user type (USER, BOT, ORGANIZATION)
      */
     @Modifying
+    @Transactional
     @Query(
         value = """
         INSERT INTO "user" (id, login, name, avatar_url, html_url, type)
@@ -137,7 +143,8 @@ public interface UserRepository extends JpaRepository<User, Long> {
             login = EXCLUDED.login,
             name = EXCLUDED.name,
             avatar_url = EXCLUDED.avatar_url,
-            html_url = EXCLUDED.html_url
+            html_url = EXCLUDED.html_url,
+            type = EXCLUDED.type
         """,
         nativeQuery = true
     )

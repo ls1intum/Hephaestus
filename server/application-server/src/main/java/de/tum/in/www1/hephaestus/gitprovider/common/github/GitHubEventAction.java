@@ -8,6 +8,42 @@ public sealed interface GitHubEventAction {
     /** The raw action string from the webhook payload. */
     String value();
 
+    // ========== Repository Events ==========
+
+    enum Repository implements GitHubEventAction {
+        CREATED,
+        DELETED,
+        EDITED,
+        ARCHIVED,
+        UNARCHIVED,
+        RENAMED,
+        TRANSFERRED,
+        PRIVATIZED,
+        PUBLICIZED,
+        UNKNOWN;
+
+        @Override
+        public String value() {
+            return name().toLowerCase();
+        }
+
+        public static Repository fromString(String action) {
+            if (action == null || action.isBlank()) return UNKNOWN;
+            return switch (action.toLowerCase()) {
+                case "created" -> CREATED;
+                case "deleted" -> DELETED;
+                case "edited" -> EDITED;
+                case "archived" -> ARCHIVED;
+                case "unarchived" -> UNARCHIVED;
+                case "renamed" -> RENAMED;
+                case "transferred" -> TRANSFERRED;
+                case "privatized" -> PRIVATIZED;
+                case "publicized" -> PUBLICIZED;
+                default -> UNKNOWN;
+            };
+        }
+    }
+
     // ========== Issue Events ==========
 
     enum Issue implements GitHubEventAction {

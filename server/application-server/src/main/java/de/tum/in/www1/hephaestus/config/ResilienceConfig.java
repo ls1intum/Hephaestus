@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.config;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.exception.InstallationSuspendedException;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
@@ -96,7 +97,11 @@ public class ResilienceConfig {
                 WebClientResponseException.class
             )
             // Don't record these as failures (they're client errors, not service failures)
-            .ignoreExceptions(IllegalArgumentException.class, IllegalStateException.class)
+            .ignoreExceptions(
+                IllegalArgumentException.class,
+                IllegalStateException.class,
+                InstallationSuspendedException.class
+            )
             .build();
 
         CircuitBreakerRegistry registry = CircuitBreakerRegistry.of(defaultConfig);

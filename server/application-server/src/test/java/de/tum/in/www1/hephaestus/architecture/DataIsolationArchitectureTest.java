@@ -79,8 +79,7 @@ class DataIsolationArchitectureTest extends HephaestusArchitectureTest {
         "Organization", // Synced from GitHub, workspace is set separately
         "Workspace", // Is the tenant root
         "WorkspaceSlugHistory", // Tracks workspace slug changes
-        "IssueType", // GitHub issue types are workspace-scoped through issue
-        "DeadLetterEvent" // System-wide debugging
+        "IssueType" // GitHub issue types are workspace-scoped through issue
     );
 
     // ========================================================================

@@ -88,6 +88,16 @@ public interface SyncTargetProvider extends SyncTimestampProvider, BackfillState
      */
     void updateSyncTimestamp(Long syncTargetId, SyncType syncType, Instant syncedAt);
 
+    /**
+     * Removes a sync target from the system.
+     * <p>
+     * This is called when a repository no longer exists on GitHub (NOT_FOUND)
+     * to stop perpetual sync retries for a deleted repository.
+     *
+     * @param syncTargetId the sync target ID to remove (must not be null)
+     */
+    void removeSyncTarget(Long syncTargetId);
+
     // ═══════════════════════════════════════════════════════════════════════════
     // SYNC SESSIONS
     // ═══════════════════════════════════════════════════════════════════════════
@@ -212,6 +222,8 @@ public interface SyncTargetProvider extends SyncTimestampProvider, BackfillState
      * @param backfillHighWaterMark           highest issue/PR number at backfill start
      * @param backfillCheckpoint              current backfill position (counts down to 0)
      * @param backfillLastRunAt               when backfill last executed
+     * @param issueSyncCursor                 pagination cursor for resuming issue sync
+     * @param pullRequestSyncCursor           pagination cursor for resuming PR sync
      */
     record SyncTarget(
         Long id,
@@ -227,7 +239,9 @@ public interface SyncTargetProvider extends SyncTimestampProvider, BackfillState
         Instant lastFullSyncAt,
         Integer backfillHighWaterMark,
         Integer backfillCheckpoint,
-        Instant backfillLastRunAt
+        Instant backfillLastRunAt,
+        String issueSyncCursor,
+        String pullRequestSyncCursor
     ) {
         /**
          * Checks if a full sync is needed based on staleness threshold.

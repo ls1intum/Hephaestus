@@ -4,6 +4,7 @@
 query GetUser($login: String!) {
     rateLimit {
         cost
+        limit
         remaining
         resetAt
     }

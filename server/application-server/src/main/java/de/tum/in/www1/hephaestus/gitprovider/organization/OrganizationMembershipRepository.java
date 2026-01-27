@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Repository for organization membership records.
@@ -21,6 +22,7 @@ public interface OrganizationMembershipRepository
     List<OrganizationMembership> findByOrganizationId(Long organizationId);
 
     @Modifying
+    @Transactional
     @Query(
         value = """
         INSERT INTO organization_membership (organization_id, user_id, role)
@@ -37,6 +39,7 @@ public interface OrganizationMembershipRepository
     );
 
     @Modifying
+    @Transactional
     @Query("DELETE FROM OrganizationMembership m WHERE m.organizationId = :orgId AND m.userId IN :userIds")
     void deleteByOrganizationIdAndUserIdIn(
         @Param("orgId") Long organizationId,

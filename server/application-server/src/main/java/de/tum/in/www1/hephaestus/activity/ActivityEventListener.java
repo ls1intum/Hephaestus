@@ -13,6 +13,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
@@ -97,8 +99,8 @@ public class ActivityEventListener {
             return;
         }
         if (pr.authorId() == null || pr.createdAt() == null) {
-            log.warn(
-                "PR created event missing required data: prId={}, authorId={}, createdAt={}",
+            log.debug(
+                "Skipping PR created event (author may be deleted): prId={}, authorId={}, createdAt={}",
                 pr.id(),
                 pr.authorId(),
                 pr.createdAt()
@@ -114,8 +116,7 @@ public class ActivityEventListener {
                 repositoryRepository.getReferenceById(pr.repository().id()),
                 ActivityTargetType.PULL_REQUEST,
                 pr.id(),
-                xpCalc.getXpPullRequestOpened(),
-                mapSource(event.context().source())
+                xpCalc.getXpPullRequestOpened()
             )
         );
     }
@@ -130,7 +131,7 @@ public class ActivityEventListener {
         // For merged PRs, prefer mergedBy, fall back to author
         Long awardeeId = pr.mergedById() != null ? pr.mergedById() : pr.authorId();
         if (awardeeId == null) {
-            log.warn("PR merged event missing awardee: prId={}", pr.id());
+            log.debug("Skipping PR merged event (awardee may be deleted): prId={}", pr.id());
             return;
         }
         Instant occurredAt = pr.mergedAt() != null ? pr.mergedAt() : pr.updatedAt();
@@ -147,8 +148,7 @@ public class ActivityEventListener {
                 repositoryRepository.getReferenceById(pr.repository().id()),
                 ActivityTargetType.PULL_REQUEST,
                 pr.id(),
-                xpCalc.getXpPullRequestMerged(),
-                mapSource(event.context().source())
+                xpCalc.getXpPullRequestMerged()
             )
         );
     }
@@ -164,7 +164,7 @@ public class ActivityEventListener {
             return;
         }
         if (pr.authorId() == null) {
-            log.warn("PR closed event missing authorId: prId={}", pr.id());
+            log.debug("Skipping PR closed event (author may be deleted): prId={}", pr.id());
             return;
         }
         Instant occurredAt = pr.closedAt() != null ? pr.closedAt() : pr.updatedAt();
@@ -181,8 +181,7 @@ public class ActivityEventListener {
                 repositoryRepository.getReferenceById(pr.repository().id()),
                 ActivityTargetType.PULL_REQUEST,
                 pr.id(),
-                0.0,
-                mapSource(event.context().source())
+                0.0
             )
         );
     }
@@ -195,7 +194,7 @@ public class ActivityEventListener {
             return;
         }
         if (pr.authorId() == null) {
-            log.warn("PR reopened event missing authorId: prId={}", pr.id());
+            log.debug("Skipping PR reopened event (author may be deleted): prId={}", pr.id());
             return;
         }
         Instant occurredAt = pr.updatedAt() != null ? pr.updatedAt() : Instant.now();
@@ -208,8 +207,7 @@ public class ActivityEventListener {
                 repositoryRepository.getReferenceById(pr.repository().id()),
                 ActivityTargetType.PULL_REQUEST,
                 pr.id(),
-                0.0, // Reopening is lifecycle tracking, no XP reward
-                mapSource(event.context().source())
+                0.0 // Reopening is lifecycle tracking, no XP reward
             )
         );
     }
@@ -222,7 +220,7 @@ public class ActivityEventListener {
             return;
         }
         if (pr.authorId() == null) {
-            log.warn("PR ready event missing authorId: prId={}", pr.id());
+            log.debug("Skipping PR ready event (author may be deleted): prId={}", pr.id());
             return;
         }
         Instant occurredAt = pr.updatedAt() != null ? pr.updatedAt() : Instant.now();
@@ -235,13 +233,13 @@ public class ActivityEventListener {
                 repositoryRepository.getReferenceById(pr.repository().id()),
                 ActivityTargetType.PULL_REQUEST,
                 pr.id(),
-                xpCalc.getXpPullRequestReady(),
-                mapSource(event.context().source())
+                xpCalc.getXpPullRequestReady()
             )
         );
     }
 
     @Async
+    @Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = true)
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onReviewSubmitted(DomainEvent.ReviewSubmitted event) {
         var reviewData = event.review();
@@ -249,8 +247,8 @@ public class ActivityEventListener {
             return;
         }
         if (reviewData.authorId() == null || reviewData.repositoryId() == null) {
-            log.warn(
-                "Review submitted event missing required data: reviewId={}, authorId={}, repositoryId={}",
+            log.debug(
+                "Skipping review submitted event (author may be deleted): reviewId={}, authorId={}, repositoryId={}",
                 reviewData.id(),
                 reviewData.authorId(),
                 reviewData.repositoryId()
@@ -275,8 +273,7 @@ public class ActivityEventListener {
                 repositoryRepository.getReferenceById(reviewData.repositoryId()),
                 ActivityTargetType.REVIEW,
                 reviewData.id(),
-                xp,
-                mapSource(event.context().source())
+                xp
             )
         );
     }
@@ -289,8 +286,8 @@ public class ActivityEventListener {
             return;
         }
         if (reviewData.authorId() == null || reviewData.repositoryId() == null) {
-            log.warn(
-                "Review dismissed event missing required data: reviewId={}, authorId={}, repositoryId={}",
+            log.debug(
+                "Skipping review dismissed event (author may be deleted): reviewId={}, authorId={}, repositoryId={}",
                 reviewData.id(),
                 reviewData.authorId(),
                 reviewData.repositoryId()
@@ -310,8 +307,7 @@ public class ActivityEventListener {
                 repositoryRepository.getReferenceById(reviewData.repositoryId()),
                 ActivityTargetType.REVIEW,
                 reviewData.id(),
-                xpAdjustment,
-                mapSource(event.context().source())
+                xpAdjustment
             )
         );
     }
@@ -327,6 +323,7 @@ public class ActivityEventListener {
      * maintaining an immutable audit trail of all review activity.
      */
     @Async
+    @Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = true)
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onReviewEdited(DomainEvent.ReviewEdited event) {
         var reviewData = event.review();
@@ -334,8 +331,8 @@ public class ActivityEventListener {
             return;
         }
         if (reviewData.authorId() == null || reviewData.repositoryId() == null) {
-            log.warn(
-                "Review edited event missing required data: reviewId={}, authorId={}, repositoryId={}",
+            log.debug(
+                "Skipping review edited event (author may be deleted): reviewId={}, authorId={}, repositoryId={}",
                 reviewData.id(),
                 reviewData.authorId(),
                 reviewData.repositoryId()
@@ -360,13 +357,13 @@ public class ActivityEventListener {
                 repositoryRepository.getReferenceById(reviewData.repositoryId()),
                 ActivityTargetType.REVIEW,
                 reviewData.id(),
-                xp,
-                mapSource(event.context().source())
+                xp
             )
         );
     }
 
     @Async
+    @Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = true)
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onCommentCreated(DomainEvent.CommentCreated event) {
         var commentData = event.comment();
@@ -374,8 +371,8 @@ public class ActivityEventListener {
             return;
         }
         if (commentData.authorId() == null || commentData.repositoryId() == null) {
-            log.warn(
-                "Comment created event missing required data: commentId={}, authorId={}, repositoryId={}",
+            log.debug(
+                "Skipping comment created event (author may be deleted): commentId={}, authorId={}, repositoryId={}",
                 commentData.id(),
                 commentData.authorId(),
                 commentData.repositoryId()
@@ -402,8 +399,7 @@ public class ActivityEventListener {
                 repositoryRepository.getReferenceById(commentData.repositoryId()),
                 ActivityTargetType.ISSUE_COMMENT,
                 commentData.id(),
-                finalXp,
-                mapSource(event.context().source())
+                finalXp
             )
         );
     }
@@ -416,8 +412,8 @@ public class ActivityEventListener {
             return;
         }
         if (commentData.authorId() == null || commentData.repositoryId() == null) {
-            log.warn(
-                "Review comment created event missing required data: commentId={}, authorId={}, repositoryId={}",
+            log.debug(
+                "Skipping review comment created event (author may be deleted): commentId={}, authorId={}, repositoryId={}",
                 commentData.id(),
                 commentData.authorId(),
                 commentData.repositoryId()
@@ -434,8 +430,7 @@ public class ActivityEventListener {
                 repositoryRepository.getReferenceById(commentData.repositoryId()),
                 ActivityTargetType.REVIEW_COMMENT,
                 commentData.id(),
-                xpCalc.getXpReviewComment(),
-                mapSource(event.context().source())
+                xpCalc.getXpReviewComment()
             )
         );
     }
@@ -452,7 +447,7 @@ public class ActivityEventListener {
             return;
         }
         if (issueData.authorId() == null) {
-            log.warn("Issue created event missing authorId: issueId={}", issueData.id());
+            log.debug("Skipping issue created event (author may be deleted): issueId={}", issueData.id());
             return;
         }
         Instant occurredAt = issueData.createdAt() != null ? issueData.createdAt() : Instant.now();
@@ -465,8 +460,7 @@ public class ActivityEventListener {
                 repositoryRepository.getReferenceById(issueData.repository().id()),
                 ActivityTargetType.ISSUE,
                 issueData.id(),
-                xpCalc.getXpIssueCreated(),
-                mapSource(event.context().source())
+                xpCalc.getXpIssueCreated()
             )
         );
     }
@@ -483,7 +477,7 @@ public class ActivityEventListener {
             return;
         }
         if (issueData.authorId() == null) {
-            log.warn("Issue closed event missing authorId: issueId={}", issueData.id());
+            log.debug("Skipping issue closed event (author may be deleted): issueId={}", issueData.id());
             return;
         }
         Instant occurredAt = issueData.closedAt() != null ? issueData.closedAt() : issueData.updatedAt();
@@ -500,8 +494,7 @@ public class ActivityEventListener {
                 repositoryRepository.getReferenceById(issueData.repository().id()),
                 ActivityTargetType.ISSUE,
                 issueData.id(),
-                0.0, // Issue closure is lifecycle tracking, no XP reward
-                mapSource(event.context().source())
+                0.0 // Issue closure is lifecycle tracking, no XP reward
             )
         );
     }
@@ -517,17 +510,5 @@ public class ActivityEventListener {
             return ActivityEventType.REVIEW_UNKNOWN;
         }
         return ActivityEventType.REVIEW_COMMENTED;
-    }
-
-    /**
-     * Map event context source to SourceSystem.
-     * Defaults to SYSTEM if source is null.
-     */
-    private SourceSystem mapSource(de.tum.in.www1.hephaestus.gitprovider.common.DataSource source) {
-        if (source == null) {
-            return SourceSystem.SYSTEM;
-        }
-        // All data sources from gitprovider are GitHub data
-        return SourceSystem.GITHUB;
     }
 }

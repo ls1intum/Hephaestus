@@ -592,7 +592,8 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
                                 "Review", // Through PR
                                 "Comment", // Through PR -> repository.organization.workspaceId
                                 "ApplicationReadyEvent", // Spring lifecycle, no workspace needed
-                                "ContextRefreshedEvent" // Spring lifecycle, no workspace needed
+                                "ContextRefreshedEvent", // Spring lifecycle, no workspace needed
+                                "WorkspacesInitializedEvent" // Startup lifecycle, signals all workspaces ready
                             );
 
                             boolean isWorkspaceAware = workspaceAwareEventPrefixes

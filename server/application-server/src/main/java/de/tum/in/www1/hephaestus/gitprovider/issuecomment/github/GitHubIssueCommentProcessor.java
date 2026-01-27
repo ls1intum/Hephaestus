@@ -5,11 +5,13 @@ import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.events.DomainEvent;
 import de.tum.in.www1.hephaestus.gitprovider.common.events.EventContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.events.EventPayload;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.BaseGitHubProcessor;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.issue.IssueRepository;
 import de.tum.in.www1.hephaestus.gitprovider.issuecomment.IssueComment;
 import de.tum.in.www1.hephaestus.gitprovider.issuecomment.IssueCommentRepository;
 import de.tum.in.www1.hephaestus.gitprovider.issuecomment.github.dto.GitHubIssueCommentEventDTO.GitHubCommentDTO;
+import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import java.util.HashSet;
 import java.util.Set;
@@ -34,13 +36,12 @@ import org.springframework.transaction.annotation.Transactional;
  * </ul>
  */
 @Service
-public class GitHubIssueCommentProcessor {
+public class GitHubIssueCommentProcessor extends BaseGitHubProcessor {
 
     private static final Logger log = LoggerFactory.getLogger(GitHubIssueCommentProcessor.class);
 
     private final IssueCommentRepository commentRepository;
     private final IssueRepository issueRepository;
-    private final UserRepository userRepository;
     private final ApplicationEventPublisher eventPublisher;
 
     public GitHubIssueCommentProcessor(
@@ -49,9 +50,9 @@ public class GitHubIssueCommentProcessor {
         UserRepository userRepository,
         ApplicationEventPublisher eventPublisher
     ) {
+        super(userRepository, null, null);
         this.commentRepository = commentRepository;
         this.issueRepository = issueRepository;
-        this.userRepository = userRepository;
         this.eventPublisher = eventPublisher;
     }
 
@@ -118,13 +119,12 @@ public class GitHubIssueCommentProcessor {
         comment.setIssue(issue);
 
         // Link author if present and not already set
-        if (dto.author() != null && dto.author().getDatabaseId() != null && comment.getAuthor() == null) {
-            userRepository
-                .findById(dto.author().getDatabaseId())
-                .ifPresent(user -> {
-                    comment.setAuthor(user);
-                    changedFields.add("author");
-                });
+        if (dto.author() != null && comment.getAuthor() == null) {
+            User author = findOrCreateUser(dto.author());
+            if (author != null) {
+                comment.setAuthor(author);
+                changedFields.add("author");
+            }
         }
 
         IssueComment saved = commentRepository.save(comment);

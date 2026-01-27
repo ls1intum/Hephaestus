@@ -10,6 +10,7 @@ import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Factory for creating ProcessingContext instances.
@@ -39,6 +40,7 @@ public class ProcessingContextFactory {
     /**
      * Create a ProcessingContext for a webhook event.
      */
+    @Transactional(readOnly = true)
     public Optional<ProcessingContext> forWebhookEvent(GitHubWebhookEvent event) {
         if (event.repository() == null || event.repository().fullName() == null) {
             log.warn("Skipped webhook event: reason=missingRepositoryData, action={}", event.action());
@@ -66,6 +68,7 @@ public class ProcessingContextFactory {
     /**
      * Create a ProcessingContext for a sync operation.
      */
+    @Transactional(readOnly = true)
     public ProcessingContext forSync(Repository repository) {
         Long scopeId = resolveScopeId(repository);
         return ProcessingContext.forSync(scopeId, repository);

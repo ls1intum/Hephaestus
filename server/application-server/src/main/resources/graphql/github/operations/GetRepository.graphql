@@ -1,4 +1,10 @@
 query GetRepository($owner: String!, $name: String!) {
+    rateLimit {
+        cost
+        limit
+        remaining
+        resetAt
+    }
     repository(owner: $owner, name: $name) {
         id
         databaseId
@@ -11,6 +17,8 @@ query GetRepository($owner: String!, $name: String!) {
         isDisabled
         isFork
         isPrivate
+        createdAt
+        updatedAt
         pushedAt
         defaultBranchRef {
             name
@@ -33,6 +41,7 @@ query GetRepository($owner: String!, $name: String!) {
                 name
                 url
                 avatarUrl
+                createdAt
             }
         }
     }

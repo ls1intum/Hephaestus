@@ -5,14 +5,13 @@ import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import java.time.Instant;
-import java.util.Map;
 import lombok.Builder;
 import org.springframework.lang.Nullable;
 
 /**
  * Command object for recording activity events.
  *
- * <p>Replaces the 10-parameter record() method with a cleaner builder pattern.
+ * <p>Replaces the multi-parameter record() method with a cleaner builder pattern.
  * Provides input validation via Bean Validation annotations.
  *
  * <h4>Usage</h4>
@@ -26,7 +25,6 @@ import org.springframework.lang.Nullable;
  *     .targetType(ActivityTargetType.REVIEW)
  *     .targetId(456L)
  *     .xp(5.0)
- *     .sourceSystem(SourceSystem.GITHUB)
  *     .build();
  *
  * activityEventService.record(command);
@@ -41,11 +39,7 @@ public record RecordActivityCommand(
     @Nullable Repository repository,
     @NotNull ActivityTargetType targetType,
     @NotNull Long targetId,
-    @Min(0) double xp,
-    @NotNull SourceSystem sourceSystem,
-    @Nullable Map<String, Object> payload,
-    /** Context explaining why this event was recorded (webhook, sync, backfill, scheduled). */
-    @Nullable String triggerContext
+    @Min(0) double xp
 ) {
     /**
      * Create a simple command for events without a repository context.
@@ -57,8 +51,7 @@ public record RecordActivityCommand(
         User actor,
         ActivityTargetType targetType,
         Long targetId,
-        double xp,
-        SourceSystem sourceSystem
+        double xp
     ) {
         return RecordActivityCommand.builder()
             .workspaceId(workspaceId)
@@ -68,7 +61,6 @@ public record RecordActivityCommand(
             .targetType(targetType)
             .targetId(targetId)
             .xp(xp)
-            .sourceSystem(sourceSystem)
             .build();
     }
 }

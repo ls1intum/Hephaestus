@@ -56,6 +56,18 @@ public class RepositoryToMonitor {
      */
     private Instant backfillLastRunAt;
 
+    /**
+     * Pagination cursor for issue sync. Persisted to allow resumption if sync
+     * fails mid-pagination. Cleared when sync completes successfully.
+     */
+    private String issueSyncCursor;
+
+    /**
+     * Pagination cursor for pull request sync. Persisted to allow resumption if sync
+     * fails mid-pagination. Cleared when sync completes successfully.
+     */
+    private String pullRequestSyncCursor;
+
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "workspace_id", nullable = false)
     @ToString.Exclude

@@ -1,12 +1,14 @@
 package de.tum.in.www1.hephaestus.gitprovider.repository.github;
 
 import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
-import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.*;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.exception.InstallationNotFoundException;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier.ClassificationResult;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser.RepositoryOwnerAndName;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncProperties;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHOrganization;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHRepository;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHRepositoryOwner;
@@ -41,15 +43,21 @@ public class GitHubRepositorySyncService {
     private final GitHubGraphQlClientProvider graphQlClientProvider;
     private final RepositoryRepository repositoryRepository;
     private final OrganizationRepository organizationRepository;
+    private final GitHubSyncProperties syncProperties;
+    private final GitHubExceptionClassifier exceptionClassifier;
 
     public GitHubRepositorySyncService(
         GitHubGraphQlClientProvider graphQlClientProvider,
         RepositoryRepository repositoryRepository,
-        OrganizationRepository organizationRepository
+        OrganizationRepository organizationRepository,
+        GitHubSyncProperties syncProperties,
+        GitHubExceptionClassifier exceptionClassifier
     ) {
         this.graphQlClientProvider = graphQlClientProvider;
         this.repositoryRepository = repositoryRepository;
         this.organizationRepository = organizationRepository;
+        this.syncProperties = syncProperties;
+        this.exceptionClassifier = exceptionClassifier;
     }
 
     /**
@@ -81,7 +89,7 @@ public class GitHubRepositorySyncService {
                 .variable("owner", repoOwner)
                 .variable("name", repoName)
                 .execute()
-                .block(GRAPHQL_TIMEOUT);
+                .block(syncProperties.getGraphqlTimeout());
 
             if (response == null || !response.isValid()) {
                 log.warn(
@@ -92,6 +100,9 @@ public class GitHubRepositorySyncService {
                 );
                 return Optional.empty();
             }
+
+            // Track rate limit from response
+            graphQlClientProvider.trackRateLimit(response);
 
             // Use typed GraphQL model for type-safe parsing
             var repoData = response.field("repository").toEntity(GHRepository.class);
@@ -137,6 +148,16 @@ public class GitHubRepositorySyncService {
             // Set disabled status
             repository.setDisabled(repoData.getIsDisabled());
 
+            // Set created at timestamp
+            if (repoData.getCreatedAt() != null) {
+                repository.setCreatedAt(repoData.getCreatedAt().toInstant());
+            }
+
+            // Set updated at timestamp
+            if (repoData.getUpdatedAt() != null) {
+                repository.setUpdatedAt(repoData.getUpdatedAt().toInstant());
+            }
+
             // Set pushed at timestamp
             if (repoData.getPushedAt() != null) {
                 repository.setPushedAt(repoData.getPushedAt().toInstant());
@@ -172,7 +193,43 @@ public class GitHubRepositorySyncService {
             // Re-throw to abort the entire sync operation
             throw e;
         } catch (Exception e) {
-            log.error("Failed to sync repository: scopeId={}, repoName={}", scopeId, safeNameWithOwner, e);
+            ClassificationResult classification = exceptionClassifier.classifyWithDetails(e);
+            switch (classification.category()) {
+                case RATE_LIMITED -> log.warn(
+                    "Rate limited during repository sync: repoName={}, scopeId={}, message={}",
+                    safeNameWithOwner,
+                    scopeId,
+                    classification.message()
+                );
+                case NOT_FOUND -> log.warn(
+                    "Resource not found during repository sync: repoName={}, scopeId={}, message={}",
+                    safeNameWithOwner,
+                    scopeId,
+                    classification.message()
+                );
+                case AUTH_ERROR -> {
+                    log.error(
+                        "Authentication error during repository sync: repoName={}, scopeId={}, message={}",
+                        safeNameWithOwner,
+                        scopeId,
+                        classification.message()
+                    );
+                    throw e;
+                }
+                case RETRYABLE -> log.warn(
+                    "Retryable error during repository sync: repoName={}, scopeId={}, message={}",
+                    safeNameWithOwner,
+                    scopeId,
+                    classification.message()
+                );
+                default -> log.error(
+                    "Unexpected error during repository sync: repoName={}, scopeId={}, message={}",
+                    safeNameWithOwner,
+                    scopeId,
+                    classification.message(),
+                    e
+                );
+            }
             return Optional.empty();
         }
     }

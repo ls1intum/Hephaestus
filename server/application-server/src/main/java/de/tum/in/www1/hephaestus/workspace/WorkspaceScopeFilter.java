@@ -87,10 +87,24 @@ public class WorkspaceScopeFilter {
     }
 
     public boolean isRepositoryAllowed(String nameWithOwner) {
-        if (allowedRepositories.isEmpty()) {
-            return true;
+        if (nameWithOwner == null) {
+            return false;
         }
-        return nameWithOwner != null && allowedRepositories.contains(normalize(nameWithOwner));
+
+        // Extract org from "org/repo" format and check against org filter
+        if (!allowedOrganizations.isEmpty()) {
+            String org = nameWithOwner.contains("/") ? nameWithOwner.split("/")[0] : nameWithOwner;
+            if (!allowedOrganizations.contains(normalize(org))) {
+                return false;
+            }
+        }
+
+        // Check specific repository filter (if configured)
+        if (!allowedRepositories.isEmpty() && !allowedRepositories.contains(normalize(nameWithOwner))) {
+            return false;
+        }
+
+        return true;
     }
 
     public boolean isOrganizationAllowed(String login) {

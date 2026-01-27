@@ -20,13 +20,6 @@ public record EventContext(
     @NonNull String correlationId
 ) {
     /**
-     * Alias for backwards compatibility.
-     * @deprecated Use {@link DataSource} directly
-     */
-    @Deprecated(forRemoval = true)
-    public static final Class<DataSource> Source = DataSource.class;
-
-    /**
      * Creates an EventContext from a ProcessingContext.
      */
     public static EventContext from(ProcessingContext ctx) {

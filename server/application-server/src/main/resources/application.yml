@@ -90,6 +90,22 @@ hephaestus:
     host-url: https://hephaestus.ase.cit.tum.de/
 
     # ═══════════════════════════════════════════════════════════════════════════
+    # SYNC CONFIGURATION
+    # ═══════════════════════════════════════════════════════════════════════════
+    # Settings for GitHub data synchronization operations.
+    # These control GraphQL timeouts and incremental sync behavior.
+    sync:
+        # Timeout in seconds for standard GraphQL operations (default: 30)
+        # Increase if experiencing timeouts on large repositories
+        graphql-timeout-seconds: ${HEPHAESTUS_SYNC_GRAPHQL_TIMEOUT_SECONDS:60}
+        # Extended timeout for complex operations like review comments (default: 60)
+        extended-graphql-timeout-seconds: ${HEPHAESTUS_SYNC_EXTENDED_GRAPHQL_TIMEOUT_SECONDS:120}
+        # Whether to use incremental sync based on last sync timestamp (default: true)
+        # When enabled, only issues/PRs updated since last sync are fetched
+        # This significantly reduces API calls for active repositories
+        incremental-sync-enabled: ${HEPHAESTUS_SYNC_INCREMENTAL_ENABLED:true}
+
+    # ═══════════════════════════════════════════════════════════════════════════
     # ACTIVITY EVENT BACKFILL
     # ═══════════════════════════════════════════════════════════════════════════
     # One-time migration to backfill activity events from historical data.
