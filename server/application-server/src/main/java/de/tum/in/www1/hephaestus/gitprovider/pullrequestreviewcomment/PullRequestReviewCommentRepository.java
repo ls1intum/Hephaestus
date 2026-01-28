@@ -8,8 +8,4 @@ import org.springframework.data.jpa.repository.JpaRepository;
  * <p>Comments are scoped through their thread which has scope through
  * the Thread -> PullRequest -> Repository -> Organization chain.
  */
-public interface PullRequestReviewCommentRepository extends JpaRepository<PullRequestReviewComment, Long> {
-    boolean existsByThreadId(Long threadId);
-
-    long countByThreadId(Long threadId);
-}
+public interface PullRequestReviewCommentRepository extends JpaRepository<PullRequestReviewComment, Long> {}

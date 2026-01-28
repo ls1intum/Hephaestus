@@ -7,6 +7,7 @@ import de.tum.in.www1.hephaestus.gitprovider.organization.Organization;
 import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationService;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.gitprovider.sync.NatsConsumerService;
+import de.tum.in.www1.hephaestus.gitprovider.sync.NatsProperties;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import java.time.Instant;
@@ -14,7 +15,6 @@ import java.util.Locale;
 import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,7 +28,7 @@ public class WorkspaceInstallationService {
 
     private static final Logger log = LoggerFactory.getLogger(WorkspaceInstallationService.class);
 
-    private final boolean isNatsEnabled;
+    private final NatsProperties natsProperties;
 
     private final WorkspaceRepository workspaceRepository;
     private final RepositoryToMonitorRepository repositoryToMonitorRepository;
@@ -42,7 +42,7 @@ public class WorkspaceInstallationService {
     private final OrganizationService organizationService;
 
     public WorkspaceInstallationService(
-        @Value("${nats.enabled}") boolean isNatsEnabled,
+        NatsProperties natsProperties,
         WorkspaceRepository workspaceRepository,
         RepositoryToMonitorRepository repositoryToMonitorRepository,
         RepositoryRepository repositoryRepository,
@@ -53,7 +53,7 @@ public class WorkspaceInstallationService {
         GitHubAppTokenService gitHubAppTokenService,
         OrganizationService organizationService
     ) {
-        this.isNatsEnabled = isNatsEnabled;
+        this.natsProperties = natsProperties;
         this.workspaceRepository = workspaceRepository;
         this.repositoryToMonitorRepository = repositoryToMonitorRepository;
         this.repositoryRepository = repositoryRepository;
@@ -459,7 +459,7 @@ public class WorkspaceInstallationService {
      */
     private void rotateOrganizationConsumer(Workspace workspace, String oldLogin, String newLogin) {
         if (
-            !isNatsEnabled ||
+            !natsProperties.enabled() ||
             workspace == null ||
             isBlank(oldLogin) ||
             isBlank(newLogin) ||
@@ -564,7 +564,7 @@ public class WorkspaceInstallationService {
      * Checks if NATS should be used for the given workspace.
      */
     private boolean shouldUseNats(Workspace workspace) {
-        return isNatsEnabled && workspace != null;
+        return natsProperties.enabled() && workspace != null;
     }
 
     /**

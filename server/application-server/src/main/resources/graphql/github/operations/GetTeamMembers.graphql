@@ -27,7 +27,9 @@ query GetTeamMembers($orgLogin: String!, $teamSlug: String!, $first: Int!, $afte
                         login
                         avatarUrl
                         name
+                        email
                         createdAt
+                        updatedAt
                     }
                 }
             }

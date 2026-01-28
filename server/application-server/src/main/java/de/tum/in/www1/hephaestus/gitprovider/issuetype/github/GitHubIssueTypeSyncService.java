@@ -17,7 +17,7 @@ import de.tum.in.www1.hephaestus.gitprovider.issuetype.IssueType;
 import de.tum.in.www1.hephaestus.gitprovider.issuetype.IssueTypeRepository;
 import de.tum.in.www1.hephaestus.gitprovider.organization.Organization;
 import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationRepository;
-import de.tum.in.www1.hephaestus.monitoring.MonitoringProperties;
+import de.tum.in.www1.hephaestus.gitprovider.sync.SyncSchedulerProperties;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.List;
@@ -45,7 +45,7 @@ public class GitHubIssueTypeSyncService {
     private final GitHubGraphQlClientProvider graphQlClientProvider;
     private final GitHubSyncProperties syncProperties;
     private final GitHubExceptionClassifier exceptionClassifier;
-    private final MonitoringProperties monitoringProperties;
+    private final SyncSchedulerProperties syncSchedulerProperties;
 
     public GitHubIssueTypeSyncService(
         IssueTypeRepository issueTypeRepository,
@@ -54,7 +54,7 @@ public class GitHubIssueTypeSyncService {
         GitHubGraphQlClientProvider graphQlClientProvider,
         GitHubSyncProperties syncProperties,
         GitHubExceptionClassifier exceptionClassifier,
-        MonitoringProperties monitoringProperties
+        SyncSchedulerProperties syncSchedulerProperties
     ) {
         this.issueTypeRepository = issueTypeRepository;
         this.organizationRepository = organizationRepository;
@@ -62,7 +62,7 @@ public class GitHubIssueTypeSyncService {
         this.graphQlClientProvider = graphQlClientProvider;
         this.syncProperties = syncProperties;
         this.exceptionClassifier = exceptionClassifier;
-        this.monitoringProperties = monitoringProperties;
+        this.syncSchedulerProperties = syncSchedulerProperties;
     }
 
     /**
@@ -87,7 +87,7 @@ public class GitHubIssueTypeSyncService {
         }
         String safeOrgLogin = sanitizeForLog(orgLogin);
 
-        if (!metadata.needsIssueTypesSync(monitoringProperties.getSyncCooldownInMinutes())) {
+        if (!metadata.needsIssueTypesSync(syncSchedulerProperties.cooldownMinutes())) {
             log.debug("Skipped issue type sync: reason=cooldownActive, scopeId={}", scopeId);
             return -1;
         }
@@ -127,7 +127,7 @@ public class GitHubIssueTypeSyncService {
                     .variable("first", LARGE_PAGE_SIZE)
                     .variable("after", cursor)
                     .execute()
-                    .block(syncProperties.getGraphqlTimeout());
+                    .block(syncProperties.graphqlTimeout());
 
                 if (graphQlResponse == null || !graphQlResponse.isValid()) {
                     log.warn(
@@ -139,10 +139,10 @@ public class GitHubIssueTypeSyncService {
                 }
 
                 // Track rate limit from response
-                graphQlClientProvider.trackRateLimit(graphQlResponse);
+                graphQlClientProvider.trackRateLimit(scopeId, graphQlResponse);
 
                 // Check if we should pause due to rate limiting
-                if (graphQlClientProvider.isRateLimitCritical()) {
+                if (graphQlClientProvider.isRateLimitCritical(scopeId)) {
                     log.warn("Aborting issue type sync due to critical rate limit: orgLogin={}", safeOrgLogin);
                     break;
                 }

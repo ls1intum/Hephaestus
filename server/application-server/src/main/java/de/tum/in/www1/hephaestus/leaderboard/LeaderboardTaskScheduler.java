@@ -12,7 +12,6 @@ import org.springframework.context.event.EventListener;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.core.task.TaskRejectedException;
-import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 import org.springframework.scheduling.support.CronExpression;
 import org.springframework.scheduling.support.CronTrigger;
@@ -23,7 +22,6 @@ import org.springframework.stereotype.Component;
  * @see SlackWeeklyLeaderboardTask
  */
 @Order(value = Ordered.LOWEST_PRECEDENCE)
-@EnableScheduling
 @Component
 public class LeaderboardTaskScheduler {
 

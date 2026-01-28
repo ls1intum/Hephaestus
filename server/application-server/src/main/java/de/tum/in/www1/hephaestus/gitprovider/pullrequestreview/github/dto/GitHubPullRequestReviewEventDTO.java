@@ -65,7 +65,7 @@ public record GitHubPullRequestReviewEventDTO(
                 review.getFullDatabaseId() != null ? review.getFullDatabaseId().longValue() : null,
                 review.getId(),
                 review.getBody(),
-                review.getState() != null ? review.getState().name() : "PENDING",
+                review.getState() != null ? review.getState().name() : null,
                 uriToString(review.getUrl()),
                 GitHubUserDTO.fromActor(review.getAuthor()),
                 toInstant(review.getSubmittedAt()),

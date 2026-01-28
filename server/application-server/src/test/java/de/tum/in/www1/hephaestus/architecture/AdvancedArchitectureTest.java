@@ -280,7 +280,8 @@ class AdvancedArchitectureTest extends HephaestusArchitectureTest {
                         javaClass.getPackageName().contains(".impl") ||
                         javaClass.getPackageName().contains(".notification") || // Notification module implements activity SPIs
                         javaClass.getSimpleName().endsWith("Adapter") ||
-                        javaClass.getSimpleName().endsWith("Provider");
+                        javaClass.getSimpleName().endsWith("Provider") ||
+                        javaClass.getSimpleName().endsWith("Tracker"); // Rate limit trackers implement RateLimitTracker SPI
 
                     if (!inAdapterPackage) {
                         events.add(

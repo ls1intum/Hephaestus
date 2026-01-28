@@ -1,0 +1,169 @@
+# GraphQL query for historical backfill of repository issues
+# Uses CREATED_AT DESC ordering to fetch issues from newest to oldest
+# This ensures most relevant data is synced first
+#
+# Why CREATED_AT DESC for backfill:
+# 1. Most relevant first: Recent issues are more actionable
+# 2. Stable ordering: Creation time doesn't change, so pagination is deterministic
+# 3. Clear progress: highWaterMark = highest number, checkpoint counts down to #1
+# 4. Incremental sync handles new items: Items created during backfill are caught by regular sync
+
+query GetRepositoryIssuesHistorical($owner: String!, $name: String!, $first: Int!, $after: String, $states: [IssueState!]) {
+    rateLimit {
+        cost
+        limit
+        remaining
+        resetAt
+    }
+    repository(owner: $owner, name: $name) {
+        issues(first: $first, after: $after, states: $states, orderBy: { field: CREATED_AT, direction: DESC }) {
+            pageInfo {
+                hasNextPage
+                endCursor
+            }
+            totalCount
+            nodes {
+                id
+                fullDatabaseId
+                number
+                title
+                body
+                state
+                stateReason
+                url
+                createdAt
+                updatedAt
+                closedAt
+                locked
+
+                # Embedded comments (first 10) - pagination handled by GetIssueComments for issues with more
+                comments(first: 10) {
+                    totalCount
+                    pageInfo {
+                        hasNextPage
+                        endCursor
+                    }
+                    nodes {
+                        id
+                        fullDatabaseId
+                        body
+                        url
+                        createdAt
+                        updatedAt
+
+                        # Author
+                        author {
+                            __typename
+                            ... on User {
+                                id
+                                databaseId
+                                login
+                                avatarUrl
+                                name
+                                email
+                                createdAt
+                                updatedAt
+                            }
+                            ... on Bot {
+                                id
+                                databaseId
+                                login
+                                avatarUrl
+                            }
+                            ... on Mannequin {
+                                id
+                                databaseId
+                                login
+                                avatarUrl
+                            }
+                            ... on Organization {
+                                id
+                                databaseId
+                                login
+                                avatarUrl
+                            }
+                        }
+
+                        authorAssociation
+                    }
+                }
+
+                # Issue type (organization-level categorization)
+                issueType {
+                    id
+                    name
+                    description
+                    color
+                    isEnabled
+                }
+
+                # Author
+                author {
+                    __typename
+                    ... on User {
+                        id
+                        databaseId
+                        login
+                        avatarUrl
+                        name
+                        email
+                        createdAt
+                        updatedAt
+                    }
+                    ... on Bot {
+                        id
+                        databaseId
+                        login
+                        avatarUrl
+                    }
+                    ... on Mannequin {
+                        id
+                        databaseId
+                        login
+                        avatarUrl
+                    }
+                    ... on Organization {
+                        id
+                        databaseId
+                        login
+                        avatarUrl
+                    }
+                }
+
+                # Labels
+                labels(first: 20) {
+                    nodes {
+                        id
+                        name
+                        color
+                        description
+                    }
+                }
+
+                # Milestone
+                milestone {
+                    id
+                    number
+                    title
+                    description
+                    state
+                    dueOn
+                }
+
+                # Assignees
+                assignees(first: 10) {
+                    nodes {
+                        id
+                        databaseId
+                        login
+                        avatarUrl
+                        name
+                        email
+                        createdAt
+                        updatedAt
+                    }
+                }
+            }
+        }
+    }
+}

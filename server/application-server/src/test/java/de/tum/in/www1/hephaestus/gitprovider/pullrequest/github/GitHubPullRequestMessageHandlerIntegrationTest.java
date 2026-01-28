@@ -66,6 +66,10 @@ import org.springframework.transaction.annotation.Transactional;
  *   <li>Commits: 1, Additions: 1, Deletions: 0, Changed files: 1</li>
  *   <li>Author: FelixTJDietrich (ID: 5898705)</li>
  * </ul>
+ * <p>
+ * Note: This test class uses @Transactional because it directly calls handler methods
+ * and needs to access lazy-loaded relationships. This is safe because there are no
+ * parallel HTTP handler threads that would compete for database connections.
  */
 @DisplayName("GitHub Pull Request Message Handler")
 @Transactional

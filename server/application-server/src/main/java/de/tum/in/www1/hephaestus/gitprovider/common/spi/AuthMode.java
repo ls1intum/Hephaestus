@@ -28,15 +28,21 @@ public enum AuthMode {
     GITHUB_APP,
 
     /**
-     * Personal Access Token authentication.
+     * Personal Access Token authentication for local development.
      * <p>
-     * Uses a user-provided PAT stored in the scope configuration.
-     * This mode is useful for:
+     * Uses a user-provided PAT stored in the workspace configuration.
+     * This mode is intended for <b>local development</b> where setting up
+     * a full GitHub App with webhooks is impractical.
+     * <p>
+     * Configure via:
      * <ul>
-     *   <li>Simple personal use cases</li>
-     *   <li>Organizations that don't allow GitHub App installation</li>
-     *   <li>Testing and development</li>
+     *   <li>{@code hephaestus.workspace.init-default: true}</li>
+     *   <li>{@code hephaestus.workspace.default.token: <your-PAT>}</li>
      * </ul>
+     * <p>
+     * <b>Not recommended for production.</b> Use {@link #GITHUB_APP} instead.
+     *
+     * @see de.tum.in.www1.hephaestus.workspace.WorkspaceProperties
      */
     PERSONAL_ACCESS_TOKEN,
 }

@@ -76,6 +76,10 @@ public record GitHubIssueDTO(
 
     /**
      * Creates a GitHubIssueDTO from a GraphQL GHIssue model.
+     * <p>
+     * The GraphQL query must include all required fields (title, url, etc.)
+     * for this method to work correctly. If fields are missing, the processor
+     * will fail with a validation error.
      *
      * @param issue the GraphQL GHIssue (may be null)
      * @return GitHubIssueDTO or null if issue is null
@@ -111,6 +115,50 @@ public record GitHubIssueDTO(
         );
     }
 
+    /**
+     * Creates a GitHubIssueDTO from a GraphQL GHIssue model that includes repository reference.
+     * <p>
+     * Used for blocker/parent issues in dependency/sub-issue sync where the referenced
+     * issue may belong to a different repository. The repository reference is needed
+     * to create stub issues in the correct repository.
+     * <p>
+     * The GraphQL query must include all required fields (title, url, repository, etc.)
+     * for this method to work correctly.
+     *
+     * @param issue the GraphQL GHIssue with repository field populated (may be null)
+     * @return GitHubIssueDTO with repository reference, or null if issue is null
+     */
+    @Nullable
+    public static GitHubIssueDTO fromIssueWithRepository(@Nullable GHIssue issue) {
+        if (issue == null) {
+            return null;
+        }
+
+        return new GitHubIssueDTO(
+            null,
+            toLong(issue.getFullDatabaseId()),
+            issue.getId(),
+            issue.getNumber(),
+            issue.getTitle(),
+            issue.getBody(),
+            convertState(issue.getState()),
+            convertStateReason(issue.getStateReason()),
+            uriToString(issue.getUrl()),
+            issue.getComments() != null ? issue.getComments().getTotalCount() : 0,
+            toInstant(issue.getCreatedAt()),
+            toInstant(issue.getUpdatedAt()),
+            toInstant(issue.getClosedAt()),
+            Boolean.TRUE.equals(issue.getLocked()),
+            GitHubUserDTO.fromActor(issue.getAuthor()),
+            extractAssignees(issue.getAssignees()),
+            GitHubLabelDTO.fromLabelConnection(issue.getLabels()),
+            GitHubMilestoneDTO.fromMilestone(issue.getMilestone()),
+            GitHubIssueTypeDTO.fromIssueType(issue.getIssueType()),
+            GitHubRepositoryRefDTO.fromRepository(issue.getRepository()),
+            null // pullRequest - GraphQL issues are never PRs
+        );
+    }
+
     // ========== CONVERSION HELPERS ==========
 
     @Nullable
@@ -121,9 +169,10 @@ public record GitHubIssueDTO(
         return value.longValueExact();
     }
 
+    @Nullable
     private static String convertState(@Nullable GHIssueState state) {
         if (state == null) {
-            return "open";
+            return null; // Let processor handle missing state with appropriate logging
         }
         return state.name().toLowerCase();
     }

@@ -37,8 +37,10 @@ public final class SyncTargetFactory {
             rtm.getIssuesAndPullRequestsSyncedAt(),
             rtm.getCollaboratorsSyncedAt(),
             rtm.getRepositorySyncedAt(),
-            rtm.getBackfillHighWaterMark(),
-            rtm.getBackfillCheckpoint(),
+            rtm.getIssueBackfillHighWaterMark(),
+            rtm.getIssueBackfillCheckpoint(),
+            rtm.getPullRequestBackfillHighWaterMark(),
+            rtm.getPullRequestBackfillCheckpoint(),
             rtm.getBackfillLastRunAt(),
             rtm.getIssueSyncCursor(),
             rtm.getPullRequestSyncCursor()

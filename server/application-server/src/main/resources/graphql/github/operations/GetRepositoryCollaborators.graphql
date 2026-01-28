@@ -25,6 +25,7 @@ query GetRepositoryCollaborators($owner: String!, $name: String!, $first: Int!, 
                     name
                     email
                     createdAt
+                    updatedAt
                 }
             }
         }

@@ -66,6 +66,35 @@ public class PullRequestReview {
     @ToString.Exclude
     private Set<PullRequestReviewComment> comments = new HashSet<>();
 
+    // ==================== Bidirectional Relationship Helpers ====================
+
+    /**
+     * Adds a comment to this review and maintains bidirectional consistency.
+     *
+     * @param comment the comment to add
+     */
+    public void addComment(PullRequestReviewComment comment) {
+        if (comment != null) {
+            this.comments.add(comment);
+            comment.setReview(this);
+        }
+    }
+
+    /**
+     * Removes a comment from this review and maintains bidirectional consistency.
+     * <p>
+     * CRITICAL: This method must be called BEFORE deleting the comment entity
+     * when orphanRemoval=true to avoid TransientObjectException.
+     *
+     * @param comment the comment to remove
+     */
+    public void removeComment(PullRequestReviewComment comment) {
+        if (comment != null) {
+            this.comments.remove(comment);
+            comment.setReview(null);
+        }
+    }
+
     /**
      * Review state. Maps directly to GitHub GraphQL PullRequestReviewState enum.
      * <p>

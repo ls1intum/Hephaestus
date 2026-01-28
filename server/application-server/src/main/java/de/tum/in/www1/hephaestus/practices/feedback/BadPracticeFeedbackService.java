@@ -4,11 +4,9 @@ import com.langfuse.client.LangfuseClient;
 import com.langfuse.client.resources.commons.types.CreateScoreValue;
 import com.langfuse.client.resources.score.types.CreateScoreRequest;
 import com.langfuse.client.resources.score.types.CreateScoreResponse;
-import de.tum.in.www1.hephaestus.practices.detection.PullRequestBadPracticeRepository;
 import de.tum.in.www1.hephaestus.practices.dto.BadPracticeFeedbackDTO;
 import de.tum.in.www1.hephaestus.practices.model.BadPracticeFeedback;
 import de.tum.in.www1.hephaestus.practices.model.PullRequestBadPractice;
-import de.tum.in.www1.hephaestus.practices.model.PullRequestBadPracticeState;
 import de.tum.in.www1.hephaestus.workspace.Workspace;
 import java.time.Instant;
 import org.slf4j.Logger;
@@ -41,20 +39,17 @@ public class BadPracticeFeedbackService {
 
     private static final Logger log = LoggerFactory.getLogger(BadPracticeFeedbackService.class);
 
-    private final PullRequestBadPracticeRepository pullRequestBadPracticeRepository;
     private final BadPracticeFeedbackRepository badPracticeFeedbackRepository;
     private final LangfuseClient langfuseClient;
     private final boolean tracingEnabled;
 
     public BadPracticeFeedbackService(
-        PullRequestBadPracticeRepository pullRequestBadPracticeRepository,
         BadPracticeFeedbackRepository badPracticeFeedbackRepository,
         @Value("${hephaestus.detection.tracing.enabled}") boolean tracingEnabled,
         @Value("${hephaestus.detection.tracing.host}") String tracingHost,
         @Value("${hephaestus.detection.tracing.public-key}") String tracingPublicKey,
         @Value("${hephaestus.detection.tracing.secret-key}") String tracingSecretKey
     ) {
-        this.pullRequestBadPracticeRepository = pullRequestBadPracticeRepository;
         this.badPracticeFeedbackRepository = badPracticeFeedbackRepository;
         this.tracingEnabled = tracingEnabled;
 
@@ -67,30 +62,6 @@ public class BadPracticeFeedbackService {
         } else {
             this.langfuseClient = null;
         }
-    }
-
-    /**
-     * Resolves a bad practice by updating its user state.
-     *
-     * @param workspace   the workspace context
-     * @param badPractice the bad practice to resolve
-     * @param state       the new state (must be a valid user resolution state)
-     * @see PullRequestBadPracticeState#USER_RESOLUTION_STATES valid states
-     */
-    public void resolveBadPractice(
-        Workspace workspace,
-        PullRequestBadPractice badPractice,
-        PullRequestBadPracticeState state
-    ) {
-        log.info(
-            "Resolved bad practice: badPracticeId={}, fromState={}, toState={}, workspaceSlug={}",
-            badPractice.getId(),
-            badPractice.getUserState(),
-            state,
-            workspace.getWorkspaceSlug()
-        );
-        badPractice.setUserState(state);
-        pullRequestBadPracticeRepository.save(badPractice);
     }
 
     /**

@@ -28,7 +28,6 @@ import de.tum.in.www1.hephaestus.gitprovider.repository.github.GitHubRepositoryS
 import de.tum.in.www1.hephaestus.gitprovider.subissue.github.GitHubSubIssueSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.sync.exception.SyncInterruptedException;
 import de.tum.in.www1.hephaestus.gitprovider.team.github.GitHubTeamSyncService;
-import de.tum.in.www1.hephaestus.monitoring.MonitoringProperties;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
@@ -67,7 +66,7 @@ public class GitHubDataSyncService {
 
     private static final Logger log = LoggerFactory.getLogger(GitHubDataSyncService.class);
 
-    private final MonitoringProperties monitoringProperties;
+    private final SyncSchedulerProperties syncSchedulerProperties;
 
     private final SyncTargetProvider syncTargetProvider;
     private final OrganizationMembershipListener organizationMembershipListener;
@@ -91,7 +90,7 @@ public class GitHubDataSyncService {
     private final AsyncTaskExecutor monitoringExecutor;
 
     public GitHubDataSyncService(
-        MonitoringProperties monitoringProperties,
+        SyncSchedulerProperties syncSchedulerProperties,
         SyncTargetProvider syncTargetProvider,
         OrganizationMembershipListener organizationMembershipListener,
         RepositoryRepository repositoryRepository,
@@ -111,7 +110,7 @@ public class GitHubDataSyncService {
         GitHubAppTokenService gitHubAppTokenService,
         @Qualifier("monitoringExecutor") AsyncTaskExecutor monitoringExecutor
     ) {
-        this.monitoringProperties = monitoringProperties;
+        this.syncSchedulerProperties = syncSchedulerProperties;
         this.syncTargetProvider = syncTargetProvider;
         this.organizationMembershipListener = organizationMembershipListener;
         this.repositoryRepository = repositoryRepository;
@@ -185,6 +184,7 @@ public class GitHubDataSyncService {
         }
 
         Long repositoryId = repository.getId();
+
         log.info(
             "Starting repository sync: scopeId={}, repoId={}, repoName={}",
             scopeId,
@@ -221,7 +221,7 @@ public class GitHubDataSyncService {
 
             // Sync issues (with cursor persistence for resumability)
             // Comments are synced inline with issues via the GraphQL query
-            int issuesCount = issueSyncService.syncForRepository(
+            SyncResult issueResult = issueSyncService.syncForRepository(
                 scopeId,
                 repositoryId,
                 syncTarget.id(),
@@ -231,7 +231,7 @@ public class GitHubDataSyncService {
 
             // Sync pull requests (with cursor persistence for resumability)
             // Review threads and comments are synced inline with PRs via the GraphQL query
-            int prsCount = pullRequestSyncService.syncForRepository(
+            SyncResult prResult = pullRequestSyncService.syncForRepository(
                 scopeId,
                 repositoryId,
                 syncTarget.id(),
@@ -239,18 +239,36 @@ public class GitHubDataSyncService {
                 syncTarget.lastIssuesAndPullRequestsSyncedAt()
             );
 
-            // Update sync timestamp via SPI
-            syncTargetProvider.updateSyncTimestamp(syncTarget.id(), SyncType.ISSUES_AND_PULL_REQUESTS, Instant.now());
+            // Only update sync timestamp if BOTH syncs completed successfully
+            // If either was aborted (rate limit or error), keep the old timestamp
+            // so the next sync retries from the same point
+            if (issueResult.isCompleted() && prResult.isCompleted()) {
+                syncTargetProvider.updateSyncTimestamp(
+                    syncTarget.id(),
+                    SyncType.ISSUES_AND_PULL_REQUESTS,
+                    Instant.now()
+                );
+            } else {
+                log.info(
+                    "Skipped timestamp update due to incomplete sync: scopeId={}, repoId={}, issueStatus={}, prStatus={}",
+                    scopeId,
+                    repositoryId,
+                    issueResult.status(),
+                    prResult.status()
+                );
+            }
 
             log.info(
-                "Completed repository sync: scopeId={}, repoId={}, collaborators={}, labels={}, milestones={}, issues={}, prs={}",
+                "Completed repository sync: scopeId={}, repoId={}, collaborators={}, labels={}, milestones={}, issues={}, prs={}, issueStatus={}, prStatus={}",
                 scopeId,
                 repositoryId,
                 collaboratorsCount >= 0 ? collaboratorsCount : "skipped",
                 labelsCount,
                 milestonesCount,
-                issuesCount,
-                prsCount
+                issueResult.count(),
+                prResult.count(),
+                issueResult.status(),
+                prResult.status()
             );
         } catch (InstallationNotFoundException e) {
             // Re-throw to abort the entire sync operation
@@ -326,7 +344,8 @@ public class GitHubDataSyncService {
      * This method orchestrates the sync in the correct order:
      * <ol>
      *   <li>Organization + memberships (users must exist first)</li>
-     *   <li>Per-repository syncs (creates repository records)</li>
+     *   <li>Issue types (organization-level, must exist before issues are synced)</li>
+     *   <li>Per-repository syncs (creates repository records, syncs issues/PRs)</li>
      *   <li>Teams + team repository permissions (requires repos to exist)</li>
      *   <li>Issue dependencies (requires issues to exist)</li>
      *   <li>Sub-issues (requires issues to exist)</li>
@@ -354,7 +373,9 @@ public class GitHubDataSyncService {
 
         var syncTargets = syncTargetProvider.getSyncTargetsForScope(scopeId);
         if (syncTargets.isEmpty()) {
-            log.warn("Skipped scope sync: reason=noSyncTargets, scopeId={}", scopeId);
+            // DEBUG level: empty sync targets is expected for newly created or PAT workspaces
+            // without repositories configured yet. Not an error condition.
+            log.debug("Skipped scope sync: reason=noSyncTargets, scopeId={}", scopeId);
             return;
         }
 
@@ -363,6 +384,10 @@ public class GitHubDataSyncService {
         try {
             // Sync organization and memberships first (users need to exist for later syncs)
             syncOrganizationAndMemberships(scopeId);
+
+            // Sync issue types BEFORE repositories (issue types are organization-level
+            // and must exist before issues are synced so they can be linked immediately)
+            syncIssueTypes(scopeId);
 
             // Sync each repository (creates repository records)
             for (SyncTarget target : syncTargets) {
@@ -457,6 +482,38 @@ public class GitHubDataSyncService {
     }
 
     /**
+     * Syncs issue types for a scope from its GitHub organization.
+     * <p>
+     * This must run AFTER organization is synced (organization must exist) but
+     * BEFORE repositories are synced (so issue types exist when issues are processed).
+     * Issue types are organization-level entities that issues reference.
+     *
+     * @param scopeId the scope ID
+     */
+    private void syncIssueTypes(Long scopeId) {
+        try {
+            // Sync issue types (has internal cooldown check)
+            int issueTypesCount = issueTypeSyncService.syncIssueTypesForScope(scopeId);
+            if (issueTypesCount >= 0) {
+                log.debug("Synced issue types: scopeId={}, issueTypeCount={}", scopeId, issueTypesCount);
+            } else {
+                log.debug("Skipped issue types sync: reason=cooldownActive, scopeId={}", scopeId);
+            }
+        } catch (InstallationNotFoundException e) {
+            throw e;
+        } catch (Exception e) {
+            ClassificationResult classification = exceptionClassifier.classifyWithDetails(e);
+            log.error(
+                "Failed to sync issue types: scopeId={}, category={}, error={}",
+                scopeId,
+                classification.category(),
+                classification.message(),
+                e
+            );
+        }
+    }
+
+    /**
      * Syncs teams, team memberships, and team repository permissions for a scope.
      * <p>
      * This must run AFTER repositories are synced because team repository
@@ -518,37 +575,18 @@ public class GitHubDataSyncService {
      * <p>
      * This includes:
      * <ul>
-     *   <li>Issue types (organization-level issue type definitions)</li>
      *   <li>Issue dependencies (blocked_by relationships)</li>
      *   <li>Sub-issues (parent-child relationships)</li>
      * </ul>
+     * <p>
+     * Note: Issue types are synced earlier via {@link #syncIssueTypes(Long)} because
+     * they must exist BEFORE issues are synced so issues can link to them.
      * <p>
      * These sync operations have their own cooldown mechanisms.
      *
      * @param scopeId the scope ID
      */
     private void syncScopeLevelRelationships(Long scopeId) {
-        try {
-            // Sync issue types (has internal cooldown check)
-            int issueTypesCount = issueTypeSyncService.syncIssueTypesForScope(scopeId);
-            if (issueTypesCount >= 0) {
-                log.debug("Synced issue types: scopeId={}, issueTypeCount={}", scopeId, issueTypesCount);
-            } else {
-                log.debug("Skipped issue types sync: reason=cooldownActive, scopeId={}", scopeId);
-            }
-        } catch (InstallationNotFoundException e) {
-            throw e;
-        } catch (Exception e) {
-            ClassificationResult classification = exceptionClassifier.classifyWithDetails(e);
-            log.error(
-                "Failed to sync issue types: scopeId={}, category={}, error={}",
-                scopeId,
-                classification.category(),
-                classification.message(),
-                e
-            );
-        }
-
         try {
             // Sync issue dependencies (has internal cooldown check)
             int dependenciesCount = issueDependencySyncService.syncDependenciesForScope(scopeId);
@@ -601,7 +639,7 @@ public class GitHubDataSyncService {
      * @return number of collaborators synced, or -1 if skipped due to cooldown
      */
     private int syncCollaboratorsIfNeeded(SyncTarget syncTarget, Long scopeId, Long repositoryId) {
-        Instant cooldownThreshold = Instant.now().minusSeconds(monitoringProperties.getSyncCooldownInMinutes() * 60L);
+        Instant cooldownThreshold = Instant.now().minusSeconds(syncSchedulerProperties.cooldownMinutes() * 60L);
         boolean shouldSync =
             syncTarget.lastCollaboratorsSyncedAt() == null ||
             syncTarget.lastCollaboratorsSyncedAt().isBefore(cooldownThreshold);
@@ -629,7 +667,7 @@ public class GitHubDataSyncService {
         }
         return target
             .lastIssuesAndPullRequestsSyncedAt()
-            .isBefore(Instant.now().minusSeconds(monitoringProperties.getSyncCooldownInMinutes() * 60L));
+            .isBefore(Instant.now().minusSeconds(syncSchedulerProperties.cooldownMinutes() * 60L));
     }
 
     /**

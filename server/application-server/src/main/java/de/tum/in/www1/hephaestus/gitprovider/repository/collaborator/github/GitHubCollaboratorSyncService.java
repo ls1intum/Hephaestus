@@ -99,6 +99,7 @@ public class GitHubCollaboratorSyncService {
             boolean hasNextPage = true;
             Set<Long> syncedUserIds = new HashSet<>();
             int pageCount = 0;
+            boolean syncCompletedNormally = false;
 
             while (hasNextPage) {
                 pageCount++;
@@ -118,7 +119,7 @@ public class GitHubCollaboratorSyncService {
                     .variable("first", LARGE_PAGE_SIZE)
                     .variable("after", cursor)
                     .execute()
-                    .block(syncProperties.getGraphqlTimeout());
+                    .block(syncProperties.graphqlTimeout());
 
                 if (graphQlResponse == null || !graphQlResponse.isValid()) {
                     log.warn(
@@ -130,10 +131,10 @@ public class GitHubCollaboratorSyncService {
                 }
 
                 // Track rate limit from response
-                graphQlClientProvider.trackRateLimit(graphQlResponse);
+                graphQlClientProvider.trackRateLimit(scopeId, graphQlResponse);
 
                 // Check if we should pause due to rate limiting
-                if (graphQlClientProvider.isRateLimitCritical()) {
+                if (graphQlClientProvider.isRateLimitCritical(scopeId)) {
                     log.warn("Aborting collaborator sync due to critical rate limit: repoName={}", safeNameWithOwner);
                     break;
                 }
@@ -173,14 +174,29 @@ public class GitHubCollaboratorSyncService {
                 cursor = pageInfo != null ? pageInfo.getEndCursor() : null;
             }
 
-            // Remove stale collaborators (collaborators in DB that no longer exist on GitHub)
-            int removedCount = removeStaleCollaborators(repositoryId, syncedUserIds);
+            // Mark sync as completed normally if we exhausted all pages
+            syncCompletedNormally = !hasNextPage;
+
+            // CRITICAL: Only remove stale collaborators if sync completed fully.
+            // If sync was aborted (rate limit, error, pagination limit), we don't have
+            // the complete list and would incorrectly delete valid collaborators.
+            int removedCount = 0;
+            if (syncCompletedNormally) {
+                removedCount = removeStaleCollaborators(repositoryId, syncedUserIds);
+            } else {
+                log.warn(
+                    "Skipped stale collaborator removal: reason=incompleteSync, repoName={}, pagesProcessed={}",
+                    safeNameWithOwner,
+                    pageCount
+                );
+            }
 
             log.info(
-                "Completed collaborator sync: repoName={}, collaboratorCount={}, removedCount={}",
+                "Completed collaborator sync: repoName={}, collaboratorCount={}, removedCount={}, complete={}",
                 safeNameWithOwner,
                 totalSynced,
-                removedCount
+                removedCount,
+                syncCompletedNormally
             );
             return totalSynced;
         } catch (InstallationNotFoundException e) {

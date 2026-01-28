@@ -122,7 +122,7 @@ public class GitHubIssueCommentSyncService {
                     .variable("first", DEFAULT_PAGE_SIZE)
                     .variable("after", cursor)
                     .execute()
-                    .block(syncProperties.getGraphqlTimeout());
+                    .block(syncProperties.graphqlTimeout());
 
                 if (response == null || !response.isValid()) {
                     // Check if this is a NOT_FOUND error (issue deleted from GitHub)
@@ -143,10 +143,10 @@ public class GitHubIssueCommentSyncService {
                 }
 
                 // Track rate limit from response
-                graphQlClientProvider.trackRateLimit(response);
+                graphQlClientProvider.trackRateLimit(scopeId, response);
 
                 // Check if we should pause due to rate limiting
-                if (graphQlClientProvider.isRateLimitCritical()) {
+                if (graphQlClientProvider.isRateLimitCritical(scopeId)) {
                     log.warn(
                         "Aborting comment sync due to critical rate limit: repoName={}, issueNumber={}, pageCount={}",
                         safeNameWithOwner,
@@ -167,7 +167,7 @@ public class GitHubIssueCommentSyncService {
                 for (var graphQlComment : connection.getNodes()) {
                     GitHubCommentDTO dto = GitHubCommentDTO.fromIssueComment(graphQlComment);
                     if (dto != null) {
-                        IssueComment entity = commentProcessor.process(dto, issue.getId(), context);
+                        IssueComment entity = commentProcessor.process(dto, issue.getNumber(), context);
                         if (entity != null) {
                             totalSynced++;
                         }
@@ -317,7 +317,7 @@ public class GitHubIssueCommentSyncService {
                     .variable("first", DEFAULT_PAGE_SIZE)
                     .variable("after", cursor)
                     .execute()
-                    .block(syncProperties.getGraphqlTimeout());
+                    .block(syncProperties.graphqlTimeout());
 
                 if (response == null || !response.isValid()) {
                     if (isNotFoundError(response, "repository.issue")) {
@@ -337,10 +337,10 @@ public class GitHubIssueCommentSyncService {
                 }
 
                 // Track rate limit from response
-                graphQlClientProvider.trackRateLimit(response);
+                graphQlClientProvider.trackRateLimit(scopeId, response);
 
                 // Check if we should pause due to rate limiting
-                if (graphQlClientProvider.isRateLimitCritical()) {
+                if (graphQlClientProvider.isRateLimitCritical(scopeId)) {
                     log.warn(
                         "Aborting remaining comment sync due to critical rate limit: repoName={}, issueNumber={}, pageCount={}",
                         safeNameWithOwner,
@@ -361,7 +361,7 @@ public class GitHubIssueCommentSyncService {
                 for (var graphQlComment : connection.getNodes()) {
                     GitHubCommentDTO dto = GitHubCommentDTO.fromIssueComment(graphQlComment);
                     if (dto != null) {
-                        IssueComment entity = commentProcessor.process(dto, issue.getId(), context);
+                        IssueComment entity = commentProcessor.process(dto, issue.getNumber(), context);
                         if (entity != null) {
                             totalSynced++;
                         }

@@ -20,7 +20,7 @@ export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends 
 
 /**
  * List global contributors
- * Returns all contributors across all workspaces
+ * Returns contributors to the Hephaestus project (for the About page)
  */
 export const listGlobalContributors = <ThrowOnError extends boolean = false>(options?: Options<ListGlobalContributorsData, ThrowOnError>) => {
     return (options?.client ?? _heyApiClient).get<ListGlobalContributorsResponses, unknown, ThrowOnError>({

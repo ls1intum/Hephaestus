@@ -66,8 +66,13 @@ public class GitHubOrganizationProcessor {
         if (dto.avatarUrl() != null) {
             organization.setAvatarUrl(dto.avatarUrl());
         }
+        // htmlUrl is required - use DTO value or construct from login
         if (dto.htmlUrl() != null) {
             organization.setHtmlUrl(dto.htmlUrl());
+        } else if (organization.getHtmlUrl() == null && dto.login() != null) {
+            // Construct htmlUrl from login as fallback
+            organization.setHtmlUrl("https://github.com/" + dto.login());
+            log.debug("Constructed htmlUrl from login for organization: orgLogin={}", dto.login());
         }
         if (dto.createdAt() != null) {
             organization.setCreatedAt(dto.createdAt());

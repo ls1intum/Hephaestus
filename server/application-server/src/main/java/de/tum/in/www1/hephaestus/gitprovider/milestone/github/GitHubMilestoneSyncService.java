@@ -99,6 +99,7 @@ public class GitHubMilestoneSyncService {
             String cursor = null;
             boolean hasNextPage = true;
             int pageCount = 0;
+            boolean syncCompletedNormally = false;
 
             while (hasNextPage) {
                 pageCount++;
@@ -118,7 +119,7 @@ public class GitHubMilestoneSyncService {
                     .variable("first", LARGE_PAGE_SIZE)
                     .variable("after", cursor)
                     .execute()
-                    .block(syncProperties.getGraphqlTimeout());
+                    .block(syncProperties.graphqlTimeout());
 
                 if (graphQlResponse == null || !graphQlResponse.isValid()) {
                     log.warn(
@@ -130,10 +131,10 @@ public class GitHubMilestoneSyncService {
                 }
 
                 // Track rate limit from response
-                graphQlClientProvider.trackRateLimit(graphQlResponse);
+                graphQlClientProvider.trackRateLimit(scopeId, graphQlResponse);
 
                 // Check if we should pause due to rate limiting
-                if (graphQlClientProvider.isRateLimitCritical()) {
+                if (graphQlClientProvider.isRateLimitCritical(scopeId)) {
                     log.warn("Aborting milestone sync due to critical rate limit: repoName={}", safeNameWithOwner);
                     break;
                 }
@@ -161,13 +162,27 @@ public class GitHubMilestoneSyncService {
                 cursor = pageInfo != null ? pageInfo.getEndCursor() : null;
             }
 
-            // Remove milestones that no longer exist
-            removeDeletedMilestones(repository.getId(), syncedNumbers, context);
+            // Mark sync as completed normally if we exhausted all pages
+            syncCompletedNormally = !hasNextPage;
+
+            // CRITICAL: Only remove stale milestones if sync completed fully.
+            // If sync was aborted (rate limit, error, pagination limit), we don't have
+            // the complete list and would incorrectly delete valid milestones.
+            if (syncCompletedNormally) {
+                removeDeletedMilestones(repository.getId(), syncedNumbers, context);
+            } else {
+                log.warn(
+                    "Skipped stale milestone removal: reason=incompleteSync, repoName={}, pagesProcessed={}",
+                    safeNameWithOwner,
+                    pageCount
+                );
+            }
 
             log.info(
-                "Completed milestone sync: repoName={}, milestoneCount={}, scopeId={}",
+                "Completed milestone sync: repoName={}, milestoneCount={}, complete={}, scopeId={}",
                 safeNameWithOwner,
                 totalSynced,
+                syncCompletedNormally,
                 scopeId
             );
             return totalSynced;

@@ -11,6 +11,7 @@ import static org.mockito.Mockito.when;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.app.GitHubAppTokenService;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
+import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -57,13 +58,11 @@ class WorkspaceProvisioningServiceTest {
 
     @BeforeEach
     void setUp() {
-        workspaceProperties = new WorkspaceProperties();
-        workspaceProperties.setInitDefault(true);
-        workspaceProperties.getDefaultWorkspace().setLogin("aet-org");
-        workspaceProperties.getDefaultWorkspace().setToken("pat-token");
+        workspaceProperties = new WorkspaceProperties(
+            true,
+            new WorkspaceProperties.DefaultProperties("aet-org", "pat-token", List.of())
+        );
 
-        // Inject real properties via reflection because @InjectMocks cannot set them
-        // directly
         provisioningService = new WorkspaceProvisioningService(
             workspaceProperties,
             workspaceRepository,

@@ -5,6 +5,7 @@ import de.tum.in.www1.hephaestus.gitprovider.common.github.app.GitHubAppTokenSer
 import de.tum.in.www1.hephaestus.gitprovider.common.github.app.GitHubAppTokenService.InstallationToken;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.AuthMode;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.InstallationTokenProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.spi.RateLimitTracker;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHRateLimit;
 import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
@@ -65,14 +66,14 @@ public class GitHubGraphQlClientProvider {
     private final InstallationTokenProvider tokenProvider;
     private final GitHubAppTokenService appTokens;
     private final CircuitBreaker circuitBreaker;
-    private final GitHubGraphQlRateLimitTracker rateLimitTracker;
+    private final RateLimitTracker rateLimitTracker;
 
     public GitHubGraphQlClientProvider(
         HttpGraphQlClient gitHubGraphQlClient,
         InstallationTokenProvider tokenProvider,
         GitHubAppTokenService appTokens,
         @Qualifier("githubGraphQlCircuitBreaker") CircuitBreaker circuitBreaker,
-        GitHubGraphQlRateLimitTracker rateLimitTracker
+        RateLimitTracker rateLimitTracker
     ) {
         this.baseClient = gitHubGraphQlClient;
         this.tokenProvider = tokenProvider;
@@ -173,22 +174,23 @@ public class GitHubGraphQlClientProvider {
     }
 
     // ========================================================================
-    // Rate Limit Tracking
+    // Rate Limit Tracking (Per-Scope)
     // ========================================================================
 
     /**
-     * Updates the rate limit tracker from a GraphQL response.
+     * Updates the rate limit tracker from a GraphQL response for a specific scope.
      * <p>
      * Call this method after every GraphQL query execution to keep the
      * rate limit tracking up to date. The rate limit data is extracted
      * from the "rateLimit" field in the response.
      *
+     * @param scopeId the scope that made the API call
      * @param response the GraphQL response containing rate limit data
      * @return the extracted rate limit info, or null if not present
      */
     @Nullable
-    public GHRateLimit trackRateLimit(@Nullable ClientGraphQlResponse response) {
-        return rateLimitTracker.updateFromResponse(response);
+    public GHRateLimit trackRateLimit(Long scopeId, @Nullable ClientGraphQlResponse response) {
+        return rateLimitTracker.updateFromResponse(scopeId, response);
     }
 
     /**
@@ -196,32 +198,44 @@ public class GitHubGraphQlClientProvider {
      *
      * @return the rate limit tracker instance
      */
-    public GitHubGraphQlRateLimitTracker getRateLimitTracker() {
+    public RateLimitTracker getRateLimitTracker() {
         return rateLimitTracker;
     }
 
     /**
-     * Checks if the rate limit is critically low and waits if necessary.
+     * Checks if the rate limit is critically low for a scope and waits if necessary.
      * <p>
      * This method should be called before making GraphQL requests in loops
      * to proactively avoid hitting the rate limit.
      *
+     * @param scopeId the scope to check
      * @return true if the method waited, false if no waiting was needed
      * @throws InterruptedException if the thread is interrupted while waiting
      */
-    public boolean waitIfRateLimitLow() throws InterruptedException {
-        return rateLimitTracker.waitIfNeeded();
+    public boolean waitIfRateLimitLow(Long scopeId) throws InterruptedException {
+        return rateLimitTracker.waitIfNeeded(scopeId);
     }
 
     /**
-     * Checks if the rate limit is at a critical level.
+     * Checks if the rate limit is at a critical level for a scope.
      * <p>
      * Use this to decide whether to abort a sync operation early.
      *
+     * @param scopeId the scope to check
      * @return true if rate limit is critically low
      */
-    public boolean isRateLimitCritical() {
-        return rateLimitTracker.isCritical();
+    public boolean isRateLimitCritical(Long scopeId) {
+        return rateLimitTracker.isCritical(scopeId);
+    }
+
+    /**
+     * Gets the remaining rate limit points for a scope.
+     *
+     * @param scopeId the scope to check
+     * @return remaining points
+     */
+    public int getRateLimitRemaining(Long scopeId) {
+        return rateLimitTracker.getRemaining(scopeId);
     }
 
     private String getToken(Long scopeId) {

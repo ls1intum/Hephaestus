@@ -46,7 +46,7 @@ public class ChatThread {
     /**
      * All messages in this thread (tree structure)
      */
-    @OneToMany(mappedBy = "thread", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
+    @OneToMany(mappedBy = "thread", cascade = CascadeType.REMOVE, fetch = FetchType.LAZY, orphanRemoval = true)
     @OrderBy("createdAt ASC")
     @ToString.Exclude
     @JsonIgnore

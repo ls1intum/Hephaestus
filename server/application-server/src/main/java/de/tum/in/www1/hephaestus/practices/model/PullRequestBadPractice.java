@@ -122,15 +122,6 @@ public class PullRequestBadPractice {
         return userState != null ? userState : state;
     }
 
-    /**
-     * Checks if this bad practice has been resolved by the user.
-     *
-     * @return true if userState is set and is a resolution state
-     */
-    public boolean isResolved() {
-        return userState != null && userState.isResolved();
-    }
-
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;

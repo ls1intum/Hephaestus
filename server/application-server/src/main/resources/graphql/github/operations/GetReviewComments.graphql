@@ -44,7 +44,9 @@ query GetReviewComments($reviewId: ID!, $first: Int!, $after: String) {
                             login
                             avatarUrl
                             name
+                            email
                             createdAt
+                            updatedAt
                         }
                         ... on Bot {
                             id
@@ -64,6 +66,18 @@ query GetReviewComments($reviewId: ID!, $first: Int!, $after: String) {
                             login
                             avatarUrl
                         }
+                    }
+
+                    # Reply to (for threading)
+                    replyTo {
+                        id
+                        fullDatabaseId
+                    }
+
+                    # Associated review
+                    pullRequestReview {
+                        id
+                        fullDatabaseId
                     }
                 }
             }

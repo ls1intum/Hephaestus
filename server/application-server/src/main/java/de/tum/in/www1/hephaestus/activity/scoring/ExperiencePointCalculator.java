@@ -46,11 +46,19 @@ public class ExperiencePointCalculator implements ExperiencePointStrategy {
     // Default Experience Point Constants (overridable via properties)
     // ========================================================================
 
-    /** Default XP awarded when a pull request is opened */
-    public static final double XP_PULL_REQUEST_OPENED = 1.0;
+    /**
+     * Default XP awarded when a pull request is opened.
+     * <p>
+     * Currently disabled (0.0). PR XP will be introduced in a future release.
+     */
+    public static final double XP_PULL_REQUEST_OPENED = 0.0;
 
-    /** Default XP awarded when a pull request is merged */
-    public static final double XP_PULL_REQUEST_MERGED = 1.0;
+    /**
+     * Default XP awarded when a pull request is merged.
+     * <p>
+     * Currently disabled (0.0). PR XP will be introduced in a future release.
+     */
+    public static final double XP_PULL_REQUEST_MERGED = 0.0;
 
     /** Default XP awarded for each inline review comment */
     public static final double XP_REVIEW_COMMENT = 0.5;
@@ -62,7 +70,7 @@ public class ExperiencePointCalculator implements ExperiencePointStrategy {
         this.pullRequestRepository = pullRequestRepository;
         this.properties = properties;
         this.selfReviewAuthorLogins = properties
-            .getSelfReviewAuthorLogins()
+            .selfReviewAuthorLogins()
             .stream()
             .filter(Objects::nonNull)
             .map(login -> login.toLowerCase(Locale.ROOT))
@@ -77,35 +85,35 @@ public class ExperiencePointCalculator implements ExperiencePointStrategy {
      * Get XP for pull request opened (configurable).
      */
     public double getXpPullRequestOpened() {
-        return properties.getXpPullRequestOpened();
+        return properties.xpAwards().pullRequestOpened();
     }
 
     /**
      * Get XP for pull request merged (configurable).
      */
     public double getXpPullRequestMerged() {
-        return properties.getXpPullRequestMerged();
+        return properties.xpAwards().pullRequestMerged();
     }
 
     /**
      * Get XP for review comment (configurable).
      */
     public double getXpReviewComment() {
-        return properties.getXpReviewComment();
+        return properties.xpAwards().reviewComment();
     }
 
     /**
      * Get XP for pull request marked ready for review (configurable).
      */
     public double getXpPullRequestReady() {
-        return properties.getXpPullRequestReady();
+        return properties.xpAwards().pullRequestReady();
     }
 
     /**
      * Get XP for issue created (configurable).
      */
     public double getXpIssueCreated() {
-        return properties.getXpIssueCreated();
+        return properties.xpAwards().issueCreated();
     }
 
     // ========================================================================
@@ -148,9 +156,9 @@ public class ExperiencePointCalculator implements ExperiencePointStrategy {
         int complexityScore = calculateComplexityScore(reviews.get(0).getPullRequest());
 
         // Get configurable weights
-        double weightApproval = properties.getWeightApproval();
-        double weightChangesRequested = properties.getWeightChangesRequested();
-        double weightComment = properties.getWeightComment();
+        double weightApproval = properties.reviewWeights().approval();
+        double weightChangesRequested = properties.reviewWeights().changesRequested();
+        double weightComment = properties.reviewWeights().comment();
 
         double approvalExperiencePoints = eligibleReviews
             .stream()
@@ -221,7 +229,7 @@ public class ExperiencePointCalculator implements ExperiencePointStrategy {
      */
     @Override
     public double calculateIssueCreatedExperiencePoints(Issue issue) {
-        return properties.getXpIssueCreated();
+        return properties.xpAwards().issueCreated();
     }
 
     /**
@@ -232,7 +240,7 @@ public class ExperiencePointCalculator implements ExperiencePointStrategy {
      */
     @Override
     public double calculatePullRequestOpenedExperiencePoints(PullRequest pullRequest) {
-        return properties.getXpPullRequestOpened();
+        return properties.xpAwards().pullRequestOpened();
     }
 
     /**
@@ -243,7 +251,7 @@ public class ExperiencePointCalculator implements ExperiencePointStrategy {
      */
     @Override
     public double calculatePullRequestMergedExperiencePoints(PullRequest pullRequest) {
-        return properties.getXpPullRequestMerged();
+        return properties.xpAwards().pullRequestMerged();
     }
 
     /**
@@ -254,7 +262,7 @@ public class ExperiencePointCalculator implements ExperiencePointStrategy {
      */
     @Override
     public double calculatePullRequestReadyExperiencePoints(PullRequest pullRequest) {
-        return properties.getXpPullRequestReady();
+        return properties.xpAwards().pullRequestReady();
     }
 
     /**
@@ -266,7 +274,7 @@ public class ExperiencePointCalculator implements ExperiencePointStrategy {
     @Override
     public double calculateReviewCommentExperiencePoints(int bodyLength) {
         // Substantive comments (>50 chars) earn full XP, trivial ones earn half
-        double base = properties.getXpReviewComment();
+        double base = properties.xpAwards().reviewComment();
         return bodyLength > 50 ? base : base * 0.5;
     }
 
@@ -328,7 +336,7 @@ public class ExperiencePointCalculator implements ExperiencePointStrategy {
         int complexityScore = calculateComplexityScore(pullRequest);
 
         // Harmonic mean with configurable comment weight
-        double weightComment = properties.getWeightComment();
+        double weightComment = properties.reviewWeights().comment();
         return (10 * weightComment * complexityScore) / (weightComment + complexityScore);
     }
 

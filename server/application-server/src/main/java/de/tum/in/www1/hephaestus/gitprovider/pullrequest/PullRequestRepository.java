@@ -3,7 +3,6 @@ package de.tum.in.www1.hephaestus.gitprovider.pullrequest;
 import jakarta.persistence.QueryHint;
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 import java.util.stream.Stream;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
@@ -46,21 +45,6 @@ public interface PullRequestRepository extends JpaRepository<PullRequest, Long> 
     );
 
     /**
-     * Finds all synced PR numbers for a repository during sync operations.
-     * Repository ID inherently has scope through Organization.
-     */
-    @Query(
-        """
-        SELECT p.number
-        FROM PullRequest p
-        WHERE Type(p) = PullRequest
-        AND p.repository.id = :repositoryId
-        AND p.lastSyncAt IS NOT NULL
-        """
-    )
-    Set<Integer> findAllSyncedPullRequestNumbers(@Param("repositoryId") long repositoryId);
-
-    /**
      * Finds a pull request by ID with assignees eagerly fetched.
      * Useful when assignees need to be accessed outside the original transaction,
      * avoiding LazyInitializationException after the Hibernate session is closed.
@@ -76,6 +60,25 @@ public interface PullRequestRepository extends JpaRepository<PullRequest, Long> 
         """
     )
     Optional<PullRequest> findByIdWithAssignees(@Param("id") Long id);
+
+    /**
+     * Finds a pull request by ID with repository eagerly fetched.
+     * Required for passing PRs across transaction boundaries where the repository
+     * relationship needs to be accessed (e.g., for logging nameWithOwner).
+     * Avoids LazyInitializationException when PR is fetched in one transaction
+     * and repository is accessed in another.
+     *
+     * @param id the pull request ID
+     * @return the pull request with repository loaded, or empty if not found
+     */
+    @Query(
+        """
+        SELECT p FROM PullRequest p
+        LEFT JOIN FETCH p.repository
+        WHERE p.id = :id
+        """
+    )
+    Optional<PullRequest> findByIdWithRepository(@Param("id") Long id);
 
     /**
      * Finds all pull requests belonging to a repository.
@@ -110,97 +113,4 @@ public interface PullRequestRepository extends JpaRepository<PullRequest, Long> 
      */
     @QueryHints(@QueryHint(name = org.hibernate.jpa.HibernateHints.HINT_FETCH_SIZE, value = "50"))
     Stream<PullRequest> streamAllByRepository_Id(Long repositoryId);
-
-    /**
-     * Finds pull requests belonging to a repository with reviews and their comments eagerly fetched,
-     * with pagination support. Uses a two-query approach to avoid Hibernate's
-     * "HHH90003004: firstResult/maxResults specified with collection fetch" warning.
-     *
-     * <p>The XP calculator needs review.comments.size() for bonus calculation, so we must
-     * fetch both the reviews and their comments in the same query.
-     *
-     * @param repositoryId the repository ID
-     * @param pageable pagination parameters
-     * @return slice of pull requests with reviews and comments for the repository
-     */
-    @Query(
-        """
-        SELECT DISTINCT p
-        FROM PullRequest p
-        LEFT JOIN FETCH p.reviews r
-        LEFT JOIN FETCH r.comments
-        LEFT JOIN FETCH p.repository
-        WHERE p.repository.id = :repositoryId
-        ORDER BY p.id
-        """
-    )
-    Slice<PullRequest> findByRepositoryIdWithReviews(@Param("repositoryId") Long repositoryId, Pageable pageable);
-
-    /**
-     * Finds pull requests belonging to a repository with review comments eagerly fetched,
-     * with pagination support.
-     *
-     * @param repositoryId the repository ID
-     * @param pageable pagination parameters
-     * @return slice of pull requests with review comments for the repository
-     */
-    @Query(
-        """
-        SELECT DISTINCT p
-        FROM PullRequest p
-        LEFT JOIN FETCH p.reviewComments rc
-        LEFT JOIN FETCH rc.author
-        LEFT JOIN FETCH p.repository
-        WHERE p.repository.id = :repositoryId
-        ORDER BY p.id
-        """
-    )
-    Slice<PullRequest> findByRepositoryIdWithReviewComments(
-        @Param("repositoryId") Long repositoryId,
-        Pageable pageable
-    );
-
-    /**
-     * Counts the number of pull requests in a repository.
-     * Used for progress estimation without loading entities into memory.
-     *
-     * @param repositoryId the repository ID
-     * @return count of pull requests
-     */
-    @Query("SELECT COUNT(p) FROM PullRequest p WHERE p.repository.id = :repositoryId")
-    long countByRepositoryId(@Param("repositoryId") Long repositoryId);
-
-    /**
-     * Counts the total number of reviews across all pull requests in a repository.
-     * Used for progress estimation without loading entities into memory.
-     *
-     * @param repositoryId the repository ID
-     * @return count of reviews
-     */
-    @Query(
-        """
-        SELECT COUNT(r)
-        FROM PullRequest p
-        JOIN p.reviews r
-        WHERE p.repository.id = :repositoryId
-        """
-    )
-    long countReviewsByRepositoryId(@Param("repositoryId") Long repositoryId);
-
-    /**
-     * Counts the total number of review comments across all pull requests in a repository.
-     * Used for progress estimation without loading entities into memory.
-     *
-     * @param repositoryId the repository ID
-     * @return count of review comments
-     */
-    @Query(
-        """
-        SELECT COUNT(rc)
-        FROM PullRequest p
-        JOIN p.reviewComments rc
-        WHERE p.repository.id = :repositoryId
-        """
-    )
-    long countReviewCommentsByRepositoryId(@Param("repositoryId") Long repositoryId);
 }

@@ -4,11 +4,15 @@ import de.tum.in.www1.hephaestus.gitprovider.common.exception.InstallationSuspen
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
-import io.github.resilience4j.ratelimiter.RateLimiter;
-import io.github.resilience4j.ratelimiter.RateLimiterConfig;
-import io.github.resilience4j.ratelimiter.RateLimiterRegistry;
+import io.github.resilience4j.micrometer.tagged.TaggedCircuitBreakerMetrics;
+import io.micrometer.core.instrument.MeterRegistry;
+import jakarta.ws.rs.ForbiddenException;
+import jakarta.ws.rs.NotAuthorizedException;
+import jakarta.ws.rs.ProcessingException;
 import java.io.IOException;
 import java.time.Duration;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.concurrent.TimeoutException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -18,13 +22,10 @@ import org.springframework.web.reactive.function.client.WebClientRequestExceptio
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 
 /**
- * Resilience4j configuration for circuit breaker and rate limiter patterns.
+ * Resilience4j configuration for circuit breaker patterns.
  * <p>
  * Provides circuit breakers for external API calls to prevent cascading failures
  * when GitHub API becomes unavailable or experiences high error rates.
- * <p>
- * Also provides rate limiting for inbound API requests to comply with OWASP API4:2023
- * (Unrestricted Resource Consumption) security guidelines.
  * <p>
  * Circuit Breaker States:
  * <ul>
@@ -41,18 +42,78 @@ import org.springframework.web.reactive.function.client.WebClientResponseExcepti
  * <li>Allows 3 test calls in half-open state</li>
  * <li>Slow call threshold: 10 seconds (counts as failure if exceeded)</li>
  * </ul>
- * <p>
- * Rate Limiting (OWASP API4:2023):
- * <ul>
- * <li>100 requests per minute per client</li>
- * <li>Fail-fast behavior - rejected requests receive 429 Too Many Requests</li>
- * <li>Apply via {@code @RateLimiter(name = "api")} annotation</li>
- * </ul>
  */
 @Configuration
 public class ResilienceConfig {
 
     private static final Logger log = LoggerFactory.getLogger(ResilienceConfig.class);
+
+    private final MeterRegistry meterRegistry;
+
+    public ResilienceConfig(MeterRegistry meterRegistry) {
+        this.meterRegistry = meterRegistry;
+    }
+
+    /**
+     * Exception types that indicate configuration problems, not transient service failures.
+     * These should never trip the circuit breaker because:
+     * <ul>
+     *   <li>401/403 errors indicate credential/permission misconfiguration</li>
+     *   <li>IllegalArgumentException indicates bad input, not service issues</li>
+     * </ul>
+     * <p>
+     * IMPORTANT: Keycloak's RESTEasy client sometimes wraps these in ProcessingException,
+     * so we must check the entire cause chain, not just the top-level exception.
+     */
+    private static final Set<Class<? extends Throwable>> CONFIG_ERROR_EXCEPTIONS = Set.of(
+        NotAuthorizedException.class,
+        ForbiddenException.class,
+        IllegalArgumentException.class
+    );
+
+    /**
+     * Checks if an exception (or any exception in its cause chain) indicates
+     * a configuration error that should NOT trip the circuit breaker.
+     * <p>
+     * This handles the case where RESTEasy wraps NotAuthorizedException inside
+     * ProcessingException during token refresh failures.
+     *
+     * @param throwable the exception to evaluate
+     * @return true if this is a config error (should be ignored), false if infrastructure failure
+     */
+    static boolean isConfigurationError(Throwable throwable) {
+        Throwable current = throwable;
+        Set<Throwable> seen = new HashSet<>(); // Prevent infinite loops on circular causes
+        while (current != null && seen.add(current)) {
+            for (Class<? extends Throwable> configError : CONFIG_ERROR_EXCEPTIONS) {
+                if (configError.isInstance(current)) {
+                    return true;
+                }
+            }
+            current = current.getCause();
+        }
+        return false;
+    }
+
+    /**
+     * Determines if an exception should be recorded as a circuit breaker failure.
+     * <p>
+     * Returns true (record as failure) only for infrastructure failures:
+     * <ul>
+     *   <li>ProcessingException without auth errors in cause chain</li>
+     *   <li>IOException (network/transport failures)</li>
+     * </ul>
+     * <p>
+     * Returns false for configuration errors (401/403) even when wrapped.
+     */
+    static boolean shouldRecordAsFailure(Throwable throwable) {
+        // First check: is this or any cause a configuration error?
+        if (isConfigurationError(throwable)) {
+            return false;
+        }
+        // Second check: is this an infrastructure failure type?
+        return throwable instanceof ProcessingException || throwable instanceof IOException;
+    }
 
     /**
      * Name of the circuit breaker for GitHub GraphQL API calls.
@@ -60,14 +121,9 @@ public class ResilienceConfig {
     public static final String GITHUB_GRAPHQL_CIRCUIT_BREAKER = "githubGraphQl";
 
     /**
-     * Name of the circuit breaker for GitHub REST API calls.
+     * Name of the circuit breaker for Keycloak Admin API calls.
      */
-    public static final String GITHUB_REST_CIRCUIT_BREAKER = "githubRest";
-
-    /**
-     * Name of the rate limiter for API endpoints (OWASP API4:2023 compliance).
-     */
-    public static final String API_RATE_LIMITER = "api";
+    public static final String KEYCLOAK_CIRCUIT_BREAKER = "keycloak";
 
     @Bean
     public CircuitBreakerRegistry circuitBreakerRegistry() {
@@ -106,19 +162,17 @@ public class ResilienceConfig {
 
         CircuitBreakerRegistry registry = CircuitBreakerRegistry.of(defaultConfig);
 
-        // Register circuit breakers with event listeners for monitoring
+        // Register circuit breaker with event listeners for monitoring
         CircuitBreaker graphQlBreaker = registry.circuitBreaker(GITHUB_GRAPHQL_CIRCUIT_BREAKER);
-        CircuitBreaker restBreaker = registry.circuitBreaker(GITHUB_REST_CIRCUIT_BREAKER);
 
         // Add event listeners for observability
         registerEventListeners(graphQlBreaker);
-        registerEventListeners(restBreaker);
 
-        log.info(
-            "Initialized circuit breakers: graphQlBreaker={}, restBreaker={}",
-            GITHUB_GRAPHQL_CIRCUIT_BREAKER,
-            GITHUB_REST_CIRCUIT_BREAKER
-        );
+        // Register Micrometer metrics for all circuit breakers in the registry
+        // Exposes metrics: resilience4j_circuitbreaker_state, resilience4j_circuitbreaker_calls_total, etc.
+        TaggedCircuitBreakerMetrics.ofCircuitBreakerRegistry(registry).bindTo(meterRegistry);
+
+        log.info("Initialized circuit breaker: name={}", GITHUB_GRAPHQL_CIRCUIT_BREAKER);
 
         return registry;
     }
@@ -166,82 +220,42 @@ public class ResilienceConfig {
     }
 
     /**
-     * Provides the GitHub REST circuit breaker for injection.
-     */
-    @Bean
-    public CircuitBreaker githubRestCircuitBreaker(CircuitBreakerRegistry registry) {
-        return registry.circuitBreaker(GITHUB_REST_CIRCUIT_BREAKER);
-    }
-
-    /**
-     * Creates a RateLimiterRegistry for API rate limiting (OWASP API4:2023 compliance).
+     * Provides the Keycloak circuit breaker for injection.
      * <p>
-     * Rate limiting protects against:
+     * Uses a more lenient configuration than GitHub since Keycloak failures
+     * are typically due to connectivity issues rather than rate limiting:
      * <ul>
-     * <li>Denial of Service (DoS) attacks</li>
-     * <li>Brute force attacks on authentication endpoints</li>
-     * <li>Resource exhaustion from excessive API calls</li>
-     * <li>Unfair resource consumption by single clients</li>
+     *   <li>Opens circuit after 3 consecutive failures (count-based)</li>
+     *   <li>Waits 30 seconds before attempting recovery (fast recovery for transient issues)</li>
+     *   <li>Allows 2 test calls in half-open state for reliable recovery detection</li>
      * </ul>
      * <p>
-     * Configuration:
-     * <ul>
-     * <li>100 requests per minute per client</li>
-     * <li>Fail-fast behavior (no waiting for permits)</li>
-     * </ul>
-     * <p>
-     * Usage: Apply {@code @RateLimiter(name = "api")} annotation to controller methods
-     * or entire controller classes that need rate limiting.
-     * <p>
-     * Example:
-     * <pre>{@code
-     * @RestController
-     * @RateLimiter(name = "api")
-     * public class MyController {
-     *     // All endpoints in this controller are rate limited
-     * }
-     * }</pre>
+     * <b>Important:</b> Uses a custom predicate to check the entire exception cause chain.
+     * This handles the case where Keycloak's RESTEasy client wraps NotAuthorizedException
+     * inside ProcessingException during token refresh failures. Without cause chain inspection,
+     * auth errors (which indicate config problems) would incorrectly trip the circuit.
+     *
+     * @see #shouldRecordAsFailure(Throwable)
+     * @see #isConfigurationError(Throwable)
      */
     @Bean
-    public RateLimiterRegistry rateLimiterRegistry() {
-        RateLimiterConfig config = RateLimiterConfig.custom()
-            // Allow 100 requests per minute
-            .limitForPeriod(100)
-            .limitRefreshPeriod(Duration.ofMinutes(1))
-            // Fail fast - don't wait for permits, reject immediately
-            .timeoutDuration(Duration.ofSeconds(0))
+    public CircuitBreaker keycloakCircuitBreaker(CircuitBreakerRegistry registry) {
+        CircuitBreakerConfig keycloakConfig = CircuitBreakerConfig.custom()
+            .slidingWindowType(CircuitBreakerConfig.SlidingWindowType.COUNT_BASED)
+            .slidingWindowSize(5)
+            .failureRateThreshold(60) // Open after 3 of 5 calls fail
+            .waitDurationInOpenState(Duration.ofSeconds(30)) // Reduced from 2 min for faster recovery
+            .permittedNumberOfCallsInHalfOpenState(2) // Increased from 1 for reliable recovery detection
+            .minimumNumberOfCalls(3)
+            .automaticTransitionFromOpenToHalfOpenEnabled(true)
+            // Use predicate to check ENTIRE cause chain for config errors
+            // This correctly handles ProcessingException wrapping NotAuthorizedException
+            .recordException(ResilienceConfig::shouldRecordAsFailure)
             .build();
 
-        RateLimiterRegistry registry = RateLimiterRegistry.of(config);
-
-        // Register the API rate limiter with event listeners
-        RateLimiter apiRateLimiter = registry.rateLimiter(API_RATE_LIMITER);
-        registerRateLimiterEventListeners(apiRateLimiter);
-
-        log.info(
-            "Initialized rate limiter: name={}, limitForPeriod={}, refreshPeriod={}",
-            API_RATE_LIMITER,
-            config.getLimitForPeriod(),
-            config.getLimitRefreshPeriod()
-        );
-
-        return registry;
-    }
-
-    private void registerRateLimiterEventListeners(RateLimiter rateLimiter) {
-        rateLimiter
-            .getEventPublisher()
-            .onSuccess(event -> log.trace("Rate limiter permitted request: name={}", event.getRateLimiterName()))
-            .onFailure(event ->
-                log.warn("Rate limiter rejected request: name={}, reason=limit_exceeded", event.getRateLimiterName())
-            );
-    }
-
-    /**
-     * Provides the API rate limiter for injection.
-     */
-    @Bean
-    public RateLimiter apiRateLimiter(RateLimiterRegistry registry) {
-        return registry.rateLimiter(API_RATE_LIMITER);
+        CircuitBreaker breaker = registry.circuitBreaker(KEYCLOAK_CIRCUIT_BREAKER, keycloakConfig);
+        registerEventListeners(breaker);
+        log.info("Initialized circuit breaker: name={}", KEYCLOAK_CIRCUIT_BREAKER);
+        return breaker;
     }
 }

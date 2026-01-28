@@ -34,17 +34,6 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     @Query(
         """
-            SELECT DISTINCT u
-            FROM User u
-            LEFT JOIN FETCH u.teamMemberships m
-            LEFT JOIN FETCH m.team t
-            WHERE u.type = 'USER'
-        """
-    )
-    List<User> findAllWithEagerTeams();
-
-    @Query(
-        """
             SELECT u
             FROM User u
             WHERE u.type = 'USER'
@@ -125,6 +114,11 @@ public interface UserRepository extends JpaRepository<User, Long> {
      * The type field is also updated on conflict to ensure that misclassified
      * users (e.g., bots stored as USER) get corrected when seen again with
      * proper type information.
+     * <p>
+     * <b>Note:</b> This method can cause deadlocks when concurrent transactions
+     * try to upsert different users in different orders. For deadlock-free
+     * concurrent inserts, prefer {@link #insertIgnore} combined with a
+     * subsequent update via JPA.
      *
      * @param id the primary key (GitHub database ID)
      * @param login the user login
@@ -156,4 +150,72 @@ public interface UserRepository extends JpaRepository<User, Long> {
         @Param("htmlUrl") String htmlUrl,
         @Param("type") String type
     );
+
+    /**
+     * Insert a user, ignoring conflicts on ID (ON CONFLICT DO NOTHING).
+     * <p>
+     * This is the preferred method for concurrent inserts because it avoids
+     * deadlocks that can occur with ON CONFLICT DO UPDATE. When multiple
+     * transactions try to insert the same user:
+     * <ul>
+     *   <li>One transaction succeeds with the insert</li>
+     *   <li>Other transactions skip (DO NOTHING) without blocking</li>
+     * </ul>
+     * <p>
+     * After calling this method, fetch the user and update via JPA if needed.
+     * This pattern separates insert (no locks) from update (row-level lock on
+     * specific row), avoiding the lock escalation that causes deadlocks.
+     * <p>
+     * <b>Note:</b> This method only handles conflicts on the ID column. If a
+     * conflict occurs on the login column (unique constraint uk_user_login),
+     * a DataIntegrityViolationException will be thrown. The caller should catch
+     * this and handle the login conflict (e.g., by updating the existing user's
+     * login first to free up the username).
+     *
+     * @param id the primary key (GitHub database ID)
+     * @param login the user login
+     * @param name the display name
+     * @param avatarUrl the avatar URL
+     * @param htmlUrl the HTML URL
+     * @param type the user type (USER, BOT, ORGANIZATION)
+     * @throws org.springframework.dao.DataIntegrityViolationException if login conflicts with existing user
+     */
+    @Modifying
+    @Transactional
+    @Query(
+        value = """
+        INSERT INTO "user" (id, login, name, avatar_url, html_url, type)
+        VALUES (:id, :login, :name, :avatarUrl, :htmlUrl, :type)
+        ON CONFLICT (id) DO NOTHING
+        """,
+        nativeQuery = true
+    )
+    void insertIgnore(
+        @Param("id") Long id,
+        @Param("login") String login,
+        @Param("name") String name,
+        @Param("avatarUrl") String avatarUrl,
+        @Param("htmlUrl") String htmlUrl,
+        @Param("type") String type
+    );
+
+    /**
+     * Update a user's login by their ID.
+     * <p>
+     * This is used when a GitHub user renames their account. The login field
+     * has a unique constraint, so when processing a new user who has taken
+     * an old username, we first need to update the old user's login.
+     *
+     * @param id the user's ID
+     * @param newLogin the new login to set (can be a placeholder like "RENAMED_123")
+     */
+    @Modifying
+    @Transactional
+    @Query(
+        value = """
+        UPDATE "user" SET login = :newLogin WHERE id = :id
+        """,
+        nativeQuery = true
+    )
+    void updateLogin(@Param("id") Long id, @Param("newLogin") String newLogin);
 }

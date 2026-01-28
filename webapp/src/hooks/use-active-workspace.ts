@@ -102,12 +102,15 @@ export function useActiveWorkspaceSlug() {
 		setSelectedSlug,
 	]);
 
-	// Keep store in sync if the stored slug is no longer valid
+	// Keep store in sync with activeSlug, but only after workspaces have loaded.
+	// During loading, activeSlug may be undefined even if the URL slug is valid,
+	// so we must wait until we have workspace data before syncing.
 	useEffect(() => {
-		if (selectedSlug && activeSlug !== selectedSlug) {
+		const workspacesLoaded = !query.isLoading && query.data !== undefined;
+		if (workspacesLoaded && activeSlug !== selectedSlug) {
 			setSelectedSlug(activeSlug);
 		}
-	}, [activeSlug, selectedSlug, setSelectedSlug]);
+	}, [activeSlug, selectedSlug, setSelectedSlug, query.isLoading, query.data]);
 
 	// Clear persisted selection when the user logs out to avoid cross-user leakage
 	useEffect(() => {

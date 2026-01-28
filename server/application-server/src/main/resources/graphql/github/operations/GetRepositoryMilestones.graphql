@@ -46,7 +46,10 @@ query GetRepositoryMilestones(
                         databaseId
                         login
                         avatarUrl
+                        name
+                        email
                         createdAt
+                        updatedAt
                     }
                     ... on Bot {
                         id

@@ -32,8 +32,14 @@ class ExperiencePointCalculatorTest {
 
     @BeforeEach
     void setUp() {
-        ExperiencePointProperties properties = new ExperiencePointProperties();
-        properties.setSelfReviewAuthorLogins(List.of("Copilot", "dependabot[bot]"));
+        // Use production defaults: only reviews and review comments earn XP
+        // PR opened/merged/ready and issue created are 0.0 (to be enabled in future release)
+        ExperiencePointProperties properties = new ExperiencePointProperties(
+            List.of("Copilot", "dependabot[bot]"),
+            new ExperiencePointProperties.ReviewWeights(2.0, 2.5, 1.5),
+            new ExperiencePointProperties.XpAwards(0.0, 0.0, 0.0, 0.5, 0.0),
+            1000.0
+        );
         calculator = new ExperiencePointCalculator(pullRequestRepository, properties);
     }
 
@@ -212,15 +218,17 @@ class ExperiencePointCalculatorTest {
     class ExperiencePointConstants {
 
         @Test
-        @DisplayName("XP_PULL_REQUEST_OPENED has expected value")
+        @DisplayName("XP_PULL_REQUEST_OPENED is disabled by default (0.0)")
         void pullRequestOpenedConstant() {
-            assertThat(ExperiencePointCalculator.XP_PULL_REQUEST_OPENED).isEqualTo(1.0);
+            // PR XP will be introduced in a future release
+            assertThat(ExperiencePointCalculator.XP_PULL_REQUEST_OPENED).isEqualTo(0.0);
         }
 
         @Test
-        @DisplayName("XP_PULL_REQUEST_MERGED has expected value")
+        @DisplayName("XP_PULL_REQUEST_MERGED is disabled by default (0.0)")
         void pullRequestMergedConstant() {
-            assertThat(ExperiencePointCalculator.XP_PULL_REQUEST_MERGED).isEqualTo(1.0);
+            // PR XP will be introduced in a future release
+            assertThat(ExperiencePointCalculator.XP_PULL_REQUEST_MERGED).isEqualTo(0.0);
         }
 
         @Test

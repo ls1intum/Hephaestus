@@ -16,6 +16,7 @@ import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserProcessor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
@@ -54,6 +55,7 @@ public class GitHubMembershipMessageHandler extends GitHubMessageHandler<GitHubM
     }
 
     @Override
+    @Transactional
     protected void handleEvent(GitHubMembershipEventDTO event) {
         var memberDto = event.member();
         var teamDto = event.team();

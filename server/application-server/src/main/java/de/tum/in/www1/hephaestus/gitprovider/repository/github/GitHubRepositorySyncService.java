@@ -89,7 +89,7 @@ public class GitHubRepositorySyncService {
                 .variable("owner", repoOwner)
                 .variable("name", repoName)
                 .execute()
-                .block(syncProperties.getGraphqlTimeout());
+                .block(syncProperties.graphqlTimeout());
 
             if (response == null || !response.isValid()) {
                 log.warn(
@@ -102,7 +102,7 @@ public class GitHubRepositorySyncService {
             }
 
             // Track rate limit from response
-            graphQlClientProvider.trackRateLimit(response);
+            graphQlClientProvider.trackRateLimit(scopeId, response);
 
             // Use typed GraphQL model for type-safe parsing
             var repoData = response.field("repository").toEntity(GHRepository.class);

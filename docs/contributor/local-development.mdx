@@ -135,14 +135,32 @@ Keycloak runs in Docker as part of the development compose stack. The bundled re
 
    ```bash
    cp server/application-server/.env.example server/application-server/.env
-   KEYCLOAK_GITHUB_CLIENT_ID=<github-client-id>
-   KEYCLOAK_GITHUB_CLIENT_SECRET=<github-client-secret>
-   KEYCLOAK_GITHUB_ADMIN_USERNAME=<github-handle-with-admin-access>
+   # Edit .env and set:
+   # KEYCLOAK_GITHUB_CLIENT_ID=<github-client-id>
+   # KEYCLOAK_GITHUB_CLIENT_SECRET=<github-client-secret>
+   # KEYCLOAK_GITHUB_ADMIN_USERNAME=<github-handle-with-admin-access>
    ```
 
    The Keycloak container resolves these placeholders during realm import, as documented in the [Keycloak import guide](https://www.keycloak.org/server/importExport#_using_environment_variables_within_the_realm_configuration_files).
-3. (Re)start the local stack: `docker compose up keycloak postgres`. On first boot Keycloak imports `keycloak-hephaestus-realm-example-config.json` and wires the GitHub provider automatically.
+
+   :::tip Pre-configured client secret
+   The `KEYCLOAK_CLIENT_SECRET` is pre-configured with a development default (`hephaestus-dev-secret`). You do not need to copy a secret from the Keycloak admin console for local development.
+   :::
+
+3. Run the application server with `./mvnw spring-boot:run`. Docker containers (Keycloak, PostgreSQL) start automatically via Spring Boot's Docker Compose support.
 4. Sign in via GitHub using the account referenced by `KEYCLOAK_GITHUB_ADMIN_USERNAME`. During the first brokered login Keycloak automatically grants that account the `admin` realm role and the `realm-management` → `realm-admin` client role, unlocking the administrative views in the application server and Keycloak console.
+
+#### Troubleshooting Keycloak
+
+If you encounter 401 Unauthorized errors or authentication issues after changing configuration:
+
+```bash
+cd server/application-server
+docker compose down -v  # Clear Keycloak data volume
+docker compose up       # Re-import realm with fresh settings
+```
+
+This deletes the Keycloak H2 database and forces a fresh realm import with your current `.env` values.
 
 ### Webhook ingest service
 

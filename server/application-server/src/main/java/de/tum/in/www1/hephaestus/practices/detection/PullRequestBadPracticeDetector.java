@@ -1,5 +1,9 @@
 package de.tum.in.www1.hephaestus.practices.detection;
 
+import static de.tum.in.www1.hephaestus.practices.model.PullRequestLabels.READY_FOR_REVIEW;
+import static de.tum.in.www1.hephaestus.practices.model.PullRequestLabels.READY_TO_MERGE;
+import static de.tum.in.www1.hephaestus.practices.model.PullRequestLabels.READY_TO_REVIEW;
+
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.intelligenceservice.api.DetectorApi;
@@ -35,10 +39,6 @@ import org.springframework.web.client.RestClientException;
 public class PullRequestBadPracticeDetector {
 
     private static final Logger log = LoggerFactory.getLogger(PullRequestBadPracticeDetector.class);
-
-    private static final String READY_TO_REVIEW = "ready to review";
-    private static final String READY_FOR_REVIEW = "ready for review";
-    private static final String READY_TO_MERGE = "ready to merge";
 
     private final PracticesPullRequestQueryRepository practicesPullRequestQueryRepository;
 

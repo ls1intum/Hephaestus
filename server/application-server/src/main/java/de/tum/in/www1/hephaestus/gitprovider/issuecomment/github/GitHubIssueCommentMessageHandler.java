@@ -17,6 +17,17 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Handles GitHub issue_comment webhook events.
+ * <p>
+ * This handler processes comments on both Issues and Pull Requests. GitHub sends
+ * issue_comment events for both entity types, with a pull_request field present
+ * when the comment is on a PR.
+ * <p>
+ * <b>Key Design Decision:</b> For Issues, we always process the parent entity first
+ * to ensure it exists. For PRs, we rely on the comment processor to create a stub
+ * PR entity if needed, since the PR webhook may not have arrived yet. This prevents
+ * the 769+ ParentEntityNotFoundException errors that occurred due to message ordering.
+ *
+ * @see GitHubIssueCommentProcessor#processWithParentCreation
  */
 @Component
 public class GitHubIssueCommentMessageHandler extends GitHubMessageHandler<GitHubIssueCommentEventDTO> {
@@ -56,11 +67,12 @@ public class GitHubIssueCommentMessageHandler extends GitHubMessageHandler<GitHu
         }
 
         log.info(
-            "Received issue_comment event: action={}, issueNumber={}, commentId={}, repoName={}",
+            "Received issue_comment event: action={}, issueNumber={}, commentId={}, repoName={}, isPullRequest={}",
             event.action(),
             issueDto.number(),
             commentDto.id(),
-            event.repository() != null ? sanitizeForLog(event.repository().fullName()) : "unknown"
+            event.repository() != null ? sanitizeForLog(event.repository().fullName()) : "unknown",
+            issueDto.isPullRequest()
         );
 
         ProcessingContext context = contextFactory.forWebhookEvent(event).orElse(null);
@@ -68,26 +80,25 @@ public class GitHubIssueCommentMessageHandler extends GitHubMessageHandler<GitHu
             return;
         }
 
-        // Only process as Issue if it's not a PR.
-        // GitHub fires issue_comment events for both issues AND pull requests.
-        // For PRs, the issue payload contains a pull_request field.
-        // PRs are already synced via pull_request webhooks, so we skip issue processing
-        // to avoid creating duplicate ISSUE records for what should be PULL_REQUEST.
+        // For regular Issues: process the Issue first to ensure it exists.
+        // This creates/updates the Issue entity before we try to attach a comment.
         if (!issueDto.isPullRequest()) {
             issueProcessor.process(issueDto, context);
-        } else {
-            log.debug(
-                "Skipped issue processing for PR comment: issueNumber={}, repoName={}",
-                issueDto.number(),
-                event.repository() != null ? sanitizeForLog(event.repository().fullName()) : "unknown"
-            );
         }
+        // For PRs: We don't call issueProcessor.process() because that would create
+        // an Issue entity with discriminator "ISSUE", but we need "PULL_REQUEST".
+        // The PR should be created by pull_request webhooks, but due to message
+        // ordering, the comment may arrive first. The comment processor will handle
+        // creating a stub PR if needed.
 
         // Handle comment action
         if (event.actionType() == GitHubEventAction.IssueComment.DELETED) {
             commentProcessor.delete(commentDto.id(), context);
         } else {
-            commentProcessor.process(commentDto, issueDto.getDatabaseId(), context);
+            // Use processWithParentCreation to handle the case where the parent
+            // entity (Issue or PR) doesn't exist yet. This creates a minimal
+            // entity from the webhook data instead of failing.
+            commentProcessor.processWithParentCreation(commentDto, issueDto, context);
         }
     }
 }

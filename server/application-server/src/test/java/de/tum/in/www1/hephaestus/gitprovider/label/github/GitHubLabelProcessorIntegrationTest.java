@@ -25,7 +25,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Integration tests for GitHubLabelProcessor.
@@ -37,7 +36,6 @@ import org.springframework.transaction.annotation.Transactional;
  * - Edge cases in DTO processing
  */
 @DisplayName("GitHub Label Processor")
-@Transactional
 class GitHubLabelProcessorIntegrationTest extends BaseIntegrationTest {
 
     private static final Long TEST_ORG_ID = 215361191L;

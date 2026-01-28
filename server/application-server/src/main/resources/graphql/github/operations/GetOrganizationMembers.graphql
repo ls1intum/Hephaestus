@@ -26,6 +26,7 @@ query GetOrganizationMembers($login: String!, $first: Int!, $after: String) {
                     name
                     email
                     createdAt
+                    updatedAt
                 }
             }
         }

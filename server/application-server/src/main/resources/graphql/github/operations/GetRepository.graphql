@@ -39,9 +39,11 @@ query GetRepository($owner: String!, $name: String!) {
                 databaseId
                 login
                 name
+                email
                 url
                 avatarUrl
                 createdAt
+                updatedAt
             }
         }
     }

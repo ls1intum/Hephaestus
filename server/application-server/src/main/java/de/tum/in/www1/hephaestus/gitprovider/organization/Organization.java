@@ -10,6 +10,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
+import org.springframework.lang.NonNull;
 
 @Entity
 @Getter
@@ -36,6 +37,7 @@ public class Organization extends BaseGitServiceEntity {
     @Column(name = "avatar_url")
     private String avatarUrl;
 
+    @NonNull
     @Column(name = "html_url")
     private String htmlUrl;
 

@@ -35,6 +35,10 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>
  * Tests use JSON fixtures parsed directly into DTOs using JSON fixtures for complete isolation.
  * Fixtures are real GitHub webhook payloads from HephaestusTest/TestRepository.
+ * <p>
+ * Note: This test class uses @Transactional because it directly calls handler methods
+ * and needs to access lazy-loaded relationships. This is safe because there are no
+ * parallel HTTP handler threads that would compete for database connections.
  */
 @DisplayName("GitHub Milestone Message Handler")
 @Transactional
@@ -293,7 +297,8 @@ class GitHubMilestoneMessageHandlerIntegrationTest extends BaseIntegrationTest {
                 0,
                 0,
                 Instant.now(),
-                Instant.now()
+                Instant.now(),
+                null // closedAt
             );
             GitHubMilestoneEventDTO event = new GitHubMilestoneEventDTO("created", milestoneDto, null, null);
 
@@ -317,7 +322,8 @@ class GitHubMilestoneMessageHandlerIntegrationTest extends BaseIntegrationTest {
                 0,
                 0,
                 Instant.now(),
-                Instant.now()
+                Instant.now(),
+                null // closedAt
             );
             GitHubMilestoneEventDTO event = new GitHubMilestoneEventDTO(
                 "created",
@@ -355,7 +361,8 @@ class GitHubMilestoneMessageHandlerIntegrationTest extends BaseIntegrationTest {
                 0,
                 0,
                 Instant.now(),
-                Instant.now()
+                Instant.now(),
+                null // closedAt
             );
             GitHubMilestoneEventDTO event = new GitHubMilestoneEventDTO(
                 "created",
@@ -403,7 +410,8 @@ class GitHubMilestoneMessageHandlerIntegrationTest extends BaseIntegrationTest {
                 0,
                 0,
                 Instant.now(),
-                Instant.now()
+                Instant.now(),
+                null // closedAt
             );
             GitHubMilestoneEventDTO event = new GitHubMilestoneEventDTO(
                 "edited",
@@ -462,7 +470,8 @@ class GitHubMilestoneMessageHandlerIntegrationTest extends BaseIntegrationTest {
                 0,
                 0,
                 Instant.now(),
-                Instant.now()
+                Instant.now(),
+                null // closedAt
             );
             GitHubMilestoneEventDTO event = new GitHubMilestoneEventDTO(
                 "unknown_action", // not created/edited/closed/opened/deleted
@@ -564,7 +573,8 @@ class GitHubMilestoneMessageHandlerIntegrationTest extends BaseIntegrationTest {
                 0,
                 0,
                 Instant.now(),
-                Instant.now()
+                Instant.now(),
+                null // closedAt
             );
             GitHubMilestoneEventDTO editEvent = new GitHubMilestoneEventDTO(
                 "edited",

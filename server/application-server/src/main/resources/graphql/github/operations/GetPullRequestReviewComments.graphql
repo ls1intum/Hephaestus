@@ -39,6 +39,8 @@ query GetPullRequestReviewComments($owner: String!, $name: String!, $number: Int
                         avatarUrl
                         name
                         email
+                        createdAt
+                        updatedAt
                     }
 
                     # Comments in this thread - initial batch, pagination handled by GetThreadComments
@@ -74,6 +76,7 @@ query GetPullRequestReviewComments($owner: String!, $name: String!, $number: Int
                                     name
                                     email
                                     createdAt
+                                    updatedAt
                                 }
                                 ... on Bot {
                                     id

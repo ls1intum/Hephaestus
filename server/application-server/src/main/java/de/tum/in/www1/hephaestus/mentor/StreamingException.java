@@ -10,10 +10,6 @@ public class StreamingException extends RuntimeException {
     @Serial
     private static final long serialVersionUID = 1L;
 
-    public StreamingException(String message) {
-        super(message);
-    }
-
     public StreamingException(String message, Throwable cause) {
         super(message, cause);
     }

@@ -44,7 +44,7 @@ export const listGlobalContributorsQueryKey = (options?: Options<ListGlobalContr
 
 /**
  * List global contributors
- * Returns all contributors across all workspaces
+ * Returns contributors to the Hephaestus project (for the About page)
  */
 export const listGlobalContributorsOptions = (options?: Options<ListGlobalContributorsData>) => {
     return queryOptions({

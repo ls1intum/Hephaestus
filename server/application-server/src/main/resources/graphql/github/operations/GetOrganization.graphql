@@ -39,6 +39,8 @@ query GetOrganization($login: String!) {
                     avatarUrl
                     name
                     email
+                    createdAt
+                    updatedAt
                 }
             }
         }

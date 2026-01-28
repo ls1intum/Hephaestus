@@ -149,6 +149,105 @@ public class PullRequest extends Issue {
     public boolean isPullRequest() {
         return true;
     }
+
+    // ==================== Bidirectional Relationship Helpers ====================
+
+    /**
+     * Adds a review to this pull request and maintains bidirectional consistency.
+     *
+     * @param review the review to add
+     */
+    public void addReview(PullRequestReview review) {
+        if (review != null) {
+            this.reviews.add(review);
+            review.setPullRequest(this);
+        }
+    }
+
+    /**
+     * Removes a review from this pull request and maintains bidirectional consistency.
+     *
+     * @param review the review to remove
+     */
+    public void removeReview(PullRequestReview review) {
+        if (review != null) {
+            this.reviews.remove(review);
+            review.setPullRequest(null);
+        }
+    }
+
+    /**
+     * Adds a review thread to this pull request and maintains bidirectional consistency.
+     *
+     * @param thread the thread to add
+     */
+    public void addReviewThread(PullRequestReviewThread thread) {
+        if (thread != null) {
+            this.reviewThreads.add(thread);
+            thread.setPullRequest(this);
+        }
+    }
+
+    /**
+     * Removes a review thread from this pull request and maintains bidirectional consistency.
+     *
+     * @param thread the thread to remove
+     */
+    public void removeReviewThread(PullRequestReviewThread thread) {
+        if (thread != null) {
+            this.reviewThreads.remove(thread);
+            thread.setPullRequest(null);
+        }
+    }
+
+    /**
+     * Adds a review comment to this pull request and maintains bidirectional consistency.
+     * <p>
+     * Note: This is a denormalized relationship - comments are also accessible via
+     * reviews.*.comments or reviewThreads.*.comments. Use with care.
+     *
+     * @param comment the comment to add
+     */
+    public void addReviewComment(PullRequestReviewComment comment) {
+        if (comment != null) {
+            this.reviewComments.add(comment);
+            comment.setPullRequest(this);
+        }
+    }
+
+    /**
+     * Removes a review comment from this pull request and maintains bidirectional consistency.
+     *
+     * @param comment the comment to remove
+     */
+    public void removeReviewComment(PullRequestReviewComment comment) {
+        if (comment != null) {
+            this.reviewComments.remove(comment);
+            comment.setPullRequest(null);
+        }
+    }
+
+    /**
+     * Adds a requested reviewer to this pull request.
+     *
+     * @param reviewer the user to request review from
+     */
+    public void addRequestedReviewer(User reviewer) {
+        if (reviewer != null) {
+            this.requestedReviewers.add(reviewer);
+        }
+    }
+
+    /**
+     * Removes a requested reviewer from this pull request.
+     *
+     * @param reviewer the user to remove from requested reviewers
+     */
+    public void removeRequestedReviewer(User reviewer) {
+        if (reviewer != null) {
+            this.requestedReviewers.remove(reviewer);
+        }
+    }
     /*
      * Other fields intentionally not synced:
      * - MergeQueueEntry.position / MergeQueueEntry.estimatedTimeToMerge (GraphQL only)

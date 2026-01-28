@@ -28,7 +28,6 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.ClassPathResource;
-import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Integration tests for GitHubLabelMessageHandler.
@@ -43,9 +42,12 @@ import org.springframework.transaction.annotation.Transactional;
  *   <li>Label color: "0075ca"</li>
  *   <li>Label description: "Improvements or additions to documentation"</li>
  * </ul>
+ * <p>
+ * Note: This test class does NOT use @Transactional because the GitHubLabelProcessor
+ * uses REQUIRES_NEW propagation. Having @Transactional here would cause deadlocks
+ * as the test transaction would hold locks needed by the processor's new transaction.
  */
 @DisplayName("GitHub Label Message Handler")
-@Transactional
 class GitHubLabelMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
     // IDs from the actual GitHub webhook fixtures
@@ -81,6 +83,9 @@ class GitHubLabelMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private ObjectMapper objectMapper;
+
+    @Autowired
+    private org.springframework.transaction.support.TransactionTemplate transactionTemplate;
 
     private Repository testRepository;
 
@@ -430,6 +435,12 @@ class GitHubLabelMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
     // ==================== Label-Issue Association Tests ====================
 
+    /**
+     * Tests that verify label-issue relationships.
+     * <p>
+     * Note: This class does NOT use @Transactional because the handler uses REQUIRES_NEW.
+     * We use TransactionTemplate for lazy loading assertions to avoid connection leaks.
+     */
     @Nested
     @DisplayName("Label-Issue Relationship")
     class LabelIssueRelationship {
@@ -468,14 +479,17 @@ class GitHubLabelMessageHandlerIntegrationTest extends BaseIntegrationTest {
             handler.handleEvent(editEvent);
 
             // Then - issue should still have the label (now with updated name)
-            Issue updatedIssue = issueRepository.findById(12345L).orElseThrow();
-            assertThat(updatedIssue.getLabels())
-                .hasSize(1)
-                .first()
-                .satisfies(l -> {
-                    assertThat(l.getName()).isEqualTo("renamed-documentation");
-                    assertThat(l.getColor()).isEqualTo("ff0000");
-                });
+            // Use TransactionTemplate for lazy loading assertions
+            transactionTemplate.executeWithoutResult(status -> {
+                Issue updatedIssue = issueRepository.findById(12345L).orElseThrow();
+                assertThat(updatedIssue.getLabels())
+                    .hasSize(1)
+                    .first()
+                    .satisfies(l -> {
+                        assertThat(l.getName()).isEqualTo("renamed-documentation");
+                        assertThat(l.getColor()).isEqualTo("ff0000");
+                    });
+            });
         }
     }
 }

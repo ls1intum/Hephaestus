@@ -6,6 +6,7 @@ import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncCons
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.LARGE_PAGE_SIZE;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.MAX_PAGINATION_PAGES;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.exception.InstallationNotFoundException;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier.ClassificationResult;
@@ -132,6 +133,18 @@ public class GitHubPullRequestReviewCommentSyncService {
             int pageCount = 0;
 
             while (hasNextPage) {
+                // Check for interrupt (e.g., during application shutdown)
+                if (Thread.interrupted()) {
+                    log.info(
+                        "Review comments sync interrupted (shutdown requested): repoName={}, prNumber={}, pageCount={}",
+                        safeNameWithOwner,
+                        pullRequest.getNumber(),
+                        pageCount
+                    );
+                    Thread.currentThread().interrupt();
+                    break;
+                }
+
                 pageCount++;
                 if (pageCount >= MAX_PAGINATION_PAGES) {
                     log.warn(
@@ -151,7 +164,7 @@ public class GitHubPullRequestReviewCommentSyncService {
                     .variable("first", DEFAULT_PAGE_SIZE)
                     .variable("after", cursor)
                     .execute()
-                    .block(syncProperties.getExtendedGraphqlTimeout());
+                    .block(syncProperties.extendedGraphqlTimeout());
 
                 if (graphQlResponse == null || !graphQlResponse.isValid()) {
                     log.warn(
@@ -164,10 +177,10 @@ public class GitHubPullRequestReviewCommentSyncService {
                 }
 
                 // Track rate limit from response
-                graphQlClientProvider.trackRateLimit(graphQlResponse);
+                graphQlClientProvider.trackRateLimit(scopeId, graphQlResponse);
 
                 // Check if we should pause due to rate limiting
-                if (graphQlClientProvider.isRateLimitCritical()) {
+                if (graphQlClientProvider.isRateLimitCritical(scopeId)) {
                     log.warn(
                         "Aborting review comment sync due to critical rate limit: repoName={}, prNumber={}",
                         safeNameWithOwner,
@@ -185,7 +198,7 @@ public class GitHubPullRequestReviewCommentSyncService {
                 }
 
                 for (var graphQlThread : response.getNodes()) {
-                    int synced = processThreadInternal(graphQlThread, pullRequest, client);
+                    int synced = processThreadInternal(graphQlThread, pullRequest, client, scopeId);
                     totalSynced += synced;
                 }
 
@@ -279,7 +292,7 @@ public class GitHubPullRequestReviewCommentSyncService {
             return 0;
         }
         HttpGraphQlClient client = graphQlClientProvider.forScope(scopeId);
-        return processThreadFromDto(threadDto, pullRequest, client);
+        return processThreadFromDto(threadDto, pullRequest, client, scopeId);
     }
 
     /**
@@ -293,7 +306,8 @@ public class GitHubPullRequestReviewCommentSyncService {
     private int processThreadFromDto(
         GitHubReviewThreadDTO threadDto,
         PullRequest pullRequest,
-        HttpGraphQlClient client
+        HttpGraphQlClient client,
+        Long scopeId
     ) {
         if (threadDto == null) {
             return 0;
@@ -312,7 +326,8 @@ public class GitHubPullRequestReviewCommentSyncService {
                 threadDto.nodeId(),
                 commentsConnection,
                 commentsPageInfo.getEndCursor(),
-                client
+                client,
+                scopeId
             );
         }
 
@@ -332,12 +347,20 @@ public class GitHubPullRequestReviewCommentSyncService {
         // Create or update the thread, passing the first comment to set timestamps
         PullRequestReviewThread thread = getOrCreateThreadFromDto(threadId, threadDto, pullRequest, firstComment);
 
+        // Create processing context for sync operations to enable activity event creation
+        ProcessingContext context = ProcessingContext.forSync(scopeId, pullRequest.getRepository());
+
         int synced = 0;
         PullRequestReviewComment rootComment = null;
         for (var graphQlComment : graphQlComments) {
             GitHubReviewCommentDTO dto = convertToDTO(graphQlComment, thread);
             if (dto != null) {
-                PullRequestReviewComment comment = commentProcessor.processCreated(dto, pullRequest.getId());
+                PullRequestReviewComment comment = commentProcessor.processCreated(
+                    dto,
+                    pullRequest.getRepository().getId(),
+                    pullRequest.getNumber(),
+                    context
+                );
                 if (comment != null) {
                     synced++;
                     // Track the first (root) comment
@@ -370,7 +393,8 @@ public class GitHubPullRequestReviewCommentSyncService {
         String threadNodeId,
         GHPullRequestReviewCommentConnection commentsConnection,
         String startCursor,
-        HttpGraphQlClient client
+        HttpGraphQlClient client,
+        Long scopeId
     ) {
         if (commentsConnection == null || commentsConnection.getNodes() == null) {
             return;
@@ -384,6 +408,17 @@ public class GitHubPullRequestReviewCommentSyncService {
         int fetchedPages = 0;
 
         while (hasMore) {
+            // Check for interrupt (e.g., during application shutdown)
+            if (Thread.interrupted()) {
+                log.info(
+                    "Thread comments fetch interrupted (shutdown requested): threadId={}, fetchedPages={}",
+                    threadNodeId,
+                    fetchedPages
+                );
+                Thread.currentThread().interrupt();
+                break;
+            }
+
             fetchedPages++;
             if (fetchedPages > MAX_PAGINATION_PAGES) {
                 log.warn(
@@ -401,7 +436,7 @@ public class GitHubPullRequestReviewCommentSyncService {
                     .variable("first", LARGE_PAGE_SIZE)
                     .variable("after", cursor)
                     .execute()
-                    .block(syncProperties.getGraphqlTimeout());
+                    .block(syncProperties.graphqlTimeout());
 
                 if (response == null || !response.isValid()) {
                     log.warn(
@@ -413,10 +448,10 @@ public class GitHubPullRequestReviewCommentSyncService {
                 }
 
                 // Track rate limit from response
-                graphQlClientProvider.trackRateLimit(response);
+                graphQlClientProvider.trackRateLimit(scopeId, response);
 
                 // Check if we should pause due to rate limiting
-                if (graphQlClientProvider.isRateLimitCritical()) {
+                if (graphQlClientProvider.isRateLimitCritical(scopeId)) {
                     log.warn("Aborting thread comments fetch due to critical rate limit: threadId={}", threadNodeId);
                     break;
                 }
@@ -576,7 +611,8 @@ public class GitHubPullRequestReviewCommentSyncService {
     private int processThreadInternal(
         GHPullRequestReviewThread graphQlThread,
         PullRequest pullRequest,
-        HttpGraphQlClient client
+        HttpGraphQlClient client,
+        Long scopeId
     ) {
         if (graphQlThread == null) {
             return 0;
@@ -595,7 +631,8 @@ public class GitHubPullRequestReviewCommentSyncService {
                 graphQlThread.getId(),
                 commentsConnection,
                 commentsPageInfo.getEndCursor(),
-                client
+                client,
+                scopeId
             );
         }
 
@@ -620,12 +657,20 @@ public class GitHubPullRequestReviewCommentSyncService {
             firstComment
         );
 
+        // Create processing context for sync operations to enable activity event creation
+        ProcessingContext context = ProcessingContext.forSync(scopeId, pullRequest.getRepository());
+
         int synced = 0;
         PullRequestReviewComment rootComment = null;
         for (var graphQlComment : graphQlComments) {
             GitHubReviewCommentDTO dto = convertToDTO(graphQlComment, thread);
             if (dto != null) {
-                PullRequestReviewComment comment = commentProcessor.processCreated(dto, pullRequest.getId());
+                PullRequestReviewComment comment = commentProcessor.processCreated(
+                    dto,
+                    pullRequest.getRepository().getId(),
+                    pullRequest.getNumber(),
+                    context
+                );
                 if (comment != null) {
                     synced++;
                     // Track the first (root) comment
@@ -801,8 +846,8 @@ public class GitHubPullRequestReviewCommentSyncService {
             graphQlComment.getCreatedAt() != null ? graphQlComment.getCreatedAt().toInstant() : null, // createdAt
             graphQlComment.getUpdatedAt() != null ? graphQlComment.getUpdatedAt().toInstant() : null, // updatedAt
             reviewId, // reviewId
-            null, // commitId - would need to fetch from commit.oid
-            null, // originalCommitId
+            graphQlComment.getCommit() != null ? graphQlComment.getCommit().getOid() : null, // commitId
+            graphQlComment.getOriginalCommit() != null ? graphQlComment.getOriginalCommit().getOid() : null, // originalCommitId
             authorAssociation, // authorAssociation
             graphQlComment.getLine(), // line
             graphQlComment.getOriginalLine(), // originalLine
@@ -890,6 +935,18 @@ public class GitHubPullRequestReviewCommentSyncService {
             int pageCount = 0;
 
             while (hasNextPage) {
+                // Check for interrupt (e.g., during application shutdown)
+                if (Thread.interrupted()) {
+                    log.info(
+                        "Remaining thread sync interrupted (shutdown requested): repoName={}, prNumber={}, pageCount={}",
+                        safeNameWithOwner,
+                        pullRequest.getNumber(),
+                        pageCount
+                    );
+                    Thread.currentThread().interrupt();
+                    break;
+                }
+
                 pageCount++;
                 if (pageCount >= MAX_PAGINATION_PAGES) {
                     log.warn(
@@ -909,7 +966,7 @@ public class GitHubPullRequestReviewCommentSyncService {
                     .variable("first", DEFAULT_PAGE_SIZE)
                     .variable("after", cursor)
                     .execute()
-                    .block(syncProperties.getExtendedGraphqlTimeout());
+                    .block(syncProperties.extendedGraphqlTimeout());
 
                 if (graphQlResponse == null || !graphQlResponse.isValid()) {
                     log.warn(
@@ -922,10 +979,10 @@ public class GitHubPullRequestReviewCommentSyncService {
                 }
 
                 // Track rate limit from response
-                graphQlClientProvider.trackRateLimit(graphQlResponse);
+                graphQlClientProvider.trackRateLimit(scopeId, graphQlResponse);
 
                 // Check if we should pause due to rate limiting
-                if (graphQlClientProvider.isRateLimitCritical()) {
+                if (graphQlClientProvider.isRateLimitCritical(scopeId)) {
                     log.warn(
                         "Aborting remaining thread sync due to critical rate limit: repoName={}, prNumber={}",
                         safeNameWithOwner,
@@ -943,7 +1000,7 @@ public class GitHubPullRequestReviewCommentSyncService {
                 }
 
                 for (var graphQlThread : response.getNodes()) {
-                    int synced = processThreadInternal(graphQlThread, pullRequest, client);
+                    int synced = processThreadInternal(graphQlThread, pullRequest, client, scopeId);
                     totalSynced += synced;
                 }
 

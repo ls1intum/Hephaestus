@@ -5,6 +5,11 @@
 # GitHub shipped the "Blocked by" UI without webhook/API event support
 # (see https://github.com/orgs/community/discussions/165749).
 # This GraphQL query is currently the ONLY way to sync blocking relationships.
+#
+# ARCHITECTURE NOTE (Jan 2026): This query includes full issue data for blockers
+# to support the "find-or-create" pattern. When a blocking issue doesn't exist
+# locally (e.g., it's in a different repo or hasn't been synced yet), we create
+# a stub issue entity on-the-fly to preserve the blocking relationship.
 
 query GetIssueDependencies($owner: String!, $name: String!, $first: Int!, $after: String) {
     rateLimit {
@@ -21,22 +26,108 @@ query GetIssueDependencies($owner: String!, $name: String!, $first: Int!, $after
             }
             totalCount
             nodes {
+                # Full issue data to support find-or-create pattern for the blocked issue itself
                 id
                 fullDatabaseId
                 number
+                title
+                body
+                state
+                stateReason
+                url
+                createdAt
+                updatedAt
+                closedAt
+                locked
                 blockedBy(first: 50) {
                     nodes {
+                        # Full issue data to support find-or-create pattern
                         id
                         fullDatabaseId
                         number
+                        title
+                        body
+                        state
+                        stateReason
+                        url
+                        createdAt
+                        updatedAt
+                        closedAt
+                        locked
+                        # Repository reference (needed to create stub in correct repo)
+                        repository {
+                            id
+                            databaseId
+                            name
+                            nameWithOwner
+                            url
+                        }
+                        # Author
+                        author {
+                            __typename
+                            ... on User {
+                                id
+                                databaseId
+                                login
+                                avatarUrl
+                                name
+                                email
+                                createdAt
+                                updatedAt
+                            }
+                            ... on Bot {
+                                id
+                                databaseId
+                                login
+                                avatarUrl
+                            }
+                        }
                     }
                     totalCount
                 }
                 blocking(first: 50) {
                     nodes {
+                        # Full issue data to support find-or-create pattern
                         id
                         fullDatabaseId
                         number
+                        title
+                        body
+                        state
+                        stateReason
+                        url
+                        createdAt
+                        updatedAt
+                        closedAt
+                        locked
+                        # Repository reference (needed to create stub in correct repo)
+                        repository {
+                            id
+                            databaseId
+                            name
+                            nameWithOwner
+                            url
+                        }
+                        # Author
+                        author {
+                            __typename
+                            ... on User {
+                                id
+                                databaseId
+                                login
+                                avatarUrl
+                                name
+                                email
+                                createdAt
+                                updatedAt
+                            }
+                            ... on Bot {
+                                id
+                                databaseId
+                                login
+                                avatarUrl
+                            }
+                        }
                     }
                     totalCount
                 }

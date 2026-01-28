@@ -59,7 +59,8 @@ export function ProfilePage({
       <ProfileContent
         reviewActivity={profileData?.reviewActivity}
         openPullRequests={profileData?.openPullRequests}
-        isLoading={isLoading}
+        activityStats={profileData?.activityStats}
+		reviewedPullRequests={profileData?.reviewedPullRequests}isLoading={isLoading}
         username={username}
         displayName={profileData?.userInfo?.name}
         currUserIsDashboardUser={currUserIsDashboardUser}

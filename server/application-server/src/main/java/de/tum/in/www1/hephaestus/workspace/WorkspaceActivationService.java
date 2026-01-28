@@ -2,7 +2,8 @@ package de.tum.in.www1.hephaestus.workspace;
 
 import de.tum.in.www1.hephaestus.gitprovider.sync.GitHubDataSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.sync.NatsConsumerService;
-import de.tum.in.www1.hephaestus.monitoring.MonitoringProperties;
+import de.tum.in.www1.hephaestus.gitprovider.sync.NatsProperties;
+import de.tum.in.www1.hephaestus.gitprovider.sync.SyncSchedulerProperties;
 import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContextHolder;
 import java.util.ArrayList;
@@ -15,7 +16,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.task.AsyncTaskExecutor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,8 +31,8 @@ public class WorkspaceActivationService {
     private static final Logger log = LoggerFactory.getLogger(WorkspaceActivationService.class);
 
     // Configuration
-    private final boolean isNatsEnabled;
-    private final MonitoringProperties monitoringProperties;
+    private final NatsProperties natsProperties;
+    private final SyncSchedulerProperties syncSchedulerProperties;
 
     // Core repository
     private final WorkspaceRepository workspaceRepository;
@@ -48,16 +48,16 @@ public class WorkspaceActivationService {
     private final AsyncTaskExecutor monitoringExecutor;
 
     public WorkspaceActivationService(
-        @Value("${nats.enabled}") boolean isNatsEnabled,
-        MonitoringProperties monitoringProperties,
+        NatsProperties natsProperties,
+        SyncSchedulerProperties syncSchedulerProperties,
         WorkspaceRepository workspaceRepository,
         NatsConsumerService natsConsumerService,
         WorkspaceScopeFilter workspaceScopeFilter,
         ObjectProvider<GitHubDataSyncService> gitHubDataSyncServiceProvider,
         @Qualifier("monitoringExecutor") AsyncTaskExecutor monitoringExecutor
     ) {
-        this.isNatsEnabled = isNatsEnabled;
-        this.monitoringProperties = monitoringProperties;
+        this.natsProperties = natsProperties;
+        this.syncSchedulerProperties = syncSchedulerProperties;
         this.workspaceRepository = workspaceRepository;
         this.natsConsumerService = natsConsumerService;
         this.workspaceScopeFilter = workspaceScopeFilter;
@@ -114,14 +114,24 @@ public class WorkspaceActivationService {
                 CompletableFuture.runAsync(
                     () -> activateWorkspace(workspace, organizationConsumersStarted),
                     monitoringExecutor
-                )
+                ).exceptionally(ex -> {
+                    // Handle unexpected errors (e.g., thread pool rejection) with workspace context
+                    log.error(
+                        "Unexpected error during workspace activation: workspaceId={}, accountLogin={}",
+                        workspace.getId(),
+                        workspace.getAccountLogin(),
+                        ex
+                    );
+                    return null;
+                })
             )
             .toList();
 
         // Log completion status (non-blocking)
         CompletableFuture.allOf(activationFutures.toArray(CompletableFuture[]::new)).whenComplete((result, ex) -> {
+            // Note: Individual workspace errors are logged above, this catches aggregate issues
             if (ex != null) {
-                log.error("Failed to activate some workspaces", ex);
+                log.error("Workspace activation completed with errors", ex);
             } else {
                 log.info("Completed workspace activations: count={}", workspacesToActivate.size());
             }
@@ -175,11 +185,10 @@ public class WorkspaceActivationService {
             return;
         }
 
-        if (monitoringProperties.isRunOnStartup()) {
+        if (syncSchedulerProperties.runOnStartup()) {
             log.info("Starting monitoring on startup: workspaceId={}", workspace.getId());
 
-            // Set workspace context for the sync operations (enables proper logging via
-            // MDC)
+            // Set workspace context for the sync operations (enables proper logging via MDC)
             WorkspaceContext workspaceContext = WorkspaceContext.fromWorkspace(workspace, Set.of());
             WorkspaceContextHolder.setContext(workspaceContext);
             try {
@@ -190,6 +199,17 @@ public class WorkspaceActivationService {
                 getGitHubDataSyncService().syncAllRepositories(workspace.getId());
 
                 log.info("Completed monitoring on startup: workspaceId={}", workspace.getId());
+            } catch (Exception e) {
+                // Log failure with full context - don't swallow silently.
+                // We continue to start NATS consumer so webhook events can still be processed.
+                // Missing entities from failed sync will be handled via NAK/retry.
+                log.error(
+                    "Failed monitoring on startup: workspaceId={}, accountLogin={}, error={}",
+                    workspace.getId(),
+                    workspace.getAccountLogin(),
+                    e.getMessage(),
+                    e
+                );
             } finally {
                 // Clear context after sync operations complete
                 WorkspaceContextHolder.clearContext();
@@ -285,7 +305,7 @@ public class WorkspaceActivationService {
      * Checks if NATS should be used for the given workspace.
      */
     private boolean shouldUseNats(Workspace workspace) {
-        return isNatsEnabled && workspace != null;
+        return natsProperties.enabled() && workspace != null;
     }
 
     private boolean isBlank(String value) {

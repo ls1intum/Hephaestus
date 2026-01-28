@@ -1,12 +1,13 @@
 package de.tum.in.www1.hephaestus.notification;
 
+import de.tum.in.www1.hephaestus.account.UserPreferencesRepository;
+import de.tum.in.www1.hephaestus.config.KeycloakProperties;
 import de.tum.in.www1.hephaestus.shared.badpractice.BadPracticeInfo;
 import de.tum.in.www1.hephaestus.shared.badpractice.BadPracticeNotificationData;
 import java.util.List;
 import org.keycloak.admin.client.Keycloak;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
 
@@ -16,27 +17,35 @@ public class MailService {
     private static final Logger log = LoggerFactory.getLogger(MailService.class);
 
     private final JavaMailSender javaMailSender;
-
     private final MailConfig mailConfig;
-
     private final Keycloak keycloak;
-
-    private final String realm;
+    private final KeycloakProperties keycloakProperties;
+    private final UserPreferencesRepository userPreferencesRepository;
 
     public MailService(
         JavaMailSender javaMailSender,
         MailConfig mailConfig,
         Keycloak keycloak,
-        @Value("${keycloak.realm}") String realm
+        KeycloakProperties keycloakProperties,
+        UserPreferencesRepository userPreferencesRepository
     ) {
         this.javaMailSender = javaMailSender;
         this.mailConfig = mailConfig;
         this.keycloak = keycloak;
-        this.realm = realm;
+        this.keycloakProperties = keycloakProperties;
+        this.userPreferencesRepository = userPreferencesRepository;
     }
 
     public void sendBadPracticesDetectedInPullRequestEmail(BadPracticeNotificationData notificationData) {
         log.debug("Preparing bad practice email: userLogin={}", notificationData.userLogin());
+
+        // Check if user has notifications disabled
+        var userPreferences = userPreferencesRepository.findByUserLogin(notificationData.userLogin());
+        if (userPreferences.isPresent() && !userPreferences.get().isNotificationsEnabled()) {
+            log.debug("Skipping email: user has notifications disabled, userLogin={}", notificationData.userLogin());
+            return;
+        }
+
         String email;
 
         if (notificationData.userEmail() != null && !notificationData.userEmail().isBlank()) {
@@ -44,7 +53,7 @@ public class MailService {
         } else {
             try {
                 var keyCloakUser = keycloak
-                    .realm(realm)
+                    .realm(keycloakProperties.realm())
                     .users()
                     .searchByUsername(notificationData.userLogin(), true)
                     .getFirst();

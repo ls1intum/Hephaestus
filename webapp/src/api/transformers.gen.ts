@@ -261,6 +261,35 @@ export const getBadPracticesForUserResponseTransformer = async (data: any): Prom
     return data;
 };
 
+const pullRequestWithBadPracticesSchemaResponseTransformer = (data: any) => {
+    data.createdAt = new Date(data.createdAt);
+    data.labels = data.labels.map((item: any) => {
+        return labelInfoSchemaResponseTransformer(item);
+    });
+    data.repository = repositoryInfoSchemaResponseTransformer(data.repository);
+    data.updatedAt = new Date(data.updatedAt);
+    return data;
+};
+
+export const getBadPracticesForPullRequestResponseTransformer = async (data: any): Promise<GetBadPracticesForPullRequestResponse> => {
+    data = pullRequestWithBadPracticesSchemaResponseTransformer(data);
+    return data;
+};
+
+const userPracticesSchemaResponseTransformer = (data: any) => {
+    if (data.pullRequests) {
+        data.pullRequests = data.pullRequests.map((item: any) => {
+            return pullRequestWithBadPracticesSchemaResponseTransformer(item);
+        });
+    }
+    return data;
+};
+
+export const getBadPracticesForUserResponseTransformer = async (data: any): Promise<GetBadPracticesForUserResponse> => {
+    data = userPracticesSchemaResponseTransformer(data);
+    return data;
+};
+
 const pullRequestBaseInfoSchemaResponseTransformer = (data: any) => {
     if (data.repository) {
         data.repository = repositoryInfoSchemaResponseTransformer(data.repository);
@@ -292,6 +321,12 @@ const profileSchemaResponseTransformer = (data: any) => {
     }
     if (data.reviewActivity) {
         data.reviewActivity = data.reviewActivity.map((item: any) => {
+            return profileReviewActivitySchemaResponseTransformer(item);
+        });
+    }
+    if (data.reviewedPullRequests) {
+        data.reviewedPullRequests = data.reviewedPullRequests.map((item: any) => {
+            return pullRequestInfoSchemaResponseTransformer(item);
             return profileReviewActivitySchemaResponseTransformer(item);
         });
     }

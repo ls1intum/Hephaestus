@@ -27,7 +27,8 @@ public record GitHubMilestoneDTO(
     @JsonProperty("open_issues") Integer openIssuesCount,
     @JsonProperty("closed_issues") Integer closedIssuesCount,
     @JsonProperty("created_at") Instant createdAt,
-    @JsonProperty("updated_at") Instant updatedAt
+    @JsonProperty("updated_at") Instant updatedAt,
+    @JsonProperty("closed_at") Instant closedAt
 ) {
     // ========== STATIC FACTORY METHODS FOR GRAPHQL RESPONSES ==========
 
@@ -50,13 +51,15 @@ public record GitHubMilestoneDTO(
             milestone.getOpenIssueCount(),
             milestone.getClosedIssueCount(),
             toInstant(milestone.getCreatedAt()),
-            toInstant(milestone.getUpdatedAt())
+            toInstant(milestone.getUpdatedAt()),
+            toInstant(milestone.getClosedAt())
         );
     }
 
+    @Nullable
     private static String convertState(@Nullable GHMilestoneState state) {
         if (state == null) {
-            return "open";
+            return null; // Let processor handle missing state with appropriate logging
         }
         return state.name().toLowerCase();
     }

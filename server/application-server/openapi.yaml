@@ -41,7 +41,7 @@ tags:
 paths:
   /contributors:
     get:
-      description: Returns all contributors across all workspaces
+      description: Returns contributors to the Hephaestus project (for the About page)
       operationId: listGlobalContributors
       responses:
         "200":
@@ -192,7 +192,7 @@ paths:
         schema:
           type: string
           format: date-time
-      - description: end of the time range (inclusive)
+      - description: end of the time range (exclusive)
         in: query
         name: before
         required: true
@@ -2468,6 +2468,9 @@ components:
       type: object
       description: Complete user profile including contribution history and activity
       properties:
+        activityStats:
+          $ref: "#/components/schemas/ProfileActivityStats"
+          description: Aggregated activity stats consistent with leaderboard calculations
         contributedRepositories:
           type: array
           description: Repositories the user has contributed to
@@ -2487,12 +2490,61 @@ components:
           description: Recent review activity with XP scores
           items:
             $ref: "#/components/schemas/ProfileReviewActivity"
+        reviewedPullRequests:
+          type: array
+          description: Distinct pull requests reviewed by this user
+          items:
+            $ref: "#/components/schemas/PullRequestInfo"
         userInfo:
           $ref: "#/components/schemas/UserInfo"
           description: Basic information about the user
       required:
       - contributedRepositories
       - userInfo
+    ProfileActivityStats:
+      type: object
+      description: Aggregated activity statistics with XP scores for a user profile
+      properties:
+        numberOfApprovals:
+          type: integer
+          format: int32
+          description: Number of approvals given
+          example: 15
+        numberOfChangeRequests:
+          type: integer
+          format: int32
+          description: Number of change requests submitted
+          example: 8
+        numberOfCodeComments:
+          type: integer
+          format: int32
+          description: Number of inline code review comments
+          example: 30
+        numberOfComments:
+          type: integer
+          format: int32
+          description: Number of review comments (COMMENTED state)
+          example: 12
+        numberOfIssueComments:
+          type: integer
+          format: int32
+          description: Number of issue comments on pull requests
+          example: 25
+        numberOfReviewedPRs:
+          type: integer
+          format: int32
+          description: Number of distinct pull requests reviewed
+          example: 42
+        numberOfUnknowns:
+          type: integer
+          format: int32
+          description: Number of reviews with unknown state
+          example: 0
+        score:
+          type: integer
+          format: int32
+          description: Total XP score
+          example: 1250
     ProfileReviewActivity:
       type: object
       description: A review activity entry with XP score for profile display

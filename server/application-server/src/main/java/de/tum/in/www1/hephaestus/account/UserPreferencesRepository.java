@@ -21,4 +21,12 @@ public interface UserPreferencesRepository extends JpaRepository<UserPreferences
      * @return the user's preferences, or empty if not yet created
      */
     Optional<UserPreferences> findByUserId(Long userId);
+
+    /**
+     * Find preferences by user login.
+     *
+     * @param login the login (username) of the user
+     * @return the user's preferences, or empty if not yet created
+     */
+    Optional<UserPreferences> findByUserLogin(String login);
 }

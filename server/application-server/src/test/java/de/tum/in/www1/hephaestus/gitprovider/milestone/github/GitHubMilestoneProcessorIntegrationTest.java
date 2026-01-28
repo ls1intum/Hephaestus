@@ -27,7 +27,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Integration tests for GitHubMilestoneProcessor.
@@ -40,7 +39,6 @@ import org.springframework.transaction.annotation.Transactional;
  * - Edge cases in DTO processing
  */
 @DisplayName("GitHub Milestone Processor")
-@Transactional
 class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
 
     // IDs from the actual GitHub webhook fixtures
@@ -158,7 +156,8 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
                 0,
                 0,
                 Instant.now(),
-                Instant.now()
+                Instant.now(),
+                null // closedAt
             );
 
             // When
@@ -217,7 +216,8 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
                 0,
                 0,
                 Instant.now(),
-                Instant.now()
+                Instant.now(),
+                null // closedAt
             );
 
             // When
@@ -265,7 +265,8 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
                 0,
                 0,
                 Instant.now(),
-                Instant.now()
+                Instant.now(),
+                null // closedAt
             );
 
             // When
@@ -306,7 +307,8 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
                 0,
                 0,
                 Instant.now(),
-                Instant.now()
+                Instant.now(),
+                null // closedAt
             );
 
             // When
@@ -336,7 +338,8 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
                 0,
                 0,
                 Instant.now(),
-                Instant.now()
+                Instant.now(),
+                null // closedAt
             );
 
             // When
@@ -363,7 +366,8 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
                 0,
                 0,
                 Instant.now(),
-                Instant.now()
+                Instant.now(),
+                null // closedAt
             );
 
             // When
@@ -390,7 +394,8 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
                 0,
                 0,
                 Instant.now(),
-                Instant.now()
+                Instant.now(),
+                null // closedAt
             );
 
             // When - process twice
@@ -420,7 +425,8 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
                 0,
                 0,
                 Instant.now(),
-                Instant.now()
+                Instant.now(),
+                null // closedAt
             );
 
             // When
@@ -449,7 +455,8 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
                 0,
                 0,
                 Instant.now(),
-                Instant.now()
+                Instant.now(),
+                null // closedAt
             );
             GitHubUserDTO newCreator = new GitHubUserDTO(
                 newUserId,
@@ -488,7 +495,8 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
                 0,
                 0,
                 Instant.now(),
-                Instant.now()
+                Instant.now(),
+                null // closedAt
             );
 
             // When
@@ -515,7 +523,8 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
                 0,
                 0,
                 Instant.now(),
-                Instant.now()
+                Instant.now(),
+                null // closedAt
             );
 
             // When
@@ -541,7 +550,8 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
                 0,
                 0,
                 Instant.now(),
-                Instant.now()
+                Instant.now(),
+                null // closedAt
             );
 
             // When

@@ -47,9 +47,11 @@ import lombok.ToString;
  * <h2>Authentication Modes</h2>
  * The workspace supports two authentication modes for GitHub API access:
  * <ul>
- *   <li>{@link GitProviderMode#PAT_ORG} – Personal Access Token (legacy, stored encrypted)</li>
- *   <li>{@link GitProviderMode#GITHUB_APP_INSTALLATION} – GitHub App installation (preferred)</li>
+ *   <li>{@link GitProviderMode#PAT_ORG} – Personal Access Token for local development (stored encrypted)</li>
+ *   <li>{@link GitProviderMode#GITHUB_APP_INSTALLATION} – GitHub App installation for production (preferred)</li>
  * </ul>
+ *
+ * <p>See {@link WorkspaceProperties} for configuration of local development PAT mode.
  *
  * <h2>Lifecycle States</h2>
  * Workspaces follow a defined lifecycle managed by {@link WorkspaceLifecycleService}:
@@ -289,14 +291,42 @@ public class Workspace {
 
     /**
      * Authentication mode for GitHub API access.
-     * <p>
-     * Migration path: New workspaces should use {@link #GITHUB_APP_INSTALLATION}.
-     * PAT-based workspaces will be migrated over time.
+     *
+     * <h2>Production vs Development</h2>
+     * <ul>
+     *   <li><b>{@link #GITHUB_APP_INSTALLATION}</b> - Production mode, automatic workspace provisioning via GitHub App</li>
+     *   <li><b>{@link #PAT_ORG}</b> - Local development mode, manual workspace bootstrap with a GitHub PAT</li>
+     * </ul>
+     *
+     * <h2>Migration Path</h2>
+     * PAT workspaces without a stored token are automatically promoted to GitHub App mode
+     * when the GitHub App is installed on the same organization. PAT workspaces with a
+     * stored token are preserved to support ongoing local development.
+     *
+     * @see WorkspaceProvisioningService#bootstrapDefaultPatWorkspace() for PAT workspace creation
+     * @see WorkspaceInstallationService#createOrUpdateFromInstallation for migration logic
      */
     public enum GitProviderMode {
-        /** Personal Access Token authentication (legacy) */
+        /**
+         * Personal Access Token authentication for local development.
+         * <p>
+         * This mode is intended for local development environments where setting up
+         * a full GitHub App with webhooks is impractical. Configure via:
+         * <ul>
+         *   <li>{@code hephaestus.workspace.init-default: true}</li>
+         *   <li>{@code hephaestus.workspace.default.token: <your-PAT>}</li>
+         *   <li>{@code hephaestus.workspace.default.login: <org-or-user>}</li>
+         * </ul>
+         * <p>
+         * <b>Not recommended for production</b> - use GitHub App installation instead.
+         */
         PAT_ORG,
-        /** GitHub App installation authentication (preferred) */
+        /**
+         * GitHub App installation authentication (production mode).
+         * <p>
+         * Uses short-lived installation tokens with automatic rotation.
+         * Workspaces are automatically created when the GitHub App is installed.
+         */
         GITHUB_APP_INSTALLATION,
     }
 

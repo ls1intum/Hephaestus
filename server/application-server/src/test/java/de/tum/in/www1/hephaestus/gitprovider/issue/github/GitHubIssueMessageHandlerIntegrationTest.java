@@ -48,6 +48,10 @@ import org.springframework.transaction.annotation.Transactional;
  * - Event publishing through the handler → processor chain
  * - Edge cases in event handling
  * <p>
+ * Note: This test class uses @Transactional because it directly calls handler methods
+ * and needs to access lazy-loaded relationships. This is safe because there are no
+ * parallel HTTP handler threads that would compete for database connections.
+ * <p>
  * <b>Fixture Values (issues.opened.json - Issue #20):</b>
  * <ul>
  *   <li>ID: 3578496080</li>

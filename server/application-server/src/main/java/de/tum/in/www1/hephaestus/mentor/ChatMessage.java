@@ -99,7 +99,7 @@ public class ChatMessage {
      * Message parts - handles complex multi-part content
      * Each part corresponds to a UIMessagePart type
      */
-    @OneToMany(mappedBy = "message", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
+    @OneToMany(mappedBy = "message", cascade = CascadeType.REMOVE, fetch = FetchType.LAZY, orphanRemoval = true)
     @OrderBy("id.orderIndex ASC")
     @ToString.Exclude
     @JsonIgnore

@@ -201,9 +201,10 @@ public record GitHubPullRequestDTO(
         return value.longValueExact();
     }
 
+    @Nullable
     private static String convertState(@Nullable GHPullRequestState state) {
         if (state == null) {
-            return "open";
+            return null; // Let processor handle missing state with appropriate logging
         }
         return state.name().toLowerCase();
     }

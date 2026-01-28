@@ -153,6 +153,10 @@ public class GitHubLabelProcessor {
 
     /**
      * Delete a label by its ID.
+     * <p>
+     * IMPORTANT: For bidirectional @ManyToMany relationships,
+     * we must sync both sides of the relationship before deleting to avoid
+     * constraint violations or stale references in the persistence context.
      *
      * @param labelId the label database ID
      * @param context processing context with scope information
@@ -166,6 +170,10 @@ public class GitHubLabelProcessor {
         labelRepository
             .findById(labelId)
             .ifPresent(label -> {
+                // CRITICAL: Remove from all referencing Issues before deletion
+                // to sync bidirectional ManyToMany relationship
+                label.removeAllIssues();
+
                 labelRepository.delete(label);
                 eventPublisher.publishEvent(
                     new DomainEvent.LabelDeleted(labelId, label.getName(), EventContext.from(context))

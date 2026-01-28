@@ -159,19 +159,4 @@ public class ActivityEvent {
     public static String buildKey(ActivityEventType type, Long targetId, Instant timestamp) {
         return String.format("%s:%d:%d", type.getValue(), targetId, timestamp.toEpochMilli());
     }
-
-    /**
-     * Verify the integrity of this activity event.
-     *
-     * <p><strong>Note:</strong> Content hash verification was removed as part of schema
-     * simplification (content_hash column dropped). This method is a stub that always
-     * returns true until integrity verification is re-implemented if needed.
-     *
-     * @return true (integrity verification not currently implemented)
-     */
-    public boolean verifyIntegrity() {
-        // Content hash verification was removed - see changelog 1768900000000-5
-        // Always return true until re-implemented
-        return true;
-    }
 }
