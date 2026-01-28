@@ -4,6 +4,7 @@ import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.events.DomainEvent;
 import de.tum.in.www1.hephaestus.gitprovider.common.events.EventContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.events.EventPayload;
+import de.tum.in.www1.hephaestus.gitprovider.issue.IssueRepository;
 import de.tum.in.www1.hephaestus.gitprovider.milestone.Milestone;
 import de.tum.in.www1.hephaestus.gitprovider.milestone.MilestoneRepository;
 import de.tum.in.www1.hephaestus.gitprovider.milestone.github.dto.GitHubMilestoneDTO;
@@ -38,15 +39,18 @@ public class GitHubMilestoneProcessor {
     private static final Logger log = LoggerFactory.getLogger(GitHubMilestoneProcessor.class);
 
     private final MilestoneRepository milestoneRepository;
+    private final IssueRepository issueRepository;
     private final UserRepository userRepository;
     private final ApplicationEventPublisher eventPublisher;
 
     public GitHubMilestoneProcessor(
         MilestoneRepository milestoneRepository,
+        IssueRepository issueRepository,
         UserRepository userRepository,
         ApplicationEventPublisher eventPublisher
     ) {
         this.milestoneRepository = milestoneRepository;
+        this.issueRepository = issueRepository;
         this.userRepository = userRepository;
         this.eventPublisher = eventPublisher;
     }
@@ -107,12 +111,21 @@ public class GitHubMilestoneProcessor {
             if (!isNew && !dto.id().equals(milestone.getId())) {
                 // Existing milestone has a different ID (likely a generated deterministic ID).
                 // Hibernate doesn't allow changing entity IDs, so we must delete and recreate.
+                Long oldMilestoneId = milestone.getId();
                 log.info(
                     "Migrating milestone from generated to real ID: oldId={}, newId={}, milestoneNumber={}",
-                    milestone.getId(),
+                    oldMilestoneId,
                     dto.id(),
                     dto.number()
                 );
+                // CRITICAL: Clear issue references via direct database UPDATE before deletion.
+                // Using issueRepository.clearMilestoneReferences() instead of milestone.removeAllIssues()
+                // because the in-memory collection may be stale or not fully loaded, leading to
+                // FK constraint violations. The direct UPDATE ensures ALL database references are cleared.
+                int clearedCount = issueRepository.clearMilestoneReferences(oldMilestoneId);
+                if (clearedCount > 0) {
+                    log.debug("Cleared milestone references from {} issues before migration", clearedCount);
+                }
                 milestoneRepository.delete(milestone);
                 milestoneRepository.flush();
                 milestone = new Milestone();
@@ -158,6 +171,9 @@ public class GitHubMilestoneProcessor {
         }
         if (dto.updatedAt() != null) {
             milestone.setUpdatedAt(dto.updatedAt());
+        }
+        if (dto.closedAt() != null) {
+            milestone.setClosedAt(dto.closedAt());
         }
         milestone.setRepository(repository);
 
@@ -209,6 +225,11 @@ public class GitHubMilestoneProcessor {
 
     /**
      * Delete a milestone by its ID.
+     * <p>
+     * IMPORTANT: Nullifies the milestone reference on all associated issues
+     * before deletion to maintain data integrity and prevent orphaned references.
+     * Uses direct database UPDATE to ensure ALL references are cleared, not just
+     * those loaded in the in-memory collection.
      *
      * @param milestoneId the milestone database ID
      * @param context processing context with scope information
@@ -222,6 +243,14 @@ public class GitHubMilestoneProcessor {
         milestoneRepository
             .findById(milestoneId)
             .ifPresent(milestone -> {
+                // Clean up issue references via direct database UPDATE before deletion.
+                // Using issueRepository.clearMilestoneReferences() instead of milestone.removeAllIssues()
+                // because the in-memory collection may be stale or not fully loaded.
+                int clearedCount = issueRepository.clearMilestoneReferences(milestoneId);
+                if (clearedCount > 0) {
+                    log.debug("Cleared milestone references from {} issues before deletion", clearedCount);
+                }
+
                 milestoneRepository.delete(milestone);
                 eventPublisher.publishEvent(
                     new DomainEvent.MilestoneDeleted(milestoneId, milestone.getTitle(), EventContext.from(context))
@@ -235,11 +264,16 @@ public class GitHubMilestoneProcessor {
      */
     private Milestone.State parseState(String state) {
         if (state == null) {
+            log.warn("Milestone state is null, defaulting to OPEN. This may indicate missing data in webhook or GraphQL response.");
             return Milestone.State.OPEN;
         }
         return switch (state.toUpperCase()) {
+            case "OPEN" -> Milestone.State.OPEN;
             case "CLOSED" -> Milestone.State.CLOSED;
-            default -> Milestone.State.OPEN;
+            default -> {
+                log.warn("Unknown milestone state '{}', defaulting to OPEN", state);
+                yield Milestone.State.OPEN;
+            }
         };
     }
 

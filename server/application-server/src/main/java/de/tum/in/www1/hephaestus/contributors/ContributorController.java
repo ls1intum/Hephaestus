@@ -30,7 +30,10 @@ public class ContributorController {
      * @return list of contributors sorted by contribution count
      */
     @GetMapping
-    @Operation(summary = "List global contributors", description = "Returns all contributors across all workspaces")
+    @Operation(
+        summary = "List global contributors",
+        description = "Returns contributors to the Hephaestus project (for the About page)"
+    )
     @SecurityRequirements
     public ResponseEntity<List<ContributorDTO>> listGlobalContributors() {
         return ResponseEntity.ok(contributorService.getGlobalContributors());

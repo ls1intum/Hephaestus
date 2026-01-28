@@ -51,7 +51,7 @@ public class PullRequestReviewComment extends BaseGitServiceEntity {
     @NonNull
     private String body;
 
-    // HTML URL is nullable because GraphQL API doesn't provide it directly
+    @NonNull
     private String htmlUrl;
 
     @NonNull

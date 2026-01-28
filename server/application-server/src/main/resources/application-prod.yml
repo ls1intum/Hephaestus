@@ -31,9 +31,6 @@ spring:
 hephaestus:
     host-url: ${APPLICATION_HOST_URL}
 
-    activity:
-        backfill-on-startup: ${HEPHAESTUS_ACTIVITY_BACKFILL_ON_STARTUP:false}
-
     webapp:
         url: ${APPLICATION_HOST_URL}
 
@@ -73,47 +70,52 @@ hephaestus:
         project-id: ${POSTHOG_PROJECT_ID:}
         personal-api-key: ${POSTHOG_PERSONAL_API_KEY:}
 
-keycloak:
-    url: ${KEYCLOAK_URL}
-    realm: ${KEYCLOAK_REALM}
-    client-id: ${KEYCLOAK_CLIENT_ID}
-    client-secret: ${KEYCLOAK_CLIENT_SECRET}
-    # Internal base URL for container-to-container access (defaults to public URL)
-    internal-url: "${KEYCLOAK_INTERNAL_URL:${KEYCLOAK_URL}}"
-    # Internal JWKS endpoint for containerized deployments (optional)
-    # Defaults to the internal (or public) Keycloak base URL plus the JWKS suffix
-    jwk-set-uri: "${KEYCLOAK_JWK_SET_URI:${keycloak.internal-url}/realms/${KEYCLOAK_REALM}/protocol/openid-connect/certs}"
+    github:
+        app:
+            # Set to 0 to disable GitHub App mode and use Personal Access Tokens instead
+            id: ${GH_APP_ID:0}
+            privateKeyLocation: ${GH_APP_PRIVATE_KEY_LOCATION:}
+            privateKey: ${GH_APP_PRIVATE_KEY:}
+        meta:
+            auth-token: ${GH_AUTH_TOKEN:}
 
-nats:
-    enabled: ${NATS_ENABLED:false}
-    timeframe: ${MONITORING_TIMEFRAME:7}
-    durable-consumer-name: ${NATS_DURABLE_CONSUMER_NAME}
-    server: ${NATS_SERVER}
+    sync:
+        run-on-startup: ${MONITORING_RUN_ON_STARTUP:true}
+        timeframe-days: ${MONITORING_TIMEFRAME:7}
+        cron: ${MONITORING_SYNC_CRON:0 0 * * * *}
+        cooldown-minutes: ${MONITORING_SYNC_COOLDOWN_IN_MINUTES:60}
+        backfill:
+            enabled: ${MONITORING_BACKFILL_ENABLED:true}
+            batch-size: ${MONITORING_BACKFILL_BATCH_SIZE:50}
+            rate-limit-threshold: ${MONITORING_BACKFILL_RATE_LIMIT_THRESHOLD:500}
+            interval-seconds: ${MONITORING_BACKFILL_INTERVAL_SECONDS:60}
+        nats:
+            enabled: ${NATS_ENABLED:false}
+            server: ${NATS_SERVER:}
+            durable-consumer-name: ${NATS_DURABLE_CONSUMER_NAME:}
 
-monitoring:
-    run-on-startup: ${MONITORING_RUN_ON_STARTUP:true}
-    timeframe: ${MONITORING_TIMEFRAME:7}
-    sync-cron: ${MONITORING_SYNC_CRON:0 0 * * * *}
-    sync-cooldown-in-minutes: ${MONITORING_SYNC_COOLDOWN_IN_MINUTES:60}
-    sync-all-issues-and-pull-requests: ${MONITORING_SYNC_ALL_ISSUES_AND_PULL_REQUESTS:true}
-    backfill:
-        enabled: ${MONITORING_BACKFILL_ENABLED:true}
-        batch-size: ${MONITORING_BACKFILL_BATCH_SIZE:50}
-        rate-limit-threshold: ${MONITORING_BACKFILL_RATE_LIMIT_THRESHOLD:500}
-        cooldown-minutes: ${MONITORING_BACKFILL_COOLDOWN_MINUTES:5}
+    # ═══════════════════════════════════════════════════════════════════════════
+    # KEYCLOAK IDENTITY PROVIDER (Production)
+    # ═══════════════════════════════════════════════════════════════════════════
+    keycloak:
+        url: ${KEYCLOAK_URL}
+        realm: ${KEYCLOAK_REALM}
+        client-id: ${KEYCLOAK_CLIENT_ID}
+        client-secret: ${KEYCLOAK_CLIENT_SECRET}
+        # Internal base URL for container-to-container access (defaults to public URL)
+        internal-url: "${KEYCLOAK_INTERNAL_URL:${KEYCLOAK_URL}}"
+        # Internal JWKS endpoint for containerized deployments (optional)
+        jwk-set-uri: "${KEYCLOAK_JWK_SET_URI:${hephaestus.keycloak.internal-url}/realms/${KEYCLOAK_REALM}/protocol/openid-connect/certs}"
 
-github:
-    app:
-        # Set to 0 to disable GitHub App mode and use Personal Access Tokens instead
-        id: ${GH_APP_ID:0}
-        privateKeyLocation: ${GH_APP_PRIVATE_KEY_LOCATION:}
-        privateKey: ${GH_APP_PRIVATE_KEY:}
-    meta:
-        auth-token: ${GH_AUTH_TOKEN:}
+    # ═══════════════════════════════════════════════════════════════════════════
+    # SLACK INTEGRATION (Production)
+    # ═══════════════════════════════════════════════════════════════════════════
+    slack:
+        token: ${SLACK_BOT_TOKEN}
+        signing-secret: ${SLACK_SIGNING_SECRET}
 
-slack:
-    token: ${SLACK_BOT_TOKEN}
-    signing-secret: ${SLACK_SIGNING_SECRET}
-
-sentry:
-    dsn: ${SENTRY_DSN}
+    # ═══════════════════════════════════════════════════════════════════════════
+    # SENTRY ERROR TRACKING (Production)
+    # ═══════════════════════════════════════════════════════════════════════════
+    sentry:
+        dsn: ${SENTRY_DSN}

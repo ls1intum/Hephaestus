@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.account;
 
+import de.tum.in.www1.hephaestus.config.KeycloakProperties;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.integrations.posthog.PosthogClientException;
 import io.swagger.v3.oas.annotations.Operation;
@@ -7,7 +8,6 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import org.keycloak.admin.client.Keycloak;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -38,18 +38,18 @@ public class AccountController {
     private final AccountService accountService;
     private final Keycloak keycloak;
     private final UserRepository userRepository;
-    private final String realm;
+    private final KeycloakProperties keycloakProperties;
 
     public AccountController(
         AccountService accountService,
         Keycloak keycloak,
         UserRepository userRepository,
-        @Value("${keycloak.realm}") String realm
+        KeycloakProperties keycloakProperties
     ) {
         this.accountService = accountService;
         this.keycloak = keycloak;
         this.userRepository = userRepository;
-        this.realm = realm;
+        this.keycloakProperties = keycloakProperties;
     }
 
     @DeleteMapping
@@ -78,7 +78,7 @@ public class AccountController {
         }
 
         log.info("Deleting user {}", keycloakUserId);
-        var response = keycloak.realm(realm).users().delete(keycloakUserId);
+        var response = keycloak.realm(keycloakProperties.realm()).users().delete(keycloakUserId);
         if (response.getStatus() != 204) {
             log.error("Failed to delete user account: {}", response.getStatusInfo().getReasonPhrase());
             return ResponseEntity.status(HttpStatus.BAD_GATEWAY).build();

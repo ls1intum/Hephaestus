@@ -5,6 +5,7 @@ import static de.tum.in.www1.hephaestus.workspace.Workspace.WorkspaceStatus;
 import de.tum.in.www1.hephaestus.core.LoggingUtils;
 import de.tum.in.www1.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.in.www1.hephaestus.gitprovider.sync.NatsConsumerService;
+import de.tum.in.www1.hephaestus.gitprovider.sync.NatsProperties;
 import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.in.www1.hephaestus.workspace.exception.WorkspaceLifecycleViolationException;
 import de.tum.in.www1.hephaestus.workspace.settings.WorkspaceTeamLabelFilterRepository;
@@ -15,7 +16,6 @@ import java.util.Comparator;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,7 +28,7 @@ public class WorkspaceLifecycleService {
 
     private static final Logger log = LoggerFactory.getLogger(WorkspaceLifecycleService.class);
 
-    private final boolean isNatsEnabled;
+    private final NatsProperties natsProperties;
     private final WorkspaceRepository workspaceRepository;
     private final NatsConsumerService natsConsumerService;
 
@@ -44,7 +44,7 @@ public class WorkspaceLifecycleService {
     private final List<WorkspacePurgeContributor> purgeContributors;
 
     public WorkspaceLifecycleService(
-        @Value("${nats.enabled}") boolean isNatsEnabled,
+        NatsProperties natsProperties,
         WorkspaceRepository workspaceRepository,
         NatsConsumerService natsConsumerService,
         RepositoryToMonitorRepository repositoryToMonitorRepository,
@@ -55,7 +55,7 @@ public class WorkspaceLifecycleService {
         WorkspaceSlugHistoryRepository workspaceSlugHistoryRepository,
         List<WorkspacePurgeContributor> purgeContributors
     ) {
-        this.isNatsEnabled = isNatsEnabled;
+        this.natsProperties = natsProperties;
         this.workspaceRepository = workspaceRepository;
         this.natsConsumerService = natsConsumerService;
         this.repositoryToMonitorRepository = repositoryToMonitorRepository;
@@ -320,6 +320,6 @@ public class WorkspaceLifecycleService {
      * </ul>
      */
     private boolean shouldUseNats(Workspace workspace) {
-        return isNatsEnabled && workspace != null && workspace.getInstallationId() != null;
+        return natsProperties.enabled() && workspace != null && workspace.getInstallationId() != null;
     }
 }

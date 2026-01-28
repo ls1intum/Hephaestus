@@ -10,6 +10,7 @@ import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.gitprovider.sync.GitHubDataSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.sync.NatsConsumerService;
+import de.tum.in.www1.hephaestus.gitprovider.sync.NatsProperties;
 import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.in.www1.hephaestus.workspace.exception.RepositoryAlreadyMonitoredException;
 import de.tum.in.www1.hephaestus.workspace.exception.RepositoryManagementNotAllowedException;
@@ -24,7 +25,6 @@ import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -44,7 +44,7 @@ public class WorkspaceRepositoryMonitorService {
     private static final Logger log = LoggerFactory.getLogger(WorkspaceRepositoryMonitorService.class);
 
     // Configuration
-    private final boolean isNatsEnabled;
+    private final NatsProperties natsProperties;
 
     // Core repositories
     private final WorkspaceRepository workspaceRepository;
@@ -61,7 +61,7 @@ public class WorkspaceRepositoryMonitorService {
     private final ObjectProvider<GitHubDataSyncService> gitHubDataSyncServiceProvider;
 
     public WorkspaceRepositoryMonitorService(
-        @Value("${nats.enabled}") boolean isNatsEnabled,
+        NatsProperties natsProperties,
         WorkspaceRepository workspaceRepository,
         RepositoryToMonitorRepository repositoryToMonitorRepository,
         RepositoryRepository repositoryRepository,
@@ -71,7 +71,7 @@ public class WorkspaceRepositoryMonitorService {
         GitHubAppTokenService gitHubAppTokenService,
         ObjectProvider<GitHubDataSyncService> gitHubDataSyncServiceProvider
     ) {
-        this.isNatsEnabled = isNatsEnabled;
+        this.natsProperties = natsProperties;
         this.workspaceRepository = workspaceRepository;
         this.repositoryToMonitorRepository = repositoryToMonitorRepository;
         this.repositoryRepository = repositoryRepository;
@@ -472,7 +472,7 @@ public class WorkspaceRepositoryMonitorService {
     }
 
     private boolean shouldUseNats(Workspace workspace) {
-        return isNatsEnabled && workspace != null;
+        return natsProperties.enabled() && workspace != null;
     }
 
     /**

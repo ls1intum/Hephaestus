@@ -76,9 +76,38 @@ public class PullRequestReviewThread extends BaseGitServiceEntity {
     @ToString.Exclude
     private User resolvedBy;
 
-    @OneToMany(mappedBy = "thread", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "thread", cascade = CascadeType.REMOVE, orphanRemoval = true)
     @ToString.Exclude
     private Set<PullRequestReviewComment> comments = new HashSet<>();
+
+    // ==================== Bidirectional Relationship Helpers ====================
+
+    /**
+     * Adds a comment to this thread and maintains bidirectional consistency.
+     *
+     * @param comment the comment to add
+     */
+    public void addComment(PullRequestReviewComment comment) {
+        if (comment != null) {
+            this.comments.add(comment);
+            comment.setThread(this);
+        }
+    }
+
+    /**
+     * Removes a comment from this thread and maintains bidirectional consistency.
+     * <p>
+     * CRITICAL: This method must be called BEFORE deleting the comment entity
+     * when orphanRemoval=true to avoid TransientObjectException.
+     *
+     * @param comment the comment to remove
+     */
+    public void removeComment(PullRequestReviewComment comment) {
+        if (comment != null) {
+            this.comments.remove(comment);
+            comment.setThread(null);
+        }
+    }
 
     public enum State {
         RESOLVED,

@@ -1,18 +1,31 @@
 package de.tum.in.www1.hephaestus.config;
 
+import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
+import org.springframework.aop.interceptor.AsyncUncaughtExceptionHandler;
+import org.springframework.aop.interceptor.SimpleAsyncUncaughtExceptionHandler;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.task.TaskExecutionAutoConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.task.AsyncTaskExecutor;
 import org.springframework.core.task.support.TaskExecutorAdapter;
+import org.springframework.scheduling.annotation.AsyncConfigurer;
 import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
+/**
+ * Async execution configuration.
+ * <p>
+ * Implements {@link AsyncConfigurer} to ensure ALL @Async methods use the bounded
+ * thread pool, preventing the default SimpleAsyncTaskExecutor from creating
+ * unbounded threads (which caused 5000+ thread creation in production).
+ */
 @Configuration
 @EnableAsync
-public class SpringAsyncConfig {
+public class SpringAsyncConfig implements AsyncConfigurer {
+
+    private ThreadPoolTaskExecutor executor;
 
     /**
      * Default async executor for @Async methods (e.g., activity event listeners).
@@ -36,7 +49,7 @@ public class SpringAsyncConfig {
      */
     @Bean(name = TaskExecutionAutoConfiguration.APPLICATION_TASK_EXECUTOR_BEAN_NAME)
     public AsyncTaskExecutor applicationTaskExecutor() {
-        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor = new ThreadPoolTaskExecutor();
         executor.setCorePoolSize(10);
         executor.setMaxPoolSize(50);
         executor.setQueueCapacity(500);
@@ -47,6 +60,25 @@ public class SpringAsyncConfig {
         executor.setAwaitTerminationSeconds(30);
         executor.initialize();
         return executor;
+    }
+
+    /**
+     * Configures the default executor for all @Async annotated methods.
+     * <p>
+     * Without this, Spring falls back to SimpleAsyncTaskExecutor which creates
+     * a new thread for every task - causing unbounded thread growth.
+     */
+    @Override
+    public Executor getAsyncExecutor() {
+        if (executor == null) {
+            applicationTaskExecutor();
+        }
+        return executor;
+    }
+
+    @Override
+    public AsyncUncaughtExceptionHandler getAsyncUncaughtExceptionHandler() {
+        return new SimpleAsyncUncaughtExceptionHandler();
     }
 
     /**

@@ -33,7 +33,10 @@ query GetIssueComments($owner: String!, $name: String!, $number: Int!, $first: I
                             databaseId
                             login
                             avatarUrl
+                            name
+                            email
                             createdAt
+                            updatedAt
                         }
                         ... on Bot {
                             id

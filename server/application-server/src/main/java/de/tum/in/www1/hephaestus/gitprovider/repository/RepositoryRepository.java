@@ -3,6 +3,8 @@ package de.tum.in.www1.hephaestus.gitprovider.repository;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 /**
  * Repository for Repository entities.
@@ -21,6 +23,16 @@ public interface RepositoryRepository extends JpaRepository<Repository, Long> {
      * Used during sync operations to check if repository exists.
      */
     Optional<Repository> findByNameWithOwner(String nameWithOwner);
+
+    /**
+     * Finds a repository by ID with the organization eagerly fetched.
+     * Used in backfill operations where the repository is passed across transaction boundaries.
+     *
+     * @param id the repository ID
+     * @return the repository with organization loaded, or empty if not found
+     */
+    @Query("SELECT r FROM Repository r LEFT JOIN FETCH r.organization WHERE r.id = :id")
+    Optional<Repository> findByIdWithOrganization(@Param("id") Long id);
 
     /**
      * Finds all repositories with the given prefix (owner/).

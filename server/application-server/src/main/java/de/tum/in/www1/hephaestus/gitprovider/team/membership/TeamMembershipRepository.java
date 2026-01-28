@@ -1,6 +1,5 @@
 package de.tum.in.www1.hephaestus.gitprovider.team.membership;
 
-import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -12,15 +11,6 @@ import org.springframework.stereotype.Repository;
  */
 @Repository
 public interface TeamMembershipRepository extends JpaRepository<TeamMembership, TeamMembership.Id> {
-    /**
-     * Find a membership by team and user IDs.
-     *
-     * @param teamId the team ID
-     * @param userId the user ID
-     * @return the membership, if it exists
-     */
-    Optional<TeamMembership> findByTeam_IdAndUser_Id(Long teamId, Long userId);
-
     /**
      * Delete a membership by team and user IDs.
      *

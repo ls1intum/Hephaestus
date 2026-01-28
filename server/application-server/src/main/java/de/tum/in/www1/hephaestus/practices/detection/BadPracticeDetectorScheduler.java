@@ -1,6 +1,9 @@
 package de.tum.in.www1.hephaestus.practices.detection;
 
-import de.tum.in.www1.hephaestus.gitprovider.label.Label;
+import static de.tum.in.www1.hephaestus.practices.model.PullRequestLabels.READY_FOR_REVIEW;
+import static de.tum.in.www1.hephaestus.practices.model.PullRequestLabels.READY_TO_MERGE;
+import static de.tum.in.www1.hephaestus.practices.model.PullRequestLabels.READY_TO_REVIEW;
+
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
@@ -9,11 +12,14 @@ import de.tum.in.www1.hephaestus.practices.spi.UserRoleChecker;
 import de.tum.in.www1.hephaestus.workspace.RepositoryToMonitorRepository;
 import de.tum.in.www1.hephaestus.workspace.Workspace;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceRepository;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -29,10 +35,7 @@ import org.springframework.stereotype.Component;
 public class BadPracticeDetectorScheduler {
 
     private static final Logger log = LoggerFactory.getLogger(BadPracticeDetectorScheduler.class);
-
-    private static final String READY_TO_REVIEW = "ready to review";
-    private static final String READY_FOR_REVIEW = "ready for review";
-    private static final String READY_TO_MERGE = "ready to merge";
+    private static final Duration SKIP_WARNING_INTERVAL = Duration.ofSeconds(30);
 
     private final TaskScheduler taskScheduler;
     private final PullRequestBadPracticeDetector pullRequestBadPracticeDetector;
@@ -43,6 +46,9 @@ public class BadPracticeDetectorScheduler {
     private final boolean runAutomaticDetectionForAll;
 
     private final Map<Long, List<ScheduledFuture<?>>> scheduledTasks = new ConcurrentHashMap<>();
+
+    private final AtomicLong skippedDueToKeycloakCount = new AtomicLong(0);
+    private final AtomicReference<Instant> lastSkipWarningTime = new AtomicReference<>(Instant.EPOCH);
 
     public BadPracticeDetectorScheduler(
         TaskScheduler taskScheduler,
@@ -65,23 +71,6 @@ public class BadPracticeDetectorScheduler {
     public void detectBadPracticeForPrWhenOpenedOrReadyForReviewEvent(PullRequest pullRequest) {
         Instant timeInOneHour = Instant.now().plusSeconds(3600);
         runAutomaticDetectionForAllIfEnabled(pullRequest, timeInOneHour, true);
-    }
-
-    public void detectBadPracticeForPrIfReadyLabels(
-        PullRequest pullRequest,
-        Set<Label> oldLabels,
-        Set<Label> newLabels
-    ) {
-        if (
-            (newLabels.stream().anyMatch(label -> READY_TO_REVIEW.equals(label.getName())) &&
-                oldLabels.stream().noneMatch(label -> READY_TO_REVIEW.equals(label.getName()))) ||
-            (newLabels.stream().anyMatch(label -> READY_FOR_REVIEW.equals(label.getName())) &&
-                oldLabels.stream().noneMatch(label -> READY_FOR_REVIEW.equals(label.getName()))) ||
-            (newLabels.stream().anyMatch(label -> READY_TO_MERGE.equals(label.getName())) &&
-                oldLabels.stream().noneMatch(label -> READY_TO_MERGE.equals(label.getName())))
-        ) {
-            runAutomaticDetectionForAllIfEnabled(pullRequest, Instant.now(), true);
-        }
     }
 
     public void detectBadPracticeForPrIfClosedEvent(PullRequest pullRequest) {
@@ -127,15 +116,47 @@ public class BadPracticeDetectorScheduler {
         }
 
         if (!userRoleChecker.isHealthy()) {
-            log.debug("Skipped role check for PR: reason=roleCheckerUnhealthy, prId={}", pullRequest.getId());
+            logSkippedDueToKeycloak(pullRequest, assignee);
             return;
+        }
+
+        // Keycloak is healthy - reset skip counter if it was previously incremented
+        long previousCount = skippedDueToKeycloakCount.getAndSet(0);
+        if (previousCount > 0) {
+            log.info("Keycloak circuit breaker recovered, resuming bad practice detection");
         }
 
         if (userRoleChecker.hasAutomaticDetectionRole(assignee.getLogin())) {
             log.info("Scheduling detection: userLogin={}, reason=hasAutomaticDetectionRole", assignee.getLogin());
             scheduleDetectionAtTime(pullRequest, scheduledTime, sendBadPracticeDetectionEmail);
         } else {
-            log.info("Skipped detection: userLogin={}, reason=noAutomaticDetectionRole", assignee.getLogin());
+            // DEBUG level: skipping is the expected default behavior when users haven't
+            // logged in or don't have the automatic detection role assigned
+            log.debug("Skipped detection: userLogin={}, reason=noAutomaticDetectionRole", assignee.getLogin());
+        }
+    }
+
+    private void logSkippedDueToKeycloak(PullRequest pullRequest, User assignee) {
+        long currentCount = skippedDueToKeycloakCount.incrementAndGet();
+        Instant now = Instant.now();
+        Instant lastWarning = lastSkipWarningTime.get();
+
+        // Always log at DEBUG level for detailed troubleshooting
+        log.debug(
+            "Skipped bad practice detection due to Keycloak circuit breaker open: prId={}, prTitle={}, assignee={}",
+            pullRequest.getId(),
+            pullRequest.getTitle(),
+            assignee.getLogin()
+        );
+
+        // Rate-limit WARN logging to avoid log spam during startup with many PRs
+        if (Duration.between(lastWarning, now).compareTo(SKIP_WARNING_INTERVAL) >= 0) {
+            if (lastSkipWarningTime.compareAndSet(lastWarning, now)) {
+                log.warn(
+                    "Skipped bad practice detection due to Keycloak circuit breaker open: skippedCount={}",
+                    currentCount
+                );
+            }
         }
     }
 
@@ -218,5 +239,41 @@ public class BadPracticeDetectorScheduler {
         });
 
         toRemovePullrequestIds.forEach(scheduledTasks::remove);
+    }
+
+    /**
+     * Cancels all scheduled bad practice detection tasks for the given pull request IDs.
+     * Called during workspace purge to clean up scheduled tasks for PRs in the workspace.
+     *
+     * @param pullRequestIds the IDs of pull requests whose scheduled tasks should be cancelled
+     * @return the number of tasks that were cancelled
+     */
+    public int cancelScheduledTasksForPullRequests(Collection<Long> pullRequestIds) {
+        if (pullRequestIds == null || pullRequestIds.isEmpty()) {
+            return 0;
+        }
+
+        int cancelledCount = 0;
+        for (Long prId : pullRequestIds) {
+            List<ScheduledFuture<?>> tasks = scheduledTasks.remove(prId);
+            if (tasks != null) {
+                for (ScheduledFuture<?> task : tasks) {
+                    if (!task.isDone() && !task.isCancelled()) {
+                        task.cancel(false);
+                        cancelledCount++;
+                    }
+                }
+            }
+        }
+
+        if (cancelledCount > 0) {
+            log.info(
+                "Cancelled scheduled bad practice detection tasks: cancelledCount={}, prCount={}",
+                cancelledCount,
+                pullRequestIds.size()
+            );
+        }
+
+        return cancelledCount;
     }
 }

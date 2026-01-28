@@ -54,7 +54,7 @@ import org.springframework.web.reactive.function.client.WebClientResponseExcepti
  * }</pre>
  *
  * @see ExponentialBackoff
- * @see GitHubGraphQlRateLimitTracker
+ * @see de.tum.in.www1.hephaestus.gitprovider.common.spi.RateLimitTracker
  */
 @Component
 public class GitHubExceptionClassifier {
@@ -305,6 +305,15 @@ public class GitHubExceptionClassifier {
             );
         }
 
+        // Database deadlocks are transient and should be retried with backoff
+        // These occur when multiple threads try to upsert the same user concurrently
+        if (isDeadlockException(cause)) {
+            return ClassificationResult.of(
+                Category.RETRYABLE,
+                "Database deadlock detected - will retry: " + cause.getMessage()
+            );
+        }
+
         // Check for WebClient response exceptions (HTTP errors)
         if (cause instanceof WebClientResponseException responseException) {
             return classifyHttpStatus(responseException);
@@ -417,6 +426,51 @@ public class GitHubExceptionClassifier {
     }
 
     /**
+     * Checks if the exception indicates a database deadlock.
+     * <p>
+     * Database deadlocks are transient failures that occur when:
+     * <ul>
+     *   <li>Multiple threads try to INSERT/UPDATE the same rows in different order</li>
+     *   <li>PostgreSQL detects a lock cycle and aborts one transaction</li>
+     * </ul>
+     * <p>
+     * Common in sync operations when parallel threads process shared entities (e.g., users).
+     * These should always be retried since the deadlock is resolved by PostgreSQL.
+     */
+    private boolean isDeadlockException(Throwable e) {
+        // Walk the cause chain to find deadlock indicators
+        Throwable current = e;
+        while (current != null) {
+            String className = current.getClass().getName();
+            String message = current.getMessage();
+
+            // Spring/Hibernate deadlock exceptions
+            if (className.contains("CannotAcquireLockException") ||
+                className.contains("LockAcquisitionException") ||
+                className.contains("DeadlockLoserDataAccessException")) {
+                return true;
+            }
+
+            // PostgreSQL deadlock SQLState 40P01
+            if (className.contains("SQLException") || className.contains("PSQLException")) {
+                if (message != null && (
+                    message.contains("deadlock detected") ||
+                    message.contains("40P01"))) {
+                    return true;
+                }
+            }
+
+            // Check message for deadlock indicators
+            if (message != null && message.toLowerCase().contains("deadlock")) {
+                return true;
+            }
+
+            current = current.getCause();
+        }
+        return false;
+    }
+
+    /**
      * Checks if the exception indicates a timeout.
      */
     private boolean isTimeoutException(Throwable e) {
@@ -434,15 +488,37 @@ public class GitHubExceptionClassifier {
 
     /**
      * Checks if the exception indicates a network error.
+     * <p>
+     * Includes transport-level errors that occur during response streaming:
+     * <ul>
+     *   <li>PrematureCloseException: Connection closed mid-response (GitHub infra issues)</li>
+     *   <li>Connection reset/abort errors</li>
+     *   <li>Standard socket exceptions</li>
+     * </ul>
      */
     private boolean isNetworkException(Throwable e) {
-        return (
-            e instanceof ConnectException ||
+        if (e instanceof ConnectException ||
             e instanceof SocketException ||
-            e instanceof UnknownHostException ||
-            e.getClass().getName().contains("ConnectionException") ||
-            e.getClass().getName().contains("ConnectionReset")
-        );
+            e instanceof UnknownHostException) {
+            return true;
+        }
+
+        String className = e.getClass().getName();
+
+        // Check for reactor-netty transport errors (PrematureCloseException, etc.)
+        if (className.contains("PrematureCloseException") ||
+            className.contains("AbortedException") ||
+            className.contains("ConnectionException") ||
+            className.contains("ConnectionReset")) {
+            return true;
+        }
+
+        // Check for Spring GraphQL transport exceptions
+        if (className.contains("GraphQlTransportException")) {
+            return true;
+        }
+
+        return false;
     }
 
     /**

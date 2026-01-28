@@ -19,18 +19,30 @@ public interface TeamRepository extends JpaRepository<Team, Long> {
     List<Team> findAllByOrganizationIgnoreCase(String organization);
 
     /**
-     * Fetch teams with all collections eagerly loaded for DTO conversion.
-     * Uses EntityGraph to fetch repoPermissions (with nested repository and its labels),
-     * and memberships (with users) in one query.
+     * Find a team by its natural key (organization + name).
      *
-     * <p>Note: Team labels are now managed via scope-specific settings
+     * @param organization the organization login (case-insensitive)
+     * @param name the team name
+     * @return the team if found
+     */
+    Optional<Team> findByOrganizationIgnoreCaseAndName(String organization, String name);
+
+    /**
+     * Fetch teams with collections eagerly loaded for DTO conversion.
+     * Uses EntityGraph to fetch repoPermissions (with nested repository),
+     * and memberships (with users).
+     *
+     * <p>Note: Repository labels are NOT included in EntityGraph to avoid
+     * Cartesian product explosion. They are batch-fetched via @BatchSize(50)
+     * on Repository.labels when accessed.
+     *
+     * <p>Note: Team labels are managed via scope-specific settings
      * (via consuming module) and are fetched separately.
      */
     @EntityGraph(
         attributePaths = {
             "repoPermissions",
             "repoPermissions.repository",
-            "repoPermissions.repository.labels",
             "memberships",
             "memberships.user",
         }
@@ -38,16 +50,19 @@ public interface TeamRepository extends JpaRepository<Team, Long> {
     List<Team> findWithCollectionsByOrganizationIgnoreCase(String organization);
 
     /**
-     * Fetch a single team by ID with all collections eagerly loaded for DTO conversion.
+     * Fetch a single team by ID with collections eagerly loaded for DTO conversion.
      *
-     * <p>Note: Team labels are now managed via scope-specific settings
+     * <p>Note: Repository labels are NOT included in EntityGraph to avoid
+     * Cartesian product explosion. They are batch-fetched via @BatchSize(50)
+     * on Repository.labels when accessed.
+     *
+     * <p>Note: Team labels are managed via scope-specific settings
      * (via consuming module) and are fetched separately.
      */
     @EntityGraph(
         attributePaths = {
             "repoPermissions",
             "repoPermissions.repository",
-            "repoPermissions.repository.labels",
             "memberships",
             "memberships.user",
         }

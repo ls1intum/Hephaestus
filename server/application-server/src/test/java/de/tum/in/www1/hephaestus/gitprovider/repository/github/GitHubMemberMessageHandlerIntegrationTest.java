@@ -23,7 +23,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.ClassPathResource;
-import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Integration tests for GitHubMemberMessageHandler.
@@ -32,7 +31,6 @@ import org.springframework.transaction.annotation.Transactional;
  * This handler processes member (collaborator) events for repository access.
  */
 @DisplayName("GitHub Member Message Handler")
-@Transactional
 class GitHubMemberMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
     @Autowired

@@ -74,7 +74,7 @@ public class WorkspaceProvisioningService {
 
     @Transactional
     public void bootstrapDefaultPatWorkspace() {
-        if (!workspaceProperties.isInitDefault()) {
+        if (!workspaceProperties.initDefault()) {
             log.debug("Skipped default PAT workspace bootstrap: reason=bootstrapDisabled");
             return;
         }
@@ -85,11 +85,11 @@ public class WorkspaceProvisioningService {
             return;
         }
 
-        WorkspaceProperties.DefaultWorkspace config = workspaceProperties.getDefaultWorkspace();
+        WorkspaceProperties.DefaultProperties config = workspaceProperties.defaultProperties();
 
         String accountLogin = null;
-        if (!isBlank(config.getLogin())) {
-            accountLogin = config.getLogin().trim();
+        if (!isBlank(config.login())) {
+            accountLogin = config.login().trim();
         }
         if (isBlank(accountLogin)) {
             throw new IllegalStateException(
@@ -97,13 +97,13 @@ public class WorkspaceProvisioningService {
             );
         }
 
-        if (isBlank(config.getToken())) {
+        if (isBlank(config.token())) {
             throw new IllegalStateException(
                 "Missing PAT for default workspace bootstrap. Configure hephaestus.workspace.default.token or set GITHUB_PAT."
             );
         }
 
-        Long ownerUserId = syncGitHubUserForPAT(config.getToken(), accountLogin);
+        Long ownerUserId = syncGitHubUserForPAT(config.token(), accountLogin);
 
         String rawSlug = accountLogin;
         String displayName = accountLogin;
@@ -117,7 +117,7 @@ public class WorkspaceProvisioningService {
         );
 
         workspace.setGitProviderMode(Workspace.GitProviderMode.PAT_ORG);
-        workspace.setPersonalAccessToken(config.getToken());
+        workspace.setPersonalAccessToken(config.token());
         workspace.setGithubRepositorySelection(RepositorySelection.SELECTED);
 
         Workspace savedWorkspace = workspaceRepository.save(workspace);
@@ -128,7 +128,7 @@ public class WorkspaceProvisioningService {
         );
 
         config
-            .getRepositoriesToMonitor()
+            .repositoriesToMonitor()
             .stream()
             .map(repo -> repo == null ? null : repo.trim())
             .filter(nameWithOwner -> !isBlank(nameWithOwner))
@@ -148,7 +148,7 @@ public class WorkspaceProvisioningService {
     }
 
     private void ensureDefaultAdminMembershipIfPresent() {
-        String defaultSlug = workspaceProperties.getDefaultWorkspace().getLogin();
+        String defaultSlug = workspaceProperties.defaultProperties().login();
         Workspace target = null;
         if (!isBlank(defaultSlug)) {
             target = workspaceRepository.findByWorkspaceSlug(defaultSlug.trim()).orElse(null);

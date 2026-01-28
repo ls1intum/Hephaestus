@@ -43,6 +43,9 @@ query GetOrganizationTeams($login: String!, $first: Int!, $after: String) {
                             login
                             avatarUrl
                             name
+                            email
+                            createdAt
+                            updatedAt
                         }
                     }
                 }

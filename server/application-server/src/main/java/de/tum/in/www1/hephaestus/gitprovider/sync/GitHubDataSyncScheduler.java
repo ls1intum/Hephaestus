@@ -12,9 +12,13 @@ import de.tum.in.www1.hephaestus.gitprovider.issuedependency.github.GitHubIssueD
 import de.tum.in.www1.hephaestus.gitprovider.issuetype.github.GitHubIssueTypeSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.subissue.github.GitHubSubIssueSyncService;
 import java.util.List;
-import lombok.RequiredArgsConstructor;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.annotation.Order;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -46,15 +50,15 @@ import org.springframework.stereotype.Component;
  * <ol>
  *   <li>Spring creates this component at startup (after {@code NatsConsumerService}
  *       due to {@code @Order(2)})</li>
- *   <li>{@code @Scheduled} method runs at cron interval from {@code monitoring.sync-cron}</li>
+ *   <li>{@code @Scheduled} method runs at cron interval from {@code hephaestus.sync.cron}</li>
  *   <li>Each run processes all ACTIVE scopes, respecting monitoring filters</li>
  * </ol>
  *
  * <h2>Configuration</h2>
  * <ul>
- *   <li>{@code monitoring.sync-cron} - Cron expression for sync schedule (default: "0 0 3 * * *" = 3 AM daily)</li>
- *   <li>{@code monitoring.filters.allowed-organizations} - Limit to specific orgs (dev filter)</li>
- *   <li>{@code monitoring.filters.allowed-repositories} - Limit to specific repos (dev filter)</li>
+ *   <li>{@code hephaestus.sync.cron} - Cron expression for sync schedule (default: "0 0 3 * * *" = 3 AM daily)</li>
+ *   <li>{@code hephaestus.sync.filters.allowed-organizations} - Limit to specific orgs (dev filter)</li>
+ *   <li>{@code hephaestus.sync.filters.allowed-repositories} - Limit to specific repos (dev filter)</li>
  * </ul>
  *
  * @see GitHubDataSyncService
@@ -62,7 +66,6 @@ import org.springframework.stereotype.Component;
  */
 @Order(value = 2)
 @Component
-@RequiredArgsConstructor
 public class GitHubDataSyncScheduler {
 
     private static final Logger log = LoggerFactory.getLogger(GitHubDataSyncScheduler.class);
@@ -73,12 +76,31 @@ public class GitHubDataSyncScheduler {
     private final GitHubSubIssueSyncService subIssueSyncService;
     private final GitHubIssueTypeSyncService issueTypeSyncService;
     private final GitHubIssueDependencySyncService issueDependencySyncService;
+    private final Executor monitoringExecutor;
+
+    public GitHubDataSyncScheduler(
+        SyncTargetProvider syncTargetProvider,
+        SyncContextProvider syncContextProvider,
+        GitHubDataSyncService dataSyncService,
+        GitHubSubIssueSyncService subIssueSyncService,
+        GitHubIssueTypeSyncService issueTypeSyncService,
+        GitHubIssueDependencySyncService issueDependencySyncService,
+        @Qualifier("monitoringExecutor") Executor monitoringExecutor
+    ) {
+        this.syncTargetProvider = syncTargetProvider;
+        this.syncContextProvider = syncContextProvider;
+        this.dataSyncService = dataSyncService;
+        this.subIssueSyncService = subIssueSyncService;
+        this.issueTypeSyncService = issueTypeSyncService;
+        this.issueDependencySyncService = issueDependencySyncService;
+        this.monitoringExecutor = monitoringExecutor;
+    }
 
     /**
      * Scheduled job to sync GitHub data for all active scopes.
      * Respects monitoring filters to limit sync scope during development.
      */
-    @Scheduled(cron = "${monitoring.sync-cron}")
+    @Scheduled(cron = "${hephaestus.sync.cron}")
     public void syncDataCron() {
         log.info("Starting scheduled sync");
 
@@ -114,11 +136,57 @@ public class GitHubDataSyncScheduler {
             );
         }
 
-        for (SyncSession session : sessions) {
-            syncScope(session);
-        }
+        // Process all workspaces in parallel - each has its own GitHub App installation
+        // with separate rate limits, so there's no reason to sync sequentially.
+        // Uses virtual threads (monitoringExecutor) for efficient I/O-bound operations.
+        //
+        // Each future handles its own exceptions via exceptionally() so that:
+        // 1. One workspace failure doesn't prevent other workspaces from completing
+        // 2. All exceptions are logged with proper context
+        // 3. We can report accurate success/failure counts
+        //
+        // No global timeout: large repositories (10k+ issues) combined with rate limits
+        // can legitimately take many hours. Individual GraphQL calls have their own
+        // timeouts for transient failures. Spring's single-threaded scheduler prevents
+        // overlapping runs, and join() respects thread interruption for JVM shutdown.
+        AtomicInteger successCount = new AtomicInteger(0);
+        AtomicInteger failureCount = new AtomicInteger(0);
 
-        log.info("Completed scheduled sync: scopeCount={}", sessions.size());
+        CompletableFuture<?>[] futures = sessions.stream()
+            .map(session -> CompletableFuture.runAsync(() -> syncScope(session), monitoringExecutor)
+                .whenComplete((result, error) -> {
+                    if (error != null) {
+                        // Already logged inside syncScope
+                        failureCount.incrementAndGet();
+                    } else {
+                        successCount.incrementAndGet();
+                    }
+                }))
+            .toArray(CompletableFuture[]::new);
+
+        // Wait for all workspace syncs to complete
+        // Use get() instead of join() because get() throws InterruptedException,
+        // allowing graceful shutdown when Ctrl+C is pressed.
+        try {
+            CompletableFuture.allOf(futures).get();
+            log.info(
+                "Completed scheduled sync: scopeCount={}, successful={}, failed={}",
+                sessions.size(),
+                successCount.get(),
+                failureCount.get()
+            );
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            log.warn(
+                "Scheduled sync interrupted (shutdown requested): scopeCount={}, successful={}, failed={}",
+                sessions.size(),
+                successCount.get(),
+                failureCount.get()
+            );
+        } catch (ExecutionException e) {
+            // Should not happen since each future handles its own exceptions via whenComplete()
+            log.error("Unexpected error during scheduled sync", e);
+        }
     }
 
     private void syncScope(SyncSession session) {
@@ -135,15 +203,19 @@ public class GitHubDataSyncScheduler {
 
             // Wrap sync operations with context propagation for async threads
             Runnable syncTask = syncContextProvider.wrapWithContext(() -> {
+                // Sync issue types FIRST (before repository syncs) because they are
+                // organization-level entities that issues reference. This ensures
+                // issue types exist when issues are processed during repository sync.
+                syncIssueTypes(session);
+
                 // Sync repositories, organizations, and teams (via syncSyncTarget)
                 for (SyncTarget target : session.syncTargets()) {
                     dataSyncService.syncSyncTarget(target);
                 }
 
-                // Sync sub-issues, issue types, and issue dependencies via GraphQL
-                // These are scope-level operations (fetched across all repositories)
+                // Sync sub-issues and issue dependencies via GraphQL
+                // These are scope-level relationships that require issues/PRs to exist first
                 syncSubIssues(session);
-                syncIssueTypes(session);
                 syncIssueDependencies(session);
             });
 

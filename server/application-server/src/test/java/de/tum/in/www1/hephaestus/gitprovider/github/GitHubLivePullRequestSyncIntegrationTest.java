@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.github.GitHubPullRequestSyncService;
+import de.tum.in.www1.hephaestus.gitprovider.sync.SyncResult;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReview;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReviewRepository;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.github.GitHubPullRequestReviewSyncService;
@@ -72,10 +73,11 @@ class GitHubLivePullRequestSyncIntegrationTest extends AbstractGitHubLiveSyncInt
         var localRepo = repositoryRepository.findByNameWithOwner(repository.fullName()).orElseThrow();
 
         // 5. Sync pull requests
-        int syncedCount = pullRequestSyncService.syncForRepository(workspace.getId(), localRepo.getId());
+        SyncResult syncResult = pullRequestSyncService.syncForRepository(workspace.getId(), localRepo.getId());
 
         // 6. Verify
-        assertThat(syncedCount).isGreaterThanOrEqualTo(1);
+        assertThat(syncResult.isCompleted()).isTrue();
+        assertThat(syncResult.count()).isGreaterThanOrEqualTo(1);
 
         PullRequest storedPR = pullRequestRepository
             .findByRepositoryIdAndNumber(localRepo.getId(), createdPR.number())
@@ -99,8 +101,9 @@ class GitHubLivePullRequestSyncIntegrationTest extends AbstractGitHubLiveSyncInt
         var localRepo = repositoryRepository.findByNameWithOwner(repository.fullName()).orElseThrow();
 
         // 3. Sync pull requests
-        int syncedCount = pullRequestSyncService.syncForRepository(workspace.getId(), localRepo.getId());
-        assertThat(syncedCount).isGreaterThanOrEqualTo(1);
+        SyncResult syncResult = pullRequestSyncService.syncForRepository(workspace.getId(), localRepo.getId());
+        assertThat(syncResult.isCompleted()).isTrue();
+        assertThat(syncResult.count()).isGreaterThanOrEqualTo(1);
 
         // 4. Verify PR is synced
         PullRequest storedPR = pullRequestRepository
@@ -170,10 +173,11 @@ class GitHubLivePullRequestSyncIntegrationTest extends AbstractGitHubLiveSyncInt
         var localRepo = repositoryRepository.findByNameWithOwner(repository.fullName()).orElseThrow();
 
         // 5. Sync pull requests
-        int syncedCount = pullRequestSyncService.syncForRepository(workspace.getId(), localRepo.getId());
+        SyncResult syncResult = pullRequestSyncService.syncForRepository(workspace.getId(), localRepo.getId());
 
         // 6. Verify both PRs are synced
-        assertThat(syncedCount).isGreaterThanOrEqualTo(2);
+        assertThat(syncResult.isCompleted()).isTrue();
+        assertThat(syncResult.count()).isGreaterThanOrEqualTo(2);
 
         PullRequest storedPR1 = pullRequestRepository
             .findByRepositoryIdAndNumber(localRepo.getId(), pr1.number())

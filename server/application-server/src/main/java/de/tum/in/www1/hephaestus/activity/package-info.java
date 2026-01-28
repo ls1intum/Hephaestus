@@ -55,8 +55,7 @@
  * <ul>
  *   <li>{@link de.tum.in.www1.hephaestus.activity.ActivityEvent} - Immutable event entity</li>
  *   <li>{@link de.tum.in.www1.hephaestus.activity.ActivityEventListener} - Domain→Activity bridge</li>
- *   <li>{@link de.tum.in.www1.hephaestus.activity.ActivityEventService} - Event persistence with retry</li>
- *   <li>{@link de.tum.in.www1.hephaestus.activity.ActivityIntegrityScheduler} - Periodic hash verification</li>
+ *   <li>{@link de.tum.in.www1.hephaestus.activity.ActivityEventService} - Event persistence</li>
  *   <li>{@link de.tum.in.www1.hephaestus.activity.scoring.ExperiencePointCalculator} - XP formulas</li>
  * </ul>
  *
@@ -68,7 +67,6 @@
  *   <li><strong>Pre-computed XP</strong>: XP calculated at write time, not on read</li>
  *   <li><strong>DB-level aggregation</strong>: SUM(xp) GROUP BY, not in-memory loops</li>
  *   <li><strong>Clean boundaries</strong>: Leaderboard queries live in leaderboard module</li>
- *   <li><strong>Verifiable</strong>: SHA-256 content hashes with scheduled verification</li>
  * </ul>
  *
  * <h2>Event Types</h2>

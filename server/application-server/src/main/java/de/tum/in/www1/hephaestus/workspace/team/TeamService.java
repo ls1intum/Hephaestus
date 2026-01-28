@@ -10,7 +10,9 @@ import de.tum.in.www1.hephaestus.gitprovider.team.permission.TeamRepositoryPermi
 import de.tum.in.www1.hephaestus.workspace.Workspace;
 import de.tum.in.www1.hephaestus.workspace.settings.WorkspaceTeamSettingsService;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -62,10 +64,18 @@ public class TeamService {
         Set<Long> hiddenTeamIds = workspaceTeamSettingsService.getHiddenTeamIds(workspaceId);
         Set<Long> hiddenRepoIds = workspaceTeamSettingsService.getHiddenRepositoryIds(workspaceId);
 
-        return teamRepository
-            .findWithCollectionsByOrganizationIgnoreCase(workspace.getAccountLogin())
+        List<Team> teams = teamRepository.findWithCollectionsByOrganizationIgnoreCase(workspace.getAccountLogin());
+
+        // Batch fetch all label filters in ONE query instead of N queries (N+1 fix)
+        Set<Long> teamIds = teams.stream().map(Team::getId).collect(Collectors.toSet());
+        Map<Long, Set<Label>> labelFiltersByTeam = workspaceTeamSettingsService.getTeamLabelFiltersForTeams(
+            workspaceId,
+            teamIds
+        );
+
+        return teams
             .stream()
-            .map(team -> convertToDTO(team, workspaceId, hiddenTeamIds, hiddenRepoIds))
+            .map(team -> convertToDTO(team, hiddenTeamIds, hiddenRepoIds, labelFiltersByTeam))
             .toList();
     }
 
@@ -156,14 +166,19 @@ public class TeamService {
      * Converts a Team entity to TeamInfoDTO with workspace-scoped settings applied.
      *
      * @param team the team entity
-     * @param workspaceId the workspace ID for looking up settings
      * @param hiddenTeamIds set of team IDs that are hidden in this workspace
      * @param hiddenRepoIds set of repository IDs hidden from contributions in this workspace
+     * @param labelFiltersByTeam pre-fetched label filters for all teams (avoids N+1 queries)
      * @return the DTO with workspace-scoped hidden/label settings
      */
-    private TeamInfoDTO convertToDTO(Team team, Long workspaceId, Set<Long> hiddenTeamIds, Set<Long> hiddenRepoIds) {
+    private TeamInfoDTO convertToDTO(
+        Team team,
+        Set<Long> hiddenTeamIds,
+        Set<Long> hiddenRepoIds,
+        Map<Long, Set<Label>> labelFiltersByTeam
+    ) {
         boolean isHidden = hiddenTeamIds.contains(team.getId());
-        Set<Label> workspaceLabels = workspaceTeamSettingsService.getTeamLabelFilters(workspaceId, team.getId());
+        Set<Label> workspaceLabels = labelFiltersByTeam.getOrDefault(team.getId(), Set.of());
 
         return TeamInfoDTO.fromTeamWithScopeSettings(team, isHidden, workspaceLabels, hiddenRepoIds);
     }

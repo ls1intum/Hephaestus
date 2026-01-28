@@ -47,6 +47,18 @@ import org.springframework.transaction.annotation.Transactional;
  * <li>Domain events published for reactive feature development</li>
  * <li>Works exclusively with DTOs for complete field coverage</li>
  * </ul>
+ * <p>
+ * <b>Stub Issue Pattern:</b>
+ * <p>
+ * Some sync operations (dependency sync, sub-issue sync) need to create "stub"
+ * issues for referential integrity - e.g., when a blocking issue exists in the
+ * same org but hasn't been synced yet. Use {@link #processStub} for these cases.
+ * Stub issues:
+ * <ul>
+ * <li>Are created with minimal data (may lack author, body, etc.)</li>
+ * <li>Do NOT trigger domain events (they're not real "issue created" events)</li>
+ * <li>Will be hydrated later by the full issue sync or webhook</li>
+ * </ul>
  */
 @Service
 public class GitHubIssueProcessor extends BaseGitHubProcessor {
@@ -77,9 +89,52 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
     /**
      * Process a GitHub issue DTO and persist it as an Issue entity.
      * Publishes appropriate domain events based on what changed.
+     * <p>
+     * Use this method for real issue data from webhooks or full sync operations.
+     * For creating placeholder issues (e.g., for dependency relationships),
+     * use {@link #processStub} instead.
      */
     @Transactional
     public Issue process(GitHubIssueDTO dto, ProcessingContext context) {
+        return processInternal(dto, context, true);
+    }
+
+    /**
+     * Process a GitHub issue DTO as a "stub" entity for referential integrity.
+     * <p>
+     * <b>IMPORTANT:</b> This method does NOT publish domain events. Use it only
+     * for creating placeholder issues needed for relationships (blocking issues,
+     * parent issues, etc.) that will be hydrated later by the full sync.
+     * <p>
+     * Stub issues are created when:
+     * <ul>
+     * <li>Dependency sync finds a blocker issue not yet in the database</li>
+     * <li>Sub-issue sync finds a parent issue not yet in the database</li>
+     * <li>Comment webhooks arrive before the issue/PR webhook</li>
+     * </ul>
+     * <p>
+     * These stubs have incomplete data (often missing author, body, etc.) and
+     * should not trigger activity events. They will be "hydrated" with full data
+     * when the real issue webhook or scheduled sync runs.
+     *
+     * @param dto     the issue DTO (may have incomplete data)
+     * @param context the processing context
+     * @return the created or updated Issue entity, or null if creation failed
+     */
+    @Transactional
+    public Issue processStub(GitHubIssueDTO dto, ProcessingContext context) {
+        return processInternal(dto, context, false);
+    }
+
+    /**
+     * Internal method that handles both regular and stub issue processing.
+     *
+     * @param dto           the issue DTO
+     * @param context       the processing context
+     * @param publishEvents whether to publish domain events (false for stubs)
+     * @return the created or updated Issue entity
+     */
+    private Issue processInternal(GitHubIssueDTO dto, ProcessingContext context, boolean publishEvents) {
         // Use getDatabaseId() which falls back to id for webhook payloads
         Long dbId = dto.getDatabaseId();
         if (dbId == null) {
@@ -98,10 +153,14 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
             // Mark sync timestamp
             issue.setLastSyncAt(Instant.now());
             issue = issueRepository.save(issue);
-            eventPublisher.publishEvent(
-                new DomainEvent.IssueCreated(EventPayload.IssueData.from(issue), EventContext.from(context))
-            );
-            log.debug("Created issue: issueId={}, issueNumber={}", dbId, dto.number());
+            if (publishEvents) {
+                eventPublisher.publishEvent(
+                    new DomainEvent.IssueCreated(EventPayload.IssueData.from(issue), EventContext.from(context))
+                );
+                log.debug("Created issue: issueId={}, issueNumber={}", dbId, dto.number());
+            } else {
+                log.debug("Created stub issue (no event): issueId={}, issueNumber={}", dbId, dto.number());
+            }
         } else {
             issue = existingOpt.get();
             Set<String> changedFields = updateIssue(dto, issue, repository);
@@ -109,7 +168,7 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
             issue.setLastSyncAt(Instant.now());
             issue = issueRepository.save(issue);
 
-            if (!changedFields.isEmpty()) {
+            if (publishEvents && !changedFields.isEmpty()) {
                 eventPublisher.publishEvent(
                     new DomainEvent.IssueUpdated(
                         EventPayload.IssueData.from(issue),

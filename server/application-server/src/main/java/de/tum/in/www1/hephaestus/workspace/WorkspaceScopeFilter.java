@@ -1,9 +1,8 @@
 package de.tum.in.www1.hephaestus.workspace;
 
-import de.tum.in.www1.hephaestus.monitoring.MonitoringFilterProperties;
+import de.tum.in.www1.hephaestus.gitprovider.sync.SyncSchedulerProperties;
 import jakarta.annotation.PostConstruct;
 import java.util.Collections;
-import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -25,7 +24,7 @@ import org.springframework.stereotype.Component;
  *   <li>If repo filter is set → only matching repositories are synced</li>
  * </ul>
  *
- * @see MonitoringFilterProperties
+ * @see SyncSchedulerProperties.FilterProperties
  */
 @Component
 public class WorkspaceScopeFilter {
@@ -35,9 +34,15 @@ public class WorkspaceScopeFilter {
     private final Set<String> allowedOrganizations;
     private final Set<String> allowedRepositories;
 
-    public WorkspaceScopeFilter(MonitoringFilterProperties properties) {
-        this.allowedOrganizations = normalizeSet(properties.getAllowedOrganizations());
-        this.allowedRepositories = normalizeSet(properties.getAllowedRepositories());
+    public WorkspaceScopeFilter(SyncSchedulerProperties properties) {
+        SyncSchedulerProperties.FilterProperties filters = properties.filters();
+        log.debug(
+            "Received SyncSchedulerProperties.filters: allowedOrganizations={}, allowedRepositories={}",
+            filters.allowedOrganizations(),
+            filters.allowedRepositories()
+        );
+        this.allowedOrganizations = normalizeSet(filters.allowedOrganizations());
+        this.allowedRepositories = normalizeSet(filters.allowedRepositories());
     }
 
     @PostConstruct
@@ -118,7 +123,7 @@ public class WorkspaceScopeFilter {
         return !(allowedOrganizations.isEmpty() && allowedRepositories.isEmpty());
     }
 
-    private Set<String> normalizeSet(List<String> values) {
+    private Set<String> normalizeSet(Set<String> values) {
         if (values == null || values.isEmpty()) {
             return Collections.emptySet();
         }

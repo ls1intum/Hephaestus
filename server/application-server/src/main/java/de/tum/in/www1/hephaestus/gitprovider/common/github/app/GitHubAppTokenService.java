@@ -9,6 +9,7 @@ import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import de.tum.in.www1.hephaestus.gitprovider.common.exception.InstallationNotFoundException;
 import de.tum.in.www1.hephaestus.gitprovider.common.exception.InstallationSuspendedException;
+import de.tum.in.www1.hephaestus.gitprovider.github.GitHubProperties;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -24,7 +25,6 @@ import java.util.Base64;
 import java.util.Date;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Service;
@@ -64,11 +64,10 @@ public class GitHubAppTokenService {
     // This is an in-memory set that all threads see immediately, bypassing DB transaction isolation.
     private final Set<Long> suspendedInstallations = ConcurrentHashMap.newKeySet();
 
-    public GitHubAppTokenService(
-        @Value("${github.app.id}") long appId,
-        @Value("${github.app.privateKeyLocation:}") Resource privateKeyRes,
-        @Value("${github.app.privateKey:}") String privateKeyPem
-    ) {
+    public GitHubAppTokenService(GitHubProperties gitHubProperties) {
+        long appId = gitHubProperties.app().id();
+        Resource privateKeyRes = gitHubProperties.app().privateKeyLocation();
+        String privateKeyPem = gitHubProperties.app().privateKey();
         this.appId = appId;
         this.credentialsConfigured = isKeyMaterialPresent(appId, privateKeyRes, privateKeyPem);
         this.privateKey = credentialsConfigured ? loadKey(privateKeyRes, privateKeyPem) : generateEphemeralRsaKey();

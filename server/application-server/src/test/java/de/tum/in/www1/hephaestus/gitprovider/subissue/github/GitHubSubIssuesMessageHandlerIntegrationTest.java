@@ -23,7 +23,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.ClassPathResource;
-import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Integration tests for GitHubSubIssuesMessageHandler.
@@ -31,7 +30,6 @@ import org.springframework.transaction.annotation.Transactional;
  * Tests use JSON fixtures parsed directly into DTOs using JSON fixtures for complete isolation.
  */
 @DisplayName("GitHub Sub Issues Message Handler")
-@Transactional
 class GitHubSubIssuesMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
     @Autowired

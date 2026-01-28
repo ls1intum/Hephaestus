@@ -29,11 +29,6 @@ public final class GitHubGraphQlErrorUtils {
     public static final String ERROR_TYPE_NOT_FOUND = "NOT_FOUND";
 
     /**
-     * GitHub GraphQL error type indicating forbidden access.
-     */
-    public static final String ERROR_TYPE_FORBIDDEN = "FORBIDDEN";
-
-    /**
      * Checks if the GraphQL response contains a NOT_FOUND error for the specified path.
      * <p>
      * GitHub returns NOT_FOUND errors when querying for resources that don't exist,
@@ -174,5 +169,134 @@ public final class GitHubGraphQlErrorUtils {
         }
 
         return null;
+    }
+
+    // ========================================================================
+    // Transient Error Detection for Retry Logic
+    // ========================================================================
+
+    /**
+     * Checks if the GraphQL response contains a transient error that should be retried.
+     * <p>
+     * Transient errors include:
+     * <ul>
+     *   <li>GitHub timeout responses ("couldn't respond in time", "Something went wrong")</li>
+     *   <li>Rate limit errors in the GraphQL response</li>
+     *   <li>Server-side errors (INTERNAL_ERROR)</li>
+     * </ul>
+     *
+     * @param response the GraphQL response to check
+     * @return the transient error info if found, null otherwise
+     */
+    @Nullable
+    public static TransientError detectTransientError(@Nullable ClientGraphQlResponse response) {
+        if (response == null) {
+            return null;
+        }
+
+        List<ResponseError> errors = response.getErrors();
+        if (errors == null || errors.isEmpty()) {
+            return null;
+        }
+
+        for (ResponseError error : errors) {
+            String message = error.getMessage();
+            if (message == null) {
+                continue;
+            }
+
+            String lowerMessage = message.toLowerCase();
+
+            // GitHub timeout responses - these come back as HTTP 200 with error in body
+            // Examples: "couldn't respond in time", "Something went wrong while executing your query"
+            if (lowerMessage.contains("couldn't respond in time") ||
+                lowerMessage.contains("could not respond in time") ||
+                lowerMessage.contains("something went wrong while executing") ||
+                lowerMessage.contains("timedout") ||
+                lowerMessage.contains("timed out")) {
+                return new TransientError(TransientErrorType.TIMEOUT, message);
+            }
+
+            // Rate limit errors in GraphQL
+            if (lowerMessage.contains("rate limit") ||
+                lowerMessage.contains("ratelimit") ||
+                lowerMessage.contains("abuse detection") ||
+                lowerMessage.contains("secondary rate")) {
+                return new TransientError(TransientErrorType.RATE_LIMIT, message);
+            }
+
+            // Check extensions for error type
+            Map<String, Object> extensions = error.getExtensions();
+            if (extensions != null) {
+                Object errorType = extensions.get("type");
+                if (errorType != null) {
+                    String type = errorType.toString();
+                    // Resource limits exceeded - new September 2025 error type
+                    // GitHub caps per-query execution resources to prevent excessive load
+                    if ("RESOURCE_LIMITS_EXCEEDED".equals(type) || "MAX_NODE_LIMIT_EXCEEDED".equals(type)) {
+                        return new TransientError(TransientErrorType.RESOURCE_LIMIT, message);
+                    }
+                    if ("INTERNAL_ERROR".equals(type) || "SERVICE_UNAVAILABLE".equals(type)) {
+                        return new TransientError(TransientErrorType.SERVER_ERROR, message);
+                    }
+                    if ("FORBIDDEN".equals(type) && lowerMessage.contains("rate")) {
+                        return new TransientError(TransientErrorType.RATE_LIMIT, message);
+                    }
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Types of transient errors that can occur in GraphQL responses.
+     */
+    public enum TransientErrorType {
+        /** GitHub couldn't respond in time - retry after short delay */
+        TIMEOUT,
+        /** Rate limit hit - need longer backoff (1 minute minimum for secondary) */
+        RATE_LIMIT,
+        /** Server-side error - retry with exponential backoff */
+        SERVER_ERROR,
+        /** Resource limits exceeded (Sept 2025) - reduce query complexity */
+        RESOURCE_LIMIT
+    }
+
+    /**
+     * Information about a transient error detected in a GraphQL response.
+     *
+     * @param type the type of transient error
+     * @param message the error message from GitHub
+     */
+    public record TransientError(TransientErrorType type, String message) {
+        /**
+         * Returns the recommended wait duration before retrying.
+         *
+         * @return recommended wait duration
+         */
+        public java.time.Duration getRecommendedWait() {
+            return switch (type) {
+                case TIMEOUT -> java.time.Duration.ofSeconds(5);
+                case RATE_LIMIT -> java.time.Duration.ofMinutes(1); // Secondary rate limits need 1 min minimum
+                case SERVER_ERROR -> java.time.Duration.ofSeconds(10);
+                case RESOURCE_LIMIT -> java.time.Duration.ofSeconds(0); // No wait - must reduce query complexity
+            };
+        }
+
+        /**
+         * Returns true if reducing query complexity might help.
+         * For RESOURCE_LIMIT errors, the query should be retried with smaller page size.
+         */
+        public boolean shouldReduceComplexity() {
+            return type == TransientErrorType.RESOURCE_LIMIT;
+        }
+
+        /**
+         * Returns true if this error should be retried.
+         */
+        public boolean isRetryable() {
+            return true; // All transient errors are retryable
+        }
     }
 }

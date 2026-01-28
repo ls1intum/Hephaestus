@@ -16,10 +16,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.dao.TransientDataAccessException;
 import org.springframework.lang.Nullable;
-import org.springframework.retry.annotation.Backoff;
-import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,7 +24,6 @@ import org.springframework.transaction.annotation.Transactional;
  * Records activity events with XP.
  *
  * <p>Idempotent via unique constraint on event_key.
- * Retries transient database errors up to 3 times with exponential backoff.
  *
  * <h3>Security Model</h3>
  * <p><strong>INTERNAL API - NOT FOR DIRECT CONTROLLER USE.</strong>
@@ -51,8 +47,6 @@ import org.springframework.transaction.annotation.Transactional;
 public class ActivityEventService {
 
     private static final Logger log = LoggerFactory.getLogger(ActivityEventService.class);
-
-    private static final int MAX_RETRY_ATTEMPTS = 3;
 
     private final ActivityEventRepository eventRepository;
     private final WorkspaceRepository workspaceRepository;
@@ -115,23 +109,14 @@ public class ActivityEventService {
      *
      * <p>This method is idempotent: duplicate events (same event_key) are silently ignored.
      *
-     * <p>Retries up to 3 times on transient database errors with exponential backoff.
-     *
      * @return true if recorded successfully, false if:
      *         <ul>
      *           <li>Event is a duplicate (already exists with same event_key)</li>
      *           <li>Workspace not found (logs warning, does not throw)</li>
-     *           <li>All retry attempts exhausted (logs error)</li>
      *         </ul>
      */
     @Transactional
     @Observed(name = "activity.record", contextualName = "record-activity-event")
-    @Retryable(
-        retryFor = TransientDataAccessException.class,
-        maxAttempts = MAX_RETRY_ATTEMPTS,
-        backoff = @Backoff(delay = 100, multiplier = 2, maxDelay = 1000),
-        listeners = "activityRetryListener"
-    )
     public boolean record(
         Long workspaceId,
         ActivityEventType eventType,
@@ -155,7 +140,7 @@ public class ActivityEventService {
         }
 
         // Clamp XP to valid bounds: minimum 0, configurable maximum (safety cap)
-        double maxXp = xpProperties.getMaxXpPerEvent();
+        double maxXp = xpProperties.maxXpPerEvent();
         double clampedXp = Math.max(0.0, Math.min(xp, maxXp));
         if (clampedXp != xp) {
             log.debug("Clamped XP value: originalXp={}, clampedXp={}, eventType={}", xp, clampedXp, eventType);
@@ -235,6 +220,45 @@ public class ActivityEventService {
             command.targetType(),
             command.targetId(),
             command.xp()
+        );
+    }
+
+    /**
+     * Record an activity event for a deleted entity.
+     *
+     * <p>When an entity is deleted, we may not have access to the actor or repository
+     * information from the entity itself. This method records the deletion event
+     * with null actor and repository - it's still valuable for audit trail purposes.
+     *
+     * <p>Deleted events always have 0 XP since they represent data removal, not
+     * value-adding activity.
+     *
+     * @param workspaceId  the workspace ID
+     * @param eventType    the event type (e.g., COMMENT_DELETED, ISSUE_DELETED)
+     * @param occurredAt   when the deletion occurred
+     * @param targetType   the type of entity that was deleted
+     * @param targetId     the ID of the deleted entity
+     * @return true if recorded successfully, false otherwise
+     */
+    @Transactional
+    @Observed(name = "activity.record.deleted", contextualName = "record-deleted-activity-event")
+    public boolean recordDeleted(
+        Long workspaceId,
+        ActivityEventType eventType,
+        Instant occurredAt,
+        ActivityTargetType targetType,
+        Long targetId
+    ) {
+        // Record with null actor and repository - acceptable for deletion audit trail
+        return record(
+            workspaceId,
+            eventType,
+            occurredAt,
+            null, // actor unknown for deleted entities
+            null, // repository unknown for deleted entities
+            targetType,
+            targetId,
+            0.0  // deletions have no XP value
         );
     }
 }

@@ -6,11 +6,14 @@ import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.events.DomainEvent;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.issue.IssueRepository;
+import de.tum.in.www1.hephaestus.gitprovider.issue.github.dto.GitHubIssueDTO;
 import de.tum.in.www1.hephaestus.gitprovider.issuecomment.IssueComment;
 import de.tum.in.www1.hephaestus.gitprovider.issuecomment.IssueCommentRepository;
 import de.tum.in.www1.hephaestus.gitprovider.issuecomment.github.dto.GitHubIssueCommentEventDTO.GitHubCommentDTO;
 import de.tum.in.www1.hephaestus.gitprovider.organization.Organization;
 import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationRepository;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.testconfig.BaseIntegrationTest;
@@ -19,6 +22,7 @@ import de.tum.in.www1.hephaestus.workspace.Workspace;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceRepository;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -27,7 +31,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Integration tests for GitHubIssueCommentProcessor.
@@ -38,7 +41,6 @@ import org.springframework.transaction.annotation.Transactional;
  * - Context handling and workspace association
  */
 @DisplayName("GitHub Issue Comment Processor")
-@Transactional
 class GitHubIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
 
     private static final Long TEST_ORG_ID = 215361191L;
@@ -56,6 +58,9 @@ class GitHubIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private IssueRepository issueRepository;
+
+    @Autowired
+    private PullRequestRepository pullRequestRepository;
 
     @Autowired
     private RepositoryRepository repositoryRepository;
@@ -259,6 +264,155 @@ class GitHubIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
     }
 
     @Nested
+    @DisplayName("Process With Parent Creation - Solves Message Ordering")
+    class ProcessWithParentCreation {
+
+        private static final Long NEW_ISSUE_ID = 555555555L;
+        private static final Long NEW_PR_ID = 666666666L;
+
+        private GitHubIssueDTO createIssueDTOForNewIssue(Long issueId, boolean isPullRequest) {
+            return new GitHubIssueDTO(
+                issueId,
+                issueId,
+                "node_id_" + issueId,
+                100,
+                "New Issue from Comment Webhook",
+                "Issue body",
+                "open",
+                null,
+                "https://github.com/" + TEST_REPO_FULL_NAME + "/issues/100",
+                0,
+                Instant.now(),
+                Instant.now(),
+                null,
+                false,
+                null,
+                Collections.emptyList(),
+                Collections.emptyList(),
+                null,
+                null,
+                null,
+                isPullRequest
+                    ? new GitHubIssueDTO.PullRequestRef(
+                          "https://api.github.com/repos/test/pulls/100",
+                          "https://github.com/test/pull/100"
+                      )
+                    : null
+            );
+        }
+
+        @Test
+        @DisplayName("should create Issue stub when parent does not exist")
+        void shouldCreateIssueStubWhenParentDoesNotExist() {
+            GitHubCommentDTO commentDto = createCommentDTO(TEST_COMMENT_ID, "Comment on new issue");
+            GitHubIssueDTO issueDto = createIssueDTOForNewIssue(NEW_ISSUE_ID, false);
+            ProcessingContext context = createContext();
+
+            // Verify issue does not exist
+            assertThat(issueRepository.existsById(NEW_ISSUE_ID)).isFalse();
+
+            IssueComment result = processor.processWithParentCreation(commentDto, issueDto, context);
+
+            // Verify comment was created
+            assertThat(result).isNotNull();
+            assertThat(result.getId()).isEqualTo(TEST_COMMENT_ID);
+            assertThat(result.getBody()).isEqualTo("Comment on new issue");
+
+            // Verify Issue stub was created
+            assertThat(issueRepository.existsById(NEW_ISSUE_ID)).isTrue();
+            Issue createdIssue = issueRepository.findById(NEW_ISSUE_ID).orElseThrow();
+            assertThat(createdIssue.getNumber()).isEqualTo(100);
+            assertThat(createdIssue.getTitle()).isEqualTo("New Issue from Comment Webhook");
+            assertThat(createdIssue.isPullRequest()).isFalse();
+            assertThat(createdIssue.getRepository().getId()).isEqualTo(TEST_REPO_ID);
+
+            // Verify comment is linked to the new issue
+            assertThat(result.getIssue().getId()).isEqualTo(NEW_ISSUE_ID);
+        }
+
+        @Test
+        @DisplayName("should create PullRequest stub when parent is PR and does not exist")
+        void shouldCreatePullRequestStubWhenParentIsPRAndDoesNotExist() {
+            GitHubCommentDTO commentDto = createCommentDTO(TEST_COMMENT_ID, "Comment on new PR");
+            GitHubIssueDTO issueDto = createIssueDTOForNewIssue(NEW_PR_ID, true);
+            ProcessingContext context = createContext();
+
+            // Verify PR does not exist
+            assertThat(pullRequestRepository.existsById(NEW_PR_ID)).isFalse();
+
+            IssueComment result = processor.processWithParentCreation(commentDto, issueDto, context);
+
+            // Verify comment was created
+            assertThat(result).isNotNull();
+            assertThat(result.getId()).isEqualTo(TEST_COMMENT_ID);
+
+            // Verify PullRequest stub was created (not Issue!)
+            assertThat(pullRequestRepository.existsById(NEW_PR_ID)).isTrue();
+            PullRequest createdPR = pullRequestRepository.findById(NEW_PR_ID).orElseThrow();
+            assertThat(createdPR.getNumber()).isEqualTo(100);
+            assertThat(createdPR.getTitle()).isEqualTo("New Issue from Comment Webhook");
+            assertThat(createdPR.isPullRequest()).isTrue();
+
+            // Verify comment is linked to the new PR (via Issue base class)
+            assertThat(result.getIssue().getId()).isEqualTo(NEW_PR_ID);
+        }
+
+        @Test
+        @DisplayName("should use existing parent when it already exists")
+        void shouldUseExistingParentWhenItAlreadyExists() {
+            GitHubCommentDTO commentDto = createCommentDTO(TEST_COMMENT_ID, "Comment on existing issue");
+            GitHubIssueDTO issueDto = createIssueDTOForNewIssue(testIssue.getId(), false);
+            ProcessingContext context = createContext();
+
+            // Get initial issue count
+            long initialCount = issueRepository.count();
+
+            IssueComment result = processor.processWithParentCreation(commentDto, issueDto, context);
+
+            // Verify comment was created
+            assertThat(result).isNotNull();
+            assertThat(result.getIssue().getId()).isEqualTo(testIssue.getId());
+
+            // Verify no new issue was created
+            assertThat(issueRepository.count()).isEqualTo(initialCount);
+        }
+
+        @Test
+        @DisplayName("should handle missing issue ID gracefully")
+        void shouldHandleMissingIssueIdGracefully() {
+            GitHubCommentDTO commentDto = createCommentDTO(TEST_COMMENT_ID, "Comment");
+            GitHubIssueDTO issueDto = new GitHubIssueDTO(
+                null,
+                null,
+                null,
+                100,
+                "Title",
+                null,
+                "open",
+                null,
+                null,
+                0,
+                Instant.now(),
+                Instant.now(),
+                null,
+                false,
+                null,
+                Collections.emptyList(),
+                Collections.emptyList(),
+                null,
+                null,
+                null,
+                null
+            );
+            ProcessingContext context = createContext();
+
+            IssueComment result = processor.processWithParentCreation(commentDto, issueDto, context);
+
+            assertThat(result).isNull();
+        }
+    }
+
+    @Nested
     @DisplayName("Delete Method")
     class DeleteMethod {
 
@@ -287,6 +441,31 @@ class GitHubIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
                     assertThat(event.commentId()).isEqualTo(TEST_COMMENT_ID);
                     assertThat(event.issueId()).isEqualTo(testIssue.getId());
                 });
+        }
+
+        @Test
+        @DisplayName("should sync bidirectional relationship with parent issue when deleting")
+        void shouldSyncBidirectionalRelationshipWhenDeleting() {
+            // Create comment with bidirectional relationship set up
+            IssueComment existing = new IssueComment();
+            existing.setId(TEST_COMMENT_ID);
+            existing.setBody("Comment to test bidirectional sync");
+            existing.setHtmlUrl("https://github.com/test");
+            existing.setCreatedAt(Instant.now());
+            existing.setIssue(testIssue);
+            commentRepository.save(existing);
+
+            // Load the issue and initialize its comments collection (simulates
+            // real-world scenario where parent is in persistence context)
+            Issue loadedIssue = issueRepository.findById(testIssue.getId()).orElseThrow();
+            loadedIssue.getComments().size(); // Force lazy initialization
+
+            // Delete should work without TransientObjectException
+            // because the processor syncs bidirectional relationship
+            assertThatCode(() -> processor.delete(TEST_COMMENT_ID, createContext())).doesNotThrowAnyException();
+
+            // Verify comment is deleted
+            assertThat(commentRepository.existsById(TEST_COMMENT_ID)).isFalse();
         }
 
         @Test

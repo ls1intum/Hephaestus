@@ -54,7 +54,10 @@ query GetRepositoryIssues($owner: String!, $name: String!, $first: Int!, $after:
                                 databaseId
                                 login
                                 avatarUrl
+                                name
+                                email
                                 createdAt
+                                updatedAt
                             }
                             ... on Bot {
                                 id
@@ -100,6 +103,7 @@ query GetRepositoryIssues($owner: String!, $name: String!, $first: Int!, $after:
                         name
                         email
                         createdAt
+                        updatedAt
                     }
                     ... on Bot {
                         id
@@ -129,7 +133,9 @@ query GetRepositoryIssues($owner: String!, $name: String!, $first: Int!, $after:
                         login
                         avatarUrl
                         name
+                        email
                         createdAt
+                        updatedAt
                     }
                 }
 

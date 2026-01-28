@@ -1,6 +1,7 @@
-# GraphQL query for fetching pull request reviews
-# Uses fullDatabaseId for reviews and comments (BigInt) since databaseId (Int) can overflow.
-# User/Bot still use databaseId as fullDatabaseId is not available on Actor types.
+# GraphQL query for fetching paginated reviews for a specific pull request
+# Used by GitHubPullRequestReviewSyncService for standalone review sync
+# Includes embedded comments (first batch) to avoid N+1 queries
+# Nested pagination for comments is handled by GetReviewComments.graphql
 
 query GetPullRequestReviews($owner: String!, $name: String!, $number: Int!, $first: Int!, $after: String) {
     rateLimit {
@@ -12,27 +13,27 @@ query GetPullRequestReviews($owner: String!, $name: String!, $number: Int!, $fir
     repository(owner: $owner, name: $name) {
         pullRequest(number: $number) {
             reviews(first: $first, after: $after) {
+                totalCount
                 pageInfo {
                     hasNextPage
                     endCursor
                 }
-                totalCount
                 nodes {
                     id
                     fullDatabaseId
                     body
                     state
                     url
+                    submittedAt
                     createdAt
                     updatedAt
-                    submittedAt
 
-                    # Commit
+                    # Commit associated with the review
                     commit {
                         oid
                     }
 
-                    # Author
+                    # Review author
                     author {
                         __typename
                         ... on User {
@@ -40,7 +41,10 @@ query GetPullRequestReviews($owner: String!, $name: String!, $number: Int!, $fir
                             databaseId
                             login
                             avatarUrl
+                            name
+                            email
                             createdAt
+                            updatedAt
                         }
                         ... on Bot {
                             id
@@ -62,11 +66,13 @@ query GetPullRequestReviews($owner: String!, $name: String!, $number: Int!, $fir
                         }
                     }
 
-                    # Comments in review
-                    comments(first: 10) {
+                    # Embedded comments (first batch)
+                    # Most reviews have few comments; pagination handled by GetReviewComments.graphql for more
+                    comments(first: 100) {
                         totalCount
                         pageInfo {
                             hasNextPage
+                            endCursor
                         }
                         nodes {
                             id
@@ -80,6 +86,9 @@ query GetPullRequestReviews($owner: String!, $name: String!, $number: Int!, $fir
                             diffHunk
                             createdAt
                             updatedAt
+                            state
+                            url
+                            authorAssociation
 
                             # Comment author
                             author {
@@ -89,7 +98,10 @@ query GetPullRequestReviews($owner: String!, $name: String!, $number: Int!, $fir
                                     databaseId
                                     login
                                     avatarUrl
+                                    name
+                                    email
                                     createdAt
+                                    updatedAt
                                 }
                                 ... on Bot {
                                     id
@@ -109,6 +121,18 @@ query GetPullRequestReviews($owner: String!, $name: String!, $number: Int!, $fir
                                     login
                                     avatarUrl
                                 }
+                            }
+
+                            # Reply to (for threading)
+                            replyTo {
+                                id
+                                fullDatabaseId
+                            }
+
+                            # Associated review reference
+                            pullRequestReview {
+                                id
+                                fullDatabaseId
                             }
                         }
                     }

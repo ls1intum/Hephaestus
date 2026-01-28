@@ -224,6 +224,10 @@ export type LeagueChange = {
  */
 export type Profile = {
     /**
+     * Aggregated activity stats consistent with leaderboard calculations
+     */
+    activityStats?: ProfileActivityStats;
+    /**
      * Repositories the user has contributed to
      */
     contributedRepositories: Array<RepositoryInfo>;
@@ -240,9 +244,51 @@ export type Profile = {
      */
     reviewActivity?: Array<ProfileReviewActivity>;
     /**
+     * Distinct pull requests reviewed by this user
+     */
+    reviewedPullRequests?: Array<PullRequestInfo>;
+    /**
      * Basic information about the user
      */
     userInfo: UserInfo;
+};
+
+/**
+ * Aggregated activity statistics with XP scores for a user profile
+ */
+export type ProfileActivityStats = {
+    /**
+     * Number of approvals given
+     */
+    numberOfApprovals?: number;
+    /**
+     * Number of change requests submitted
+     */
+    numberOfChangeRequests?: number;
+    /**
+     * Number of inline code review comments
+     */
+    numberOfCodeComments?: number;
+    /**
+     * Number of review comments (COMMENTED state)
+     */
+    numberOfComments?: number;
+    /**
+     * Number of issue comments on pull requests
+     */
+    numberOfIssueComments?: number;
+    /**
+     * Number of distinct pull requests reviewed
+     */
+    numberOfReviewedPRs?: number;
+    /**
+     * Number of reviews with unknown state
+     */
+    numberOfUnknowns?: number;
+    /**
+     * Total XP score
+     */
+    score?: number;
 };
 
 /**
@@ -1149,7 +1195,7 @@ export type GetLeaderboardData = {
          */
         after: Date;
         /**
-         * end of the time range (inclusive)
+         * end of the time range (exclusive)
          */
         before: Date;
         /**

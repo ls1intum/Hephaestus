@@ -4,7 +4,6 @@ import java.time.Clock;
 import org.keycloak.OAuth2Constants;
 import org.keycloak.admin.client.Keycloak;
 import org.keycloak.admin.client.KeycloakBuilder;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -12,31 +11,20 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class KeycloakConfig {
 
-    private final String authServerUrl;
-    private final String realm;
-    private final String clientId;
-    private final String clientSecret;
+    private final KeycloakProperties keycloakProperties;
 
-    public KeycloakConfig(
-        @Value("${keycloak.url}") String authServerUrl,
-        @Value("${keycloak.realm}") String realm,
-        @Value("${keycloak.client-id}") String clientId,
-        @Value("${keycloak.client-secret}") String clientSecret
-    ) {
-        this.authServerUrl = authServerUrl;
-        this.realm = realm;
-        this.clientId = clientId;
-        this.clientSecret = clientSecret;
+    public KeycloakConfig(KeycloakProperties keycloakProperties) {
+        this.keycloakProperties = keycloakProperties;
     }
 
     @Bean
     public Keycloak keycloakClient() {
         return KeycloakBuilder.builder()
-            .serverUrl(authServerUrl)
-            .realm(realm)
+            .serverUrl(keycloakProperties.url())
+            .realm(keycloakProperties.realm())
             .grantType(OAuth2Constants.CLIENT_CREDENTIALS)
-            .clientId(clientId)
-            .clientSecret(clientSecret)
+            .clientId(keycloakProperties.clientId())
+            .clientSecret(keycloakProperties.clientSecret())
             .build();
     }
 

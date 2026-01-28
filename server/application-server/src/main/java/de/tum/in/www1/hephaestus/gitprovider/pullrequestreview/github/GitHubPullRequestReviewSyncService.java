@@ -6,6 +6,7 @@ import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncCons
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.LARGE_PAGE_SIZE;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.MAX_PAGINATION_PAGES;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.exception.InstallationNotFoundException;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier.ClassificationResult;
@@ -161,6 +162,9 @@ public class GitHubPullRequestReviewSyncService {
         }
         RepositoryOwnerAndName ownerAndName = parsedName.get();
 
+        // Create processing context for sync operations to enable activity event creation
+        ProcessingContext context = ProcessingContext.forSync(scopeId, repository);
+
         HttpGraphQlClient client = graphQlClientProvider.forScope(scopeId);
 
         int totalSynced = 0;
@@ -169,6 +173,18 @@ public class GitHubPullRequestReviewSyncService {
         int pageCount = 0;
 
         while (hasMore) {
+            // Check for interrupt (e.g., during application shutdown)
+            if (Thread.interrupted()) {
+                log.info(
+                    "Review sync interrupted (shutdown requested): repoName={}, prNumber={}, pageCount={}",
+                    safeNameWithOwner,
+                    pullRequest.getNumber(),
+                    pageCount
+                );
+                Thread.currentThread().interrupt();
+                break;
+            }
+
             pageCount++;
             if (pageCount >= MAX_PAGINATION_PAGES) {
                 log.warn(
@@ -189,7 +205,7 @@ public class GitHubPullRequestReviewSyncService {
                     .variable("first", DEFAULT_PAGE_SIZE)
                     .variable("after", cursor)
                     .execute()
-                    .block(syncProperties.getGraphqlTimeout());
+                    .block(syncProperties.graphqlTimeout());
 
                 if (response == null || !response.isValid()) {
                     // Check if this is a NOT_FOUND error (PR deleted from GitHub)
@@ -211,10 +227,10 @@ public class GitHubPullRequestReviewSyncService {
                 }
 
                 // Track rate limit from response
-                graphQlClientProvider.trackRateLimit(response);
+                graphQlClientProvider.trackRateLimit(scopeId, response);
 
                 // Check if we should pause due to rate limiting
-                if (graphQlClientProvider.isRateLimitCritical()) {
+                if (graphQlClientProvider.isRateLimitCritical(scopeId)) {
                     log.warn(
                         "Aborting review sync due to critical rate limit: repoName={}, prNumber={}, pageCount={}",
                         safeNameWithOwner,
@@ -239,13 +255,13 @@ public class GitHubPullRequestReviewSyncService {
                         var commentsPageInfo = commentsConnection.getPageInfo();
                         if (commentsPageInfo != null && Boolean.TRUE.equals(commentsPageInfo.getHasNextPage())) {
                             // Fetch all remaining comments using pagination
-                            fetchAllRemainingComments(client, graphQlReview, commentsPageInfo.getEndCursor());
+                            fetchAllRemainingComments(client, graphQlReview, commentsPageInfo.getEndCursor(), scopeId);
                         }
                     }
 
                     GitHubReviewDTO dto = GitHubReviewDTO.fromPullRequestReview(graphQlReview);
                     if (dto != null) {
-                        PullRequestReview entity = reviewProcessor.process(dto, pullRequest.getId());
+                        PullRequestReview entity = reviewProcessor.process(dto, pullRequest.getId(), context);
                         if (entity != null) {
                             totalSynced++;
                         }
@@ -337,7 +353,8 @@ public class GitHubPullRequestReviewSyncService {
     private void fetchAllRemainingComments(
         HttpGraphQlClient client,
         GHPullRequestReview graphQlReview,
-        String startCursor
+        String startCursor,
+        Long scopeId
     ) {
         String reviewId = graphQlReview.getId();
         GHPullRequestReviewCommentConnection existingComments = graphQlReview.getComments();
@@ -353,6 +370,17 @@ public class GitHubPullRequestReviewSyncService {
         int fetchedPages = 0;
 
         while (hasMore) {
+            // Check for interrupt (e.g., during application shutdown)
+            if (Thread.interrupted()) {
+                log.info(
+                    "Review comments fetch interrupted (shutdown requested): reviewId={}, fetchedPages={}",
+                    reviewId,
+                    fetchedPages
+                );
+                Thread.currentThread().interrupt();
+                break;
+            }
+
             fetchedPages++;
             if (fetchedPages > MAX_PAGINATION_PAGES) {
                 log.warn(
@@ -370,7 +398,7 @@ public class GitHubPullRequestReviewSyncService {
                     .variable("first", LARGE_PAGE_SIZE)
                     .variable("after", cursor)
                     .execute()
-                    .block(syncProperties.getGraphqlTimeout());
+                    .block(syncProperties.graphqlTimeout());
 
                 if (response == null || !response.isValid()) {
                     log.warn(
@@ -382,10 +410,10 @@ public class GitHubPullRequestReviewSyncService {
                 }
 
                 // Track rate limit from response
-                graphQlClientProvider.trackRateLimit(response);
+                graphQlClientProvider.trackRateLimit(scopeId, response);
 
                 // Check if we should pause due to rate limiting
-                if (graphQlClientProvider.isRateLimitCritical()) {
+                if (graphQlClientProvider.isRateLimitCritical(scopeId)) {
                     log.warn("Aborting review comments fetch due to critical rate limit: reviewId={}", reviewId);
                     break;
                 }

@@ -68,32 +68,42 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
     /**
      * Process a GitHub pull request DTO and persist it as a PullRequest entity.
      * Publishes appropriate domain events based on what changed.
+     * <p>
+     * Uses (repository_id, number) as the canonical lookup key to ensure idempotency
+     * across both GraphQL sync and webhook events, which use different ID formats.
      *
-     * @return the processed PullRequest, or null if the DTO has no valid ID
+     * @return the processed PullRequest, or null if the repository context is missing
      */
     @Transactional
     public PullRequest process(GitHubPullRequestDTO dto, ProcessingContext context) {
-        Long prId = dto.getDatabaseId();
-        if (prId == null) {
-            log.warn("Skipped pull request processing: reason=missingDatabaseId, prNumber={}", dto.number());
+        Repository repository = context.repository();
+        if (repository == null || repository.getId() == null) {
+            log.warn("Skipped pull request processing: reason=missingRepository, prNumber={}", dto.number());
             return null;
         }
-        Optional<PullRequest> existingOpt = pullRequestRepository.findById(prId);
+
+        // Use (repository_id, number) as the canonical key for lookup.
+        // This ensures idempotency regardless of whether the DTO came from
+        // GraphQL (with fullDatabaseId) or webhook (with REST API id).
+        Optional<PullRequest> existingOpt = pullRequestRepository.findByRepositoryIdAndNumber(
+            repository.getId(),
+            dto.number()
+        );
 
         PullRequest pr;
         boolean isNew = existingOpt.isEmpty();
 
         if (isNew) {
-            pr = createPullRequest(dto, context.repository());
+            pr = createPullRequest(dto, repository);
             pr.setLastSyncAt(Instant.now());
             pr = pullRequestRepository.save(pr);
             eventPublisher.publishEvent(
                 new DomainEvent.PullRequestCreated(EventPayload.PullRequestData.from(pr), EventContext.from(context))
             );
-            log.debug("Created pull request: prId={}, prNumber={}", prId, dto.number());
+            log.debug("Created pull request: prId={}, prNumber={}", pr.getId(), dto.number());
         } else {
             pr = existingOpt.get();
-            Set<String> changedFields = updatePullRequest(dto, pr, context.repository());
+            Set<String> changedFields = updatePullRequest(dto, pr, repository);
             pr.setLastSyncAt(Instant.now());
             pr = pullRequestRepository.save(pr);
 
@@ -105,7 +115,7 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
                         EventContext.from(context)
                     )
                 );
-                log.debug("Updated pull request: prId={}, changedFields={}", prId, changedFields);
+                log.debug("Updated pull request: prId={}, changedFields={}", pr.getId(), changedFields);
             }
         }
 
@@ -463,13 +473,17 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
 
     private Issue.State convertState(String state) {
         if (state == null) {
+            log.warn("PR state is null, defaulting to OPEN. This may indicate missing data in webhook or GraphQL response.");
             return Issue.State.OPEN;
         }
         return switch (state.toUpperCase()) {
             case "OPEN" -> Issue.State.OPEN;
             case "CLOSED" -> Issue.State.CLOSED;
             case "MERGED" -> Issue.State.MERGED;
-            default -> Issue.State.OPEN;
+            default -> {
+                log.warn("Unknown PR state '{}', defaulting to OPEN", state);
+                yield Issue.State.OPEN;
+            }
         };
     }
 }

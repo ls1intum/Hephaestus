@@ -18,6 +18,10 @@ import org.springframework.transaction.annotation.Transactional;
  * Integration tests for {@link GitHubIssueDependencySyncService}.
  * <p>
  * Tests the blocked_by/blocking relationship management.
+ * <p>
+ * Note: This test class uses @Transactional because it directly calls service methods
+ * and needs to access lazy-loaded relationships. This is safe because there are no
+ * parallel HTTP handler threads that would compete for database connections.
  */
 @Transactional
 class GitHubIssueDependencySyncServiceIntegrationTest extends BaseIntegrationTest {

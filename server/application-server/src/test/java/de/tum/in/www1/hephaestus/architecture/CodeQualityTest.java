@@ -137,10 +137,9 @@ class CodeQualityTest extends HephaestusArchitectureTest {
         @Test
         @DisplayName("Methods have limited parameters (max 6)")
         void methodsHaveLimitedParameters() {
-            // Methods that have command-object overloads but need many params for Spring annotations
+            // Methods that have command-object overloads but need many params for internal processing
             java.util.Set<String> allowedOverloads = java.util.Set.of(
-                "ActivityEventService.record", // Has RecordActivityCommand overload; params needed for @Retryable
-                "ActivityEventService.recordWithContext" // Internal method called by record(); same parameter pattern
+                "ActivityEventService.record" // Has RecordActivityCommand overload for cleaner API
             );
 
             ArchCondition<JavaClass> haveMethodsWithLimitedParams = new ArchCondition<>(
@@ -448,8 +447,8 @@ class CodeQualityTest extends HephaestusArchitectureTest {
         @DisplayName("ObjectProvider usage is limited to known cases")
         void objectProviderUsageIsLimited() {
             java.util.Set<String> knownCycleBreakers = java.util.Set.of(
-                "ActivityEventBackfillService", // Self-injection for @Transactional(REQUIRES_NEW) via AOP proxy
                 "WorkspaceActivationService",
+                "WorkspaceProvisioningAdapter", // Lazy-loaded to break circular reference with GitHubDataSyncService
                 "WorkspaceRepositoryMonitorService"
             );
 

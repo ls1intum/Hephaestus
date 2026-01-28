@@ -73,6 +73,7 @@ query GetRepositoryPullRequests(
                         name
                         email
                         createdAt
+                        updatedAt
                     }
                     ... on Bot {
                         id
@@ -102,7 +103,10 @@ query GetRepositoryPullRequests(
                         databaseId
                         login
                         avatarUrl
+                        name
+                        email
                         createdAt
+                        updatedAt
                     }
                     ... on Bot {
                         id
@@ -132,7 +136,9 @@ query GetRepositoryPullRequests(
                         login
                         avatarUrl
                         name
+                        email
                         createdAt
+                        updatedAt
                     }
                 }
 
@@ -146,7 +152,10 @@ query GetRepositoryPullRequests(
                                 databaseId
                                 login
                                 avatarUrl
+                                name
+                                email
                                 createdAt
+                                updatedAt
                             }
                             ... on Team {
                                 id
@@ -220,7 +229,10 @@ query GetRepositoryPullRequests(
                                 databaseId
                                 login
                                 avatarUrl
+                                name
+                                email
                                 createdAt
+                                updatedAt
                             }
                             ... on Bot {
                                 id
@@ -274,6 +286,7 @@ query GetRepositoryPullRequests(
                             name
                             email
                             createdAt
+                            updatedAt
                         }
 
                         # Comments in thread (first 10)
@@ -310,6 +323,7 @@ query GetRepositoryPullRequests(
                                         name
                                         email
                                         createdAt
+                                        updatedAt
                                     }
                                     ... on Bot {
                                         id
@@ -335,6 +349,14 @@ query GetRepositoryPullRequests(
                                 replyTo {
                                     id
                                     fullDatabaseId
+                                }
+
+                                # Commit reference
+                                commit {
+                                    oid
+                                }
+                                originalCommit {
+                                    oid
                                 }
 
                                 # Associated review

@@ -39,21 +39,4 @@ public interface ProfileRepositoryQueryRepository extends JpaRepository<Reposito
         @Param("contributorLogin") String contributorLogin,
         @Param("workspaceId") Long workspaceId
     );
-
-    /**
-     * Finds all active (monitored) repositories in a workspace.
-     *
-     * @param workspaceId the workspace to scope to
-     * @return all repositories monitored by the workspace
-     */
-    @Query(
-        """
-        SELECT r
-        FROM Repository r
-        JOIN RepositoryToMonitor rtm ON rtm.nameWithOwner = r.nameWithOwner
-        WHERE rtm.workspace.id = :workspaceId
-        ORDER BY r.name ASC
-        """
-    )
-    List<Repository> findActiveByWorkspaceId(@Param("workspaceId") Long workspaceId);
 }

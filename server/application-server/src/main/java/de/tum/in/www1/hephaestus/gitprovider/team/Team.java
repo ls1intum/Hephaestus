@@ -10,6 +10,7 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.Set;
@@ -17,9 +18,18 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
+import org.springframework.lang.NonNull;
 
 @Entity
-@Table(name = "team")
+@Table(
+    name = "team",
+    uniqueConstraints = {
+        @UniqueConstraint(
+            name = "uk_team_organization_name",
+            columnNames = {"organization", "name"}
+        )
+    }
+)
 @Getter
 @Setter
 @NoArgsConstructor
@@ -37,6 +47,7 @@ public class Team extends BaseGitServiceEntity {
 
     private String organization;
 
+    @NonNull
     @Column(length = 512)
     private String htmlUrl;
 
@@ -57,7 +68,7 @@ public class Team extends BaseGitServiceEntity {
     @ToString.Exclude
     private Set<TeamRepositoryPermission> repoPermissions = new HashSet<>();
 
-    @OneToMany(mappedBy = "team", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "team", cascade = CascadeType.REMOVE, orphanRemoval = true)
     @ToString.Exclude
     private Set<TeamMembership> memberships = new HashSet<>();
 
@@ -76,9 +87,41 @@ public class Team extends BaseGitServiceEntity {
         permission.setTeam(this);
     }
 
+    /**
+     * Removes a repository permission from this team and maintains bidirectional consistency.
+     *
+     * @param permission the permission to remove
+     */
+    public void removeRepoPermission(TeamRepositoryPermission permission) {
+        repoPermissions.remove(permission);
+        permission.setTeam(null);
+    }
+
     public void clearAndAddRepoPermissions(Set<TeamRepositoryPermission> fresh) {
         repoPermissions.clear();
         fresh.forEach(this::addRepoPermission);
+    }
+
+    /**
+     * Clears all memberships from this team.
+     * <p>
+     * CRITICAL: This method must be called BEFORE deleting the team entity
+     * when orphanRemoval=true to avoid TransientObjectException.
+     */
+    public void clearMemberships() {
+        memberships.forEach(m -> m.setTeam(null));
+        memberships.clear();
+    }
+
+    /**
+     * Clears all repository permissions from this team.
+     * <p>
+     * CRITICAL: This method must be called BEFORE deleting the team entity
+     * when orphanRemoval=true to avoid TransientObjectException.
+     */
+    public void clearRepoPermissions() {
+        repoPermissions.forEach(p -> p.setTeam(null));
+        repoPermissions.clear();
     }
 
     /**

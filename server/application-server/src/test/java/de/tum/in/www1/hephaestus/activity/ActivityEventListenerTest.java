@@ -14,6 +14,7 @@ import de.tum.in.www1.hephaestus.gitprovider.issuecomment.IssueCommentRepository
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReview;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReviewRepository;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewthread.PullRequestReviewThreadRepository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
@@ -56,6 +57,9 @@ class ActivityEventListenerTest {
     private IssueCommentRepository issueCommentRepository;
 
     @Mock
+    private PullRequestReviewThreadRepository reviewThreadRepository;
+
+    @Mock
     private UserRepository userRepository;
 
     @Mock
@@ -84,6 +88,7 @@ class ActivityEventListenerTest {
             experiencePointCalculator,
             reviewRepository,
             issueCommentRepository,
+            reviewThreadRepository,
             userRepository,
             repositoryRepository
         );
@@ -346,6 +351,30 @@ class ActivityEventListenerTest {
 
             verifyNoInteractions(activityEventService);
         }
+
+        @Test
+        @DisplayName("records issue with null author and zero XP (deleted user or bot)")
+        void recordsIssueWithNullAuthorAndZeroXp() {
+            // Create issue WITHOUT author - simulates deleted GitHub user or bot
+            Issue issue = createIssue(14L);
+            issue.setAuthor(null);
+
+            var event = new DomainEvent.IssueCreated(createIssueData(issue), createContext());
+
+            listener.onIssueCreated(event);
+
+            // Event is STILL recorded (for audit trail), but with null actor and 0 XP
+            verify(activityEventService).record(
+                eq(42L),
+                eq(ActivityEventType.ISSUE_CREATED),
+                any(Instant.class),
+                isNull(), // null actor - user deleted or bot
+                eq(testRepository),
+                eq(ActivityTargetType.ISSUE),
+                eq(14L),
+                eq(0.0) // Zero XP for unknown authors
+            );
+        }
     }
 
     @Nested
@@ -384,6 +413,31 @@ class ActivityEventListenerTest {
             listener.onIssueClosed(event);
 
             verifyNoInteractions(activityEventService);
+        }
+
+        @Test
+        @DisplayName("records issue closed with null author (deleted user or bot)")
+        void recordsIssueClosedWithNullAuthor() {
+            // Create issue WITHOUT author - simulates deleted GitHub user or bot
+            Issue issue = createIssue(15L);
+            issue.setAuthor(null);
+            issue.setClosedAt(Instant.now());
+
+            var event = new DomainEvent.IssueClosed(createIssueData(issue), null, createContext());
+
+            listener.onIssueClosed(event);
+
+            // Event is STILL recorded (for audit trail), but with null actor
+            verify(activityEventService).record(
+                eq(42L),
+                eq(ActivityEventType.ISSUE_CLOSED),
+                any(Instant.class),
+                isNull(), // null actor - user deleted or bot
+                eq(testRepository),
+                eq(ActivityTargetType.ISSUE),
+                eq(15L),
+                eq(0.0) // Issue closure has 0 XP anyway
+            );
         }
     }
 

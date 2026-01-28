@@ -43,7 +43,7 @@ class ActivityEventServiceTest {
     void setUp() {
         meterRegistry = new SimpleMeterRegistry();
         // Use lenient stubbing since not all tests exercise XP clamping path
-        lenient().when(xpProperties.getMaxXpPerEvent()).thenReturn(1000.0);
+        lenient().when(xpProperties.maxXpPerEvent()).thenReturn(1000.0);
         service = new ActivityEventService(eventRepository, workspaceRepository, xpProperties, meterRegistry);
     }
 

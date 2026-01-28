@@ -4,12 +4,16 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
+import de.tum.in.www1.hephaestus.activity.ActivityEvent;
 import de.tum.in.www1.hephaestus.activity.ActivityEventRepository;
+import de.tum.in.www1.hephaestus.activity.ActivityEventType;
 import de.tum.in.www1.hephaestus.activity.ActivityTargetType;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.issuecomment.IssueComment;
+import de.tum.in.www1.hephaestus.gitprovider.issuecomment.IssueCommentRepository;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReview;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReviewRepository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
@@ -33,9 +37,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 /**
  * Unit tests for UserProfileService.
  *
- * <p>Tests verify the CQRS pattern: XP is read from the activity_event ledger,
- * not recalculated on-the-fly. Also verifies proper layer separation - the profile
- * module composes gitprovider data with XP from activity module.
+ * <p>Tests verify the CQRS pattern: ActivityEvent is the source of truth for
+ * what activity exists (same as leaderboard), with entity details hydrated
+ * from gitprovider tables.
  */
 @Tag("unit")
 @DisplayName("UserProfileService")
@@ -43,6 +47,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class UserProfileServiceTest {
 
     private static final Long WORKSPACE_ID = 1L;
+    private static final Long USER_ID = 100L;
     private static final String USER_LOGIN = "alice";
     private static final Instant AFTER = Instant.parse("2024-01-01T00:00:00Z");
     private static final Instant BEFORE = Instant.parse("2024-01-08T00:00:00Z");
@@ -57,13 +62,13 @@ class UserProfileServiceTest {
     private ProfilePullRequestQueryRepository profilePullRequestQueryRepository;
 
     @Mock
-    private ProfileReviewQueryRepository profileReviewQueryRepository;
-
-    @Mock
-    private ProfileCommentQueryRepository profileCommentQueryRepository;
-
-    @Mock
     private ActivityEventRepository activityEventRepository;
+
+    @Mock
+    private PullRequestReviewRepository pullRequestReviewRepository;
+
+    @Mock
+    private IssueCommentRepository issueCommentRepository;
 
     @Mock
     private ProfileReviewActivityAssembler reviewActivityAssembler;
@@ -82,9 +87,9 @@ class UserProfileServiceTest {
             userRepository,
             profileRepositoryQueryRepository,
             profilePullRequestQueryRepository,
-            profileReviewQueryRepository,
-            profileCommentQueryRepository,
             activityEventRepository,
+            pullRequestReviewRepository,
+            issueCommentRepository,
             reviewActivityAssembler,
             workspaceMembershipService,
             workspaceContributionActivityService
@@ -96,46 +101,32 @@ class UserProfileServiceTest {
     class CqrsArchitectureTests {
 
         @Test
-        @DisplayName("fetches XP from activity_event ledger (not recalculated)")
-        void fetchesXpFromActivityEventLedger() {
+        @DisplayName("queries ActivityEvent first then hydrates from gitprovider")
+        void queriesActivityEventFirstThenHydrates() {
             // Arrange
-            User user = createUser(100L, USER_LOGIN);
+            User user = createUser(USER_ID, USER_LOGIN);
             Repository repo = createRepository(200L);
             PullRequest pr = createPullRequest(300L, user, repo);
             PullRequestReview review = createReview(400L, user, pr);
 
             when(userRepository.findByLogin(USER_LOGIN)).thenReturn(Optional.of(user));
-            when(
-                profileReviewQueryRepository.findAllByAuthorLoginInTimeframe(
-                    eq(USER_LOGIN),
-                    any(),
-                    any(),
-                    eq(WORKSPACE_ID)
-                )
-            ).thenReturn(List.of(review));
-            when(
-                profileCommentQueryRepository.findAllByAuthorLoginInTimeframe(
-                    eq(USER_LOGIN),
-                    any(),
-                    any(),
-                    eq(true),
-                    eq(WORKSPACE_ID)
-                )
-            ).thenReturn(List.of());
-            when(profilePullRequestQueryRepository.findAssignedByLoginAndStates(any(), any(), any())).thenReturn(
-                List.of()
-            );
+            when(profilePullRequestQueryRepository.findAssignedByLoginAndStates(any(), any(), any()))
+                .thenReturn(List.of());
             when(profileRepositoryQueryRepository.findContributedByLogin(any(), any())).thenReturn(List.of());
 
-            // XP from activity_event ledger
-            ActivityEventRepository.TargetXpProjection xpProjection = createXpProjection(400L, 15.0);
+            // ActivityEvent is the source of truth
+            ActivityEvent event = createActivityEvent(WORKSPACE_ID, USER_ID, 400L, ActivityTargetType.REVIEW, 15.0);
             when(
-                activityEventRepository.findXpByTargetIdsAndTypes(
+                activityEventRepository.findProfileActivityByActorInTimeframe(
                     eq(WORKSPACE_ID),
-                    eq(Set.of(400L)),
-                    eq(Set.of(ActivityTargetType.REVIEW, ActivityTargetType.ISSUE_COMMENT))
+                    eq(USER_ID),
+                    any(),
+                    any()
                 )
-            ).thenReturn(List.of(xpProjection));
+            ).thenReturn(List.of(event));
+
+            // Hydrate review details from gitprovider
+            when(pullRequestReviewRepository.findAllByIdWithRelations(Set.of(400L))).thenReturn(List.of(review));
 
             // Mock assembler
             when(reviewActivityAssembler.assemble(eq(review), eq(15))).thenReturn(createProfileReviewDTO(400L, 15));
@@ -146,67 +137,59 @@ class UserProfileServiceTest {
             // Assert
             assertThat(result).isPresent();
 
-            // Verify XP was fetched from activity_event ledger (CQRS pattern)
-            verify(activityEventRepository).findXpByTargetIdsAndTypes(
+            // Verify ActivityEvent queried first (source of truth)
+            verify(activityEventRepository).findProfileActivityByActorInTimeframe(
                 eq(WORKSPACE_ID),
-                eq(Set.of(400L)),
-                eq(Set.of(ActivityTargetType.REVIEW, ActivityTargetType.ISSUE_COMMENT))
+                eq(USER_ID),
+                any(),
+                any()
             );
 
-            // Verify assembler was called with pre-computed XP (15)
+            // Verify entity hydrated from gitprovider
+            verify(pullRequestReviewRepository).findAllByIdWithRelations(Set.of(400L));
+
+            // Verify assembler was called with XP from ActivityEvent
             verify(reviewActivityAssembler).assemble(eq(review), eq(15));
         }
 
         @Test
-        @DisplayName("uses zero XP for historical reviews without activity events")
-        void usesZeroXpForHistoricalReviews() {
+        @DisplayName("returns empty activity when no ActivityEvents exist")
+        void returnsEmptyWhenNoActivityEvents() {
             // Arrange
-            User user = createUser(100L, USER_LOGIN);
-            Repository repo = createRepository(200L);
-            PullRequest pr = createPullRequest(300L, user, repo);
-            PullRequestReview review = createReview(400L, user, pr);
+            User user = createUser(USER_ID, USER_LOGIN);
 
             when(userRepository.findByLogin(USER_LOGIN)).thenReturn(Optional.of(user));
-            when(
-                profileReviewQueryRepository.findAllByAuthorLoginInTimeframe(
-                    eq(USER_LOGIN),
-                    any(),
-                    any(),
-                    eq(WORKSPACE_ID)
-                )
-            ).thenReturn(List.of(review));
-            when(
-                profileCommentQueryRepository.findAllByAuthorLoginInTimeframe(
-                    eq(USER_LOGIN),
-                    any(),
-                    any(),
-                    eq(true),
-                    eq(WORKSPACE_ID)
-                )
-            ).thenReturn(List.of());
-            when(profilePullRequestQueryRepository.findAssignedByLoginAndStates(any(), any(), any())).thenReturn(
-                List.of()
-            );
+            when(profilePullRequestQueryRepository.findAssignedByLoginAndStates(any(), any(), any()))
+                .thenReturn(List.of());
             when(profileRepositoryQueryRepository.findContributedByLogin(any(), any())).thenReturn(List.of());
 
-            // No XP in ledger (historical review before activity_event existed)
-            when(activityEventRepository.findXpByTargetIdsAndTypes(any(), any(), any())).thenReturn(List.of());
-
-            // Mock assembler
-            when(reviewActivityAssembler.assemble(eq(review), eq(0))).thenReturn(createProfileReviewDTO(400L, 0));
+            // No ActivityEvents in ledger
+            when(
+                activityEventRepository.findProfileActivityByActorInTimeframe(
+                    eq(WORKSPACE_ID),
+                    eq(USER_ID),
+                    any(),
+                    any()
+                )
+            ).thenReturn(List.of());
 
             // Act
-            service.getUserProfile(USER_LOGIN, WORKSPACE_ID, AFTER, BEFORE);
+            Optional<ProfileDTO> result = service.getUserProfile(USER_LOGIN, WORKSPACE_ID, AFTER, BEFORE);
 
-            // Assert: assembler called with 0 XP as fallback
-            verify(reviewActivityAssembler).assemble(eq(review), eq(0));
+            // Assert
+            assertThat(result).isPresent();
+            assertThat(result.get().reviewActivity()).isEmpty();
+
+            // Verify no hydration queries (efficiency)
+            verifyNoInteractions(pullRequestReviewRepository);
+            verifyNoInteractions(issueCommentRepository);
         }
 
         @Test
-        @DisplayName("batch-fetches XP for multiple reviews and comments efficiently")
-        void batchFetchesXpForMultipleItems() {
+        @DisplayName("batch-fetches reviews and comments efficiently (no N+1)")
+        void batchFetchesEntitiesEfficiently() {
             // Arrange
-            User user = createUser(100L, USER_LOGIN);
+            User user = createUser(USER_ID, USER_LOGIN);
             Repository repo = createRepository(200L);
             PullRequest pr = createPullRequest(300L, user, repo);
             PullRequestReview review1 = createReview(400L, user, pr);
@@ -214,38 +197,33 @@ class UserProfileServiceTest {
             IssueComment comment = createIssueComment(500L, user, pr);
 
             when(userRepository.findByLogin(USER_LOGIN)).thenReturn(Optional.of(user));
-            when(
-                profileReviewQueryRepository.findAllByAuthorLoginInTimeframe(
-                    eq(USER_LOGIN),
-                    any(),
-                    any(),
-                    eq(WORKSPACE_ID)
-                )
-            ).thenReturn(List.of(review1, review2));
-            when(
-                profileCommentQueryRepository.findAllByAuthorLoginInTimeframe(
-                    eq(USER_LOGIN),
-                    any(),
-                    any(),
-                    eq(true),
-                    eq(WORKSPACE_ID)
-                )
-            ).thenReturn(List.of(comment));
-            when(profilePullRequestQueryRepository.findAssignedByLoginAndStates(any(), any(), any())).thenReturn(
-                List.of()
-            );
+            when(profilePullRequestQueryRepository.findAssignedByLoginAndStates(any(), any(), any()))
+                .thenReturn(List.of());
             when(profileRepositoryQueryRepository.findContributedByLogin(any(), any())).thenReturn(List.of());
 
-            // XP from activity_event ledger (batch query for all 3 items)
-            when(
-                activityEventRepository.findXpByTargetIdsAndTypes(
-                    eq(WORKSPACE_ID),
-                    eq(Set.of(400L, 401L, 500L)),
-                    eq(Set.of(ActivityTargetType.REVIEW, ActivityTargetType.ISSUE_COMMENT))
-                )
-            ).thenReturn(
-                List.of(createXpProjection(400L, 10.0), createXpProjection(401L, 20.0), createXpProjection(500L, 5.0))
+            // ActivityEvents for 2 reviews + 1 comment
+            ActivityEvent event1 = createActivityEvent(WORKSPACE_ID, USER_ID, 400L, ActivityTargetType.REVIEW, 10.0);
+            ActivityEvent event2 = createActivityEvent(WORKSPACE_ID, USER_ID, 401L, ActivityTargetType.REVIEW, 20.0);
+            ActivityEvent event3 = createActivityEvent(
+                WORKSPACE_ID,
+                USER_ID,
+                500L,
+                ActivityTargetType.ISSUE_COMMENT,
+                5.0
             );
+            when(
+                activityEventRepository.findProfileActivityByActorInTimeframe(
+                    eq(WORKSPACE_ID),
+                    eq(USER_ID),
+                    any(),
+                    any()
+                )
+            ).thenReturn(List.of(event1, event2, event3));
+
+            // Batch hydration
+            when(pullRequestReviewRepository.findAllByIdWithRelations(Set.of(400L, 401L)))
+                .thenReturn(List.of(review1, review2));
+            when(issueCommentRepository.findAllByIdWithRelations(Set.of(500L))).thenReturn(List.of(comment));
 
             // Mock assembler returns
             when(reviewActivityAssembler.assemble(eq(review1), eq(10))).thenReturn(createProfileReviewDTO(400L, 10));
@@ -255,13 +233,50 @@ class UserProfileServiceTest {
             // Act
             service.getUserProfile(USER_LOGIN, WORKSPACE_ID, AFTER, BEFORE);
 
-            // Assert: Single batch query for all IDs (no N+1)
-            verify(activityEventRepository, times(1)).findXpByTargetIdsAndTypes(any(), any(), any());
+            // Assert: Single batch query for each entity type (no N+1)
+            verify(pullRequestReviewRepository, times(1)).findAllByIdWithRelations(any());
+            verify(issueCommentRepository, times(1)).findAllByIdWithRelations(any());
 
-            // Verify each item assembled with its correct XP
+            // Verify each item assembled with its correct XP from ActivityEvent
             verify(reviewActivityAssembler).assemble(eq(review1), eq(10));
             verify(reviewActivityAssembler).assemble(eq(review2), eq(20));
             verify(reviewActivityAssembler).assemble(eq(comment), eq(5));
+        }
+
+        @Test
+        @DisplayName("skips missing entities gracefully (logs warning)")
+        void skipsMissingEntitiesGracefully() {
+            // Arrange
+            User user = createUser(USER_ID, USER_LOGIN);
+
+            when(userRepository.findByLogin(USER_LOGIN)).thenReturn(Optional.of(user));
+            when(profilePullRequestQueryRepository.findAssignedByLoginAndStates(any(), any(), any()))
+                .thenReturn(List.of());
+            when(profileRepositoryQueryRepository.findContributedByLogin(any(), any())).thenReturn(List.of());
+
+            // ActivityEvent exists but entity was deleted
+            ActivityEvent event = createActivityEvent(WORKSPACE_ID, USER_ID, 999L, ActivityTargetType.REVIEW, 15.0);
+            when(
+                activityEventRepository.findProfileActivityByActorInTimeframe(
+                    eq(WORKSPACE_ID),
+                    eq(USER_ID),
+                    any(),
+                    any()
+                )
+            ).thenReturn(List.of(event));
+
+            // Entity not found in gitprovider
+            when(pullRequestReviewRepository.findAllByIdWithRelations(Set.of(999L))).thenReturn(List.of());
+
+            // Act
+            Optional<ProfileDTO> result = service.getUserProfile(USER_LOGIN, WORKSPACE_ID, AFTER, BEFORE);
+
+            // Assert
+            assertThat(result).isPresent();
+            assertThat(result.get().reviewActivity()).isEmpty();
+
+            // Assembler should not be called for missing entity
+            verifyNoInteractions(reviewActivityAssembler);
         }
     }
 
@@ -315,18 +330,24 @@ class UserProfileServiceTest {
         return comment;
     }
 
-    private ActivityEventRepository.TargetXpProjection createXpProjection(Long targetId, Double xp) {
-        return new ActivityEventRepository.TargetXpProjection() {
-            @Override
-            public Long getTargetId() {
-                return targetId;
-            }
-
-            @Override
-            public Double getXp() {
-                return xp;
-            }
-        };
+    private ActivityEvent createActivityEvent(
+        Long workspaceId,
+        Long actorId,
+        Long targetId,
+        ActivityTargetType targetType,
+        Double xp
+    ) {
+        ActivityEvent event = new ActivityEvent();
+        event.setTargetId(targetId);
+        event.setTargetType(targetType.getValue());
+        event.setXp(xp);
+        event.setOccurredAt(Instant.now());
+        event.setEventType(
+            targetType == ActivityTargetType.REVIEW
+                ? ActivityEventType.REVIEW_APPROVED
+                : ActivityEventType.COMMENT_CREATED
+        );
+        return event;
     }
 
     private ProfileReviewActivityDTO createProfileReviewDTO(Long id, int score) {

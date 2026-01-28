@@ -4,6 +4,7 @@ import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.LARGE_PAGE_SIZE;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.MAX_PAGINATION_PAGES;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.exception.InstallationNotFoundException;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier.ClassificationResult;
@@ -17,11 +18,17 @@ import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHIssue;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHIssueConnection;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.issue.IssueRepository;
+import de.tum.in.www1.hephaestus.gitprovider.issue.github.GitHubIssueProcessor;
+import de.tum.in.www1.hephaestus.gitprovider.issue.github.dto.GitHubIssueDTO;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
-import de.tum.in.www1.hephaestus.monitoring.MonitoringProperties;
+import de.tum.in.www1.hephaestus.gitprovider.sync.SyncSchedulerProperties;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -30,6 +37,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.graphql.client.ClientGraphQlResponse;
 import org.springframework.graphql.client.HttpGraphQlClient;
+import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -56,6 +64,12 @@ import org.springframework.transaction.annotation.Transactional;
  * (see <a href="https://github.com/orgs/community/discussions/165749">
  * Community Discussion #165749</a>). Until webhooks become available,
  * use {@link #syncDependenciesForScope} for bulk GraphQL sync.
+ * <p>
+ * <b>ARCHITECTURE NOTE (Jan 2026):</b> This service implements the "find-or-create"
+ * pattern for blocker issues. When a blocking issue doesn't exist locally (e.g.,
+ * it's in a different repository or hasn't been synced yet), we create a stub
+ * issue entity on-the-fly using the GraphQL response data. This ensures blocking
+ * relationships are preserved even during incremental sync, before backfill completes.
  */
 @Service
 public class GitHubIssueDependencySyncService {
@@ -71,7 +85,8 @@ public class GitHubIssueDependencySyncService {
     private final GitHubGraphQlClientProvider graphQlClientProvider;
     private final GitHubSyncProperties syncProperties;
     private final GitHubExceptionClassifier exceptionClassifier;
-    private final MonitoringProperties monitoringProperties;
+    private final SyncSchedulerProperties syncSchedulerProperties;
+    private final GitHubIssueProcessor issueProcessor;
     private final GitHubIssueDependencySyncService self;
 
     public GitHubIssueDependencySyncService(
@@ -81,7 +96,8 @@ public class GitHubIssueDependencySyncService {
         GitHubGraphQlClientProvider graphQlClientProvider,
         GitHubSyncProperties syncProperties,
         GitHubExceptionClassifier exceptionClassifier,
-        MonitoringProperties monitoringProperties,
+        SyncSchedulerProperties syncSchedulerProperties,
+        GitHubIssueProcessor issueProcessor,
         @Lazy GitHubIssueDependencySyncService self
     ) {
         this.issueRepository = issueRepository;
@@ -90,7 +106,8 @@ public class GitHubIssueDependencySyncService {
         this.graphQlClientProvider = graphQlClientProvider;
         this.syncProperties = syncProperties;
         this.exceptionClassifier = exceptionClassifier;
-        this.monitoringProperties = monitoringProperties;
+        this.syncSchedulerProperties = syncSchedulerProperties;
+        this.issueProcessor = issueProcessor;
         this.self = self;
     }
 
@@ -162,7 +179,7 @@ public class GitHubIssueDependencySyncService {
         }
 
         SyncMetadata metadata = metadataOpt.get();
-        if (!metadata.needsIssueDependenciesSync(monitoringProperties.getSyncCooldownInMinutes())) {
+        if (!metadata.needsIssueDependenciesSync(syncSchedulerProperties.cooldownMinutes())) {
             log.debug(
                 "Skipped issue dependencies sync: reason=cooldownActive, scopeId={}, lastSyncedAt={}",
                 scopeId,
@@ -195,7 +212,7 @@ public class GitHubIssueDependencySyncService {
             }
 
             try {
-                int synced = syncRepositoryDependencies(client, repoOpt.get());
+                int synced = syncRepositoryDependencies(client, repoOpt.get(), scopeId);
                 totalSynced += synced;
             } catch (InstallationNotFoundException e) {
                 log.warn("Installation not found for scope {}, skipping issue dependency sync", scopeId);
@@ -272,7 +289,7 @@ public class GitHubIssueDependencySyncService {
      * Sync dependencies for a single repository.
      * Uses type-safe generated DTOs for GraphQL response handling.
      */
-    private int syncRepositoryDependencies(HttpGraphQlClient client, Repository repo) {
+    private int syncRepositoryDependencies(HttpGraphQlClient client, Repository repo, Long scopeId) {
         String safeNameWithOwner = sanitizeForLog(repo.getNameWithOwner());
         Optional<RepositoryOwnerAndName> parsedName = GitHubRepositoryNameParser.parse(repo.getNameWithOwner());
         if (parsedName.isEmpty()) {
@@ -305,7 +322,7 @@ public class GitHubIssueDependencySyncService {
                 .variable("first", LARGE_PAGE_SIZE)
                 .variable("after", after)
                 .execute()
-                .block(syncProperties.getGraphqlTimeout());
+                .block(syncProperties.graphqlTimeout());
 
             if (graphQlResponse == null || !graphQlResponse.isValid()) {
                 log.warn(
@@ -317,10 +334,10 @@ public class GitHubIssueDependencySyncService {
             }
 
             // Track rate limit from response
-            graphQlClientProvider.trackRateLimit(graphQlResponse);
+            graphQlClientProvider.trackRateLimit(scopeId, graphQlResponse);
 
             // Check if we should pause due to rate limiting
-            if (graphQlClientProvider.isRateLimitCritical()) {
+            if (graphQlClientProvider.isRateLimitCritical(scopeId)) {
                 log.warn("Aborting dependency sync due to critical rate limit: repoName={}", safeNameWithOwner);
                 break;
             }
@@ -342,7 +359,7 @@ public class GitHubIssueDependencySyncService {
             after = pageInfo != null ? pageInfo.getEndCursor() : null;
 
             // Process each page in its own transaction (call through proxy for @Transactional to work)
-            totalSynced += self.processIssueDependenciesPage(issueConnection);
+            totalSynced += self.processIssueDependenciesPage(issueConnection, repo, scopeId);
         }
 
         return totalSynced;
@@ -355,56 +372,101 @@ public class GitHubIssueDependencySyncService {
      * providing better resilience if a single page fails.
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    protected int processIssueDependenciesPage(GHIssueConnection issueConnection) {
+    protected int processIssueDependenciesPage(GHIssueConnection issueConnection, Repository repo, Long scopeId) {
         if (issueConnection.getNodes() == null) {
             return 0;
         }
 
         int synced = 0;
         for (var graphQlIssue : issueConnection.getNodes()) {
-            synced += processIssueDependencies(graphQlIssue);
+            synced += processIssueDependencies(graphQlIssue, repo, scopeId);
         }
         return synced;
     }
 
     /**
      * Process dependencies for a single issue from the GraphQL response.
+     * <p>
+     * Implements find-or-create pattern: if the issue doesn't exist locally,
+     * we create it from the GraphQL data. This ensures relationships are
+     * preserved even before backfill completes.
      */
-    private int processIssueDependencies(GHIssue graphQlIssue) {
+    private int processIssueDependencies(GHIssue graphQlIssue, Repository repo, Long scopeId) {
         if (graphQlIssue.getFullDatabaseId() == null) {
             return 0;
         }
 
-        long issueId = graphQlIssue.getFullDatabaseId().longValue();
-        Optional<Issue> issueOpt = issueRepository.findById(issueId);
-        if (issueOpt.isEmpty()) {
+        // Find or create the blocked issue
+        Issue issue = findOrCreateIssue(graphQlIssue, repo, scopeId);
+        if (issue == null) {
             return 0;
         }
-
-        Issue issue = issueOpt.get();
 
         // Process blockedBy relationships
         var blockedBy = graphQlIssue.getBlockedBy();
-        if (blockedBy == null || blockedBy.getNodes() == null) {
+        if (blockedBy == null || blockedBy.getNodes() == null || blockedBy.getNodes().isEmpty()) {
+            // No blockers - clear any existing relationships
+            if (!issue.getBlockedBy().isEmpty()) {
+                issue.getBlockedBy().clear();
+                issueRepository.save(issue);
+            }
             return 0;
         }
 
-        Set<Long> blockedByIds = blockedBy
-            .getNodes()
-            .stream()
-            .filter(node -> node.getFullDatabaseId() != null)
-            .map(node -> node.getFullDatabaseId().longValue())
-            .collect(Collectors.toSet());
+        return syncBlockedByRelationships(issue, blockedBy.getNodes(), scopeId);
+    }
 
-        return syncBlockedByRelationships(issue, blockedByIds);
+    /**
+     * Find an issue by ID, or create it from GraphQL data if it doesn't exist.
+     * <p>
+     * This implements the find-or-create pattern needed for dependency sync
+     * to work during incremental sync, before backfill completes.
+     * <p>
+     * <b>Note:</b> Uses {@code processStub()} to create placeholder issues without
+     * triggering domain events. These stubs will be hydrated with full data when
+     * the regular issue sync runs.
+     */
+    @Nullable
+    private Issue findOrCreateIssue(GHIssue graphQlIssue, Repository repo, Long scopeId) {
+        if (graphQlIssue.getFullDatabaseId() == null) {
+            return null;
+        }
+
+        long issueId = graphQlIssue.getFullDatabaseId().longValue();
+        Optional<Issue> existingOpt = issueRepository.findById(issueId);
+        if (existingOpt.isPresent()) {
+            return existingOpt.get();
+        }
+
+        // Issue doesn't exist - create it from GraphQL data as a stub
+        log.debug(
+            "Creating stub issue from dependency sync: issueId={}, issueNumber={}, repoName={}",
+            issueId,
+            graphQlIssue.getNumber(),
+            sanitizeForLog(repo.getNameWithOwner())
+        );
+
+        GitHubIssueDTO dto = GitHubIssueDTO.fromIssue(graphQlIssue);
+        if (dto == null) {
+            return null;
+        }
+
+        // Use ProcessingContext.forSync directly to avoid LazyInitializationException
+        // when accessing repository.getOrganization() in the factory
+        ProcessingContext context = ProcessingContext.forSync(scopeId, repo);
+        // Use processStub() to avoid triggering IssueCreated events for placeholder issues
+        return issueProcessor.processStub(dto, context);
     }
 
     /**
      * Synchronize blocked-by relationships for an issue.
-     * Uses batch loading to avoid N+1 query problems.
+     * <p>
+     * Implements find-or-create pattern for blocker issues: if a blocker
+     * doesn't exist locally, we create a stub issue from the GraphQL data.
+     * This ensures relationships are preserved even before backfill completes.
      */
-    private int syncBlockedByRelationships(Issue issue, Set<Long> expectedBlockerIds) {
-        if (expectedBlockerIds.isEmpty()) {
+    private int syncBlockedByRelationships(Issue issue, List<GHIssue> blockerNodes, Long scopeId) {
+        if (blockerNodes.isEmpty()) {
             // Remove all existing relationships
             int removed = issue.getBlockedBy().size();
             if (removed > 0) {
@@ -414,14 +476,54 @@ public class GitHubIssueDependencySyncService {
             return 0;
         }
 
-        // Batch load all blockers in one query (fixes N+1 problem)
-        List<Issue> blockers = issueRepository.findAllById(expectedBlockerIds);
-        Set<Long> foundBlockerIds = blockers.stream().map(Issue::getId).collect(Collectors.toSet());
+        // Build map of blocker ID -> GraphQL data for find-or-create
+        Map<Long, GHIssue> blockerGraphQlData = new HashMap<>();
+        Set<Long> expectedBlockerIds = new HashSet<>();
+        for (GHIssue blockerNode : blockerNodes) {
+            if (blockerNode.getFullDatabaseId() != null) {
+                long blockerId = blockerNode.getFullDatabaseId().longValue();
+                expectedBlockerIds.add(blockerId);
+                blockerGraphQlData.put(blockerId, blockerNode);
+            }
+        }
+
+        if (expectedBlockerIds.isEmpty()) {
+            return 0;
+        }
+
+        // Batch load existing blockers (fixes N+1 problem)
+        List<Issue> existingBlockers = issueRepository.findAllById(expectedBlockerIds);
+        Set<Long> foundBlockerIds = existingBlockers.stream().map(Issue::getId).collect(Collectors.toSet());
+
+        // Find blockers that need to be created
+        Set<Long> missingBlockerIds = new HashSet<>(expectedBlockerIds);
+        missingBlockerIds.removeAll(foundBlockerIds);
+
+        // Create missing blockers from GraphQL data
+        List<Issue> createdBlockers = new ArrayList<>();
+        for (Long missingId : missingBlockerIds) {
+            GHIssue blockerGraphQl = blockerGraphQlData.get(missingId);
+            Issue createdBlocker = createBlockerIssue(blockerGraphQl, scopeId);
+            if (createdBlocker != null) {
+                createdBlockers.add(createdBlocker);
+                log.debug(
+                    "Created stub blocker issue: blockerId={}, blockerNumber={}, blockedIssueNumber={}",
+                    createdBlocker.getId(),
+                    createdBlocker.getNumber(),
+                    issue.getNumber()
+                );
+            }
+        }
+
+        // Combine existing and created blockers
+        List<Issue> allBlockers = new ArrayList<>(existingBlockers);
+        allBlockers.addAll(createdBlockers);
+        Set<Long> allBlockerIds = allBlockers.stream().map(Issue::getId).collect(Collectors.toSet());
 
         int changes = 0;
 
         // Add missing relationships
-        for (Issue blocker : blockers) {
+        for (Issue blocker : allBlockers) {
             if (!issue.getBlockedBy().contains(blocker)) {
                 issue.getBlockedBy().add(blocker);
                 changes++;
@@ -430,7 +532,7 @@ public class GitHubIssueDependencySyncService {
 
         // Remove stale relationships (blockers that should no longer exist)
         int initialSize = issue.getBlockedBy().size();
-        issue.getBlockedBy().removeIf(blocker -> !foundBlockerIds.contains(blocker.getId()));
+        issue.getBlockedBy().removeIf(blocker -> !allBlockerIds.contains(blocker.getId()));
         int removedCount = initialSize - issue.getBlockedBy().size();
         changes += removedCount;
 
@@ -439,6 +541,68 @@ public class GitHubIssueDependencySyncService {
         }
 
         return changes;
+    }
+
+    /**
+     * Create a blocker issue from GraphQL data.
+     * <p>
+     * The blocker may be in a different repository than the blocked issue.
+     * We use the repository reference from the GraphQL data to find or create
+     * the repository and then create the issue in that repository.
+     * <p>
+     * <b>Note:</b> Uses {@code processStub()} to create placeholder issues without
+     * triggering domain events. These stubs will be hydrated with full data when
+     * the regular issue sync runs.
+     */
+    @Nullable
+    private Issue createBlockerIssue(GHIssue blockerGraphQl, Long scopeId) {
+        if (blockerGraphQl == null || blockerGraphQl.getFullDatabaseId() == null) {
+            return null;
+        }
+
+        // The blocker may be in a different repository
+        Repository blockerRepo = resolveBlockerRepository(blockerGraphQl);
+        if (blockerRepo == null) {
+            log.debug(
+                "Skipped creating blocker: reason=repositoryNotFound, blockerId={}, blockerNumber={}",
+                blockerGraphQl.getFullDatabaseId(),
+                blockerGraphQl.getNumber()
+            );
+            return null;
+        }
+
+        GitHubIssueDTO dto = GitHubIssueDTO.fromIssueWithRepository(blockerGraphQl);
+        if (dto == null) {
+            return null;
+        }
+
+        // Use ProcessingContext.forSync directly to avoid LazyInitializationException
+        // when accessing repository.getOrganization() in the factory
+        ProcessingContext context = ProcessingContext.forSync(scopeId, blockerRepo);
+        // Use processStub() to avoid triggering IssueCreated events for placeholder issues
+        return issueProcessor.processStub(dto, context);
+    }
+
+    /**
+     * Resolve the repository for a blocker issue.
+     * <p>
+     * The blocker issue may be in a different repository. We first try to find
+     * it by the nameWithOwner from the GraphQL response. If not found and the
+     * repository is within the same scope, we could create it - but for now
+     * we just skip blockers in unknown repositories.
+     */
+    @Nullable
+    private Repository resolveBlockerRepository(GHIssue blockerGraphQl) {
+        if (blockerGraphQl.getRepository() == null) {
+            return null;
+        }
+
+        String nameWithOwner = blockerGraphQl.getRepository().getNameWithOwner();
+        if (nameWithOwner == null) {
+            return null;
+        }
+
+        return repositoryRepository.findByNameWithOwner(nameWithOwner).orElse(null);
     }
 
     // ═══════════════════════════════════════════════════════════════════════════

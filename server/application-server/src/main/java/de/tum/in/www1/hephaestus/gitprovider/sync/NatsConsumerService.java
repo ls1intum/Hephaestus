@@ -10,6 +10,7 @@ import de.tum.in.www1.hephaestus.gitprovider.common.spi.NatsSubscriptionProvider
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.NatsSubscriptionProvider.NatsSubscriptionInfo;
 import de.tum.in.www1.hephaestus.gitprovider.sync.exception.NatsConnectionException;
 import io.nats.client.Connection;
+import io.nats.client.ConsumeOptions;
 import io.nats.client.ConsumerContext;
 import io.nats.client.ErrorListener;
 import io.nats.client.JetStreamApiException;
@@ -25,10 +26,10 @@ import io.nats.client.api.DeliverPolicy;
 import jakarta.annotation.PreDestroy;
 import java.io.IOException;
 import java.time.Duration;
+import java.time.Instant;
 import java.time.ZonedDateTime;
 import java.util.Arrays;
 import java.util.HashSet;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.BlockingQueue;
@@ -40,7 +41,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.context.event.EventListener;
@@ -135,16 +135,12 @@ public class NatsConsumerService {
 
     private final AtomicBoolean shuttingDown = new AtomicBoolean(false);
 
-    private final boolean isNatsEnabled;
-    private final int timeframe;
-    private final String natsServer;
-    private final String durableConsumerName;
-    private final int consumerAckWaitMinutes;
-    private final int maxAckPending;
-    private final int reconnectDelaySeconds;
-    private final int requestTimeoutSeconds;
+    private final NatsProperties natsProperties;
 
     private Connection natsConnection;
+
+    /** Tracks consecutive heartbeat alarms per consumer for restart decisions */
+    private final Map<String, HeartbeatAlarmState> heartbeatAlarmStates = new ConcurrentHashMap<>();
 
     /** One consumer per scope - keyed by scope ID */
     private final Map<Long, ScopeConsumer> scopeConsumers = new ConcurrentHashMap<>();
@@ -164,25 +160,11 @@ public class NatsConsumerService {
     public NatsConsumerService(
         @Lazy GitHubMessageHandlerRegistry handlerRegistry,
         NatsSubscriptionProvider subscriptionProvider,
-        @Value("${nats.enabled}") boolean isNatsEnabled,
-        @Value("${nats.timeframe}") int timeframe,
-        @Value("${nats.server}") String natsServer,
-        @Value("${nats.durable-consumer-name}") String durableConsumerName,
-        @Value("${nats.consumer.ack-wait-minutes:5}") int consumerAckWaitMinutes,
-        @Value("${nats.consumer.max-ack-pending:500}") int maxAckPending,
-        @Value("${nats.consumer.reconnect-delay-seconds:2}") int reconnectDelaySeconds,
-        @Value("${nats.consumer.request-timeout-seconds:10}") int requestTimeoutSeconds
+        NatsProperties natsProperties
     ) {
         this.handlerRegistry = handlerRegistry;
         this.subscriptionProvider = subscriptionProvider;
-        this.isNatsEnabled = isNatsEnabled;
-        this.timeframe = timeframe;
-        this.natsServer = natsServer;
-        this.durableConsumerName = durableConsumerName;
-        this.consumerAckWaitMinutes = consumerAckWaitMinutes;
-        this.maxAckPending = maxAckPending;
-        this.reconnectDelaySeconds = reconnectDelaySeconds;
-        this.requestTimeoutSeconds = requestTimeoutSeconds;
+        this.natsProperties = natsProperties;
     }
 
     /**
@@ -195,7 +177,7 @@ public class NatsConsumerService {
      */
     @EventListener(ApplicationReadyEvent.class)
     public void init() {
-        if (!isNatsEnabled) {
+        if (!natsProperties.enabled()) {
             log.info("Skipped NATS initialization: reason=disabled");
             return;
         }
@@ -216,7 +198,7 @@ public class NatsConsumerService {
      */
     @EventListener(WorkspacesInitializedEvent.class)
     public void onWorkspacesInitialized(WorkspacesInitializedEvent event) {
-        if (!isNatsEnabled) {
+        if (!natsProperties.enabled()) {
             return;
         }
 
@@ -243,7 +225,7 @@ public class NatsConsumerService {
     }
 
     private void validateConfigurations() {
-        if (natsServer == null || natsServer.trim().isEmpty()) {
+        if (natsProperties.server() == null || natsProperties.server().trim().isEmpty()) {
             throw new IllegalArgumentException("NATS server configuration is missing.");
         }
     }
@@ -255,7 +237,7 @@ public class NatsConsumerService {
         while (!shuttingDown.get()) {
             try {
                 natsConnection = Nats.connect(options);
-                log.info("Established NATS connection: server={}", natsServer);
+                log.info("Established NATS connection: server={}", natsProperties.server());
                 return;
             } catch (InterruptedException interrupted) {
                 Thread.currentThread().interrupt();
@@ -264,7 +246,7 @@ public class NatsConsumerService {
                 long delayMs = ExponentialBackoff.calculateDelay(attempt);
                 log.error(
                     "Failed to connect to NATS: server={}, attempt={}, nextRetryDelayMs={}",
-                    natsServer,
+                    natsProperties.server(),
                     attempt,
                     delayMs,
                     e
@@ -279,7 +261,7 @@ public class NatsConsumerService {
         // Connection timeout should be short (10s), while request timeout can be longer for JetStream API calls
         int connectionTimeoutSeconds = 10;
         return Options.builder()
-            .server(natsServer)
+            .server(natsProperties.server())
             .connectionListener((conn, type) -> {
                 if (conn != null && conn.getServerInfo() != null) {
                     log.info("NATS connection event: type={}, port={}", type, conn.getServerInfo().getPort());
@@ -289,7 +271,7 @@ public class NatsConsumerService {
             })
             .errorListener(new JetStreamErrorListener())
             .maxReconnects(-1)
-            .reconnectWait(Duration.ofSeconds(reconnectDelaySeconds))
+            .reconnectWait(natsProperties.consumer().reconnectDelay())
             .connectionTimeout(Duration.ofSeconds(connectionTimeoutSeconds))
             .build();
     }
@@ -302,7 +284,7 @@ public class NatsConsumerService {
      * @param scopeId The scope ID to start consuming for
      */
     public void startConsumingScope(Long scopeId) {
-        if (!isNatsEnabled || shuttingDown.get() || scopeId == null) {
+        if (!natsProperties.enabled() || shuttingDown.get() || scopeId == null) {
             return;
         }
 
@@ -338,7 +320,7 @@ public class NatsConsumerService {
      * @param scopeId The scope ID with updated repositories
      */
     public void updateScopeConsumer(Long scopeId) {
-        if (!isNatsEnabled || shuttingDown.get() || scopeId == null) {
+        if (!natsProperties.enabled() || shuttingDown.get() || scopeId == null) {
             return;
         }
 
@@ -401,12 +383,12 @@ public class NatsConsumerService {
             return;
         }
 
-        String consumerName = durableConsumerName + "-scope-" + scopeId;
+        String consumerName = natsProperties.durableConsumerName() + "-scope-" + scopeId;
 
         try {
             // Use longer timeout for scopes with many repositories
             JetStreamOptions jsOptions = JetStreamOptions.builder()
-                .requestTimeout(Duration.ofSeconds(requestTimeoutSeconds))
+                .requestTimeout(natsProperties.consumer().requestTimeout())
                 .build();
             StreamContext streamContext = natsConnection.getStreamContext("github", jsOptions);
             ConsumerContext consumerContext = createOrUpdateConsumer(streamContext, consumerName, subjects);
@@ -429,11 +411,11 @@ public class NatsConsumerService {
 
     private void setupInstallationConsumer() throws IOException {
         String[] subjects = getInstallationSubjects();
-        String consumerName = durableConsumerName + "-installation";
+        String consumerName = natsProperties.durableConsumerName() + "-installation";
 
         try {
             JetStreamOptions jsOptions = JetStreamOptions.builder()
-                .requestTimeout(Duration.ofSeconds(requestTimeoutSeconds))
+                .requestTimeout(natsProperties.consumer().requestTimeout())
                 .build();
             StreamContext streamContext = natsConnection.getStreamContext("github", jsOptions);
             ConsumerContext consumerContext = createOrUpdateConsumer(streamContext, consumerName, subjects);
@@ -448,7 +430,8 @@ public class NatsConsumerService {
 
     private ConsumerContext createOrUpdateConsumer(StreamContext streamContext, String consumerName, String[] subjects)
         throws IOException, JetStreamApiException {
-        boolean isDurable = durableConsumerName != null && !durableConsumerName.isBlank();
+        boolean isDurable =
+            natsProperties.durableConsumerName() != null && !natsProperties.durableConsumerName().isBlank();
 
         try {
             if (isDurable) {
@@ -483,15 +466,15 @@ public class NatsConsumerService {
             isDurable ? "durable" : "ephemeral",
             isDurable ? consumerName : "ephemeral",
             subjects.length,
-            timeframe
+            natsProperties.replayTimeframeDays()
         );
 
         ConsumerConfiguration.Builder configBuilder = ConsumerConfiguration.builder()
             .filterSubjects(subjects)
             .deliverPolicy(DeliverPolicy.ByStartTime)
-            .ackWait(Duration.ofMinutes(consumerAckWaitMinutes))
-            .maxAckPending(maxAckPending)
-            .startTime(ZonedDateTime.now().minusDays(timeframe));
+            .ackWait(natsProperties.consumer().ackWait())
+            .maxAckPending(natsProperties.consumer().maxAckPending())
+            .startTime(ZonedDateTime.now().minusDays(natsProperties.replayTimeframeDays()));
 
         if (isDurable) {
             configBuilder.durable(consumerName);
@@ -523,32 +506,55 @@ public class NatsConsumerService {
         return subjects.toArray(String[]::new);
     }
 
+    /**
+     * Returns a SINGLE wildcard subject that matches ALL events for a repository.
+     *
+     * <p>Uses NATS wildcard token {@code >} which matches one or more tokens.
+     * Example: {@code github.ls1intum.Artemis.>} matches:
+     * <ul>
+     *   <li>{@code github.ls1intum.Artemis.issues}</li>
+     *   <li>{@code github.ls1intum.Artemis.pull_request}</li>
+     *   <li>{@code github.ls1intum.Artemis.push}</li>
+     * </ul>
+     *
+     * <p><strong>Why wildcards?</strong> Without wildcards, a scope with 200 repos
+     * and 12 event types creates 2,400 filter subjects. NATS JetStream consumer
+     * creation validates each subject against the stream, causing O(n*m) timeouts
+     * on large filter lists. Using wildcards reduces this to O(n) where n=repos.
+     *
+     * @param nameWithOwner repository identifier in "owner/repo" format
+     * @return single-element array containing the wildcard subject
+     */
     private String[] getRepositorySubjects(String nameWithOwner) {
-        return handlerRegistry
-            .getSupportedRepositoryEvents()
-            .stream()
-            .map(event -> buildSubject(getSubjectPrefix(nameWithOwner), event))
-            .toArray(String[]::new);
+        // Use wildcard to match ALL events for this repository
+        return new String[] { getSubjectPrefix(nameWithOwner) + ".>" };
     }
 
+    /**
+     * Returns a SINGLE wildcard subject that matches ALL org-level events.
+     *
+     * <p>Organization events use {@code ?} as repo placeholder in the subject,
+     * so we match {@code github.owner.?.>} for all org-level events.
+     *
+     * @param owner the organization login
+     * @return single-element array containing the wildcard subject
+     */
     private String[] getOrganizationSubjects(String owner) {
-        return handlerRegistry
-            .getSupportedOrganizationEvents()
-            .stream()
-            .map(event -> buildSubject(getSubjectPrefix(owner + "/?"), event))
-            .toArray(String[]::new);
+        // Use wildcard to match ALL org-level events (? is the repo placeholder)
+        return new String[] { getSubjectPrefix(owner + "/?") + ".>" };
     }
 
+    /**
+     * Returns a SINGLE wildcard subject that matches ALL installation-level events.
+     *
+     * <p>Installation events use {@code ?/?} as owner/repo placeholder,
+     * so we match {@code github.?.?.>} for all installation events.
+     *
+     * @return single-element array containing the wildcard subject
+     */
     private String[] getInstallationSubjects() {
-        return handlerRegistry
-            .getSupportedInstallationEvents()
-            .stream()
-            .map(event -> buildSubject(getSubjectPrefix("?/?"), event))
-            .toArray(String[]::new);
-    }
-
-    private String buildSubject(String prefix, String eventKey) {
-        return prefix + "." + eventKey.toLowerCase(Locale.ENGLISH);
+        // Use wildcard to match ALL installation-level events
+        return new String[] { getSubjectPrefix("?/?") + ".>" };
     }
 
     private String getSubjectPrefix(String nameWithOwner) {
@@ -581,7 +587,10 @@ public class NatsConsumerService {
             GitHubMessageHandler<?> eventHandler = handlerRegistry.getHandler(eventKey);
 
             if (eventHandler == null) {
-                log.warn("No handler found for event: eventType={}", eventKey);
+                // DEBUG level, not WARN: This is expected behavior for GitHub events we don't need
+                // to handle (e.g., check_run, check_suite, push). The message is still acknowledged
+                // so it won't be redelivered. Using WARN would pollute logs and mask real issues.
+                log.debug("No handler found for event: eventType={}", eventKey);
                 msg.ack();
                 return;
             }
@@ -671,12 +680,12 @@ public class NatsConsumerService {
                 return;
             }
 
-            log.info("Reconnecting to NATS server: server={}", natsServer);
+            log.info("Reconnecting to NATS server: server={}", natsProperties.server());
             try {
                 natsConnection = Nats.connect(buildNatsOptions());
-                log.info("Connected to NATS: server={}", natsServer);
+                log.info("Connected to NATS: server={}", natsProperties.server());
             } catch (IOException e) {
-                log.error("Failed to connect to NATS: server={}", natsServer, e);
+                log.error("Failed to connect to NATS: server={}", natsProperties.server(), e);
                 throw new NatsConnectionException("Failed to establish NATS connection", e);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
@@ -723,7 +732,7 @@ public class NatsConsumerService {
 
     @PreDestroy
     public void shutdown() {
-        if (!isNatsEnabled) {
+        if (!natsProperties.enabled()) {
             return;
         }
 
@@ -770,19 +779,196 @@ public class NatsConsumerService {
         if (natsConnection != null) {
             try {
                 natsConnection.close();
-                log.info("Closed NATS connection: server={}", natsServer);
+                log.info("Closed NATS connection: server={}", natsProperties.server());
             } catch (Exception e) {
-                log.debug("Failed to close NATS connection: server={}", natsServer, e);
+                log.debug("Failed to close NATS connection: server={}", natsProperties.server(), e);
             }
             natsConnection = null;
         }
 
-        log.info("Completed NATS consumer shutdown: server={}", natsServer);
+        log.info("Completed NATS consumer shutdown: server={}", natsProperties.server());
     }
 
-    private static class JetStreamErrorListener implements ErrorListener {
+    /**
+     * Tracks heartbeat alarm state for a consumer to detect stuck consumers.
+     *
+     * @param consecutiveAlarms count of consecutive heartbeat failures without progress
+     * @param lastLogTime last time we logged a heartbeat alarm (to avoid log spam)
+     * @param lastStreamSeq last observed stream sequence to detect progress
+     */
+    private record HeartbeatAlarmState(int consecutiveAlarms, Instant lastLogTime, long lastStreamSeq) {
+        /** Creates initial state for a consumer. */
+        static HeartbeatAlarmState initial(long streamSeq) {
+            return new HeartbeatAlarmState(1, Instant.now(), streamSeq);
+        }
 
-        private static final Logger log = LoggerFactory.getLogger(JetStreamErrorListener.class);
+        /** Increments alarm counter when no progress is made. */
+        HeartbeatAlarmState incrementAlarm(Instant logTime) {
+            return new HeartbeatAlarmState(consecutiveAlarms + 1, logTime, lastStreamSeq);
+        }
+
+        /** Resets alarm counter when progress is detected. */
+        HeartbeatAlarmState reset(long newStreamSeq) {
+            return new HeartbeatAlarmState(0, lastLogTime, newStreamSeq);
+        }
+    }
+
+    /**
+     * Handles a heartbeat alarm for a consumer.
+     * Tracks consecutive alarms and triggers restart if threshold is exceeded.
+     *
+     * @param consumerName the name of the consumer
+     * @param streamSeq the current stream sequence
+     */
+    private void handleHeartbeatAlarm(String consumerName, long streamSeq) {
+        if (consumerName == null || shuttingDown.get()) {
+            return;
+        }
+
+        HeartbeatAlarmState newState = heartbeatAlarmStates.compute(consumerName, (name, currentState) -> {
+            if (currentState == null) {
+                // First alarm for this consumer
+                return HeartbeatAlarmState.initial(streamSeq);
+            }
+
+            // Check if consumer is making progress (stream sequence advanced)
+            if (streamSeq > currentState.lastStreamSeq()) {
+                log.debug(
+                    "Consumer making progress, resetting alarm state: consumerName={}, oldSeq={}, newSeq={}",
+                    consumerName,
+                    currentState.lastStreamSeq(),
+                    streamSeq
+                );
+                return currentState.reset(streamSeq);
+            }
+
+            // No progress - check if we should log
+            Instant now = Instant.now();
+            Duration sinceLastLog = Duration.between(currentState.lastLogTime(), now);
+            boolean shouldLog = sinceLastLog.compareTo(natsProperties.consumer().heartbeatLogInterval()) >= 0;
+
+            if (shouldLog) {
+                log.warn(
+                    "NATS heartbeat alarm: consumerName={}, consecutiveAlarms={}, streamSeq={}, threshold={}",
+                    consumerName,
+                    currentState.consecutiveAlarms() + 1,
+                    streamSeq,
+                    natsProperties.consumer().heartbeatRestartThreshold()
+                );
+                return currentState.incrementAlarm(now);
+            } else {
+                // Increment alarm count but don't update log time
+                return new HeartbeatAlarmState(
+                    currentState.consecutiveAlarms() + 1,
+                    currentState.lastLogTime(),
+                    currentState.lastStreamSeq()
+                );
+            }
+        });
+
+        // Check if we need to restart the consumer
+        if (newState.consecutiveAlarms() >= natsProperties.consumer().heartbeatRestartThreshold()) {
+            log.warn(
+                "Heartbeat alarm threshold exceeded, triggering consumer restart: consumerName={}, alarms={}",
+                consumerName,
+                newState.consecutiveAlarms()
+            );
+
+            // Reset the alarm state before restart to prevent repeated restart attempts
+            heartbeatAlarmStates.remove(consumerName);
+
+            // Find and restart the consumer
+            triggerConsumerRestart(consumerName);
+        }
+    }
+
+    /**
+     * Triggers a consumer restart based on the consumer name.
+     * Determines if it's a scope consumer or installation consumer and restarts accordingly.
+     *
+     * @param consumerName the name of the consumer to restart
+     */
+    private void triggerConsumerRestart(String consumerName) {
+        if (consumerName == null) {
+            return;
+        }
+
+        // Check if it's the installation consumer
+        String installationConsumerName = natsProperties.durableConsumerName() + "-installation";
+        if (consumerName.equals(installationConsumerName)) {
+            restartInstallationConsumer();
+            return;
+        }
+
+        // Check if it's a scope consumer (format: {durableConsumerName}-scope-{scopeId})
+        String scopePrefix = natsProperties.durableConsumerName() + "-scope-";
+        if (consumerName.startsWith(scopePrefix)) {
+            try {
+                Long scopeId = Long.parseLong(consumerName.substring(scopePrefix.length()));
+                restartScopeConsumer(scopeId);
+            } catch (NumberFormatException e) {
+                log.error("Failed to parse scope ID from consumer name: consumerName={}", consumerName);
+            }
+        }
+    }
+
+    /**
+     * Restarts a scope consumer by stopping the existing one and creating a new one.
+     *
+     * @param scopeId the scope ID whose consumer should be restarted
+     */
+    private void restartScopeConsumer(Long scopeId) {
+        if (scopeId == null || shuttingDown.get()) {
+            return;
+        }
+
+        log.info("Restarting scope consumer: scopeId={}", scopeId);
+
+        ScopeConsumer existing = scopeConsumers.remove(scopeId);
+        if (existing != null) {
+            try {
+                existing.stop();
+                cleanupConsumer(existing.consumerName);
+            } catch (Exception e) {
+                log.warn("Failed to stop existing consumer during restart: scopeId={}", scopeId, e);
+            }
+        }
+
+        // Recreate the consumer
+        startConsumingScope(scopeId);
+        log.info("Scope consumer restart initiated: scopeId={}", scopeId);
+    }
+
+    /**
+     * Restarts the installation consumer.
+     */
+    private void restartInstallationConsumer() {
+        if (shuttingDown.get()) {
+            return;
+        }
+
+        log.info("Restarting installation consumer");
+
+        ScopeConsumer existing = installationConsumer;
+        if (existing != null) {
+            installationConsumer = null;
+            try {
+                existing.stop();
+                cleanupConsumer(existing.consumerName);
+            } catch (Exception e) {
+                log.warn("Failed to stop existing installation consumer during restart", e);
+            }
+        }
+
+        // Recreate the consumer
+        startInstallationConsumer();
+        log.info("Installation consumer restart initiated");
+    }
+
+    /**
+     * Non-static error listener that can access service methods for heartbeat alarm handling.
+     */
+    private class JetStreamErrorListener implements ErrorListener {
 
         @Override
         public void errorOccurred(Connection conn, String error) {
@@ -796,14 +982,45 @@ public class NatsConsumerService {
             long lastStreamSequence,
             long lastConsumerSequence
         ) {
-            String consumerName = sub != null ? sub.getConsumerName() : "unknown";
-            log.warn(
-                "NATS heartbeat alarm: consumerName={}, streamSeq={}, consumerSeq={}",
-                consumerName,
-                lastStreamSequence,
-                lastConsumerSequence
-            );
+            String consumerName = sub != null ? sub.getConsumerName() : null;
+            handleHeartbeatAlarm(consumerName, lastStreamSequence);
         }
+    }
+
+    /**
+     * Builds ConsumeOptions with tuned idle heartbeat for remote NATS connections.
+     * <p>
+     * <b>Why this matters:</b> NATS JetStream push consumers use idle heartbeats to detect
+     * stuck subscriptions. The server sends heartbeats when there's no data. If heartbeats
+     * don't arrive in time, the client fires {@code heartbeatAlarm()} in the error listener.
+     * <p>
+     * The default idle heartbeat (15s) is too aggressive for WAN connections where:
+     * <ul>
+     *   <li>Network latency can spike during congestion</li>
+     *   <li>NATS server may be geographically distant</li>
+     *   <li>Cloud networking adds variable latency</li>
+     * </ul>
+     * <p>
+     * <b>NATS client behavior:</b> The Java client calculates idle heartbeat as:
+     * {@code min(30000ms, expiresIn * 50%)}. To achieve our desired idle heartbeat,
+     * we set {@code expiresIn = max(idleHeartbeat * 2, DEFAULT_EXPIRES_IN)}.
+     * <p>
+     * With {@code idleHeartbeatSeconds=30}, this gives expiresIn=60s, resulting in
+     * idleHeartbeat=30s (capped by MAX_HEARTBEAT_MILLIS). Alarms fire after ~3
+     * consecutive missed heartbeats, so roughly 90 seconds without server contact.
+     *
+     * @return ConsumeOptions configured for reliable remote operation
+     */
+    private ConsumeOptions buildConsumeOptions() {
+        // Calculate expiresIn to achieve desired idle heartbeat
+        // NATS formula: idleHeartbeat = min(30000ms, expiresIn * 50%)
+        // So: expiresIn = idleHeartbeat * 2 (to get the desired idle heartbeat up to 30s cap)
+        long desiredIdleHeartbeatMs = natsProperties.consumer().idleHeartbeat().toMillis();
+        long calculatedExpiresIn = desiredIdleHeartbeatMs * 2;
+        // Ensure we don't go below the default (30s) as NATS has min validation
+        long expiresInMs = Math.max(calculatedExpiresIn, 30_000L);
+
+        return ConsumeOptions.builder().expiresIn(expiresInMs).build();
     }
 
     /**
@@ -861,8 +1078,9 @@ public class NatsConsumerService {
                 .name("nats-processor-" + (scopeId != null ? "scope-" + scopeId : "installation"))
                 .start(this::processMessagesSequentially);
 
-            // Subscribe to NATS - messages go to queue for sequential processing
-            subscription = context.consume(this::enqueueMessage);
+            // Subscribe to NATS with tuned heartbeat options for remote connections
+            // Using buildConsumeOptions() from enclosing service for consistent configuration
+            subscription = context.consume(buildConsumeOptions(), this::enqueueMessage);
         }
 
         synchronized void stop() {
@@ -916,7 +1134,8 @@ public class NatsConsumerService {
                     log.warn("Failed to close subscription during subject update: consumerName={}", consumerName, e);
                 }
             }
-            subscription = context.consume(this::enqueueMessage);
+            // Use tuned heartbeat options for the new subscription
+            subscription = context.consume(buildConsumeOptions(), this::enqueueMessage);
         }
 
         private void enqueueMessage(Message msg) {

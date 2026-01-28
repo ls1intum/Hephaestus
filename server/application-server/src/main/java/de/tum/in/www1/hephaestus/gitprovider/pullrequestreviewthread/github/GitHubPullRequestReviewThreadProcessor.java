@@ -10,6 +10,7 @@ import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,24 +33,8 @@ public class GitHubPullRequestReviewThreadProcessor {
         this.eventPublisher = eventPublisher;
     }
 
-    /**
-     * Resolve without emitting events (for sync operations).
-     */
     @Transactional
-    public boolean resolve(Long threadId) {
-        return resolve(threadId, null, null);
-    }
-
-    /**
-     * Resolve with resolvedBy user but without emitting events (for sync operations).
-     */
-    @Transactional
-    public boolean resolve(Long threadId, User resolvedBy) {
-        return resolve(threadId, resolvedBy, null);
-    }
-
-    @Transactional
-    public boolean resolve(Long threadId, User resolvedBy, ProcessingContext context) {
+    public boolean resolve(Long threadId, User resolvedBy, @NonNull ProcessingContext context) {
         if (threadId == null) {
             log.debug("Skipped thread resolve: reason=nullThreadId");
             return false;
@@ -63,13 +48,11 @@ public class GitHubPullRequestReviewThreadProcessor {
                     thread.setResolvedBy(resolvedBy);
                 }
                 thread = threadRepository.save(thread);
-                if (context != null) {
-                    EventPayload.ReviewThreadData.from(thread).ifPresent(threadData ->
-                        eventPublisher.publishEvent(
-                            new DomainEvent.ReviewThreadResolved(threadData, EventContext.from(context))
-                        )
-                    );
-                }
+                EventPayload.ReviewThreadData.from(thread).ifPresent(threadData ->
+                    eventPublisher.publishEvent(
+                        new DomainEvent.ReviewThreadResolved(threadData, EventContext.from(context))
+                    )
+                );
                 log.info(
                     "Resolved thread: threadId={}, resolvedByLogin={}",
                     threadId,
@@ -83,16 +66,8 @@ public class GitHubPullRequestReviewThreadProcessor {
             });
     }
 
-    /**
-     * Unresolve without emitting events (for sync operations).
-     */
     @Transactional
-    public boolean unresolve(Long threadId) {
-        return unresolve(threadId, null);
-    }
-
-    @Transactional
-    public boolean unresolve(Long threadId, ProcessingContext context) {
+    public boolean unresolve(Long threadId, @NonNull ProcessingContext context) {
         if (threadId == null) {
             log.debug("Skipped thread unresolve: reason=nullThreadId");
             return false;
@@ -104,13 +79,11 @@ public class GitHubPullRequestReviewThreadProcessor {
                 thread.setState(PullRequestReviewThread.State.UNRESOLVED);
                 thread.setResolvedBy(null);
                 thread = threadRepository.save(thread);
-                if (context != null) {
-                    EventPayload.ReviewThreadData.from(thread).ifPresent(threadData ->
-                        eventPublisher.publishEvent(
-                            new DomainEvent.ReviewThreadUnresolved(threadData, EventContext.from(context))
-                        )
-                    );
-                }
+                EventPayload.ReviewThreadData.from(thread).ifPresent(threadData ->
+                    eventPublisher.publishEvent(
+                        new DomainEvent.ReviewThreadUnresolved(threadData, EventContext.from(context))
+                    )
+                );
                 log.info("Unresolved thread: threadId={}", threadId);
                 return true;
             })

@@ -1,14 +1,12 @@
 package de.tum.in.www1.hephaestus.gitprovider.issue;
 
-import jakarta.persistence.QueryHint;
 import java.util.List;
-import java.util.Set;
-import java.util.stream.Stream;
+import java.util.Optional;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.jpa.repository.QueryHints;
 import org.springframework.data.repository.query.Param;
 
 /**
@@ -18,6 +16,32 @@ import org.springframework.data.repository.query.Param;
  * through the Repository -> Organization relationship chain.
  */
 public interface IssueRepository extends JpaRepository<Issue, Long> {
+    /**
+     * Finds an issue by repository ID and number.
+     * This is the canonical lookup for sync operations as it uses the natural key
+     * (repository_id, number) which is consistent across both GraphQL sync and
+     * webhook events, regardless of which ID format they use.
+     *
+     * @param repositoryId the repository ID
+     * @param number the issue number within the repository
+     * @return the issue if found
+     */
+    @Query(
+        """
+        SELECT i
+        FROM Issue i
+        LEFT JOIN FETCH i.labels
+        LEFT JOIN FETCH i.author
+        LEFT JOIN FETCH i.assignees
+        LEFT JOIN FETCH i.repository
+        WHERE i.repository.id = :repositoryId AND i.number = :number
+        """
+    )
+    Optional<Issue> findByRepositoryIdAndNumber(
+        @Param("repositoryId") long repositoryId,
+        @Param("number") int number
+    );
+
     /**
      * Finds all issues belonging to a repository.
      *
@@ -37,74 +61,19 @@ public interface IssueRepository extends JpaRepository<Issue, Long> {
     Slice<Issue> findByRepository_Id(Long repositoryId, Pageable pageable);
 
     /**
-     * Streams all issues belonging to a repository.
+     * Nullifies milestone references on all issues that reference the given milestone.
      * <p>
-     * Must be used within a try-with-resources block to ensure the stream is closed
-     * and the database connection is released. The calling method must be annotated
-     * with @Transactional(readOnly = true) for streaming to work properly.
+     * This is a direct database update that doesn't rely on Hibernate's collection state.
+     * MUST be called before deleting a milestone to avoid foreign key constraint violations.
+     * <p>
+     * Unlike {@code milestone.removeAllIssues()} which operates on the in-memory collection
+     * (which may be stale or not fully loaded), this method updates ALL issues in the
+     * database that reference the milestone.
      *
-     * @param repositoryId the repository ID
-     * @return stream of issues for the repository
+     * @param milestoneId the milestone ID to detach from issues
+     * @return the number of issues updated
      */
-    @QueryHints(@QueryHint(name = org.hibernate.jpa.HibernateHints.HINT_FETCH_SIZE, value = "50"))
-    Stream<Issue> streamAllByRepository_Id(Long repositoryId);
-
-    @Query(
-        """
-        SELECT i.number
-        FROM Issue i
-        WHERE Type(i) = Issue
-        AND i.repository.id = :repositoryId
-        AND i.lastSyncAt IS NOT NULL
-        """
-    )
-    Set<Integer> findAllSyncedIssueNumbers(@Param("repositoryId") long repositoryId);
-
-    /**
-     * Finds issues belonging to a repository with comments eagerly fetched,
-     * with pagination support.
-     *
-     * @param repositoryId the repository ID
-     * @param pageable pagination parameters
-     * @return slice of issues with comments for the repository
-     */
-    @Query(
-        """
-        SELECT DISTINCT i
-        FROM Issue i
-        LEFT JOIN FETCH i.comments c
-        LEFT JOIN FETCH c.author
-        LEFT JOIN FETCH i.repository
-        WHERE i.repository.id = :repositoryId
-        ORDER BY i.id
-        """
-    )
-    Slice<Issue> findByRepositoryIdWithComments(@Param("repositoryId") Long repositoryId, Pageable pageable);
-
-    /**
-     * Counts the number of issues (excluding pull requests) in a repository.
-     * Used for progress estimation without loading entities into memory.
-     *
-     * @param repositoryId the repository ID
-     * @return count of issues
-     */
-    @Query("SELECT COUNT(i) FROM Issue i WHERE TYPE(i) = Issue AND i.repository.id = :repositoryId")
-    long countIssuesByRepositoryId(@Param("repositoryId") Long repositoryId);
-
-    /**
-     * Counts the total number of comments across all issues in a repository.
-     * Used for progress estimation without loading entities into memory.
-     *
-     * @param repositoryId the repository ID
-     * @return count of issue comments
-     */
-    @Query(
-        """
-        SELECT COUNT(c)
-        FROM Issue i
-        JOIN i.comments c
-        WHERE i.repository.id = :repositoryId
-        """
-    )
-    long countCommentsByRepositoryId(@Param("repositoryId") Long repositoryId);
+    @Modifying
+    @Query("UPDATE Issue i SET i.milestone = null WHERE i.milestone.id = :milestoneId")
+    int clearMilestoneReferences(@Param("milestoneId") Long milestoneId);
 }

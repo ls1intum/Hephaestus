@@ -69,6 +69,11 @@
         Adds performance index for chat message queries by thread and creation time.
     -->
     <changeSet author="FelixTJDietrich" id="1765851336797-1">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <indexExists indexName="idx_chat_message_thread_created"/>
+            </not>
+        </preConditions>
         <createIndex indexName="idx_chat_message_thread_created" tableName="chat_message">
             <column name="thread_id"/>
             <column name="created_at"/>
@@ -2039,6 +2044,830 @@
             <column name="issue_sync_cursor" type="VARCHAR(255)"/>
             <column name="pull_request_sync_cursor" type="VARCHAR(255)"/>
         </addColumn>
+    </changeSet>
+
+
+    <!-- ==================== SECTION 35: Repository Name Uniqueness Fix ==================== -->
+    <!--
+        Problem: The repository.name_with_owner column had no unique constraint,
+        allowing duplicates that caused NonUniqueResultException crashes.
+        
+        Solution:
+        1. Delete duplicate records, keeping the most recently updated one
+        2. Add unique constraint to prevent future duplicates
+    -->
+
+    <changeSet id="1768852494000-1-deduplicate-repositories" author="FelixTJDietrich">
+        <preConditions onFail="MARK_RAN">
+            <tableExists tableName="repository"/>
+            <columnExists tableName="repository" columnName="name_with_owner"/>
+            <sqlCheck expectedResult="1">
+                SELECT CASE WHEN EXISTS (
+                    SELECT name_with_owner
+                    FROM repository
+                    WHERE name_with_owner IS NOT NULL
+                    GROUP BY name_with_owner
+                    HAVING COUNT(*) > 1
+                ) THEN 1 ELSE 0 END
+            </sqlCheck>
+        </preConditions>
+        <comment>Delete duplicate repository records, keeping the most recently updated one</comment>
+        <sql>
+            DELETE FROM repository
+            WHERE id IN (
+                SELECT id FROM (
+                    SELECT id,
+                           ROW_NUMBER() OVER (
+                               PARTITION BY name_with_owner
+                               ORDER BY updated_at DESC NULLS LAST, id DESC
+                           ) as rn
+                    FROM repository
+                    WHERE name_with_owner IS NOT NULL
+                ) ranked
+                WHERE rn > 1
+            );
+        </sql>
+        <rollback><empty/></rollback>
+    </changeSet>
+
+    <changeSet id="1768852494000-2-add-unique-constraint" author="FelixTJDietrich">
+        <preConditions onFail="MARK_RAN">
+            <tableExists tableName="repository"/>
+            <columnExists tableName="repository" columnName="name_with_owner"/>
+            <not><indexExists indexName="uq_repository_name_with_owner"/></not>
+        </preConditions>
+        <comment>Add unique constraint on repository.name_with_owner</comment>
+        <addUniqueConstraint
+            tableName="repository"
+            columnNames="name_with_owner"
+            constraintName="uq_repository_name_with_owner"/>
+    </changeSet>
+
+    <!-- ==================== SECTION 36: Label Repository Uniqueness ==================== -->
+
+    <changeSet author="FelixTJDietrich" id="1769000656361-1-label-unique">
+        <preConditions onFail="MARK_RAN">
+            <not><indexExists indexName="uq_label_repository_name"/></not>
+        </preConditions>
+        <comment>Add unique constraint on label (repository_id, name)</comment>
+        <addUniqueConstraint columnNames="repository_id, name" 
+                             constraintName="uq_label_repository_name" 
+                             tableName="label"/>
+    </changeSet>
+
+    <!-- ==================== SECTION 37: Milestone Repository Uniqueness ==================== -->
+
+    <changeSet author="FelixTJDietrich" id="1769159314000-1-milestone-unique">
+        <preConditions onFail="MARK_RAN">
+            <not><indexExists indexName="uk_milestone_number_repository"/></not>
+        </preConditions>
+        <comment>Add unique constraint on milestone (number, repository_id)</comment>
+        <addUniqueConstraint columnNames="number, repository_id" 
+                             constraintName="uk_milestone_number_repository" 
+                             tableName="milestone"/>
+    </changeSet>
+
+    <!-- ==================== SECTION 38: Separate Backfill Tracking ==================== -->
+    <!--
+        Split backfill tracking into separate columns for issues and pull requests.
+        This allows independent progress tracking for each entity type.
+    -->
+
+    <changeSet author="FelixTJDietrich" id="1769362088000-1-add-backfill-columns">
+        <comment>Add separate backfill tracking columns for issues and pull requests</comment>
+        <addColumn tableName="repository_to_monitor">
+            <column name="issue_backfill_high_water_mark" type="INTEGER">
+                <constraints nullable="true"/>
+            </column>
+        </addColumn>
+        <addColumn tableName="repository_to_monitor">
+            <column name="issue_backfill_checkpoint" type="INTEGER">
+                <constraints nullable="true"/>
+            </column>
+        </addColumn>
+        <addColumn tableName="repository_to_monitor">
+            <column name="pull_request_backfill_high_water_mark" type="INTEGER">
+                <constraints nullable="true"/>
+            </column>
+        </addColumn>
+        <addColumn tableName="repository_to_monitor">
+            <column name="pull_request_backfill_checkpoint" type="INTEGER">
+                <constraints nullable="true"/>
+            </column>
+        </addColumn>
+    </changeSet>
+
+    <changeSet author="FelixTJDietrich" id="1769362088000-2-migrate-backfill-data">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="repository_to_monitor" columnName="backfill_high_water_mark"/>
+        </preConditions>
+        <comment>Migrate existing backfill state to separate issue/pull request columns</comment>
+        <sql>
+            UPDATE repository_to_monitor
+            SET issue_backfill_high_water_mark = backfill_high_water_mark,
+                issue_backfill_checkpoint = backfill_checkpoint,
+                pull_request_backfill_high_water_mark = backfill_high_water_mark,
+                pull_request_backfill_checkpoint = backfill_checkpoint
+            WHERE backfill_high_water_mark IS NOT NULL
+        </sql>
+    </changeSet>
+
+    <changeSet author="FelixTJDietrich" id="1769362088000-3-drop-legacy-backfill-columns">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="repository_to_monitor" columnName="backfill_high_water_mark"/>
+        </preConditions>
+        <comment>Drop legacy combined backfill columns</comment>
+        <dropColumn tableName="repository_to_monitor" columnName="backfill_high_water_mark"/>
+        <dropColumn tableName="repository_to_monitor" columnName="backfill_checkpoint"/>
+    </changeSet>
+
+    <!-- ==================== SECTION 39: Reset Backfill State ==================== -->
+    <!--
+        Reset all backfill state to force a fresh sync after the major refactoring.
+        This ensures data consistency with the new sync logic.
+    -->
+
+    <changeSet author="FelixTJDietrich" id="1768089179000-reset-backfill">
+        <comment>Reset backfill state to force fresh sync after major refactoring</comment>
+        <sql>
+            UPDATE repository_to_monitor
+            SET issue_backfill_high_water_mark = NULL,
+                issue_backfill_checkpoint = NULL,
+                pull_request_backfill_high_water_mark = NULL,
+                pull_request_backfill_checkpoint = NULL
+        </sql>
+    </changeSet>
+
+    <!-- ==================== SECTION 40: Reset Activity Events ==================== -->
+    <!--
+        Truncate activity events to force recalculation with updated XP logic.
+        The backfill service will repopulate these from synced entities.
+    -->
+
+    <!-- ==================== SECTION 41: Wipe GitProvider Data for Fresh Resync ==================== -->
+    <!--
+        WIPE AND RESYNC STRATEGY
+        ========================
+        Instead of complex data migrations and activity backfill, we take the clean approach:
+        1. Wipe all gitprovider data (except users - they have stable GitHub IDs)
+        2. Resync everything fresh from GitHub
+        3. Activity events are generated automatically during sync via domain events
+
+        PRESERVED:
+        - user table (stable GitHub IDs, referenced by user_preferences, chat_thread, etc.)
+        - user_preferences (FK to user)
+        - workspace, workspace_membership (configuration)
+        - chat_thread, chat_message (mentor conversations)
+        - document (uploaded files)
+
+        WIPED (will be resynced from GitHub):
+        - All gitprovider entities (organization, repository, issue, PR, reviews, comments, etc.)
+        - activity_event (regenerated during sync)
+        - workspace_team_* settings (regenerated from teams during sync)
+    -->
+
+    <changeSet author="FelixTJDietrich" id="1768089179000-wipe-gitprovider-for-resync">
+        <comment>
+            Wipe all gitprovider data for fresh resync from GitHub.
+            Users are preserved (stable GitHub IDs).
+            Activity events will be regenerated during sync.
+        </comment>
+        <sql splitStatements="false">
+            -- Disable triggers temporarily for faster truncation
+            SET session_replication_role = 'replica';
+
+            -- Wipe activity events (will be regenerated during sync)
+            TRUNCATE TABLE activity_event CASCADE;
+
+            -- Wipe workspace team settings (will be regenerated from teams)
+            TRUNCATE TABLE workspace_team_label_filter CASCADE;
+            TRUNCATE TABLE workspace_team_repository_settings CASCADE;
+            TRUNCATE TABLE workspace_team_settings CASCADE;
+
+            -- Wipe bad practice data (will be regenerated by detection)
+            TRUNCATE TABLE pull_request_bad_practice CASCADE;
+            TRUNCATE TABLE bad_practice_detection CASCADE;
+
+            -- Wipe PR review data (CASCADE handles dependencies)
+            TRUNCATE TABLE pull_request_review_comment CASCADE;
+            TRUNCATE TABLE pull_request_review_thread CASCADE;
+            TRUNCATE TABLE pull_request_review CASCADE;
+
+            -- Wipe issue data
+            TRUNCATE TABLE issue_comment CASCADE;
+            TRUNCATE TABLE issue_blocking CASCADE;
+            TRUNCATE TABLE issue CASCADE;  -- Includes pull_request via STI
+
+            -- Wipe supporting entities
+            TRUNCATE TABLE milestone CASCADE;
+            TRUNCATE TABLE label CASCADE;
+            TRUNCATE TABLE issue_type CASCADE;
+
+            -- Wipe team data
+            TRUNCATE TABLE team_membership CASCADE;
+            TRUNCATE TABLE team_repository_permission CASCADE;
+            TRUNCATE TABLE team CASCADE;
+
+            -- Wipe repository data
+            TRUNCATE TABLE repository_to_monitor CASCADE;
+            TRUNCATE TABLE repository_collaborator CASCADE;
+            TRUNCATE TABLE repository CASCADE;
+
+            -- Wipe organization data
+            -- IMPORTANT: Unlink workspaces first to prevent CASCADE from deleting workspace/membership data
+            UPDATE workspace SET organization_id = NULL;
+            TRUNCATE TABLE organization CASCADE;
+
+            -- Re-enable triggers
+            SET session_replication_role = 'origin';
+        </sql>
+    </changeSet>
+
+    <!-- ==================== SECTION 42: Migrate hidden_from_contributions Data ==================== -->
+    <!--
+        Context:
+        - Production (main branch) uses TeamRepositoryPermission.hiddenFromContributions column
+        - Current branch uses WorkspaceTeamRepositorySettings table (which may be empty)
+        - The old column was removed from the entity but data needs to be migrated
+
+        This migration safely copies the data from the legacy location to the new workspace-scoped
+        table. It uses preconditions to ensure it only runs when the source column still exists.
+
+        Join Path for workspace_id:
+        - team_repository_permission.team_id -> team.id
+        - team.organization -> workspace.account_login (case-insensitive match)
+
+        This gives us the workspace that owns the team, which is the correct workspace to
+        scope the repository settings to.
+
+        Safety:
+        - Uses ON CONFLICT DO NOTHING to avoid duplicates on re-run
+        - Preconditions prevent execution if column already dropped
+        - Only migrates records where hidden_from_contributions = true (non-default values)
+    -->
+
+    <changeSet id="1769464521939-1-migrate-hidden-from-contributions-safety"
+               author="FelixTJDietrich"
+               runOnChange="false"
+               failOnError="true">
+        <preConditions onFail="MARK_RAN">
+            <!-- Only run if the legacy column still exists in the database -->
+            <columnExists tableName="team_repository_permission" columnName="hidden_from_contributions"/>
+            <!-- Ensure target table exists -->
+            <tableExists tableName="workspace_team_repository_settings"/>
+            <!-- Ensure required join tables exist -->
+            <tableExists tableName="team"/>
+            <tableExists tableName="workspace"/>
+        </preConditions>
+        <comment>
+            Migrate TeamRepositoryPermission.hiddenFromContributions data to WorkspaceTeamRepositorySettings.
+
+            This is a safety migration to ensure data is not lost when deploying from a branch
+            that has removed the hiddenFromContributions column from the entity. The migration
+            copies all records where hidden_from_contributions=true to the new workspace-scoped
+            settings table.
+
+            The workspace_id is determined by matching team.organization to workspace.account_login,
+            which represents the GitHub organization/user that owns both the team and workspace.
+        </comment>
+        <sql splitStatements="false">
+            -- Migrate hidden_from_contributions=true records to workspace_team_repository_settings
+            -- Join path: team_repository_permission -> team -> workspace (via organization/account_login)
+            INSERT INTO workspace_team_repository_settings (
+                workspace_id,
+                team_id,
+                repository_id,
+                hidden_from_contributions
+            )
+            SELECT
+                w.id AS workspace_id,
+                trp.team_id,
+                trp.repository_id,
+                true AS hidden_from_contributions
+            FROM team_repository_permission trp
+            INNER JOIN team t ON t.id = trp.team_id
+            INNER JOIN workspace w ON LOWER(w.account_login) = LOWER(t.organization)
+            WHERE trp.hidden_from_contributions = true
+              AND w.status != 'PURGED'  -- Skip purged workspaces
+            ON CONFLICT (workspace_id, team_id, repository_id) DO UPDATE
+                SET hidden_from_contributions = EXCLUDED.hidden_from_contributions
+            ;
+        </sql>
+        <rollback>
+            <!--
+                Rollback is complex because we can't distinguish migrated data from
+                newly created data. Leave the data in place as it's still valid.
+            -->
+            <empty/>
+        </rollback>
+    </changeSet>
+
+    <!--
+    Verification changeset: Log migration statistics for debugging
+    This helps verify the migration worked correctly in production logs.
+    -->
+    <changeSet id="1769464521939-2-verify-migration"
+               author="FelixTJDietrich"
+               runOnChange="false"
+               failOnError="false">
+        <preConditions onFail="MARK_RAN">
+            <tableExists tableName="workspace_team_repository_settings"/>
+        </preConditions>
+        <comment>
+            Verification step: Count migrated records for logging purposes.
+            This helps verify the migration succeeded in production.
+        </comment>
+        <sql splitStatements="false">
+            -- Log the count of records now in workspace_team_repository_settings
+            -- This is purely for verification and does not modify data
+            DO $$
+            DECLARE
+                record_count INTEGER;
+            BEGIN
+                SELECT COUNT(*) INTO record_count
+                FROM workspace_team_repository_settings
+                WHERE hidden_from_contributions = true;
+
+                RAISE NOTICE 'Migration verification: % records with hidden_from_contributions=true in workspace_team_repository_settings', record_count;
+            END $$;
+        </sql>
+    </changeSet>
+
+    <!-- ==================== SECTION 43: Issue Unique Constraint ==================== -->
+    <!--
+        Context:
+        - GitHub uses a unified ID space where Issues and PRs share the same number sequence
+        - A repository CANNOT have both Issue #5 and PR #5 - they're mutually exclusive
+        - The Issue table uses SINGLE_TABLE inheritance with a discriminator column (issue_type)
+        - Without a unique constraint, race conditions can create duplicate entries
+        - This causes IncorrectResultSizeDataAccessException when querying by (repository_id, number)
+
+        Root Cause of Bug:
+        - When an issue_comment webhook arrives before the parent issue/PR webhook
+        - GitHubIssueCommentProcessor.createMinimalPullRequest() creates a stub PullRequest
+        - If there's any race condition, the actual PR processor might create another entry
+        - The query IssueRepository.findByRepositoryIdAndNumber returns 2 results -> exception
+
+        Solution:
+        1. Clean up any existing duplicates (keep the newest by updated_at)
+        2. Add unique constraint on (repository_id, number)
+
+        This constraint ensures data integrity at the database level, matching GitHub's semantics.
+    -->
+
+    <changeSet id="1769467778000-1-cleanup-duplicate-issues"
+               author="ClaudeCode"
+               runOnChange="false"
+               failOnError="true">
+        <comment>
+            Clean up duplicate Issue/PullRequest entries with same (repository_id, number).
+            Keeps the record with the most recent updated_at timestamp and deletes the rest.
+            This is necessary before adding the unique constraint.
+
+            IMPORTANT: This migration handles all FK references before deleting:
+            - issue_label, issue_assignee (junction tables - delete/merge)
+            - issue_comment, pull_request_review, etc. (re-point to keeper)
+            - issue_blocking, parent_issue_id (re-point to keeper)
+        </comment>
+        <sql splitStatements="false">
+            -- Create temp table mapping duplicate issues to their keeper
+            CREATE TEMP TABLE issue_merge_map AS
+            SELECT
+                duplicate_id,
+                keeper_id
+            FROM (
+                SELECT
+                    i.id AS duplicate_id,
+                    FIRST_VALUE(i.id) OVER (
+                        PARTITION BY i.repository_id, i.number
+                        ORDER BY i.updated_at DESC NULLS LAST, i.id DESC
+                    ) AS keeper_id
+                FROM issue i
+                WHERE i.repository_id IS NOT NULL
+                  AND i.number IS NOT NULL
+                  AND (i.repository_id, i.number) IN (
+                    SELECT repository_id, number
+                    FROM issue
+                    WHERE repository_id IS NOT NULL
+                    GROUP BY repository_id, number
+                    HAVING COUNT(*) > 1
+                  )
+            ) ranked
+            WHERE duplicate_id != keeper_id;
+
+            -- Only proceed if there are duplicates
+            DO $$
+            BEGIN
+                IF EXISTS (SELECT 1 FROM issue_merge_map) THEN
+                    -- Handle junction tables (delete referencing rows for duplicates)
+                    -- issue_label: Delete label associations for duplicate issues
+                    DELETE FROM issue_label il
+                    WHERE EXISTS (SELECT 1 FROM issue_merge_map m WHERE il.issue_id = m.duplicate_id);
+
+                    -- issue_assignee: Delete assignee associations for duplicate issues
+                    DELETE FROM issue_assignee ia
+                    WHERE EXISTS (SELECT 1 FROM issue_merge_map m WHERE ia.issue_id = m.duplicate_id);
+
+                    -- pull_request_requested_reviewers: Delete for duplicate PRs
+                    DELETE FROM pull_request_requested_reviewers prr
+                    WHERE EXISTS (SELECT 1 FROM issue_merge_map m WHERE prr.pull_request_id = m.duplicate_id);
+
+                    -- Handle FK references by re-pointing to keeper
+                    -- issue_comment
+                    UPDATE issue_comment SET issue_id = m.keeper_id
+                    FROM issue_merge_map m WHERE issue_comment.issue_id = m.duplicate_id;
+
+                    -- pull_request_review
+                    UPDATE pull_request_review SET pull_request_id = m.keeper_id
+                    FROM issue_merge_map m WHERE pull_request_review.pull_request_id = m.duplicate_id;
+
+                    -- pull_request_review_comment
+                    UPDATE pull_request_review_comment SET pull_request_id = m.keeper_id
+                    FROM issue_merge_map m WHERE pull_request_review_comment.pull_request_id = m.duplicate_id;
+
+                    -- pull_request_review_thread
+                    UPDATE pull_request_review_thread SET pull_request_id = m.keeper_id
+                    FROM issue_merge_map m WHERE pull_request_review_thread.pull_request_id = m.duplicate_id;
+
+                    -- bad_practice_detection
+                    UPDATE bad_practice_detection SET pullrequest_id = m.keeper_id
+                    FROM issue_merge_map m WHERE bad_practice_detection.pullrequest_id = m.duplicate_id;
+
+                    -- pull_request_bad_practice
+                    UPDATE pull_request_bad_practice SET pullrequest_id = m.keeper_id
+                    FROM issue_merge_map m WHERE pull_request_bad_practice.pullrequest_id = m.duplicate_id;
+
+                    -- issue_blocking (both columns reference issue)
+                    UPDATE issue_blocking SET blocked_issue_id = m.keeper_id
+                    FROM issue_merge_map m WHERE issue_blocking.blocked_issue_id = m.duplicate_id;
+
+                    UPDATE issue_blocking SET blocking_issue_id = m.keeper_id
+                    FROM issue_merge_map m WHERE issue_blocking.blocking_issue_id = m.duplicate_id;
+
+                    -- issue.parent_issue_id (self-reference)
+                    UPDATE issue SET parent_issue_id = m.keeper_id
+                    FROM issue_merge_map m WHERE issue.parent_issue_id = m.duplicate_id;
+
+                    -- Now delete the duplicate issues
+                    DELETE FROM issue WHERE id IN (SELECT duplicate_id FROM issue_merge_map);
+                END IF;
+            END $$;
+
+            -- Clean up temp table
+            DROP TABLE IF EXISTS issue_merge_map;
+        </sql>
+        <rollback>
+            <!-- Cannot rollback deleted data -->
+            <empty/>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="1769467778000-2-add-unique-constraint"
+               author="ClaudeCode"
+               runOnChange="false"
+               failOnError="true">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <indexExists indexName="uk_issue_repository_number"/>
+            </not>
+        </preConditions>
+        <comment>
+            Add unique constraint on (repository_id, number) to prevent duplicate issues/PRs.
+            GitHub uses a unified number space per repository - a repo cannot have both
+            Issue #5 and PR #5. This constraint enforces that invariant at the database level.
+        </comment>
+        <addUniqueConstraint
+            tableName="issue"
+            columnNames="repository_id, number"
+            constraintName="uk_issue_repository_number"/>
+    </changeSet>
+
+    <!-- ==================== SECTION 44: Team and User Unique Constraints ==================== -->
+    <!--
+        Context:
+        - Team entity: identified by (organization, name) - the natural key in GitHub
+        - User entity: identified by (login) - the unique username in GitHub
+        - Without unique constraints, race conditions in the sync pipeline can create duplicates
+        - This causes IncorrectResultSizeDataAccessException when querying by these keys
+
+        Root Cause (Team):
+        - GitHubTeamProcessor uses findByOrganizationIgnoreCaseAndName() to look up teams
+        - Without a unique constraint, concurrent webhook processing can create duplicates
+        - Query returns multiple results -> exception
+
+        Root Cause (User):
+        - GitHubUserProcessor uses findByLogin() to look up users
+        - Without a unique constraint, concurrent processing can create duplicate users
+        - This is especially problematic since User is referenced by many other entities
+
+        Solution:
+        1. Clean up any existing duplicate teams (keep the newest by updated_at)
+        2. Clean up any existing duplicate users (keep the newest by updated_at)
+        3. Add unique constraints to enforce data integrity
+
+        These constraints ensure data integrity at the database level, matching GitHub's semantics.
+    -->
+
+    <!-- ==================== TEAM UNIQUE CONSTRAINT ==================== -->
+
+    <changeSet id="1769468245000-1-cleanup-duplicate-teams"
+               author="ClaudeCode"
+               runOnChange="false"
+               failOnError="true">
+        <comment>
+            Clean up duplicate Team entries with same (organization, name).
+            Keeps the record with the most recent updated_at timestamp and deletes the rest.
+            This is necessary before adding the unique constraint.
+        </comment>
+        <sql splitStatements="false">
+            -- First, update any foreign key references to point to the team we're keeping
+            -- TeamMembership references
+            UPDATE team_membership tm
+            SET team_id = (
+                SELECT keeper_id FROM (
+                    SELECT
+                        t1.organization,
+                        t1.name,
+                        (SELECT id FROM team t2
+                         WHERE t2.organization = t1.organization AND t2.name = t1.name
+                         ORDER BY t2.updated_at DESC NULLS LAST, t2.id DESC
+                         LIMIT 1) AS keeper_id
+                    FROM team t1
+                    WHERE t1.id = tm.team_id
+                ) subq
+            )
+            WHERE EXISTS (
+                SELECT 1 FROM team t1
+                JOIN team t2 ON t1.organization = t2.organization
+                    AND t1.name = t2.name
+                    AND t1.id != t2.id
+                WHERE t1.id = tm.team_id
+            );
+
+            -- TeamRepositoryPermission references
+            UPDATE team_repository_permission trp
+            SET team_id = (
+                SELECT keeper_id FROM (
+                    SELECT
+                        t1.organization,
+                        t1.name,
+                        (SELECT id FROM team t2
+                         WHERE t2.organization = t1.organization AND t2.name = t1.name
+                         ORDER BY t2.updated_at DESC NULLS LAST, t2.id DESC
+                         LIMIT 1) AS keeper_id
+                    FROM team t1
+                    WHERE t1.id = trp.team_id
+                ) subq
+            )
+            WHERE EXISTS (
+                SELECT 1 FROM team t1
+                JOIN team t2 ON t1.organization = t2.organization
+                    AND t1.name = t2.name
+                    AND t1.id != t2.id
+                WHERE t1.id = trp.team_id
+            );
+
+            -- WorkspaceTeamLabelFilter references
+            UPDATE workspace_team_label_filter wtlf
+            SET team_id = (
+                SELECT keeper_id FROM (
+                    SELECT
+                        t1.organization,
+                        t1.name,
+                        (SELECT id FROM team t2
+                         WHERE t2.organization = t1.organization AND t2.name = t1.name
+                         ORDER BY t2.updated_at DESC NULLS LAST, t2.id DESC
+                         LIMIT 1) AS keeper_id
+                    FROM team t1
+                    WHERE t1.id = wtlf.team_id
+                ) subq
+            )
+            WHERE EXISTS (
+                SELECT 1 FROM team t1
+                JOIN team t2 ON t1.organization = t2.organization
+                    AND t1.name = t2.name
+                    AND t1.id != t2.id
+                WHERE t1.id = wtlf.team_id
+            );
+
+            -- WorkspaceTeamRepositorySettings references
+            UPDATE workspace_team_repository_settings wtrs
+            SET team_id = (
+                SELECT keeper_id FROM (
+                    SELECT
+                        t1.organization,
+                        t1.name,
+                        (SELECT id FROM team t2
+                         WHERE t2.organization = t1.organization AND t2.name = t1.name
+                         ORDER BY t2.updated_at DESC NULLS LAST, t2.id DESC
+                         LIMIT 1) AS keeper_id
+                    FROM team t1
+                    WHERE t1.id = wtrs.team_id
+                ) subq
+            )
+            WHERE EXISTS (
+                SELECT 1 FROM team t1
+                JOIN team t2 ON t1.organization = t2.organization
+                    AND t1.name = t2.name
+                    AND t1.id != t2.id
+                WHERE t1.id = wtrs.team_id
+            );
+
+            -- Now delete duplicate teams, keeping the one with the latest updated_at
+            DELETE FROM team
+            WHERE id IN (
+                SELECT id FROM (
+                    SELECT
+                        id,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY organization, name
+                            ORDER BY updated_at DESC NULLS LAST, id DESC
+                        ) AS rn
+                    FROM team
+                    WHERE organization IS NOT NULL AND name IS NOT NULL
+                ) ranked
+                WHERE rn > 1
+            );
+        </sql>
+        <rollback>
+            <!-- Cannot rollback deleted data -->
+            <empty/>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="1769468245000-2-add-team-unique-constraint"
+               author="ClaudeCode"
+               runOnChange="false"
+               failOnError="true">
+        <comment>
+            Add unique constraint on (organization, name) to prevent duplicate teams.
+            GitHub teams are uniquely identified by their organization and name.
+            This constraint enforces that invariant at the database level.
+        </comment>
+        <addUniqueConstraint
+            tableName="team"
+            columnNames="organization, name"
+            constraintName="uk_team_organization_name"/>
+    </changeSet>
+
+    <!-- ==================== USER UNIQUE CONSTRAINT ==================== -->
+
+    <changeSet id="1769468245000-3-cleanup-duplicate-users"
+               author="ClaudeCode"
+               runOnChange="false"
+               failOnError="true">
+        <comment>
+            Clean up duplicate User entries with same login.
+            Keeps the record with the most recent updated_at timestamp and deletes the rest.
+
+            IMPORTANT: User is referenced by many tables. This migration updates all FK
+            references to point to the kept user before deleting duplicates.
+
+            Referenced tables: issue (author_id, merged_by), issue_comment (author_id),
+            pull_request_review (author_id), pull_request_review_comment (author_id),
+            pull_request_review_thread (resolved_by), milestone (creator_id),
+            team_membership (user_id), repository_collaborator (user_id),
+            workspace_membership (user_id), activity_event (actor_id), user_preferences (user_id),
+            chat_thread (user_id), document (user_id),
+            issue_assignee (user_id), pull_request_requested_reviewers (user_id).
+        </comment>
+        <sql splitStatements="false">
+            -- Create a temp table mapping duplicate users to their keeper
+            -- Uses window function to identify duplicates and their keeper (newest by updated_at)
+            CREATE TEMP TABLE user_merge_map AS
+            SELECT
+                duplicate_id,
+                keeper_id
+            FROM (
+                SELECT
+                    u.id AS duplicate_id,
+                    FIRST_VALUE(u.id) OVER (
+                        PARTITION BY u.login
+                        ORDER BY u.updated_at DESC NULLS LAST, u.id DESC
+                    ) AS keeper_id
+                FROM "user" u
+                WHERE u.login IN (
+                    SELECT login FROM "user" GROUP BY login HAVING COUNT(*) > 1
+                )
+            ) ranked
+            WHERE duplicate_id != keeper_id;
+
+            -- Only proceed if there are duplicates
+            DO $$
+            BEGIN
+                IF EXISTS (SELECT 1 FROM user_merge_map) THEN
+                    -- Update issue.author_id
+                    UPDATE issue SET author_id = m.keeper_id
+                    FROM user_merge_map m WHERE issue.author_id = m.duplicate_id;
+
+                    -- Update issue.merged_by_id (for pull requests)
+                    UPDATE issue SET merged_by_id = m.keeper_id
+                    FROM user_merge_map m WHERE issue.merged_by_id = m.duplicate_id;
+
+                    -- Update issue_comment.author_id
+                    UPDATE issue_comment SET author_id = m.keeper_id
+                    FROM user_merge_map m WHERE issue_comment.author_id = m.duplicate_id;
+
+                    -- Update pull_request_review.author_id
+                    UPDATE pull_request_review SET author_id = m.keeper_id
+                    FROM user_merge_map m WHERE pull_request_review.author_id = m.duplicate_id;
+
+                    -- Update pull_request_review_comment.author_id
+                    UPDATE pull_request_review_comment SET author_id = m.keeper_id
+                    FROM user_merge_map m WHERE pull_request_review_comment.author_id = m.duplicate_id;
+
+                    -- Update pull_request_review_thread.resolved_by_id
+                    UPDATE pull_request_review_thread SET resolved_by_id = m.keeper_id
+                    FROM user_merge_map m WHERE pull_request_review_thread.resolved_by_id = m.duplicate_id;
+
+                    -- Update milestone.creator_id
+                    UPDATE milestone SET creator_id = m.keeper_id
+                    FROM user_merge_map m WHERE milestone.creator_id = m.duplicate_id;
+
+                    -- Update activity_event.actor_id
+                    UPDATE activity_event SET actor_id = m.keeper_id
+                    FROM user_merge_map m WHERE activity_event.actor_id = m.duplicate_id;
+
+                    -- Delete user_preferences for duplicate users (keeper keeps their own preferences)
+                    DELETE FROM user_preferences up
+                    WHERE EXISTS (SELECT 1 FROM user_merge_map m WHERE up.user_id = m.duplicate_id);
+
+                    -- Update chat_thread.user_id (mentor conversations)
+                    UPDATE chat_thread SET user_id = m.keeper_id
+                    FROM user_merge_map m WHERE chat_thread.user_id = m.duplicate_id;
+
+                    -- Update document.user_id (uploaded files)
+                    UPDATE document SET user_id = m.keeper_id
+                    FROM user_merge_map m WHERE document.user_id = m.duplicate_id;
+
+                    -- Delete duplicate team_membership entries (avoid PK conflict)
+                    DELETE FROM team_membership tm
+                    WHERE EXISTS (SELECT 1 FROM user_merge_map m WHERE tm.user_id = m.duplicate_id);
+
+                    -- Delete duplicate repository_collaborator entries (avoid PK conflict)
+                    DELETE FROM repository_collaborator rc
+                    WHERE EXISTS (SELECT 1 FROM user_merge_map m WHERE rc.user_id = m.duplicate_id);
+
+                    -- Update workspace_membership - transfer to keeper if no conflict, delete otherwise
+                    -- First, try to update non-conflicting memberships
+                    UPDATE workspace_membership wm SET user_id = m.keeper_id
+                    FROM user_merge_map m WHERE wm.user_id = m.duplicate_id
+                    AND NOT EXISTS (
+                        SELECT 1 FROM workspace_membership wm2
+                        WHERE wm2.workspace_id = wm.workspace_id AND wm2.user_id = m.keeper_id
+                    );
+                    -- Delete remaining duplicate workspace_memberships (where keeper already has membership)
+                    DELETE FROM workspace_membership wm
+                    WHERE EXISTS (SELECT 1 FROM user_merge_map m WHERE wm.user_id = m.duplicate_id);
+
+                    -- Update issue_assignee junction table
+                    UPDATE issue_assignee SET user_id = m.keeper_id
+                    FROM user_merge_map m WHERE issue_assignee.user_id = m.duplicate_id
+                    AND NOT EXISTS (
+                        SELECT 1 FROM issue_assignee ia2
+                        WHERE ia2.issue_id = issue_assignee.issue_id AND ia2.user_id = m.keeper_id
+                    );
+                    DELETE FROM issue_assignee ia
+                    WHERE EXISTS (SELECT 1 FROM user_merge_map m WHERE ia.user_id = m.duplicate_id);
+
+                    -- Update pull_request_requested_reviewers junction table
+                    UPDATE pull_request_requested_reviewers SET user_id = m.keeper_id
+                    FROM user_merge_map m WHERE pull_request_requested_reviewers.user_id = m.duplicate_id
+                    AND NOT EXISTS (
+                        SELECT 1 FROM pull_request_requested_reviewers pr2
+                        WHERE pr2.pull_request_id = pull_request_requested_reviewers.pull_request_id
+                        AND pr2.user_id = m.keeper_id
+                    );
+                    DELETE FROM pull_request_requested_reviewers pr
+                    WHERE EXISTS (SELECT 1 FROM user_merge_map m WHERE pr.user_id = m.duplicate_id);
+
+                    -- Now delete duplicate users
+                    DELETE FROM "user" WHERE id IN (SELECT duplicate_id FROM user_merge_map);
+                END IF;
+            END $$;
+
+            -- Clean up temp table
+            DROP TABLE IF EXISTS user_merge_map;
+        </sql>
+        <rollback>
+            <!-- Cannot rollback deleted data -->
+            <empty/>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="1769468245000-4-add-user-unique-constraint"
+               author="ClaudeCode"
+               runOnChange="false"
+               failOnError="true">
+        <comment>
+            Add unique constraint on (login) to prevent duplicate users.
+            GitHub users are uniquely identified by their login (username).
+            This constraint enforces that invariant at the database level.
+        </comment>
+        <addUniqueConstraint
+            tableName="user"
+            columnNames="login"
+            constraintName="uk_user_login"/>
     </changeSet>
 
 </databaseChangeLog>

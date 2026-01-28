@@ -25,7 +25,8 @@ import de.tum.in.www1.hephaestus.gitprovider.issuecomment.github.GitHubIssueComm
 import de.tum.in.www1.hephaestus.gitprovider.issuecomment.github.dto.GitHubIssueCommentEventDTO.GitHubCommentDTO;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
-import de.tum.in.www1.hephaestus.monitoring.MonitoringProperties;
+import de.tum.in.www1.hephaestus.gitprovider.sync.SyncResult;
+import de.tum.in.www1.hephaestus.gitprovider.sync.SyncSchedulerProperties;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.OffsetDateTime;
@@ -36,11 +37,14 @@ import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.graphql.client.ClientGraphQlResponse;
+import org.springframework.graphql.client.GraphQlTransportException;
 import org.springframework.graphql.client.HttpGraphQlClient;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionTemplate;
+import reactor.core.publisher.Mono;
+import reactor.util.retry.Retry;
 
 /**
  * Service for synchronizing GitHub issues via GraphQL API.
@@ -69,11 +73,23 @@ public class GitHubIssueSyncService {
     private final BackfillStateProvider backfillStateProvider;
     private final TransactionTemplate transactionTemplate;
     private final GitHubSyncProperties syncProperties;
-    private final MonitoringProperties monitoringProperties;
+    private final SyncSchedulerProperties syncSchedulerProperties;
     private final GitHubExceptionClassifier exceptionClassifier;
 
     /** Maximum number of retry attempts for transient failures. */
     private static final int MAX_RETRY_ATTEMPTS = 3;
+
+    /**
+     * Retry configuration for transport-level errors during body streaming.
+     * <p>
+     * CRITICAL: WebClient ExchangeFilterFunction retries DO NOT cover body streaming errors.
+     * PrematureCloseException occurs AFTER HTTP headers are received, during body consumption.
+     * We must retry at this level using Mono.defer() to wrap the entire execute() call.
+     */
+    private static final int TRANSPORT_MAX_RETRIES = 3;
+    private static final Duration TRANSPORT_INITIAL_BACKOFF = Duration.ofSeconds(2);
+    private static final Duration TRANSPORT_MAX_BACKOFF = Duration.ofSeconds(15);
+    private static final double JITTER_FACTOR = 0.5;
 
     /**
      * Container for issues that need additional comment pagination.
@@ -89,7 +105,7 @@ public class GitHubIssueSyncService {
         BackfillStateProvider backfillStateProvider,
         TransactionTemplate transactionTemplate,
         GitHubSyncProperties syncProperties,
-        MonitoringProperties monitoringProperties,
+        SyncSchedulerProperties syncSchedulerProperties,
         GitHubExceptionClassifier exceptionClassifier
     ) {
         this.repositoryRepository = repositoryRepository;
@@ -100,7 +116,7 @@ public class GitHubIssueSyncService {
         this.backfillStateProvider = backfillStateProvider;
         this.transactionTemplate = transactionTemplate;
         this.syncProperties = syncProperties;
-        this.monitoringProperties = monitoringProperties;
+        this.syncSchedulerProperties = syncSchedulerProperties;
         this.exceptionClassifier = exceptionClassifier;
     }
 
@@ -115,9 +131,9 @@ public class GitHubIssueSyncService {
      *
      * @param scopeId      the scope ID for authentication
      * @param repositoryId the repository ID to sync issues for
-     * @return number of issues synced
+     * @return sync result containing status and count of issues synced
      */
-    public int syncForRepository(Long scopeId, Long repositoryId) {
+    public SyncResult syncForRepository(Long scopeId, Long repositoryId) {
         return syncForRepository(scopeId, repositoryId, null, null, null);
     }
 
@@ -134,9 +150,9 @@ public class GitHubIssueSyncService {
      * @param repositoryId  the repository ID to sync issues for
      * @param syncTargetId  the sync target ID for cursor persistence (null to disable)
      * @param initialCursor the cursor to resume from (null to start from beginning)
-     * @return number of issues synced
+     * @return sync result containing status and count of issues synced
      */
-    public int syncForRepository(
+    public SyncResult syncForRepository(
         Long scopeId,
         Long repositoryId,
         @Nullable Long syncTargetId,
@@ -167,9 +183,9 @@ public class GitHubIssueSyncService {
      * @param syncTargetId      the sync target ID for cursor persistence (null to disable)
      * @param initialCursor     the cursor to resume from (null to start from beginning)
      * @param lastSyncTimestamp the timestamp of the last sync for incremental sync (null for full sync)
-     * @return number of issues synced
+     * @return sync result containing status and count of issues synced
      */
-    public int syncForRepository(
+    public SyncResult syncForRepository(
         Long scopeId,
         Long repositoryId,
         @Nullable Long syncTargetId,
@@ -182,7 +198,7 @@ public class GitHubIssueSyncService {
         );
         if (repository == null) {
             log.debug("Skipped issue sync: reason=repositoryNotFound, repoId={}", repositoryId);
-            return 0;
+            return SyncResult.completed(0);
         }
 
         String nameWithOwner = repository.getNameWithOwner();
@@ -190,27 +206,35 @@ public class GitHubIssueSyncService {
         Optional<RepositoryOwnerAndName> parsedName = GitHubRepositoryNameParser.parse(nameWithOwner);
         if (parsedName.isEmpty()) {
             log.warn("Skipped issue sync: reason=invalidRepoNameFormat, repoName={}", safeNameWithOwner);
-            return 0;
+            return SyncResult.completed(0);
         }
         RepositoryOwnerAndName ownerAndName = parsedName.get();
 
         HttpGraphQlClient client = graphQlClientProvider.forScope(scopeId);
-        Duration timeout = syncProperties.getGraphqlTimeout();
+        Duration timeout = syncProperties.graphqlTimeout();
 
         // Determine the 'since' parameter for incremental sync
+        // Apply safety buffer to handle clock skew between server and GitHub
         OffsetDateTime sinceDateTime = null;
         boolean isIncrementalSync = false;
-        if (syncProperties.isIncrementalSyncEnabled()) {
+        if (syncProperties.incrementalSyncEnabled()) {
             if (lastSyncTimestamp != null) {
-                sinceDateTime = lastSyncTimestamp.atOffset(ZoneOffset.UTC);
-                log.info("Starting incremental issue sync: repoName={}, since={}", safeNameWithOwner, sinceDateTime);
+                // Subtract buffer to ensure items updated just before recorded timestamp are still fetched
+                Instant bufferedTimestamp = lastSyncTimestamp.minus(syncProperties.incrementalSyncBuffer());
+                sinceDateTime = bufferedTimestamp.atOffset(ZoneOffset.UTC);
+                log.info(
+                    "Starting incremental issue sync: repoName={}, since={}, buffer={}",
+                    safeNameWithOwner,
+                    sinceDateTime,
+                    syncProperties.incrementalSyncBuffer()
+                );
             } else {
                 // First sync - use configured timeframe as fallback to limit initial data fetch
-                sinceDateTime = OffsetDateTime.now(ZoneOffset.UTC).minusDays(monitoringProperties.getTimeframe());
+                sinceDateTime = OffsetDateTime.now(ZoneOffset.UTC).minusDays(syncSchedulerProperties.timeframeDays());
                 log.info(
                     "Starting first issue sync with timeframe fallback: repoName={}, timeframeDays={}, since={}",
                     safeNameWithOwner,
-                    monitoringProperties.getTimeframe(),
+                    syncSchedulerProperties.timeframeDays(),
                     sinceDateTime
                 );
             }
@@ -226,6 +250,7 @@ public class GitHubIssueSyncService {
         int retryAttempt = 0;
         boolean resuming = initialCursor != null;
         final boolean incrementalSync = isIncrementalSync;
+        SyncResult.Status abortReason = null; // null means completed successfully
 
         if (resuming) {
             log.info(
@@ -247,20 +272,43 @@ public class GitHubIssueSyncService {
             }
 
             try {
-                // Build the GraphQL request with optional 'since' parameter for incremental sync
-                var requestBuilder = client
-                    .documentName(QUERY_DOCUMENT)
-                    .variable("owner", ownerAndName.owner())
-                    .variable("name", ownerAndName.name())
-                    .variable("first", DEFAULT_PAGE_SIZE)
-                    .variable("after", cursor);
+                // Build the GraphQL request with optional 'since' parameter for incremental sync.
+                // Use Mono.defer() to wrap the entire execute() call so retries cover body streaming.
+                // This is CRITICAL: WebClient ExchangeFilterFunction retries only cover the HTTP exchange,
+                // not body consumption. PrematureCloseException occurs DURING body streaming.
+                final String currentCursor = cursor;
+                final int currentPage = pageCount;
+                final OffsetDateTime sinceDt = sinceDateTime;
 
-                // Add 'since' parameter for incremental sync (filters by updatedAt >= since)
-                if (sinceDateTime != null) {
-                    requestBuilder = requestBuilder.variable("since", sinceDateTime.toString());
-                }
+                ClientGraphQlResponse response = Mono.defer(() -> {
+                    var requestBuilder = client
+                        .documentName(QUERY_DOCUMENT)
+                        .variable("owner", ownerAndName.owner())
+                        .variable("name", ownerAndName.name())
+                        .variable("first", DEFAULT_PAGE_SIZE)
+                        .variable("after", currentCursor);
 
-                ClientGraphQlResponse response = requestBuilder.execute().block(timeout);
+                    // Add 'since' parameter for incremental sync (filters by updatedAt >= since)
+                    if (sinceDt != null) {
+                        requestBuilder = requestBuilder.variable("since", sinceDt.toString());
+                    }
+
+                    return requestBuilder.execute();
+                })
+                .retryWhen(
+                    Retry.backoff(TRANSPORT_MAX_RETRIES, TRANSPORT_INITIAL_BACKOFF)
+                        .maxBackoff(TRANSPORT_MAX_BACKOFF)
+                        .jitter(JITTER_FACTOR)
+                        .filter(this::isTransportError)
+                        .doBeforeRetry(signal -> log.warn(
+                            "Retrying issue sync after transport error: repoName={}, page={}, attempt={}, error={}",
+                            safeNameWithOwner,
+                            currentPage,
+                            signal.totalRetries() + 1,
+                            signal.failure().getMessage()
+                        ))
+                )
+                .block(timeout);
 
                 if (response == null || !response.isValid()) {
                     log.warn(
@@ -271,16 +319,17 @@ public class GitHubIssueSyncService {
                     break;
                 }
 
-                // Track rate limit from response
-                graphQlClientProvider.trackRateLimit(response);
+                // Track rate limit from response (per-scope tracking)
+                graphQlClientProvider.trackRateLimit(scopeId, response);
 
                 // Check if we should pause due to rate limiting
-                if (graphQlClientProvider.isRateLimitCritical()) {
+                if (graphQlClientProvider.isRateLimitCritical(scopeId)) {
                     log.warn(
                         "Aborting issue sync due to critical rate limit: repoName={}, pageCount={}",
                         safeNameWithOwner,
                         pageCount
                     );
+                    abortReason = SyncResult.Status.ABORTED_RATE_LIMIT;
                     break;
                 }
 
@@ -341,6 +390,7 @@ public class GitHubIssueSyncService {
                             } catch (InterruptedException ie) {
                                 Thread.currentThread().interrupt();
                                 log.warn("Issue sync interrupted during backoff: repoName={}", safeNameWithOwner);
+                                abortReason = SyncResult.Status.ABORTED_ERROR;
                                 break;
                             }
                             continue; // Retry the same page
@@ -351,6 +401,7 @@ public class GitHubIssueSyncService {
                             safeNameWithOwner,
                             classification.message()
                         );
+                        abortReason = SyncResult.Status.ABORTED_ERROR;
                         break;
                     }
                     case RATE_LIMITED -> {
@@ -375,6 +426,7 @@ public class GitHubIssueSyncService {
                                     "Issue sync interrupted during rate limit wait: repoName={}",
                                     safeNameWithOwner
                                 );
+                                abortReason = SyncResult.Status.ABORTED_RATE_LIMIT;
                                 break;
                             }
                             continue; // Retry the same page
@@ -384,6 +436,7 @@ public class GitHubIssueSyncService {
                             safeNameWithOwner,
                             classification.message()
                         );
+                        abortReason = SyncResult.Status.ABORTED_RATE_LIMIT;
                         break;
                     }
                     case NOT_FOUND -> {
@@ -393,6 +446,7 @@ public class GitHubIssueSyncService {
                             safeNameWithOwner,
                             classification.message()
                         );
+                        abortReason = SyncResult.Status.ABORTED_ERROR;
                         break;
                     }
                     case AUTH_ERROR -> {
@@ -402,6 +456,7 @@ public class GitHubIssueSyncService {
                             safeNameWithOwner,
                             classification.message()
                         );
+                        abortReason = SyncResult.Status.ABORTED_ERROR;
                         break;
                     }
                     case CLIENT_ERROR -> {
@@ -411,6 +466,7 @@ public class GitHubIssueSyncService {
                             safeNameWithOwner,
                             classification.message()
                         );
+                        abortReason = SyncResult.Status.ABORTED_ERROR;
                         break;
                     }
                     default -> {
@@ -421,6 +477,7 @@ public class GitHubIssueSyncService {
                             classification.message(),
                             e
                         );
+                        abortReason = SyncResult.Status.ABORTED_ERROR;
                         break;
                     }
                 }
@@ -447,21 +504,26 @@ public class GitHubIssueSyncService {
         }
 
         // Clear cursor on successful completion (uses REQUIRES_NEW)
-        if (syncTargetId != null && !hasMore) {
+        // Only clear if sync completed without abort
+        if (syncTargetId != null && !hasMore && abortReason == null) {
             clearCursorCheckpoint(syncTargetId);
         }
 
+        // Determine the final result status
+        SyncResult.Status finalStatus = abortReason != null ? abortReason : SyncResult.Status.COMPLETED;
+
         log.info(
-            "Completed issue sync: repoName={}, issueCount={}, commentCount={}, issuesWithPagination={}, scopeId={}, resumed={}, incremental={}",
+            "Completed issue sync: repoName={}, issueCount={}, commentCount={}, issuesWithPagination={}, scopeId={}, resumed={}, incremental={}, status={}",
             safeNameWithOwner,
             totalIssuesSynced,
             totalCommentsSynced,
             issuesNeedingCommentPagination.size(),
             scopeId,
             resuming,
-            incrementalSync
+            incrementalSync,
+            finalStatus
         );
-        return totalIssuesSynced;
+        return new SyncResult(finalStatus, totalIssuesSynced);
     }
 
     /**
@@ -497,7 +559,7 @@ public class GitHubIssueSyncService {
             // Process embedded comments
             EmbeddedCommentsDTO embeddedComments = issueWithComments.embeddedComments();
             for (GitHubCommentDTO commentDTO : embeddedComments.comments()) {
-                if (commentProcessor.process(commentDTO, entity.getId(), context) != null) {
+                if (commentProcessor.process(commentDTO, entity.getNumber(), context) != null) {
                     commentsSynced++;
                 }
             }
@@ -541,5 +603,67 @@ public class GitHubIssueSyncService {
             backfillStateProvider.updateIssueSyncCursor(syncTargetId, null);
             log.debug("Cleared issue sync cursor checkpoint: syncTargetId={}", syncTargetId);
         });
+    }
+
+    // ========================================================================
+    // Transport Error Detection
+    // ========================================================================
+
+    /**
+     * Determines if an exception is a transport-level error that should be retried.
+     * <p>
+     * Transport errors occur at the network/connection level during body streaming:
+     * <ul>
+     *   <li>{@code GraphQlTransportException}: Spring GraphQL wrapper for transport failures</li>
+     *   <li>{@code PrematureCloseException}: Connection closed during response body streaming</li>
+     *   <li>Connection reset/abort exceptions</li>
+     * </ul>
+     * <p>
+     * IMPORTANT: These errors occur AFTER HTTP headers are received (200 OK) but DURING
+     * body consumption. WebClient ExchangeFilterFunction retries do NOT catch these.
+     *
+     * @param throwable the exception to check
+     * @return true if this is a retryable transport error
+     */
+    private boolean isTransportError(Throwable throwable) {
+        // GraphQlTransportException is Spring GraphQL's wrapper for transport failures
+        if (throwable instanceof GraphQlTransportException) {
+            return true;
+        }
+
+        // Walk the cause chain for wrapped transport errors
+        Throwable cause = throwable;
+        while (cause != null) {
+            String className = cause.getClass().getName();
+
+            // PrematureCloseException: Connection closed during response streaming
+            if (className.contains("PrematureCloseException")) {
+                return true;
+            }
+
+            // Other reactor-netty transport errors
+            if (className.contains("AbortedException") ||
+                className.contains("ConnectionResetException")) {
+                return true;
+            }
+
+            // Check for IOException indicating connection issues
+            if (cause instanceof java.io.IOException) {
+                String message = cause.getMessage();
+                if (message != null) {
+                    String lower = message.toLowerCase();
+                    if (lower.contains("connection reset") ||
+                        lower.contains("broken pipe") ||
+                        lower.contains("connection abort") ||
+                        lower.contains("premature") ||
+                        lower.contains("stream closed")) {
+                        return true;
+                    }
+                }
+            }
+
+            cause = cause.getCause();
+        }
+        return false;
     }
 }

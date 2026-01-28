@@ -12,6 +12,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.Set;
@@ -22,7 +23,12 @@ import lombok.Setter;
 import lombok.ToString;
 
 @Entity
-@Table(name = "milestone")
+@Table(
+    name = "milestone",
+    uniqueConstraints = {
+        @UniqueConstraint(name = "uk_milestone_number_repository", columnNames = { "number", "repository_id" }),
+    }
+)
 @Getter
 @Setter
 @NoArgsConstructor
@@ -76,6 +82,17 @@ public class Milestone extends BaseGitServiceEntity {
      * and detect stale data.
      */
     private Instant lastSyncAt;
+
+    /**
+     * Removes this milestone from all referencing issues (recommended before deletion).
+     * <p>
+     * This ensures data integrity by nullifying the milestone reference on issues
+     * before the milestone is deleted, preventing orphaned foreign key references.
+     */
+    public void removeAllIssues() {
+        this.issues.forEach(issue -> issue.setMilestone(null));
+        this.issues.clear();
+    }
 
     public enum State {
         OPEN,

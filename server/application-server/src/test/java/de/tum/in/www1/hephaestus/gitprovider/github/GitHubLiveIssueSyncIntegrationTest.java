@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.issue.IssueRepository;
 import de.tum.in.www1.hephaestus.gitprovider.issue.github.GitHubIssueSyncService;
+import de.tum.in.www1.hephaestus.gitprovider.sync.SyncResult;
 import de.tum.in.www1.hephaestus.gitprovider.issuecomment.IssueComment;
 import de.tum.in.www1.hephaestus.gitprovider.issuecomment.IssueCommentRepository;
 import de.tum.in.www1.hephaestus.gitprovider.issuecomment.github.GitHubIssueCommentSyncService;
@@ -57,10 +58,11 @@ class GitHubLiveIssueSyncIntegrationTest extends AbstractGitHubLiveSyncIntegrati
         var localRepo = repositoryRepository.findByNameWithOwner(repository.fullName()).orElseThrow();
 
         // 4. Sync issues
-        int syncedCount = issueSyncService.syncForRepository(workspace.getId(), localRepo.getId());
+        SyncResult syncResult = issueSyncService.syncForRepository(workspace.getId(), localRepo.getId());
 
         // 5. Verify
-        assertThat(syncedCount).isGreaterThanOrEqualTo(1);
+        assertThat(syncResult.isCompleted()).isTrue();
+        assertThat(syncResult.count()).isGreaterThanOrEqualTo(1);
 
         Issue storedIssue = issueRepository.findById(createdIssue.databaseId()).orElseThrow();
         assertThat(storedIssue.getTitle()).isEqualTo(issueTitle);
@@ -81,8 +83,9 @@ class GitHubLiveIssueSyncIntegrationTest extends AbstractGitHubLiveSyncIntegrati
         var localRepo = repositoryRepository.findByNameWithOwner(repository.fullName()).orElseThrow();
 
         // 3. Sync issues (this should include comments via the issue processor)
-        int syncedCount = issueSyncService.syncForRepository(workspace.getId(), localRepo.getId());
-        assertThat(syncedCount).isGreaterThanOrEqualTo(1);
+        SyncResult syncResult = issueSyncService.syncForRepository(workspace.getId(), localRepo.getId());
+        assertThat(syncResult.isCompleted()).isTrue();
+        assertThat(syncResult.count()).isGreaterThanOrEqualTo(1);
 
         // 4. Verify issue is synced
         Issue storedIssue = issueRepository.findById(createdIssue.issueId()).orElseThrow();
@@ -133,10 +136,11 @@ class GitHubLiveIssueSyncIntegrationTest extends AbstractGitHubLiveSyncIntegrati
         var localRepo = repositoryRepository.findByNameWithOwner(repository.fullName()).orElseThrow();
 
         // 4. Sync issues
-        int syncedCount = issueSyncService.syncForRepository(workspace.getId(), localRepo.getId());
+        SyncResult syncResult = issueSyncService.syncForRepository(workspace.getId(), localRepo.getId());
 
         // 5. Verify both issues are synced
-        assertThat(syncedCount).isGreaterThanOrEqualTo(2);
+        assertThat(syncResult.isCompleted()).isTrue();
+        assertThat(syncResult.count()).isGreaterThanOrEqualTo(2);
 
         Issue storedIssue1 = issueRepository.findById(issue1.databaseId()).orElseThrow();
         assertThat(storedIssue1.getTitle()).isEqualTo(issueTitle1);

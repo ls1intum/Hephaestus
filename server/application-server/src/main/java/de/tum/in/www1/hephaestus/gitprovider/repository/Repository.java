@@ -19,6 +19,7 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
+import org.hibernate.annotations.BatchSize;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.Set;
@@ -113,6 +114,7 @@ public class Repository extends BaseGitServiceEntity {
     private Set<Issue> issues = new HashSet<>();
 
     @OneToMany(mappedBy = "repository", cascade = CascadeType.REMOVE, orphanRemoval = true)
+    @BatchSize(size = 50) // Batch fetch labels to avoid Cartesian product in team queries
     @ToString.Exclude
     private Set<Label> labels = new HashSet<>();
 
@@ -120,7 +122,7 @@ public class Repository extends BaseGitServiceEntity {
     @ToString.Exclude
     private Set<Milestone> milestones = new HashSet<>();
 
-    @OneToMany(mappedBy = "repository", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "repository", cascade = CascadeType.REMOVE, orphanRemoval = true)
     @ToString.Exclude
     private Set<TeamRepositoryPermission> teamRepoPermissions = new HashSet<>();
 

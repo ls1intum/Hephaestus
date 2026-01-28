@@ -12,6 +12,8 @@ import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.github.dto.GitHubUserDTO;
 import java.util.Optional;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.lang.Nullable;
 
 /**
@@ -25,6 +27,8 @@ import org.springframework.lang.Nullable;
  * extracting them eliminates duplication and ensures consistent behavior.
  */
 public abstract class BaseGitHubProcessor {
+
+    private static final Logger log = LoggerFactory.getLogger(BaseGitHubProcessor.class);
 
     protected final UserRepository userRepository;
     protected final LabelRepository labelRepository;
@@ -141,24 +145,102 @@ public abstract class BaseGitHubProcessor {
 
     /**
      * Find an existing milestone or create a new one from the DTO.
+     * <p>
+     * CRITICAL: Always looks up by repository + number FIRST because this is the unique
+     * constraint (uk_milestone_number_repository). This handles the case where GraphQL sync
+     * created a milestone with a deterministic ID, then a webhook arrives with the actual
+     * GitHub databaseId. Looking up by the webhook's ID would miss the existing entity.
+     * <p>
+     * For GraphQL responses that don't include databaseId (id is null), we generate a
+     * deterministic negative ID to avoid collision with real GitHub IDs.
+     * <p>
+     * NEVER changes the ID of an existing (managed) entity - Hibernate will throw
+     * "identifier of an instance was altered" exception.
      */
     @Nullable
     protected Milestone findOrCreateMilestone(GitHubMilestoneDTO dto, Repository repository) {
-        if (dto == null || dto.id() == null) {
+        if (dto == null || dto.number() <= 0) {
             return null;
         }
-        Long milestoneId = dto.id();
-        return milestoneRepository
-            .findById(milestoneId)
-            .orElseGet(() -> {
-                Milestone milestone = new Milestone();
-                milestone.setId(milestoneId);
-                milestone.setNumber(dto.number());
-                milestone.setTitle(dto.title());
-                milestone.setDueOn(dto.dueOn());
-                milestone.setRepository(repository);
-                return milestoneRepository.save(milestone);
-            });
+
+        // ALWAYS check by unique key (repository_id + number) FIRST - this is the constraint we enforce.
+        // This handles the case where GraphQL sync created a milestone with a deterministic ID,
+        // then a webhook arrives with the actual GitHub databaseId.
+        Optional<Milestone> existingOpt = milestoneRepository.findByNumberAndRepositoryId(
+            dto.number(),
+            repository.getId()
+        );
+
+        // Fall back to ID lookup if number lookup didn't find it (handles edge cases)
+        if (existingOpt.isEmpty() && dto.id() != null) {
+            existingOpt = milestoneRepository.findById(dto.id());
+        }
+
+        if (existingOpt.isPresent()) {
+            // Return existing milestone - NEVER modify its ID
+            return existingOpt.get();
+        }
+
+        // Create new milestone
+        Milestone milestone = new Milestone();
+        // Use provided ID or generate deterministic one for new milestones only
+        Long milestoneId = dto.id() != null
+            ? dto.id()
+            : generateDeterministicMilestoneId(repository.getId(), dto.number());
+        milestone.setId(milestoneId);
+        milestone.setNumber(dto.number());
+        milestone.setTitle(dto.title() != null ? dto.title() : "Milestone " + dto.number());
+        milestone.setHtmlUrl(dto.htmlUrl() != null ? dto.htmlUrl() : "");
+        milestone.setState(parseMilestoneState(dto.state()));
+        milestone.setDescription(dto.description());
+        milestone.setDueOn(dto.dueOn());
+        milestone.setRepository(repository);
+        if (dto.openIssuesCount() != null) {
+            milestone.setOpenIssuesCount(dto.openIssuesCount());
+        }
+        if (dto.closedIssuesCount() != null) {
+            milestone.setClosedIssuesCount(dto.closedIssuesCount());
+        }
+        if (dto.createdAt() != null) {
+            milestone.setCreatedAt(dto.createdAt());
+        }
+        if (dto.updatedAt() != null) {
+            milestone.setUpdatedAt(dto.updatedAt());
+        }
+        return milestoneRepository.save(milestone);
+    }
+
+    /**
+     * Generate a deterministic negative ID for milestones created from GraphQL data.
+     * <p>
+     * Uses bit shifting to combine repo ID and milestone number without collision.
+     * Uses negative values to avoid collision with real GitHub milestone IDs which are
+     * always positive.
+     */
+    private Long generateDeterministicMilestoneId(Long repositoryId, int milestoneNumber) {
+        long combined = (repositoryId << 32) | (milestoneNumber & 0xFFFFFFFFL);
+        return -combined;
+    }
+
+    /**
+     * Converts a GitHub API milestone state string to Milestone.State enum.
+     */
+    private Milestone.State parseMilestoneState(String state) {
+        if (state == null) {
+            log.warn(
+                "Milestone state is null, defaulting to OPEN. " +
+                    "This may indicate missing data in webhook or GraphQL response."
+            );
+            return Milestone.State.OPEN;
+        }
+        return switch (state.toUpperCase()) {
+            case "OPEN" -> Milestone.State.OPEN;
+            case "CLOSED" -> Milestone.State.CLOSED;
+            default -> {
+                log.warn("Unknown milestone state '{}', defaulting to OPEN", state);
+                yield Milestone.State.OPEN;
+            }
+        };
     }
 
     /**

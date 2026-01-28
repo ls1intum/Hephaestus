@@ -47,6 +47,7 @@ query GetThreadComments($threadId: ID!, $first: Int!, $after: String) {
                             name
                             email
                             createdAt
+                            updatedAt
                         }
                         ... on Bot {
                             id

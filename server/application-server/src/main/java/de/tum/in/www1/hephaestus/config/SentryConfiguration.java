@@ -2,7 +2,6 @@ package de.tum.in.www1.hephaestus.config;
 
 import io.sentry.Sentry;
 import jakarta.annotation.PostConstruct;
-import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -15,19 +14,17 @@ public class SentryConfiguration {
     private static final Logger log = LoggerFactory.getLogger(SentryConfiguration.class);
 
     private final Environment environment;
-
     private final String hephaestusVersion;
-
-    private final Optional<String> sentryDsn;
+    private final SentryProperties sentryProperties;
 
     public SentryConfiguration(
         Environment environment,
         @Value("${spring.application.version}") String hephaestusVersion,
-        @Value("${sentry.dsn}") Optional<String> sentryDsn
+        SentryProperties sentryProperties
     ) {
         this.environment = environment;
         this.hephaestusVersion = hephaestusVersion;
-        this.sentryDsn = sentryDsn;
+        this.sentryProperties = sentryProperties;
     }
 
     /**
@@ -40,13 +37,13 @@ public class SentryConfiguration {
             return;
         }
 
-        if (sentryDsn.isEmpty() || sentryDsn.get().isEmpty()) {
+        if (!sentryProperties.isConfigured()) {
             log.info("Skipped Sentry initialization: reason=missing_dsn");
             return;
         }
 
         try {
-            final String dsn = sentryDsn.get() + "?stacktrace.app.packages=de.tum.in.www1.hephaestus";
+            final String dsn = sentryProperties.dsn() + "?stacktrace.app.packages=de.tum.in.www1.hephaestus";
 
             Sentry.init(options -> {
                 options.setDsn(dsn);

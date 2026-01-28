@@ -30,7 +30,27 @@ public enum ActivityTargetType {
     /**
      * Target is an issue (not a pull request).
      */
-    ISSUE("issue");
+    ISSUE("issue"),
+
+    /**
+     * Target is a pull request review thread (for thread resolved/unresolved events).
+     */
+    REVIEW_THREAD("review_thread"),
+
+    /**
+     * Target is a label (for label created/updated/deleted events).
+     */
+    LABEL("label"),
+
+    /**
+     * Target is a milestone (for milestone created/updated/deleted events).
+     */
+    MILESTONE("milestone"),
+
+    /**
+     * Target is a team (for team created/updated/deleted events).
+     */
+    TEAM("team");
 
     private final String value;
 

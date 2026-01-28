@@ -1,4 +1,46 @@
 {
+  "groups": [
+    {
+      "name": "hephaestus.sync",
+      "description": "GitHub data synchronization settings"
+    },
+    {
+      "name": "hephaestus.sync.nats",
+      "description": "NATS JetStream integration for real-time event processing"
+    },
+    {
+      "name": "hephaestus.github",
+      "description": "GitHub API authentication and App configuration"
+    },
+    {
+      "name": "hephaestus.detection",
+      "description": "Bad practice detection and tracing settings"
+    },
+    {
+      "name": "hephaestus.posthog",
+      "description": "PostHog analytics integration"
+    },
+    {
+      "name": "hephaestus.workspace",
+      "description": "Workspace initialization and management settings"
+    },
+    {
+      "name": "hephaestus.activity",
+      "description": "Activity event tracking and XP scoring settings"
+    },
+    {
+      "name": "hephaestus.keycloak",
+      "description": "Keycloak identity provider integration"
+    },
+    {
+      "name": "hephaestus.slack",
+      "description": "Slack workspace integration for notifications"
+    },
+    {
+      "name": "hephaestus.sentry",
+      "description": "Sentry error tracking integration"
+    }
+  ],
   "properties": [
     {
       "name": "hephaestus.intelligence-service.url",
@@ -6,7 +48,7 @@
       "description": "Base URL of the intelligence service"
     },
     {
-      "name": "hephaestus.mail.from",
+      "name": "hephaestus.mail.sender",
       "type": "java.lang.String",
       "description": "Email sender address"
     },
@@ -21,120 +63,198 @@
       "description": "Cron expression for leaderboard calculation"
     },
     {
-      "name": "hephaestus.leaderboard.self-review-author-logins",
+      "name": "hephaestus.activity.self-review-author-logins",
       "type": "java.util.List",
       "description": "List of bot logins whose PRs are excluded from self-review scoring"
     },
     {
-      "name": "hephaestus.git-sync.schedule.cron",
+      "name": "hephaestus.detection.run-automatic-detection-for-all",
+      "type": "java.lang.Boolean",
+      "description": "Whether to run automatic detection for all PRs"
+    },
+    {
+      "name": "hephaestus.detection.tracing.enabled",
+      "type": "java.lang.Boolean",
+      "description": "Whether Langfuse tracing is enabled for detection operations"
+    },
+    {
+      "name": "hephaestus.detection.tracing.host",
       "type": "java.lang.String",
-      "description": "Cron expression for git sync"
+      "description": "Langfuse server host URL"
     },
     {
-      "name": "hephaestus.git-sync.sync-on-startup.enabled",
-      "type": "java.lang.Boolean",
-      "description": "Whether to sync on startup"
-    },
-    {
-      "name": "hephaestus.git-sync.sync-on-startup.full-sync",
-      "type": "java.lang.Boolean",
-      "description": "Whether to do a full sync on startup"
-    },
-    {
-      "name": "hephaestus.detector.schedule.cron",
+      "name": "hephaestus.detection.tracing.public-key",
       "type": "java.lang.String",
-      "description": "Cron expression for detector"
+      "description": "Langfuse public key for authentication"
     },
     {
-      "name": "keycloak.enabled",
+      "name": "hephaestus.detection.tracing.secret-key",
+      "type": "java.lang.String",
+      "description": "Langfuse secret key for authentication (use environment variable in production)"
+    },
+    {
+      "name": "hephaestus.sync.graphql-timeout",
+      "type": "java.time.Duration",
+      "description": "Timeout for standard GraphQL operations (default: 30s). Accepts duration format: 30s, 1m, PT30S"
+    },
+    {
+      "name": "hephaestus.sync.extended-graphql-timeout",
+      "type": "java.time.Duration",
+      "description": "Extended timeout for complex GraphQL operations like review comments (default: 60s). Accepts duration format: 60s, 1m, PT60S"
+    },
+    {
+      "name": "hephaestus.sync.pagination-throttle",
+      "type": "java.time.Duration",
+      "description": "Delay between pagination requests to avoid hammering GitHub's API (default: 200ms). Accepts duration format: 200ms, PT0.2S"
+    },
+    {
+      "name": "hephaestus.sync.incremental-sync-enabled",
       "type": "java.lang.Boolean",
-      "description": "Whether Keycloak integration is enabled"
+      "description": "Whether to use incremental sync based on last sync timestamp"
     },
     {
-      "name": "keycloak.server-url",
+      "name": "hephaestus.sync.cooldown-minutes",
+      "type": "java.lang.Integer",
+      "description": "Minimum minutes between consecutive sync operations"
+    },
+    {
+      "name": "hephaestus.sync.nats.enabled",
+      "type": "java.lang.Boolean",
+      "description": "Whether NATS JetStream integration is enabled"
+    },
+    {
+      "name": "hephaestus.sync.nats.server",
+      "type": "java.lang.String",
+      "description": "NATS server URL (e.g., nats://localhost:4222)"
+    },
+    {
+      "name": "hephaestus.sync.nats.durable-consumer-name",
+      "type": "java.lang.String",
+      "description": "Durable consumer name for JetStream subscriptions (empty for ephemeral)"
+    },
+    {
+      "name": "hephaestus.sync.nats.replay-timeframe-days",
+      "type": "java.lang.Integer",
+      "description": "Number of days to replay messages when starting a new consumer"
+    },
+    {
+      "name": "hephaestus.posthog.enabled",
+      "type": "java.lang.Boolean",
+      "description": "Whether PostHog analytics is enabled"
+    },
+    {
+      "name": "hephaestus.posthog.api-host",
+      "type": "java.lang.String",
+      "description": "PostHog API host URL"
+    },
+    {
+      "name": "hephaestus.posthog.project-id",
+      "type": "java.lang.String",
+      "description": "PostHog project ID"
+    },
+    {
+      "name": "hephaestus.posthog.personal-api-key",
+      "type": "java.lang.String",
+      "description": "PostHog personal API key (use environment variable in production)"
+    },
+    {
+      "name": "hephaestus.webapp.url",
+      "type": "java.lang.String",
+      "description": "Base URL of the webapp for generating links"
+    },
+    {
+      "name": "hephaestus.workspace.init-default",
+      "type": "java.lang.Boolean",
+      "description": "Whether to bootstrap a PAT-based workspace on startup (for local development)"
+    },
+    {
+      "name": "hephaestus.keycloak.url",
       "type": "java.lang.String",
       "description": "Keycloak server URL"
     },
     {
-      "name": "keycloak.realm",
+      "name": "hephaestus.keycloak.realm",
       "type": "java.lang.String",
       "description": "Keycloak realm"
     },
     {
-      "name": "keycloak.client-id",
+      "name": "hephaestus.keycloak.client-id",
       "type": "java.lang.String",
       "description": "Keycloak client ID"
     },
     {
-      "name": "keycloak.client-secret",
+      "name": "hephaestus.keycloak.client-secret",
       "type": "java.lang.String",
-      "description": "Keycloak client secret"
+      "description": "Keycloak client secret (use environment variable in production)"
     },
     {
-      "name": "nats.enabled",
-      "type": "java.lang.Boolean",
-      "description": "Whether NATS integration is enabled"
-    },
-    {
-      "name": "nats.server",
+      "name": "hephaestus.keycloak.internal-url",
       "type": "java.lang.String",
-      "description": "NATS server URL"
+      "description": "Internal Keycloak URL for container-to-container access; defaults to public URL"
     },
     {
-      "name": "nats.stream-name",
+      "name": "hephaestus.keycloak.jwk-set-uri",
       "type": "java.lang.String",
-      "description": "NATS stream name"
+      "description": "JWK Set URI for token verification; defaults to standard Keycloak endpoint"
     },
     {
-      "name": "nats.durable-name",
+      "name": "hephaestus.slack.token",
       "type": "java.lang.String",
-      "description": "NATS durable consumer name"
+      "description": "Slack bot token for workspace notifications (starts with xoxb-)"
     },
     {
-      "name": "monitoring.environment",
+      "name": "hephaestus.slack.signing-secret",
       "type": "java.lang.String",
-      "description": "Monitoring environment name"
+      "description": "Slack signing secret for webhook verification"
     },
     {
-      "name": "github.webhook-secret",
+      "name": "hephaestus.sentry.dsn",
       "type": "java.lang.String",
-      "description": "GitHub webhook secret"
-    },
-    {
-      "name": "github.app.id",
-      "type": "java.lang.String",
-      "description": "GitHub App ID"
-    },
-    {
-      "name": "github.app.private-key",
-      "type": "java.lang.String",
-      "description": "GitHub App private key"
-    },
-    {
-      "name": "github.app.name",
-      "type": "java.lang.String",
-      "description": "GitHub App name"
-    },
-    {
-      "name": "slack.enabled",
-      "type": "java.lang.Boolean",
-      "description": "Whether Slack integration is enabled"
-    },
-    {
-      "name": "slack.bot-token",
-      "type": "java.lang.String",
-      "description": "Slack bot token"
-    },
-    {
-      "name": "slack.signing-secret",
-      "type": "java.lang.String",
-      "description": "Slack signing secret"
-    },
-    {
-      "name": "spring.graphql.client.http.url",
-      "type": "java.lang.String",
-      "description": "GraphQL client HTTP URL"
+      "description": "Sentry DSN for error tracking; leave blank to disable"
     }
   ],
-  "hints": []
+  "hints": [
+    {
+      "name": "hephaestus.sync.cron",
+      "values": [
+        { "value": "0 0 * * * *", "description": "Every hour" },
+        { "value": "0 0 3 * * *", "description": "Daily at 3 AM (default)" },
+        { "value": "0 */15 * * * *", "description": "Every 15 minutes" }
+      ],
+      "providers": [{ "name": "any" }]
+    },
+    {
+      "name": "hephaestus.sync.timeframe-days",
+      "values": [
+        { "value": "7", "description": "One week (default)" },
+        { "value": "14", "description": "Two weeks" },
+        { "value": "30", "description": "One month" }
+      ]
+    },
+    {
+      "name": "hephaestus.sync.nats.consumer.ack-wait",
+      "values": [
+        { "value": "5m", "description": "5 minutes (default)" },
+        { "value": "10m", "description": "10 minutes for slow processing" },
+        { "value": "PT5M", "description": "ISO-8601 format" }
+      ],
+      "providers": [{ "name": "any" }]
+    },
+    {
+      "name": "hephaestus.sync.nats.consumer.idle-heartbeat",
+      "values": [
+        { "value": "30s", "description": "30 seconds (default, good for WAN)" },
+        { "value": "15s", "description": "15 seconds (LAN only)" },
+        { "value": "60s", "description": "60 seconds (high-latency connections)" }
+      ],
+      "providers": [{ "name": "any" }]
+    },
+    {
+      "name": "hephaestus.posthog.api-host",
+      "values": [
+        { "value": "https://app.posthog.com", "description": "PostHog Cloud (default)" },
+        { "value": "https://eu.posthog.com", "description": "PostHog Cloud EU" }
+      ]
+    }
+  ]
 }

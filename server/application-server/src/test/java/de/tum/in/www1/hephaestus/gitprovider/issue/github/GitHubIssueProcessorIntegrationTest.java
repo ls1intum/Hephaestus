@@ -36,7 +36,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Integration tests for GitHubIssueProcessor.
@@ -51,7 +50,6 @@ import org.springframework.transaction.annotation.Transactional;
  * - Edge cases in DTO processing including the critical getDatabaseId() fallback
  */
 @DisplayName("GitHub Issue Processor")
-@Transactional
 class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
 
     // IDs from the actual GitHub webhook fixtures
@@ -1252,6 +1250,47 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
 
             // When/Then - should not throw
             assertThatCode(() -> processor.processDeleted(dto, createContext())).doesNotThrowAnyException();
+        }
+
+        @Test
+        @DisplayName("processDeleted should sync bidirectional ManyToMany relationships")
+        void processDeletedShouldSyncBidirectionalRelationships() {
+            // Given - create issue with labels (ManyToMany relationship)
+            Long issueId = FIXTURE_ISSUE_ID;
+            Issue existing = new Issue();
+            existing.setId(issueId);
+            existing.setNumber(21);
+            existing.setTitle("Issue with labels");
+            existing.setState(Issue.State.OPEN);
+            existing.setHtmlUrl("https://example.com");
+            existing.setRepository(testRepository);
+            existing = issueRepository.save(existing);
+
+            // Create a label and associate it with the issue
+            de.tum.in.www1.hephaestus.gitprovider.label.Label label =
+                new de.tum.in.www1.hephaestus.gitprovider.label.Label();
+            label.setId(100001L);
+            label.setName("bug");
+            label.setColor("d73a4a");
+            label.setRepository(testRepository);
+            label = labelRepository.save(label);
+
+            // Use helper method for proper bidirectional sync
+            existing.addLabel(label);
+            existing = issueRepository.save(existing);
+
+            // Verify setup
+            assertThat(issueRepository.findById(issueId)).isPresent();
+            assertThat(labelRepository.findById(label.getId())).isPresent();
+
+            GitHubIssueDTO dto = createBasicIssueDto(issueId, 21);
+
+            // When - delete should work without TransientObjectException
+            assertThatCode(() -> processor.processDeleted(dto, createContext())).doesNotThrowAnyException();
+
+            // Then - issue deleted, label still exists
+            assertThat(issueRepository.findById(issueId)).isEmpty();
+            assertThat(labelRepository.findById(100001L)).isPresent();
         }
     }
 

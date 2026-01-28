@@ -21,11 +21,6 @@ public final class GitHubSyncConstants {
      */
     public static final String GITHUB_API_BASE_URL = "https://api.github.com";
 
-    /**
-     * GitHub GraphQL API URL.
-     */
-    public static final String GITHUB_GRAPHQL_URL = "https://api.github.com/graphql";
-
     // ========================================================================
     // Pagination
     // ========================================================================

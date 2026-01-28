@@ -240,16 +240,16 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
 
     @Override
     @Transactional
-    public void updateBackfillState(Long syncTargetId, Integer highWaterMark, Integer checkpoint, Instant lastRunAt) {
+    public void updateIssueBackfillState(Long syncTargetId, Integer highWaterMark, Integer checkpoint, Instant lastRunAt) {
         repositoryToMonitorRepository
             .findById(syncTargetId)
             .ifPresentOrElse(
                 rtm -> {
                     if (highWaterMark != null) {
-                        rtm.setBackfillHighWaterMark(highWaterMark);
+                        rtm.setIssueBackfillHighWaterMark(highWaterMark);
                     }
                     if (checkpoint != null) {
-                        rtm.setBackfillCheckpoint(checkpoint);
+                        rtm.setIssueBackfillCheckpoint(checkpoint);
                     }
                     if (lastRunAt != null) {
                         rtm.setBackfillLastRunAt(lastRunAt);
@@ -257,10 +257,32 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
                     repositoryToMonitorRepository.save(rtm);
                 },
                 () ->
-                    log.warn(
-                        "Failed to update backfill state: reason=syncTargetNotFound, syncTargetId={}",
-                        syncTargetId
-                    )
+                    // DEBUG: Expected during workspace reconfiguration when repository is removed mid-sync
+                    log.debug("Skipped issue backfill state update: reason=syncTargetNotFound, syncTargetId={}", syncTargetId)
+            );
+    }
+
+    @Override
+    @Transactional
+    public void updatePullRequestBackfillState(Long syncTargetId, Integer highWaterMark, Integer checkpoint, Instant lastRunAt) {
+        repositoryToMonitorRepository
+            .findById(syncTargetId)
+            .ifPresentOrElse(
+                rtm -> {
+                    if (highWaterMark != null) {
+                        rtm.setPullRequestBackfillHighWaterMark(highWaterMark);
+                    }
+                    if (checkpoint != null) {
+                        rtm.setPullRequestBackfillCheckpoint(checkpoint);
+                    }
+                    if (lastRunAt != null) {
+                        rtm.setBackfillLastRunAt(lastRunAt);
+                    }
+                    repositoryToMonitorRepository.save(rtm);
+                },
+                () ->
+                    // DEBUG: Expected during workspace reconfiguration when repository is removed mid-sync
+                    log.debug("Skipped pull request backfill state update: reason=syncTargetNotFound, syncTargetId={}", syncTargetId)
             );
     }
 
@@ -281,8 +303,9 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
                     repositoryToMonitorRepository.save(rtm);
                 },
                 () ->
-                    log.warn(
-                        "Failed to update issue sync cursor: reason=syncTargetNotFound, syncTargetId={}",
+                    // DEBUG: Expected during workspace reconfiguration when repository is removed mid-sync
+                    log.debug(
+                        "Skipped issue sync cursor update: reason=syncTargetNotFound, syncTargetId={}",
                         syncTargetId
                     )
             );
@@ -299,10 +322,8 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
                     repositoryToMonitorRepository.save(rtm);
                 },
                 () ->
-                    log.warn(
-                        "Failed to update PR sync cursor: reason=syncTargetNotFound, syncTargetId={}",
-                        syncTargetId
-                    )
+                    // DEBUG: Expected during workspace reconfiguration when repository is removed mid-sync
+                    log.debug("Skipped pull request sync cursor update: reason=syncTargetNotFound, syncTargetId={}", syncTargetId)
             );
     }
 

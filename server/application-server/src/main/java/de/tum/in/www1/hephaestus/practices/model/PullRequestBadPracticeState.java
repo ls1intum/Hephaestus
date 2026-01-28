@@ -1,7 +1,6 @@
 package de.tum.in.www1.hephaestus.practices.model;
 
 import de.tum.in.www1.hephaestus.intelligenceservice.model.BadPractice;
-import java.util.Set;
 
 /**
  * State of a detected bad practice in a pull request.
@@ -52,73 +51,27 @@ public enum PullRequestBadPracticeState {
     // === Detection States (AI-assigned severity) ===
 
     /** No issue detected - PR follows best practices. */
-    GOOD_PRACTICE("Good Practice"),
+    GOOD_PRACTICE,
 
     /** Minor issue that can be deferred - low impact on code quality. */
-    MINOR_ISSUE("Minor Issue"),
+    MINOR_ISSUE,
 
     /** Standard issue that should be addressed before merge. */
-    NORMAL_ISSUE("Normal Issue"),
+    NORMAL_ISSUE,
 
     /** Severe issue that blocks merge - must be fixed. */
-    CRITICAL_ISSUE("Critical Issue"),
+    CRITICAL_ISSUE,
 
     // === User Resolution States (User-assigned) ===
 
     /** Issue was detected but author has addressed it. */
-    FIXED("Fixed"),
+    FIXED,
 
     /** Author acknowledges issue but chooses not to fix. */
-    WONT_FIX("Won't Fix"),
+    WONT_FIX,
 
     /** Detection was incorrect - false positive reported by user. */
-    WRONG("Wrong");
-
-    /**
-     * States that can be set by users to resolve a detected bad practice.
-     * Used for validation in resolution endpoints.
-     */
-    public static final Set<PullRequestBadPracticeState> USER_RESOLUTION_STATES = Set.of(FIXED, WONT_FIX, WRONG);
-
-    /**
-     * States indicating the bad practice has been resolved (no longer actionable).
-     * Used to filter out resolved issues from active detection results.
-     */
-    public static final Set<PullRequestBadPracticeState> RESOLVED_STATES = Set.of(
-        FIXED,
-        WONT_FIX,
-        WRONG,
-        GOOD_PRACTICE
-    );
-
-    private final String value;
-
-    PullRequestBadPracticeState(String value) {
-        this.value = value;
-    }
-
-    /** Returns the display value of this state. */
-    public String getValue() {
-        return value;
-    }
-
-    /**
-     * Checks if this state represents a resolved (non-actionable) bad practice.
-     *
-     * @return true if the bad practice no longer requires action
-     */
-    public boolean isResolved() {
-        return RESOLVED_STATES.contains(this);
-    }
-
-    /**
-     * Checks if this state can be set by users as a resolution action.
-     *
-     * @return true if users can transition to this state
-     */
-    public boolean isUserResolutionState() {
-        return USER_RESOLUTION_STATES.contains(this);
-    }
+    WRONG;
 
     /**
      * Converts from intelligence service status enum to domain state.

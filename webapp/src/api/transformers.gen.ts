@@ -295,6 +295,11 @@ const profileSchemaResponseTransformer = (data: any) => {
             return profileReviewActivitySchemaResponseTransformer(item);
         });
     }
+    if (data.reviewedPullRequests) {
+        data.reviewedPullRequests = data.reviewedPullRequests.map((item: any) => {
+            return pullRequestInfoSchemaResponseTransformer(item);
+        });
+    }
     return data;
 };
 

@@ -99,7 +99,7 @@ public class GitHubOrganizationSyncService {
                 .documentName(GET_ORGANIZATION_DOCUMENT)
                 .variable("login", organizationLogin)
                 .execute()
-                .block(syncProperties.getGraphqlTimeout());
+                .block(syncProperties.graphqlTimeout());
 
             if (graphQlResponse == null || !graphQlResponse.isValid()) {
                 log.warn(
@@ -111,10 +111,10 @@ public class GitHubOrganizationSyncService {
             }
 
             // Track rate limit from response
-            graphQlClientProvider.trackRateLimit(graphQlResponse);
+            graphQlClientProvider.trackRateLimit(scopeId, graphQlResponse);
 
             // Check if we should pause due to rate limiting
-            if (graphQlClientProvider.isRateLimitCritical()) {
+            if (graphQlClientProvider.isRateLimitCritical(scopeId)) {
                 log.warn(
                     "Aborting organization sync due to critical rate limit: orgLogin={}",
                     sanitizeForLog(organizationLogin)
@@ -135,7 +135,7 @@ public class GitHubOrganizationSyncService {
 
             if (organization != null) {
                 // Sync organization memberships with full pagination
-                int membersSynced = syncOrganizationMemberships(client, organization, graphQlOrg);
+                int membersSynced = syncOrganizationMemberships(client, organization, graphQlOrg, scopeId);
 
                 // Mark sync timestamp - organization is managed entity, will be persisted at commit
                 organization.setLastSyncAt(Instant.now());
@@ -209,7 +209,8 @@ public class GitHubOrganizationSyncService {
     private int syncOrganizationMemberships(
         HttpGraphQlClient client,
         Organization organization,
-        GHOrganization graphQlOrg
+        GHOrganization graphQlOrg,
+        Long scopeId
     ) {
         var membersConnection = graphQlOrg.getMembersWithRole();
         if (membersConnection == null || membersConnection.getEdges() == null) {
@@ -234,6 +235,7 @@ public class GitHubOrganizationSyncService {
         String cursor = pageInfo != null ? pageInfo.getEndCursor() : null;
         int pageCount = 0;
         int latestTotalCount = membersConnection.getTotalCount();
+        boolean syncCompletedNormally = false;
 
         // Paginate through all remaining members if there are more pages
         while (pageInfo != null && Boolean.TRUE.equals(pageInfo.getHasNextPage())) {
@@ -264,7 +266,7 @@ public class GitHubOrganizationSyncService {
                 .variable("first", LARGE_PAGE_SIZE)
                 .variable("after", cursor)
                 .execute()
-                .block(syncProperties.getGraphqlTimeout());
+                .block(syncProperties.graphqlTimeout());
 
             if (graphQlResponse == null || !graphQlResponse.isValid()) {
                 log.warn(
@@ -276,10 +278,10 @@ public class GitHubOrganizationSyncService {
             }
 
             // Track rate limit from response
-            graphQlClientProvider.trackRateLimit(graphQlResponse);
+            graphQlClientProvider.trackRateLimit(scopeId, graphQlResponse);
 
             // Check if we should pause due to rate limiting
-            if (graphQlClientProvider.isRateLimitCritical()) {
+            if (graphQlClientProvider.isRateLimitCritical(scopeId)) {
                 log.warn(
                     "Aborting organization members sync due to critical rate limit: orgLogin={}",
                     sanitizeForLog(organization.getLogin())
@@ -312,13 +314,17 @@ public class GitHubOrganizationSyncService {
             cursor = pageInfo != null ? pageInfo.getEndCursor() : null;
         }
 
+        // Mark sync as completed normally if we exhausted all pages (pageInfo.hasNextPage is false)
+        syncCompletedNormally = pageInfo == null || !Boolean.TRUE.equals(pageInfo.getHasNextPage());
+
         log.debug(
-            "Fetched organization members: orgId={}, orgLogin={}, fetchedCount={}, totalCount={}, pages={}",
+            "Fetched organization members: orgId={}, orgLogin={}, fetchedCount={}, totalCount={}, pages={}, complete={}",
             organization.getGithubId(),
             sanitizeForLog(organization.getLogin()),
             allMembers.size(),
             latestTotalCount,
-            pageCount + 1
+            pageCount + 1,
+            syncCompletedNormally
         );
 
         Set<Long> syncedUserIds = new HashSet<>();
@@ -357,8 +363,18 @@ public class GitHubOrganizationSyncService {
             }
         }
 
-        // Remove memberships for users no longer in the organization
-        removeStaleMemberships(organization, syncedUserIds);
+        // CRITICAL: Only remove stale memberships if sync completed fully.
+        // If sync was aborted (rate limit, error, pagination limit), we don't have
+        // the complete list and would incorrectly delete valid memberships.
+        if (syncCompletedNormally) {
+            removeStaleMemberships(organization, syncedUserIds);
+        } else {
+            log.warn(
+                "Skipped stale membership removal: reason=incompleteSync, orgLogin={}, pagesProcessed={}",
+                sanitizeForLog(organization.getLogin()),
+                pageCount + 1
+            );
+        }
 
         return memberCount;
     }

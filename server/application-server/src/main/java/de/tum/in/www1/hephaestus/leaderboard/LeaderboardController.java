@@ -46,9 +46,12 @@ public class LeaderboardController {
     /**
      * Generate a leaderboard for the specified time range and filters.
      *
+     * <p>Time range semantics: [after, before) - inclusive start, exclusive end.
+     * This is the standard half-open interval convention for time ranges.
+     *
      * @param workspaceContext the resolved workspace context
      * @param after start of the time range (inclusive)
-     * @param before end of the time range (inclusive)
+     * @param before end of the time range (exclusive)
      * @param team team filter for INDIVIDUAL mode ("all" for no filter)
      * @param sort sorting metric (SCORE or LEAGUE_POINTS)
      * @param mode aggregation mode (INDIVIDUAL or TEAM)

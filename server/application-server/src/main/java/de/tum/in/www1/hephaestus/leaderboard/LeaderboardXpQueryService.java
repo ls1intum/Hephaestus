@@ -32,6 +32,10 @@ import org.springframework.transaction.annotation.Transactional;
  *                                                ↓
  *                        LeaderboardXpQueryService (this) ← LeaderboardService
  * </pre>
+ *
+ * <p><strong>Time range convention:</strong> All timeframe queries use half-open intervals
+ * [since, until) - inclusive start, exclusive end. This ensures consistency across
+ * the leaderboard module and prevents double-counting at interval boundaries.
  */
 @Service
 public class LeaderboardXpQueryService {

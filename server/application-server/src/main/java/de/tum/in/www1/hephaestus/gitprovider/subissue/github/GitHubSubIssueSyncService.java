@@ -4,6 +4,7 @@ import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.LARGE_PAGE_SIZE;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.MAX_PAGINATION_PAGES;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.exception.InstallationNotFoundException;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier.ClassificationResult;
@@ -18,14 +19,17 @@ import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHIssueConnect
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHSubIssuesSummary;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.issue.IssueRepository;
+import de.tum.in.www1.hephaestus.gitprovider.issue.github.GitHubIssueProcessor;
+import de.tum.in.www1.hephaestus.gitprovider.issue.github.dto.GitHubIssueDTO;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
-import de.tum.in.www1.hephaestus.monitoring.MonitoringProperties;
+import de.tum.in.www1.hephaestus.gitprovider.sync.SyncSchedulerProperties;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.graphql.client.ClientGraphQlResponse;
 import org.springframework.graphql.client.HttpGraphQlClient;
 import org.springframework.lang.Nullable;
@@ -52,6 +56,12 @@ import org.springframework.transaction.annotation.Transactional;
  * <li>Uses Spring's {@code documentName()} for query loading</li>
  * <li>Respects sync cooldown to avoid excessive API calls</li>
  * </ul>
+ * <p>
+ * <b>ARCHITECTURE NOTE (Jan 2026):</b> This service implements the "find-or-create"
+ * pattern for parent issues. When a parent issue doesn't exist locally (e.g.,
+ * it's in a different repository or hasn't been synced yet), we create a stub
+ * issue entity on-the-fly using the GraphQL response data. This ensures parent-child
+ * relationships are preserved even during incremental sync, before backfill completes.
  *
  * @see GitHubSubIssuesMessageHandler
  */
@@ -69,7 +79,9 @@ public class GitHubSubIssueSyncService {
     private final GitHubGraphQlClientProvider graphQlClientProvider;
     private final GitHubSyncProperties syncProperties;
     private final GitHubExceptionClassifier exceptionClassifier;
-    private final MonitoringProperties monitoringProperties;
+    private final SyncSchedulerProperties syncSchedulerProperties;
+    private final GitHubIssueProcessor issueProcessor;
+    private final GitHubSubIssueSyncService self;
 
     public GitHubSubIssueSyncService(
         IssueRepository issueRepository,
@@ -78,7 +90,9 @@ public class GitHubSubIssueSyncService {
         GitHubGraphQlClientProvider graphQlClientProvider,
         GitHubSyncProperties syncProperties,
         GitHubExceptionClassifier exceptionClassifier,
-        MonitoringProperties monitoringProperties
+        SyncSchedulerProperties syncSchedulerProperties,
+        GitHubIssueProcessor issueProcessor,
+        @Lazy GitHubSubIssueSyncService self
     ) {
         this.issueRepository = issueRepository;
         this.repositoryRepository = repositoryRepository;
@@ -86,7 +100,9 @@ public class GitHubSubIssueSyncService {
         this.graphQlClientProvider = graphQlClientProvider;
         this.syncProperties = syncProperties;
         this.exceptionClassifier = exceptionClassifier;
-        this.monitoringProperties = monitoringProperties;
+        this.syncSchedulerProperties = syncSchedulerProperties;
+        this.issueProcessor = issueProcessor;
+        this.self = self;
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -217,7 +233,7 @@ public class GitHubSubIssueSyncService {
         SyncMetadata metadata = metadataOpt.get();
 
         // Check cooldown
-        if (!metadata.needsSubIssuesSync(monitoringProperties.getSyncCooldownInMinutes())) {
+        if (!metadata.needsSubIssuesSync(syncSchedulerProperties.cooldownMinutes())) {
             log.debug(
                 "Skipped sub-issues sync: reason=cooldownActive, scopeId={}, lastSyncedAt={}",
                 scopeId,
@@ -253,7 +269,7 @@ public class GitHubSubIssueSyncService {
             }
 
             try {
-                totalLinked += syncSubIssuesForRepository(client, repoOpt.get());
+                totalLinked += syncSubIssuesForRepository(client, repoOpt.get(), scopeId);
             } catch (InstallationNotFoundException e) {
                 log.warn("Installation not found for scope {}, skipping sub-issue sync", scopeId);
                 return 0;
@@ -319,7 +335,7 @@ public class GitHubSubIssueSyncService {
         syncTargetProvider.updateScopeSyncTimestamp(scopeId, SyncTargetProvider.SyncType.SUB_ISSUES, Instant.now());
     }
 
-    private int syncSubIssuesForRepository(HttpGraphQlClient client, Repository repository) {
+    private int syncSubIssuesForRepository(HttpGraphQlClient client, Repository repository, Long scopeId) {
         Optional<RepositoryOwnerAndName> parsedName = GitHubRepositoryNameParser.parse(repository.getNameWithOwner());
         if (parsedName.isEmpty()) {
             log.warn(
@@ -356,7 +372,7 @@ public class GitHubSubIssueSyncService {
                     .variable("first", LARGE_PAGE_SIZE)
                     .variable("after", cursor)
                     .execute()
-                    .block(syncProperties.getGraphqlTimeout());
+                    .block(syncProperties.graphqlTimeout());
 
                 if (graphQlResponse == null || !graphQlResponse.isValid()) {
                     log.warn(
@@ -368,10 +384,10 @@ public class GitHubSubIssueSyncService {
                 }
 
                 // Track rate limit from response
-                graphQlClientProvider.trackRateLimit(graphQlResponse);
+                graphQlClientProvider.trackRateLimit(scopeId, graphQlResponse);
 
                 // Check if we should pause due to rate limiting
-                if (graphQlClientProvider.isRateLimitCritical()) {
+                if (graphQlClientProvider.isRateLimitCritical(scopeId)) {
                     log.warn(
                         "Aborting sub-issue sync due to critical rate limit: repoName={}",
                         sanitizeForLog(repository.getNameWithOwner())
@@ -401,8 +417,8 @@ public class GitHubSubIssueSyncService {
                 hasNextPage = pageInfo != null && Boolean.TRUE.equals(pageInfo.getHasNextPage());
                 cursor = pageInfo != null ? pageInfo.getEndCursor() : null;
 
-                // Process each page in its own transaction
-                linkedCount += processIssueNodesInTransaction(issueConnection, repository);
+                // Process each page in its own transaction (call through proxy for @Transactional)
+                linkedCount += self.processIssueNodesInTransaction(issueConnection, repository, scopeId);
             } catch (InstallationNotFoundException e) {
                 // Re-throw to abort the entire sync operation
                 throw e;
@@ -453,7 +469,7 @@ public class GitHubSubIssueSyncService {
      * providing better resilience if a single page fails.
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    protected int processIssueNodesInTransaction(GHIssueConnection issueConnection, Repository repository) {
+    protected int processIssueNodesInTransaction(GHIssueConnection issueConnection, Repository repository, Long scopeId) {
         if (issueConnection.getNodes() == null) {
             return 0;
         }
@@ -462,66 +478,212 @@ public class GitHubSubIssueSyncService {
 
         for (var graphQlIssue : issueConnection.getNodes()) {
             if (graphQlIssue.getParent() != null) {
-                linkedCount += processParentRelationship(graphQlIssue, repository);
+                linkedCount += processParentRelationship(graphQlIssue, repository, scopeId);
             }
 
             if (graphQlIssue.getSubIssuesSummary() != null) {
-                processSubIssuesSummary(graphQlIssue);
+                processSubIssuesSummary(graphQlIssue, repository, scopeId);
             }
         }
 
         return linkedCount;
     }
 
-    private int processParentRelationship(GHIssue graphQlIssue, Repository repository) {
-        long issueDatabaseId = graphQlIssue.getFullDatabaseId().longValue();
-        long parentDatabaseId = graphQlIssue.getParent().getFullDatabaseId().longValue();
-
-        Optional<Issue> issueOpt = issueRepository.findById(issueDatabaseId);
-        Optional<Issue> parentOpt = issueRepository.findById(parentDatabaseId);
-
-        if (issueOpt.isPresent() && parentOpt.isPresent()) {
-            Issue issue = issueOpt.get();
-            Issue parent = parentOpt.get();
-
-            if (!parent.equals(issue.getParentIssue())) {
-                issue.setParentIssue(parent);
-                issueRepository.save(issue);
-
-                log.debug(
-                    "Linked issue to parent: issueNumber={}, parentIssueNumber={}, repoName={}",
-                    issue.getNumber(),
-                    parent.getNumber(),
-                    sanitizeForLog(repository.getNameWithOwner())
-                );
-                return 1;
-            }
+    /**
+     * Process parent relationship for a sub-issue.
+     * <p>
+     * Implements find-or-create pattern: if the sub-issue or parent doesn't exist
+     * locally, we create it from the GraphQL data. This ensures relationships are
+     * preserved even before backfill completes.
+     */
+    private int processParentRelationship(GHIssue graphQlIssue, Repository repository, Long scopeId) {
+        if (graphQlIssue.getFullDatabaseId() == null) {
+            return 0;
+        }
+        GHIssue parentGraphQl = graphQlIssue.getParent();
+        if (parentGraphQl == null || parentGraphQl.getFullDatabaseId() == null) {
+            return 0;
         }
 
-        return 0;
+        // Find or create the sub-issue
+        Issue subIssue = findOrCreateIssue(graphQlIssue, repository, scopeId);
+        if (subIssue == null) {
+            return 0;
+        }
+
+        // Find or create the parent issue
+        Issue parent = findOrCreateParentIssue(parentGraphQl, scopeId);
+        if (parent == null) {
+            log.debug(
+                "Skipped parent relationship: reason=parentNotCreated, subIssueNumber={}, parentNumber={}",
+                graphQlIssue.getNumber(),
+                parentGraphQl.getNumber()
+            );
+            return 0;
+        }
+
+        // Check if relationship already exists
+        if (parent.equals(subIssue.getParentIssue())) {
+            return 0;
+        }
+
+        // Set the parent relationship
+        subIssue.setParentIssue(parent);
+        issueRepository.save(subIssue);
+
+        log.debug(
+            "Linked issue to parent: issueNumber={}, parentIssueNumber={}, repoName={}",
+            subIssue.getNumber(),
+            parent.getNumber(),
+            sanitizeForLog(repository.getNameWithOwner())
+        );
+        return 1;
     }
 
-    private void processSubIssuesSummary(GHIssue graphQlIssue) {
+    /**
+     * Find an issue by ID, or create it from GraphQL data if it doesn't exist.
+     * <p>
+     * <b>Note:</b> Uses {@code processStub()} to create placeholder issues without
+     * triggering domain events. These stubs will be hydrated with full data when
+     * the regular issue sync runs.
+     */
+    @Nullable
+    private Issue findOrCreateIssue(GHIssue graphQlIssue, Repository repo, Long scopeId) {
+        if (graphQlIssue.getFullDatabaseId() == null) {
+            return null;
+        }
+
+        long issueId = graphQlIssue.getFullDatabaseId().longValue();
+        Optional<Issue> existingOpt = issueRepository.findById(issueId);
+        if (existingOpt.isPresent()) {
+            return existingOpt.get();
+        }
+
+        // Issue doesn't exist - create it from GraphQL data as a stub
+        log.debug(
+            "Creating stub issue from sub-issue sync: issueId={}, issueNumber={}, repoName={}",
+            issueId,
+            graphQlIssue.getNumber(),
+            sanitizeForLog(repo.getNameWithOwner())
+        );
+
+        GitHubIssueDTO dto = GitHubIssueDTO.fromIssue(graphQlIssue);
+        if (dto == null) {
+            return null;
+        }
+
+        // Use ProcessingContext.forSync directly to avoid LazyInitializationException
+        // when accessing repository.getOrganization() in the factory
+        ProcessingContext context = ProcessingContext.forSync(scopeId, repo);
+        // Use processStub() to avoid triggering IssueCreated events for placeholder issues
+        return issueProcessor.processStub(dto, context);
+    }
+
+    /**
+     * Find or create a parent issue from GraphQL data.
+     * <p>
+     * The parent may be in a different repository than the sub-issue.
+     * We use the repository reference from the GraphQL data to find the repository
+     * and create the issue there.
+     * <p>
+     * <b>Note:</b> Uses {@code processStub()} to create placeholder issues without
+     * triggering domain events. These stubs will be hydrated with full data when
+     * the regular issue sync runs.
+     */
+    @Nullable
+    private Issue findOrCreateParentIssue(GHIssue parentGraphQl, Long scopeId) {
+        if (parentGraphQl.getFullDatabaseId() == null) {
+            return null;
+        }
+
+        long parentId = parentGraphQl.getFullDatabaseId().longValue();
+        Optional<Issue> existingOpt = issueRepository.findById(parentId);
+        if (existingOpt.isPresent()) {
+            return existingOpt.get();
+        }
+
+        // Parent doesn't exist - create it from GraphQL data as a stub
+        Repository parentRepo = resolveParentRepository(parentGraphQl);
+        if (parentRepo == null) {
+            log.debug(
+                "Skipped creating parent: reason=repositoryNotFound, parentId={}, parentNumber={}",
+                parentId,
+                parentGraphQl.getNumber()
+            );
+            return null;
+        }
+
+        log.debug(
+            "Creating stub parent issue from sub-issue sync: parentId={}, parentNumber={}, repoName={}",
+            parentId,
+            parentGraphQl.getNumber(),
+            sanitizeForLog(parentRepo.getNameWithOwner())
+        );
+
+        GitHubIssueDTO dto = GitHubIssueDTO.fromIssueWithRepository(parentGraphQl);
+        if (dto == null) {
+            return null;
+        }
+
+        // Use ProcessingContext.forSync directly to avoid LazyInitializationException
+        // when accessing repository.getOrganization() in the factory
+        ProcessingContext context = ProcessingContext.forSync(scopeId, parentRepo);
+        // Use processStub() to avoid triggering IssueCreated events for placeholder issues
+        return issueProcessor.processStub(dto, context);
+    }
+
+    /**
+     * Resolve the repository for a parent issue.
+     * <p>
+     * The parent issue may be in a different repository. We find it by the
+     * nameWithOwner from the GraphQL response.
+     */
+    @Nullable
+    private Repository resolveParentRepository(GHIssue parentGraphQl) {
+        if (parentGraphQl.getRepository() == null) {
+            return null;
+        }
+
+        String nameWithOwner = parentGraphQl.getRepository().getNameWithOwner();
+        if (nameWithOwner == null) {
+            return null;
+        }
+
+        return repositoryRepository.findByNameWithOwner(nameWithOwner).orElse(null);
+    }
+
+    /**
+     * Process sub-issues summary for an issue.
+     * <p>
+     * Also implements find-or-create for the issue itself.
+     */
+    private void processSubIssuesSummary(GHIssue graphQlIssue, Repository repository, Long scopeId) {
         GHSubIssuesSummary summary = graphQlIssue.getSubIssuesSummary();
         if (summary == null || summary.getTotal() == 0) {
             return;
         }
 
-        long databaseId = graphQlIssue.getFullDatabaseId().longValue();
-        issueRepository
-            .findById(databaseId)
-            .ifPresent(issue -> {
-                issue.setSubIssuesTotal(summary.getTotal());
-                issue.setSubIssuesCompleted(summary.getCompleted());
-                issue.setSubIssuesPercentCompleted(summary.getPercentCompleted());
-                issueRepository.save(issue);
+        if (graphQlIssue.getFullDatabaseId() == null) {
+            return;
+        }
 
-                log.debug(
-                    "Updated issue sub-issues summary: issueNumber={}, completedCount={}, totalCount={}",
-                    issue.getNumber(),
-                    summary.getCompleted(),
-                    summary.getTotal()
-                );
-            });
+        // Find or create the issue
+        Issue issue = findOrCreateIssue(graphQlIssue, repository, scopeId);
+        if (issue == null) {
+            return;
+        }
+
+        // Update the summary
+        issue.setSubIssuesTotal(summary.getTotal());
+        issue.setSubIssuesCompleted(summary.getCompleted());
+        issue.setSubIssuesPercentCompleted(summary.getPercentCompleted());
+        issueRepository.save(issue);
+
+        log.debug(
+            "Updated issue sub-issues summary: issueNumber={}, completedCount={}, totalCount={}",
+            issue.getNumber(),
+            summary.getCompleted(),
+            summary.getTotal()
+        );
     }
 }

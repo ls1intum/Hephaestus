@@ -208,22 +208,24 @@ public interface SyncTargetProvider extends SyncTimestampProvider, BackfillState
     /**
      * A repository configured for synchronization within a scope.
      *
-     * @param id                              unique sync target identifier
-     * @param scopeId                         parent scope identifier
-     * @param installationId                  GitHub App installation ID (null for PAT auth)
-     * @param personalAccessToken             PAT for authentication (null for App auth)
-     * @param authMode                        authentication mechanism to use
-     * @param repositoryNameWithOwner         repository identifier in "owner/repo" format
-     * @param lastLabelsSyncedAt              last labels sync timestamp
-     * @param lastMilestonesSyncedAt          last milestones sync timestamp
-     * @param lastIssuesAndPullRequestsSyncedAt last issues/PRs sync timestamp
-     * @param lastCollaboratorsSyncedAt       last collaborators sync timestamp
-     * @param lastFullSyncAt                  last full repository sync timestamp
-     * @param backfillHighWaterMark           highest issue/PR number at backfill start
-     * @param backfillCheckpoint              current backfill position (counts down to 0)
-     * @param backfillLastRunAt               when backfill last executed
-     * @param issueSyncCursor                 pagination cursor for resuming issue sync
-     * @param pullRequestSyncCursor           pagination cursor for resuming PR sync
+     * @param id                                  unique sync target identifier
+     * @param scopeId                             parent scope identifier
+     * @param installationId                      GitHub App installation ID (null for PAT auth)
+     * @param personalAccessToken                 PAT for authentication (null for App auth)
+     * @param authMode                            authentication mechanism to use
+     * @param repositoryNameWithOwner             repository identifier in "owner/repo" format
+     * @param lastLabelsSyncedAt                  last labels sync timestamp
+     * @param lastMilestonesSyncedAt              last milestones sync timestamp
+     * @param lastIssuesAndPullRequestsSyncedAt   last issues/PRs sync timestamp
+     * @param lastCollaboratorsSyncedAt           last collaborators sync timestamp
+     * @param lastFullSyncAt                      last full repository sync timestamp
+     * @param issueBackfillHighWaterMark          highest issue number at issue backfill start
+     * @param issueBackfillCheckpoint             current issue backfill position (counts down to 0)
+     * @param pullRequestBackfillHighWaterMark    highest PR number at PR backfill start
+     * @param pullRequestBackfillCheckpoint       current PR backfill position (counts down to 0)
+     * @param backfillLastRunAt                   when backfill last executed
+     * @param issueSyncCursor                     pagination cursor for resuming issue sync
+     * @param pullRequestSyncCursor               pagination cursor for resuming PR sync
      */
     record SyncTarget(
         Long id,
@@ -237,8 +239,10 @@ public interface SyncTargetProvider extends SyncTimestampProvider, BackfillState
         Instant lastIssuesAndPullRequestsSyncedAt,
         Instant lastCollaboratorsSyncedAt,
         Instant lastFullSyncAt,
-        Integer backfillHighWaterMark,
-        Integer backfillCheckpoint,
+        Integer issueBackfillHighWaterMark,
+        Integer issueBackfillCheckpoint,
+        Integer pullRequestBackfillHighWaterMark,
+        Integer pullRequestBackfillCheckpoint,
         Instant backfillLastRunAt,
         String issueSyncCursor,
         String pullRequestSyncCursor
@@ -263,24 +267,57 @@ public interface SyncTargetProvider extends SyncTimestampProvider, BackfillState
             return lastLabelsSyncedAt == null || lastLabelsSyncedAt.isBefore(staleThreshold);
         }
 
-        /** @return true if backfill has been initialized (high water mark captured) */
+        /** @return true if issue backfill has been initialized (high water mark captured) */
+        public boolean isIssueBackfillInitialized() {
+            return issueBackfillHighWaterMark != null;
+        }
+
+        /** @return true if pull request backfill has been initialized (high water mark captured) */
+        public boolean isPullRequestBackfillInitialized() {
+            return pullRequestBackfillHighWaterMark != null;
+        }
+
+        /** @return true if any backfill has been initialized */
         public boolean isBackfillInitialized() {
-            return backfillHighWaterMark != null;
+            return isIssueBackfillInitialized() || isPullRequestBackfillInitialized();
         }
 
-        /** @return true if backfill has completed (checkpoint reached 0 or no items to backfill) */
+        /** @return true if issue backfill has completed */
+        public boolean isIssueBackfillComplete() {
+            return isIssueBackfillInitialized()
+                && (issueBackfillHighWaterMark == 0
+                    || (issueBackfillCheckpoint != null && issueBackfillCheckpoint <= 0));
+        }
+
+        /** @return true if pull request backfill has completed */
+        public boolean isPullRequestBackfillComplete() {
+            return isPullRequestBackfillInitialized()
+                && (pullRequestBackfillHighWaterMark == 0
+                    || (pullRequestBackfillCheckpoint != null && pullRequestBackfillCheckpoint <= 0));
+        }
+
+        /** @return true if both issue and pull request backfill have completed */
         public boolean isBackfillComplete() {
-            return (
-                isBackfillInitialized() &&
-                (backfillHighWaterMark == 0 || (backfillCheckpoint != null && backfillCheckpoint <= 0))
-            );
+            return isIssueBackfillComplete() && isPullRequestBackfillComplete();
         }
 
-        /** @return number of items remaining to backfill (0 if complete or not initialized) */
+        /** @return number of issues remaining to backfill */
+        public int getIssueBackfillRemaining() {
+            if (!isIssueBackfillInitialized() || issueBackfillHighWaterMark == 0) return 0;
+            if (issueBackfillCheckpoint == null) return issueBackfillHighWaterMark;
+            return Math.max(0, issueBackfillCheckpoint);
+        }
+
+        /** @return number of pull requests remaining to backfill */
+        public int getPullRequestBackfillRemaining() {
+            if (!isPullRequestBackfillInitialized() || pullRequestBackfillHighWaterMark == 0) return 0;
+            if (pullRequestBackfillCheckpoint == null) return pullRequestBackfillHighWaterMark;
+            return Math.max(0, pullRequestBackfillCheckpoint);
+        }
+
+        /** @return total items remaining to backfill (issues + pull requests) */
         public int getBackfillRemaining() {
-            if (!isBackfillInitialized() || backfillHighWaterMark == 0) return 0;
-            if (backfillCheckpoint == null) return backfillHighWaterMark;
-            return Math.max(0, backfillCheckpoint);
+            return getIssueBackfillRemaining() + getPullRequestBackfillRemaining();
         }
     }
 

@@ -24,6 +24,7 @@ import jakarta.persistence.ManyToMany;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.Set;
@@ -34,7 +35,15 @@ import lombok.ToString;
 import org.springframework.lang.NonNull;
 
 @Entity
-@Table(name = "issue")
+@Table(
+    name = "issue",
+    uniqueConstraints = {
+        @UniqueConstraint(
+            name = "uk_issue_repository_number",
+            columnNames = {"repository_id", "number"}
+        )
+    }
+)
 @Inheritance(strategy = InheritanceType.SINGLE_TABLE)
 @DiscriminatorColumn(name = "issue_type", discriminatorType = DiscriminatorType.STRING)
 @DiscriminatorValue(value = "ISSUE")
@@ -215,5 +224,101 @@ public class Issue extends BaseGitServiceEntity {
 
     public boolean isPullRequest() {
         return false;
+    }
+
+    // ==================== Bidirectional Relationship Helpers ====================
+
+    /**
+     * Adds a label to this issue and maintains bidirectional consistency.
+     *
+     * @param label the label to add
+     */
+    public void addLabel(Label label) {
+        if (label != null) {
+            this.labels.add(label);
+            label.getIssues().add(this);
+        }
+    }
+
+    /**
+     * Removes a label from this issue and maintains bidirectional consistency.
+     *
+     * @param label the label to remove
+     */
+    public void removeLabel(Label label) {
+        if (label != null) {
+            this.labels.remove(label);
+            label.getIssues().remove(this);
+        }
+    }
+
+    /**
+     * Adds an assignee to this issue and maintains bidirectional consistency.
+     *
+     * @param assignee the user to add as assignee
+     */
+    public void addAssignee(User assignee) {
+        if (assignee != null) {
+            this.assignees.add(assignee);
+        }
+    }
+
+    /**
+     * Removes an assignee from this issue.
+     *
+     * @param assignee the user to remove
+     */
+    public void removeAssignee(User assignee) {
+        if (assignee != null) {
+            this.assignees.remove(assignee);
+        }
+    }
+
+    /**
+     * Adds a comment to this issue and maintains bidirectional consistency.
+     *
+     * @param comment the comment to add
+     */
+    public void addComment(IssueComment comment) {
+        if (comment != null) {
+            this.comments.add(comment);
+            comment.setIssue(this);
+        }
+    }
+
+    /**
+     * Removes a comment from this issue and maintains bidirectional consistency.
+     *
+     * @param comment the comment to remove
+     */
+    public void removeComment(IssueComment comment) {
+        if (comment != null) {
+            this.comments.remove(comment);
+            comment.setIssue(null);
+        }
+    }
+
+    /**
+     * Adds a blocking relationship (this issue blocks the given issue).
+     *
+     * @param blockedIssue the issue that this issue blocks
+     */
+    public void addBlocking(Issue blockedIssue) {
+        if (blockedIssue != null) {
+            blockedIssue.getBlockedBy().add(this);
+            this.blocking.add(blockedIssue);
+        }
+    }
+
+    /**
+     * Removes a blocking relationship (this issue no longer blocks the given issue).
+     *
+     * @param blockedIssue the issue that this issue no longer blocks
+     */
+    public void removeBlocking(Issue blockedIssue) {
+        if (blockedIssue != null) {
+            blockedIssue.getBlockedBy().remove(this);
+            this.blocking.remove(blockedIssue);
+        }
     }
 }

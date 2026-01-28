@@ -6,11 +6,15 @@ import de.tum.in.www1.hephaestus.gitprovider.issuecomment.IssueComment;
 import de.tum.in.www1.hephaestus.gitprovider.issuecomment.IssueCommentRepository;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReview;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReviewRepository;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewthread.PullRequestReviewThread;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewthread.PullRequestReviewThreadRepository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
+import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import java.time.Instant;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.lang.Nullable;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
@@ -43,6 +47,7 @@ public class ActivityEventListener {
     private final ExperiencePointCalculator xpCalc;
     private final PullRequestReviewRepository reviewRepository;
     private final IssueCommentRepository issueCommentRepository;
+    private final PullRequestReviewThreadRepository reviewThreadRepository;
     private final UserRepository userRepository;
     private final RepositoryRepository repositoryRepository;
 
@@ -51,6 +56,7 @@ public class ActivityEventListener {
         ExperiencePointCalculator xpCalc,
         PullRequestReviewRepository reviewRepository,
         IssueCommentRepository issueCommentRepository,
+        PullRequestReviewThreadRepository reviewThreadRepository,
         UserRepository userRepository,
         RepositoryRepository repositoryRepository
     ) {
@@ -58,6 +64,7 @@ public class ActivityEventListener {
         this.xpCalc = xpCalc;
         this.reviewRepository = reviewRepository;
         this.issueCommentRepository = issueCommentRepository;
+        this.reviewThreadRepository = reviewThreadRepository;
         this.userRepository = userRepository;
         this.repositoryRepository = repositoryRepository;
     }
@@ -91,7 +98,41 @@ public class ActivityEventListener {
         return true;
     }
 
+    /**
+     * Gets the actor (User) for an activity event, or null if the actor is unknown.
+     *
+     * <p>When an author ID is null (e.g., GitHub user deleted, organization bot, etc.),
+     * we return null rather than skipping the event. This preserves the activity record
+     * for audit trail and repository metrics while correctly attributing no XP.
+     *
+     * <p>The ActivityEvent schema explicitly supports null actors for system events
+     * and events where the original actor is no longer known.
+     *
+     * @param authorId the author ID from the event payload (nullable)
+     * @return User reference if authorId is present, null otherwise
+     */
+    @Nullable
+    private User getActorOrNull(@Nullable Long authorId) {
+        return authorId != null ? userRepository.getReferenceById(authorId) : null;
+    }
+
+    /**
+     * Calculates XP for an event, returning 0 if the actor is unknown.
+     *
+     * <p>When we don't know who performed an action (author deleted, bot, etc.),
+     * no XP should be awarded. The event is still recorded for audit purposes,
+     * but deleted users cannot earn XP posthumously.
+     *
+     * @param authorId the author ID (nullable)
+     * @param xpIfKnown the XP to award if the author is known
+     * @return xpIfKnown if authorId is present, 0.0 otherwise
+     */
+    private double xpForActor(@Nullable Long authorId, double xpIfKnown) {
+        return authorId != null ? xpIfKnown : 0.0;
+    }
+
     @Async
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onPullRequestCreated(DomainEvent.PullRequestCreated event) {
         var pr = event.pullRequest();
@@ -122,6 +163,7 @@ public class ActivityEventListener {
     }
 
     @Async
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onPullRequestMerged(DomainEvent.PullRequestMerged event) {
         var pr = event.pullRequest();
@@ -154,6 +196,7 @@ public class ActivityEventListener {
     }
 
     @Async
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onPullRequestClosed(DomainEvent.PullRequestClosed event) {
         if (event.wasMerged()) {
@@ -187,6 +230,7 @@ public class ActivityEventListener {
     }
 
     @Async
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onPullRequestReopened(DomainEvent.PullRequestReopened event) {
         var pr = event.pullRequest();
@@ -213,6 +257,7 @@ public class ActivityEventListener {
     }
 
     @Async
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onPullRequestReady(DomainEvent.PullRequestReady event) {
         var pr = event.pullRequest();
@@ -238,17 +283,157 @@ public class ActivityEventListener {
         );
     }
 
+    /**
+     * Handle pull request converted to draft (ready->draft transition).
+     *
+     * <p>Records lifecycle event with 0 XP - converting back to draft is
+     * a workflow tracking event, not a value-adding activity.
+     */
     @Async
-    @Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = true)
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onPullRequestDrafted(DomainEvent.PullRequestDrafted event) {
+        var pr = event.pullRequest();
+        if (!hasValidScopeId("PR drafted", pr.id(), event.context().scopeId())) {
+            return;
+        }
+        if (pr.authorId() == null) {
+            log.debug("Skipping PR drafted event (author may be deleted): prId={}", pr.id());
+            return;
+        }
+        Instant occurredAt = pr.updatedAt() != null ? pr.updatedAt() : Instant.now();
+        safeRecord("PR drafted", pr.id(), () ->
+            activityEventService.record(
+                event.context().scopeId(),
+                ActivityEventType.PULL_REQUEST_DRAFTED,
+                occurredAt,
+                userRepository.getReferenceById(pr.authorId()),
+                repositoryRepository.getReferenceById(pr.repository().id()),
+                ActivityTargetType.PULL_REQUEST,
+                pr.id(),
+                0.0 // Draft conversion is lifecycle tracking, no XP reward
+            )
+        );
+    }
+
+    /**
+     * Handle pull request synchronized (new commits pushed to the branch).
+     *
+     * <p>Records lifecycle event with 0 XP - pushing new commits is tracked
+     * for activity completeness but doesn't award XP (the PR creation already did).
+     */
+    @Async
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onPullRequestSynchronized(DomainEvent.PullRequestSynchronized event) {
+        var pr = event.pullRequest();
+        if (!hasValidScopeId("PR synchronized", pr.id(), event.context().scopeId())) {
+            return;
+        }
+        if (pr.authorId() == null) {
+            log.debug("Skipping PR synchronized event (author may be deleted): prId={}", pr.id());
+            return;
+        }
+        Instant occurredAt = pr.updatedAt() != null ? pr.updatedAt() : Instant.now();
+        safeRecord("PR synchronized", pr.id(), () ->
+            activityEventService.record(
+                event.context().scopeId(),
+                ActivityEventType.PULL_REQUEST_SYNCHRONIZED,
+                occurredAt,
+                userRepository.getReferenceById(pr.authorId()),
+                repositoryRepository.getReferenceById(pr.repository().id()),
+                ActivityTargetType.PULL_REQUEST,
+                pr.id(),
+                0.0 // Synchronization is lifecycle tracking, no XP reward
+            )
+        );
+    }
+
+    /**
+     * Handle label added to pull request.
+     *
+     * <p>Records workflow tracking event with 0 XP - labeling is organizational
+     * activity that helps with workflow but doesn't directly add value.
+     */
+    @Async
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onPullRequestLabeled(DomainEvent.PullRequestLabeled event) {
+        var pr = event.pullRequest();
+        if (!hasValidScopeId("PR labeled", pr.id(), event.context().scopeId())) {
+            return;
+        }
+        if (pr.authorId() == null) {
+            log.debug("Skipping PR labeled event (author may be deleted): prId={}", pr.id());
+            return;
+        }
+        Instant occurredAt = pr.updatedAt() != null ? pr.updatedAt() : Instant.now();
+        safeRecord("PR labeled", pr.id(), () ->
+            activityEventService.record(
+                event.context().scopeId(),
+                ActivityEventType.PULL_REQUEST_LABELED,
+                occurredAt,
+                userRepository.getReferenceById(pr.authorId()),
+                repositoryRepository.getReferenceById(pr.repository().id()),
+                ActivityTargetType.PULL_REQUEST,
+                pr.id(),
+                0.0 // Labeling is workflow tracking, no XP reward
+            )
+        );
+    }
+
+    /**
+     * Handle label removed from pull request.
+     *
+     * <p>Records workflow tracking event with 0 XP - unlabeling is organizational
+     * activity that helps with workflow but doesn't directly add value.
+     */
+    @Async
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onPullRequestUnlabeled(DomainEvent.PullRequestUnlabeled event) {
+        var pr = event.pullRequest();
+        if (!hasValidScopeId("PR unlabeled", pr.id(), event.context().scopeId())) {
+            return;
+        }
+        if (pr.authorId() == null) {
+            log.debug("Skipping PR unlabeled event (author may be deleted): prId={}", pr.id());
+            return;
+        }
+        Instant occurredAt = pr.updatedAt() != null ? pr.updatedAt() : Instant.now();
+        safeRecord("PR unlabeled", pr.id(), () ->
+            activityEventService.record(
+                event.context().scopeId(),
+                ActivityEventType.PULL_REQUEST_UNLABELED,
+                occurredAt,
+                userRepository.getReferenceById(pr.authorId()),
+                repositoryRepository.getReferenceById(pr.repository().id()),
+                ActivityTargetType.PULL_REQUEST,
+                pr.id(),
+                0.0 // Unlabeling is workflow tracking, no XP reward
+            )
+        );
+    }
+
+    @Async
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onReviewSubmitted(DomainEvent.ReviewSubmitted event) {
         var reviewData = event.review();
+        log.info(
+            "Received ReviewSubmitted event: reviewId={}, state={}, scopeId={}, authorId={}, repositoryId={}",
+            reviewData.id(),
+            reviewData.state(),
+            event.context().scopeId(),
+            reviewData.authorId(),
+            reviewData.repositoryId()
+        );
         if (!hasValidScopeId("Review submitted", reviewData.id(), event.context().scopeId())) {
             return;
         }
         if (reviewData.authorId() == null || reviewData.repositoryId() == null) {
-            log.debug(
-                "Skipping review submitted event (author may be deleted): reviewId={}, authorId={}, repositoryId={}",
+            log.warn(
+                "Skipping review submitted event (author or repository may be deleted): reviewId={}, authorId={}, repositoryId={}",
                 reviewData.id(),
                 reviewData.authorId(),
                 reviewData.repositoryId()
@@ -279,6 +464,7 @@ public class ActivityEventListener {
     }
 
     @Async
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onReviewDismissed(DomainEvent.ReviewDismissed event) {
         var reviewData = event.review();
@@ -315,15 +501,16 @@ public class ActivityEventListener {
     /**
      * Handle review edited events.
      *
-     * <p>When a review is edited (e.g., state changes from COMMENTED to APPROVED),
-     * we record a new event with the updated state. The XP is recalculated based
-     * on the new review state and all reviews for the PR by this author.
+     * <p>When a review is edited (e.g., body text changes), we record a new event
+     * for audit trail purposes with 0 XP. The original REVIEW_SUBMITTED event
+     * already captured the XP, so edited events should not add more XP to avoid
+     * double-counting in leaderboard aggregation.
      *
      * <p>Note: This creates a new event rather than updating the original,
      * maintaining an immutable audit trail of all review activity.
      */
     @Async
-    @Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = true)
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onReviewEdited(DomainEvent.ReviewEdited event) {
         var reviewData = event.review();
@@ -339,14 +526,8 @@ public class ActivityEventListener {
             );
             return;
         }
-        // Calculate XP for THIS single review only - not cumulative across all reviews.
-        // Each event stores XP for its own review to avoid double-counting when aggregated.
-        PullRequestReview review = reviewRepository.findById(reviewData.id()).orElse(null);
-        if (review == null) {
-            log.warn("Review not found for XP calculation: reviewId={}", reviewData.id());
-            return;
-        }
-        double xp = xpCalc.calculateReviewExperiencePoints(review);
+        // Record with 0 XP - the original review submission already captured XP.
+        // Editing a review should not grant additional XP to avoid double-counting.
         Instant occurredAt = reviewData.submittedAt() != null ? reviewData.submittedAt() : Instant.now();
         safeRecord("review edited", reviewData.id(), () ->
             activityEventService.record(
@@ -357,13 +538,13 @@ public class ActivityEventListener {
                 repositoryRepository.getReferenceById(reviewData.repositoryId()),
                 ActivityTargetType.REVIEW,
                 reviewData.id(),
-                xp
+                0.0 // No XP for edits - original submission already counted
             )
         );
     }
 
     @Async
-    @Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = true)
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onCommentCreated(DomainEvent.CommentCreated event) {
         var commentData = event.comment();
@@ -404,7 +585,83 @@ public class ActivityEventListener {
         );
     }
 
+    /**
+     * Handle comment updated events.
+     *
+     * <p>Records audit trail event with 0 XP - the original comment creation
+     * already captured XP, edits don't add additional value.
+     */
     @Async
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onCommentUpdated(DomainEvent.CommentUpdated event) {
+        var commentData = event.comment();
+        if (!hasValidScopeId("Comment updated", commentData.id(), event.context().scopeId())) {
+            return;
+        }
+        if (commentData.authorId() == null || commentData.repositoryId() == null) {
+            log.debug(
+                "Skipping comment updated event (author may be deleted): commentId={}, authorId={}, repositoryId={}",
+                commentData.id(),
+                commentData.authorId(),
+                commentData.repositoryId()
+            );
+            return;
+        }
+        Instant occurredAt = Instant.now(); // Use current time for edits
+        safeRecord("comment updated", commentData.id(), () ->
+            activityEventService.record(
+                event.context().scopeId(),
+                ActivityEventType.COMMENT_UPDATED,
+                occurredAt,
+                userRepository.getReferenceById(commentData.authorId()),
+                repositoryRepository.getReferenceById(commentData.repositoryId()),
+                ActivityTargetType.ISSUE_COMMENT,
+                commentData.id(),
+                0.0 // No XP for edits - original creation already counted
+            )
+        );
+    }
+
+    /**
+     * Handle comment deleted events.
+     *
+     * <p>Records audit trail event with 0 XP. Note that we may not have full
+     * comment data since the entity was deleted - we rely on the event metadata.
+     */
+    @Async
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onCommentDeleted(DomainEvent.CommentDeleted event) {
+        Long commentId = event.commentId();
+        if (!hasValidScopeId("Comment deleted", commentId, event.context().scopeId())) {
+            return;
+        }
+        // For deleted comments, we don't have author info from the event
+        // We record with a null user reference - this is acceptable for audit trail
+        log.debug("Recording comment deleted event: commentId={}", commentId);
+        safeRecord("comment deleted", commentId, () ->
+            activityEventService.recordDeleted(
+                event.context().scopeId(),
+                ActivityEventType.COMMENT_DELETED,
+                Instant.now(),
+                ActivityTargetType.ISSUE_COMMENT,
+                commentId
+            )
+        );
+    }
+
+    /**
+     * Handle review comment (inline code comment) created events.
+     *
+     * <p>Records with 0 XP because the review's XP calculation already factors in
+     * the number of inline comments via {@code calculateCodeReviewBonus()}. Adding
+     * separate XP here would double-count the same comments.
+     *
+     * <p>We still record the event for audit trail and activity tracking purposes.
+     */
+    @Async
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onReviewCommentCreated(DomainEvent.ReviewCommentCreated event) {
         var commentData = event.comment();
@@ -421,6 +678,8 @@ public class ActivityEventListener {
             return;
         }
         Instant occurredAt = commentData.createdAt() != null ? commentData.createdAt() : Instant.now();
+        // Record with 0 XP - the review's calculateCodeReviewBonus() already factors in comment count.
+        // Recording the event for audit purposes only.
         safeRecord("review comment", commentData.id(), () ->
             activityEventService.record(
                 event.context().scopeId(),
@@ -430,12 +689,189 @@ public class ActivityEventListener {
                 repositoryRepository.getReferenceById(commentData.repositoryId()),
                 ActivityTargetType.REVIEW_COMMENT,
                 commentData.id(),
-                xpCalc.getXpReviewComment()
+                0.0 // No XP - already counted in review's code review bonus
             )
         );
     }
 
+    /**
+     * Handle review comment edited events.
+     *
+     * <p>Records audit trail event with 0 XP - edits are tracked for completeness
+     * but don't affect XP since the review bonus already accounted for the comment.
+     */
     @Async
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onReviewCommentEdited(DomainEvent.ReviewCommentEdited event) {
+        var commentData = event.comment();
+        if (!hasValidScopeId("Review comment edited", commentData.id(), event.context().scopeId())) {
+            return;
+        }
+        if (commentData.authorId() == null || commentData.repositoryId() == null) {
+            log.debug(
+                "Skipping review comment edited event (author may be deleted): commentId={}, authorId={}, repositoryId={}",
+                commentData.id(),
+                commentData.authorId(),
+                commentData.repositoryId()
+            );
+            return;
+        }
+        Instant occurredAt = Instant.now(); // Use current time for edits
+        safeRecord("review comment edited", commentData.id(), () ->
+            activityEventService.record(
+                event.context().scopeId(),
+                ActivityEventType.REVIEW_COMMENT_EDITED,
+                occurredAt,
+                userRepository.getReferenceById(commentData.authorId()),
+                repositoryRepository.getReferenceById(commentData.repositoryId()),
+                ActivityTargetType.REVIEW_COMMENT,
+                commentData.id(),
+                0.0 // No XP for edits
+            )
+        );
+    }
+
+    /**
+     * Handle review comment deleted events.
+     *
+     * <p>Records audit trail event with 0 XP. Note that we may not have full
+     * comment data since the entity was deleted.
+     */
+    @Async
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onReviewCommentDeleted(DomainEvent.ReviewCommentDeleted event) {
+        Long commentId = event.commentId();
+        if (!hasValidScopeId("Review comment deleted", commentId, event.context().scopeId())) {
+            return;
+        }
+        log.debug("Recording review comment deleted event: commentId={}", commentId);
+        safeRecord("review comment deleted", commentId, () ->
+            activityEventService.recordDeleted(
+                event.context().scopeId(),
+                ActivityEventType.REVIEW_COMMENT_DELETED,
+                Instant.now(),
+                ActivityTargetType.REVIEW_COMMENT,
+                commentId
+            )
+        );
+    }
+
+    // ========================================================================
+    // Review Thread Events (Code Review Effectiveness)
+    // ========================================================================
+
+    /**
+     * Handle review thread resolved events.
+     *
+     * <p>Resolving a review thread indicates that code review feedback has been
+     * addressed. This is valuable for tracking code review effectiveness metrics.
+     * Records with 0 XP since the value is in the resolution of feedback, not
+     * in the act of marking it resolved.
+     */
+    @Async
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onReviewThreadResolved(DomainEvent.ReviewThreadResolved event) {
+        var threadData = event.thread();
+        if (!hasValidScopeId("Review thread resolved", threadData.id(), event.context().scopeId())) {
+            return;
+        }
+        // Fetch the thread to get repository and resolver info
+        PullRequestReviewThread thread = reviewThreadRepository.findById(threadData.id()).orElse(null);
+        if (thread == null) {
+            log.debug("Skipping review thread resolved event (thread not found): threadId={}", threadData.id());
+            return;
+        }
+        if (thread.getPullRequest() == null || thread.getPullRequest().getRepository() == null) {
+            log.debug("Skipping review thread resolved event (missing PR or repository): threadId={}", threadData.id());
+            return;
+        }
+        // The resolver might be different from the PR author - use resolvedBy if available
+        Long resolverId = thread.getResolvedBy() != null
+            ? thread.getResolvedBy().getId()
+            : (thread.getPullRequest().getAuthor() != null ? thread.getPullRequest().getAuthor().getId() : null);
+        if (resolverId == null) {
+            log.debug("Skipping review thread resolved event (no resolver found): threadId={}", threadData.id());
+            return;
+        }
+        Long repositoryId = thread.getPullRequest().getRepository().getId();
+        safeRecord("review thread resolved", threadData.id(), () ->
+            activityEventService.record(
+                event.context().scopeId(),
+                ActivityEventType.REVIEW_THREAD_RESOLVED,
+                Instant.now(),
+                userRepository.getReferenceById(resolverId),
+                repositoryRepository.getReferenceById(repositoryId),
+                ActivityTargetType.REVIEW_THREAD,
+                threadData.id(),
+                0.0 // Lifecycle tracking, no XP reward
+            )
+        );
+    }
+
+    /**
+     * Handle review thread unresolved events.
+     *
+     * <p>Unresolving a review thread indicates that previously addressed feedback
+     * needs more attention. Records with 0 XP since this is workflow tracking.
+     */
+    @Async
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onReviewThreadUnresolved(DomainEvent.ReviewThreadUnresolved event) {
+        var threadData = event.thread();
+        if (!hasValidScopeId("Review thread unresolved", threadData.id(), event.context().scopeId())) {
+            return;
+        }
+        // Fetch the thread to get repository info
+        PullRequestReviewThread thread = reviewThreadRepository.findById(threadData.id()).orElse(null);
+        if (thread == null) {
+            log.debug("Skipping review thread unresolved event (thread not found): threadId={}", threadData.id());
+            return;
+        }
+        if (thread.getPullRequest() == null || thread.getPullRequest().getRepository() == null) {
+            log.debug(
+                "Skipping review thread unresolved event (missing PR or repository): threadId={}",
+                threadData.id()
+            );
+            return;
+        }
+        // For unresolved, we use the PR author since we don't track who unresolved it
+        Long userId = thread.getPullRequest().getAuthor() != null
+            ? thread.getPullRequest().getAuthor().getId()
+            : null;
+        if (userId == null) {
+            log.debug("Skipping review thread unresolved event (no user found): threadId={}", threadData.id());
+            return;
+        }
+        Long repositoryId = thread.getPullRequest().getRepository().getId();
+        safeRecord("review thread unresolved", threadData.id(), () ->
+            activityEventService.record(
+                event.context().scopeId(),
+                ActivityEventType.REVIEW_THREAD_UNRESOLVED,
+                Instant.now(),
+                userRepository.getReferenceById(userId),
+                repositoryRepository.getReferenceById(repositoryId),
+                ActivityTargetType.REVIEW_THREAD,
+                threadData.id(),
+                0.0 // Lifecycle tracking, no XP reward
+            )
+        );
+    }
+
+    /**
+     * Handle issue created events.
+     *
+     * <p>Records ISSUE_CREATED activity event. If the author is unknown (null),
+     * the event is still recorded for audit purposes but with 0 XP. This handles
+     * cases where the GitHub user was deleted or the issue was created by a bot.
+     *
+     * <p>XP is only awarded when we can attribute the action to a known user.
+     */
+    @Async
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onIssueCreated(DomainEvent.IssueCreated event) {
         var issueData = event.issue();
@@ -446,9 +882,12 @@ public class ActivityEventListener {
         if (!hasValidScopeId("Issue created", issueData.id(), event.context().scopeId())) {
             return;
         }
+        // Log unknown authors for observability, but don't skip the event
         if (issueData.authorId() == null) {
-            log.debug("Skipping issue created event (author may be deleted): issueId={}", issueData.id());
-            return;
+            log.info(
+                "Recording issue created event with unknown author (user deleted or bot): issueId={}, xp=0",
+                issueData.id()
+            );
         }
         Instant occurredAt = issueData.createdAt() != null ? issueData.createdAt() : Instant.now();
         safeRecord("issue created", issueData.id(), () ->
@@ -456,16 +895,25 @@ public class ActivityEventListener {
                 event.context().scopeId(),
                 ActivityEventType.ISSUE_CREATED,
                 occurredAt,
-                userRepository.getReferenceById(issueData.authorId()),
+                getActorOrNull(issueData.authorId()),
                 repositoryRepository.getReferenceById(issueData.repository().id()),
                 ActivityTargetType.ISSUE,
                 issueData.id(),
-                xpCalc.getXpIssueCreated()
+                xpForActor(issueData.authorId(), xpCalc.getXpIssueCreated())
             )
         );
     }
 
+    /**
+     * Handle issue closed events.
+     *
+     * <p>Records lifecycle event with 0 XP - issue closure is tracked for
+     * activity completeness but doesn't award XP.
+     *
+     * <p>Events are recorded even when author is unknown (null actor).
+     */
     @Async
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onIssueClosed(DomainEvent.IssueClosed event) {
         var issueData = event.issue();
@@ -474,10 +922,6 @@ public class ActivityEventListener {
             return;
         }
         if (!hasValidScopeId("Issue closed", issueData.id(), event.context().scopeId())) {
-            return;
-        }
-        if (issueData.authorId() == null) {
-            log.debug("Skipping issue closed event (author may be deleted): issueId={}", issueData.id());
             return;
         }
         Instant occurredAt = issueData.closedAt() != null ? issueData.closedAt() : issueData.updatedAt();
@@ -490,11 +934,212 @@ public class ActivityEventListener {
                 event.context().scopeId(),
                 ActivityEventType.ISSUE_CLOSED,
                 finalOccurredAt,
-                userRepository.getReferenceById(issueData.authorId()),
+                getActorOrNull(issueData.authorId()),
                 repositoryRepository.getReferenceById(issueData.repository().id()),
                 ActivityTargetType.ISSUE,
                 issueData.id(),
                 0.0 // Issue closure is lifecycle tracking, no XP reward
+            )
+        );
+    }
+
+    /**
+     * Handle issue reopened events.
+     *
+     * <p>Records lifecycle event with 0 XP - reopening an issue is workflow
+     * tracking indicating work resumption.
+     *
+     * <p>Events are recorded even when author is unknown (null actor).
+     */
+    @Async
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onIssueReopened(DomainEvent.IssueReopened event) {
+        var issueData = event.issue();
+        // Skip pull requests - they have their own events
+        if (issueData.isPullRequest()) {
+            return;
+        }
+        if (!hasValidScopeId("Issue reopened", issueData.id(), event.context().scopeId())) {
+            return;
+        }
+        Instant occurredAt = issueData.updatedAt() != null ? issueData.updatedAt() : Instant.now();
+        safeRecord("issue reopened", issueData.id(), () ->
+            activityEventService.record(
+                event.context().scopeId(),
+                ActivityEventType.ISSUE_REOPENED,
+                occurredAt,
+                getActorOrNull(issueData.authorId()),
+                repositoryRepository.getReferenceById(issueData.repository().id()),
+                ActivityTargetType.ISSUE,
+                issueData.id(),
+                0.0 // Reopening is lifecycle tracking, no XP reward
+            )
+        );
+    }
+
+    /**
+     * Handle issue deleted events.
+     *
+     * <p>Records audit trail event with 0 XP. Note that we only have the issue ID
+     * since the entity was deleted.
+     */
+    @Async
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onIssueDeleted(DomainEvent.IssueDeleted event) {
+        Long issueId = event.issueId();
+        if (!hasValidScopeId("Issue deleted", issueId, event.context().scopeId())) {
+            return;
+        }
+        log.debug("Recording issue deleted event: issueId={}", issueId);
+        safeRecord("issue deleted", issueId, () ->
+            activityEventService.recordDeleted(
+                event.context().scopeId(),
+                ActivityEventType.ISSUE_DELETED,
+                Instant.now(),
+                ActivityTargetType.ISSUE,
+                issueId
+            )
+        );
+    }
+
+    /**
+     * Handle label added to issue events.
+     *
+     * <p>Records workflow tracking event with 0 XP - labeling is organizational
+     * activity that helps with categorization but doesn't directly add value.
+     *
+     * <p>Events are recorded even when author is unknown (null actor).
+     */
+    @Async
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onIssueLabeled(DomainEvent.IssueLabeled event) {
+        var issueData = event.issue();
+        // Skip pull requests - they have their own events
+        if (issueData.isPullRequest()) {
+            return;
+        }
+        if (!hasValidScopeId("Issue labeled", issueData.id(), event.context().scopeId())) {
+            return;
+        }
+        Instant occurredAt = issueData.updatedAt() != null ? issueData.updatedAt() : Instant.now();
+        safeRecord("issue labeled", issueData.id(), () ->
+            activityEventService.record(
+                event.context().scopeId(),
+                ActivityEventType.ISSUE_LABELED,
+                occurredAt,
+                getActorOrNull(issueData.authorId()),
+                repositoryRepository.getReferenceById(issueData.repository().id()),
+                ActivityTargetType.ISSUE,
+                issueData.id(),
+                0.0 // Labeling is workflow tracking, no XP reward
+            )
+        );
+    }
+
+    /**
+     * Handle label removed from issue events.
+     *
+     * <p>Records workflow tracking event with 0 XP - unlabeling is organizational
+     * activity that helps with categorization but doesn't directly add value.
+     *
+     * <p>Events are recorded even when author is unknown (null actor).
+     */
+    @Async
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onIssueUnlabeled(DomainEvent.IssueUnlabeled event) {
+        var issueData = event.issue();
+        // Skip pull requests - they have their own events
+        if (issueData.isPullRequest()) {
+            return;
+        }
+        if (!hasValidScopeId("Issue unlabeled", issueData.id(), event.context().scopeId())) {
+            return;
+        }
+        Instant occurredAt = issueData.updatedAt() != null ? issueData.updatedAt() : Instant.now();
+        safeRecord("issue unlabeled", issueData.id(), () ->
+            activityEventService.record(
+                event.context().scopeId(),
+                ActivityEventType.ISSUE_UNLABELED,
+                occurredAt,
+                getActorOrNull(issueData.authorId()),
+                repositoryRepository.getReferenceById(issueData.repository().id()),
+                ActivityTargetType.ISSUE,
+                issueData.id(),
+                0.0 // Unlabeling is workflow tracking, no XP reward
+            )
+        );
+    }
+
+    /**
+     * Handle issue type assigned events.
+     *
+     * <p>Records workflow tracking event with 0 XP - assigning issue types
+     * (bug, feature, task, etc.) is categorization that helps with work tracking.
+     *
+     * <p>Events are recorded even when author is unknown (null actor).
+     */
+    @Async
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onIssueTyped(DomainEvent.IssueTyped event) {
+        var issueData = event.issue();
+        // Skip pull requests
+        if (issueData.isPullRequest()) {
+            return;
+        }
+        if (!hasValidScopeId("Issue typed", issueData.id(), event.context().scopeId())) {
+            return;
+        }
+        Instant occurredAt = issueData.updatedAt() != null ? issueData.updatedAt() : Instant.now();
+        safeRecord("issue typed", issueData.id(), () ->
+            activityEventService.record(
+                event.context().scopeId(),
+                ActivityEventType.ISSUE_TYPED,
+                occurredAt,
+                getActorOrNull(issueData.authorId()),
+                repositoryRepository.getReferenceById(issueData.repository().id()),
+                ActivityTargetType.ISSUE,
+                issueData.id(),
+                0.0 // Type assignment is workflow tracking, no XP reward
+            )
+        );
+    }
+
+    /**
+     * Handle issue type removed events.
+     *
+     * <p>Records workflow tracking event with 0 XP - removing issue types
+     * is a categorization change for work tracking purposes.
+     *
+     * <p>Events are recorded even when author is unknown (null actor).
+     */
+    @Async
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onIssueUntyped(DomainEvent.IssueUntyped event) {
+        var issueData = event.issue();
+        // Skip pull requests
+        if (issueData.isPullRequest()) {
+            return;
+        }
+        if (!hasValidScopeId("Issue untyped", issueData.id(), event.context().scopeId())) {
+            return;
+        }
+        Instant occurredAt = issueData.updatedAt() != null ? issueData.updatedAt() : Instant.now();
+        safeRecord("issue untyped", issueData.id(), () ->
+            activityEventService.record(
+                event.context().scopeId(),
+                ActivityEventType.ISSUE_UNTYPED,
+                occurredAt,
+                getActorOrNull(issueData.authorId()),
+                repositoryRepository.getReferenceById(issueData.repository().id()),
+                ActivityTargetType.ISSUE,
+                issueData.id(),
+                0.0 // Type removal is workflow tracking, no XP reward
             )
         );
     }

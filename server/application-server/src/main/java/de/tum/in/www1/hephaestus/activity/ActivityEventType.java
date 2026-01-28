@@ -25,8 +25,16 @@ public enum ActivityEventType {
     PULL_REQUEST_CLOSED("pull_request.closed"),
     /** Pull request reopened - lifecycle tracking */
     PULL_REQUEST_REOPENED("pull_request.reopened"),
-    /** Pull request marked ready for review (draft→ready transition) */
+    /** Pull request marked ready for review (draft->ready transition) */
     PULL_REQUEST_READY("pull_request.ready"),
+    /** Pull request converted to draft (ready->draft transition) */
+    PULL_REQUEST_DRAFTED("pull_request.drafted"),
+    /** Pull request synchronized - new commits pushed to the branch */
+    PULL_REQUEST_SYNCHRONIZED("pull_request.synchronized"),
+    /** Label added to pull request - workflow tracking */
+    PULL_REQUEST_LABELED("pull_request.labeled"),
+    /** Label removed from pull request - workflow tracking */
+    PULL_REQUEST_UNLABELED("pull_request.unlabeled"),
 
     // ========================================================================
     // Review Lifecycle (Effectiveness metrics)
@@ -49,8 +57,24 @@ public enum ActivityEventType {
     // ========================================================================
     /** Comment created on issue or pull request (general discussion) */
     COMMENT_CREATED("comment.created"),
+    /** Comment updated - audit trail */
+    COMMENT_UPDATED("comment.updated"),
+    /** Comment deleted - audit trail */
+    COMMENT_DELETED("comment.deleted"),
     /** Inline code review comment created (higher-value feedback) */
     REVIEW_COMMENT_CREATED("review_comment.created"),
+    /** Inline code review comment edited - audit trail */
+    REVIEW_COMMENT_EDITED("review_comment.edited"),
+    /** Inline code review comment deleted - audit trail */
+    REVIEW_COMMENT_DELETED("review_comment.deleted"),
+
+    // ========================================================================
+    // Review Threads (Code review effectiveness metrics)
+    // ========================================================================
+    /** Review thread resolved - indicates addressed feedback */
+    REVIEW_THREAD_RESOLVED("review_thread.resolved"),
+    /** Review thread unresolved - indicates reopened discussion */
+    REVIEW_THREAD_UNRESOLVED("review_thread.unresolved"),
 
     // ========================================================================
     // Issue Lifecycle (Work tracking)
@@ -58,7 +82,19 @@ public enum ActivityEventType {
     /** Issue created - drives work creation */
     ISSUE_CREATED("issue.created"),
     /** Issue closed - work completion signal */
-    ISSUE_CLOSED("issue.closed");
+    ISSUE_CLOSED("issue.closed"),
+    /** Issue reopened - work resumption signal */
+    ISSUE_REOPENED("issue.reopened"),
+    /** Issue deleted - audit trail */
+    ISSUE_DELETED("issue.deleted"),
+    /** Label added to issue - workflow tracking */
+    ISSUE_LABELED("issue.labeled"),
+    /** Label removed from issue - workflow tracking */
+    ISSUE_UNLABELED("issue.unlabeled"),
+    /** Issue type assigned (e.g., bug, feature, task) - work categorization */
+    ISSUE_TYPED("issue.typed"),
+    /** Issue type removed - work categorization change */
+    ISSUE_UNTYPED("issue.untyped");
 
     private final String value;
 

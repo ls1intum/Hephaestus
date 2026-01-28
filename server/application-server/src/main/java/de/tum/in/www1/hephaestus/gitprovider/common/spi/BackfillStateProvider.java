@@ -35,18 +35,34 @@ public interface BackfillStateProvider {
     }
 
     /**
-     * Updates the backfill state for a sync target.
+     * Updates the issue backfill state for a sync target.
      * <p>
      * <b>Important:</b> The default implementation is a no-op. Implementations
      * MUST override this method to persist backfill state, otherwise sync progress
      * will be lost between restarts.
      *
      * @param syncTargetId   the sync target ID
-     * @param highWaterMark  the high water mark (highest issue/PR number at backfill start), or null to keep current
-     * @param checkpoint     the current checkpoint (issue/PR number being processed), or null to keep current
+     * @param highWaterMark  the high water mark (highest issue number at backfill start), or null to keep current
+     * @param checkpoint     the current checkpoint (lowest issue number synced), or null to keep current
      * @param lastRunAt      when the backfill was last run, or null to keep current
      */
-    default void updateBackfillState(Long syncTargetId, Integer highWaterMark, Integer checkpoint, Instant lastRunAt) {
+    default void updateIssueBackfillState(Long syncTargetId, Integer highWaterMark, Integer checkpoint, Instant lastRunAt) {
+        // Default no-op - implementations MUST override to persist state
+    }
+
+    /**
+     * Updates the pull request backfill state for a sync target.
+     * <p>
+     * <b>Important:</b> The default implementation is a no-op. Implementations
+     * MUST override this method to persist backfill state, otherwise sync progress
+     * will be lost between restarts.
+     *
+     * @param syncTargetId   the sync target ID
+     * @param highWaterMark  the high water mark (highest pull request number at backfill start), or null to keep current
+     * @param checkpoint     the current checkpoint (lowest pull request number synced), or null to keep current
+     * @param lastRunAt      when the backfill was last run, or null to keep current
+     */
+    default void updatePullRequestBackfillState(Long syncTargetId, Integer highWaterMark, Integer checkpoint, Instant lastRunAt) {
         // Default no-op - implementations MUST override to persist state
     }
 

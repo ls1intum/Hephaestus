@@ -32,7 +32,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Integration tests for GitHubPullRequestProcessor.
@@ -47,7 +46,6 @@ import org.springframework.transaction.annotation.Transactional;
  * - Edge cases in DTO processing including the critical getDatabaseId() fallback
  */
 @DisplayName("GitHub Pull Request Processor")
-@Transactional
 class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
 
     // IDs from the actual GitHub webhook fixtures

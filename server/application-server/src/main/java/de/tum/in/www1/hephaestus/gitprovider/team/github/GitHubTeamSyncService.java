@@ -4,6 +4,7 @@ import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.LARGE_PAGE_SIZE;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.MAX_PAGINATION_PAGES;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.exception.InstallationNotFoundException;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier.ClassificationResult;
@@ -110,6 +111,8 @@ public class GitHubTeamSyncService {
         String safeOrgLogin = sanitizeForLog(organizationLogin);
 
         HttpGraphQlClient client = graphQlClientProvider.forScope(scopeId);
+        // Create processing context for sync operations (no repository for org-level teams)
+        ProcessingContext context = ProcessingContext.forSync(scopeId, null);
 
         try {
             Set<Long> syncedTeamIds = new HashSet<>();
@@ -118,6 +121,7 @@ public class GitHubTeamSyncService {
             String cursor = null;
             boolean hasNextPage = true;
             int pageCount = 0;
+            boolean syncCompletedNormally = false;
 
             while (hasNextPage) {
                 pageCount++;
@@ -136,7 +140,7 @@ public class GitHubTeamSyncService {
                     .variable("first", LARGE_PAGE_SIZE)
                     .variable("after", cursor)
                     .execute()
-                    .block(syncProperties.getGraphqlTimeout());
+                    .block(syncProperties.graphqlTimeout());
 
                 if (graphQlResponse == null || !graphQlResponse.isValid()) {
                     log.warn(
@@ -148,10 +152,10 @@ public class GitHubTeamSyncService {
                 }
 
                 // Track rate limit from response
-                graphQlClientProvider.trackRateLimit(graphQlResponse);
+                graphQlClientProvider.trackRateLimit(scopeId, graphQlResponse);
 
                 // Check if we should pause due to rate limiting
-                if (graphQlClientProvider.isRateLimitCritical()) {
+                if (graphQlClientProvider.isRateLimitCritical(scopeId)) {
                     log.warn("Aborting team sync due to critical rate limit: orgLogin={}", safeOrgLogin);
                     break;
                 }
@@ -165,11 +169,11 @@ public class GitHubTeamSyncService {
                 }
 
                 for (var graphQlTeam : response.getNodes()) {
-                    Team team = processTeam(graphQlTeam, organizationLogin);
+                    Team team = processTeam(graphQlTeam, organizationLogin, context);
                     if (team != null) {
                         syncedTeamIds.add(team.getId());
-                        syncTeamMemberships(client, team, graphQlTeam, organizationLogin);
-                        totalPermissions += syncTeamRepoPermissions(client, team, graphQlTeam, organizationLogin);
+                        syncTeamMemberships(client, team, graphQlTeam, organizationLogin, scopeId);
+                        totalPermissions += syncTeamRepoPermissions(client, team, graphQlTeam, organizationLogin, scopeId);
                         totalSynced++;
                     }
                 }
@@ -179,14 +183,28 @@ public class GitHubTeamSyncService {
                 cursor = pageInfo != null ? pageInfo.getEndCursor() : null;
             }
 
-            // Remove teams that no longer exist in the organization
-            removeDeletedTeams(organizationLogin, syncedTeamIds);
+            // Mark sync as completed normally if we exhausted all pages
+            syncCompletedNormally = !hasNextPage;
+
+            // CRITICAL: Only remove stale teams if sync completed fully.
+            // If sync was aborted (rate limit, error, pagination limit), we don't have
+            // the complete list and would incorrectly delete valid teams.
+            if (syncCompletedNormally) {
+                removeDeletedTeams(organizationLogin, syncedTeamIds, context);
+            } else {
+                log.warn(
+                    "Skipped stale team removal: reason=incompleteSync, orgLogin={}, pagesProcessed={}",
+                    safeOrgLogin,
+                    pageCount
+                );
+            }
 
             log.info(
-                "Completed team sync: orgLogin={}, teamCount={}, permissionCount={}, scopeId={}",
+                "Completed team sync: orgLogin={}, teamCount={}, permissionCount={}, complete={}, scopeId={}",
                 safeOrgLogin,
                 totalSynced,
                 totalPermissions,
+                syncCompletedNormally,
                 scopeId
             );
             return totalSynced;
@@ -240,11 +258,12 @@ public class GitHubTeamSyncService {
      *
      * @param graphQlTeam       the GraphQL team object
      * @param organizationLogin the organization login
+     * @param context           the processing context
      * @return the persisted Team entity, or null if processing failed
      */
-    private Team processTeam(GHTeam graphQlTeam, String organizationLogin) {
+    private Team processTeam(GHTeam graphQlTeam, String organizationLogin, ProcessingContext context) {
         GitHubTeamEventDTO.GitHubTeamDTO dto = convertToDTO(graphQlTeam);
-        Team team = teamProcessor.process(dto, organizationLogin);
+        Team team = teamProcessor.process(dto, organizationLogin, context);
 
         if (team != null) {
             // Update parent team reference if available
@@ -276,7 +295,8 @@ public class GitHubTeamSyncService {
         HttpGraphQlClient client,
         Team team,
         GHTeam graphQlTeam,
-        String organizationLogin
+        String organizationLogin,
+        Long scopeId
     ) {
         var membersConnection = graphQlTeam.getMembers();
         if (membersConnection == null || membersConnection.getEdges() == null) {
@@ -297,7 +317,8 @@ public class GitHubTeamSyncService {
                 client,
                 organizationLogin,
                 graphQlTeam.getSlug(),
-                membersPageInfo.getEndCursor()
+                membersPageInfo.getEndCursor(),
+                scopeId
             );
             allMemberEdges.addAll(additionalMemberEdges);
         }
@@ -378,7 +399,8 @@ public class GitHubTeamSyncService {
         HttpGraphQlClient client,
         Team team,
         GHTeam graphQlTeam,
-        String organizationLogin
+        String organizationLogin,
+        Long scopeId
     ) {
         var reposConnection = graphQlTeam.getRepositories();
         if (reposConnection == null || reposConnection.getEdges() == null) {
@@ -411,7 +433,8 @@ public class GitHubTeamSyncService {
                 client,
                 organizationLogin,
                 graphQlTeam.getSlug(),
-                reposPageInfo.getEndCursor()
+                reposPageInfo.getEndCursor(),
+                scopeId
             );
             allRepoEdges.addAll(additionalRepoEdges);
         }
@@ -503,7 +526,8 @@ public class GitHubTeamSyncService {
         HttpGraphQlClient client,
         String organizationLogin,
         String teamSlug,
-        String startCursor
+        String startCursor,
+        Long scopeId
     ) {
         List<GHTeamMemberEdge> allMemberEdges = new ArrayList<>();
         String cursor = startCursor;
@@ -528,7 +552,7 @@ public class GitHubTeamSyncService {
                 .variable("first", LARGE_PAGE_SIZE)
                 .variable("after", cursor)
                 .execute()
-                .block(syncProperties.getGraphqlTimeout());
+                .block(syncProperties.graphqlTimeout());
 
             if (graphQlResponse == null || !graphQlResponse.isValid()) {
                 log.warn(
@@ -540,10 +564,10 @@ public class GitHubTeamSyncService {
             }
 
             // Track rate limit from response
-            graphQlClientProvider.trackRateLimit(graphQlResponse);
+            graphQlClientProvider.trackRateLimit(scopeId, graphQlResponse);
 
             // Check if we should pause due to rate limiting
-            if (graphQlClientProvider.isRateLimitCritical()) {
+            if (graphQlClientProvider.isRateLimitCritical(scopeId)) {
                 log.warn("Aborting team members fetch due to critical rate limit: teamSlug={}", teamSlug);
                 break;
             }
@@ -579,7 +603,8 @@ public class GitHubTeamSyncService {
         HttpGraphQlClient client,
         String organizationLogin,
         String teamSlug,
-        String startCursor
+        String startCursor,
+        Long scopeId
     ) {
         List<GHTeamRepositoryEdge> allEdges = new ArrayList<>();
         String cursor = startCursor;
@@ -604,7 +629,7 @@ public class GitHubTeamSyncService {
                 .variable("first", LARGE_PAGE_SIZE)
                 .variable("after", cursor)
                 .execute()
-                .block(syncProperties.getGraphqlTimeout());
+                .block(syncProperties.graphqlTimeout());
 
             if (graphQlResponse == null || !graphQlResponse.isValid()) {
                 log.warn(
@@ -616,10 +641,10 @@ public class GitHubTeamSyncService {
             }
 
             // Track rate limit from response
-            graphQlClientProvider.trackRateLimit(graphQlResponse);
+            graphQlClientProvider.trackRateLimit(scopeId, graphQlResponse);
 
             // Check if we should pause due to rate limiting
-            if (graphQlClientProvider.isRateLimitCritical()) {
+            if (graphQlClientProvider.isRateLimitCritical(scopeId)) {
                 log.warn("Aborting team repositories fetch due to critical rate limit: teamSlug={}", teamSlug);
                 break;
             }
@@ -670,14 +695,15 @@ public class GitHubTeamSyncService {
      *
      * @param organizationLogin the organization login
      * @param syncedTeamIds     the set of team IDs that were synced
+     * @param context           the processing context
      */
-    private void removeDeletedTeams(String organizationLogin, Set<Long> syncedTeamIds) {
+    private void removeDeletedTeams(String organizationLogin, Set<Long> syncedTeamIds, ProcessingContext context) {
         List<Team> existingTeams = teamRepository.findAllByOrganizationIgnoreCase(organizationLogin);
         int removed = 0;
 
         for (Team team : existingTeams) {
             if (!syncedTeamIds.contains(team.getId())) {
-                teamProcessor.delete(team.getId());
+                teamProcessor.delete(team.getId(), context);
                 removed++;
             }
         }

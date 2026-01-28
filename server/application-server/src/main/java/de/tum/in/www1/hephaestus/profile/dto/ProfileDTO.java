@@ -31,5 +31,8 @@ public record ProfileDTO(
     @Schema(description = "Repositories the user has contributed to")
     List<RepositoryInfoDTO> contributedRepositories,
     @Schema(description = "Recent review activity with XP scores") List<ProfileReviewActivityDTO> reviewActivity,
-    @Schema(description = "Currently open pull requests authored by the user") List<PullRequestInfoDTO> openPullRequests
+    @Schema(description = "Currently open pull requests authored by the user") List<PullRequestInfoDTO> openPullRequests,
+    @Schema(description = "Aggregated activity stats consistent with leaderboard calculations")
+    ProfileActivityStatsDTO activityStats,
+    @Schema(description = "Distinct pull requests reviewed by this user") List<PullRequestInfoDTO> reviewedPullRequests
 ) {}

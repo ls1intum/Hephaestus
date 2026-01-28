@@ -8,7 +8,6 @@ import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContextFactory;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventAction;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventType;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
-import de.tum.in.www1.hephaestus.gitprovider.pullrequest.github.GitHubPullRequestProcessor;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.github.dto.GitHubPullRequestReviewEventDTO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -17,6 +16,17 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Handles GitHub pull_request_review webhook events.
+ * <p>
+ * This handler processes reviews on Pull Requests. The webhook includes
+ * embedded PR data, which we use to create a stub PR entity if the PR
+ * webhook hasn't arrived yet (message ordering issue).
+ * <p>
+ * <b>Key Design Decision:</b> We use processWithParentCreation to handle the case
+ * where the review webhook arrives before the PR webhook. This creates a minimal
+ * PR stub from the webhook data, which will be hydrated later by the PR webhook
+ * or scheduled sync. This prevents data loss that occurred due to message ordering.
+ *
+ * @see GitHubPullRequestReviewProcessor#processWithParentCreation
  */
 @Component
 public class GitHubPullRequestReviewMessageHandler extends GitHubMessageHandler<GitHubPullRequestReviewEventDTO> {
@@ -24,19 +34,16 @@ public class GitHubPullRequestReviewMessageHandler extends GitHubMessageHandler<
     private static final Logger log = LoggerFactory.getLogger(GitHubPullRequestReviewMessageHandler.class);
 
     private final ProcessingContextFactory contextFactory;
-    private final GitHubPullRequestProcessor prProcessor;
     private final GitHubPullRequestReviewProcessor reviewProcessor;
 
     GitHubPullRequestReviewMessageHandler(
         ProcessingContextFactory contextFactory,
-        GitHubPullRequestProcessor prProcessor,
         GitHubPullRequestReviewProcessor reviewProcessor,
         NatsMessageDeserializer deserializer,
         TransactionTemplate transactionTemplate
     ) {
         super(GitHubPullRequestReviewEventDTO.class, deserializer, transactionTemplate);
         this.contextFactory = contextFactory;
-        this.prProcessor = prProcessor;
         this.reviewProcessor = reviewProcessor;
     }
 
@@ -68,14 +75,14 @@ public class GitHubPullRequestReviewMessageHandler extends GitHubMessageHandler<
             return;
         }
 
-        // Ensure PR exists
-        prProcessor.process(prDto, context);
-
         // Delegate to processor based on action
+        // Use processWithParentCreation to handle the case where the PR webhook
+        // hasn't arrived yet. This creates a minimal PR stub from the webhook data
+        // instead of losing the review.
         if (event.actionType() == GitHubEventAction.PullRequestReview.DISMISSED) {
             reviewProcessor.processDismissed(reviewDto.id(), context);
         } else {
-            reviewProcessor.process(reviewDto, prDto.getDatabaseId(), context);
+            reviewProcessor.processWithParentCreation(reviewDto, prDto, context);
         }
     }
 }
