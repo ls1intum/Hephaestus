@@ -16,35 +16,39 @@ import java.util.List;
 import java.util.function.Consumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 @Component
 public class LeaguePointsUpdateTask implements Runnable {
 
-    private static final Logger logger = LoggerFactory.getLogger(LeaguePointsUpdateTask.class);
+    private static final Logger log = LoggerFactory.getLogger(LeaguePointsUpdateTask.class);
 
-    @Value("${hephaestus.leaderboard.schedule.day}")
-    private String scheduledDay;
+    private final String scheduledDay;
+    private final String scheduledTime;
+    private final UserRepository userRepository;
+    private final LeaderboardService leaderboardService;
+    private final LeaguePointsService leaguePointsService;
+    private final WorkspaceMembershipService workspaceMembershipService;
+    private final WorkspaceRepository workspaceRepository;
 
-    @Value("${hephaestus.leaderboard.schedule.time}")
-    private String scheduledTime;
-
-    @Autowired
-    private UserRepository userRepository;
-
-    @Autowired
-    private LeaderboardService leaderboardService;
-
-    @Autowired
-    private LeaguePointsCalculationService leaguePointsCalculationService;
-
-    @Autowired
-    private WorkspaceMembershipService workspaceMembershipService;
-
-    @Autowired
-    private WorkspaceRepository workspaceRepository;
+    public LeaguePointsUpdateTask(
+        @Value("${hephaestus.leaderboard.schedule.day}") String scheduledDay,
+        @Value("${hephaestus.leaderboard.schedule.time}") String scheduledTime,
+        UserRepository userRepository,
+        LeaderboardService leaderboardService,
+        LeaguePointsService leaguePointsService,
+        WorkspaceMembershipService workspaceMembershipService,
+        WorkspaceRepository workspaceRepository
+    ) {
+        this.scheduledDay = scheduledDay;
+        this.scheduledTime = scheduledTime;
+        this.userRepository = userRepository;
+        this.leaderboardService = leaderboardService;
+        this.leaguePointsService = leaguePointsService;
+        this.workspaceMembershipService = workspaceMembershipService;
+        this.workspaceRepository = workspaceRepository;
+    }
 
     @Override
     @Transactional
@@ -52,27 +56,21 @@ public class LeaguePointsUpdateTask implements Runnable {
         List<Workspace> workspaces = workspaceRepository.findAll();
 
         if (workspaces.isEmpty()) {
-            logger.debug("Skipping league points update because no workspaces are configured.");
+            log.debug("Skipped league points update: reason=noWorkspacesConfigured");
             return;
         }
 
-        logger.info("Starting scheduled league points update for {} workspace(s).", workspaces.size());
+        log.info("Started scheduled league points update: workspaceCount={}", workspaces.size());
 
         for (Workspace workspace : workspaces) {
             try {
                 updateLeaguePointsForWorkspace(workspace);
             } catch (Exception e) {
-                logger.error(
-                    "Failed to update league points for workspace '{}' (id={}): {}",
-                    workspace.getWorkspaceSlug(),
-                    workspace.getId(),
-                    e.getMessage(),
-                    e
-                );
+                log.error("Failed to update league points: workspaceId={}", workspace.getId(), e);
             }
         }
 
-        logger.info("Completed scheduled league points update for {} workspace(s).", workspaces.size());
+        log.info("Completed scheduled league points update: workspaceCount={}", workspaces.size());
     }
 
     /**
@@ -82,17 +80,17 @@ public class LeaguePointsUpdateTask implements Runnable {
      */
     private void updateLeaguePointsForWorkspace(Workspace workspace) {
         if (workspace == null || workspace.getId() == null) {
-            logger.warn("Skipping league points update because workspace context is missing an id");
+            log.warn("Skipped league points update: reason=missingWorkspaceId");
             return;
         }
 
         Long workspaceId = workspace.getId();
-        logger.debug("Updating league points for workspace id={}.", workspaceId);
+        log.debug("Started league points update: workspaceId={}", workspaceId);
 
         List<LeaderboardEntryDTO> leaderboard = getLatestLeaderboard(workspace);
         leaderboard.forEach(updateLeaderboardEntry(workspaceId));
 
-        logger.debug("Updated league points for {} users in workspace id={}.", leaderboard.size(), workspaceId);
+        log.debug("Updated league points: workspaceId={}, userCount={}", workspaceId, leaderboard.size());
     }
 
     /**
@@ -108,7 +106,7 @@ public class LeaguePointsUpdateTask implements Runnable {
             }
             var user = userRepository.findByLoginWithEagerMergedPullRequests(leaderboardUser.login()).orElseThrow();
             int currentPoints = workspaceMembershipService.getCurrentLeaguePoints(workspaceId, user);
-            int newPoints = leaguePointsCalculationService.calculateNewPoints(user, currentPoints, entry);
+            int newPoints = leaguePointsService.calculateNewPoints(user, currentPoints, entry);
             workspaceMembershipService.updateLeaguePoints(workspaceId, user, newPoints);
         };
     }

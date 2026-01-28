@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Stream;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.convert.converter.Converter;
@@ -27,6 +28,14 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 @EnableWebSecurity
 @EnableMethodSecurity(prePostEnabled = true)
 public class SecurityConfig {
+
+    private final List<String> allowedOrigins;
+
+    public SecurityConfig(
+        @Value("${hephaestus.cors.allowed-origins:http://localhost:4200}") List<String> allowedOrigins
+    ) {
+        this.allowedOrigins = allowedOrigins;
+    }
 
     interface AuthoritiesConverter extends Converter<Map<String, Object>, Collection<GrantedAuthority>> {}
 
@@ -74,7 +83,18 @@ public class SecurityConfig {
             .csrf(csrf -> csrf.disable())
             .cors(cors -> cors.configurationSource(corsConfigurationSource()));
 
+        http.headers(headers ->
+            headers
+                .frameOptions(frameOptions -> frameOptions.deny())
+                .contentTypeOptions(contentType -> {})
+                .httpStrictTransportSecurity(hsts -> hsts.includeSubDomains(true).maxAgeInSeconds(31536000))
+        );
+
         http.authorizeHttpRequests(requests -> {
+            // OpenAPI documentation endpoints (public for spec generation and dev access)
+            requests
+                .requestMatchers("/v3/api-docs/**", "/v3/api-docs.yaml", "/swagger-ui/**", "/swagger-ui.html")
+                .permitAll();
             // Public read for slugged workspace paths (filter enforces membership/public visibility).
             requests.requestMatchers(HttpMethod.GET, "/workspaces/*/**").permitAll();
             // Registry/listing stays authenticated to avoid leaking tenant directory.
@@ -82,7 +102,12 @@ public class SecurityConfig {
             // Non-GET workspace operations still require authentication.
             requests.requestMatchers("/workspaces/**").authenticated();
             requests.requestMatchers("/mentor/**").hasAuthority("mentor_access");
-            requests.anyRequest().permitAll();
+            // Public endpoints
+            requests.requestMatchers(HttpMethod.GET, "/contributors").permitAll();
+            // User account management requires authentication
+            requests.requestMatchers("/user/**").authenticated();
+            // Default: require authentication for all other endpoints
+            requests.anyRequest().authenticated();
         });
 
         return http.build();
@@ -91,8 +116,13 @@ public class SecurityConfig {
     @Bean
     CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.applyPermitDefaultValues();
+        configuration.setAllowedOrigins(allowedOrigins);
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD", "PATCH"));
+        configuration.setAllowedHeaders(
+            List.of("Authorization", "Content-Type", "Accept", "X-Requested-With", "Origin")
+        );
+        configuration.setAllowCredentials(true);
+        configuration.setMaxAge(3600L);
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
         return source;

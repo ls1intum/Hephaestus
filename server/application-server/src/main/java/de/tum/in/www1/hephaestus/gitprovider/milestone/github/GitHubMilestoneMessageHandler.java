@@ -1,57 +1,72 @@
 package de.tum.in.www1.hephaestus.gitprovider.milestone.github;
 
+import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
+
+import de.tum.in.www1.hephaestus.gitprovider.common.NatsMessageDeserializer;
+import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
+import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContextFactory;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventAction;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventType;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
-import de.tum.in.www1.hephaestus.gitprovider.milestone.MilestoneRepository;
-import de.tum.in.www1.hephaestus.gitprovider.repository.github.GitHubRepositorySyncService;
-import org.kohsuke.github.GHEvent;
-import org.kohsuke.github.GHEventPayloadMilestone;
+import de.tum.in.www1.hephaestus.gitprovider.milestone.github.dto.GitHubMilestoneDTO;
+import de.tum.in.www1.hephaestus.gitprovider.milestone.github.dto.GitHubMilestoneEventDTO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.support.TransactionTemplate;
 
+/**
+ * Handles GitHub milestone webhook events.
+ */
 @Component
-public class GitHubMilestoneMessageHandler extends GitHubMessageHandler<GHEventPayloadMilestone> {
+public class GitHubMilestoneMessageHandler extends GitHubMessageHandler<GitHubMilestoneEventDTO> {
 
-    private static final Logger logger = LoggerFactory.getLogger(GitHubMilestoneMessageHandler.class);
+    private static final Logger log = LoggerFactory.getLogger(GitHubMilestoneMessageHandler.class);
 
-    private final MilestoneRepository milestoneRepository;
-    private final GitHubMilestoneSyncService milestoneSyncService;
-    private final GitHubRepositorySyncService repositorySyncService;
+    private final ProcessingContextFactory contextFactory;
+    private final GitHubMilestoneProcessor milestoneProcessor;
 
-    private GitHubMilestoneMessageHandler(
-        MilestoneRepository milestoneRepository,
-        GitHubMilestoneSyncService milestoneSyncService,
-        GitHubRepositorySyncService repositorySyncService
+    GitHubMilestoneMessageHandler(
+        ProcessingContextFactory contextFactory,
+        GitHubMilestoneProcessor milestoneProcessor,
+        NatsMessageDeserializer deserializer,
+        TransactionTemplate transactionTemplate
     ) {
-        super(GHEventPayloadMilestone.class);
-        this.milestoneRepository = milestoneRepository;
-        this.milestoneSyncService = milestoneSyncService;
-        this.repositorySyncService = repositorySyncService;
+        super(GitHubMilestoneEventDTO.class, deserializer, transactionTemplate);
+        this.contextFactory = contextFactory;
+        this.milestoneProcessor = milestoneProcessor;
     }
 
     @Override
-    protected void handleEvent(GHEventPayloadMilestone eventPayload) {
-        var action = eventPayload.getAction();
-        var milestone = eventPayload.getMilestone();
-        var repository = eventPayload.getRepository();
-        logger.info(
-            "Received milestone event for repository: {}, action: {}, milestoneId: {}",
-            repository.getFullName(),
-            action,
-            milestone.getId()
+    public GitHubEventType getEventType() {
+        return GitHubEventType.MILESTONE;
+    }
+
+    @Override
+    protected void handleEvent(GitHubMilestoneEventDTO event) {
+        GitHubMilestoneDTO milestoneDto = event.milestone();
+
+        if (milestoneDto == null) {
+            log.warn("Received milestone event with missing data: action={}", event.action());
+            return;
+        }
+
+        log.info(
+            "Received milestone event: action={}, milestoneTitle={}, repoName={}",
+            event.action(),
+            sanitizeForLog(milestoneDto.title()),
+            event.repository() != null ? sanitizeForLog(event.repository().fullName()) : "unknown"
         );
 
-        repositorySyncService.processRepository(repository);
-
-        if (action.equals("deleted")) {
-            milestoneRepository.deleteById(milestone.getId());
-        } else {
-            milestoneSyncService.processMilestone(milestone);
+        ProcessingContext context = contextFactory.forWebhookEvent(event).orElse(null);
+        if (context == null) {
+            return;
         }
-    }
 
-    @Override
-    protected GHEvent getHandlerEvent() {
-        return GHEvent.MILESTONE;
+        if (event.actionType() == GitHubEventAction.Milestone.DELETED) {
+            milestoneProcessor.delete(milestoneDto.id(), context);
+        } else {
+            milestoneProcessor.process(milestoneDto, context.repository(), null, context);
+        }
     }
 }

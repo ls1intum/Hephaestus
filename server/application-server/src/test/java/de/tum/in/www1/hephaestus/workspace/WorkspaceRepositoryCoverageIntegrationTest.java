@@ -3,6 +3,7 @@ package de.tum.in.www1.hephaestus.workspace;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.github.app.GitHubAppTokenService;
 import de.tum.in.www1.hephaestus.gitprovider.installation.github.GitHubInstallationRepositoryEnumerationService;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.testconfig.BaseIntegrationTest;
@@ -12,7 +13,6 @@ import java.util.Locale;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.kohsuke.github.GHRepositorySelection;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
@@ -21,7 +21,7 @@ class WorkspaceRepositoryCoverageIntegrationTest extends BaseIntegrationTest {
     private static final long INSTALLATION_ID = 9912345L;
 
     @Autowired
-    private WorkspaceService workspaceService;
+    private WorkspaceRepositoryMonitorService workspaceRepositoryMonitorService;
 
     @Autowired
     private WorkspaceRepository workspaceRepository;
@@ -35,15 +35,21 @@ class WorkspaceRepositoryCoverageIntegrationTest extends BaseIntegrationTest {
     @MockitoBean
     private GitHubInstallationRepositoryEnumerationService repositoryEnumerator;
 
+    @Autowired
+    private GitHubAppTokenService gitHubAppTokenService;
+
     @BeforeEach
     void setup() {
         databaseTestUtils.cleanDatabase();
+        // Clear any suspended installation state from previous tests
+        // This prevents test pollution when async syncs mark installations as suspended
+        gitHubAppTokenService.markInstallationActive(INSTALLATION_ID);
     }
 
     @Test
     @DisplayName("ensureAllInstallationRepositoriesCovered adds missing monitors and prunes stale ones")
     void shouldReconcileMonitorsForInstallation() {
-        Workspace workspace = persistWorkspace(GHRepositorySelection.ALL);
+        Workspace workspace = persistWorkspace(RepositorySelection.ALL);
         repositoryToMonitorRepository.save(buildMonitor(workspace, "HephaestusTest/Orphaned"));
 
         when(repositoryEnumerator.enumerate(INSTALLATION_ID)).thenReturn(
@@ -53,7 +59,9 @@ class WorkspaceRepositoryCoverageIntegrationTest extends BaseIntegrationTest {
             )
         );
 
-        workspaceService.ensureAllInstallationRepositoriesCovered(INSTALLATION_ID);
+        // Use deferSync=true to prevent async syncs from running during test
+        // Async syncs can mark installations as suspended on 403 errors, affecting subsequent calls
+        workspaceRepositoryMonitorService.ensureAllInstallationRepositoriesCovered(INSTALLATION_ID, null, true);
 
         List<RepositoryToMonitor> monitors = repositoryToMonitorRepository.findByWorkspaceId(workspace.getId());
         assertThat(monitors)
@@ -67,13 +75,14 @@ class WorkspaceRepositoryCoverageIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("ensureAllInstallationRepositoriesCovered runs for SELECTED installations")
     void shouldRespectSelectedInstallations() {
-        Workspace workspace = persistWorkspace(GHRepositorySelection.SELECTED);
+        Workspace workspace = persistWorkspace(RepositorySelection.SELECTED);
 
         when(repositoryEnumerator.enumerate(INSTALLATION_ID)).thenReturn(
             List.of(snapshot(3L, "HephaestusTest/HelloWorld", "HelloWorld", true))
         );
 
-        workspaceService.ensureAllInstallationRepositoriesCovered(INSTALLATION_ID);
+        // Use deferSync=true to prevent async syncs from running during test
+        workspaceRepositoryMonitorService.ensureAllInstallationRepositoriesCovered(INSTALLATION_ID, null, true);
 
         List<RepositoryToMonitor> monitors = repositoryToMonitorRepository.findByWorkspaceId(workspace.getId());
         assertThat(monitors)
@@ -81,7 +90,7 @@ class WorkspaceRepositoryCoverageIntegrationTest extends BaseIntegrationTest {
             .containsExactly("HephaestusTest/HelloWorld");
     }
 
-    private Workspace persistWorkspace(GHRepositorySelection selection) {
+    private Workspace persistWorkspace(RepositorySelection selection) {
         return workspaceRepository.save(
             WorkspaceTestFixtures.installationWorkspace(INSTALLATION_ID, "HephaestusTest")
                 .withRepositorySelection(selection)

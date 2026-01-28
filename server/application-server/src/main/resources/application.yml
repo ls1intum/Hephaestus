@@ -8,8 +8,8 @@ spring:
 
     datasource:
         url: jdbc:postgresql://localhost:5432/hephaestus
-        username: root
-        password: root
+        username: ${DB_USERNAME:root}
+        password: ${DB_PASSWORD:}
         hikari:
             connection-timeout: 45000
             idle-timeout: 600000
@@ -30,14 +30,23 @@ spring:
             hibernate:
                 integrator_provider: de.tum.in.www1.hephaestus.ClassImportIntegratorIntegratorProvider
                 format_sql: "true"
+                jdbc:
+                    batch_size: 50
+                order_inserts: true
+                order_updates: true
 
     liquibase:
         change-log: classpath:db/master.xml
 
     devtools:
-        restart:
-            additional-exclude: org/kohsuke/github/**
         add-properties: false
+        restart:
+            # Use trigger file for controlled restarts - touch .reloadtrigger to restart
+            # This prevents NoClassDefFoundError issues with synthetic classes during automatic restarts
+            trigger-file: .reloadtrigger
+            # Increase quiet period to ensure full compilation before restart
+            quiet-period: 1000
+            poll-interval: 2000
 
     security:
         oauth2:
@@ -67,23 +76,184 @@ spring:
     mustache:
         check-template-location: false
 
+    # GraphQL client configuration for GitHub API operations
+    # Operations are colocated with the schema at graphql/github/operations/
+    graphql:
+        client:
+            document-locations: classpath:graphql/github/operations/
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # GRACEFUL SHUTDOWN
+    # ═══════════════════════════════════════════════════════════════════════════
+    # Enable graceful shutdown to drain in-flight requests before terminating.
+    # Critical for zero-downtime deployments in Kubernetes.
+    lifecycle:
+        timeout-per-shutdown-phase: ${SHUTDOWN_TIMEOUT:20s}
+
+server:
+    shutdown: graceful
+
+# ═══════════════════════════════════════════════════════════════════════════
+# ACTUATOR & HEALTH PROBES
+# ═══════════════════════════════════════════════════════════════════════════
+# Configure health endpoints for Kubernetes liveness/readiness probes.
+# Security: Run actuator on separate management port in production.
+management:
+    server:
+        port: ${MANAGEMENT_PORT:8080}
+    endpoints:
+        web:
+            exposure:
+                include: health,info,prometheus,metrics
+            base-path: /actuator
+    endpoint:
+        health:
+            show-details: when_authorized
+            probes:
+                enabled: true
+        # Disable potentially sensitive endpoints
+        env:
+            enabled: false
+        beans:
+            enabled: false
+        configprops:
+            enabled: false
+    health:
+        livenessState:
+            enabled: true
+        readinessState:
+            enabled: true
+
 springdoc:
     default-produces-media-type: application/json
     writer-with-order-by-keys: true
 
-logging:
-    level:
-        # Suppress warnings about unknown enum values from GitHub API responses
-        # For example: when GitHub returns null for the 'side' field in PR review comments
-        # (typically for outdated comments, multi-line comments, or file-level comments)
-        org.kohsuke.github.internal.EnumUtils: ERROR
-
 hephaestus:
     host-url: https://hephaestus.ase.cit.tum.de/
 
+    # ═══════════════════════════════════════════════════════════════════════════
+    # SYNC CONFIGURATION
+    # ═══════════════════════════════════════════════════════════════════════════
+    # Settings for GitHub data synchronization operations.
+    # These control GraphQL timeouts and incremental sync behavior.
+    sync:
+        # Timeout for standard GraphQL operations (default: 30s)
+        # Accepts duration format: 60s, 1m, PT60S
+        # Increase if experiencing timeouts on large repositories
+        graphql-timeout: ${HEPHAESTUS_SYNC_GRAPHQL_TIMEOUT:60s}
+        # Extended timeout for complex operations like review comments (default: 60s)
+        # Accepts duration format: 120s, 2m, PT2M
+        extended-graphql-timeout: ${HEPHAESTUS_SYNC_EXTENDED_GRAPHQL_TIMEOUT:120s}
+        # Delay between pagination requests (default: 200ms)
+        # Accepts duration format: 200ms, PT0.2S
+        # Reduces 502/504 errors caused by rapid-fire complex queries
+        pagination-throttle: ${HEPHAESTUS_SYNC_PAGINATION_THROTTLE:200ms}
+        # Whether to use incremental sync based on last sync timestamp (default: true)
+        # When enabled, only issues/PRs updated since last sync are fetched
+        # This significantly reduces API calls for active repositories
+        incremental-sync-enabled: ${HEPHAESTUS_SYNC_INCREMENTAL_ENABLED:true}
+        # Safety buffer subtracted from last sync timestamp (default: 5m)
+        # Handles clock skew between application server and GitHub
+        # Ensures items updated just before the recorded timestamp are still fetched
+        # Accepts duration format: 5m, 300s, PT5M
+        incremental-sync-buffer: ${HEPHAESTUS_SYNC_INCREMENTAL_BUFFER:5m}
+        # Timeout for historical backfill operations (default: 120s)
+        # Needs to be longer than regular timeout for large repositories
+        # because backfill responses include embedded reviews/threads/comments
+        backfill-graphql-timeout: ${HEPHAESTUS_SYNC_BACKFILL_TIMEOUT:120s}
+        # Page size for pull request backfill queries (default: 10)
+        # Smaller than regular PR sync because backfill includes embedded
+        # reviews/threads/comments which creates very large responses
+        backfill-pr-page-size: ${HEPHAESTUS_SYNC_BACKFILL_PR_PAGE_SIZE:10}
+        run-on-startup: true
+        # Fetching timeframe in days for recent data sync
+        timeframe-days: 7
+        cron: "0 0 3 * * *"
+        # Cooldown in minutes before running the monitoring again
+        cooldown-minutes: 15
+        # ═══════════════════════════════════════════════════════════════════════════
+        # BACKFILL CONFIGURATION
+        # ═══════════════════════════════════════════════════════════════════════════
+        # Historical data synchronization settings.
+        # When enabled, backfill runs AFTER recent sync completes, in small batches
+        # to avoid exhausting GitHub API rate limits.
+        backfill:
+            # Whether to backfill historical issues and pull requests
+            enabled: false
+            # Number of pages to sync per repository per cycle (default: 25)
+            batch-size: 25
+            # Minimum rate limit remaining before backfill runs (default: 500)
+            # Backfill skips if remaining < threshold to preserve rate limit for real-time sync
+            rate-limit-threshold: 500
+            # Seconds between backfill cycles (default: 60)
+            # Rate limit is the actual throttle - cycles run frequently to maximize throughput
+            interval-seconds: 60
+        # ═══════════════════════════════════════════════════════════════════════════
+        # DEVELOPMENT FILTERS
+        # ═══════════════════════════════════════════════════════════════════════════
+        # Limit which organizations/repositories are actively synced.
+        # Useful in development to avoid syncing hundreds of repos from GitHub App installations.
+        #
+        # Empty lists = no filtering (production behavior, sync everything)
+        # Non-empty = only sync matching items
+        #
+        # Configure these in application-local.yml for development:
+        #   hephaestus:
+        #     sync:
+        #       filters:
+        #         allowed-organizations:
+        #           - ls1intum
+        #           - HephaestusTest
+        #         allowed-repositories:
+        #           - ls1intum/Hephaestus
+        #           - ls1intum/Artemis
+        # ═══════════════════════════════════════════════════════════════════════════
+        # Note: filters.allowed-organizations and filters.allowed-repositories are
+        # intentionally not defined here to allow profile-specific overrides.
+        # Configure them in application-local.yml for development filtering.
+        # ═══════════════════════════════════════════════════════════════════════════
+        # NATS CONFIGURATION
+        # ═══════════════════════════════════════════════════════════════════════════
+        nats:
+            enabled: false
+            replay-timeframe-days: 7
+            durable-consumer-name: ""
+            server: ""
+            consumer:
+                # How long to wait for acknowledgment before redelivery (Duration format: 5m, PT5M, etc.)
+                ack-wait: 5m
+                # Maximum pending unacknowledged messages per consumer (1-10000)
+                max-ack-pending: 500
+                # ═══════════════════════════════════════════════════════════════════════════
+                # HEARTBEAT CONFIGURATION (tuned for remote/WAN NATS connections)
+                # ═══════════════════════════════════════════════════════════════════════════
+                # Idle heartbeat: Server sends heartbeats when no data is available.
+                # Default NATS client uses 15s which is too aggressive for remote servers.
+                # 30s+ recommended for cloud/WAN connections to tolerate latency spikes.
+                # Alarm fires after ~3x this interval without server contact.
+                idle-heartbeat: 30s
+                # Number of consecutive heartbeat alarms before triggering consumer restart.
+                # With 30s idle heartbeat, alarms fire every ~90s when stuck.
+                # Threshold of 60 means restart after ~90 minutes of no progress.
+                # This tolerates extended idle periods (no GitHub events) without false positives.
+                heartbeat-restart-threshold: 60
+                # Minimum interval between heartbeat alarm log messages (Duration format: 5m, PT5M, etc.)
+                # Prevents log spam while still providing visibility
+                heartbeat-log-interval: 5m
+                # ═══════════════════════════════════════════════════════════════════════════
+                # Delay between reconnection attempts (Duration format: 2s, PT2S, etc.)
+                reconnect-delay: 2s
+                # Request timeout for JetStream API calls (Duration format: 60s, PT60S, etc.)
+                # Increase for workspaces with many repositories
+                request-timeout: 60s
+
+    cors:
+        allowed-origins:
+            - ${CLIENT_HOST:http://localhost:4200}
+
     webapp:
         url: ${CLIENT_HOST:http://localhost:4200}
-    
+
     leaderboard:
         schedule:
             day: 2
@@ -95,7 +265,7 @@ hephaestus:
         # PR authors whose assignee-reviewers don't earn points (e.g., AI bots)
         self-review-author-logins:
             - Copilot
-    
+
     # ═══════════════════════════════════════════════════════════════════════════
     # WORKSPACE CONFIGURATION
     # ═══════════════════════════════════════════════════════════════════════════
@@ -133,7 +303,7 @@ hephaestus:
             repositories-to-monitor:
                 - ls1intum/Hephaestus
                 - ls1intum/Artemis
-    
+
     intelligence-service:
         url: http://localhost:8000
 
@@ -141,6 +311,9 @@ hephaestus:
         contributors:
             # Eviction rate in milliseconds (1 hour)
             evict-rate: 3600000
+        leaderboard-xp:
+            # Eviction rate in milliseconds (60 seconds - leaderboard data is moderately hot)
+            evict-rate: 60000
     mail:
         enabled: ${MAIL_ENABLED:false}
         sender: ${MAIL_SENDER:hephaestus@gmail.com} # use gmail email address for local testing
@@ -162,99 +335,65 @@ hephaestus:
         project-id: ${POSTHOG_PROJECT_ID:}
         personal-api-key: ${POSTHOG_PERSONAL_API_KEY:}
 
+    # ═══════════════════════════════════════════════════════════════════════════
+    # GITHUB AUTHENTICATION
+    # ═══════════════════════════════════════════════════════════════════════════
+    # Can be any OAuth token, such as the PAT
+    github:
+        app:
+            # Set to 0 to disable GitHub App mode and use Personal Access Tokens instead
+            id: ${GH_APP_ID:0}
+            privateKeyLocation: ${GH_APP_PRIVATE_KEY_LOCATION:}
+            privateKey: ${GH_APP_PRIVATE_KEY:}
+        meta:
+            auth-token: ${GH_AUTH_TOKEN:}
 
+    # ═══════════════════════════════════════════════════════════════════════════
+    # KEYCLOAK IDENTITY PROVIDER
+    # ═══════════════════════════════════════════════════════════════════════════
+    keycloak:
+        url: http://localhost:8081
+        realm: hephaestus
+        client-id: hephaestus-confidential
+        # SECURITY: Never commit secrets. Use environment variables in production.
+        # For local development, the default 'hephaestus-dev-secret' matches the realm import.
+        client-secret: ${KEYCLOAK_CLIENT_SECRET:hephaestus-dev-secret}
 
-keycloak:
-    url: http://localhost:8081
-    realm: hephaestus
-    client-id: hephaestus-confidential
-    client-secret: ${KEYCLOAK_HEPHAESTUS_CONFIDENTIAL_CLIENT_SECRET:${KEYCLOAK_CLIENT_SECRET:0g0QtFmz6GB1Jv03SszCFepPro0hiP7G}}
+    # ═══════════════════════════════════════════════════════════════════════════
+    # SLACK INTEGRATION
+    # ═══════════════════════════════════════════════════════════════════════════
+    slack:
+        token: ${SLACK_TOKEN:}
+        signing-secret: ${SLACK_SIGNING_SECRET:}
 
-nats:
-    enabled: false
-    timeframe: 7
-    durable-consumer-name: ""
-    server: ""
-    consumer:
-        # How long to wait for acknowledgment before redelivery (minutes)
-        ack-wait-minutes: 5
-        # Maximum pending unacknowledged messages per consumer
-        max-ack-pending: 500
-        # Minimum interval between heartbeat alarm log messages (minutes)
-        heartbeat-log-interval-minutes: 5
-        # Number of consecutive heartbeat alarms before triggering consumer restart
-        heartbeat-restart-threshold: 3
-        # Delay between reconnection attempts (seconds)
-        reconnect-delay-seconds: 2
-        # Request timeout for JetStream API calls (seconds) - increase for workspaces with many repositories
-        request-timeout-seconds: 60
-
-monitoring:
-    run-on-startup: true
-    # Fetching timeframe in days for recent data sync
-    timeframe: 7
-    sync-cron: "0 0 3 * * *"
-    # Cooldown in minutes before running the monitoring again
-    sync-cooldown-in-minutes: 15
     # ═══════════════════════════════════════════════════════════════════════════
-    # BACKFILL CONFIGURATION
+    # SENTRY ERROR TRACKING
     # ═══════════════════════════════════════════════════════════════════════════
-    # Historical data synchronization settings.
-    # When enabled, backfill runs AFTER recent sync completes, in small batches
-    # to avoid exhausting GitHub API rate limits.
-    backfill:
-        # Whether to backfill historical issues and pull requests
-        enabled: false
-        # Number of issues/PRs to sync per batch (default: 25)
-        # Lower = fewer API calls per sync cycle, Higher = faster backfill
-        batch-size: 25
-        # Minimum rate limit remaining before backfill runs (default: 500)
-        # Backfill skips if remaining < threshold to preserve rate limit for real-time sync
-        rate-limit-threshold: 500
-        # Minutes to wait between backfill batches (default: 5)
-        # Spreads API usage over time to avoid rate limit exhaustion
-        cooldown-minutes: 5
-    # ═══════════════════════════════════════════════════════════════════════════
-    # DEVELOPMENT FILTERS
-    # ═══════════════════════════════════════════════════════════════════════════
-    # Limit which organizations/repositories are actively synced.
-    # Useful in development to avoid syncing hundreds of repos from GitHub App installations.
-    #
-    # Empty lists = no filtering (production behavior, sync everything)
-    # Non-empty = only sync matching items
-    #
-    # Configure these in application-local.yml for development:
-    #   monitoring:
-    #     filters:
-    #       allowed-organizations:
-    #         - ls1intum
-    #         - HephaestusTest
-    #       allowed-repositories:
-    #         - ls1intum/Hephaestus
-    #         - ls1intum/Artemis
-    # ═══════════════════════════════════════════════════════════════════════════
-    filters:
-        # Limit to workspaces owned by these organizations (case-insensitive)
-        allowed-organizations: []
-        # Limit to these specific repositories (format: owner/repo, case-insensitive)
-        allowed-repositories: []
+    sentry:
+        dsn: ${SENTRY_DSN:}
 
 # ═══════════════════════════════════════════════════════════════════════════
-# GITHUB AUTHENTICATION
+# RESILIENCE4J CIRCUIT BREAKER
 # ═══════════════════════════════════════════════════════════════════════════
-# Can be any OAuth token, such as the PAT
-github:
-    app:
-        # Set to 0 to disable GitHub App mode and use Personal Access Tokens instead
-        id: ${GH_APP_ID:0}
-        privateKeyLocation: ${GH_APP_PRIVATE_KEY_LOCATION:}
-        privateKey: ${GH_APP_PRIVATE_KEY:}
-    meta:
-        auth-token: ${GH_AUTH_TOKEN:}
-
-slack:
-    token: ""
-    signing-secret: ""
-
-sentry:
-    dsn: ""
+# Protects against cascading failures when GitHub API is unavailable
+# See ResilienceConfig.java for default values; these can be overridden here
+resilience4j:
+    circuitbreaker:
+        configs:
+            default:
+                slidingWindowSize: 10
+                failureRateThreshold: 50
+                waitDurationInOpenState: 30s
+                permittedNumberOfCallsInHalfOpenState: 3
+                minimumNumberOfCalls: 5
+                slowCallDurationThreshold: 10s
+                slowCallRateThreshold: 80
+        instances:
+            githubGraphQl:
+                baseConfig: default
+            githubRest:
+                baseConfig: default
+            intelligence-service:
+                baseConfig: default
+                slowCallDurationThreshold: 30s
+                waitDurationInOpenState: 60s

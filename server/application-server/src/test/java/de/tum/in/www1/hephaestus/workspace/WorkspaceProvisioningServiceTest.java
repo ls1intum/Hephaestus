@@ -9,15 +9,13 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.github.app.GitHubAppTokenService;
-import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
-import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserSyncService;
+import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.kohsuke.github.GitHub;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -34,16 +32,16 @@ class WorkspaceProvisioningServiceTest {
     private WorkspaceService workspaceService;
 
     @Mock
+    private WorkspaceInstallationService workspaceInstallationService;
+
+    @Mock
+    private WorkspaceRepositoryMonitorService workspaceRepositoryMonitorService;
+
+    @Mock
     private GitHubAppTokenService gitHubAppTokenService;
 
     @Mock
-    private GitHubUserSyncService gitHubUserSyncService;
-
-    @Mock
     private UserRepository userRepository;
-
-    @Mock
-    private OrganizationSyncService organizationSyncService;
 
     @Mock
     private WorkspaceMembershipRepository workspaceMembershipRepository;
@@ -51,29 +49,32 @@ class WorkspaceProvisioningServiceTest {
     @Mock
     private WorkspaceMembershipService workspaceMembershipService;
 
+    @Mock
+    private WorkspaceScopeFilter workspaceScopeFilter;
+
     private WorkspaceProvisioningService provisioningService;
 
     private WorkspaceProperties workspaceProperties;
 
     @BeforeEach
     void setUp() {
-        workspaceProperties = new WorkspaceProperties();
-        workspaceProperties.setInitDefault(true);
-        workspaceProperties.getDefaultWorkspace().setLogin("aet-org");
-        workspaceProperties.getDefaultWorkspace().setToken("pat-token");
+        workspaceProperties = new WorkspaceProperties(
+            true,
+            new WorkspaceProperties.DefaultProperties("aet-org", "pat-token", List.of())
+        );
 
-        // Inject real properties via reflection because @InjectMocks cannot set them directly
         provisioningService = new WorkspaceProvisioningService(
             workspaceProperties,
             workspaceRepository,
             repositoryToMonitorRepository,
             workspaceService,
+            workspaceInstallationService,
+            workspaceRepositoryMonitorService,
             gitHubAppTokenService,
-            gitHubUserSyncService,
             userRepository,
-            organizationSyncService,
             workspaceMembershipRepository,
-            workspaceMembershipService
+            workspaceMembershipService,
+            workspaceScopeFilter
         );
     }
 
@@ -108,7 +109,8 @@ class WorkspaceProvisioningServiceTest {
             workspaceService.createWorkspace(anyString(), anyString(), anyString(), any(AccountType.class), anyLong())
         ).thenReturn(workspace);
         when(workspaceRepository.save(any(Workspace.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(gitHubUserSyncService.syncUser(any(GitHub.class), anyString())).thenReturn(owner);
+        // User lookup for PAT bootstrap - user already exists
+        when(userRepository.findByLogin("aet-org")).thenReturn(Optional.of(owner));
         when(userRepository.findByLogin("admin")).thenReturn(Optional.of(admin));
 
         provisioningService.bootstrapDefaultPatWorkspace();
@@ -118,7 +120,8 @@ class WorkspaceProvisioningServiceTest {
             admin.getId(),
             WorkspaceMembership.WorkspaceRole.ADMIN
         );
-        // Default admin handling should not throw and should not trigger redundant workspace creations
+        // Default admin handling should not throw and should not trigger redundant
+        // workspace creations
         verify(workspaceService).createWorkspace(anyString(), anyString(), anyString(), any(), anyLong());
         assertThat(workspace.getPersonalAccessToken()).isEqualTo("pat-token");
     }
@@ -143,7 +146,8 @@ class WorkspaceProvisioningServiceTest {
             workspaceService.createWorkspace(anyString(), anyString(), anyString(), any(AccountType.class), anyLong())
         ).thenReturn(workspace);
         when(workspaceRepository.save(any(Workspace.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(gitHubUserSyncService.syncUser(any(GitHub.class), anyString())).thenReturn(owner);
+        // User lookup for PAT bootstrap - user already exists
+        when(userRepository.findByLogin("aet-org")).thenReturn(Optional.of(owner));
         when(userRepository.findByLogin("admin")).thenReturn(Optional.empty());
 
         provisioningService.bootstrapDefaultPatWorkspace();

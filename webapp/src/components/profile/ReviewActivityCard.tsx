@@ -41,11 +41,23 @@ const REVIEW_STATE_STYLES: Record<
 		skeletonColor: "bg-github-muted-foreground/30",
 		tooltip: "Reviewed",
 	},
+	PENDING: {
+		icon: GitPullRequestIcon,
+		color: "text-github-muted-foreground",
+		skeletonColor: "bg-github-muted-foreground/30",
+		tooltip: "Pending",
+	},
+	DISMISSED: {
+		icon: GitPullRequestIcon,
+		color: "text-github-muted-foreground",
+		skeletonColor: "bg-github-muted-foreground/30",
+		tooltip: "Dismissed",
+	},
 };
 
 export interface ReviewActivityCardProps {
 	isLoading: boolean;
-	state?: "COMMENTED" | "APPROVED" | "CHANGES_REQUESTED" | "UNKNOWN";
+	state?: "COMMENTED" | "APPROVED" | "CHANGES_REQUESTED" | "PENDING" | "DISMISSED" | "UNKNOWN";
 	submittedAt?: Date;
 	htmlUrl?: string;
 	pullRequest?: {

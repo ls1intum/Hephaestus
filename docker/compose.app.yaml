@@ -18,7 +18,7 @@ services:
       POSTHOG_API_HOST: ${POSTHOG_API_HOST}
       TANSTACK_DEVTOOLS_ENABLED: ${TANSTACK_DEVTOOLS_ENABLED:-false}
     ports:
-      - '80'
+      - "80"
     depends_on:
       - application-server
     restart: unless-stopped
@@ -55,7 +55,7 @@ services:
   application-server:
     image: "ghcr.io/ls1intum/hephaestus/application-server:${IMAGE_TAG}"
     ports:
-      - '8080'
+      - "8080"
     environment:
       SPRING_PROFILES_ACTIVE: prod
       APPLICATION_HOST_URL: https://${APP_HOSTNAME}
@@ -153,7 +153,7 @@ services:
       - postgres
     restart: unless-stopped
     ports:
-      - '8000'
+      - "8000"
     networks:
       - shared-network
     healthcheck:
@@ -169,13 +169,13 @@ services:
         max-file: "5"
 
   postgres:
-    image: 'postgres:16'
+    image: "postgres:16"
     environment:
       - POSTGRES_DB=hephaestus
       - POSTGRES_PASSWORD=root
       - POSTGRES_USER=root
     ports:
-      - '5432'
+      - "5432"
     networks:
       shared-network:
         aliases:

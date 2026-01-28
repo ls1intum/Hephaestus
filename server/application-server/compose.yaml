@@ -1,4 +1,7 @@
 # Used for local development
+#
+# IMPORTANT: After updating .env or realm config, run `docker compose down -v && docker compose up`
+# to clear Keycloak data and re-import the realm with new settings.
 
 services:
   postgres:
@@ -19,20 +22,34 @@ services:
     environment:
       KC_BOOTSTRAP_ADMIN_USERNAME: admin
       KC_BOOTSTRAP_ADMIN_PASSWORD: admin
-      KEYCLOAK_IMPORT: /opt/keycloak/data/import/hephaestus-realm.json
+      # GitHub OAuth credentials for identity provider (resolved by Keycloak during realm import)
       KEYCLOAK_GITHUB_CLIENT_ID: '${KEYCLOAK_GITHUB_CLIENT_ID:?Set GitHub OAuth client ID}'
       KEYCLOAK_GITHUB_CLIENT_SECRET: '${KEYCLOAK_GITHUB_CLIENT_SECRET:?Set GitHub OAuth client secret}'
       KEYCLOAK_GITHUB_ADMIN_USERNAME: '${KEYCLOAK_GITHUB_ADMIN_USERNAME:?Set GitHub admin username}'
-    command: 
+      # Confidential client secret - must match what the application server uses
+      # Default: hephaestus-dev-secret (for local development only)
+      KEYCLOAK_CONFIDENTIAL_CLIENT_SECRET: '${KEYCLOAK_CLIENT_SECRET:-hephaestus-dev-secret}'
+      # Enable health endpoint for container healthcheck
+      KC_HEALTH_ENABLED: 'true'
+    command:
       - start-dev
       - --import-realm
     ports:
       - '8081:8080'
     volumes:
-      - keycloak-data:/opt/keycloak/data/
-      - ./keycloak-hephaestus-realm-example-config.json:/opt/keycloak/data/import/hephaestus-realm.json
+      # Mount realm config to import directory
+      - ./keycloak-hephaestus-realm-example-config.json:/opt/keycloak/data/import/hephaestus-realm.json:ro
+      # Persist Keycloak data (H2 database) for user sessions between restarts
+      - keycloak-data:/opt/keycloak/data
     networks:
       - app-network
+    # Keycloak 26+ exposes health endpoints on management port 9000, not the main port 8080
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/9000 && echo -e 'GET /health/ready HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n' >&3 && grep -q '200 OK' <&3"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
 
 networks:
   app-network:

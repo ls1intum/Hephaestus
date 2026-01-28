@@ -1,10 +1,10 @@
 package de.tum.in.www1.hephaestus.workspace;
 
+import static de.tum.in.www1.hephaestus.shared.LeaguePointsConstants.POINTS_DEFAULT;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserTeamsDTO;
-import de.tum.in.www1.hephaestus.leaderboard.LeaguePointsCalculationService;
 import de.tum.in.www1.hephaestus.testconfig.TestAuthUtils;
 import de.tum.in.www1.hephaestus.testconfig.WithAdminUser;
 import de.tum.in.www1.hephaestus.testconfig.WithMentorUser;
@@ -269,8 +269,7 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
     @WithAdminUser
     void resetLeagueEndpointRequiresExistingWorkspaceAndResetsPoints() {
         User user = persistUser("league-user");
-        user.setLeaguePoints(1_500);
-        userRepository.save(user);
+        // Note: leaguePoints is on WorkspaceMembership, not User
 
         Workspace workspace = createWorkspace("league-space", "League", "league", AccountType.ORG, user);
         ensureAdminMembership(workspace);
@@ -301,7 +300,7 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
         var membership = workspaceMembershipRepository
             .findByWorkspace_IdAndUser_Id(workspace.getId(), user.getId())
             .orElseThrow();
-        assertThat(membership.getLeaguePoints()).isEqualTo(LeaguePointsCalculationService.POINTS_DEFAULT);
+        assertThat(membership.getLeaguePoints()).isEqualTo(POINTS_DEFAULT);
     }
 
     @Test

@@ -2,24 +2,28 @@ package de.tum.in.www1.hephaestus.config;
 
 import com.slack.api.bolt.App;
 import com.slack.api.bolt.AppConfig;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 @Configuration
 public class SlackAppConfig {
 
-    @Value("${slack.token}")
-    private String botToken;
+    private final SlackProperties slackProperties;
 
-    @Value("${slack.signing-secret}")
-    private String signingSecret;
+    public SlackAppConfig(SlackProperties slackProperties) {
+        this.slackProperties = slackProperties;
+    }
 
     @Bean
     public App initSlackApp() {
-        if (botToken == null || signingSecret == null || botToken.isEmpty() || signingSecret.isEmpty()) {
+        if (!slackProperties.isConfigured()) {
             return new App();
         }
-        return new App(AppConfig.builder().singleTeamBotToken(botToken).signingSecret(signingSecret).build());
+        return new App(
+            AppConfig.builder()
+                .singleTeamBotToken(slackProperties.token())
+                .signingSecret(slackProperties.signingSecret())
+                .build()
+        );
     }
 }

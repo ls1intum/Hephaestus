@@ -1,12 +1,12 @@
 import { XCircleIcon } from "lucide-react";
-import type { UserProfile } from "@/api/types.gen";
+import type { Profile } from "@/api/types.gen";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import type { LeaderboardSchedule } from "@/lib/timeframe";
 import { ProfileContent } from "./ProfileContent";
 import { ProfileHeader } from "./ProfileHeader";
 
 interface ProfileProps {
-	profileData?: UserProfile;
+	profileData?: Profile;
 	isLoading: boolean;
 	error: boolean;
 	username: string;
@@ -55,6 +55,8 @@ export function ProfilePage({
 			<ProfileContent
 				reviewActivity={profileData?.reviewActivity}
 				openPullRequests={profileData?.openPullRequests}
+				activityStats={profileData?.activityStats}
+				reviewedPullRequests={profileData?.reviewedPullRequests}
 				isLoading={isLoading}
 				username={username}
 				displayName={profileData?.userInfo?.name}

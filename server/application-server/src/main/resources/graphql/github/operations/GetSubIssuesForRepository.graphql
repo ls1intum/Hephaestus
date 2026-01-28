@@ -1,0 +1,91 @@
+# GraphQL operation for syncing sub-issues across a repository
+# Used by GitHubSubIssueSyncService via documentName("GetSubIssuesForRepository")
+#
+# Returns issues with their parent relationships and sub_issues_summary for efficient bulk sync.
+# Uses GitHub's GraphQL API for sub-issues feature (2024).
+#
+# ARCHITECTURE NOTE (Jan 2026): This query includes full parent issue data to support
+# the "find-or-create" pattern. When a parent issue doesn't exist locally (e.g., it's
+# in a different repo or hasn't been synced yet), we create a stub issue entity
+# on-the-fly to preserve the parent-child relationship.
+
+query GetSubIssuesForRepository($owner: String!, $name: String!, $first: Int!, $after: String) {
+    rateLimit {
+        cost
+        limit
+        remaining
+        resetAt
+    }
+    repository(owner: $owner, name: $name) {
+        issues(first: $first, after: $after, filterBy: { states: [OPEN, CLOSED] }) {
+            pageInfo {
+                hasNextPage
+                endCursor
+            }
+            totalCount
+            nodes {
+                # Full issue data to support find-or-create pattern for the sub-issue itself
+                id
+                fullDatabaseId
+                number
+                title
+                body
+                state
+                stateReason
+                url
+                createdAt
+                updatedAt
+                closedAt
+                locked
+                parent {
+                    # Full parent issue data to support find-or-create pattern
+                    id
+                    fullDatabaseId
+                    number
+                    title
+                    body
+                    state
+                    stateReason
+                    url
+                    createdAt
+                    updatedAt
+                    closedAt
+                    locked
+                    # Repository reference (needed to create stub in correct repo)
+                    repository {
+                        id
+                        databaseId
+                        name
+                        nameWithOwner
+                        url
+                    }
+                    # Author
+                    author {
+                        __typename
+                        ... on User {
+                            id
+                            databaseId
+                            login
+                            avatarUrl
+                            name
+                            email
+                            createdAt
+                            updatedAt
+                        }
+                        ... on Bot {
+                            id
+                            databaseId
+                            login
+                            avatarUrl
+                        }
+                    }
+                }
+                subIssuesSummary {
+                    total
+                    completed
+                    percentCompleted
+                }
+            }
+        }
+    }
+}

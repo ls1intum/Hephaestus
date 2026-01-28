@@ -12,7 +12,6 @@ import org.springframework.context.event.EventListener;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.core.task.TaskRejectedException;
-import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 import org.springframework.scheduling.support.CronExpression;
 import org.springframework.scheduling.support.CronTrigger;
@@ -23,29 +22,33 @@ import org.springframework.stereotype.Component;
  * @see SlackWeeklyLeaderboardTask
  */
 @Order(value = Ordered.LOWEST_PRECEDENCE)
-@EnableScheduling
 @Component
 public class LeaderboardTaskScheduler {
 
-    private static final Logger logger = LoggerFactory.getLogger(LeaderboardTaskScheduler.class);
+    private static final Logger log = LoggerFactory.getLogger(LeaderboardTaskScheduler.class);
 
-    @Value("${hephaestus.leaderboard.notification.enabled}")
-    private boolean runScheduledMessage;
+    private final boolean runScheduledMessage;
+    private final String scheduledDay;
+    private final String scheduledTime;
+    private final ThreadPoolTaskScheduler taskScheduler;
+    private final SlackWeeklyLeaderboardTask slackWeeklyLeaderboardTask;
+    private final LeaguePointsUpdateTask leaguePointsUpdateTask;
 
-    @Value("${hephaestus.leaderboard.schedule.day}")
-    private String scheduledDay;
-
-    @Value("${hephaestus.leaderboard.schedule.time}")
-    private String scheduledTime;
-
-    @Autowired
-    private ThreadPoolTaskScheduler taskScheduler;
-
-    @Autowired
-    private SlackWeeklyLeaderboardTask slackWeeklyLeaderboardTask;
-
-    @Autowired
-    private LeaguePointsUpdateTask leaguePointsUpdateTask;
+    public LeaderboardTaskScheduler(
+        @Value("${hephaestus.leaderboard.notification.enabled}") boolean runScheduledMessage,
+        @Value("${hephaestus.leaderboard.schedule.day}") String scheduledDay,
+        @Value("${hephaestus.leaderboard.schedule.time}") String scheduledTime,
+        ThreadPoolTaskScheduler taskScheduler,
+        @Autowired(required = false) SlackWeeklyLeaderboardTask slackWeeklyLeaderboardTask,
+        LeaguePointsUpdateTask leaguePointsUpdateTask
+    ) {
+        this.runScheduledMessage = runScheduledMessage;
+        this.scheduledDay = scheduledDay;
+        this.scheduledTime = scheduledTime;
+        this.taskScheduler = taskScheduler;
+        this.slackWeeklyLeaderboardTask = slackWeeklyLeaderboardTask;
+        this.leaguePointsUpdateTask = leaguePointsUpdateTask;
+    }
 
     @EventListener(ApplicationReadyEvent.class)
     public void activateTaskScheduler() {
@@ -61,7 +64,7 @@ public class LeaderboardTaskScheduler {
         );
 
         if (!CronExpression.isValidExpression(cron)) {
-            logger.error("Invalid cron expression: " + cron);
+            log.error("Rejected invalid cron expression: cronExpression={}", cron);
             return;
         }
 
@@ -74,39 +77,39 @@ public class LeaderboardTaskScheduler {
      */
     private void scheduleSlackMessage(String cron) {
         if (!runScheduledMessage) {
-            logger.info("Leaderboard notifications disabled; Slack message not scheduled.");
+            log.info("Skipped Slack message scheduling: reason=notificationsDisabled");
             return;
         }
 
         if (slackWeeklyLeaderboardTask == null) {
-            logger.warn("SlackWeeklyLeaderboardTask bean not available; skipping Slack scheduling.");
+            log.warn("Skipped Slack message scheduling: reason=beanNotAvailable");
             return;
         }
 
         if (!slackWeeklyLeaderboardTask.testSlackConnection()) {
-            logger.error("Failed to schedule Slack message");
+            log.error("Failed to schedule Slack message: reason=connectionTestFailed");
             return;
         }
 
-        logger.info("Scheduling Slack message to run with {}", cron);
+        log.info("Scheduled Slack message: cronExpression={}", cron);
         scheduleSafely(slackWeeklyLeaderboardTask, new CronTrigger(cron), "Slack weekly leaderboard message");
     }
 
     private void scheduleLeaguePointsUpdate(String cron) {
-        logger.info("Scheduling league points update to run with {}", cron);
+        log.info("Scheduled league points update: cronExpression={}", cron);
         scheduleSafely(leaguePointsUpdateTask, new CronTrigger(cron), "league points update");
     }
 
     private void scheduleSafely(Runnable task, CronTrigger trigger, String description) {
         if (isSchedulerShuttingDown()) {
-            logger.info("Skipping {} scheduling because task scheduler is shutting down.", description);
+            log.info("Skipped scheduling: reason=schedulerShuttingDown, task={}", description);
             return;
         }
 
         try {
             taskScheduler.schedule(task, trigger);
         } catch (TaskRejectedException ex) {
-            logger.warn("Task scheduler rejected {} scheduling: {}", description, ex.getMessage());
+            log.warn("Skipped scheduling: reason=taskRejected, task={}", description, ex);
         }
     }
 

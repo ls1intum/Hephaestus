@@ -23,14 +23,15 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.reactive.function.client.ClientResponse;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 /**
  * Transparent proxy for mentor endpoints to the intelligence service.
@@ -51,6 +52,7 @@ import reactor.core.publisher.Flux;
 @WorkspaceScopedController
 @Hidden
 @RequestMapping("/mentor")
+@PreAuthorize("isAuthenticated()")
 public class MentorProxyController {
 
     private static final Logger log = LoggerFactory.getLogger(MentorProxyController.class);
@@ -147,7 +149,7 @@ public class MentorProxyController {
                 h.addAll(outHeaders);
             })
             .bodyValue(safeBody)
-            .exchange()
+            .exchangeToMono(clientResp -> Mono.just(clientResp))
             .block();
 
         if (clientResponse == null) {
@@ -235,7 +237,7 @@ public class MentorProxyController {
                         outputStream.flush();
                     } catch (IOException e) {
                         log.debug("Client disconnected during SSE streaming: {}", e.getMessage());
-                        throw new RuntimeException("Client disconnected", e);
+                        throw new StreamingException("Client disconnected", e);
                     }
                 })
                 .doOnError(e -> log.debug("SSE stream error: {}", e.getMessage()))
@@ -249,7 +251,7 @@ public class MentorProxyController {
                 .blockLast(); // Safe to block here - we're on a servlet thread
         } catch (IOException e) {
             log.debug("SSE streaming initialization failed: {}", e.getMessage());
-        } catch (RuntimeException e) {
+        } catch (StreamingException e) {
             // Client disconnected - this is expected behavior, not an error
             log.debug("SSE streaming terminated: {}", e.getMessage());
         }

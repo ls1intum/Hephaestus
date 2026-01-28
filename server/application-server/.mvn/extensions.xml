@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    Maven Build Cache Extension Configuration
+
+    This extension enables incremental builds by caching build outputs and
+    avoiding redundant work when inputs haven't changed.
+
+    Version: 1.2.1 (latest stable as of October 2025)
+    Requires: Maven 3.9.x or later
+
+    Documentation: https://maven.apache.org/extensions/maven-build-cache-extension/
+
+    IMPORTANT: This file MUST be in .mvn/extensions.xml (not in pom.xml)
+    to enable full access to Maven APIs and sophisticated optimizations.
+-->
+<extensions xmlns="http://maven.apache.org/EXTENSIONS/1.0.0"
+            xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+            xsi:schemaLocation="http://maven.apache.org/EXTENSIONS/1.0.0
+                                https://maven.apache.org/xsd/core-extensions-1.0.0.xsd">
+
+    <extension>
+        <groupId>org.apache.maven.extensions</groupId>
+        <artifactId>maven-build-cache-extension</artifactId>
+        <version>1.2.1</version>
+    </extension>
+
+</extensions>

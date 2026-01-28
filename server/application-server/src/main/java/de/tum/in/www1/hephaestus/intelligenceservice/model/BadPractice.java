@@ -33,6 +33,7 @@ import org.hibernate.validator.constraints.*;
   BadPractice.JSON_PROPERTY_STATUS
 })
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
+@SuppressWarnings("all")
 public class BadPractice {
   public static final String JSON_PROPERTY_TITLE = "title";
   private String title;

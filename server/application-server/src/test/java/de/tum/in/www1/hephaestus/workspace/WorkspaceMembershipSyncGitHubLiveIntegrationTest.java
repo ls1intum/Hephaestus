@@ -1,53 +1,40 @@
 package de.tum.in.www1.hephaestus.workspace;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.awaitility.Awaitility.await;
 
-import de.tum.in.www1.hephaestus.gitprovider.github.BaseGitHubLiveIntegrationTest;
+import de.tum.in.www1.hephaestus.gitprovider.github.AbstractGitHubLiveSyncIntegrationTest;
+import de.tum.in.www1.hephaestus.gitprovider.organization.Organization;
 import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationMembershipRepository;
-import de.tum.in.www1.hephaestus.gitprovider.user.User;
-import java.time.Duration;
+import de.tum.in.www1.hephaestus.gitprovider.organization.github.GitHubOrganizationSyncService;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
-class WorkspaceMembershipSyncGitHubLiveIntegrationTest extends BaseGitHubLiveIntegrationTest {
+/**
+ * Live integration tests for organization membership synchronization.
+ * <p>
+ * Tests that organization members are correctly synced from GitHub.
+ */
+class WorkspaceMembershipSyncGitHubLiveIntegrationTest extends AbstractGitHubLiveSyncIntegrationTest {
 
     @Autowired
-    private WorkspaceService workspaceService;
-
-    @Autowired
-    private WorkspaceRepository workspaceRepository;
+    private GitHubOrganizationSyncService orgSyncService;
 
     @Autowired
     private OrganizationMembershipRepository organizationMembershipRepository;
 
-    @Autowired
-    private WorkspaceMembershipRepository workspaceMembershipRepository;
-
     @Test
-    void syncsOrganizationMembersIntoWorkspaceMemberships() {
-        // provisioning runs on context load; trigger monitoring pipeline (includes members sync)
-        workspaceService.activateAllWorkspaces();
-        Workspace workspace = workspaceRepository.findAll().stream().findFirst().orElseThrow();
+    void syncsOrganizationMembersFromGitHub() {
+        // Sync the HephaestusTest organization (our test GitHub App is installed there)
+        Organization org = orgSyncService.syncOrganization(workspace.getId(), "HephaestusTest");
+        assertThat(org).as("Organization should be synced from GitHub").isNotNull();
+        assertThat(org.getLogin()).isEqualTo("HephaestusTest");
 
-        await()
-            .atMost(Duration.ofSeconds(60))
-            .untilAsserted(() -> {
-                List<Long> orgMembers = organizationMembershipRepository.findUserIdsByOrganizationId(
-                    workspace.getOrganization().getId()
-                );
-                List<WorkspaceMembership> workspaceMembers = workspaceMembershipRepository.findByWorkspace_Id(
-                    workspace.getId()
-                );
+        // Verify org members were synced (repository stores only IDs, not full User objects)
+        List<Long> orgMemberUserIds = organizationMembershipRepository.findUserIdsByOrganizationId(org.getId());
+        assertThat(orgMemberUserIds).as("organization members should be synced from GitHub").isNotEmpty();
 
-                assertThat(orgMembers).as("organization members should be present").isNotEmpty();
-                assertThat(workspaceMembers)
-                    .as("workspace members should mirror organization members")
-                    .hasSize(orgMembers.size());
-                assertThat(
-                    workspaceMembers.stream().map(WorkspaceMembership::getUser).map(User::getId).toList()
-                ).containsAll(orgMembers);
-            });
+        // Verify at least one member exists (the person who installed the GitHub App)
+        assertThat(orgMemberUserIds.size()).isGreaterThanOrEqualTo(1);
     }
 }

@@ -1,0 +1,66 @@
+# GraphQL query for fetching issue comments
+# Uses fullDatabaseId for comment (BigInt) since databaseId (Int) can overflow for newer GitHub entities.
+# User/Bot still use databaseId as fullDatabaseId is not available on Actor types.
+
+query GetIssueComments($owner: String!, $name: String!, $number: Int!, $first: Int!, $after: String) {
+    rateLimit {
+        cost
+        limit
+        remaining
+        resetAt
+    }
+    repository(owner: $owner, name: $name) {
+        issue(number: $number) {
+            comments(first: $first, after: $after) {
+                pageInfo {
+                    hasNextPage
+                    endCursor
+                }
+                totalCount
+                nodes {
+                    id
+                    fullDatabaseId
+                    body
+                    url
+                    createdAt
+                    updatedAt
+
+                    # Author
+                    author {
+                        __typename
+                        ... on User {
+                            id
+                            databaseId
+                            login
+                            avatarUrl
+                            name
+                            email
+                            createdAt
+                            updatedAt
+                        }
+                        ... on Bot {
+                            id
+                            databaseId
+                            login
+                            avatarUrl
+                        }
+                        ... on Mannequin {
+                            id
+                            databaseId
+                            login
+                            avatarUrl
+                        }
+                        ... on Organization {
+                            id
+                            databaseId
+                            login
+                            avatarUrl
+                        }
+                    }
+
+                    authorAssociation
+                }
+            }
+        }
+    }
+}

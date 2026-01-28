@@ -2,13 +2,14 @@ package de.tum.in.www1.hephaestus.gitprovider.label;
 
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
-import de.tum.in.www1.hephaestus.gitprovider.team.Team;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToMany;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
+import java.time.Instant;
 import java.util.HashSet;
 import java.util.Objects;
 import java.util.Set;
@@ -19,7 +20,10 @@ import lombok.Setter;
 import lombok.ToString;
 
 @Entity
-@Table(name = "label")
+@Table(
+    name = "label",
+    uniqueConstraints = @UniqueConstraint(name = "uq_label_repository_name", columnNames = { "repository_id", "name" })
+)
 @Getter
 @Setter
 @NoArgsConstructor
@@ -28,7 +32,17 @@ public class Label {
     @Id
     protected Long id;
 
-    // Note: This entity does not have a createdAt and updatedAt field
+    /**
+     * When this label was created on GitHub.
+     * Nullable because GitHub's GraphQL API returns this as optional.
+     */
+    private Instant createdAt;
+
+    /**
+     * When this label was last updated on GitHub.
+     * Nullable because GitHub's GraphQL API returns this as optional.
+     */
+    private Instant updatedAt;
 
     @NonNull
     private String name;
@@ -48,14 +62,14 @@ public class Label {
     @ToString.Exclude
     private Repository repository;
 
-    @ManyToMany(mappedBy = "labels")
-    @ToString.Exclude
-    private Set<Team> teams = new HashSet<>();
-
-    public void removeAllTeams() {
-        this.teams.forEach(team -> team.getLabels().remove(this));
-        this.teams.clear();
-    }
+    /**
+     * Timestamp of the last successful sync for this label from the Git provider.
+     * <p>
+     * This is ETL infrastructure used by the sync engine to track when this label
+     * was last synchronized via GraphQL. Used to implement sync cooldown logic
+     * and detect stale data.
+     */
+    private Instant lastSyncAt;
 
     /**
      * Removes this label from all referencing issues (required before deletion).

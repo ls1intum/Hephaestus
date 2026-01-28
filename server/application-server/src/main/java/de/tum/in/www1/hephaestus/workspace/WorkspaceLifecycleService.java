@@ -4,9 +4,16 @@ import static de.tum.in.www1.hephaestus.workspace.Workspace.WorkspaceStatus;
 
 import de.tum.in.www1.hephaestus.core.LoggingUtils;
 import de.tum.in.www1.hephaestus.core.exception.EntityNotFoundException;
+import de.tum.in.www1.hephaestus.gitprovider.sync.NatsConsumerService;
+import de.tum.in.www1.hephaestus.gitprovider.sync.NatsProperties;
 import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.in.www1.hephaestus.workspace.exception.WorkspaceLifecycleViolationException;
-import lombok.RequiredArgsConstructor;
+import de.tum.in.www1.hephaestus.workspace.settings.WorkspaceTeamLabelFilterRepository;
+import de.tum.in.www1.hephaestus.workspace.settings.WorkspaceTeamRepositorySettingsRepository;
+import de.tum.in.www1.hephaestus.workspace.settings.WorkspaceTeamSettingsRepository;
+import de.tum.in.www1.hephaestus.workspace.spi.WorkspacePurgeContributor;
+import java.util.Comparator;
+import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -17,12 +24,48 @@ import org.springframework.transaction.annotation.Transactional;
  * Manages suspend, resume, and purge operations with proper guardrails.
  */
 @Service
-@RequiredArgsConstructor
 public class WorkspaceLifecycleService {
 
-    private static final Logger logger = LoggerFactory.getLogger(WorkspaceLifecycleService.class);
+    private static final Logger log = LoggerFactory.getLogger(WorkspaceLifecycleService.class);
 
+    private final NatsProperties natsProperties;
     private final WorkspaceRepository workspaceRepository;
+    private final NatsConsumerService natsConsumerService;
+
+    // Repositories for workspace-scoped data cleanup
+    private final RepositoryToMonitorRepository repositoryToMonitorRepository;
+    private final WorkspaceMembershipRepository workspaceMembershipRepository;
+    private final WorkspaceTeamSettingsRepository workspaceTeamSettingsRepository;
+    private final WorkspaceTeamLabelFilterRepository workspaceTeamLabelFilterRepository;
+    private final WorkspaceTeamRepositorySettingsRepository workspaceTeamRepositorySettingsRepository;
+    private final WorkspaceSlugHistoryRepository workspaceSlugHistoryRepository;
+
+    // SPI for cross-module cleanup during purge
+    private final List<WorkspacePurgeContributor> purgeContributors;
+
+    public WorkspaceLifecycleService(
+        NatsProperties natsProperties,
+        WorkspaceRepository workspaceRepository,
+        NatsConsumerService natsConsumerService,
+        RepositoryToMonitorRepository repositoryToMonitorRepository,
+        WorkspaceMembershipRepository workspaceMembershipRepository,
+        WorkspaceTeamSettingsRepository workspaceTeamSettingsRepository,
+        WorkspaceTeamLabelFilterRepository workspaceTeamLabelFilterRepository,
+        WorkspaceTeamRepositorySettingsRepository workspaceTeamRepositorySettingsRepository,
+        WorkspaceSlugHistoryRepository workspaceSlugHistoryRepository,
+        List<WorkspacePurgeContributor> purgeContributors
+    ) {
+        this.natsProperties = natsProperties;
+        this.workspaceRepository = workspaceRepository;
+        this.natsConsumerService = natsConsumerService;
+        this.repositoryToMonitorRepository = repositoryToMonitorRepository;
+        this.workspaceMembershipRepository = workspaceMembershipRepository;
+        this.workspaceTeamSettingsRepository = workspaceTeamSettingsRepository;
+        this.workspaceTeamLabelFilterRepository = workspaceTeamLabelFilterRepository;
+        this.workspaceTeamRepositorySettingsRepository = workspaceTeamRepositorySettingsRepository;
+        this.workspaceSlugHistoryRepository = workspaceSlugHistoryRepository;
+        this.purgeContributors = purgeContributors;
+    }
 
     /**
      * Suspend a workspace, preventing new sync cycles and making it read-only.
@@ -46,13 +89,14 @@ public class WorkspaceLifecycleService {
         if (workspace.getStatus() != WorkspaceStatus.SUSPENDED) {
             workspace.setStatus(WorkspaceStatus.SUSPENDED);
             workspace = workspaceRepository.save(workspace);
-            logger.info("Workspace '{}' has been suspended.", LoggingUtils.sanitizeForLog(workspaceSlug));
-            // TODO: Stop NATS consumers and signal schedulers
+            log.info("Suspended workspace: workspaceSlug={}", LoggingUtils.sanitizeForLog(workspaceSlug));
+            stopNatsForWorkspace(workspace);
         }
 
         return workspace;
     }
 
+    @Transactional
     public Workspace suspendWorkspace(WorkspaceContext workspaceContext) {
         return suspendWorkspace(requireSlug(workspaceContext));
     }
@@ -79,22 +123,41 @@ public class WorkspaceLifecycleService {
         if (workspace.getStatus() != WorkspaceStatus.ACTIVE) {
             workspace.setStatus(WorkspaceStatus.ACTIVE);
             workspace = workspaceRepository.save(workspace);
-            logger.info("Workspace '{}' has been resumed.", LoggingUtils.sanitizeForLog(workspaceSlug));
-            // TODO: Restart NATS consumers and re-enable schedulers
+            log.info("Resumed workspace: workspaceSlug={}", LoggingUtils.sanitizeForLog(workspaceSlug));
+            startNatsForWorkspace(workspace);
         }
 
         return workspace;
     }
 
+    @Transactional
     public Workspace resumeWorkspace(WorkspaceContext workspaceContext) {
         return resumeWorkspace(requireSlug(workspaceContext));
     }
 
     /**
-     * Purge (soft delete) a workspace immediately.
-     * Idempotent: calling purge on an already purged workspace is a no-op.
+     * Purge a workspace by deleting all associated data and marking it as PURGED.
      *
-     * @param slug the workspace slug
+     * <p>This performs a hard delete of all workspace-scoped data in the correct order:
+     * <ol>
+     *   <li><b>Stop NATS consumers</b> - Prevents race conditions during cleanup</li>
+     *   <li><b>Delete workspace settings</b> - Team settings, label filters, repository settings</li>
+     *   <li><b>Delete workspace memberships</b> - User-workspace associations</li>
+     *   <li><b>Invoke purge contributors</b> - Module-specific cleanup via SPI (e.g., activity events)</li>
+     *   <li><b>Delete repository monitors</b> - Monitored repository configuration</li>
+     *   <li><b>Delete slug history</b> - URL redirect history</li>
+     *   <li><b>Unlink organization</b> - Clear the organization association</li>
+     *   <li><b>Mark as PURGED</b> - Terminal state preventing reactivation</li>
+     * </ol>
+     *
+     * <p>Idempotent: calling purge on an already purged workspace is a no-op.
+     *
+     * <p><b>Note:</b> This method runs in a single transaction. For very large workspaces
+     * with millions of activity events, consider implementing batch deletion in a
+     * separate scheduled job to avoid long-running transactions.
+     *
+     * @param workspaceSlug the workspace slug
+     * @return the purged workspace
      * @throws EntityNotFoundException if workspace does not exist
      */
     @Transactional
@@ -104,18 +167,73 @@ public class WorkspaceLifecycleService {
             .orElseThrow(() -> new EntityNotFoundException("Workspace", workspaceSlug));
 
         if (workspace.getStatus() == WorkspaceStatus.PURGED) {
-            logger.info("Workspace '{}' is already purged. Skipping.", LoggingUtils.sanitizeForLog(workspaceSlug));
+            log.debug(
+                "Skipped workspace purge: reason=alreadyPurged, workspaceSlug={}",
+                LoggingUtils.sanitizeForLog(workspaceSlug)
+            );
             return workspace;
         }
 
-        // TODO: Implement hard delete with batch cascade strategy
+        Long workspaceId = workspace.getId();
+        String sanitizedSlug = LoggingUtils.sanitizeForLog(workspaceSlug);
 
+        // Step 1: Stop NATS consumers FIRST to prevent race conditions
+        // Must happen before any data deletion to avoid processing events for deleted entities
+        stopNatsForWorkspace(workspace);
+        log.debug("Stopped NATS consumer for workspace purge: workspaceId={}", workspaceId);
+
+        // Step 2: Delete workspace settings (team settings, label filters, repository settings)
+        // These have FK constraints to workspace, so delete them first
+        workspaceTeamLabelFilterRepository.deleteAllByWorkspaceId(workspaceId);
+        workspaceTeamRepositorySettingsRepository.deleteAllByWorkspaceId(workspaceId);
+        workspaceTeamSettingsRepository.deleteAllByWorkspaceId(workspaceId);
+        log.debug("Deleted workspace settings: workspaceId={}", workspaceId);
+
+        // Step 3: Delete workspace memberships
+        workspaceMembershipRepository.deleteAllByWorkspaceId(workspaceId);
+        log.debug("Deleted workspace memberships: workspaceId={}", workspaceId);
+
+        // Step 4: Invoke purge contributors (e.g., activity events, leaderboard data)
+        // Contributors are sorted by order and handle their own module's cleanup
+        purgeContributors
+            .stream()
+            .sorted(Comparator.comparingInt(WorkspacePurgeContributor::getOrder))
+            .forEach(contributor -> contributor.deleteWorkspaceData(workspaceId));
+        log.debug("Invoked purge contributors: workspaceId={}, count={}", workspaceId, purgeContributors.size());
+
+        // Step 5: Delete repository monitors
+        // Note: The RepositoryToMonitor entities are also managed via Workspace.repositoriesToMonitor
+        // with orphanRemoval=true, but we explicitly delete here for clarity and to ensure
+        // the collection is cleared before workspace save
+        repositoryToMonitorRepository.deleteAllByWorkspaceId(workspaceId);
+        workspace.getRepositoriesToMonitor().clear();
+        log.debug("Deleted repository monitors: workspaceId={}", workspaceId);
+
+        // Step 6: Delete slug history (redirect entries)
+        workspaceSlugHistoryRepository.deleteAllByWorkspaceId(workspaceId);
+        log.debug("Deleted slug history: workspaceId={}", workspaceId);
+
+        // Step 7: Unlink organization (don't delete - Organization is a shared entity)
+        workspace.setOrganization(null);
+
+        // Step 8: Clear sync timestamps for clean slate on potential reactivation
+        // This ensures that if the workspace is ever reactivated, sync will fetch fresh data
+        workspace.setUsersSyncedAt(null);
+        workspace.setTeamsSyncedAt(null);
+        workspace.setMembersSyncedAt(null);
+        workspace.setSubIssuesSyncedAt(null);
+        workspace.setIssueTypesSyncedAt(null);
+        workspace.setIssueDependenciesSyncedAt(null);
+
+        // Step 9: Mark workspace as PURGED (terminal state)
         workspace.setStatus(WorkspaceStatus.PURGED);
         workspace = workspaceRepository.save(workspace);
-        logger.info("Workspace '{}' has been purged (soft deleted).", LoggingUtils.sanitizeForLog(workspaceSlug));
+
+        log.info("Purged workspace: workspaceSlug={}, workspaceId={}", sanitizedSlug, workspaceId);
         return workspace;
     }
 
+    @Transactional
     public Workspace purgeWorkspace(WorkspaceContext workspaceContext) {
         return purgeWorkspace(requireSlug(workspaceContext));
     }
@@ -150,6 +268,7 @@ public class WorkspaceLifecycleService {
         };
     }
 
+    @Transactional
     public Workspace updateStatus(WorkspaceContext workspaceContext, WorkspaceStatus targetStatus) {
         return updateStatus(requireSlug(workspaceContext), targetStatus);
     }
@@ -165,5 +284,42 @@ public class WorkspaceLifecycleService {
         }
 
         return slug;
+    }
+
+    // -------------------------------------------------------------------------
+    // NATS consumer lifecycle helpers
+    // -------------------------------------------------------------------------
+
+    /**
+     * Stop NATS consumer for a workspace.
+     * Only applies when NATS is enabled and workspace uses GitHub App mode.
+     */
+    private void stopNatsForWorkspace(Workspace workspace) {
+        if (shouldUseNats(workspace)) {
+            natsConsumerService.stopConsumingScope(workspace.getId());
+        }
+    }
+
+    /**
+     * Start NATS consumer for a workspace.
+     * Only applies when NATS is enabled and workspace uses GitHub App mode.
+     */
+    private void startNatsForWorkspace(Workspace workspace) {
+        if (shouldUseNats(workspace)) {
+            natsConsumerService.startConsumingScope(workspace.getId());
+        }
+    }
+
+    /**
+     * Checks if NATS should be used for the given workspace.
+     * NATS consumers are only used when:
+     * <ul>
+     *   <li>NATS is enabled globally</li>
+     *   <li>Workspace exists</li>
+     *   <li>Workspace has an installation ID (GitHub App mode)</li>
+     * </ul>
+     */
+    private boolean shouldUseNats(Workspace workspace) {
+        return natsProperties.enabled() && workspace != null && workspace.getInstallationId() != null;
     }
 }

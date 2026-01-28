@@ -16,7 +16,7 @@ public class GitHubMessageHandlerRegistry {
 
     public GitHubMessageHandlerRegistry(GitHubMessageHandler<?>[] handlers) {
         for (GitHubMessageHandler<?> handler : handlers) {
-            String eventKey = normalize(handler.getEventKey());
+            String eventKey = normalize(handler.getEventType().getValue());
             registerHandler(handler.getDomain(), eventKey, handler);
             handler.getAdditionalDomains().forEach(domain -> registerHandler(domain, eventKey, handler));
         }

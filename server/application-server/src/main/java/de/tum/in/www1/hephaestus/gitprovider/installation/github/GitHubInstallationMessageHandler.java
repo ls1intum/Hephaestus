@@ -1,166 +1,54 @@
 package de.tum.in.www1.hephaestus.gitprovider.installation.github;
 
+import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
+
+import de.tum.in.www1.hephaestus.gitprovider.common.NatsMessageDeserializer;
+import de.tum.in.www1.hephaestus.gitprovider.common.exception.InstallationNotFoundException;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventAction;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventType;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.app.GitHubAppTokenService;
+import de.tum.in.www1.hephaestus.gitprovider.common.spi.ProvisioningListener;
+import de.tum.in.www1.hephaestus.gitprovider.common.spi.ProvisioningListener.AccountType;
+import de.tum.in.www1.hephaestus.gitprovider.common.spi.ProvisioningListener.InstallationData;
+import de.tum.in.www1.hephaestus.gitprovider.common.spi.ProvisioningListener.RepositorySnapshot;
+import de.tum.in.www1.hephaestus.gitprovider.installation.github.dto.GitHubInstallationEventDTO;
 import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationService;
-import de.tum.in.www1.hephaestus.gitprovider.repository.github.GitHubRepositorySyncService;
-import de.tum.in.www1.hephaestus.workspace.Workspace;
-import de.tum.in.www1.hephaestus.workspace.WorkspaceService;
-import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
-import java.util.Set;
-import java.util.stream.Collectors;
-import org.kohsuke.github.GHAppInstallation;
-import org.kohsuke.github.GHEvent;
-import org.kohsuke.github.GHEventPayload;
-import org.kohsuke.github.GHRepositorySelection;
-import org.kohsuke.github.GHUser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * Handles GitHub App installation events.
+ * Handles GitHub installation webhook events and provisions scopes.
  */
 @Component
-public class GitHubInstallationMessageHandler extends GitHubMessageHandler<GHEventPayload.Installation> {
+public class GitHubInstallationMessageHandler extends GitHubMessageHandler<GitHubInstallationEventDTO> {
 
-    private static final Logger logger = LoggerFactory.getLogger(GitHubInstallationMessageHandler.class);
+    private static final Logger log = LoggerFactory.getLogger(GitHubInstallationMessageHandler.class);
 
-    private final GitHubRepositorySyncService repositorySyncService;
-    private final WorkspaceService workspaceService;
+    private final ProvisioningListener provisioningListener;
     private final OrganizationService organizationService;
+    private final GitHubAppTokenService gitHubAppTokenService;
 
-    public GitHubInstallationMessageHandler(
-        GitHubRepositorySyncService repositorySyncService,
-        @Lazy WorkspaceService workspaceService,
-        OrganizationService organizationService
+    GitHubInstallationMessageHandler(
+        ProvisioningListener provisioningListener,
+        OrganizationService organizationService,
+        GitHubAppTokenService gitHubAppTokenService,
+        NatsMessageDeserializer deserializer,
+        TransactionTemplate transactionTemplate
     ) {
-        super(GHEventPayload.Installation.class);
-        this.repositorySyncService = repositorySyncService;
-        this.workspaceService = workspaceService;
+        super(GitHubInstallationEventDTO.class, deserializer, transactionTemplate);
+        this.provisioningListener = provisioningListener;
         this.organizationService = organizationService;
+        this.gitHubAppTokenService = gitHubAppTokenService;
     }
 
     @Override
-    protected void handleEvent(GHEventPayload.Installation payload) {
-        var action = payload.getAction();
-        var installation = payload.getInstallation();
-        var rawRepositories = safeGetRawRepositories(payload);
-        logger.info(
-            "Received installation event: action={}, appId={}, repositories={}",
-            action,
-            installation != null ? installation.getAppId() : null,
-            rawRepositories != null ? rawRepositories.size() : 0
-        );
-
-        if (installation == null) {
-            logger.warn("Ignoring installation event without installation payload (action={}).", action);
-            return;
-        }
-
-        long installationId = installation.getId();
-        var selection = safeGetRepositorySelection(installation);
-        GHUser account = safeGetAccount(installation);
-        String accountLogin = account != null ? account.getLogin() : null;
-        boolean isDeletion = "deleted".equalsIgnoreCase(action);
-        if (!isDeletion) {
-            Workspace workspace = workspaceService.ensureForInstallation(installationId, accountLogin, selection);
-            if (workspace == null) {
-                // Could not create workspace (e.g., old installation, can't sync user)
-                logger.info(
-                    "Skipping installation event for {} (action={}): workspace could not be ensured.",
-                    installationId,
-                    action
-                );
-                return;
-            }
-            workspaceService.updateRepositorySelection(installationId, selection);
-
-            if (account != null && "Organization".equalsIgnoreCase(safeGetAccountType(account))) {
-                organizationService.upsertIdentityAndAttachInstallation(account.getId(), accountLogin, installationId);
-            }
-        }
-
-        // Deleted: remove repositories and exit early
-        if (isDeletion) {
-            handleInstallationDeleted(installationId, rawRepositories, accountLogin);
-            return;
-        }
-
-        if ("suspend".equalsIgnoreCase(action)) {
-            workspaceService.updateStatusForInstallation(installationId, Workspace.WorkspaceStatus.SUSPENDED);
-        } else if ("unsuspend".equalsIgnoreCase(action) || "created".equalsIgnoreCase(action)) {
-            workspaceService.updateStatusForInstallation(installationId, Workspace.WorkspaceStatus.ACTIVE);
-        }
-
-        // Other actions: upsert any provided repositories
-        if (rawRepositories != null && !rawRepositories.isEmpty()) {
-            rawRepositories.forEach(r -> {
-                if (r.getFullName() != null && !r.getFullName().isBlank()) {
-                    repositorySyncService.upsertFromInstallationPayload(
-                        r.getId(),
-                        r.getFullName(),
-                        r.getName(),
-                        r.isPrivate()
-                    );
-                    workspaceService.ensureRepositoryMonitorForInstallation(installationId, r.getFullName());
-                }
-            });
-        }
-        if (selection == GHRepositorySelection.ALL) {
-            Set<String> protectedRepositories = rawRepositories == null
-                ? Collections.emptySet()
-                : rawRepositories
-                      .stream()
-                      .map(GHEventPayload.Installation.Repository::getFullName)
-                      .filter(fullName -> fullName != null && !fullName.isBlank())
-                      .collect(Collectors.toSet());
-            workspaceService.ensureAllInstallationRepositoriesCovered(installationId, protectedRepositories);
-        }
-    }
-
-    /**
-     * Handle installation deletion: clean up monitors, repositories, organization link, and NATS consumers.
-     * <p>
-     * GitHub does NOT guarantee that the repositories array is populated on deletion events,
-     * especially when repository_selection is ALL. We therefore clean up by owner prefix rather
-     * than relying on the webhook payload.
-     * </p>
-     */
-    private void handleInstallationDeleted(
-        long installationId,
-        List<GHEventPayload.Installation.Repository> rawRepositories,
-        String accountLogin
-    ) {
-        // 1. Stop NATS consumer for the workspace first (before removing monitors)
-        workspaceService.stopNatsConsumerForInstallation(installationId);
-
-        // 2. Remove all repository monitors
-        workspaceService.removeAllRepositoryMonitorsForInstallation(installationId);
-
-        // 3. Delete repositories - use both approaches for safety:
-        //    a) Delete by IDs if provided in payload
-        //    b) Delete by owner prefix (catches any repos not in payload)
-        if (rawRepositories != null && !rawRepositories.isEmpty()) {
-            var ids = rawRepositories.stream().map(GHEventPayload.Installation.Repository::getId).toList();
-            repositorySyncService.deleteRepositoriesByIds(ids);
-        }
-        if (accountLogin != null && !accountLogin.isBlank()) {
-            repositorySyncService.deleteRepositoriesByOwnerPrefix(accountLogin + "/");
-        }
-
-        // 4. Detach organization from installation (set installationId to null)
-        organizationService.detachInstallation(installationId);
-
-        // 5. Mark workspace as PURGED (not SUSPENDED - deleted is permanent)
-        workspaceService.updateStatusForInstallation(installationId, Workspace.WorkspaceStatus.PURGED);
-    }
-
-    @Override
-    protected GHEvent getHandlerEvent() {
-        return GHEvent.INSTALLATION;
+    public GitHubEventType getEventType() {
+        return GitHubEventType.INSTALLATION;
     }
 
     @Override
@@ -168,31 +56,152 @@ public class GitHubInstallationMessageHandler extends GitHubMessageHandler<GHEve
         return GitHubMessageDomain.INSTALLATION;
     }
 
-    private GHUser safeGetAccount(GHAppInstallation installation) {
-        return installation.getAccount();
-    }
+    @Override
+    protected void handleEvent(GitHubInstallationEventDTO event) {
+        var installation = event.installation();
 
-    private GHRepositorySelection safeGetRepositorySelection(GHAppInstallation installation) {
-        return installation.getRepositorySelection();
-    }
-
-    private String safeGetAccountType(GHUser account) {
-        if (account == null) {
-            return null;
+        if (installation == null) {
+            log.warn("Received installation event with missing data: action={}", event.action());
+            return;
         }
-        try {
-            return account.getType();
-        } catch (IOException e) {
-            logger.warn("Failed to resolve account type for {}: {}", account.getLogin(), e.getMessage());
-            return null;
+
+        var account = installation.account();
+        String accountLogin = account != null ? account.login() : null;
+        Long installationId = installation.id();
+
+        log.info(
+            "Received installation event: action={}, installationId={}, accountLogin={}",
+            event.action(),
+            installationId,
+            accountLogin != null ? sanitizeForLog(accountLogin) : "unknown"
+        );
+
+        GitHubEventAction.Installation action = event.actionType();
+
+        // Handle deletion early - no scope provisioning needed
+        if (action == GitHubEventAction.Installation.DELETED) {
+            log.info(
+                "Processed installation deletion: installationId={}, accountLogin={}",
+                installationId,
+                sanitizeForLog(accountLogin)
+            );
+            provisioningListener.onInstallationDeleted(installationId);
+            return;
+        }
+
+        // For SUSPEND/UNSUSPEND: verify via API FIRST, then update status only
+        // Don't do full provisioning - just check current state and sync it
+        if (action == GitHubEventAction.Installation.SUSPEND || action == GitHubEventAction.Installation.UNSUSPEND) {
+            verifyAndUpdateInstallationStatus(installationId);
+            return;
+        }
+
+        // For CREATED and other events: do full provisioning
+        String repositorySelection = installation.repositorySelection();
+        String avatarUrl = account != null ? account.avatarUrl() : null;
+        Long accountId = account != null ? account.id() : null;
+        AccountType accountType = account != null && "Organization".equalsIgnoreCase(account.type())
+            ? AccountType.ORGANIZATION
+            : AccountType.USER;
+
+        // Extract repository snapshots from the installation event payload
+        // These are provided for "created" events with "selected" repository selection
+        List<RepositorySnapshot> repositories = event.repositories() != null
+            ? event
+                  .repositories()
+                  .stream()
+                  .map(ref -> new RepositorySnapshot(ref.id(), ref.fullName(), ref.name(), ref.isPrivate()))
+                  .toList()
+            : Collections.emptyList();
+
+        InstallationData installationData = new InstallationData(
+            installationId,
+            accountId,
+            accountLogin,
+            accountType,
+            avatarUrl,
+            repositories
+        );
+
+        // For CREATED events - verify current installation status first
+        // This prevents reactivating suspended installations from stale NATS replay events
+        if (action == GitHubEventAction.Installation.CREATED) {
+            try {
+                boolean currentlySuspended = gitHubAppTokenService.isInstallationSuspended(installationId);
+                if (currentlySuspended) {
+                    log.info(
+                        "Installation created event received but installation is currently suspended, marking suspended: installationId={}",
+                        installationId
+                    );
+                    gitHubAppTokenService.markInstallationSuspended(installationId);
+                    // Still create the workspace but don't activate it
+                    provisioningListener.onInstallationCreated(installationData);
+                    provisioningListener.onRepositorySelectionChanged(installationId, repositorySelection);
+                    provisioningListener.onInstallationSuspended(installationId);
+                    return;
+                }
+            } catch (InstallationNotFoundException e) {
+                // Installation no longer exists on GitHub - do NOT create workspace for deleted installation
+                log.info(
+                    "Installation no longer exists on GitHub, skipping workspace creation: installationId={}",
+                    installationId
+                );
+                return;
+            } catch (RuntimeException e) {
+                // Network errors, credentials not configured, or other transient issues
+                // Proceed with activation - if installation is truly suspended, token minting will fail fast
+                log.warn(
+                    "Could not verify installation status for created event, proceeding with activation: installationId={}, error={}",
+                    installationId,
+                    e.getMessage()
+                );
+            }
+        }
+
+        provisioningListener.onInstallationCreated(installationData);
+        provisioningListener.onRepositorySelectionChanged(installationId, repositorySelection);
+
+        // Ensure organization identity is up-to-date if applicable
+        if (account != null && "Organization".equalsIgnoreCase(account.type())) {
+            organizationService.upsertIdentity(account.id(), accountLogin);
+        }
+
+        // Handle activation for CREATED events
+        if (action == GitHubEventAction.Installation.CREATED) {
+            provisioningListener.onInstallationActivated(installationId);
         }
     }
 
-    private List<GHEventPayload.Installation.Repository> safeGetRawRepositories(GHEventPayload.Installation payload) {
+    /**
+     * Verify installation status via GitHub API and update workspace accordingly.
+     * This is the "webhook as trigger" pattern - we don't trust the webhook action,
+     * instead we verify the CURRENT state via API and update based on that.
+     */
+    private void verifyAndUpdateInstallationStatus(Long installationId) {
         try {
-            return payload.getRawRepositories();
-        } catch (NullPointerException e) {
-            return null;
+            boolean isSuspended = gitHubAppTokenService.isInstallationSuspended(installationId);
+
+            if (isSuspended) {
+                log.info("Verified installation status via API: installationId={}, status=SUSPENDED", installationId);
+                // Mark in-memory FIRST to immediately block all running threads from minting tokens
+                gitHubAppTokenService.markInstallationSuspended(installationId);
+                provisioningListener.onInstallationSuspended(installationId);
+            } else {
+                log.info("Verified installation status via API: installationId={}, status=ACTIVE", installationId);
+                // Clear in-memory suspension flag
+                gitHubAppTokenService.markInstallationActive(installationId);
+                provisioningListener.onInstallationActivated(installationId);
+            }
+        } catch (InstallationNotFoundException e) {
+            // Installation was deleted - nothing to update
+            log.info("Installation no longer exists, skipping status update: installationId={}", installationId);
+        } catch (RuntimeException e) {
+            // Network errors or other transient issues - don't update status if we can't verify
+            log.warn(
+                "Failed to verify installation status via API, skipping status update: installationId={}, error={}",
+                installationId,
+                e.getMessage()
+            );
         }
     }
 }

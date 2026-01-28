@@ -85,7 +85,8 @@ public final class PostgreSQLTestContainer {
         PostgreSQLContainer<?> newContainer = new PostgreSQLContainer<>("postgres:16")
             .withDatabaseName(DEFAULT_TEST_DB)
             .withUsername(DEFAULT_TEST_USER)
-            .withPassword(DEFAULT_TEST_PASSWORD);
+            .withPassword(DEFAULT_TEST_PASSWORD)
+            .withReuse(true); // Reuse container across test runs for faster startup
 
         newContainer.start();
 

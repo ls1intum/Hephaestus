@@ -37,6 +37,7 @@ import org.hibernate.validator.constraints.*;
 })
 @JsonTypeName("mentorChat_request")
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
+@SuppressWarnings("all")
 public class MentorChatRequest {
   public static final String JSON_PROPERTY_ID = "id";
   private UUID id;

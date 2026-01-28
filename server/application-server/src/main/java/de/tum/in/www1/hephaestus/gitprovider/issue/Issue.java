@@ -2,6 +2,7 @@ package de.tum.in.www1.hephaestus.gitprovider.issue;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.BaseGitServiceEntity;
 import de.tum.in.www1.hephaestus.gitprovider.issuecomment.IssueComment;
+import de.tum.in.www1.hephaestus.gitprovider.issuetype.IssueType;
 import de.tum.in.www1.hephaestus.gitprovider.label.Label;
 import de.tum.in.www1.hephaestus.gitprovider.milestone.Milestone;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
@@ -23,6 +24,7 @@ import jakarta.persistence.ManyToMany;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.Set;
@@ -30,11 +32,15 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
-import lombok.experimental.Accessors;
 import org.springframework.lang.NonNull;
 
 @Entity
-@Table(name = "issue")
+@Table(
+    name = "issue",
+    uniqueConstraints = {
+        @UniqueConstraint(name = "uk_issue_repository_number", columnNames = { "repository_id", "number" }),
+    }
+)
 @Inheritance(strategy = InheritanceType.SINGLE_TABLE)
 @DiscriminatorColumn(name = "issue_type", discriminatorType = DiscriminatorType.STRING)
 @DiscriminatorValue(value = "ISSUE")
@@ -55,6 +61,7 @@ public class Issue extends BaseGitServiceEntity {
     private Issue.StateReason stateReason;
 
     @NonNull
+    @Column(length = 1024)
     private String title;
 
     @Column(columnDefinition = "TEXT")
@@ -70,10 +77,15 @@ public class Issue extends BaseGitServiceEntity {
 
     private int commentsCount;
 
-    @Accessors(prefix = { "" })
-    private boolean hasPullRequest;
-
-    // The last time the issue and its associated comments were updated (is also used for pull requests with reviews and review comments)
+    /**
+     * Timestamp of the last successful sync for this issue/PR and its associated data.
+     * <p>
+     * This is ETL infrastructure used by the sync engine to track when this issue
+     * (and its comments) or pull request (and its reviews, review comments) was last
+     * synchronized via GraphQL. Used to implement incremental sync and detect stale data.
+     * <p>
+     * Updated by the GitHub sync processors after successfully syncing all related entities.
+     */
     private Instant lastSyncAt;
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -112,49 +124,198 @@ public class Issue extends BaseGitServiceEntity {
     @ToString.Exclude
     private Set<IssueComment> comments = new HashSet<>();
 
+    /**
+     * The parent issue if this is a sub-issue. Null if this is a top-level issue.
+     * Maps to GitHub's Issue.parent GraphQL field.
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "parent_issue_id")
+    @ToString.Exclude
+    private Issue parentIssue;
+
+    /**
+     * Sub-issues of this issue. Empty if this issue has no children.
+     * Maps to GitHub's Issue.subIssues GraphQL connection.
+     */
+    @OneToMany(mappedBy = "parentIssue")
+    @ToString.Exclude
+    private Set<Issue> subIssues = new HashSet<>();
+
+    /**
+     * Total number of sub-issues (from GitHub's sub_issues_summary.total).
+     * This is a denormalized count for efficient querying without loading all
+     * sub-issues.
+     */
+    private Integer subIssuesTotal;
+
+    /**
+     * Number of completed sub-issues (from GitHub's sub_issues_summary.completed).
+     * A sub-issue is considered completed when its state is CLOSED.
+     */
+    private Integer subIssuesCompleted;
+
+    /**
+     * Percentage of sub-issues completed (from GitHub's
+     * sub_issues_summary.percent_completed).
+     * Value between 0 and 100. Null if no sub-issues exist.
+     */
+    private Integer subIssuesPercentCompleted;
+
+    /**
+     * The issue type (category) for this issue.
+     * Managed at the organization level in GitHub.
+     * Maps to GitHub's Issue.issueType GraphQL field.
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "issue_type_id")
+    @ToString.Exclude
+    private IssueType issueType;
+
+    /**
+     * Issues that block this issue from being worked on or completed.
+     * Maps to GitHub's Issue.blockedBy GraphQL connection.
+     * When this issue is blocked, blockedBy contains the blockers.
+     */
+    @ManyToMany
+    @JoinTable(
+        name = "issue_blocking",
+        joinColumns = @JoinColumn(name = "blocked_issue_id"),
+        inverseJoinColumns = @JoinColumn(name = "blocking_issue_id")
+    )
+    @ToString.Exclude
+    private Set<Issue> blockedBy = new HashSet<>();
+
+    /**
+     * Issues that this issue is blocking.
+     * Maps to GitHub's Issue.blocking GraphQL connection.
+     * When this issue blocks others, blocking contains the blocked issues.
+     */
+    @ManyToMany(mappedBy = "blockedBy")
+    @ToString.Exclude
+    private Set<Issue> blocking = new HashSet<>();
+
     public enum State {
         OPEN,
         CLOSED,
+        /** Pull request was merged. Only applicable to PullRequest entities, never to Issues. */
+        MERGED,
     }
 
+    /**
+     * Reason for the issue's current state. Maps to GitHub GraphQL IssueClosedStateReason.
+     *
+     * @see <a href="https://docs.github.com/en/graphql/reference/enums#issueclosedstatereason">GitHub IssueClosedStateReason</a>
+     */
     public enum StateReason {
+        /** Issue was completed/resolved. */
         COMPLETED,
+        /** Issue was closed as a duplicate of another issue. */
+        DUPLICATE,
+        /** Issue was closed as not planned/won't fix. */
         NOT_PLANNED,
+        /** Issue was reopened from a closed state. */
         REOPENED,
+        /** Unknown or unmapped state reason (fallback for forward compatibility). */
         UNKNOWN,
     }
 
     public boolean isPullRequest() {
         return false;
     }
-    /*
-     * Webhook payload data currently ignored while still surfaced by hub4j (no extra REST request required):
-     * Fields:
-     * - issue.closed_by (github/issues.closed.json) via GHIssue#getClosedBy(). Reason: converter never calls getClosedBy().
-     * Relationships:
-     * - issue.pull_request stub (github/pull_request.closed.json) via GHIssue#getPullRequest(). Reason: converter ignores the embedded pull-request reference.
+
+    // ==================== Bidirectional Relationship Helpers ====================
+
+    /**
+     * Adds a label to this issue and maintains bidirectional consistency.
      *
-     * Data that would require additional REST fetches (not yet wired):
-     * - issue timeline events (GHIssue#listEvents(); follows timeline_url).
-     * - issue reaction details (GHIssue#listReactions(); follows reactions.url).
-     *
-     * Webhook payload attributes not surfaced by hub4j/github-api 2.0-rc.5 (would require raw JSON parsing or GraphQL):
-     * Fields:
-     * - issue.author_association (github/issues.closed.json).
-     * - issue.active_lock_reason (github/issues.locked.json).
-     * - issue.type (github/issues.typed.json).
-     * - issue.issue_dependencies_summary (github/issues.transferred.json).
-     * - issue.sub_issues_summary (github/issues.closed.json).
-     * - issue.reactions total counters (github/issues.closed.json).
-     * - issue.formProgress (GraphQL Issue.formProgress.nodes).
-     * Relationships:
-     * - Parent/child linkage (sub_issues.* payloads: parent_issue_url, sub_issue objects).
-     * - Dependency edges (GraphQL Issue.trackedIn / Issue.tracks).
-     * - Issue.projectItems (GraphQL Issue.projectItems / ProjectV2ItemConnection).
-     * - Timeline discussion + commit events (GraphQL Issue.timelineItems variants not bound in hub4j).
-     *
-     * Explicitly not persisted today:
-     * - issue.timeline_url (pointer for ad-hoc pagination).
-     * - URLs to REST endpoints (e.g. labels_url, events_url) beyond repository association.
+     * @param label the label to add
      */
+    public void addLabel(Label label) {
+        if (label != null) {
+            this.labels.add(label);
+            label.getIssues().add(this);
+        }
+    }
+
+    /**
+     * Removes a label from this issue and maintains bidirectional consistency.
+     *
+     * @param label the label to remove
+     */
+    public void removeLabel(Label label) {
+        if (label != null) {
+            this.labels.remove(label);
+            label.getIssues().remove(this);
+        }
+    }
+
+    /**
+     * Adds an assignee to this issue and maintains bidirectional consistency.
+     *
+     * @param assignee the user to add as assignee
+     */
+    public void addAssignee(User assignee) {
+        if (assignee != null) {
+            this.assignees.add(assignee);
+        }
+    }
+
+    /**
+     * Removes an assignee from this issue.
+     *
+     * @param assignee the user to remove
+     */
+    public void removeAssignee(User assignee) {
+        if (assignee != null) {
+            this.assignees.remove(assignee);
+        }
+    }
+
+    /**
+     * Adds a comment to this issue and maintains bidirectional consistency.
+     *
+     * @param comment the comment to add
+     */
+    public void addComment(IssueComment comment) {
+        if (comment != null) {
+            this.comments.add(comment);
+            comment.setIssue(this);
+        }
+    }
+
+    /**
+     * Removes a comment from this issue and maintains bidirectional consistency.
+     *
+     * @param comment the comment to remove
+     */
+    public void removeComment(IssueComment comment) {
+        if (comment != null) {
+            this.comments.remove(comment);
+            comment.setIssue(null);
+        }
+    }
+
+    /**
+     * Adds a blocking relationship (this issue blocks the given issue).
+     *
+     * @param blockedIssue the issue that this issue blocks
+     */
+    public void addBlocking(Issue blockedIssue) {
+        if (blockedIssue != null) {
+            blockedIssue.getBlockedBy().add(this);
+            this.blocking.add(blockedIssue);
+        }
+    }
+
+    /**
+     * Removes a blocking relationship (this issue no longer blocks the given issue).
+     *
+     * @param blockedIssue the issue that this issue no longer blocks
+     */
+    public void removeBlocking(Issue blockedIssue) {
+        if (blockedIssue != null) {
+            blockedIssue.getBlockedBy().remove(this);
+            this.blocking.remove(blockedIssue);
+        }
+    }
 }

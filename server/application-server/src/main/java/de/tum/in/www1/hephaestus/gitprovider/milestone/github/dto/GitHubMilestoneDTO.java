@@ -1,0 +1,66 @@
+package de.tum.in.www1.hephaestus.gitprovider.milestone.github.dto;
+
+import static de.tum.in.www1.hephaestus.gitprovider.common.DateTimeUtils.toInstant;
+import static de.tum.in.www1.hephaestus.gitprovider.common.DateTimeUtils.uriToString;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHMilestone;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHMilestoneState;
+import java.time.Instant;
+import org.springframework.lang.Nullable;
+
+/**
+ * DTO for GitHub milestones.
+ * <p>
+ * Provides factory methods for creating from both REST (webhook) and GraphQL responses.
+ */
+@JsonIgnoreProperties(ignoreUnknown = true)
+public record GitHubMilestoneDTO(
+    @JsonProperty("id") Long id,
+    @JsonProperty("number") int number,
+    @JsonProperty("title") String title,
+    @JsonProperty("description") String description,
+    @JsonProperty("state") String state,
+    @JsonProperty("due_on") Instant dueOn,
+    @JsonProperty("html_url") String htmlUrl,
+    @JsonProperty("open_issues") Integer openIssuesCount,
+    @JsonProperty("closed_issues") Integer closedIssuesCount,
+    @JsonProperty("created_at") Instant createdAt,
+    @JsonProperty("updated_at") Instant updatedAt,
+    @JsonProperty("closed_at") Instant closedAt
+) {
+    // ========== STATIC FACTORY METHODS FOR GRAPHQL RESPONSES ==========
+
+    /**
+     * Creates a GitHubMilestoneDTO from a GraphQL GHMilestone model.
+     */
+    @Nullable
+    public static GitHubMilestoneDTO fromMilestone(@Nullable GHMilestone milestone) {
+        if (milestone == null) {
+            return null;
+        }
+        return new GitHubMilestoneDTO(
+            null,
+            milestone.getNumber(),
+            milestone.getTitle(),
+            milestone.getDescription(),
+            convertState(milestone.getState()),
+            toInstant(milestone.getDueOn()),
+            uriToString(milestone.getUrl()),
+            milestone.getOpenIssueCount(),
+            milestone.getClosedIssueCount(),
+            toInstant(milestone.getCreatedAt()),
+            toInstant(milestone.getUpdatedAt()),
+            toInstant(milestone.getClosedAt())
+        );
+    }
+
+    @Nullable
+    private static String convertState(@Nullable GHMilestoneState state) {
+        if (state == null) {
+            return null; // Let processor handle missing state with appropriate logging
+        }
+        return state.name().toLowerCase();
+    }
+}

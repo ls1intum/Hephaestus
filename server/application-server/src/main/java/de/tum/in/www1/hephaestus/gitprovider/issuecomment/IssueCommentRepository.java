@@ -6,42 +6,61 @@ import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
 
+/**
+ * Repository for IssueComment entities.
+ */
+@Repository
 public interface IssueCommentRepository extends JpaRepository<IssueComment, Long> {
+    /**
+     * Batch fetch comments by IDs with all related entities eagerly loaded.
+     *
+     * <p>Used by the profile module to hydrate ActivityEvent target entities.
+     * Fetches author, issue, and repository in one query to avoid N+1.
+     *
+     * @param ids the comment IDs to fetch
+     * @return comments with related entities eagerly loaded
+     */
     @Query(
         """
         SELECT ic
         FROM IssueComment ic
         LEFT JOIN FETCH ic.author
-        LEFT JOIN FETCH ic.issue
-        LEFT JOIN FETCH ic.issue.repository
-        WHERE
-            ic.author.login ILIKE :authorLogin
-            AND ic.createdAt >= :activitySince
-            AND ic.issue.repository.organization.workspace.id = :workspaceId
-            AND (:onlyFromPullRequests = false OR ic.issue.htmlUrl LIKE '%/pull/%')
-        ORDER BY ic.createdAt DESC
+        LEFT JOIN FETCH ic.issue i
+        LEFT JOIN FETCH i.repository
+        WHERE ic.id IN :ids
         """
     )
-    List<IssueComment> findAllByAuthorLoginSince(
-        @Param("authorLogin") String authorLogin,
-        @Param("activitySince") Instant activitySince,
-        @Param("onlyFromPullRequests") boolean onlyFromPullRequests,
-        @Param("workspaceId") Long workspaceId
-    );
+    List<IssueComment> findAllByIdWithRelations(@Param("ids") Collection<Long> ids);
 
+    /**
+     * Find all issue comments by a specific author within a time range, scoped to a workspace.
+     *
+     * <p>Used by the profile module to show all comment activity directly from the source,
+     * independent of ActivityEvent records.
+     *
+     * @param authorLogin the login of the comment author
+     * @param after start of time range (inclusive)
+     * @param before end of time range (exclusive)
+     * @param onlyFromPullRequests if true, only return comments on pull requests
+     * @param workspaceId the workspace to scope the query to
+     * @return comments with related entities eagerly loaded, ordered by createdAt descending
+     */
     @Query(
         """
         SELECT ic
         FROM IssueComment ic
         LEFT JOIN FETCH ic.author
-        LEFT JOIN FETCH ic.issue
-        LEFT JOIN FETCH ic.issue.repository
-        WHERE
-            ic.author.login ILIKE :authorLogin
-            AND ic.createdAt BETWEEN :after AND :before
-            AND ic.issue.repository.organization.workspace.id = :workspaceId
-            AND (:onlyFromPullRequests = false OR ic.issue.htmlUrl LIKE '%/pull/%')
+        LEFT JOIN FETCH ic.issue i
+        LEFT JOIN FETCH i.repository repo
+        JOIN RepositoryToMonitor rtm ON rtm.nameWithOwner = repo.nameWithOwner
+        WHERE ic.author.login = :authorLogin
+            AND ic.createdAt >= :after
+            AND ic.createdAt < :before
+            AND ic.author.type = 'USER'
+            AND rtm.workspace.id = :workspaceId
+            AND (:onlyFromPullRequests = false OR i.htmlUrl LIKE '%/pull/%')
         ORDER BY ic.createdAt DESC
         """
     )
@@ -52,87 +71,4 @@ public interface IssueCommentRepository extends JpaRepository<IssueComment, Long
         @Param("onlyFromPullRequests") boolean onlyFromPullRequests,
         @Param("workspaceId") Long workspaceId
     );
-
-    @Query(
-        """
-        SELECT ic
-        FROM IssueComment ic
-        LEFT JOIN FETCH ic.author
-        LEFT JOIN FETCH ic.issue
-        LEFT JOIN FETCH ic.issue.repository
-        WHERE
-            ic.createdAt BETWEEN :after AND :before
-            AND ic.author.type = 'USER'
-            AND ic.issue.repository.organization.workspace.id = :workspaceId
-            AND (:onlyFromPullRequests = false OR ic.issue.htmlUrl LIKE '%/pull/%')
-        ORDER BY ic.createdAt DESC
-        """
-    )
-    List<IssueComment> findAllInTimeframe(
-        @Param("after") Instant after,
-        @Param("before") Instant before,
-        @Param("onlyFromPullRequests") boolean onlyFromPullRequests,
-        @Param("workspaceId") Long workspaceId
-    );
-
-    @Query(
-        """
-        SELECT ic
-        FROM IssueComment ic
-        LEFT JOIN FETCH ic.author
-        LEFT JOIN FETCH ic.issue
-        LEFT JOIN FETCH ic.issue.repository
-        WHERE
-            ic.createdAt BETWEEN :after AND :before
-            AND ic.author.type = 'USER'
-            AND ic.issue.repository.organization.workspace.id = :workspaceId
-            AND EXISTS (
-                SELECT 1
-                FROM TeamRepositoryPermission trp
-                JOIN trp.team t
-                WHERE trp.repository = ic.issue.repository
-                AND t.id IN :teamIds
-                AND trp.hiddenFromContributions = false
-                AND (
-                    NOT EXISTS (
-                        SELECT l
-                        FROM t.labels l
-                        WHERE l.repository = ic.issue.repository
-                    )
-                    OR
-                    EXISTS (
-                        SELECT l
-                        FROM t.labels l
-                        WHERE l.repository = ic.issue.repository
-                        AND l MEMBER OF ic.issue.labels
-                    )
-                )
-            )
-            AND EXISTS (
-                SELECT 1
-                FROM TeamMembership tm
-                WHERE tm.team.id IN :teamIds
-                AND tm.user = ic.author
-            )
-            AND (:onlyFromPullRequests = false OR ic.issue.htmlUrl LIKE '%/pull/%')
-        ORDER BY ic.createdAt DESC
-        """
-    )
-    List<IssueComment> findAllInTimeframeOfTeams(
-        @Param("after") Instant after,
-        @Param("before") Instant before,
-        @Param("teamIds") Collection<Long> teamIds,
-        @Param("onlyFromPullRequests") boolean onlyFromPullRequests,
-        @Param("workspaceId") Long workspaceId
-    );
-
-    @Query(
-        """
-        SELECT MIN(ic.createdAt)
-        FROM IssueComment ic
-        WHERE ic.author.id = :userId
-            AND ic.issue.repository.organization.workspace.id = :workspaceId
-        """
-    )
-    Instant findEarliestCreatedAt(@Param("workspaceId") Long workspaceId, @Param("userId") Long userId);
 }

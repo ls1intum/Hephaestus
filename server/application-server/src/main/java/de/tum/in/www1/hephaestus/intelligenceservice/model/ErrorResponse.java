@@ -31,6 +31,7 @@ import org.hibernate.validator.constraints.*;
   ErrorResponse.JSON_PROPERTY_ERROR
 })
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
+@SuppressWarnings("all")
 public class ErrorResponse {
   public static final String JSON_PROPERTY_ERROR = "error";
   private String error;

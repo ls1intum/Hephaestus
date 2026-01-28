@@ -1,28 +1,38 @@
 package de.tum.in.www1.hephaestus.workspace.dto;
 
 import de.tum.in.www1.hephaestus.workspace.Workspace;
+import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
 import org.springframework.lang.NonNull;
 
+@Schema(description = "Complete workspace information including configuration and settings")
 public record WorkspaceDTO(
-    @NonNull Long id,
-    @NonNull String workspaceSlug,
-    @NonNull String displayName,
-    @NonNull Boolean isPubliclyViewable,
-    @NonNull String status,
-    @NonNull String accountLogin,
-    Long installationId,
-    String gitProviderMode,
-    @NonNull Instant createdAt,
-    @NonNull Instant updatedAt,
-    Instant installationLinkedAt,
+    @NonNull @Schema(description = "Unique identifier of the workspace") Long id,
+    @NonNull
+    @Schema(description = "URL-friendly identifier for the workspace", example = "my-workspace")
+    String workspaceSlug,
+    @NonNull @Schema(description = "Human-readable name of the workspace") String displayName,
+    @NonNull
+    @Schema(description = "Whether the workspace is publicly viewable without authentication")
+    Boolean isPubliclyViewable,
+    @NonNull
+    @Schema(description = "Current lifecycle status of the workspace (PENDING, ACTIVE, ARCHIVED)")
+    String status,
+    @NonNull @Schema(description = "GitHub account login associated with this workspace") String accountLogin,
+    @Schema(description = "GitHub App installation ID, if linked") Long installationId,
+    @Schema(description = "Git provider mode (INSTALLATION or PAT)") String gitProviderMode,
+    @NonNull @Schema(description = "Timestamp when the workspace was created") Instant createdAt,
+    @NonNull @Schema(description = "Timestamp when the workspace was last updated") Instant updatedAt,
+    @Schema(description = "Timestamp when the GitHub App installation was linked") Instant installationLinkedAt,
+    @Schema(description = "Day of week for leaderboard notifications (1=Monday, 7=Sunday)", example = "1")
     Integer leaderboardScheduleDay,
+    @Schema(description = "Time for leaderboard notifications in HH:mm format", example = "09:00")
     String leaderboardScheduleTime,
-    Boolean leaderboardNotificationEnabled,
-    String leaderboardNotificationTeam,
-    String leaderboardNotificationChannelId,
-    @NonNull Boolean hasSlackToken,
-    @NonNull Boolean hasSlackSigningSecret
+    @Schema(description = "Whether leaderboard notifications are enabled") Boolean leaderboardNotificationEnabled,
+    @Schema(description = "Team name for leaderboard notifications") String leaderboardNotificationTeam,
+    @Schema(description = "Slack channel ID for leaderboard notifications") String leaderboardNotificationChannelId,
+    @NonNull @Schema(description = "Whether Slack token is configured") Boolean hasSlackToken,
+    @NonNull @Schema(description = "Whether Slack signing secret is configured") Boolean hasSlackSigningSecret
 ) {
     public static WorkspaceDTO from(Workspace workspace) {
         return new WorkspaceDTO(

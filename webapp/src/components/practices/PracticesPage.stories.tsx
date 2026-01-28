@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { fn } from "storybook/test";
-import type { Activity } from "@/api/types.gen";
+import type { UserPractices } from "@/api/types.gen";
 import { PracticesPage } from "./PracticesPage";
 
 /**
@@ -72,7 +72,7 @@ export default meta;
 
 type Story = StoryObj<typeof PracticesPage>;
 
-const mockActivityData: Activity = {
+const mockActivityData: UserPractices = {
 	pullRequests: [
 		{
 			id: 1,

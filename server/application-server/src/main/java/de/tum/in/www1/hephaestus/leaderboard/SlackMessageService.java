@@ -7,27 +7,36 @@ import com.slack.api.methods.response.auth.AuthTestResponse;
 import com.slack.api.methods.response.chat.ChatPostMessageResponse;
 import com.slack.api.model.User;
 import com.slack.api.model.block.LayoutBlock;
+import de.tum.in.www1.hephaestus.core.WorkspaceAgnostic;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
 /**
  * Light wrapper around the Slack App to send messages to the Slack workspace.
+ *
+ * <p>Workspace-agnostic: This is a system-level integration service that handles
+ * Slack communication. The actual workspace context is passed by callers when
+ * sending messages (channel IDs are workspace-specific).
+ *
  * @implNote Use the exposed method to test the Slack connection beforehand.
  */
 @Service
 @ConditionalOnProperty(prefix = "hephaestus.leaderboard.notification", name = "enabled", havingValue = "true")
+@WorkspaceAgnostic("System-level Slack integration - callers provide workspace context via channel IDs")
 public class SlackMessageService {
 
-    private static final Logger logger = LoggerFactory.getLogger(SlackMessageService.class);
+    private static final Logger log = LoggerFactory.getLogger(SlackMessageService.class);
 
-    @Autowired
-    private App slackApp;
+    private final App slackApp;
+
+    public SlackMessageService(App slackApp) {
+        this.slackApp = slackApp;
+    }
 
     /**
      * Gets all members of the Slack workspace.
@@ -40,7 +49,7 @@ public class SlackMessageService {
                 .usersList(r -> r)
                 .getMembers();
         } catch (IOException | SlackApiException e) {
-            logger.error("Failed to get all members from Slack: " + e.getMessage());
+            log.error("Failed to get Slack members:", e);
             return new ArrayList<>();
         }
     }
@@ -64,7 +73,7 @@ public class SlackMessageService {
         ChatPostMessageResponse response = slackApp.client().chatPostMessage(request);
 
         if (!response.isOk()) {
-            logger.error("Failed to send message to Slack channel: " + response.getError());
+            log.error("Failed to send Slack message: channelId={}, error={}", channelId, response.getError());
         }
     }
 
@@ -73,7 +82,7 @@ public class SlackMessageService {
      * Does not guarantee that the app has the necessary permissions to send messages.
      */
     public boolean initTest() {
-        logger.info("Testing Slack app initialization...");
+        log.debug("Started Slack app initialization test");
         AuthTestResponse response;
         try {
             response = slackApp.client().authTest(r -> r);
@@ -83,10 +92,10 @@ public class SlackMessageService {
             response.setError(e.getMessage());
         }
         if (response.isOk()) {
-            logger.info("Slack app is successfully initialized.");
+            log.info("Slack app initialized successfully");
             return true;
         } else {
-            logger.error("Failed to initialize Slack app: " + response.getError());
+            log.error("Failed to initialize Slack app: error={}", response.getError());
             return false;
         }
     }

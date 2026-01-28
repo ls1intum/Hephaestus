@@ -1,5 +1,8 @@
 # Minimal test configuration for Spring Boot tests
 spring:
+  # Allow test configs to override production beans
+  main:
+    allow-bean-definition-overriding: true
   # Database configuration for tests (overridden by Testcontainers)
   datasource:
     # These values will be overridden by @DynamicPropertySource in test classes
@@ -8,14 +11,15 @@ spring:
     username: test
     password: test
     # HikariCP configuration optimized for tests
+    # Note: Pool size increased to handle REQUIRES_NEW nested transactions
     hikari:
-      maximum-pool-size: 5
-      minimum-idle: 1
-      max-lifetime: 300000  # 5 minutes (shorter for tests)
-      connection-timeout: 10000  # 10 seconds
-      idle-timeout: 60000  # 1 minute (shorter for tests)
-      validation-timeout: 5000  # 5 seconds
-      leak-detection-threshold: 10000  # 10 seconds for leak detection
+      maximum-pool-size: 10
+      minimum-idle: 2
+      max-lifetime: 120000  # 2 minutes (shorter for faster cleanup)
+      connection-timeout: 5000  # 5 seconds (fail fast)
+      idle-timeout: 30000  # 30 seconds (faster cleanup)
+      validation-timeout: 3000  # 3 seconds
+      leak-detection-threshold: 5000  # 5 seconds for leak detection
       connection-test-query: SELECT 1
 
   # JPA configuration for tests
@@ -55,13 +59,18 @@ hephaestus:
     init-default: false  # Disable PAT workspace bootstrap
   intelligence-service:
     url: http://localhost:8080
-
-# NATS configuration for tests (matches actual properties)
-nats:
-  enabled: false
-  server: nats://localhost:4222
-  timeframe: 1
-  durable-consumer-name: test-consumer
+  cors:
+    allowed-origins:
+      - http://localhost:4200
+  webapp:
+    url: http://localhost:4200
+  # NATS configuration for tests
+  sync:
+    nats:
+      enabled: false
+      server: nats://localhost:4222
+      replay-timeframe-days: 1
+      durable-consumer-name: test-consumer
 
 monitoring:
   run-on-startup: false

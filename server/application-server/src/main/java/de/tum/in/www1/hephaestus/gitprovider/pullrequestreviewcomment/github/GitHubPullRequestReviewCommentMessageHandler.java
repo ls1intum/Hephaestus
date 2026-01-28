@@ -1,68 +1,107 @@
 package de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.github;
 
+import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
+
+import de.tum.in.www1.hephaestus.gitprovider.common.NatsMessageDeserializer;
+import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
+import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContextFactory;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventAction;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventType;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
-import de.tum.in.www1.hephaestus.gitprovider.pullrequest.github.GitHubPullRequestSyncService;
-import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.PullRequestReviewCommentRepository;
-import de.tum.in.www1.hephaestus.gitprovider.repository.github.GitHubRepositorySyncService;
-import org.kohsuke.github.GHEvent;
-import org.kohsuke.github.GHEventPayload;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.github.dto.GitHubPullRequestReviewCommentEventDTO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.support.TransactionTemplate;
 
+/**
+ * Handles GitHub pull_request_review_comment webhook events.
+ * <p>
+ * This handler processes review comments on Pull Requests. The webhook includes
+ * embedded PR data, which we use to create a stub PR entity if the PR
+ * webhook hasn't arrived yet (message ordering issue).
+ * <p>
+ * <b>Key Design Decision:</b> We use processCreatedWithParentCreation to handle the case
+ * where the review comment webhook arrives before the PR webhook. This creates a minimal
+ * PR stub from the webhook data, which will be hydrated later by the PR webhook
+ * or scheduled sync. This prevents data loss that occurred due to message ordering.
+ *
+ * @see GitHubPullRequestReviewCommentProcessor#processCreatedWithParentCreation
+ */
 @Component
 public class GitHubPullRequestReviewCommentMessageHandler
-    extends GitHubMessageHandler<GHEventPayload.PullRequestReviewComment> {
+    extends GitHubMessageHandler<GitHubPullRequestReviewCommentEventDTO> {
 
-    private static final Logger logger = LoggerFactory.getLogger(GitHubPullRequestReviewCommentMessageHandler.class);
+    private static final Logger log = LoggerFactory.getLogger(GitHubPullRequestReviewCommentMessageHandler.class);
 
-    private final PullRequestReviewCommentRepository pullRequestReviewCommentRepository;
-    private final GitHubPullRequestReviewCommentSyncService pullRequestReviewCommentSyncService;
-    private final GitHubPullRequestSyncService pullRequestSyncService;
-    private final GitHubRepositorySyncService repositorySyncService;
+    private final ProcessingContextFactory contextFactory;
+    private final GitHubPullRequestReviewCommentProcessor commentProcessor;
 
-    public GitHubPullRequestReviewCommentMessageHandler(
-        PullRequestReviewCommentRepository pullRequestReviewCommentRepository,
-        GitHubPullRequestReviewCommentSyncService pullRequestReviewCommentSyncService,
-        GitHubPullRequestSyncService pullRequestSyncService,
-        GitHubRepositorySyncService repositorySyncService
+    GitHubPullRequestReviewCommentMessageHandler(
+        ProcessingContextFactory contextFactory,
+        GitHubPullRequestReviewCommentProcessor commentProcessor,
+        NatsMessageDeserializer deserializer,
+        TransactionTemplate transactionTemplate
     ) {
-        super(GHEventPayload.PullRequestReviewComment.class);
-        this.pullRequestReviewCommentRepository = pullRequestReviewCommentRepository;
-        this.pullRequestReviewCommentSyncService = pullRequestReviewCommentSyncService;
-        this.pullRequestSyncService = pullRequestSyncService;
-        this.repositorySyncService = repositorySyncService;
+        super(GitHubPullRequestReviewCommentEventDTO.class, deserializer, transactionTemplate);
+        this.contextFactory = contextFactory;
+        this.commentProcessor = commentProcessor;
     }
 
     @Override
-    protected void handleEvent(GHEventPayload.PullRequestReviewComment eventPayload) {
-        var action = eventPayload.getAction();
-        var pullRequest = eventPayload.getPullRequest();
-        var repository = pullRequest.getRepository();
-        var comment = eventPayload.getComment();
-        logger.info(
-            "Received pull request review comment event for repository: {}, pull request: {}, action: {}, commentId: {}",
-            repository.getFullName(),
-            pullRequest.getNumber(),
-            action,
-            comment.getId()
-        );
-        repositorySyncService.processRepository(repository);
-        pullRequestSyncService.processPullRequest(pullRequest);
+    public GitHubEventType getEventType() {
+        return GitHubEventType.PULL_REQUEST_REVIEW_COMMENT;
+    }
 
-        if (action.equals("deleted")) {
-            pullRequestReviewCommentSyncService.deletePullRequestReviewComment(comment.getId());
-        } else {
-            pullRequestReviewCommentSyncService.processPullRequestReviewComment(
-                comment,
-                pullRequest,
-                eventPayload.getSender()
+    @Override
+    protected void handleEvent(GitHubPullRequestReviewCommentEventDTO event) {
+        var commentDto = event.comment();
+        var prDto = event.pullRequest();
+
+        if (commentDto == null || prDto == null) {
+            log.warn("Received pull_request_review_comment event with missing data: action={}", event.action());
+            return;
+        }
+
+        log.info(
+            "Received pull_request_review_comment event: action={}, prNumber={}, commentId={}, repoName={}",
+            event.action(),
+            prDto.number(),
+            commentDto.id(),
+            event.repository() != null ? sanitizeForLog(event.repository().fullName()) : "unknown"
+        );
+
+        ProcessingContext context = contextFactory.forWebhookEvent(event).orElse(null);
+        if (context == null) {
+            return;
+        }
+
+        Long prId = prDto.getDatabaseId();
+
+        // Delegate to processor based on action
+        // Use processCreatedWithParentCreation to handle the case where the PR webhook
+        // hasn't arrived yet. This creates a minimal PR stub from the webhook data
+        // instead of losing the comment.
+        switch (event.actionType()) {
+            case GitHubEventAction.PullRequestReviewComment.DELETED -> commentProcessor.processDeleted(
+                commentDto.id(),
+                prId,
+                context
+            );
+            case GitHubEventAction.PullRequestReviewComment.CREATED -> commentProcessor.processCreatedWithParentCreation(
+                commentDto,
+                prDto,
+                context
+            );
+            case GitHubEventAction.PullRequestReviewComment.EDITED -> commentProcessor.processEdited(
+                commentDto,
+                prId,
+                context
+            );
+            default -> log.debug(
+                "Skipped pull_request_review_comment event: reason=unhandledAction, action={}",
+                event.action()
             );
         }
-    }
-
-    @Override
-    protected GHEvent getHandlerEvent() {
-        return GHEvent.PULL_REQUEST_REVIEW_COMMENT;
     }
 }

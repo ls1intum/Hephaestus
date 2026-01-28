@@ -35,6 +35,7 @@ import org.hibernate.validator.constraints.*;
   ChatThreadSummary.JSON_PROPERTY_CREATED_AT
 })
 @jakarta.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", comments = "Generator version: 7.7.0")
+@SuppressWarnings("all")
 public class ChatThreadSummary {
   public static final String JSON_PROPERTY_ID = "id";
   private UUID id;

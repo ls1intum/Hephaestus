@@ -1,6 +1,7 @@
 package de.tum.in.www1.hephaestus.workspace;
 
 import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -37,35 +38,123 @@ public class RepositoryToMonitor {
     // The time up to which issues and pull requests have been synced in the recent sync
     private Instant issuesAndPullRequestsSyncedAt;
 
-    /**
-     * The highest issue number discovered in the repository for backfill tracking.
-     * Set when backfill starts, used to know when backfill is complete.
-     */
-    private Integer backfillHighWaterMark;
+    // ========================================================================
+    // Issue Backfill Tracking
+    // ========================================================================
 
     /**
-     * The last issue number that was successfully backfilled.
-     * Backfill works backwards from highWaterMark down to 1.
-     * When this reaches 1, backfill is complete.
+     * The highest issue number discovered in the repository for backfill tracking.
+     * Set when issue backfill starts, used to know when issue backfill is complete.
      */
-    private Integer backfillCheckpoint;
+    private Integer issueBackfillHighWaterMark;
+
+    /**
+     * The lowest issue number that was successfully backfilled in the current batch.
+     * Issue backfill works backwards from highWaterMark down to 1 (CREATED_AT DESC).
+     * When this reaches 0, issue backfill is complete.
+     */
+    private Integer issueBackfillCheckpoint;
+
+    // ========================================================================
+    // Pull Request Backfill Tracking
+    // ========================================================================
+
+    /**
+     * The highest pull request number discovered in the repository for backfill tracking.
+     * Set when pull request backfill starts, used to know when pull request backfill is complete.
+     */
+    private Integer pullRequestBackfillHighWaterMark;
+
+    /**
+     * The lowest pull request number that was successfully backfilled in the current batch.
+     * Pull request backfill works backwards from highWaterMark down to 1 (CREATED_AT DESC).
+     * When this reaches 0, pull request backfill is complete.
+     */
+    private Integer pullRequestBackfillCheckpoint;
 
     /**
      * When the backfill was last run. Used for cooldown between backfill batches.
      */
     private Instant backfillLastRunAt;
 
-    @ManyToOne
-    @JoinColumn(name = "workspace_id")
+    /**
+     * Pagination cursor for issue sync. Persisted to allow resumption if sync
+     * fails mid-pagination. Cleared when sync completes successfully.
+     */
+    private String issueSyncCursor;
+
+    /**
+     * Pagination cursor for pull request sync. Persisted to allow resumption if sync
+     * fails mid-pagination. Cleared when sync completes successfully.
+     */
+    private String pullRequestSyncCursor;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "workspace_id", nullable = false)
     @ToString.Exclude
     private Workspace workspace;
 
+    // ========================================================================
+    // Backfill Status Helper Methods
+    // ========================================================================
+
     /**
-     * Checks if backfill has been initialized (high water mark set).
-     * @return true if backfill tracking has been initialized
+     * Checks if issue backfill has been initialized (high water mark set).
+     * @return true if issue backfill tracking has been initialized
+     */
+    public boolean isIssueBackfillInitialized() {
+        return issueBackfillHighWaterMark != null;
+    }
+
+    /**
+     * Checks if pull request backfill has been initialized (high water mark set).
+     * @return true if pull request backfill tracking has been initialized
+     */
+    public boolean isPullRequestBackfillInitialized() {
+        return pullRequestBackfillHighWaterMark != null;
+    }
+
+    /**
+     * Checks if backfill has been initialized for either issues or pull requests.
+     * @return true if any backfill tracking has been initialized
      */
     public boolean isBackfillInitialized() {
-        return backfillHighWaterMark != null;
+        return isIssueBackfillInitialized() || isPullRequestBackfillInitialized();
+    }
+
+    /**
+     * Checks if issue backfill has completed.
+     * Complete when checkpoint is 0 or high water mark is 0 (empty).
+     * @return true if issue backfill finished or there were no issues to backfill
+     */
+    public boolean isIssueBackfillComplete() {
+        if (!isIssueBackfillInitialized()) {
+            return false;
+        }
+        return issueBackfillHighWaterMark == 0 || (issueBackfillCheckpoint != null && issueBackfillCheckpoint <= 0);
+    }
+
+    /**
+     * Checks if pull request backfill has completed.
+     * Complete when checkpoint is 0 or high water mark is 0 (empty).
+     * @return true if pull request backfill finished or there were no pull requests to backfill
+     */
+    public boolean isPullRequestBackfillComplete() {
+        if (!isPullRequestBackfillInitialized()) {
+            return false;
+        }
+        return (
+            pullRequestBackfillHighWaterMark == 0 ||
+            (pullRequestBackfillCheckpoint != null && pullRequestBackfillCheckpoint <= 0)
+        );
+    }
+
+    /**
+     * Checks if all backfill has completed (both issues and pull requests).
+     * @return true if both issue and pull request backfill finished
+     */
+    public boolean isBackfillComplete() {
+        return isIssueBackfillComplete() && isPullRequestBackfillComplete();
     }
 
     /**
@@ -73,45 +162,42 @@ public class RepositoryToMonitor {
      * @return true if backfill has started and is not yet complete
      */
     public boolean isBackfillInProgress() {
-        if (!isBackfillInitialized()) {
-            return false;
-        }
-        // If high water mark is 0, there's nothing to backfill
-        if (backfillHighWaterMark == 0) {
-            return false;
-        }
-        // In progress if checkpoint hasn't reached 0 yet
-        return backfillCheckpoint == null || backfillCheckpoint > 0;
+        return isBackfillInitialized() && !isBackfillComplete();
     }
 
     /**
-     * Checks if backfill has completed (checkpoint reached 0 or high water mark is 0).
-     * Backfill is complete when:
-     * - High water mark is 0 (nothing to backfill from the start)
-     * - Checkpoint is 0 or less (we've processed down to issue #1)
-     * @return true if backfill finished or there was nothing to backfill
+     * Returns the number of issues remaining to backfill.
+     * @return issues remaining, or 0 if not initialized or complete
      */
-    public boolean isBackfillComplete() {
-        if (!isBackfillInitialized()) {
-            return false; // Not initialized = not complete
-        }
-        // Complete if nothing to backfill or checkpoint reached/passed end
-        return backfillHighWaterMark == 0 || (backfillCheckpoint != null && backfillCheckpoint <= 0);
-    }
-
-    /**
-     * Returns the number of items remaining to backfill.
-     * Since checkpoint represents the next issue number to process (working down to 0),
-     * the remaining count is simply the checkpoint value itself.
-     * @return items remaining, or 0 if not initialized or complete
-     */
-    public int getBackfillRemaining() {
-        if (!isBackfillInitialized() || backfillHighWaterMark == 0) {
+    public int getIssueBackfillRemaining() {
+        if (!isIssueBackfillInitialized() || issueBackfillHighWaterMark == 0) {
             return 0;
         }
-        if (backfillCheckpoint == null) {
-            return backfillHighWaterMark;
+        if (issueBackfillCheckpoint == null) {
+            return issueBackfillHighWaterMark;
         }
-        return Math.max(0, backfillCheckpoint);
+        return Math.max(0, issueBackfillCheckpoint);
+    }
+
+    /**
+     * Returns the number of pull requests remaining to backfill.
+     * @return pull requests remaining, or 0 if not initialized or complete
+     */
+    public int getPullRequestBackfillRemaining() {
+        if (!isPullRequestBackfillInitialized() || pullRequestBackfillHighWaterMark == 0) {
+            return 0;
+        }
+        if (pullRequestBackfillCheckpoint == null) {
+            return pullRequestBackfillHighWaterMark;
+        }
+        return Math.max(0, pullRequestBackfillCheckpoint);
+    }
+
+    /**
+     * Returns the total number of items remaining to backfill (issues + pull requests).
+     * @return total items remaining
+     */
+    public int getBackfillRemaining() {
+        return getIssueBackfillRemaining() + getPullRequestBackfillRemaining();
     }
 }

@@ -1,0 +1,50 @@
+query GetRepository($owner: String!, $name: String!) {
+    rateLimit {
+        cost
+        limit
+        remaining
+        resetAt
+    }
+    repository(owner: $owner, name: $name) {
+        id
+        databaseId
+        name
+        nameWithOwner
+        description
+        url
+        visibility
+        isArchived
+        isDisabled
+        isFork
+        isPrivate
+        createdAt
+        updatedAt
+        pushedAt
+        defaultBranchRef {
+            name
+        }
+        owner {
+            __typename
+            ... on Organization {
+                id
+                databaseId
+                login
+                name
+                description
+                url
+                avatarUrl
+            }
+            ... on User {
+                id
+                databaseId
+                login
+                name
+                email
+                url
+                avatarUrl
+                createdAt
+                updatedAt
+            }
+        }
+    }
+}

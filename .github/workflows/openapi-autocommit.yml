@@ -43,7 +43,7 @@ jobs:
 
       - name: Compile Application Server
         working-directory: server/application-server
-        run: mvn compile -DskipTests --quiet
+        run: mvn compile -DskipTests --quiet -Dmaven.build.cache.enabled=true
 
       - name: Generate OpenAPI specs and clients
         run: npm run generate:api

@@ -13,6 +13,7 @@ import io.swagger.v3.oas.annotations.media.ArraySchema;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import jakarta.validation.Valid;
 import java.net.URI;
 import java.util.List;
@@ -35,6 +36,8 @@ public class WorkspaceController {
 
     private final WorkspaceService workspaceService;
     private final WorkspaceLifecycleService workspaceLifecycleService;
+    private final WorkspaceRepositoryMonitorService workspaceRepositoryMonitorService;
+    private final WorkspaceTeamLabelService workspaceTeamLabelService;
 
     @GetMapping
     @Operation(summary = "Fetch a workspace by slug")
@@ -43,6 +46,7 @@ public class WorkspaceController {
         description = "Workspace returned",
         content = @Content(schema = @Schema(implementation = WorkspaceDTO.class))
     )
+    @SecurityRequirements
     public ResponseEntity<WorkspaceDTO> getWorkspace(WorkspaceContext workspaceContext) {
         Workspace workspace = workspaceService
             .getWorkspaceBySlug(workspaceContext.slug())
@@ -187,8 +191,13 @@ public class WorkspaceController {
         description = "Repository list",
         content = @Content(array = @ArraySchema(schema = @Schema(implementation = String.class)))
     )
+    @SecurityRequirements
     public ResponseEntity<List<String>> getRepositoriesToMonitor(WorkspaceContext workspaceContext) {
-        var repositories = workspaceService.getRepositoriesToMonitor(workspaceContext).stream().sorted().toList();
+        var repositories = workspaceRepositoryMonitorService
+            .getMonitoredRepositories(workspaceContext)
+            .stream()
+            .sorted()
+            .toList();
         return ResponseEntity.ok(repositories);
     }
 
@@ -200,7 +209,7 @@ public class WorkspaceController {
         @PathVariable String owner,
         @PathVariable String name
     ) {
-        workspaceService.addRepositoryToMonitor(workspaceContext, owner + '/' + name);
+        workspaceRepositoryMonitorService.addRepositoryToMonitor(workspaceContext, owner + '/' + name);
         URI location = ServletUriComponentsBuilder.fromCurrentRequest().build().toUri();
         return ResponseEntity.created(location).build();
     }
@@ -213,14 +222,15 @@ public class WorkspaceController {
         @PathVariable String owner,
         @PathVariable String name
     ) {
-        workspaceService.removeRepositoryToMonitor(workspaceContext, owner + '/' + name);
+        workspaceRepositoryMonitorService.removeRepositoryFromMonitor(workspaceContext, owner + '/' + name);
         return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/users")
     @Operation(summary = "List workspace users and the teams they belong to")
+    @SecurityRequirements
     public ResponseEntity<List<UserTeamsDTO>> getUsersWithTeams(WorkspaceContext workspaceContext) {
-        return ResponseEntity.ok(workspaceService.getUsersWithTeams(workspaceContext));
+        return ResponseEntity.ok(workspaceTeamLabelService.getUsersWithTeams(workspaceContext));
     }
 
     @PostMapping("/teams/{teamId}/labels/{repositoryId}/{label}")
@@ -232,7 +242,7 @@ public class WorkspaceController {
         @PathVariable Long repositoryId,
         @PathVariable String label
     ) {
-        return workspaceService
+        return workspaceTeamLabelService
             .addLabelToTeam(workspaceContext, teamId, repositoryId, label)
             .map(ResponseEntity::ok)
             .orElseGet(() -> ResponseEntity.notFound().build());
@@ -246,7 +256,7 @@ public class WorkspaceController {
         @PathVariable Long teamId,
         @PathVariable Long labelId
     ) {
-        return workspaceService
+        return workspaceTeamLabelService
             .removeLabelFromTeam(workspaceContext, teamId, labelId)
             .map(ResponseEntity::ok)
             .orElseGet(() -> ResponseEntity.notFound().build());
