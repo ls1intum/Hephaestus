@@ -63,23 +63,6 @@
     =======================================================================================
     -->
 
-    <!-- ==================== SECTION 0: Chat Message Index ==================== -->
-    <!--
-        Merged from 1765851336797_changelog.xml.
-        Adds performance index for chat message queries by thread and creation time.
-    -->
-    <changeSet author="FelixTJDietrich" id="1765851336797-1">
-        <preConditions onFail="MARK_RAN">
-            <not>
-                <indexExists indexName="idx_chat_message_thread_created"/>
-            </not>
-        </preConditions>
-        <createIndex indexName="idx_chat_message_thread_created" tableName="chat_message">
-            <column name="thread_id"/>
-            <column name="created_at"/>
-        </createIndex>
-    </changeSet>
-
     <!-- ==================== SECTION 1: Documentation Changesets ==================== -->
 
     <changeSet id="1767287604000-1-add-triage-permission-doc" author="FelixTJDietrich">
