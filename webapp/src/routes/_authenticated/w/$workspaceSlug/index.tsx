@@ -1,13 +1,13 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { createFileRoute, retainSearchParams, useNavigate } from "@tanstack/react-router";
 import { zodValidator } from "@tanstack/zod-adapter";
 import { formatISO } from "date-fns";
 import { useEffect } from "react";
 import { z } from "zod";
 import {
+	computeUserLeagueStatsMutation,
 	getAllTeamsOptions,
 	getLeaderboardOptions,
-	getUserLeagueStatsOptions,
 	getUserProfileOptions,
 	getWorkspaceOptions,
 } from "@/api/@tanstack/react-query.gen";
@@ -236,31 +236,23 @@ function LeaderboardContainer() {
 
 	const leaderboardEnd = formatISO(endDate);
 
-	// Query for league points change data if we have a current user entry
-	const leagueStatsQuery = useQuery({
-		...getUserLeagueStatsOptions({
+	// Mutation for league points change data (POST endpoint used to compute stats)
+	const leagueStatsMutation = useMutation({
+		...computeUserLeagueStatsMutation({
 			path: { workspaceSlug: slug, login: username || "" },
-			body: currentUserEntry || {
-				rank: 0,
-				score: 0,
-				user: {
-					id: 0,
-					name: "",
-					login: username || "",
-					avatarUrl: "",
-					htmlUrl: "",
-				},
-				reviewedPullRequests: [],
-				numberOfReviewedPRs: 0,
-				numberOfApprovals: 0,
-				numberOfChangeRequests: 0,
-				numberOfComments: 0,
-				numberOfUnknowns: 0,
-				numberOfCodeComments: 0,
-			},
 		}),
-		enabled: hasWorkspace && Boolean(username && currentUserEntry),
 	});
+
+	// Trigger the mutation when we have a current user entry
+	// biome-ignore lint/correctness/useExhaustiveDependencies: mutate is stable from react-query
+	useEffect(() => {
+		if (hasWorkspace && username && currentUserEntry) {
+			leagueStatsMutation.mutate({
+				path: { workspaceSlug: slug, login: username },
+				body: currentUserEntry,
+			});
+		}
+	}, [hasWorkspace, username, currentUserEntry, slug]);
 
 	if (showNoWorkspace) {
 		return <NoWorkspace />;
@@ -342,7 +334,7 @@ function LeaderboardContainer() {
 			currentUser={userProfileQuery.data?.userInfo}
 			currentUserEntry={currentUserEntry}
 			leaguePoints={userProfileQuery.data?.userInfo?.leaguePoints}
-			leaguePointsChange={leagueStatsQuery.data?.leaguePointsChange}
+			leaguePointsChange={leagueStatsMutation.data?.leaguePointsChange}
 			teamOptions={teamOptions}
 			teamLabelsById={teamLabelsById}
 			selectedTeam={team}

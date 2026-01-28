@@ -401,7 +401,7 @@ public class LeaderboardService {
     }
 
     @Transactional(readOnly = true)
-    public LeagueChangeDTO getUserLeagueStats(Workspace workspace, String login, LeaderboardEntryDTO entry) {
+    public LeagueChangeDTO computeUserLeagueStats(Workspace workspace, String login, LeaderboardEntryDTO entry) {
         User user = userRepository.findByLogin(login).orElseThrow(() -> new EntityNotFoundException("User", login));
 
         if (workspace == null || workspace.getId() == null) {

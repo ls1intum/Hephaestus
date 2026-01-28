@@ -242,7 +242,7 @@ paths:
     post:
       description: Computes projected league point changes for a specific user based
         on their leaderboard entry
-      operationId: getUserLeagueStats
+      operationId: computeUserLeagueStats
       parameters:
       - description: Workspace slug
         in: path
@@ -449,8 +449,6 @@ paths:
       - workspace-membership
   /workspaces/{workspaceSlug}/mentor/chat:
     post:
-      x-hephaestus:
-        export: true
       operationId: mentorChat
       parameters:
       - description: Workspace slug

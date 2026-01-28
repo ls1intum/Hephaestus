@@ -5,107 +5,99 @@ export type ClientOptions = {
 };
 
 /**
- * Request to assign or update a user's role in a workspace
+ * Team visibility settings for a specific workspace
  */
-export type AssignRoleRequest = {
+export type WorkspaceTeamSettings = {
     /**
-     * New role to assign (OWNER, ADMIN, MEMBER)
+     * Whether the team is hidden in the leaderboard for this workspace
      */
-    role: 'OWNER' | 'ADMIN' | 'MEMBER';
+    hidden: boolean;
     /**
-     * User ID of the member to update
+     * The team ID these settings apply to
      */
-    userId: number;
+    teamId: number;
+    /**
+     * The workspace ID these settings belong to
+     */
+    workspaceId: number;
 };
 
 /**
- * User feedback on a detected bad practice
+ * Repository contribution visibility settings for a specific team within a workspace
  */
-export type BadPracticeFeedback = {
+export type WorkspaceTeamRepositorySettings = {
     /**
-     * User's explanation for the feedback
+     * Whether contributions from this repository are hidden from leaderboard calculations
      */
-    explanation: string;
+    hiddenFromContributions: boolean;
     /**
-     * Type of feedback (e.g., 'false_positive', 'not_applicable')
+     * The repository ID these settings apply to
      */
-    type: string;
+    repositoryId: number;
+    /**
+     * The team ID these settings apply to
+     */
+    teamId: number;
+    /**
+     * The workspace ID these settings belong to
+     */
+    workspaceId: number;
 };
 
-export type ChatMessageVote = {
-    createdAt: Date;
-    isUpvoted: boolean;
-    messageId: string;
-    updatedAt: Date;
-};
-
-export type ChatThreadGroup = {
-    groupName: string;
-    threads: Array<ChatThreadSummary>;
-};
-
-export type ChatThreadSummary = {
+/**
+ * A user's membership in a workspace
+ */
+export type WorkspaceMembership = {
+    /**
+     * Timestamp when the membership was created
+     */
     createdAt?: Date;
-    id: string;
-    title: string;
+    /**
+     * League points earned by the user in this workspace
+     */
+    leaguePoints?: number;
+    /**
+     * Role of the user in this workspace (OWNER, ADMIN, MEMBER)
+     */
+    role?: 'OWNER' | 'ADMIN' | 'MEMBER';
+    /**
+     * Unique identifier of the user
+     */
+    userId?: number;
+    /**
+     * Login/username of the user
+     */
+    userLogin?: string;
+    /**
+     * Display name of the user
+     */
+    userName?: string;
 };
 
 /**
- * Information about a contributor to the Hephaestus project
+ * Summary information about a workspace for list views
  */
-export type Contributor = {
+export type WorkspaceListItem = {
     /**
-     * URL to the contributor's avatar image
-     */
-    avatarUrl: string;
-    /**
-     * Number of contributions to the project
-     */
-    contributions?: number;
-    /**
-     * URL to the contributor's GitHub profile
-     */
-    htmlUrl: string;
-    /**
-     * GitHub user ID
-     */
-    id: number;
-    /**
-     * GitHub username
-     */
-    login: string;
-    /**
-     * Display name of the contributor
-     */
-    name: string;
-};
-
-export type CreateDocumentRequest = {
-    content: string;
-    kind: DocumentKind;
-    title: string;
-};
-
-/**
- * Request to create a new workspace
- */
-export type CreateWorkspaceRequest = {
-    /**
-     * GitHub account login to associate with this workspace
+     * GitHub account login associated with this workspace
      */
     accountLogin: string;
     /**
-     * Type of GitHub account (USER or ORGANIZATION)
+     * Timestamp when the workspace was created
      */
-    accountType: 'ORG' | 'USER';
+    createdAt: Date;
     /**
      * Human-readable name of the workspace
      */
     displayName: string;
     /**
-     * User ID of the workspace owner
+     * Unique identifier of the workspace
      */
-    ownerUserId: number;
+    id: number;
+    /**
+     * Current lifecycle status of the workspace (PENDING, ACTIVE, ARCHIVED)
+     */
+    status: string;
     /**
      * URL-friendly identifier for the workspace
      */
@@ -113,37 +105,188 @@ export type CreateWorkspaceRequest = {
 };
 
 /**
- * Response for detection operations
+ * Complete workspace information including configuration and settings
  */
-export type DetectionResult = {
-    result?: 'BAD_PRACTICES_DETECTED' | 'NO_BAD_PRACTICES_DETECTED' | 'ERROR_NO_UPDATE_ON_PULLREQUEST';
-};
-
-export type Document = {
-    content: string;
-    createdAt: Date;
-    id: string;
-    kind: DocumentKind;
-    title: string;
-    userId: number;
-    versionNumber: number;
-};
-
-export type DocumentKind = 'text';
-
-export type DocumentSummary = {
-    createdAt: Date;
-    id: string;
-    kind: DocumentKind;
-    title: string;
-    userId: number;
-};
-
-export type ErrorResponse = {
+export type Workspace = {
     /**
-     * Human-readable error message
+     * GitHub account login associated with this workspace
      */
-    error: string;
+    accountLogin: string;
+    /**
+     * Timestamp when the workspace was created
+     */
+    createdAt: Date;
+    /**
+     * Human-readable name of the workspace
+     */
+    displayName: string;
+    /**
+     * Git provider mode (INSTALLATION or PAT)
+     */
+    gitProviderMode?: string;
+    /**
+     * Whether Slack signing secret is configured
+     */
+    hasSlackSigningSecret: boolean;
+    /**
+     * Whether Slack token is configured
+     */
+    hasSlackToken: boolean;
+    /**
+     * Unique identifier of the workspace
+     */
+    id: number;
+    /**
+     * GitHub App installation ID, if linked
+     */
+    installationId?: number;
+    /**
+     * Timestamp when the GitHub App installation was linked
+     */
+    installationLinkedAt?: Date;
+    /**
+     * Whether the workspace is publicly viewable without authentication
+     */
+    isPubliclyViewable: boolean;
+    /**
+     * Slack channel ID for leaderboard notifications
+     */
+    leaderboardNotificationChannelId?: string;
+    /**
+     * Whether leaderboard notifications are enabled
+     */
+    leaderboardNotificationEnabled?: boolean;
+    /**
+     * Team name for leaderboard notifications
+     */
+    leaderboardNotificationTeam?: string;
+    /**
+     * Day of week for leaderboard notifications (1=Monday, 7=Sunday)
+     */
+    leaderboardScheduleDay?: number;
+    /**
+     * Time for leaderboard notifications in HH:mm format
+     */
+    leaderboardScheduleTime?: string;
+    /**
+     * Current lifecycle status of the workspace (PENDING, ACTIVE, ARCHIVED)
+     */
+    status: string;
+    /**
+     * Timestamp when the workspace was last updated
+     */
+    updatedAt: Date;
+    /**
+     * URL-friendly identifier for the workspace
+     */
+    workspaceSlug: string;
+};
+
+export type VoteMessageRequest = {
+    isUpvoted: boolean;
+};
+
+export type UserTeams = {
+    email?: string;
+    id: number;
+    login: string;
+    name: string;
+    teams: Array<TeamSummary>;
+    url: string;
+};
+
+/**
+ * Lightweight summary of a team without member/repository details
+ */
+export type TeamSummary = {
+    /**
+     * Description of the team
+     */
+    description?: string;
+    /**
+     * Whether the team is hidden from leaderboard display
+     */
+    hidden: boolean;
+    /**
+     * URL to the team's page on the git provider
+     */
+    htmlUrl?: string;
+    /**
+     * Unique identifier of the team
+     */
+    id: number;
+    /**
+     * Name of the team
+     */
+    name: string;
+    /**
+     * Organization the team belongs to
+     */
+    organization?: string;
+    /**
+     * ID of the parent team, if this is a sub-team
+     */
+    parentId?: number;
+    /**
+     * Privacy level of the team (SECRET or VISIBLE)
+     */
+    privacy?: 'SECRET' | 'VISIBLE';
+};
+
+/**
+ * User preferences and settings
+ */
+export type UserSettings = {
+    /**
+     * Whether the user consents to participate in research studies
+     */
+    participateInResearch: boolean;
+    /**
+     * Whether the user wants to receive notifications
+     */
+    receiveNotifications: boolean;
+};
+
+/**
+ * Response for user bad practices listing
+ */
+export type UserPractices = {
+    login?: string;
+    pullRequests?: Array<PullRequestWithBadPractices>;
+};
+
+/**
+ * Information about a git repository
+ */
+export type RepositoryInfo = {
+    /**
+     * Description of the repository
+     */
+    description?: string;
+    /**
+     * Whether contributions from this repository are hidden from leaderboard calculations
+     */
+    hiddenFromContributions: boolean;
+    /**
+     * URL to the repository on the git provider
+     */
+    htmlUrl: string;
+    /**
+     * Unique identifier of the repository
+     */
+    id: number;
+    /**
+     * Labels defined in the repository
+     */
+    labels?: Array<LabelInfo>;
+    /**
+     * Name of the repository
+     */
+    name: string;
+    /**
+     * Full name including owner (e.g., 'owner/repo')
+     */
+    nameWithOwner: string;
 };
 
 /**
@@ -169,175 +312,6 @@ export type LabelInfo = {
 };
 
 /**
- * A ranked entry in the leaderboard (individual or team)
- */
-export type LeaderboardEntry = {
-    /**
-     * Count of review approvals
-     */
-    numberOfApprovals: number;
-    /**
-     * Count of change requests submitted
-     */
-    numberOfChangeRequests: number;
-    /**
-     * Count of inline code review comments
-     */
-    numberOfCodeComments: number;
-    /**
-     * Count of review and issue comments
-     */
-    numberOfComments: number;
-    /**
-     * Count of distinct PRs reviewed
-     */
-    numberOfReviewedPRs: number;
-    /**
-     * Count of reviews with unknown/unrecognized state
-     */
-    numberOfUnknowns: number;
-    /**
-     * Position in the leaderboard (1-based)
-     */
-    rank: number;
-    /**
-     * Sample of reviewed PRs for display
-     */
-    reviewedPullRequests: Array<PullRequestInfo>;
-    /**
-     * Total XP score for the timeframe
-     */
-    score: number;
-    /**
-     * Team info (populated in TEAM mode, null in INDIVIDUAL mode)
-     */
-    team?: TeamInfo;
-    /**
-     * User info (populated in INDIVIDUAL mode, null in TEAM mode)
-     */
-    user?: UserInfo;
-};
-
-export type LeagueChange = {
-    leaguePointsChange: number;
-    login: string;
-};
-
-/**
- * Complete user profile including contribution history and activity
- */
-export type Profile = {
-    /**
-     * Aggregated activity stats consistent with leaderboard calculations
-     */
-    activityStats?: ProfileActivityStats;
-    /**
-     * Repositories the user has contributed to
-     */
-    contributedRepositories: Array<RepositoryInfo>;
-    /**
-     * Timestamp of the user's first contribution
-     */
-    firstContribution?: Date;
-    /**
-     * Currently open pull requests authored by the user
-     */
-    openPullRequests?: Array<PullRequestInfo>;
-    /**
-     * Recent review activity with XP scores
-     */
-    reviewActivity?: Array<ProfileReviewActivity>;
-    /**
-     * Distinct pull requests reviewed by this user
-     */
-    reviewedPullRequests?: Array<PullRequestInfo>;
-    /**
-     * Basic information about the user
-     */
-    userInfo: UserInfo;
-};
-
-/**
- * Aggregated activity statistics with XP scores for a user profile
- */
-export type ProfileActivityStats = {
-    /**
-     * Number of approvals given
-     */
-    numberOfApprovals?: number;
-    /**
-     * Number of change requests submitted
-     */
-    numberOfChangeRequests?: number;
-    /**
-     * Number of inline code review comments
-     */
-    numberOfCodeComments?: number;
-    /**
-     * Number of review comments (COMMENTED state)
-     */
-    numberOfComments?: number;
-    /**
-     * Number of issue comments on pull requests
-     */
-    numberOfIssueComments?: number;
-    /**
-     * Number of distinct pull requests reviewed
-     */
-    numberOfReviewedPRs?: number;
-    /**
-     * Number of reviews with unknown state
-     */
-    numberOfUnknowns?: number;
-    /**
-     * Total XP score
-     */
-    score?: number;
-};
-
-/**
- * A review activity entry with XP score for profile display
- */
-export type ProfileReviewActivity = {
-    /**
-     * Author of the review
-     */
-    author?: UserInfo;
-    /**
-     * Number of inline code comments in the review
-     */
-    codeComments: number;
-    /**
-     * URL to the review on the git provider
-     */
-    htmlUrl: string;
-    /**
-     * Unique identifier of the review
-     */
-    id: number;
-    /**
-     * Whether the review was dismissed
-     */
-    isDismissed: boolean;
-    /**
-     * Pull request that was reviewed
-     */
-    pullRequest?: PullRequestBaseInfo;
-    /**
-     * XP score earned for this review
-     */
-    score?: number;
-    /**
-     * State of the review (APPROVED, CHANGES_REQUESTED, COMMENTED, etc.)
-     */
-    state: 'COMMENTED' | 'APPROVED' | 'CHANGES_REQUESTED' | 'PENDING' | 'DISMISSED' | 'UNKNOWN';
-    /**
-     * Timestamp when the review was submitted
-     */
-    submittedAt?: Date;
-};
-
-/**
  * A detected bad practice in a pull request
  */
 export type PullRequestBadPractice = {
@@ -360,9 +334,29 @@ export type PullRequestBadPractice = {
 };
 
 /**
- * Basic information about a pull request
+ * Pull request with associated bad practice detection results
  */
-export type PullRequestBaseInfo = {
+export type PullRequestWithBadPractices = {
+    /**
+     * Number of lines added
+     */
+    additions: number;
+    /**
+     * AI-generated summary of detected bad practices
+     */
+    badPracticeSummary: string;
+    /**
+     * Currently active bad practices
+     */
+    badPractices: Array<PullRequestBadPractice>;
+    /**
+     * Timestamp when the pull request was created
+     */
+    createdAt: Date;
+    /**
+     * Number of lines deleted
+     */
+    deletions: number;
     /**
      * URL to the pull request on the git provider
      */
@@ -380,21 +374,247 @@ export type PullRequestBaseInfo = {
      */
     isMerged: boolean;
     /**
+     * Labels applied to the pull request
+     */
+    labels: Array<LabelInfo>;
+    /**
      * Pull request number within the repository
      */
     number: number;
     /**
+     * Previously resolved or dismissed bad practices
+     */
+    oldBadPractices: Array<PullRequestBadPractice>;
+    /**
      * Repository the pull request belongs to
      */
-    repository?: RepositoryInfo;
+    repository: RepositoryInfo;
     /**
-     * Current state of the pull request (OPEN, CLOSED, MERGED)
+     * Current state of the pull request (OPEN, CLOSED)
      */
     state: 'OPEN' | 'CLOSED' | 'MERGED';
     /**
      * Title of the pull request
      */
     title: string;
+    /**
+     * Timestamp when the pull request was last updated
+     */
+    updatedAt: Date;
+};
+
+/**
+ * Information about a user from the git provider
+ */
+export type UserInfo = {
+    /**
+     * URL to the user's avatar image
+     */
+    avatarUrl: string;
+    /**
+     * Email address of the user, if public
+     */
+    email?: string;
+    /**
+     * URL to the user's profile on the git provider
+     */
+    htmlUrl: string;
+    /**
+     * Unique identifier of the user
+     */
+    id: number;
+    /**
+     * League points earned by the user in the current scope
+     */
+    leaguePoints?: number;
+    /**
+     * Login/username of the user
+     */
+    login: string;
+    /**
+     * Display name of the user
+     */
+    name: string;
+};
+
+/**
+ * Request to update the workspace's GitHub Personal Access Token
+ */
+export type UpdateWorkspaceTokenRequest = {
+    /**
+     * GitHub Personal Access Token for API access
+     */
+    personalAccessToken: string;
+};
+
+/**
+ * Request to update the workspace lifecycle status
+ */
+export type UpdateWorkspaceStatusRequest = {
+    /**
+     * New lifecycle status (PENDING, ACTIVE, ARCHIVED)
+     */
+    status: 'ACTIVE' | 'SUSPENDED' | 'PURGED';
+};
+
+/**
+ * Request to update Slack integration credentials
+ */
+export type UpdateWorkspaceSlackCredentialsRequest = {
+    /**
+     * Slack Signing Secret for webhook verification
+     */
+    slackSigningSecret: string;
+    /**
+     * Slack Bot User OAuth Token for API access
+     */
+    slackToken: string;
+};
+
+/**
+ * Request to update the leaderboard notification schedule
+ */
+export type UpdateWorkspaceScheduleRequest = {
+    /**
+     * Day of week (1=Monday, 7=Sunday)
+     */
+    day: number;
+    /**
+     * Time in 24-hour format (HH:mm)
+     */
+    time: string;
+};
+
+/**
+ * Request to update workspace public visibility setting
+ */
+export type UpdateWorkspacePublicVisibilityRequest = {
+    /**
+     * Whether the workspace should be publicly viewable without authentication
+     */
+    isPubliclyViewable: boolean;
+};
+
+/**
+ * Request to update leaderboard notification settings
+ */
+export type UpdateWorkspaceNotificationsRequest = {
+    /**
+     * Slack channel ID for notifications
+     */
+    channelId?: string;
+    /**
+     * Whether leaderboard notifications are enabled
+     */
+    enabled?: boolean;
+    /**
+     * Team name for filtering leaderboard notifications
+     */
+    team?: string;
+};
+
+/**
+ * Request to update team visibility settings in a workspace
+ */
+export type UpdateTeamSettingsRequest = {
+    /**
+     * Whether the team should be hidden from the leaderboard
+     */
+    hidden: boolean;
+};
+
+/**
+ * Request to update repository contribution visibility settings in a workspace
+ */
+export type UpdateRepositorySettingsRequest = {
+    /**
+     * Whether contributions from this repository should be hidden from leaderboard calculations
+     */
+    hiddenFromContributions: boolean;
+};
+
+export type ThreadDetail = {
+    id: string;
+    messages: Array<{
+        createdAt?: Date;
+        id: string;
+        parentMessageId?: string | null;
+        parts: Array<{
+            type: string;
+            [key: string]: unknown | string;
+        }>;
+        role: 'system' | 'user' | 'assistant';
+    }>;
+    selectedLeafMessageId?: string | null;
+    title?: string | null;
+};
+
+/**
+ * Detailed information about a team including members, repositories, and labels
+ */
+export type TeamInfo = {
+    /**
+     * Description of the team
+     */
+    description?: string;
+    /**
+     * Whether the team is hidden from leaderboard display
+     */
+    hidden: boolean;
+    /**
+     * URL to the team's page on the git provider
+     */
+    htmlUrl?: string;
+    /**
+     * Unique identifier of the team
+     */
+    id: number;
+    /**
+     * Labels configured as filters for this team
+     */
+    labels: Array<LabelInfo>;
+    /**
+     * Members of the team (excluding bots)
+     */
+    members: Array<UserInfo>;
+    /**
+     * Total count of team memberships
+     */
+    membershipCount: number;
+    /**
+     * Name of the team
+     */
+    name: string;
+    /**
+     * Organization the team belongs to
+     */
+    organization?: string;
+    /**
+     * ID of the parent team, if this is a sub-team
+     */
+    parentId?: number;
+    /**
+     * Privacy level of the team (SECRET or VISIBLE)
+     */
+    privacy?: 'SECRET' | 'VISIBLE';
+    /**
+     * Count of repository permissions
+     */
+    repoPermissionCount: number;
+    /**
+     * Repositories the team has access to
+     */
+    repositories: Array<RepositoryInfo>;
+};
+
+/**
+ * Request to rename a workspace's URL slug
+ */
+export type RenameWorkspaceSlugRequest = {
+    /**
+     * New URL-friendly identifier for the workspace
+     */
+    newSlug: string;
 };
 
 /**
@@ -476,29 +696,9 @@ export type PullRequestInfo = {
 };
 
 /**
- * Pull request with associated bad practice detection results
+ * Basic information about a pull request
  */
-export type PullRequestWithBadPractices = {
-    /**
-     * Number of lines added
-     */
-    additions: number;
-    /**
-     * AI-generated summary of detected bad practices
-     */
-    badPracticeSummary: string;
-    /**
-     * Currently active bad practices
-     */
-    badPractices: Array<PullRequestBadPractice>;
-    /**
-     * Timestamp when the pull request was created
-     */
-    createdAt: Date;
-    /**
-     * Number of lines deleted
-     */
-    deletions: number;
+export type PullRequestBaseInfo = {
     /**
      * URL to the pull request on the git provider
      */
@@ -516,537 +716,332 @@ export type PullRequestWithBadPractices = {
      */
     isMerged: boolean;
     /**
-     * Labels applied to the pull request
-     */
-    labels: Array<LabelInfo>;
-    /**
      * Pull request number within the repository
      */
     number: number;
     /**
-     * Previously resolved or dismissed bad practices
-     */
-    oldBadPractices: Array<PullRequestBadPractice>;
-    /**
      * Repository the pull request belongs to
      */
-    repository: RepositoryInfo;
+    repository?: RepositoryInfo;
     /**
-     * Current state of the pull request (OPEN, CLOSED)
+     * Current state of the pull request (OPEN, CLOSED, MERGED)
      */
     state: 'OPEN' | 'CLOSED' | 'MERGED';
     /**
      * Title of the pull request
      */
     title: string;
-    /**
-     * Timestamp when the pull request was last updated
-     */
-    updatedAt: Date;
 };
 
 /**
- * Request to rename a workspace's URL slug
+ * A review activity entry with XP score for profile display
  */
-export type RenameWorkspaceSlugRequest = {
+export type ProfileReviewActivity = {
     /**
-     * New URL-friendly identifier for the workspace
+     * Author of the review
      */
-    newSlug: string;
-};
-
-/**
- * Information about a git repository
- */
-export type RepositoryInfo = {
+    author?: UserInfo;
     /**
-     * Description of the repository
+     * Number of inline code comments in the review
      */
-    description?: string;
+    codeComments: number;
     /**
-     * Whether contributions from this repository are hidden from leaderboard calculations
-     */
-    hiddenFromContributions: boolean;
-    /**
-     * URL to the repository on the git provider
+     * URL to the review on the git provider
      */
     htmlUrl: string;
     /**
-     * Unique identifier of the repository
+     * Unique identifier of the review
      */
     id: number;
     /**
-     * Labels defined in the repository
+     * Whether the review was dismissed
      */
-    labels?: Array<LabelInfo>;
+    isDismissed: boolean;
     /**
-     * Name of the repository
+     * Pull request that was reviewed
      */
-    name: string;
+    pullRequest?: PullRequestBaseInfo;
     /**
-     * Full name including owner (e.g., 'owner/repo')
+     * XP score earned for this review
      */
-    nameWithOwner: string;
-};
-
-export type StreamPart = {
-    type: string;
-    [key: string]: unknown | string;
+    score?: number;
+    /**
+     * State of the review (APPROVED, CHANGES_REQUESTED, COMMENTED, etc.)
+     */
+    state: 'COMMENTED' | 'APPROVED' | 'CHANGES_REQUESTED' | 'PENDING' | 'DISMISSED' | 'UNKNOWN';
+    /**
+     * Timestamp when the review was submitted
+     */
+    submittedAt?: Date;
 };
 
 /**
- * Detailed information about a team including members, repositories, and labels
+ * Aggregated activity statistics with XP scores for a user profile
  */
-export type TeamInfo = {
+export type ProfileActivityStats = {
     /**
-     * Description of the team
+     * Number of approvals given
      */
-    description?: string;
+    numberOfApprovals?: number;
     /**
-     * Whether the team is hidden from leaderboard display
+     * Number of change requests submitted
      */
-    hidden: boolean;
+    numberOfChangeRequests?: number;
     /**
-     * URL to the team's page on the git provider
+     * Number of inline code review comments
      */
-    htmlUrl?: string;
+    numberOfCodeComments?: number;
     /**
-     * Unique identifier of the team
+     * Number of review comments (COMMENTED state)
      */
-    id: number;
+    numberOfComments?: number;
     /**
-     * Labels configured as filters for this team
+     * Number of issue comments on pull requests
      */
-    labels: Array<LabelInfo>;
+    numberOfIssueComments?: number;
     /**
-     * Members of the team (excluding bots)
+     * Number of distinct pull requests reviewed
      */
-    members: Array<UserInfo>;
+    numberOfReviewedPRs?: number;
     /**
-     * Total count of team memberships
+     * Number of reviews with unknown state
      */
-    membershipCount: number;
+    numberOfUnknowns?: number;
     /**
-     * Name of the team
+     * Total XP score
      */
-    name: string;
-    /**
-     * Organization the team belongs to
-     */
-    organization?: string;
-    /**
-     * ID of the parent team, if this is a sub-team
-     */
-    parentId?: number;
-    /**
-     * Privacy level of the team (SECRET or VISIBLE)
-     */
-    privacy?: 'SECRET' | 'VISIBLE';
-    /**
-     * Count of repository permissions
-     */
-    repoPermissionCount: number;
-    /**
-     * Repositories the team has access to
-     */
-    repositories: Array<RepositoryInfo>;
+    score?: number;
 };
 
 /**
- * Lightweight summary of a team without member/repository details
+ * Complete user profile including contribution history and activity
  */
-export type TeamSummary = {
+export type Profile = {
     /**
-     * Description of the team
+     * Aggregated activity stats consistent with leaderboard calculations
      */
-    description?: string;
+    activityStats?: ProfileActivityStats;
     /**
-     * Whether the team is hidden from leaderboard display
+     * Repositories the user has contributed to
      */
-    hidden: boolean;
+    contributedRepositories: Array<RepositoryInfo>;
     /**
-     * URL to the team's page on the git provider
+     * Timestamp of the user's first contribution
      */
-    htmlUrl?: string;
+    firstContribution?: Date;
     /**
-     * Unique identifier of the team
+     * Currently open pull requests authored by the user
      */
-    id: number;
+    openPullRequests?: Array<PullRequestInfo>;
     /**
-     * Name of the team
+     * Recent review activity with XP scores
      */
-    name: string;
+    reviewActivity?: Array<ProfileReviewActivity>;
     /**
-     * Organization the team belongs to
+     * Distinct pull requests reviewed by this user
      */
-    organization?: string;
+    reviewedPullRequests?: Array<PullRequestInfo>;
     /**
-     * ID of the parent team, if this is a sub-team
+     * Basic information about the user
      */
-    parentId?: number;
-    /**
-     * Privacy level of the team (SECRET or VISIBLE)
-     */
-    privacy?: 'SECRET' | 'VISIBLE';
+    userInfo: UserInfo;
 };
 
-export type ThreadDetail = {
+export type LeagueChange = {
+    leaguePointsChange: number;
+    login: string;
+};
+
+/**
+ * A ranked entry in the leaderboard (individual or team)
+ */
+export type LeaderboardEntry = {
+    /**
+     * Count of review approvals
+     */
+    numberOfApprovals: number;
+    /**
+     * Count of change requests submitted
+     */
+    numberOfChangeRequests: number;
+    /**
+     * Count of inline code review comments
+     */
+    numberOfCodeComments: number;
+    /**
+     * Count of review and issue comments
+     */
+    numberOfComments: number;
+    /**
+     * Count of distinct PRs reviewed
+     */
+    numberOfReviewedPRs: number;
+    /**
+     * Count of reviews with unknown/unrecognized state
+     */
+    numberOfUnknowns: number;
+    /**
+     * Position in the leaderboard (1-based)
+     */
+    rank: number;
+    /**
+     * Sample of reviewed PRs for display
+     */
+    reviewedPullRequests: Array<PullRequestInfo>;
+    /**
+     * Total XP score for the timeframe
+     */
+    score: number;
+    /**
+     * Team info (populated in TEAM mode, null in INDIVIDUAL mode)
+     */
+    team?: TeamInfo;
+    /**
+     * User info (populated in INDIVIDUAL mode, null in TEAM mode)
+     */
+    user?: UserInfo;
+};
+
+export type ErrorResponse = {
+    /**
+     * Human-readable error message
+     */
+    error: string;
+};
+
+export type DocumentSummary = {
+    createdAt: Date;
     id: string;
-    messages: Array<{
-        createdAt?: Date;
-        id: string;
-        parentMessageId?: string | null;
-        parts: Array<{
-            type: string;
-            [key: string]: unknown | string;
-        }>;
-        role: 'system' | 'user' | 'assistant';
-    }>;
-    selectedLeafMessageId?: string | null;
-    title?: string | null;
+    kind: DocumentKind;
+    title: string;
+    userId: number;
+};
+
+export type DocumentKind = 'text';
+
+export type Document = {
+    content: string;
+    createdAt: Date;
+    id: string;
+    kind: DocumentKind;
+    title: string;
+    userId: number;
+    versionNumber: number;
 };
 
 /**
- * Request to update repository contribution visibility settings in a workspace
+ * Response for detection operations
  */
-export type UpdateRepositorySettingsRequest = {
-    /**
-     * Whether contributions from this repository should be hidden from leaderboard calculations
-     */
-    hiddenFromContributions: boolean;
+export type DetectionResult = {
+    result?: 'BAD_PRACTICES_DETECTED' | 'NO_BAD_PRACTICES_DETECTED' | 'ERROR_NO_UPDATE_ON_PULLREQUEST';
 };
 
 /**
- * Request to update team visibility settings in a workspace
+ * Request to create a new workspace
  */
-export type UpdateTeamSettingsRequest = {
+export type CreateWorkspaceRequest = {
     /**
-     * Whether the team should be hidden from the leaderboard
+     * GitHub account login to associate with this workspace
      */
-    hidden: boolean;
+    accountLogin: string;
+    /**
+     * Type of GitHub account (USER or ORGANIZATION)
+     */
+    accountType: 'ORG' | 'USER';
+    /**
+     * Human-readable name of the workspace
+     */
+    displayName: string;
+    /**
+     * User ID of the workspace owner
+     */
+    ownerUserId: number;
+    /**
+     * URL-friendly identifier for the workspace
+     */
+    workspaceSlug: string;
+};
+
+export type CreateDocumentRequest = {
+    content: string;
+    kind: DocumentKind;
+    title: string;
 };
 
 /**
- * Request to update leaderboard notification settings
+ * Information about a contributor to the Hephaestus project
  */
-export type UpdateWorkspaceNotificationsRequest = {
+export type Contributor = {
     /**
-     * Slack channel ID for notifications
-     */
-    channelId?: string;
-    /**
-     * Whether leaderboard notifications are enabled
-     */
-    enabled?: boolean;
-    /**
-     * Team name for filtering leaderboard notifications
-     */
-    team?: string;
-};
-
-/**
- * Request to update workspace public visibility setting
- */
-export type UpdateWorkspacePublicVisibilityRequest = {
-    /**
-     * Whether the workspace should be publicly viewable without authentication
-     */
-    isPubliclyViewable: boolean;
-};
-
-/**
- * Request to update the leaderboard notification schedule
- */
-export type UpdateWorkspaceScheduleRequest = {
-    /**
-     * Day of week (1=Monday, 7=Sunday)
-     */
-    day: number;
-    /**
-     * Time in 24-hour format (HH:mm)
-     */
-    time: string;
-};
-
-/**
- * Request to update Slack integration credentials
- */
-export type UpdateWorkspaceSlackCredentialsRequest = {
-    /**
-     * Slack Signing Secret for webhook verification
-     */
-    slackSigningSecret: string;
-    /**
-     * Slack Bot User OAuth Token for API access
-     */
-    slackToken: string;
-};
-
-/**
- * Request to update the workspace lifecycle status
- */
-export type UpdateWorkspaceStatusRequest = {
-    /**
-     * New lifecycle status (PENDING, ACTIVE, ARCHIVED)
-     */
-    status: 'ACTIVE' | 'SUSPENDED' | 'PURGED';
-};
-
-/**
- * Request to update the workspace's GitHub Personal Access Token
- */
-export type UpdateWorkspaceTokenRequest = {
-    /**
-     * GitHub Personal Access Token for API access
-     */
-    personalAccessToken: string;
-};
-
-/**
- * Information about a user from the git provider
- */
-export type UserInfo = {
-    /**
-     * URL to the user's avatar image
+     * URL to the contributor's avatar image
      */
     avatarUrl: string;
     /**
-     * Email address of the user, if public
+     * Number of contributions to the project
      */
-    email?: string;
+    contributions?: number;
     /**
-     * URL to the user's profile on the git provider
+     * URL to the contributor's GitHub profile
      */
     htmlUrl: string;
     /**
-     * Unique identifier of the user
+     * GitHub user ID
      */
     id: number;
     /**
-     * League points earned by the user in the current scope
-     */
-    leaguePoints?: number;
-    /**
-     * Login/username of the user
+     * GitHub username
      */
     login: string;
     /**
-     * Display name of the user
+     * Display name of the contributor
      */
     name: string;
 };
 
-/**
- * Response for user bad practices listing
- */
-export type UserPractices = {
-    login?: string;
-    pullRequests?: Array<PullRequestWithBadPractices>;
-};
-
-/**
- * User preferences and settings
- */
-export type UserSettings = {
-    /**
-     * Whether the user consents to participate in research studies
-     */
-    participateInResearch: boolean;
-    /**
-     * Whether the user wants to receive notifications
-     */
-    receiveNotifications: boolean;
-};
-
-export type UserTeams = {
-    email?: string;
-    id: number;
-    login: string;
-    name: string;
-    teams: Array<TeamSummary>;
-    url: string;
-};
-
-export type VoteMessageRequest = {
-    isUpvoted: boolean;
-};
-
-/**
- * Complete workspace information including configuration and settings
- */
-export type Workspace = {
-    /**
-     * GitHub account login associated with this workspace
-     */
-    accountLogin: string;
-    /**
-     * Timestamp when the workspace was created
-     */
-    createdAt: Date;
-    /**
-     * Human-readable name of the workspace
-     */
-    displayName: string;
-    /**
-     * Git provider mode (INSTALLATION or PAT)
-     */
-    gitProviderMode?: string;
-    /**
-     * Whether Slack signing secret is configured
-     */
-    hasSlackSigningSecret: boolean;
-    /**
-     * Whether Slack token is configured
-     */
-    hasSlackToken: boolean;
-    /**
-     * Unique identifier of the workspace
-     */
-    id: number;
-    /**
-     * GitHub App installation ID, if linked
-     */
-    installationId?: number;
-    /**
-     * Timestamp when the GitHub App installation was linked
-     */
-    installationLinkedAt?: Date;
-    /**
-     * Whether the workspace is publicly viewable without authentication
-     */
-    isPubliclyViewable: boolean;
-    /**
-     * Slack channel ID for leaderboard notifications
-     */
-    leaderboardNotificationChannelId?: string;
-    /**
-     * Whether leaderboard notifications are enabled
-     */
-    leaderboardNotificationEnabled?: boolean;
-    /**
-     * Team name for leaderboard notifications
-     */
-    leaderboardNotificationTeam?: string;
-    /**
-     * Day of week for leaderboard notifications (1=Monday, 7=Sunday)
-     */
-    leaderboardScheduleDay?: number;
-    /**
-     * Time for leaderboard notifications in HH:mm format
-     */
-    leaderboardScheduleTime?: string;
-    /**
-     * Current lifecycle status of the workspace (PENDING, ACTIVE, ARCHIVED)
-     */
-    status: string;
-    /**
-     * Timestamp when the workspace was last updated
-     */
-    updatedAt: Date;
-    /**
-     * URL-friendly identifier for the workspace
-     */
-    workspaceSlug: string;
-};
-
-/**
- * Summary information about a workspace for list views
- */
-export type WorkspaceListItem = {
-    /**
-     * GitHub account login associated with this workspace
-     */
-    accountLogin: string;
-    /**
-     * Timestamp when the workspace was created
-     */
-    createdAt: Date;
-    /**
-     * Human-readable name of the workspace
-     */
-    displayName: string;
-    /**
-     * Unique identifier of the workspace
-     */
-    id: number;
-    /**
-     * Current lifecycle status of the workspace (PENDING, ACTIVE, ARCHIVED)
-     */
-    status: string;
-    /**
-     * URL-friendly identifier for the workspace
-     */
-    workspaceSlug: string;
-};
-
-/**
- * A user's membership in a workspace
- */
-export type WorkspaceMembership = {
-    /**
-     * Timestamp when the membership was created
-     */
+export type ChatThreadSummary = {
     createdAt?: Date;
-    /**
-     * League points earned by the user in this workspace
-     */
-    leaguePoints?: number;
-    /**
-     * Role of the user in this workspace (OWNER, ADMIN, MEMBER)
-     */
-    role?: 'OWNER' | 'ADMIN' | 'MEMBER';
-    /**
-     * Unique identifier of the user
-     */
-    userId?: number;
-    /**
-     * Login/username of the user
-     */
-    userLogin?: string;
-    /**
-     * Display name of the user
-     */
-    userName?: string;
+    id: string;
+    title: string;
+};
+
+export type ChatThreadGroup = {
+    groupName: string;
+    threads: Array<ChatThreadSummary>;
+};
+
+export type ChatMessageVote = {
+    createdAt: Date;
+    isUpvoted: boolean;
+    messageId: string;
+    updatedAt: Date;
 };
 
 /**
- * Repository contribution visibility settings for a specific team within a workspace
+ * User feedback on a detected bad practice
  */
-export type WorkspaceTeamRepositorySettings = {
+export type BadPracticeFeedback = {
     /**
-     * Whether contributions from this repository are hidden from leaderboard calculations
+     * User's explanation for the feedback
      */
-    hiddenFromContributions: boolean;
+    explanation: string;
     /**
-     * The repository ID these settings apply to
+     * Type of feedback (e.g., 'false_positive', 'not_applicable')
      */
-    repositoryId: number;
-    /**
-     * The team ID these settings apply to
-     */
-    teamId: number;
-    /**
-     * The workspace ID these settings belong to
-     */
-    workspaceId: number;
+    type: string;
 };
 
 /**
- * Team visibility settings for a specific workspace
+ * Request to assign or update a user's role in a workspace
  */
-export type WorkspaceTeamSettings = {
+export type AssignRoleRequest = {
     /**
-     * Whether the team is hidden in the leaderboard for this workspace
+     * New role to assign (OWNER, ADMIN, MEMBER)
      */
-    hidden: boolean;
+    role: 'OWNER' | 'ADMIN' | 'MEMBER';
     /**
-     * The team ID these settings apply to
+     * User ID of the member to update
      */
-    teamId: number;
-    /**
-     * The workspace ID these settings belong to
-     */
-    workspaceId: number;
+    userId: number;
 };
 
 export type ListGlobalContributorsData = {
@@ -1227,7 +1222,7 @@ export type GetLeaderboardResponses = {
 
 export type GetLeaderboardResponse = GetLeaderboardResponses[keyof GetLeaderboardResponses];
 
-export type GetUserLeagueStatsData = {
+export type ComputeUserLeagueStatsData = {
     /**
      * the user's current leaderboard entry for comparison
      */
@@ -1246,14 +1241,14 @@ export type GetUserLeagueStatsData = {
     url: '/workspaces/{workspaceSlug}/leaderboard/users/{login}/league-stats';
 };
 
-export type GetUserLeagueStatsResponses = {
+export type ComputeUserLeagueStatsResponses = {
     /**
      * league change statistics including projected point delta
      */
     200: LeagueChange;
 };
 
-export type GetUserLeagueStatsResponse = GetUserLeagueStatsResponses[keyof GetUserLeagueStatsResponses];
+export type ComputeUserLeagueStatsResponse = ComputeUserLeagueStatsResponses[keyof ComputeUserLeagueStatsResponses];
 
 export type ResetAndRecalculateLeaguesData = {
     body?: never;
@@ -1396,50 +1391,6 @@ export type GetMemberResponses = {
 };
 
 export type GetMemberResponse = GetMemberResponses[keyof GetMemberResponses];
-
-export type MentorChatData = {
-    /**
-     * Chat request body
-     */
-    body: {
-        /**
-         * If true, generate a greeting without user message
-         */
-        greeting?: boolean;
-        id: string;
-        message?: {
-            id: string;
-            parts: Array<{
-                text: string;
-                type: 'text';
-            } | {
-                mediaType: 'image/jpeg' | 'image/png';
-                name: string;
-                type: 'file';
-                url: string;
-            }>;
-            role: 'user';
-        };
-        previousMessageId?: string;
-    };
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-    };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/mentor/chat';
-};
-
-export type MentorChatResponses = {
-    /**
-     * Event stream of chat updates.
-     */
-    200: StreamPart;
-};
-
-export type MentorChatResponse = MentorChatResponses[keyof MentorChatResponses];
 
 export type ListDocumentsData = {
     body?: never;

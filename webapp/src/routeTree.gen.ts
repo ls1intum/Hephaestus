@@ -130,23 +130,23 @@ const AuthenticatedWWorkspaceSlugAdminAdminMembersRoute =
   } as any)
 
 export interface FileRoutesByFullPath {
+  '/': typeof AuthenticatedIndexRoute
   '/about': typeof AboutRoute
   '/imprint': typeof ImprintRoute
   '/landing': typeof LandingRoute
   '/privacy': typeof PrivacyRoute
   '/settings': typeof AuthenticatedSettingsRoute
-  '/': typeof AuthenticatedIndexRoute
   '/mentor': typeof AuthenticatedMentorMentor_accessRoute
-  '/w/$workspaceSlug': typeof AuthenticatedWWorkspaceSlugIndexRoute
+  '/w/$workspaceSlug/': typeof AuthenticatedWWorkspaceSlugIndexRoute
   '/w/$workspaceSlug/admin': typeof AuthenticatedWWorkspaceSlugAdminAdminRouteWithChildren
   '/w/$workspaceSlug/mentor/$threadId': typeof AuthenticatedWWorkspaceSlugMentorThreadIdRoute
-  '/w/$workspaceSlug/mentor': typeof AuthenticatedWWorkspaceSlugMentorIndexRoute
-  '/w/$workspaceSlug/teams': typeof AuthenticatedWWorkspaceSlugTeamsIndexRoute
+  '/w/$workspaceSlug/mentor/': typeof AuthenticatedWWorkspaceSlugMentorIndexRoute
+  '/w/$workspaceSlug/teams/': typeof AuthenticatedWWorkspaceSlugTeamsIndexRoute
   '/w/$workspaceSlug/admin/members': typeof AuthenticatedWWorkspaceSlugAdminAdminMembersRoute
   '/w/$workspaceSlug/admin/settings': typeof AuthenticatedWWorkspaceSlugAdminAdminSettingsRoute
   '/w/$workspaceSlug/admin/teams': typeof AuthenticatedWWorkspaceSlugAdminAdminTeamsRoute
   '/w/$workspaceSlug/user/$username/best-practices': typeof AuthenticatedWWorkspaceSlugUserUsernameBestPracticesRoute
-  '/w/$workspaceSlug/user/$username': typeof AuthenticatedWWorkspaceSlugUserUsernameIndexRoute
+  '/w/$workspaceSlug/user/$username/': typeof AuthenticatedWWorkspaceSlugUserUsernameIndexRoute
 }
 export interface FileRoutesByTo {
   '/about': typeof AboutRoute
@@ -191,23 +191,23 @@ export interface FileRoutesById {
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
+    | '/'
     | '/about'
     | '/imprint'
     | '/landing'
     | '/privacy'
     | '/settings'
-    | '/'
     | '/mentor'
-    | '/w/$workspaceSlug'
+    | '/w/$workspaceSlug/'
     | '/w/$workspaceSlug/admin'
     | '/w/$workspaceSlug/mentor/$threadId'
-    | '/w/$workspaceSlug/mentor'
-    | '/w/$workspaceSlug/teams'
+    | '/w/$workspaceSlug/mentor/'
+    | '/w/$workspaceSlug/teams/'
     | '/w/$workspaceSlug/admin/members'
     | '/w/$workspaceSlug/admin/settings'
     | '/w/$workspaceSlug/admin/teams'
     | '/w/$workspaceSlug/user/$username/best-practices'
-    | '/w/$workspaceSlug/user/$username'
+    | '/w/$workspaceSlug/user/$username/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/about'
@@ -290,7 +290,7 @@ declare module '@tanstack/react-router' {
     '/_authenticated': {
       id: '/_authenticated'
       path: ''
-      fullPath: ''
+      fullPath: '/'
       preLoaderRoute: typeof AuthenticatedRouteImport
       parentRoute: typeof rootRouteImport
     }
@@ -318,21 +318,21 @@ declare module '@tanstack/react-router' {
     '/_authenticated/w/$workspaceSlug/': {
       id: '/_authenticated/w/$workspaceSlug/'
       path: '/w/$workspaceSlug'
-      fullPath: '/w/$workspaceSlug'
+      fullPath: '/w/$workspaceSlug/'
       preLoaderRoute: typeof AuthenticatedWWorkspaceSlugIndexRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/w/$workspaceSlug/teams/': {
       id: '/_authenticated/w/$workspaceSlug/teams/'
       path: '/w/$workspaceSlug/teams'
-      fullPath: '/w/$workspaceSlug/teams'
+      fullPath: '/w/$workspaceSlug/teams/'
       preLoaderRoute: typeof AuthenticatedWWorkspaceSlugTeamsIndexRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/w/$workspaceSlug/mentor/': {
       id: '/_authenticated/w/$workspaceSlug/mentor/'
       path: '/w/$workspaceSlug/mentor'
-      fullPath: '/w/$workspaceSlug/mentor'
+      fullPath: '/w/$workspaceSlug/mentor/'
       preLoaderRoute: typeof AuthenticatedWWorkspaceSlugMentorIndexRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
@@ -353,7 +353,7 @@ declare module '@tanstack/react-router' {
     '/_authenticated/w/$workspaceSlug/user/$username/': {
       id: '/_authenticated/w/$workspaceSlug/user/$username/'
       path: '/w/$workspaceSlug/user/$username'
-      fullPath: '/w/$workspaceSlug/user/$username'
+      fullPath: '/w/$workspaceSlug/user/$username/'
       preLoaderRoute: typeof AuthenticatedWWorkspaceSlugUserUsernameIndexRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
