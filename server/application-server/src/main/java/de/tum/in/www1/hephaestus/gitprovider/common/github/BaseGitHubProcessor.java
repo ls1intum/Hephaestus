@@ -184,9 +184,8 @@ public abstract class BaseGitHubProcessor {
         // Create new milestone
         Milestone milestone = new Milestone();
         // Use provided ID or generate deterministic one for new milestones only
-        Long milestoneId = dto.id() != null
-            ? dto.id()
-            : generateDeterministicMilestoneId(repository.getId(), dto.number());
+        Long milestoneId =
+            dto.id() != null ? dto.id() : generateDeterministicMilestoneId(repository.getId(), dto.number());
         milestone.setId(milestoneId);
         milestone.setNumber(dto.number());
         milestone.setTitle(dto.title() != null ? dto.title() : "Milestone " + dto.number());

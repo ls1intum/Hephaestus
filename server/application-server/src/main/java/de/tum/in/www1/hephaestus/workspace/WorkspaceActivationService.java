@@ -236,9 +236,10 @@ public class WorkspaceActivationService {
         boolean changed = false;
 
         if (workspace.getGitProviderMode() == null) {
-            Workspace.GitProviderMode mode = workspace.getInstallationId() != null
-                ? Workspace.GitProviderMode.GITHUB_APP_INSTALLATION
-                : Workspace.GitProviderMode.PAT_ORG;
+            Workspace.GitProviderMode mode =
+                workspace.getInstallationId() != null
+                    ? Workspace.GitProviderMode.GITHUB_APP_INSTALLATION
+                    : Workspace.GitProviderMode.PAT_ORG;
             workspace.setGitProviderMode(mode);
             changed = true;
         }

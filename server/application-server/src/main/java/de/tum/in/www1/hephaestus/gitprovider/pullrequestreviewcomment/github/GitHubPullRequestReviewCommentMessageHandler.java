@@ -30,7 +30,8 @@ import org.springframework.transaction.support.TransactionTemplate;
  */
 @Component
 public class GitHubPullRequestReviewCommentMessageHandler
-    extends GitHubMessageHandler<GitHubPullRequestReviewCommentEventDTO> {
+    extends GitHubMessageHandler<GitHubPullRequestReviewCommentEventDTO>
+{
 
     private static final Logger log = LoggerFactory.getLogger(GitHubPullRequestReviewCommentMessageHandler.class);
 

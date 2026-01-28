@@ -93,6 +93,7 @@
   "overrides": {
     "vitest": "4.0.16",
     "@vitest/browser": "4.0.16",
-    "@vitest/runner": "4.0.16"
+    "@vitest/runner": "4.0.16",
+    "hono": "4.11.4"
   }
 }
