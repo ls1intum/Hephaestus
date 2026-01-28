@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.13.0](https://github.com/ls1intum/Hephaestus/compare/v0.12.4...v0.13.0) (2026-01-28)
+
+### 🐛 Bug Fixes
+
+* **ci:** use TUM Docker mirror (standard ls1intum approach) ([f01f49b](https://github.com/ls1intum/Hephaestus/commit/f01f49bae669ac28b91a10cd9d5e01c85a80636e))
+
+### 🚀 Features
+
+* remove hub4j dependency and refactor GitHub sync infrastructure ([4bce1ee](https://github.com/ls1intum/Hephaestus/commit/4bce1ee4418c7b6d1c60dd31475e671030421a91))
+
 ## [0.12.4](https://github.com/ls1intum/Hephaestus/compare/v0.12.3...v0.12.4) (2025-12-31)
 
 ### 🐛 Bug Fixes
