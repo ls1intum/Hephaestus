@@ -262,8 +262,6 @@ services:
       MONITORING_RUN_ON_STARTUP: ${MONITORING_RUN_ON_STARTUP:-false}
       MONITORING_SYNC_CRON: ${MONITORING_SYNC_CRON:-0 0 2 * * *}
       MONITORING_BACKFILL_ENABLED: "false"
-      # Activity event backfill (disabled for previews - not needed with seeded databases)
-      HEPHAESTUS_ACTIVITY_BACKFILL_ON_STARTUP: "false"
       # Notifications disabled for previews
       LEADERBOARD_NOTIFICATION_ENABLED: "false"
       # Observability (optional)
