@@ -6,7 +6,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.5.0</version>
+        <version>3.5.10</version>
         <relativePath/>
         <!-- lookup parent from repository -->
     </parent>
@@ -394,7 +394,7 @@
             <dependency>
                 <groupId>org.springframework.modulith</groupId>
                 <artifactId>spring-modulith-bom</artifactId>
-                <version>1.4.6</version>
+                <version>1.4.7</version>
                 <scope>import</scope>
                 <type>pom</type>
             </dependency>
@@ -798,7 +798,7 @@
                     <dependency>
                         <groupId>org.springframework.boot</groupId>
                         <artifactId>spring-boot-starter-data-jpa</artifactId>
-                        <version>3.5.9</version>
+                        <version>3.5.10</version>
                     </dependency>
                     <dependency>
                         <groupId>jakarta.validation</groupId>
