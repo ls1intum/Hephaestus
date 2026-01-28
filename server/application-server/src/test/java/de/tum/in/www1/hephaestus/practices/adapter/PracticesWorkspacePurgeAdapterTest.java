@@ -49,7 +49,9 @@ class PracticesWorkspacePurgeAdapterTest {
     void deleteWorkspaceData_withNoPullRequests_skipsSchedulerCall() {
         // Given
         Long workspaceId = 456L;
-        when(pullRequestQueryRepository.findPullRequestIdsByWorkspaceId(workspaceId)).thenReturn(Collections.emptyList());
+        when(pullRequestQueryRepository.findPullRequestIdsByWorkspaceId(workspaceId)).thenReturn(
+            Collections.emptyList()
+        );
 
         // When
         adapter.deleteWorkspaceData(workspaceId);

@@ -158,9 +158,7 @@ public class GitHubTeamProcessor {
                 team.getRepoPermissions().clear();
 
                 teamRepository.delete(team);
-                eventPublisher.publishEvent(
-                    new DomainEvent.TeamDeleted(teamId, teamName, EventContext.from(context))
-                );
+                eventPublisher.publishEvent(new DomainEvent.TeamDeleted(teamId, teamName, EventContext.from(context)));
                 log.info("Deleted team: teamId={}, teamSlug={}", teamId, teamName);
             });
     }
@@ -173,8 +171,7 @@ public class GitHubTeamProcessor {
         if (message == null) {
             return false;
         }
-        return message.contains("uk_team_organization_name") ||
-               (message.contains("team") && message.contains("name"));
+        return message.contains("uk_team_organization_name") || (message.contains("team") && message.contains("name"));
     }
 
     /**
@@ -187,7 +184,12 @@ public class GitHubTeamProcessor {
      *
      * @return the saved team, or null if unable to resolve
      */
-    private Team handleNameConflict(Team team, String orgLogin, GitHubTeamEventDTO.GitHubTeamDTO dto, ProcessingContext context) {
+    private Team handleNameConflict(
+        Team team,
+        String orgLogin,
+        GitHubTeamEventDTO.GitHubTeamDTO dto,
+        ProcessingContext context
+    ) {
         String teamName = dto.name();
 
         // Find the team that has the conflicting name

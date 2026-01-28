@@ -46,7 +46,12 @@ public interface BackfillStateProvider {
      * @param checkpoint     the current checkpoint (lowest issue number synced), or null to keep current
      * @param lastRunAt      when the backfill was last run, or null to keep current
      */
-    default void updateIssueBackfillState(Long syncTargetId, Integer highWaterMark, Integer checkpoint, Instant lastRunAt) {
+    default void updateIssueBackfillState(
+        Long syncTargetId,
+        Integer highWaterMark,
+        Integer checkpoint,
+        Instant lastRunAt
+    ) {
         // Default no-op - implementations MUST override to persist state
     }
 
@@ -62,7 +67,12 @@ public interface BackfillStateProvider {
      * @param checkpoint     the current checkpoint (lowest pull request number synced), or null to keep current
      * @param lastRunAt      when the backfill was last run, or null to keep current
      */
-    default void updatePullRequestBackfillState(Long syncTargetId, Integer highWaterMark, Integer checkpoint, Instant lastRunAt) {
+    default void updatePullRequestBackfillState(
+        Long syncTargetId,
+        Integer highWaterMark,
+        Integer checkpoint,
+        Instant lastRunAt
+    ) {
         // Default no-op - implementations MUST override to persist state
     }
 

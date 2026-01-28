@@ -13,8 +13,8 @@ import de.tum.in.www1.hephaestus.gitprovider.issuetype.github.GitHubIssueTypeSyn
 import de.tum.in.www1.hephaestus.gitprovider.subissue.github.GitHubSubIssueSyncService;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -152,16 +152,20 @@ public class GitHubDataSyncScheduler {
         AtomicInteger successCount = new AtomicInteger(0);
         AtomicInteger failureCount = new AtomicInteger(0);
 
-        CompletableFuture<?>[] futures = sessions.stream()
-            .map(session -> CompletableFuture.runAsync(() -> syncScope(session), monitoringExecutor)
-                .whenComplete((result, error) -> {
-                    if (error != null) {
-                        // Already logged inside syncScope
-                        failureCount.incrementAndGet();
-                    } else {
-                        successCount.incrementAndGet();
+        CompletableFuture<?>[] futures = sessions
+            .stream()
+            .map(session ->
+                CompletableFuture.runAsync(() -> syncScope(session), monitoringExecutor).whenComplete(
+                    (result, error) -> {
+                        if (error != null) {
+                            // Already logged inside syncScope
+                            failureCount.incrementAndGet();
+                        } else {
+                            successCount.incrementAndGet();
+                        }
                     }
-                }))
+                )
+            )
             .toArray(CompletableFuture[]::new);
 
         // Wait for all workspace syncs to complete

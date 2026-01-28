@@ -14,7 +14,6 @@ package de.tum.in.www1.hephaestus.gitprovider.sync;
  * @param count  the number of items successfully synced before completion or abort
  */
 public record SyncResult(Status status, int count) {
-
     /**
      * The completion status of a sync operation.
      */
@@ -35,7 +34,7 @@ public record SyncResult(Status status, int count) {
          * Sync was aborted due to an error (auth, not found, client error, etc.).
          * The timestamp should NOT be updated to allow retry from the same point.
          */
-        ABORTED_ERROR
+        ABORTED_ERROR,
     }
 
     /**

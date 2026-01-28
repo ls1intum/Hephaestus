@@ -240,7 +240,12 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
 
     @Override
     @Transactional
-    public void updateIssueBackfillState(Long syncTargetId, Integer highWaterMark, Integer checkpoint, Instant lastRunAt) {
+    public void updateIssueBackfillState(
+        Long syncTargetId,
+        Integer highWaterMark,
+        Integer checkpoint,
+        Instant lastRunAt
+    ) {
         repositoryToMonitorRepository
             .findById(syncTargetId)
             .ifPresentOrElse(
@@ -258,13 +263,21 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
                 },
                 () ->
                     // DEBUG: Expected during workspace reconfiguration when repository is removed mid-sync
-                    log.debug("Skipped issue backfill state update: reason=syncTargetNotFound, syncTargetId={}", syncTargetId)
+                    log.debug(
+                        "Skipped issue backfill state update: reason=syncTargetNotFound, syncTargetId={}",
+                        syncTargetId
+                    )
             );
     }
 
     @Override
     @Transactional
-    public void updatePullRequestBackfillState(Long syncTargetId, Integer highWaterMark, Integer checkpoint, Instant lastRunAt) {
+    public void updatePullRequestBackfillState(
+        Long syncTargetId,
+        Integer highWaterMark,
+        Integer checkpoint,
+        Instant lastRunAt
+    ) {
         repositoryToMonitorRepository
             .findById(syncTargetId)
             .ifPresentOrElse(
@@ -282,7 +295,10 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
                 },
                 () ->
                     // DEBUG: Expected during workspace reconfiguration when repository is removed mid-sync
-                    log.debug("Skipped pull request backfill state update: reason=syncTargetNotFound, syncTargetId={}", syncTargetId)
+                    log.debug(
+                        "Skipped pull request backfill state update: reason=syncTargetNotFound, syncTargetId={}",
+                        syncTargetId
+                    )
             );
     }
 
@@ -323,7 +339,10 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
                 },
                 () ->
                     // DEBUG: Expected during workspace reconfiguration when repository is removed mid-sync
-                    log.debug("Skipped pull request sync cursor update: reason=syncTargetNotFound, syncTargetId={}", syncTargetId)
+                    log.debug(
+                        "Skipped pull request sync cursor update: reason=syncTargetNotFound, syncTargetId={}",
+                        syncTargetId
+                    )
             );
     }
 

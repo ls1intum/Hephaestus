@@ -18,6 +18,7 @@ import de.tum.in.www1.hephaestus.gitprovider.common.spi.BackfillStateProvider;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHPageInfo;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHPullRequestConnection;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.github.dto.EmbeddedReviewThreadsDTO;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.github.dto.EmbeddedReviewsDTO;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.github.dto.GitHubReviewThreadDTO;
@@ -28,7 +29,6 @@ import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.github.dto.GitHub
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.github.GitHubPullRequestReviewCommentSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
-import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
 import de.tum.in.www1.hephaestus.gitprovider.sync.SyncResult;
 import de.tum.in.www1.hephaestus.gitprovider.sync.SyncSchedulerProperties;
 import java.time.Duration;
@@ -326,20 +326,22 @@ public class GitHubPullRequestSyncService {
                         .variable("after", currentCursor)
                         .execute()
                 )
-                .retryWhen(
-                    Retry.backoff(TRANSPORT_MAX_RETRIES, TRANSPORT_INITIAL_BACKOFF)
-                        .maxBackoff(TRANSPORT_MAX_BACKOFF)
-                        .jitter(JITTER_FACTOR)
-                        .filter(this::isTransportError)
-                        .doBeforeRetry(signal -> log.warn(
-                            "Retrying PR sync after transport error: repoName={}, page={}, attempt={}, error={}",
-                            safeNameWithOwner,
-                            currentPage,
-                            signal.totalRetries() + 1,
-                            signal.failure().getMessage()
-                        ))
-                )
-                .block(timeout);
+                    .retryWhen(
+                        Retry.backoff(TRANSPORT_MAX_RETRIES, TRANSPORT_INITIAL_BACKOFF)
+                            .maxBackoff(TRANSPORT_MAX_BACKOFF)
+                            .jitter(JITTER_FACTOR)
+                            .filter(this::isTransportError)
+                            .doBeforeRetry(signal ->
+                                log.warn(
+                                    "Retrying PR sync after transport error: repoName={}, page={}, attempt={}, error={}",
+                                    safeNameWithOwner,
+                                    currentPage,
+                                    signal.totalRetries() + 1,
+                                    signal.failure().getMessage()
+                                )
+                            )
+                    )
+                    .block(timeout);
 
                 if (response == null || !response.isValid()) {
                     log.warn(
@@ -566,7 +568,9 @@ public class GitHubPullRequestSyncService {
                 // Re-fetch PR from database with repository eagerly loaded to avoid
                 // LazyInitializationException when syncRemainingReviews accesses pr.getRepository()
                 // in a new transaction. If the transaction that created this PR was rolled back, skip it.
-                PullRequest pr = pullRequestRepository.findByIdWithRepository(prWithCursor.pullRequestId()).orElse(null);
+                PullRequest pr = pullRequestRepository
+                    .findByIdWithRepository(prWithCursor.pullRequestId())
+                    .orElse(null);
                 if (pr == null) {
                     log.debug(
                         "Skipped review pagination: reason=prNotFound (likely transaction rollback), prId={}",
@@ -596,7 +600,9 @@ public class GitHubPullRequestSyncService {
                 // Re-fetch PR from database with repository eagerly loaded to avoid
                 // LazyInitializationException when syncRemainingThreads accesses pr.getRepository()
                 // in a new transaction. If the transaction that created this PR was rolled back, skip it.
-                PullRequest pr = pullRequestRepository.findByIdWithRepository(prWithCursor.pullRequestId()).orElse(null);
+                PullRequest pr = pullRequestRepository
+                    .findByIdWithRepository(prWithCursor.pullRequestId())
+                    .orElse(null);
                 if (pr == null) {
                     log.debug(
                         "Skipped thread pagination: reason=prNotFound (likely transaction rollback), prId={}",
@@ -683,7 +689,9 @@ public class GitHubPullRequestSyncService {
             // Track PRs that need additional review pagination (with cursor for efficient continuation)
             // Store PR ID instead of entity reference to survive transaction rollbacks
             if (embeddedReviews.needsPagination()) {
-                prsNeedingReviewPagination.add(new PullRequestWithReviewCursor(entity.getId(), embeddedReviews.endCursor()));
+                prsNeedingReviewPagination.add(
+                    new PullRequestWithReviewCursor(entity.getId(), embeddedReviews.endCursor())
+                );
             }
 
             // Process embedded review threads and their comments
@@ -696,7 +704,9 @@ public class GitHubPullRequestSyncService {
             // Track PRs that need additional thread pagination (with cursor for efficient continuation)
             // Store PR ID instead of entity reference to survive transaction rollbacks
             if (embeddedThreads.needsPagination()) {
-                prsNeedingThreadPagination.add(new PullRequestWithThreadCursor(entity.getId(), embeddedThreads.endCursor()));
+                prsNeedingThreadPagination.add(
+                    new PullRequestWithThreadCursor(entity.getId(), embeddedThreads.endCursor())
+                );
             }
         }
 
@@ -772,8 +782,7 @@ public class GitHubPullRequestSyncService {
             }
 
             // Other reactor-netty transport errors
-            if (className.contains("AbortedException") ||
-                className.contains("ConnectionResetException")) {
+            if (className.contains("AbortedException") || className.contains("ConnectionResetException")) {
                 return true;
             }
 
@@ -782,11 +791,13 @@ public class GitHubPullRequestSyncService {
                 String message = cause.getMessage();
                 if (message != null) {
                     String lower = message.toLowerCase();
-                    if (lower.contains("connection reset") ||
+                    if (
+                        lower.contains("connection reset") ||
                         lower.contains("broken pipe") ||
                         lower.contains("connection abort") ||
                         lower.contains("premature") ||
-                        lower.contains("stream closed")) {
+                        lower.contains("stream closed")
+                    ) {
                         return true;
                     }
                 }

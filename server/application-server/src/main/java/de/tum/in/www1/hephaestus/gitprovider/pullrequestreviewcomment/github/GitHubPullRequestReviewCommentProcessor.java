@@ -154,10 +154,9 @@ public class GitHubPullRequestReviewCommentProcessor {
 
         // Try to find existing parent entity using repository ID and PR number (not database ID)
         // This avoids inconsistencies between GraphQL and webhook database IDs
-        PullRequest pr = prRepository.findByRepositoryIdAndNumber(
-            context.repository().getId(),
-            prDto.number()
-        ).orElse(null);
+        PullRequest pr = prRepository
+            .findByRepositoryIdAndNumber(context.repository().getId(), prDto.number())
+            .orElse(null);
 
         // If parent doesn't exist, create a minimal entity from webhook data
         if (pr == null) {
@@ -252,9 +251,7 @@ public class GitHubPullRequestReviewCommentProcessor {
                 );
             });
 
-        eventPublisher.publishEvent(
-            new DomainEvent.ReviewCommentDeleted(commentId, prId, EventContext.from(context))
-        );
+        eventPublisher.publishEvent(new DomainEvent.ReviewCommentDeleted(commentId, prId, EventContext.from(context)));
     }
 
     private PullRequestReviewComment createComment(

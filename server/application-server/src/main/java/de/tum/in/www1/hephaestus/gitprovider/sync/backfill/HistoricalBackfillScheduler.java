@@ -50,6 +50,7 @@ public class HistoricalBackfillScheduler {
 
     private final HistoricalBackfillService backfillService;
     private final SyncSchedulerProperties syncSchedulerProperties;
+
     // Injected to satisfy architecture test: signals this scheduler iterates workspaces via the service
     @SuppressWarnings("unused")
     private final SyncTargetProvider syncTargetProvider;

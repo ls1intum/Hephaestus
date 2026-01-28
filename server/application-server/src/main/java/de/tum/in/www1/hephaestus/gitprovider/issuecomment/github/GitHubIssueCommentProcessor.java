@@ -98,10 +98,9 @@ public class GitHubIssueCommentProcessor extends BaseGitHubProcessor {
             return null;
         }
 
-        Issue issue = issueRepository.findByRepositoryIdAndNumber(
-            context.repository().getId(),
-            issueNumber
-        ).orElse(null);
+        Issue issue = issueRepository
+            .findByRepositoryIdAndNumber(context.repository().getId(), issueNumber)
+            .orElse(null);
         if (issue == null) {
             log.warn(
                 "Skipped comment processing: reason=parentNotFound, repoId={}, issueNumber={}, commentId={}",
@@ -154,16 +153,19 @@ public class GitHubIssueCommentProcessor extends BaseGitHubProcessor {
         }
 
         if (issueDto.number() <= 0) {
-            log.warn("Skipped comment processing: reason=invalidIssueNumber, issueNumber={}, commentId={}", issueDto.number(), dto.id());
+            log.warn(
+                "Skipped comment processing: reason=invalidIssueNumber, issueNumber={}, commentId={}",
+                issueDto.number(),
+                dto.id()
+            );
             return null;
         }
 
         // Try to find existing parent entity using natural key (repository + number)
         // This is consistent across both GraphQL sync and webhook events
-        Issue issue = issueRepository.findByRepositoryIdAndNumber(
-            context.repository().getId(),
-            issueDto.number()
-        ).orElse(null);
+        Issue issue = issueRepository
+            .findByRepositoryIdAndNumber(context.repository().getId(), issueDto.number())
+            .orElse(null);
 
         // If parent doesn't exist, create a minimal entity from webhook data
         if (issue == null) {
@@ -327,10 +329,9 @@ public class GitHubIssueCommentProcessor extends BaseGitHubProcessor {
                 context.repository().getId(),
                 issueDto.number()
             );
-            return issueRepository.findByRepositoryIdAndNumber(
-                context.repository().getId(),
-                issueDto.number()
-            ).orElse(null);
+            return issueRepository
+                .findByRepositoryIdAndNumber(context.repository().getId(), issueDto.number())
+                .orElse(null);
         }
     }
 

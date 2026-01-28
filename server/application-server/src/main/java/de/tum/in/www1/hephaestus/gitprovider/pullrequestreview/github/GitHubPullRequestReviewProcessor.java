@@ -131,10 +131,9 @@ public class GitHubPullRequestReviewProcessor extends BaseGitHubProcessor {
 
         // Use repository ID + PR number for lookup - these are stable across GraphQL and webhooks.
         // Do NOT use prDto.getDatabaseId() as the ID format may differ between API sources.
-        PullRequest pr = prRepository.findByRepositoryIdAndNumber(
-            context.repository().getId(),
-            prDto.number()
-        ).orElse(null);
+        PullRequest pr = prRepository
+            .findByRepositoryIdAndNumber(context.repository().getId(), prDto.number())
+            .orElse(null);
 
         // If parent doesn't exist, create a minimal entity from webhook data
         if (pr == null) {
@@ -180,9 +179,7 @@ public class GitHubPullRequestReviewProcessor extends BaseGitHubProcessor {
                 review.setDismissed(true);
                 review = reviewRepository.save(review);
                 EventPayload.ReviewData.from(review).ifPresent(reviewData ->
-                    eventPublisher.publishEvent(
-                        new DomainEvent.ReviewDismissed(reviewData, EventContext.from(context))
-                    )
+                    eventPublisher.publishEvent(new DomainEvent.ReviewDismissed(reviewData, EventContext.from(context)))
                 );
                 log.debug("Dismissed review: reviewId={}", reviewId);
             });

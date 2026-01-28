@@ -7,6 +7,7 @@ import java.util.Locale;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -44,20 +45,11 @@ public class DatabaseTestUtils {
 
         for (int attempt = 1; attempt <= MAX_RETRIES; attempt++) {
             try {
-                entityManager.flush();
-
-                String truncateStatement = getTruncateStatement();
-                if (truncateStatement.isEmpty()) {
-                    entityManager.clear();
-                    return;
-                }
-
-                entityManager.createNativeQuery(truncateStatement).executeUpdate();
-                entityManager.clear();
+                // Execute in a new transaction so that failures don't pollute the calling transaction
+                doCleanDatabase();
                 return; // Success
             } catch (Exception e) {
                 lastException = e;
-                entityManager.clear(); // Clear any failed transaction state
 
                 // Check if this is a transient deadlock error
                 if (isDeadlockException(e) && attempt < MAX_RETRIES) {
@@ -74,6 +66,24 @@ public class DatabaseTestUtils {
         }
 
         throw new IllegalStateException("Failed to clean database for integration tests", lastException);
+    }
+
+    /**
+     * Performs the actual database cleanup in its own transaction.
+     * Uses REQUIRES_NEW to ensure a fresh transaction for each retry attempt.
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void doCleanDatabase() {
+        entityManager.flush();
+
+        String truncateStatement = getTruncateStatement();
+        if (truncateStatement.isEmpty()) {
+            entityManager.clear();
+            return;
+        }
+
+        entityManager.createNativeQuery(truncateStatement).executeUpdate();
+        entityManager.clear();
     }
 
     /**

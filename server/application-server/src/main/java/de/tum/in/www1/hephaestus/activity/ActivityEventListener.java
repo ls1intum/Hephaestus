@@ -839,9 +839,7 @@ public class ActivityEventListener {
             return;
         }
         // For unresolved, we use the PR author since we don't track who unresolved it
-        Long userId = thread.getPullRequest().getAuthor() != null
-            ? thread.getPullRequest().getAuthor().getId()
-            : null;
+        Long userId = thread.getPullRequest().getAuthor() != null ? thread.getPullRequest().getAuthor().getId() : null;
         if (userId == null) {
             log.debug("Skipping review thread unresolved event (no user found): threadId={}", threadData.id());
             return;

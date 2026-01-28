@@ -242,12 +242,13 @@ public class HistoricalBackfillService {
         AtomicInteger repositoriesProcessed = new AtomicInteger(0);
         AtomicInteger pendingRepositories = new AtomicInteger(0);
 
-        CompletableFuture<?>[] futures = sessions.stream()
-            .map(session -> CompletableFuture.runAsync(
-                () -> backfillSession(session, backfillProps, repositoriesProcessed, pendingRepositories),
-                monitoringExecutor
-            )
-                .whenComplete((result, error) -> {
+        CompletableFuture<?>[] futures = sessions
+            .stream()
+            .map(session ->
+                CompletableFuture.runAsync(
+                    () -> backfillSession(session, backfillProps, repositoriesProcessed, pendingRepositories),
+                    monitoringExecutor
+                ).whenComplete((result, error) -> {
                     if (error != null) {
                         log.error(
                             "Backfill session failed: scopeId={}, scopeSlug={}, error={}",
@@ -256,7 +257,8 @@ public class HistoricalBackfillService {
                             error.getMessage()
                         );
                     }
-                }))
+                })
+            )
             .toArray(CompletableFuture[]::new);
 
         // Wait for all workspace backfills to complete
@@ -321,7 +323,8 @@ public class HistoricalBackfillService {
         // Check if ALL repos have completed incremental sync before starting any backfill.
         // This prevents backfill from consuming rate limit points that are needed for
         // incremental sync of remaining repos, which would delay the initial sync.
-        long pendingIncrementalSync = targets.stream()
+        long pendingIncrementalSync = targets
+            .stream()
             .filter(t -> t.lastIssuesAndPullRequestsSyncedAt() == null)
             .count();
 
@@ -329,7 +332,7 @@ public class HistoricalBackfillService {
             long completed = targets.size() - pendingIncrementalSync;
             log.debug(
                 "Skipping backfill for scope: reason=incrementalSyncPending, scopeId={}, scopeSlug={}, " +
-                "incrementalComplete={}, incrementalPending={}",
+                    "incrementalComplete={}, incrementalPending={}",
                 scopeId,
                 session.slug(),
                 completed,
@@ -456,7 +459,7 @@ public class HistoricalBackfillService {
         } else {
             log.info(
                 "Resuming backfill: repo={}, issueCheckpoint=#{}, issueHighWaterMark=#{}, " +
-                "pullRequestCheckpoint=#{}, pullRequestHighWaterMark=#{}, pullRequestPageSize={}, timeout={}s",
+                    "pullRequestCheckpoint=#{}, pullRequestHighWaterMark=#{}, pullRequestPageSize={}, timeout={}s",
                 safeRepoName,
                 target.issueBackfillCheckpoint(),
                 target.issueBackfillHighWaterMark(),
@@ -492,14 +495,21 @@ public class HistoricalBackfillService {
         // This gives admin visibility into issue backfill progress.
         if (issueResult.itemsSynced() > 0) {
             Integer issueCheckpoint = issueResult.minNumber() > 0 ? issueResult.minNumber() : null;
-            Integer issueHighWaterMark = isIssueFirstBatch && issueResult.maxNumber() > 0 ? issueResult.maxNumber() : null;
+            Integer issueHighWaterMark = isIssueFirstBatch && issueResult.maxNumber() > 0
+                ? issueResult.maxNumber()
+                : null;
 
             // Mark issue backfill complete if no more pages
             if (!issueResult.hasMore()) {
                 issueCheckpoint = 0;
             }
 
-            backfillStateProvider.updateIssueBackfillState(syncTargetId, issueHighWaterMark, issueCheckpoint, Instant.now());
+            backfillStateProvider.updateIssueBackfillState(
+                syncTargetId,
+                issueHighWaterMark,
+                issueCheckpoint,
+                Instant.now()
+            );
 
             if (!issueResult.hasMore()) {
                 log.info(
@@ -539,7 +549,12 @@ public class HistoricalBackfillService {
                 prCheckpoint = 0;
             }
 
-            backfillStateProvider.updatePullRequestBackfillState(syncTargetId, prHighWaterMark, prCheckpoint, Instant.now());
+            backfillStateProvider.updatePullRequestBackfillState(
+                syncTargetId,
+                prHighWaterMark,
+                prCheckpoint,
+                Instant.now()
+            );
 
             if (!prResult.hasMore()) {
                 log.info(
@@ -638,21 +653,19 @@ public class HistoricalBackfillService {
                         .variable("after", currentCursor)
                         .execute()
                 )
-                .retryWhen(createTransportRetrySpec("issues backfill", repoNameForLog, pageCount))
-                .block(timeout);
+                    .retryWhen(createTransportRetrySpec("issues backfill", repoNameForLog, pageCount))
+                    .block(timeout);
 
                 if (response == null) {
-                    log.warn(
-                        "Null GraphQL response for issues backfill: repo={}",
-                        sanitizeForLog(repoNameForLog)
-                    );
+                    log.warn("Null GraphQL response for issues backfill: repo={}", sanitizeForLog(repoNameForLog));
                     break;
                 }
 
                 // Check for transient errors (timeouts, rate limits, server errors)
                 // These come back as HTTP 200 with error in the response body
-                GitHubGraphQlErrorUtils.TransientError transientError =
-                    GitHubGraphQlErrorUtils.detectTransientError(response);
+                GitHubGraphQlErrorUtils.TransientError transientError = GitHubGraphQlErrorUtils.detectTransientError(
+                    response
+                );
                 if (transientError != null) {
                     log.warn(
                         "Detected transient GraphQL error for issues backfill: repo={}, type={}, message={}",
@@ -811,8 +824,8 @@ public class HistoricalBackfillService {
                         .variable("after", currentCursor)
                         .execute()
                 )
-                .retryWhen(createTransportRetrySpec("pull requests backfill", repoNameForLog, pageCount))
-                .block(timeout);
+                    .retryWhen(createTransportRetrySpec("pull requests backfill", repoNameForLog, pageCount))
+                    .block(timeout);
 
                 if (response == null) {
                     log.warn(
@@ -824,8 +837,9 @@ public class HistoricalBackfillService {
 
                 // Check for transient errors (timeouts, rate limits, server errors)
                 // These come back as HTTP 200 with error in the response body
-                GitHubGraphQlErrorUtils.TransientError transientError =
-                    GitHubGraphQlErrorUtils.detectTransientError(response);
+                GitHubGraphQlErrorUtils.TransientError transientError = GitHubGraphQlErrorUtils.detectTransientError(
+                    response
+                );
                 if (transientError != null) {
                     log.warn(
                         "Detected transient GraphQL error for pull requests backfill: repo={}, type={}, message={}",
@@ -984,7 +998,11 @@ public class HistoricalBackfillService {
         }
 
         return new BackfillBatchResult(
-            totalPRsSynced, totalReviewsSynced + totalReviewCommentsSynced, hasMore, batchMinNumber, batchMaxNumber
+            totalPRsSynced,
+            totalReviewsSynced + totalReviewCommentsSynced,
+            hasMore,
+            batchMinNumber,
+            batchMaxNumber
         );
     }
 
@@ -1019,9 +1037,9 @@ public class HistoricalBackfillService {
             // This ensures the entity is attached and lazy associations can be accessed.
             Repository repository = repositoryRepository
                 .findByIdWithOrganization(repositoryId)
-                .orElseThrow(() -> new IllegalStateException(
-                    "Repository not found during backfill processing: id=" + repositoryId
-                ));
+                .orElseThrow(() ->
+                    new IllegalStateException("Repository not found during backfill processing: id=" + repositoryId)
+                );
 
             ProcessingContext context = ProcessingContext.forSync(scopeId, repository);
             int issueCount = 0;
@@ -1103,9 +1121,9 @@ public class HistoricalBackfillService {
             // This ensures the entity is attached and lazy associations can be accessed.
             Repository repository = repositoryRepository
                 .findByIdWithOrganization(repositoryId)
-                .orElseThrow(() -> new IllegalStateException(
-                    "Repository not found during backfill processing: id=" + repositoryId
-                ));
+                .orElseThrow(() ->
+                    new IllegalStateException("Repository not found during backfill processing: id=" + repositoryId)
+                );
 
             ProcessingContext context = ProcessingContext.forSync(scopeId, repository);
             int prCount = 0;
@@ -1163,7 +1181,12 @@ public class HistoricalBackfillService {
             }
 
             return new PullRequestPageResult(
-                prCount, reviewCount, reviewCommentCount, prsNeedingReviewPagination, minNumber, maxNumber
+                prCount,
+                reviewCount,
+                reviewCommentCount,
+                prsNeedingReviewPagination,
+                minNumber,
+                maxNumber
             );
         });
         return result != null ? result : new PullRequestPageResult(0, 0, 0, new ArrayList<>(), 0, 0);
@@ -1389,8 +1412,12 @@ public class HistoricalBackfillService {
 
             // Check for WebClientResponseException with 5xx status
             if (className.equals("WebClientResponseException") && message != null) {
-                if (message.contains("502") || message.contains("503") ||
-                    message.contains("504") || message.contains("500")) {
+                if (
+                    message.contains("502") ||
+                    message.contains("503") ||
+                    message.contains("504") ||
+                    message.contains("500")
+                ) {
                     isTransientError = true;
                     break;
                 }
@@ -1399,12 +1426,16 @@ public class HistoricalBackfillService {
             // Check message content for 5xx indicators, transport errors, or timeouts
             if (message != null) {
                 String lowerMessage = message.toLowerCase();
-                if (message.contains("502") || message.contains("503") ||
-                    message.contains("504") || message.contains("500 Internal") ||
+                if (
+                    message.contains("502") ||
+                    message.contains("503") ||
+                    message.contains("504") ||
+                    message.contains("500 Internal") ||
                     lowerMessage.contains("connection prematurely closed") ||
                     lowerMessage.contains("connection reset") ||
                     lowerMessage.contains("transport error") ||
-                    lowerMessage.contains("timeout on blocking read")) {
+                    lowerMessage.contains("timeout on blocking read")
+                ) {
                     isTransientError = true;
                     break;
                 }
@@ -1456,14 +1487,16 @@ public class HistoricalBackfillService {
             .maxBackoff(TRANSPORT_MAX_BACKOFF)
             .jitter(JITTER_FACTOR)
             .filter(this::isTransportError)
-            .doBeforeRetry(signal -> log.warn(
-                "Retrying {} after transport error: repo={}, page={}, attempt={}, error={}",
-                operation,
-                sanitizeForLog(repoName),
-                pageNumber,
-                signal.totalRetries() + 1,
-                signal.failure().getMessage()
-            ));
+            .doBeforeRetry(signal ->
+                log.warn(
+                    "Retrying {} after transport error: repo={}, page={}, attempt={}, error={}",
+                    operation,
+                    sanitizeForLog(repoName),
+                    pageNumber,
+                    signal.totalRetries() + 1,
+                    signal.failure().getMessage()
+                )
+            );
     }
 
     /**
@@ -1498,25 +1531,29 @@ public class HistoricalBackfillService {
             }
 
             // Other reactor-netty transport errors
-            if (className.contains("AbortedException") ||
-                className.contains("ConnectionResetException")) {
+            if (className.contains("AbortedException") || className.contains("ConnectionResetException")) {
                 return true;
             }
 
             // Timeout during blocking read (body consumption timeout)
-            if (cause instanceof IllegalStateException && message != null &&
-                message.toLowerCase().contains("timeout on blocking read")) {
+            if (
+                cause instanceof IllegalStateException &&
+                message != null &&
+                message.toLowerCase().contains("timeout on blocking read")
+            ) {
                 return true;
             }
 
             // Check for IOException indicating connection issues
             if (cause instanceof java.io.IOException && message != null) {
                 String lower = message.toLowerCase();
-                if (lower.contains("connection reset") ||
+                if (
+                    lower.contains("connection reset") ||
                     lower.contains("broken pipe") ||
                     lower.contains("connection abort") ||
                     lower.contains("premature") ||
-                    lower.contains("stream closed")) {
+                    lower.contains("stream closed")
+                ) {
                     return true;
                 }
             }

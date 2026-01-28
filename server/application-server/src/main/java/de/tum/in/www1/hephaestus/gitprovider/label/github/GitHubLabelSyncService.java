@@ -108,11 +108,7 @@ public class GitHubLabelSyncService {
                     .client(client)
                     .scopeId(scopeId)
                     .documentName(GET_LABELS_DOCUMENT)
-                    .variables(Map.of(
-                        "owner", owner,
-                        "name", name,
-                        "first", LARGE_PAGE_SIZE
-                    ))
+                    .variables(Map.of("owner", owner, "name", name, "first", LARGE_PAGE_SIZE))
                     .timeout(syncProperties.graphqlTimeout())
                     .connectionFieldPath("repository.labels")
                     .connectionType(GHLabelConnection.class)

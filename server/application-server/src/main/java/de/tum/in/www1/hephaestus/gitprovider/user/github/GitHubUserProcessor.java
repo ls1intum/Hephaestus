@@ -190,7 +190,14 @@ public class GitHubUserProcessor {
      * 2. Renaming that user's login to a placeholder (RENAMED_&lt;id&gt;)
      * 3. Retrying the insert for the new user
      */
-    private void handleLoginConflict(Long userId, String login, String name, String avatarUrl, String htmlUrl, String type) {
+    private void handleLoginConflict(
+        Long userId,
+        String login,
+        String name,
+        String avatarUrl,
+        String htmlUrl,
+        String type
+    ) {
         // Find the user who has this login
         User oldUser = userRepository.findByLogin(login).orElse(null);
         if (oldUser == null) {

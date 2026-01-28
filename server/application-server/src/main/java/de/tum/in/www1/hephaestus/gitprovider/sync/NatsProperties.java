@@ -114,38 +114,27 @@ public record NatsProperties(
      * @param requestTimeout the timeout for NATS request operations (default: 60 seconds)
      */
     public record Consumer(
-        @DurationUnit(ChronoUnit.MINUTES)
-        @DefaultValue("5m")
-        @NotNull(message = "Ack wait duration must not be null")
-        Duration ackWait,
-
-        @DefaultValue("500")
-        @Min(value = 1, message = "Max ack pending must be at least 1")
-        @Max(value = 10000, message = "Max ack pending must not exceed 10,000")
-        int maxAckPending,
-
-        @DurationUnit(ChronoUnit.SECONDS)
-        @DefaultValue("30s")
-        @NotNull(message = "Idle heartbeat duration must not be null")
-        Duration idleHeartbeat,
-
-        @DefaultValue("60")
-        @Positive(message = "Heartbeat restart threshold must be positive")
-        int heartbeatRestartThreshold,
-
-        @DurationUnit(ChronoUnit.MINUTES)
-        @DefaultValue("5m")
-        @NotNull(message = "Heartbeat log interval must not be null")
-        Duration heartbeatLogInterval,
-
-        @DurationUnit(ChronoUnit.SECONDS)
-        @DefaultValue("2s")
-        @NotNull(message = "Reconnect delay must not be null")
-        Duration reconnectDelay,
-
-        @DurationUnit(ChronoUnit.SECONDS)
-        @DefaultValue("60s")
-        @NotNull(message = "Request timeout must not be null")
-        Duration requestTimeout
+        @DurationUnit(ChronoUnit.MINUTES) @DefaultValue("5m") @NotNull(
+            message = "Ack wait duration must not be null"
+        ) Duration ackWait,
+        @DefaultValue("500") @Min(value = 1, message = "Max ack pending must be at least 1") @Max(
+            value = 10000,
+            message = "Max ack pending must not exceed 10,000"
+        ) int maxAckPending,
+        @DurationUnit(ChronoUnit.SECONDS) @DefaultValue("30s") @NotNull(
+            message = "Idle heartbeat duration must not be null"
+        ) Duration idleHeartbeat,
+        @DefaultValue("60") @Positive(
+            message = "Heartbeat restart threshold must be positive"
+        ) int heartbeatRestartThreshold,
+        @DurationUnit(ChronoUnit.MINUTES) @DefaultValue("5m") @NotNull(
+            message = "Heartbeat log interval must not be null"
+        ) Duration heartbeatLogInterval,
+        @DurationUnit(ChronoUnit.SECONDS) @DefaultValue("2s") @NotNull(
+            message = "Reconnect delay must not be null"
+        ) Duration reconnectDelay,
+        @DurationUnit(ChronoUnit.SECONDS) @DefaultValue("60s") @NotNull(
+            message = "Request timeout must not be null"
+        ) Duration requestTimeout
     ) {}
 }

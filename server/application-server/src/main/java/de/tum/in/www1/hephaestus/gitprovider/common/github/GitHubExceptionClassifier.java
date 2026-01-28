@@ -445,17 +445,17 @@ public class GitHubExceptionClassifier {
             String message = current.getMessage();
 
             // Spring/Hibernate deadlock exceptions
-            if (className.contains("CannotAcquireLockException") ||
+            if (
+                className.contains("CannotAcquireLockException") ||
                 className.contains("LockAcquisitionException") ||
-                className.contains("DeadlockLoserDataAccessException")) {
+                className.contains("DeadlockLoserDataAccessException")
+            ) {
                 return true;
             }
 
             // PostgreSQL deadlock SQLState 40P01
             if (className.contains("SQLException") || className.contains("PSQLException")) {
-                if (message != null && (
-                    message.contains("deadlock detected") ||
-                    message.contains("40P01"))) {
+                if (message != null && (message.contains("deadlock detected") || message.contains("40P01"))) {
                     return true;
                 }
             }
@@ -497,19 +497,19 @@ public class GitHubExceptionClassifier {
      * </ul>
      */
     private boolean isNetworkException(Throwable e) {
-        if (e instanceof ConnectException ||
-            e instanceof SocketException ||
-            e instanceof UnknownHostException) {
+        if (e instanceof ConnectException || e instanceof SocketException || e instanceof UnknownHostException) {
             return true;
         }
 
         String className = e.getClass().getName();
 
         // Check for reactor-netty transport errors (PrematureCloseException, etc.)
-        if (className.contains("PrematureCloseException") ||
+        if (
+            className.contains("PrematureCloseException") ||
             className.contains("AbortedException") ||
             className.contains("ConnectionException") ||
-            className.contains("ConnectionReset")) {
+            className.contains("ConnectionReset")
+        ) {
             return true;
         }
 

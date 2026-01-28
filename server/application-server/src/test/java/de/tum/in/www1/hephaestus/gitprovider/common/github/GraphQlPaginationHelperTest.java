@@ -61,6 +61,7 @@ class GraphQlPaginationHelperTest {
      * Simple test connection class that mimics GraphQL connection types.
      */
     static class TestConnection {
+
         private final List<String> nodes;
         private final GHPageInfo pageInfo;
 
@@ -156,9 +157,7 @@ class GraphQlPaginationHelperTest {
             when(graphQlClientProvider.isRateLimitCritical(SCOPE_ID)).thenReturn(true);
 
             // When
-            PaginationResult result = helper.paginate(
-                createRequest(conn -> true)
-            );
+            PaginationResult result = helper.paginate(createRequest(conn -> true));
 
             // Then
             assertThat(result.pagesProcessed()).isEqualTo(1);
@@ -176,9 +175,7 @@ class GraphQlPaginationHelperTest {
             mockClientExecution(response);
 
             // When
-            PaginationResult result = helper.paginate(
-                createRequest(conn -> true)
-            );
+            PaginationResult result = helper.paginate(createRequest(conn -> true));
 
             // Then
             assertThat(result.pagesProcessed()).isEqualTo(1);
@@ -198,9 +195,7 @@ class GraphQlPaginationHelperTest {
             mockClientExecution(response);
 
             // When
-            PaginationResult result = helper.paginate(
-                createRequest(conn -> true)
-            );
+            PaginationResult result = helper.paginate(createRequest(conn -> true));
 
             // Then
             assertThat(result.pagesProcessed()).isEqualTo(1);
@@ -377,7 +372,9 @@ class GraphQlPaginationHelperTest {
 
     // Helper methods
 
-    private PaginationRequest<TestConnection> createRequest(GraphQlPaginationHelper.PageProcessor<TestConnection> processor) {
+    private PaginationRequest<TestConnection> createRequest(
+        GraphQlPaginationHelper.PageProcessor<TestConnection> processor
+    ) {
         return PaginationRequest.<TestConnection>builder()
             .client(client)
             .scopeId(SCOPE_ID)

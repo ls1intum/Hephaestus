@@ -295,20 +295,22 @@ public class GitHubIssueSyncService {
 
                     return requestBuilder.execute();
                 })
-                .retryWhen(
-                    Retry.backoff(TRANSPORT_MAX_RETRIES, TRANSPORT_INITIAL_BACKOFF)
-                        .maxBackoff(TRANSPORT_MAX_BACKOFF)
-                        .jitter(JITTER_FACTOR)
-                        .filter(this::isTransportError)
-                        .doBeforeRetry(signal -> log.warn(
-                            "Retrying issue sync after transport error: repoName={}, page={}, attempt={}, error={}",
-                            safeNameWithOwner,
-                            currentPage,
-                            signal.totalRetries() + 1,
-                            signal.failure().getMessage()
-                        ))
-                )
-                .block(timeout);
+                    .retryWhen(
+                        Retry.backoff(TRANSPORT_MAX_RETRIES, TRANSPORT_INITIAL_BACKOFF)
+                            .maxBackoff(TRANSPORT_MAX_BACKOFF)
+                            .jitter(JITTER_FACTOR)
+                            .filter(this::isTransportError)
+                            .doBeforeRetry(signal ->
+                                log.warn(
+                                    "Retrying issue sync after transport error: repoName={}, page={}, attempt={}, error={}",
+                                    safeNameWithOwner,
+                                    currentPage,
+                                    signal.totalRetries() + 1,
+                                    signal.failure().getMessage()
+                                )
+                            )
+                    )
+                    .block(timeout);
 
                 if (response == null || !response.isValid()) {
                     log.warn(
@@ -642,8 +644,7 @@ public class GitHubIssueSyncService {
             }
 
             // Other reactor-netty transport errors
-            if (className.contains("AbortedException") ||
-                className.contains("ConnectionResetException")) {
+            if (className.contains("AbortedException") || className.contains("ConnectionResetException")) {
                 return true;
             }
 
@@ -652,11 +653,13 @@ public class GitHubIssueSyncService {
                 String message = cause.getMessage();
                 if (message != null) {
                     String lower = message.toLowerCase();
-                    if (lower.contains("connection reset") ||
+                    if (
+                        lower.contains("connection reset") ||
                         lower.contains("broken pipe") ||
                         lower.contains("connection abort") ||
                         lower.contains("premature") ||
-                        lower.contains("stream closed")) {
+                        lower.contains("stream closed")
+                    ) {
                         return true;
                     }
                 }

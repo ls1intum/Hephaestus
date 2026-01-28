@@ -64,20 +64,13 @@ hephaestus:
       - http://localhost:4200
   webapp:
     url: http://localhost:4200
-
-# NATS configuration for tests (matches actual properties)
-nats:
-  enabled: false
-  server: nats://localhost:4222
-  timeframe: 1
-  durable-consumer-name: test-consumer
-  consumer:
-    ack-wait-minutes: 5
-    max-ack-pending: 500
-    heartbeat-log-interval-minutes: 5
-    heartbeat-restart-threshold: 3
-    reconnect-delay-seconds: 2
-    request-timeout-seconds: 60
+  # NATS configuration for tests
+  sync:
+    nats:
+      enabled: false
+      server: nats://localhost:4222
+      replay-timeframe-days: 1
+      durable-consumer-name: test-consumer
 
 monitoring:
   run-on-startup: false

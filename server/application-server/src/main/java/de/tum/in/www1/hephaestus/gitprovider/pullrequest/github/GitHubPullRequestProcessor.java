@@ -82,6 +82,12 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
             return null;
         }
 
+        // Check for valid database ID - required for assigned ID strategy
+        if (dto.getDatabaseId() == null) {
+            log.warn("Skipped pull request processing: reason=missingDatabaseId, prNumber={}", dto.number());
+            return null;
+        }
+
         // Use (repository_id, number) as the canonical key for lookup.
         // This ensures idempotency regardless of whether the DTO came from
         // GraphQL (with fullDatabaseId) or webhook (with REST API id).
@@ -473,7 +479,9 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
 
     private Issue.State convertState(String state) {
         if (state == null) {
-            log.warn("PR state is null, defaulting to OPEN. This may indicate missing data in webhook or GraphQL response.");
+            log.warn(
+                "PR state is null, defaulting to OPEN. This may indicate missing data in webhook or GraphQL response."
+            );
             return Issue.State.OPEN;
         }
         return switch (state.toUpperCase()) {

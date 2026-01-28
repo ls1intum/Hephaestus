@@ -40,12 +40,7 @@ public interface TeamRepository extends JpaRepository<Team, Long> {
      * (via consuming module) and are fetched separately.
      */
     @EntityGraph(
-        attributePaths = {
-            "repoPermissions",
-            "repoPermissions.repository",
-            "memberships",
-            "memberships.user",
-        }
+        attributePaths = { "repoPermissions", "repoPermissions.repository", "memberships", "memberships.user" }
     )
     List<Team> findWithCollectionsByOrganizationIgnoreCase(String organization);
 
@@ -60,12 +55,7 @@ public interface TeamRepository extends JpaRepository<Team, Long> {
      * (via consuming module) and are fetched separately.
      */
     @EntityGraph(
-        attributePaths = {
-            "repoPermissions",
-            "repoPermissions.repository",
-            "memberships",
-            "memberships.user",
-        }
+        attributePaths = { "repoPermissions", "repoPermissions.repository", "memberships", "memberships.user" }
     )
     Optional<Team> findWithCollectionsById(Long id);
 }

@@ -258,7 +258,7 @@ public class ActivityEventService {
             null, // repository unknown for deleted entities
             targetType,
             targetId,
-            0.0  // deletions have no XP value
+            0.0 // deletions have no XP value
         );
     }
 }

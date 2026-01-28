@@ -23,9 +23,9 @@ import org.springframework.graphql.support.ResourceDocumentSource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
+import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.http.codec.json.Jackson2JsonDecoder;
 import org.springframework.http.codec.json.Jackson2JsonEncoder;
-import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.web.reactive.function.client.ClientResponse;
 import org.springframework.web.reactive.function.client.ExchangeFilterFunction;
 import org.springframework.web.reactive.function.client.ExchangeStrategies;
@@ -140,8 +140,7 @@ public class GitHubGraphQlConfig {
             .lifo() // Use last-in-first-out to prefer fresh connections
             .build();
 
-        HttpClient httpClient = HttpClient.create(connectionProvider)
-            .responseTimeout(Duration.ofSeconds(90)); // Response timeout for slow responses
+        HttpClient httpClient = HttpClient.create(connectionProvider).responseTimeout(Duration.ofSeconds(90)); // Response timeout for slow responses
 
         return WebClient.builder()
             .clientConnector(new ReactorClientHttpConnector(httpClient))
@@ -304,7 +303,8 @@ public class GitHubGraphQlConfig {
      */
     private ExchangeFilterFunction transportErrorRetryFilter() {
         return (request, next) ->
-            next.exchange(request)
+            next
+                .exchange(request)
                 .retryWhen(
                     Retry.backoff(TRANSPORT_MAX_RETRIES, TRANSPORT_INITIAL_BACKOFF)
                         .maxBackoff(TRANSPORT_MAX_BACKOFF)
@@ -329,8 +329,10 @@ public class GitHubGraphQlConfig {
                                 failure.getMessage()
                             );
                             return new TransportException(
-                                "GitHub GraphQL request failed after " + TRANSPORT_MAX_RETRIES +
-                                    " retries due to transport error: " + failure.getMessage(),
+                                "GitHub GraphQL request failed after " +
+                                    TRANSPORT_MAX_RETRIES +
+                                    " retries due to transport error: " +
+                                    failure.getMessage(),
                                 failure
                             );
                         })
@@ -363,9 +365,11 @@ public class GitHubGraphQlConfig {
             // Check for connection-related exceptions by class name
             // (to avoid hard dependencies on internal reactor-netty classes)
             String className = cause.getClass().getName();
-            if (className.contains("PrematureCloseException") ||
+            if (
+                className.contains("PrematureCloseException") ||
                 className.contains("AbortedException") ||
-                className.contains("ConnectionResetException")) {
+                className.contains("ConnectionResetException")
+            ) {
                 return true;
             }
 
@@ -374,11 +378,13 @@ public class GitHubGraphQlConfig {
                 String message = cause.getMessage();
                 if (message != null) {
                     String lowerMessage = message.toLowerCase();
-                    if (lowerMessage.contains("connection reset") ||
+                    if (
+                        lowerMessage.contains("connection reset") ||
                         lowerMessage.contains("broken pipe") ||
                         lowerMessage.contains("connection abort") ||
                         lowerMessage.contains("premature") ||
-                        lowerMessage.contains("stream closed")) {
+                        lowerMessage.contains("stream closed")
+                    ) {
                         return true;
                     }
                 }

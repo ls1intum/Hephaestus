@@ -149,28 +149,28 @@ public final class GraphQlPaginationHelper {
                         .maxBackoff(TRANSPORT_MAX_BACKOFF)
                         .jitter(JITTER_FACTOR)
                         .filter(this::isTransportError)
-                        .doBeforeRetry(signal -> log.warn(
-                            "Retrying GraphQL request after transport error: context={}, page={}, attempt={}, error={}",
-                            request.contextDescription(),
-                            currentPage,
-                            signal.totalRetries() + 1,
-                            signal.failure().getMessage()
-                        ))
+                        .doBeforeRetry(signal ->
+                            log.warn(
+                                "Retrying GraphQL request after transport error: context={}, page={}, attempt={}, error={}",
+                                request.contextDescription(),
+                                currentPage,
+                                signal.totalRetries() + 1,
+                                signal.failure().getMessage()
+                            )
+                        )
                 )
                 .block(request.timeout());
 
             if (response == null) {
-                log.warn(
-                    "Received null GraphQL response: context={}",
-                    request.contextDescription()
-                );
+                log.warn("Received null GraphQL response: context={}", request.contextDescription());
                 return new PaginationResult(pageCount, TerminationReason.INVALID_RESPONSE);
             }
 
             // Check for transient errors (timeouts, rate limits, server errors)
             // These come back as HTTP 200 with error in the response body
-            GitHubGraphQlErrorUtils.TransientError transientError =
-                GitHubGraphQlErrorUtils.detectTransientError(response);
+            GitHubGraphQlErrorUtils.TransientError transientError = GitHubGraphQlErrorUtils.detectTransientError(
+                response
+            );
             if (transientError != null) {
                 log.warn(
                     "Detected transient GraphQL error: context={}, type={}, message={}, recommendedWait={}",
@@ -196,10 +196,7 @@ public final class GraphQlPaginationHelper {
 
             // Check rate limit threshold
             if (graphQlClientProvider.isRateLimitCritical(request.scopeId())) {
-                log.warn(
-                    "Aborting pagination due to critical rate limit: context={}",
-                    request.contextDescription()
-                );
+                log.warn("Aborting pagination due to critical rate limit: context={}", request.contextDescription());
                 return new PaginationResult(pageCount, TerminationReason.RATE_LIMIT_CRITICAL);
             }
 
@@ -270,6 +267,7 @@ public final class GraphQlPaginationHelper {
          * @param <T> the connection type
          */
         public static class Builder<T> {
+
             private HttpGraphQlClient client;
             private Long scopeId;
             private String documentName;
@@ -448,8 +446,10 @@ public final class GraphQlPaginationHelper {
          * Returns true if pagination was aborted due to an error or limit.
          */
         public boolean isAborted() {
-            return terminationReason != TerminationReason.COMPLETED
-                && terminationReason != TerminationReason.PROCESSOR_STOP;
+            return (
+                terminationReason != TerminationReason.COMPLETED &&
+                terminationReason != TerminationReason.PROCESSOR_STOP
+            );
         }
 
         /**
@@ -479,7 +479,7 @@ public final class GraphQlPaginationHelper {
         /** Transient error detected (timeout, rate limit, server error). */
         TRANSIENT_ERROR,
         /** Thread was interrupted (e.g., during application shutdown). */
-        INTERRUPTED
+        INTERRUPTED,
     }
 
     // ========================================================================
@@ -519,8 +519,7 @@ public final class GraphQlPaginationHelper {
             }
 
             // Other reactor-netty transport errors
-            if (className.contains("AbortedException") ||
-                className.contains("ConnectionResetException")) {
+            if (className.contains("AbortedException") || className.contains("ConnectionResetException")) {
                 return true;
             }
 
@@ -529,11 +528,13 @@ public final class GraphQlPaginationHelper {
                 String message = cause.getMessage();
                 if (message != null) {
                     String lower = message.toLowerCase();
-                    if (lower.contains("connection reset") ||
+                    if (
+                        lower.contains("connection reset") ||
                         lower.contains("broken pipe") ||
                         lower.contains("connection abort") ||
                         lower.contains("premature") ||
-                        lower.contains("stream closed")) {
+                        lower.contains("stream closed")
+                    ) {
                         return true;
                     }
                 }

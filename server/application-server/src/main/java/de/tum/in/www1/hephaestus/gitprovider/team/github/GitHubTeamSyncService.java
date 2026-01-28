@@ -173,7 +173,13 @@ public class GitHubTeamSyncService {
                     if (team != null) {
                         syncedTeamIds.add(team.getId());
                         syncTeamMemberships(client, team, graphQlTeam, organizationLogin, scopeId);
-                        totalPermissions += syncTeamRepoPermissions(client, team, graphQlTeam, organizationLogin, scopeId);
+                        totalPermissions += syncTeamRepoPermissions(
+                            client,
+                            team,
+                            graphQlTeam,
+                            organizationLogin,
+                            scopeId
+                        );
                         totalSynced++;
                     }
                 }

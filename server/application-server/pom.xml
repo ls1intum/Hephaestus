@@ -678,6 +678,10 @@
                     <!-- Tag filtering: run integration tests, exclude live tests -->
                     <groups>${failsafe.includedGroups}</groups>
                     <excludedGroups>${failsafe.excludedGroups}</excludedGroups>
+                    <!-- Include *IntegrationTest.java pattern (project convention) -->
+                    <includes>
+                        <include>**/*IntegrationTest.java</include>
+                    </includes>
                 </configuration>
                 <executions>
                     <execution>

@@ -19,7 +19,6 @@ import org.springframework.lang.Nullable;
  * @see de.tum.in.www1.hephaestus.gitprovider.common.github.ScopedRateLimitTracker
  */
 public interface RateLimitTracker {
-
     /**
      * Updates rate limit state from a GraphQL response for a specific scope.
      *

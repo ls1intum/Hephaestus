@@ -38,10 +38,7 @@ import org.springframework.lang.NonNull;
 @Table(
     name = "issue",
     uniqueConstraints = {
-        @UniqueConstraint(
-            name = "uk_issue_repository_number",
-            columnNames = {"repository_id", "number"}
-        )
+        @UniqueConstraint(name = "uk_issue_repository_number", columnNames = { "repository_id", "number" }),
     }
 )
 @Inheritance(strategy = InheritanceType.SINGLE_TABLE)

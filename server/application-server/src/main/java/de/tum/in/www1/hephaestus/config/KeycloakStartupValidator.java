@@ -30,11 +30,7 @@ import org.springframework.stereotype.Component;
  * @see KeycloakConfig
  */
 @Component
-@ConditionalOnProperty(
-    name = "hephaestus.keycloak.validate-on-startup",
-    havingValue = "true",
-    matchIfMissing = false
-)
+@ConditionalOnProperty(name = "hephaestus.keycloak.validate-on-startup", havingValue = "true", matchIfMissing = false)
 public class KeycloakStartupValidator {
 
     private static final Logger logger = LoggerFactory.getLogger(KeycloakStartupValidator.class);
@@ -98,8 +94,8 @@ public class KeycloakStartupValidator {
         }
 
         logger.error(
-            "Failed to verify Keycloak connectivity after {} attempts over {} seconds. "
-                + "Application will continue, but authentication may be degraded until Keycloak becomes available.",
+            "Failed to verify Keycloak connectivity after {} attempts over {} seconds. " +
+                "Application will continue, but authentication may be degraded until Keycloak becomes available.",
             attempt,
             MAX_WAIT_TIME_MS / 1000
         );

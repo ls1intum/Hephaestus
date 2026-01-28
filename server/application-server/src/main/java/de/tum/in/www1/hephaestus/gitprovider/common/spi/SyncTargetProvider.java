@@ -284,16 +284,19 @@ public interface SyncTargetProvider extends SyncTimestampProvider, BackfillState
 
         /** @return true if issue backfill has completed */
         public boolean isIssueBackfillComplete() {
-            return isIssueBackfillInitialized()
-                && (issueBackfillHighWaterMark == 0
-                    || (issueBackfillCheckpoint != null && issueBackfillCheckpoint <= 0));
+            return (
+                isIssueBackfillInitialized() &&
+                (issueBackfillHighWaterMark == 0 || (issueBackfillCheckpoint != null && issueBackfillCheckpoint <= 0))
+            );
         }
 
         /** @return true if pull request backfill has completed */
         public boolean isPullRequestBackfillComplete() {
-            return isPullRequestBackfillInitialized()
-                && (pullRequestBackfillHighWaterMark == 0
-                    || (pullRequestBackfillCheckpoint != null && pullRequestBackfillCheckpoint <= 0));
+            return (
+                isPullRequestBackfillInitialized() &&
+                (pullRequestBackfillHighWaterMark == 0 ||
+                    (pullRequestBackfillCheckpoint != null && pullRequestBackfillCheckpoint <= 0))
+            );
         }
 
         /** @return true if both issue and pull request backfill have completed */

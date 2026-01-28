@@ -72,9 +72,7 @@ public record ExperiencePointProperties(
     @Validated
     public record ReviewWeights(
         @PositiveOrZero @Max(100) @DefaultValue("2.0") double approval,
-
         @PositiveOrZero @Max(100) @DefaultValue("2.5") double changesRequested,
-
         @PositiveOrZero @Max(100) @DefaultValue("1.5") double comment
     ) {}
 
@@ -97,13 +95,9 @@ public record ExperiencePointProperties(
     @Validated
     public record XpAwards(
         @PositiveOrZero @Max(1000) @DefaultValue("0.0") double pullRequestOpened,
-
         @PositiveOrZero @Max(1000) @DefaultValue("0.0") double pullRequestMerged,
-
         @PositiveOrZero @Max(1000) @DefaultValue("0.0") double pullRequestReady,
-
         @PositiveOrZero @Max(1000) @DefaultValue("0.5") double reviewComment,
-
         @PositiveOrZero @Max(1000) @DefaultValue("0.0") double issueCreated
     ) {}
 

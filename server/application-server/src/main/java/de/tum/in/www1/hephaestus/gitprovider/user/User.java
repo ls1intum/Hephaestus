@@ -47,12 +47,7 @@ import org.springframework.lang.NonNull;
  * @see de.tum.in.www1.hephaestus.gitprovider.repository.collaborator.RepositoryCollaborator
  */
 @Entity
-@Table(
-    name = "\"user\"",
-    uniqueConstraints = {
-        @UniqueConstraint(name = "uk_user_login", columnNames = {"login"})
-    }
-)
+@Table(name = "\"user\"", uniqueConstraints = { @UniqueConstraint(name = "uk_user_login", columnNames = { "login" }) })
 @Getter
 @Setter
 @NoArgsConstructor

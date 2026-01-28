@@ -24,10 +24,7 @@ import org.springframework.lang.NonNull;
 @Table(
     name = "team",
     uniqueConstraints = {
-        @UniqueConstraint(
-            name = "uk_team_organization_name",
-            columnNames = {"organization", "name"}
-        )
+        @UniqueConstraint(name = "uk_team_organization_name", columnNames = { "organization", "name" }),
     }
 )
 @Getter

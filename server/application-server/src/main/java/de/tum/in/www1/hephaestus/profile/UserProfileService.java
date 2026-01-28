@@ -240,11 +240,7 @@ public class UserProfileService {
      * <p><strong>Time range convention:</strong> Uses half-open interval [since, until)
      * consistent with leaderboard queries.
      */
-    private List<ProfileReviewActivityDTO> buildReviewActivity(
-        String login,
-        Long workspaceId,
-        TimeRange timeRange
-    ) {
+    private List<ProfileReviewActivityDTO> buildReviewActivity(String login, Long workspaceId, TimeRange timeRange) {
         if (workspaceId == null || login == null) {
             return List.of();
         }
@@ -269,12 +265,14 @@ public class UserProfileService {
         }
 
         // Separate review events from comment events
-        Set<Long> reviewIds = activityEvents.stream()
+        Set<Long> reviewIds = activityEvents
+            .stream()
             .filter(e -> "review".equals(e.getTargetType()))
             .map(ActivityEvent::getTargetId)
             .collect(Collectors.toSet());
 
-        Set<Long> commentIds = activityEvents.stream()
+        Set<Long> commentIds = activityEvents
+            .stream()
             .filter(e -> "issue_comment".equals(e.getTargetType()))
             .map(ActivityEvent::getTargetId)
             .collect(Collectors.toSet());
@@ -282,24 +280,32 @@ public class UserProfileService {
         // Batch-fetch entity details
         Map<Long, PullRequestReview> reviewsById = reviewIds.isEmpty()
             ? Map.of()
-            : pullRequestReviewRepository.findAllByIdWithRelations(reviewIds).stream()
-                .collect(Collectors.toMap(PullRequestReview::getId, Function.identity()));
+            : pullRequestReviewRepository
+                  .findAllByIdWithRelations(reviewIds)
+                  .stream()
+                  .collect(Collectors.toMap(PullRequestReview::getId, Function.identity()));
 
         Map<Long, IssueComment> commentsById = commentIds.isEmpty()
             ? Map.of()
-            : issueCommentRepository.findAllByIdWithRelations(commentIds).stream()
-                .collect(Collectors.toMap(IssueComment::getId, Function.identity()));
+            : issueCommentRepository
+                  .findAllByIdWithRelations(commentIds)
+                  .stream()
+                  .collect(Collectors.toMap(IssueComment::getId, Function.identity()));
 
         // Build XP lookup map from activity events
-        Map<Long, Double> xpByTargetId = activityEvents.stream()
-            .collect(Collectors.toMap(
-                ActivityEvent::getTargetId,
-                ActivityEvent::getXp,
-                (xp1, xp2) -> xp1 + xp2  // Sum if same targetId appears multiple times
-            ));
+        Map<Long, Double> xpByTargetId = activityEvents
+            .stream()
+            .collect(
+                Collectors.toMap(
+                    ActivityEvent::getTargetId,
+                    ActivityEvent::getXp,
+                    (xp1, xp2) -> xp1 + xp2 // Sum if same targetId appears multiple times
+                )
+            );
 
         // Assemble DTOs from activity events
-        List<ProfileReviewActivityDTO> reviewActivity = activityEvents.stream()
+        List<ProfileReviewActivityDTO> reviewActivity = activityEvents
+            .stream()
             .map(event -> {
                 int xp = XpPrecision.roundToInt(xpByTargetId.getOrDefault(event.getTargetId(), 0.0));
                 if ("review".equals(event.getTargetType())) {
@@ -317,11 +323,13 @@ public class UserProfileService {
             })
             .filter(dto -> dto != null)
             // Deduplicate by ID (same review can have multiple events like EDITED)
-            .collect(Collectors.toMap(
-                ProfileReviewActivityDTO::id,
-                Function.identity(),
-                (existing, replacement) -> existing  // Keep first occurrence
-            ))
+            .collect(
+                Collectors.toMap(
+                    ProfileReviewActivityDTO::id,
+                    Function.identity(),
+                    (existing, replacement) -> existing // Keep first occurrence
+                )
+            )
             .values()
             .stream()
             .sorted(Comparator.comparing(ProfileReviewActivityDTO::submittedAt).reversed())
@@ -342,11 +350,7 @@ public class UserProfileService {
      * @param timeRange the time range for activity
      * @return list of distinct PRs reviewed, or empty list if no data
      */
-    private List<PullRequestInfoDTO> buildReviewedPullRequestsList(
-        Long workspaceId,
-        Long userId,
-        TimeRange timeRange
-    ) {
+    private List<PullRequestInfoDTO> buildReviewedPullRequestsList(Long workspaceId, Long userId, TimeRange timeRange) {
         if (workspaceId == null || userId == null) {
             return List.of();
         }
@@ -362,11 +366,7 @@ public class UserProfileService {
             return List.of();
         }
 
-        return pullRequestRepository
-            .findAllById(prIds)
-            .stream()
-            .map(PullRequestInfoDTO::fromPullRequest)
-            .toList();
+        return pullRequestRepository.findAllById(prIds).stream().map(PullRequestInfoDTO::fromPullRequest).toList();
     }
 
     private record TimeRange(Instant after, Instant before) {}

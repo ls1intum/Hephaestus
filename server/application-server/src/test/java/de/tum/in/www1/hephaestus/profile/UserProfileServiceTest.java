@@ -119,8 +119,9 @@ class UserProfileServiceTest {
             PullRequestReview review = createReview(400L, user, pr);
 
             when(userRepository.findByLogin(USER_LOGIN)).thenReturn(Optional.of(user));
-            when(profilePullRequestQueryRepository.findAssignedByLoginAndStates(any(), any(), any()))
-                .thenReturn(List.of());
+            when(profilePullRequestQueryRepository.findAssignedByLoginAndStates(any(), any(), any())).thenReturn(
+                List.of()
+            );
             when(profileRepositoryQueryRepository.findContributedByLogin(any(), any())).thenReturn(List.of());
 
             // ActivityEvent is the source of truth
@@ -168,8 +169,9 @@ class UserProfileServiceTest {
             User user = createUser(USER_ID, USER_LOGIN);
 
             when(userRepository.findByLogin(USER_LOGIN)).thenReturn(Optional.of(user));
-            when(profilePullRequestQueryRepository.findAssignedByLoginAndStates(any(), any(), any()))
-                .thenReturn(List.of());
+            when(profilePullRequestQueryRepository.findAssignedByLoginAndStates(any(), any(), any())).thenReturn(
+                List.of()
+            );
             when(profileRepositoryQueryRepository.findContributedByLogin(any(), any())).thenReturn(List.of());
 
             // No ActivityEvents in ledger
@@ -206,8 +208,9 @@ class UserProfileServiceTest {
             IssueComment comment = createIssueComment(500L, user, pr);
 
             when(userRepository.findByLogin(USER_LOGIN)).thenReturn(Optional.of(user));
-            when(profilePullRequestQueryRepository.findAssignedByLoginAndStates(any(), any(), any()))
-                .thenReturn(List.of());
+            when(profilePullRequestQueryRepository.findAssignedByLoginAndStates(any(), any(), any())).thenReturn(
+                List.of()
+            );
             when(profileRepositoryQueryRepository.findContributedByLogin(any(), any())).thenReturn(List.of());
 
             // ActivityEvents for 2 reviews + 1 comment
@@ -230,8 +233,9 @@ class UserProfileServiceTest {
             ).thenReturn(List.of(event1, event2, event3));
 
             // Batch hydration
-            when(pullRequestReviewRepository.findAllByIdWithRelations(Set.of(400L, 401L)))
-                .thenReturn(List.of(review1, review2));
+            when(pullRequestReviewRepository.findAllByIdWithRelations(Set.of(400L, 401L))).thenReturn(
+                List.of(review1, review2)
+            );
             when(issueCommentRepository.findAllByIdWithRelations(Set.of(500L))).thenReturn(List.of(comment));
 
             // Mock assembler returns
@@ -259,8 +263,9 @@ class UserProfileServiceTest {
             User user = createUser(USER_ID, USER_LOGIN);
 
             when(userRepository.findByLogin(USER_LOGIN)).thenReturn(Optional.of(user));
-            when(profilePullRequestQueryRepository.findAssignedByLoginAndStates(any(), any(), any()))
-                .thenReturn(List.of());
+            when(profilePullRequestQueryRepository.findAssignedByLoginAndStates(any(), any(), any())).thenReturn(
+                List.of()
+            );
             when(profileRepositoryQueryRepository.findContributedByLogin(any(), any())).thenReturn(List.of());
 
             // ActivityEvent exists but entity was deleted
@@ -356,13 +361,15 @@ class UserProfileServiceTest {
                     ? ActivityEventType.REVIEW_APPROVED
                     : ActivityEventType.COMMENT_CREATED
             )
-            .eventKey(ActivityEvent.buildKey(
-                targetType == ActivityTargetType.REVIEW
-                    ? ActivityEventType.REVIEW_APPROVED
-                    : ActivityEventType.COMMENT_CREATED,
-                targetId,
-                Instant.now()
-            ))
+            .eventKey(
+                ActivityEvent.buildKey(
+                    targetType == ActivityTargetType.REVIEW
+                        ? ActivityEventType.REVIEW_APPROVED
+                        : ActivityEventType.COMMENT_CREATED,
+                    targetId,
+                    Instant.now()
+                )
+            )
             .build();
     }
 

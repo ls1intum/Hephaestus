@@ -264,7 +264,9 @@ public class GitHubMilestoneProcessor {
      */
     private Milestone.State parseState(String state) {
         if (state == null) {
-            log.warn("Milestone state is null, defaulting to OPEN. This may indicate missing data in webhook or GraphQL response.");
+            log.warn(
+                "Milestone state is null, defaulting to OPEN. This may indicate missing data in webhook or GraphQL response."
+            );
             return Milestone.State.OPEN;
         }
         return switch (state.toUpperCase()) {

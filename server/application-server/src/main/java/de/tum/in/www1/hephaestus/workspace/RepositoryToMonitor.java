@@ -131,8 +131,7 @@ public class RepositoryToMonitor {
         if (!isIssueBackfillInitialized()) {
             return false;
         }
-        return issueBackfillHighWaterMark == 0
-            || (issueBackfillCheckpoint != null && issueBackfillCheckpoint <= 0);
+        return issueBackfillHighWaterMark == 0 || (issueBackfillCheckpoint != null && issueBackfillCheckpoint <= 0);
     }
 
     /**
@@ -144,8 +143,10 @@ public class RepositoryToMonitor {
         if (!isPullRequestBackfillInitialized()) {
             return false;
         }
-        return pullRequestBackfillHighWaterMark == 0
-            || (pullRequestBackfillCheckpoint != null && pullRequestBackfillCheckpoint <= 0);
+        return (
+            pullRequestBackfillHighWaterMark == 0 ||
+            (pullRequestBackfillCheckpoint != null && pullRequestBackfillCheckpoint <= 0)
+        );
     }
 
     /**

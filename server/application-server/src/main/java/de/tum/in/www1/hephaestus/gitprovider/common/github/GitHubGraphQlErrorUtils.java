@@ -209,19 +209,23 @@ public final class GitHubGraphQlErrorUtils {
 
             // GitHub timeout responses - these come back as HTTP 200 with error in body
             // Examples: "couldn't respond in time", "Something went wrong while executing your query"
-            if (lowerMessage.contains("couldn't respond in time") ||
+            if (
+                lowerMessage.contains("couldn't respond in time") ||
                 lowerMessage.contains("could not respond in time") ||
                 lowerMessage.contains("something went wrong while executing") ||
                 lowerMessage.contains("timedout") ||
-                lowerMessage.contains("timed out")) {
+                lowerMessage.contains("timed out")
+            ) {
                 return new TransientError(TransientErrorType.TIMEOUT, message);
             }
 
             // Rate limit errors in GraphQL
-            if (lowerMessage.contains("rate limit") ||
+            if (
+                lowerMessage.contains("rate limit") ||
                 lowerMessage.contains("ratelimit") ||
                 lowerMessage.contains("abuse detection") ||
-                lowerMessage.contains("secondary rate")) {
+                lowerMessage.contains("secondary rate")
+            ) {
                 return new TransientError(TransientErrorType.RATE_LIMIT, message);
             }
 
@@ -260,7 +264,7 @@ public final class GitHubGraphQlErrorUtils {
         /** Server-side error - retry with exponential backoff */
         SERVER_ERROR,
         /** Resource limits exceeded (Sept 2025) - reduce query complexity */
-        RESOURCE_LIMIT
+        RESOURCE_LIMIT,
     }
 
     /**

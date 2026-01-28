@@ -35,6 +35,7 @@ public interface PracticesPullRequestQueryRepository extends JpaRepository<PullR
         """
     )
     List<Long> findPullRequestIdsByWorkspaceId(@Param("workspaceId") Long workspaceId);
+
     /**
      * Finds pull requests assigned to a user by login and states, scoped to a workspace.
      *

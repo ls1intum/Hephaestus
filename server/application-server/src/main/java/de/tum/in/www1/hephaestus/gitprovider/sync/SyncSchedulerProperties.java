@@ -80,10 +80,7 @@ public record SyncSchedulerProperties(
      * @param allowedOrganizations Set of organization names to include (empty = all)
      * @param allowedRepositories Set of repository names (org/repo) to include (empty = all)
      */
-    public record FilterProperties(
-        Set<String> allowedOrganizations,
-        Set<String> allowedRepositories
-    ) {
+    public record FilterProperties(Set<String> allowedOrganizations, Set<String> allowedRepositories) {
         /** Compact constructor ensuring null safety. */
         public FilterProperties {
             if (allowedOrganizations == null) {

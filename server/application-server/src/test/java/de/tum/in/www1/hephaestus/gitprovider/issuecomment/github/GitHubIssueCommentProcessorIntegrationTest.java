@@ -31,6 +31,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Integration tests for GitHubIssueCommentProcessor.
@@ -444,6 +445,7 @@ class GitHubIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
+        @Transactional
         @DisplayName("should sync bidirectional relationship with parent issue when deleting")
         void shouldSyncBidirectionalRelationshipWhenDeleting() {
             // Create comment with bidirectional relationship set up

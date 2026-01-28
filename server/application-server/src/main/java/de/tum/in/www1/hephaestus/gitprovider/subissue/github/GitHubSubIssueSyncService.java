@@ -469,7 +469,11 @@ public class GitHubSubIssueSyncService {
      * providing better resilience if a single page fails.
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    protected int processIssueNodesInTransaction(GHIssueConnection issueConnection, Repository repository, Long scopeId) {
+    protected int processIssueNodesInTransaction(
+        GHIssueConnection issueConnection,
+        Repository repository,
+        Long scopeId
+    ) {
         if (issueConnection.getNodes() == null) {
             return 0;
         }
