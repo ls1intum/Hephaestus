@@ -32,7 +32,6 @@ import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.github.Git
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.gitprovider.sync.SyncSchedulerProperties;
-import de.tum.in.www1.hephaestus.workspace.RepositoryToMonitorRepository;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -156,7 +155,6 @@ public class HistoricalBackfillService {
     private final GitHubPullRequestReviewSyncService reviewSyncService;
     private final GitHubPullRequestReviewCommentSyncService reviewCommentSyncService;
     private final RepositoryRepository repositoryRepository;
-    private final RepositoryToMonitorRepository repositoryToMonitorRepository;
     private final TransactionTemplate transactionTemplate;
     private final Executor monitoringExecutor;
 
@@ -173,7 +171,6 @@ public class HistoricalBackfillService {
         GitHubPullRequestReviewSyncService reviewSyncService,
         GitHubPullRequestReviewCommentSyncService reviewCommentSyncService,
         RepositoryRepository repositoryRepository,
-        RepositoryToMonitorRepository repositoryToMonitorRepository,
         TransactionTemplate transactionTemplate,
         @Qualifier("monitoringExecutor") Executor monitoringExecutor
     ) {
@@ -189,7 +186,6 @@ public class HistoricalBackfillService {
         this.reviewSyncService = reviewSyncService;
         this.reviewCommentSyncService = reviewCommentSyncService;
         this.repositoryRepository = repositoryRepository;
-        this.repositoryToMonitorRepository = repositoryToMonitorRepository;
         this.transactionTemplate = transactionTemplate;
         this.monitoringExecutor = monitoringExecutor;
     }
@@ -1063,9 +1059,7 @@ public class HistoricalBackfillService {
 
             // Persist cursor INSIDE the same transaction as data processing.
             // This ensures atomicity: either both data AND cursor are saved, or neither.
-            repositoryToMonitorRepository.findById(syncTargetId).ifPresent(rtm -> {
-                rtm.setIssueSyncCursor(nextCursor);
-            });
+            backfillStateProvider.updateIssueSyncCursor(syncTargetId, nextCursor);
 
             // Normalize min/max if no items were processed
             if (issueCount == 0) {
@@ -1160,9 +1154,7 @@ public class HistoricalBackfillService {
 
             // Persist cursor INSIDE the same transaction as data processing.
             // This ensures atomicity: either both data AND cursor are saved, or neither.
-            repositoryToMonitorRepository.findById(syncTargetId).ifPresent(rtm -> {
-                rtm.setPullRequestSyncCursor(nextCursor);
-            });
+            backfillStateProvider.updatePullRequestSyncCursor(syncTargetId, nextCursor);
 
             // Normalize min/max if no items were processed
             if (prCount == 0) {

@@ -92,7 +92,7 @@ erDiagram
         INTEGER comments_count "NOT NULL"
         VARCHAR(255) html_url
         BOOLEAN is_locked "NOT NULL"
-        INTEGER number "NOT NULL"
+        INTEGER number UK "NOT NULL"
         VARCHAR(255) state
         VARCHAR(1024) title
         INTEGER additions
@@ -104,7 +104,7 @@ erDiagram
         TIMESTAMPTZ merged_at
         BIGINT author_id FK
         BIGINT milestone_id FK
-        BIGINT repository_id FK
+        BIGINT repository_id FK,UK
         BIGINT merged_by_id FK
         TIMESTAMPTZ last_sync_at
         VARCHAR(32) state_reason
@@ -177,11 +177,11 @@ erDiagram
         TIMESTAMPTZ closed_at
         TIMESTAMPTZ due_on
         VARCHAR(255) html_url
-        INTEGER number "NOT NULL"
+        INTEGER number UK "NOT NULL"
         VARCHAR(255) state
         VARCHAR(255) title
         BIGINT creator_id FK
-        BIGINT repository_id FK
+        BIGINT repository_id FK,UK
         TEXT description
         INTEGER closed_issues_count "NOT NULL"
         INTEGER open_issues_count "NOT NULL"
@@ -309,22 +309,24 @@ erDiagram
         VARCHAR(255) name_with_owner
         TIMESTAMPTZ repository_synced_at
         BIGINT workspace_id FK
-        INTEGER backfill_checkpoint
-        INTEGER backfill_high_water_mark
         TIMESTAMPTZ backfill_last_run_at
         TIMESTAMPTZ collaborators_synced_at
         VARCHAR(255) issue_sync_cursor
         VARCHAR(255) pull_request_sync_cursor
+        INTEGER issue_backfill_high_water_mark
+        INTEGER issue_backfill_checkpoint
+        INTEGER pull_request_backfill_high_water_mark
+        INTEGER pull_request_backfill_checkpoint
     }
 
     Team {
         BIGINT id PK
-        VARCHAR(255) name
+        VARCHAR(255) name UK
         TIMESTAMPTZ created_at
         TEXT description
         VARCHAR(512) html_url
         TIMESTAMPTZ last_sync_at
-        VARCHAR(255) organization
+        VARCHAR(255) organization UK
         BIGINT parent_id
         VARCHAR(32) privacy
         TIMESTAMPTZ updated_at
@@ -349,7 +351,7 @@ erDiagram
         VARCHAR(255) avatar_url
         VARCHAR(255) email
         VARCHAR(255) html_url
-        VARCHAR(255) login
+        VARCHAR(255) login UK
         VARCHAR(255) name
         VARCHAR(255) type
     }
@@ -433,7 +435,9 @@ erDiagram
     Workspace ||--|| ActivityEvent : has
     ChatMessage ||--|| ChatMessagePart : has
     ChatMessage ||--|| ChatThread : references
+    Repository ||--|| Issue : has
     Repository ||--|| Label : labeled
+    Repository ||--|| Milestone : has
     PullRequestReviewComment ||--|| PullRequestReviewThread : reviewed
     User ||--|| UserPreference : has
     Organization ||--|| Workspace : has
@@ -456,12 +460,10 @@ erDiagram
     User ||--o{ Issue : merged_by
     Milestone ||--o{ Issue : has
     Issue ||--o{ Issue : has
-    Repository ||--o{ Issue : has
     User ||--o{ IssueComment : commented_on
     Issue ||--o{ IssueComment : commented_on
     Organization ||--o{ IssueType : has
     User ||--o{ Milestone : created_by
-    Repository ||--o{ Milestone : has
     BadPracticeDetection ||--o{ PullRequestBadPractice : has
     Issue ||--o{ PullRequestBadPractice : references
     User ||--o{ PullRequestReview : reviewed

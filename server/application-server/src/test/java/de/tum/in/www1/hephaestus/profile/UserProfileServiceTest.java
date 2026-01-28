@@ -12,6 +12,7 @@ import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.issuecomment.IssueComment;
 import de.tum.in.www1.hephaestus.gitprovider.issuecomment.IssueCommentRepository;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReview;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReviewRepository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
@@ -62,9 +63,6 @@ class UserProfileServiceTest {
     private ProfilePullRequestQueryRepository profilePullRequestQueryRepository;
 
     @Mock
-    private ActivityEventRepository activityEventRepository;
-
-    @Mock
     private PullRequestReviewRepository pullRequestReviewRepository;
 
     @Mock
@@ -79,6 +77,15 @@ class UserProfileServiceTest {
     @Mock
     private WorkspaceContributionActivityService workspaceContributionActivityService;
 
+    @Mock
+    private ProfileActivityQueryService profileActivityQueryService;
+
+    @Mock
+    private PullRequestRepository pullRequestRepository;
+
+    @Mock
+    private ActivityEventRepository activityEventRepository;
+
     private UserProfileService service;
 
     @BeforeEach
@@ -87,12 +94,14 @@ class UserProfileServiceTest {
             userRepository,
             profileRepositoryQueryRepository,
             profilePullRequestQueryRepository,
-            activityEventRepository,
             pullRequestReviewRepository,
             issueCommentRepository,
             reviewActivityAssembler,
             workspaceMembershipService,
-            workspaceContributionActivityService
+            workspaceContributionActivityService,
+            profileActivityQueryService,
+            pullRequestRepository,
+            activityEventRepository
         );
     }
 
@@ -337,17 +346,24 @@ class UserProfileServiceTest {
         ActivityTargetType targetType,
         Double xp
     ) {
-        ActivityEvent event = new ActivityEvent();
-        event.setTargetId(targetId);
-        event.setTargetType(targetType.getValue());
-        event.setXp(xp);
-        event.setOccurredAt(Instant.now());
-        event.setEventType(
-            targetType == ActivityTargetType.REVIEW
-                ? ActivityEventType.REVIEW_APPROVED
-                : ActivityEventType.COMMENT_CREATED
-        );
-        return event;
+        return ActivityEvent.builder()
+            .targetId(targetId)
+            .targetType(targetType.getValue())
+            .xp(xp)
+            .occurredAt(Instant.now())
+            .eventType(
+                targetType == ActivityTargetType.REVIEW
+                    ? ActivityEventType.REVIEW_APPROVED
+                    : ActivityEventType.COMMENT_CREATED
+            )
+            .eventKey(ActivityEvent.buildKey(
+                targetType == ActivityTargetType.REVIEW
+                    ? ActivityEventType.REVIEW_APPROVED
+                    : ActivityEventType.COMMENT_CREATED,
+                targetId,
+                Instant.now()
+            ))
+            .build();
     }
 
     private ProfileReviewActivityDTO createProfileReviewDTO(Long id, int score) {

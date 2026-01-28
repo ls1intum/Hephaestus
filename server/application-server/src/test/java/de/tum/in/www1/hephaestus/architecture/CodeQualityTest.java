@@ -56,7 +56,8 @@ class CodeQualityTest extends HephaestusArchitectureTest {
         void servicesHaveLimitedConstructorParams() {
             // Orchestrator services that coordinate many sub-services are allowed more dependencies
             java.util.Set<String> orchestratorExceptions = java.util.Set.of(
-                "GitHubDataSyncService" // Coordinates 15 entity-specific sync services
+                "GitHubDataSyncService", // Coordinates 15 entity-specific sync services
+                "HistoricalBackfillService" // Coordinates multiple sync services for historical data backfill
             );
 
             ArchRule rule = classes()

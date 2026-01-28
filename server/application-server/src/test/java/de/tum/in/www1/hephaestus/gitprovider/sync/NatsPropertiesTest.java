@@ -68,7 +68,7 @@ class NatsPropertiesTest {
                 assertThat(consumer.ackWait()).isEqualTo(Duration.ofMinutes(5));
                 assertThat(consumer.maxAckPending()).isEqualTo(500);
                 assertThat(consumer.idleHeartbeat()).isEqualTo(Duration.ofSeconds(30));
-                assertThat(consumer.heartbeatRestartThreshold()).isEqualTo(5);
+                assertThat(consumer.heartbeatRestartThreshold()).isEqualTo(60);
                 assertThat(consumer.heartbeatLogInterval()).isEqualTo(Duration.ofMinutes(5));
                 assertThat(consumer.reconnectDelay()).isEqualTo(Duration.ofSeconds(2));
                 assertThat(consumer.requestTimeout()).isEqualTo(Duration.ofSeconds(60));

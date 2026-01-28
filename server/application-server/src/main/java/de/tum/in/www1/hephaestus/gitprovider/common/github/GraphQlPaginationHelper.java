@@ -70,7 +70,7 @@ import reactor.util.retry.Retry;
  * @see PaginationResult for result details
  */
 @Component
-public class GraphQlPaginationHelper {
+public final class GraphQlPaginationHelper {
 
     private static final Logger log = LoggerFactory.getLogger(GraphQlPaginationHelper.class);
 

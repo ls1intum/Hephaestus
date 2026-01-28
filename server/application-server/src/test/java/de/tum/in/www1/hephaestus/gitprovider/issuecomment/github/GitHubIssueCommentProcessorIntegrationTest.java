@@ -162,7 +162,7 @@ class GitHubIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
             GitHubCommentDTO dto = createCommentDTO(TEST_COMMENT_ID, "This is a test comment.");
             ProcessingContext context = createContext();
 
-            IssueComment result = processor.process(dto, testIssue.getId(), context);
+            IssueComment result = processor.process(dto, testIssue.getNumber(), context);
 
             assertThat(result).isNotNull();
             assertThat(result.getId()).isEqualTo(TEST_COMMENT_ID);
@@ -183,7 +183,7 @@ class GitHubIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
         @Test
         @DisplayName("should handle null DTO gracefully")
         void shouldHandleNullDTO() {
-            IssueComment result = processor.process(null, testIssue.getId(), createContext());
+            IssueComment result = processor.process(null, testIssue.getNumber(), createContext());
 
             assertThat(result).isNull();
             assertThat(eventListener.getCreatedEvents()).isEmpty();
@@ -194,7 +194,7 @@ class GitHubIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
         void shouldHandleMissingIssue() {
             GitHubCommentDTO dto = createCommentDTO(TEST_COMMENT_ID, "Test");
 
-            IssueComment result = processor.process(dto, 999999L, createContext());
+            IssueComment result = processor.process(dto, 999999, createContext());
 
             assertThat(result).isNull();
             assertThat(eventListener.getCreatedEvents()).isEmpty();
@@ -221,7 +221,7 @@ class GitHubIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
             GitHubCommentDTO dto = createCommentDTO(TEST_COMMENT_ID, "Updated body");
             ProcessingContext context = createContext();
 
-            IssueComment result = processor.process(dto, testIssue.getId(), context);
+            IssueComment result = processor.process(dto, testIssue.getNumber(), context);
 
             assertThat(result).isNotNull();
             assertThat(result.getBody()).isEqualTo("Updated body");
@@ -255,7 +255,7 @@ class GitHubIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
             // Process with same data
             GitHubCommentDTO dto = createCommentDTO(TEST_COMMENT_ID, "Same body");
 
-            processor.process(dto, testIssue.getId(), createContext());
+            processor.process(dto, testIssue.getNumber(), createContext());
 
             // No events should be published for unchanged data
             assertThat(eventListener.getCreatedEvents()).isEmpty();

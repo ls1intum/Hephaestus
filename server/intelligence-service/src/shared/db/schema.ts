@@ -392,6 +392,7 @@ export const issue = pgTable(
 			foreignColumns: [issueType.id],
 			name: "fk_issue_issue_type",
 		}).onDelete("set null"),
+		unique("uk_issue_repository_number").on(table.number, table.repositoryId),
 		check(
 			"issue_merge_state_status_check",
 			sql`(merge_state_status)::text = ANY (ARRAY['BEHIND'::text, 'BLOCKED'::text, 'CLEAN'::text, 'DIRTY'::text, 'HAS_HOOKS'::text, 'UNKNOWN'::text, 'UNSTABLE'::text])`,
@@ -587,6 +588,7 @@ export const milestone = pgTable(
 			foreignColumns: [user.id],
 			name: "fkg6ieho7gomiumy85puy6l13f1",
 		}),
+		unique("uk_milestone_number_repository").on(table.number, table.repositoryId),
 	],
 );
 
@@ -916,8 +918,6 @@ export const repositoryToMonitor = pgTable(
 		repositorySyncedAt: timestamp("repository_synced_at", { withTimezone: true, mode: "string" }),
 		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
 		workspaceId: bigint("workspace_id", { mode: "number" }),
-		backfillCheckpoint: integer("backfill_checkpoint"),
-		backfillHighWaterMark: integer("backfill_high_water_mark"),
 		backfillLastRunAt: timestamp("backfill_last_run_at", {
 			precision: 6,
 			withTimezone: true,
@@ -930,6 +930,10 @@ export const repositoryToMonitor = pgTable(
 		}),
 		issueSyncCursor: varchar("issue_sync_cursor", { length: 255 }),
 		pullRequestSyncCursor: varchar("pull_request_sync_cursor", { length: 255 }),
+		issueBackfillHighWaterMark: integer("issue_backfill_high_water_mark"),
+		issueBackfillCheckpoint: integer("issue_backfill_checkpoint"),
+		pullRequestBackfillHighWaterMark: integer("pull_request_backfill_high_water_mark"),
+		pullRequestBackfillCheckpoint: integer("pull_request_backfill_checkpoint"),
 	},
 	(table) => [
 		foreignKey({
@@ -940,22 +944,26 @@ export const repositoryToMonitor = pgTable(
 	],
 );
 
-export const team = pgTable("team", {
-	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
-	id: bigint({ mode: "number" })
-		.primaryKey()
-		.generatedByDefaultAsIdentity({ name: "team_id_seq", startWith: 1, increment: 1, cache: 1 }),
-	name: varchar({ length: 255 }),
-	createdAt: timestamp("created_at", { precision: 6, withTimezone: true, mode: "string" }),
-	description: text(),
-	htmlUrl: varchar("html_url", { length: 512 }),
-	lastSyncAt: timestamp("last_sync_at", { withTimezone: true, mode: "string" }),
-	organization: varchar({ length: 255 }),
-	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
-	parentId: bigint("parent_id", { mode: "number" }),
-	privacy: varchar({ length: 32 }),
-	updatedAt: timestamp("updated_at", { precision: 6, withTimezone: true, mode: "string" }),
-});
+export const team = pgTable(
+	"team",
+	{
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		id: bigint({ mode: "number" })
+			.primaryKey()
+			.generatedByDefaultAsIdentity({ name: "team_id_seq", startWith: 1, increment: 1, cache: 1 }),
+		name: varchar({ length: 255 }),
+		createdAt: timestamp("created_at", { precision: 6, withTimezone: true, mode: "string" }),
+		description: text(),
+		htmlUrl: varchar("html_url", { length: 512 }),
+		lastSyncAt: timestamp("last_sync_at", { withTimezone: true, mode: "string" }),
+		organization: varchar({ length: 255 }),
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		parentId: bigint("parent_id", { mode: "number" }),
+		privacy: varchar({ length: 32 }),
+		updatedAt: timestamp("updated_at", { precision: 6, withTimezone: true, mode: "string" }),
+	},
+	(table) => [unique("uk_team_organization_name").on(table.name, table.organization)],
+);
 
 export const teamMembership = pgTable(
 	"team_membership",
@@ -1008,18 +1016,22 @@ export const teamRepositoryPermission = pgTable(
 	],
 );
 
-export const user = pgTable("user", {
-	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
-	id: bigint({ mode: "number" }).primaryKey().notNull(),
-	createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }),
-	updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" }),
-	avatarUrl: varchar("avatar_url", { length: 255 }),
-	email: varchar({ length: 255 }),
-	htmlUrl: varchar("html_url", { length: 255 }),
-	login: varchar({ length: 255 }),
-	name: varchar({ length: 255 }),
-	type: varchar({ length: 255 }),
-});
+export const user = pgTable(
+	"user",
+	{
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		id: bigint({ mode: "number" }).primaryKey().notNull(),
+		createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }),
+		updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" }),
+		avatarUrl: varchar("avatar_url", { length: 255 }),
+		email: varchar({ length: 255 }),
+		htmlUrl: varchar("html_url", { length: 255 }),
+		login: varchar({ length: 255 }),
+		name: varchar({ length: 255 }),
+		type: varchar({ length: 255 }),
+	},
+	(table) => [unique("uk_user_login").on(table.login)],
+);
 
 export const userPreferences = pgTable(
 	"user_preferences",

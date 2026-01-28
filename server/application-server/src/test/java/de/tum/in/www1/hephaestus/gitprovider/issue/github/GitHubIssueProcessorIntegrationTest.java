@@ -564,7 +564,8 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
                 0,
                 0,
                 Instant.now(),
-                Instant.now()
+                Instant.now(),
+                null // closedAt
             );
             GitHubIssueDTO dto = new GitHubIssueDTO(
                 issueId,
@@ -767,7 +768,8 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
                 0,
                 0,
                 Instant.now(),
-                Instant.now()
+                Instant.now(),
+                null // closedAt
             );
             GitHubIssueDTO dto = new GitHubIssueDTO(
                 issueId,

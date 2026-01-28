@@ -156,7 +156,8 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
                 0,
                 0,
                 Instant.now(),
-                Instant.now()
+                Instant.now(),
+                null // closedAt
             );
 
             // When
@@ -215,7 +216,8 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
                 0,
                 0,
                 Instant.now(),
-                Instant.now()
+                Instant.now(),
+                null // closedAt
             );
 
             // When
@@ -263,7 +265,8 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
                 0,
                 0,
                 Instant.now(),
-                Instant.now()
+                Instant.now(),
+                null // closedAt
             );
 
             // When
@@ -304,7 +307,8 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
                 0,
                 0,
                 Instant.now(),
-                Instant.now()
+                Instant.now(),
+                null // closedAt
             );
 
             // When
@@ -334,7 +338,8 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
                 0,
                 0,
                 Instant.now(),
-                Instant.now()
+                Instant.now(),
+                null // closedAt
             );
 
             // When
@@ -361,7 +366,8 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
                 0,
                 0,
                 Instant.now(),
-                Instant.now()
+                Instant.now(),
+                null // closedAt
             );
 
             // When
@@ -388,7 +394,8 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
                 0,
                 0,
                 Instant.now(),
-                Instant.now()
+                Instant.now(),
+                null // closedAt
             );
 
             // When - process twice
@@ -418,7 +425,8 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
                 0,
                 0,
                 Instant.now(),
-                Instant.now()
+                Instant.now(),
+                null // closedAt
             );
 
             // When
@@ -447,7 +455,8 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
                 0,
                 0,
                 Instant.now(),
-                Instant.now()
+                Instant.now(),
+                null // closedAt
             );
             GitHubUserDTO newCreator = new GitHubUserDTO(
                 newUserId,
@@ -486,7 +495,8 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
                 0,
                 0,
                 Instant.now(),
-                Instant.now()
+                Instant.now(),
+                null // closedAt
             );
 
             // When
@@ -513,7 +523,8 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
                 0,
                 0,
                 Instant.now(),
-                Instant.now()
+                Instant.now(),
+                null // closedAt
             );
 
             // When
@@ -539,7 +550,8 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
                 0,
                 0,
                 Instant.now(),
-                Instant.now()
+                Instant.now(),
+                null // closedAt
             );
 
             // When

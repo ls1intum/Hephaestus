@@ -297,7 +297,8 @@ class GitHubMilestoneMessageHandlerIntegrationTest extends BaseIntegrationTest {
                 0,
                 0,
                 Instant.now(),
-                Instant.now()
+                Instant.now(),
+                null // closedAt
             );
             GitHubMilestoneEventDTO event = new GitHubMilestoneEventDTO("created", milestoneDto, null, null);
 
@@ -321,7 +322,8 @@ class GitHubMilestoneMessageHandlerIntegrationTest extends BaseIntegrationTest {
                 0,
                 0,
                 Instant.now(),
-                Instant.now()
+                Instant.now(),
+                null // closedAt
             );
             GitHubMilestoneEventDTO event = new GitHubMilestoneEventDTO(
                 "created",
@@ -359,7 +361,8 @@ class GitHubMilestoneMessageHandlerIntegrationTest extends BaseIntegrationTest {
                 0,
                 0,
                 Instant.now(),
-                Instant.now()
+                Instant.now(),
+                null // closedAt
             );
             GitHubMilestoneEventDTO event = new GitHubMilestoneEventDTO(
                 "created",
@@ -407,7 +410,8 @@ class GitHubMilestoneMessageHandlerIntegrationTest extends BaseIntegrationTest {
                 0,
                 0,
                 Instant.now(),
-                Instant.now()
+                Instant.now(),
+                null // closedAt
             );
             GitHubMilestoneEventDTO event = new GitHubMilestoneEventDTO(
                 "edited",
@@ -466,7 +470,8 @@ class GitHubMilestoneMessageHandlerIntegrationTest extends BaseIntegrationTest {
                 0,
                 0,
                 Instant.now(),
-                Instant.now()
+                Instant.now(),
+                null // closedAt
             );
             GitHubMilestoneEventDTO event = new GitHubMilestoneEventDTO(
                 "unknown_action", // not created/edited/closed/opened/deleted
@@ -568,7 +573,8 @@ class GitHubMilestoneMessageHandlerIntegrationTest extends BaseIntegrationTest {
                 0,
                 0,
                 Instant.now(),
-                Instant.now()
+                Instant.now(),
+                null // closedAt
             );
             GitHubMilestoneEventDTO editEvent = new GitHubMilestoneEventDTO(
                 "edited",

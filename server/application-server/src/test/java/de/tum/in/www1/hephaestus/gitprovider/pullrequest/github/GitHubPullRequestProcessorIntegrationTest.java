@@ -487,7 +487,8 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
                 0,
                 0,
                 Instant.now(),
-                Instant.now()
+                Instant.now(),
+                null // closedAt
             );
 
             GitHubPullRequestDTO dto = new GitHubPullRequestDTO(

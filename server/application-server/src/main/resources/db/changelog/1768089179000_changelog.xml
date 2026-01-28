@@ -2699,6 +2699,11 @@
                author="ClaudeCode"
                runOnChange="false"
                failOnError="true">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <indexExists indexName="uk_team_organization_name"/>
+            </not>
+        </preConditions>
         <comment>
             Add unique constraint on (organization, name) to prevent duplicate teams.
             GitHub teams are uniquely identified by their organization and name.
