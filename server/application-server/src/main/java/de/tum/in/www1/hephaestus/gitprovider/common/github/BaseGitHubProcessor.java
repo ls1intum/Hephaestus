@@ -129,10 +129,13 @@ public abstract class BaseGitHubProcessor {
 
         if (inserted == 0) {
             // Another thread inserted first - fetch the winner
+            // Note: orElse(null) is safe here - if conflict occurred, the row exists.
+            // The only failure case is concurrent DELETE which is not a supported operation.
             return labelRepository.findByRepositoryIdAndName(repository.getId(), dto.name()).orElse(null);
         }
 
         // We inserted - fetch the entity to return a managed instance
+        // Note: Same transaction guarantees visibility (PostgreSQL MVCC).
         return labelRepository.findById(labelId).orElse(null);
     }
 
@@ -195,7 +198,7 @@ public abstract class BaseGitHubProcessor {
 
         String title = dto.title() != null ? dto.title() : "Milestone " + dto.number();
         String htmlUrl = dto.htmlUrl() != null ? dto.htmlUrl() : "";
-        String state = dto.state() != null ? dto.state().toUpperCase() : "OPEN";
+        String state = parseMilestoneState(dto.state()).name();
         int openIssuesCount = dto.openIssuesCount() != null ? dto.openIssuesCount() : 0;
         int closedIssuesCount = dto.closedIssuesCount() != null ? dto.closedIssuesCount() : 0;
 
