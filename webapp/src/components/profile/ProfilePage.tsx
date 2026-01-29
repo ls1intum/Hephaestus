@@ -1,5 +1,5 @@
 import { XCircleIcon } from "lucide-react";
-import type { Profile, ProfileXpRecord } from "@/api/types.gen";
+import type { Profile } from "@/api/types.gen";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import type { LeaderboardSchedule } from "@/lib/timeframe";
 import { ProfileContent } from "./ProfileContent";
@@ -17,7 +17,6 @@ interface ProfileProps {
 	onTimeframeChange?: (afterDate: string, beforeDate?: string) => void;
 	/** Leaderboard schedule for proper week calculations */
 	schedule?: LeaderboardSchedule;
-	userXpRecord: ProfileXpRecord;
 }
 
 export function ProfilePage({
@@ -31,7 +30,6 @@ export function ProfilePage({
 	before,
 	onTimeframeChange,
 	schedule,
-	userXpRecord,
 }: ProfileProps) {
 	if (error) {
 		return (
@@ -52,7 +50,7 @@ export function ProfilePage({
 				firstContribution={profileData?.firstContribution}
 				contributedRepositories={profileData?.contributedRepositories}
 				leaguePoints={profileData?.userInfo?.leaguePoints}
-				userXpRecord={userXpRecord}
+				userXpRecord={profileData?.xpRecord}
 				isLoading={isLoading}
 			/>
 			<ProfileContent

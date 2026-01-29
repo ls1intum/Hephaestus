@@ -14,7 +14,7 @@ export interface ProfileHeaderProps {
 	firstContribution?: Date;
 	contributedRepositories?: RepositoryInfo[];
 	leaguePoints?: number;
-	userXpRecord: ProfileXpRecord;
+	userXpRecord?: ProfileXpRecord;
 	isLoading: boolean;
 }
 
@@ -22,7 +22,7 @@ export function ProfileHeader({
 	user,
 	firstContribution,
 	leaguePoints = 0,
-	userXpRecord,
+	userXpRecord = { currentLevel: 1, currentLevelXP: 0, totalXP: 0, xpNeeded: 150 },
 	isLoading,
 }: ProfileHeaderProps) {
 	// unpack xp relevant data
