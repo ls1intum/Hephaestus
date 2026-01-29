@@ -242,41 +242,9 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
      * @return true if any relationships were changed
      */
     private boolean updateRelationships(GitHubIssueDTO dto, Issue issue, Repository repository) {
-        boolean changed = false;
-
-        // Update assignees
-        if (dto.assignees() != null) {
-            Set<User> newAssignees = new HashSet<>();
-            for (GitHubUserDTO assigneeDto : dto.assignees()) {
-                User assignee = findOrCreateUser(assigneeDto);
-                if (assignee != null) {
-                    newAssignees.add(assignee);
-                }
-            }
-            if (!issue.getAssignees().equals(newAssignees)) {
-                issue.getAssignees().clear();
-                issue.getAssignees().addAll(newAssignees);
-                changed = true;
-            }
-        }
-
-        // Update labels
-        if (dto.labels() != null) {
-            Set<Label> newLabels = new HashSet<>();
-            for (GitHubLabelDTO labelDto : dto.labels()) {
-                Label label = findOrCreateLabel(labelDto, repository);
-                if (label != null) {
-                    newLabels.add(label);
-                }
-            }
-            if (!issue.getLabels().equals(newLabels)) {
-                issue.getLabels().clear();
-                issue.getLabels().addAll(newLabels);
-                changed = true;
-            }
-        }
-
-        return changed;
+        boolean assigneesChanged = updateAssignees(dto.assignees(), issue.getAssignees());
+        boolean labelsChanged = updateLabels(dto.labels(), issue.getLabels(), repository);
+        return assigneesChanged || labelsChanged;
     }
 
     /**

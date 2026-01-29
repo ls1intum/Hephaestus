@@ -24,9 +24,6 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Repository
 public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UUID> {
-    /** Check for idempotent upsert */
-    boolean existsByWorkspaceIdAndEventKey(Long workspaceId, String eventKey);
-
     /**
      * Atomically inserts an activity event if absent (race-condition safe).
      *

@@ -11,7 +11,10 @@ import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.github.dto.GitHubUserDTO;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.lang.Nullable;
@@ -260,5 +263,101 @@ public abstract class BaseGitHubProcessor {
     @Nullable
     protected String sanitize(@Nullable String input) {
         return PostgresStringUtils.sanitize(input);
+    }
+
+    // ========================================================================
+    // Shared relationship update helpers (used by Issue and PR processors)
+    // ========================================================================
+
+    /**
+     * Updates assignees collection from DTO list.
+     * Shared between Issue and PullRequest processors to avoid code duplication.
+     *
+     * @param assigneeDtos the assignee DTOs from GitHub (null means don't update)
+     * @param currentAssignees the current assignee set to update (modified in place)
+     * @return true if assignments changed, false otherwise
+     */
+    protected boolean updateAssignees(@Nullable List<GitHubUserDTO> assigneeDtos, Set<User> currentAssignees) {
+        if (assigneeDtos == null) {
+            return false;
+        }
+
+        Set<User> newAssignees = new HashSet<>();
+        for (GitHubUserDTO assigneeDto : assigneeDtos) {
+            User assignee = findOrCreateUser(assigneeDto);
+            if (assignee != null) {
+                newAssignees.add(assignee);
+            }
+        }
+
+        if (!currentAssignees.equals(newAssignees)) {
+            currentAssignees.clear();
+            currentAssignees.addAll(newAssignees);
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Updates labels collection from DTO list.
+     * Shared between Issue and PullRequest processors to avoid code duplication.
+     *
+     * @param labelDtos the label DTOs from GitHub (null means don't update)
+     * @param currentLabels the current label set to update (modified in place)
+     * @param repository the repository context for label lookup/creation
+     * @return true if labels changed, false otherwise
+     */
+    protected boolean updateLabels(
+        @Nullable List<GitHubLabelDTO> labelDtos,
+        Set<Label> currentLabels,
+        Repository repository
+    ) {
+        if (labelDtos == null) {
+            return false;
+        }
+
+        Set<Label> newLabels = new HashSet<>();
+        for (GitHubLabelDTO labelDto : labelDtos) {
+            Label label = findOrCreateLabel(labelDto, repository);
+            if (label != null) {
+                newLabels.add(label);
+            }
+        }
+
+        if (!currentLabels.equals(newLabels)) {
+            currentLabels.clear();
+            currentLabels.addAll(newLabels);
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Updates requested reviewers collection from DTO list.
+     * Specific to PullRequest but provided here for consistency.
+     *
+     * @param reviewerDtos the reviewer DTOs from GitHub (null means don't update)
+     * @param currentReviewers the current reviewer set to update (modified in place)
+     * @return true if reviewers changed, false otherwise
+     */
+    protected boolean updateRequestedReviewers(@Nullable List<GitHubUserDTO> reviewerDtos, Set<User> currentReviewers) {
+        if (reviewerDtos == null) {
+            return false;
+        }
+
+        Set<User> newReviewers = new HashSet<>();
+        for (GitHubUserDTO reviewerDto : reviewerDtos) {
+            User reviewer = findOrCreateUser(reviewerDto);
+            if (reviewer != null) {
+                newReviewers.add(reviewer);
+            }
+        }
+
+        if (!currentReviewers.equals(newReviewers)) {
+            currentReviewers.clear();
+            currentReviewers.addAll(newReviewers);
+            return true;
+        }
+        return false;
     }
 }

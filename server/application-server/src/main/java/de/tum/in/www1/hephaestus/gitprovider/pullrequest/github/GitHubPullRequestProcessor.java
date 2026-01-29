@@ -99,6 +99,24 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
         );
         boolean isNew = existingOpt.isEmpty();
 
+        // Skip update if existing data is newer (prevents stale webhooks from overwriting)
+        if (!isNew) {
+            PullRequest existing = existingOpt.get();
+            if (
+                existing.getUpdatedAt() != null &&
+                dto.updatedAt() != null &&
+                !dto.updatedAt().isAfter(existing.getUpdatedAt())
+            ) {
+                log.debug(
+                    "Skipped stale PR update: prId={}, existingUpdatedAt={}, dtoUpdatedAt={}",
+                    existing.getId(),
+                    existing.getUpdatedAt(),
+                    dto.updatedAt()
+                );
+                return existing;
+            }
+        }
+
         // Resolve related entities BEFORE the upsert
         User author = dto.author() != null ? findOrCreateUser(dto.author()) : null;
         User mergedBy = dto.mergedBy() != null ? findOrCreateUser(dto.mergedBy()) : null;
@@ -198,57 +216,10 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
      * @return true if any relationships were changed
      */
     private boolean updateRelationships(GitHubPullRequestDTO dto, PullRequest pr, Repository repository) {
-        boolean changed = false;
-
-        // Update assignees
-        if (dto.assignees() != null) {
-            Set<User> newAssignees = new HashSet<>();
-            for (GitHubUserDTO assigneeDto : dto.assignees()) {
-                User assignee = findOrCreateUser(assigneeDto);
-                if (assignee != null) {
-                    newAssignees.add(assignee);
-                }
-            }
-            if (!pr.getAssignees().equals(newAssignees)) {
-                pr.getAssignees().clear();
-                pr.getAssignees().addAll(newAssignees);
-                changed = true;
-            }
-        }
-
-        // Update labels
-        if (dto.labels() != null) {
-            Set<Label> newLabels = new HashSet<>();
-            for (GitHubLabelDTO labelDto : dto.labels()) {
-                Label label = findOrCreateLabel(labelDto, repository);
-                if (label != null) {
-                    newLabels.add(label);
-                }
-            }
-            if (!pr.getLabels().equals(newLabels)) {
-                pr.getLabels().clear();
-                pr.getLabels().addAll(newLabels);
-                changed = true;
-            }
-        }
-
-        // Update requested reviewers
-        if (dto.requestedReviewers() != null) {
-            Set<User> newReviewers = new HashSet<>();
-            for (GitHubUserDTO reviewerDto : dto.requestedReviewers()) {
-                User reviewer = findOrCreateUser(reviewerDto);
-                if (reviewer != null) {
-                    newReviewers.add(reviewer);
-                }
-            }
-            if (!pr.getRequestedReviewers().equals(newReviewers)) {
-                pr.getRequestedReviewers().clear();
-                pr.getRequestedReviewers().addAll(newReviewers);
-                changed = true;
-            }
-        }
-
-        return changed;
+        boolean assigneesChanged = updateAssignees(dto.assignees(), pr.getAssignees());
+        boolean labelsChanged = updateLabels(dto.labels(), pr.getLabels(), repository);
+        boolean reviewersChanged = updateRequestedReviewers(dto.requestedReviewers(), pr.getRequestedReviewers());
+        return assigneesChanged || labelsChanged || reviewersChanged;
     }
 
     /**
