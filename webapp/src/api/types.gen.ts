@@ -251,6 +251,10 @@ export type Profile = {
      * Basic information about the user
      */
     userInfo: UserInfo;
+    /**
+     * XP progress information for the users' profile
+     */
+    xpRecord?: ProfileXpRecord;
 };
 
 /**
@@ -331,6 +335,28 @@ export type ProfileReviewActivity = {
      * Timestamp when the review was submitted
      */
     submittedAt?: Date;
+};
+
+/**
+ * User's XP and Level progress details
+ */
+export type ProfileXpRecord = {
+    /**
+     * Current calculated level
+     */
+    currentLevel?: number;
+    /**
+     * XP accumulated in the current level
+     */
+    currentLevelXP?: number;
+    /**
+     * Overall total XP accumulated
+     */
+    totalXP?: number;
+    /**
+     * XP needed to reach the next level
+     */
+    xpNeeded?: number;
 };
 
 /**

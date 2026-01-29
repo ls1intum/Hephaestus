@@ -2164,7 +2164,8 @@ components:
       - type
     ChatMessageVote:
       type: object
-      x-hephaestus: a1
+      x-hephaestus:
+        export: true
       properties:
         createdAt:
           type: string
@@ -2184,7 +2185,8 @@ components:
       - updatedAt
     ChatThreadGroup:
       type: object
-      x-hephaestus: a1
+      x-hephaestus:
+        export: true
       properties:
         groupName:
           type: string
@@ -2197,7 +2199,8 @@ components:
       - threads
     ChatThreadSummary:
       type: object
-      x-hephaestus: a1
+      x-hephaestus:
+        export: true
       properties:
         createdAt:
           type: string
@@ -2243,7 +2246,8 @@ components:
       - name
     CreateDocumentRequest:
       type: object
-      x-hephaestus: a1
+      x-hephaestus:
+        export: true
       properties:
         content:
           type: string
@@ -2303,7 +2307,8 @@ components:
           - ERROR_NO_UPDATE_ON_PULLREQUEST
     Document:
       type: object
-      x-hephaestus: a1
+      x-hephaestus:
+        export: true
       properties:
         content:
           type: string
@@ -2333,10 +2338,12 @@ components:
       type: string
       enum:
       - text
-      x-hephaestus: a1
+      x-hephaestus:
+        export: true
     DocumentSummary:
       type: object
-      x-hephaestus: a1
+      x-hephaestus:
+        export: true
       properties:
         createdAt:
           type: string
@@ -2498,6 +2505,9 @@ components:
         userInfo:
           $ref: "#/components/schemas/UserInfo"
           description: Basic information about the user
+        xpRecord:
+          $ref: "#/components/schemas/ProfileXpRecord"
+          description: XP progress information for the users' profile
       required:
       - contributedRepositories
       - userInfo
@@ -2596,6 +2606,30 @@ components:
       - id
       - isDismissed
       - state
+    ProfileXpRecord:
+      type: object
+      description: User's XP and Level progress details
+      properties:
+        currentLevel:
+          type: integer
+          format: int32
+          description: Current calculated level
+          example: 5
+        currentLevelXP:
+          type: integer
+          format: int64
+          description: XP accumulated in the current level
+          example: 450
+        totalXP:
+          type: integer
+          format: int64
+          description: Overall total XP accumulated
+          example: 5450
+        xpNeeded:
+          type: integer
+          format: int64
+          description: XP needed to reach the next level
+          example: 1000
     PullRequestBadPractice:
       type: object
       description: A detected bad practice in a pull request
@@ -2897,7 +2931,8 @@ components:
     StreamPart:
       type: object
       additionalProperties: {}
-      x-hephaestus: a1
+      x-hephaestus:
+        export: true
       properties:
         type:
           type: string
@@ -3008,7 +3043,8 @@ components:
       - name
     ThreadDetail:
       type: object
-      x-hephaestus: a1
+      x-hephaestus:
+        export: true
       properties:
         id:
           type: string
@@ -3243,7 +3279,8 @@ components:
       - url
     VoteMessageRequest:
       type: object
-      x-hephaestus: a1
+      x-hephaestus:
+        export: true
       properties:
         isUpvoted:
           type: boolean
