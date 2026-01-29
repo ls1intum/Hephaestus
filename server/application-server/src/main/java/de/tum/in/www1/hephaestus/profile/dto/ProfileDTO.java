@@ -36,5 +36,5 @@ public record ProfileDTO(
     @Schema(description = "Aggregated activity stats consistent with leaderboard calculations")
     ProfileActivityStatsDTO activityStats,
     @Schema(description = "Distinct pull requests reviewed by this user") List<PullRequestInfoDTO> reviewedPullRequests,
-    @Schema(description = "XP progress information for the users' profile") ProfileXPRecordDTO xpRecord
+    @Schema(description = "XP progress information for the users' profile") ProfileXpRecordDTO xpRecord
 ) {}

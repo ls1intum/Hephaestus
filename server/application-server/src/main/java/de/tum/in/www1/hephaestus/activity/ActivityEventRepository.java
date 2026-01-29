@@ -66,6 +66,7 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
 
     /**
      * Aggregate XP by actor for leaderboard, filtered by teams.
+
      *
      * <p>This query includes label filtering for review-related events. For each team:
      * <ul>
@@ -294,7 +295,34 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
     // ========================================================================
 
     /**
+     * Calculate total lifetime XP for a specific actor in a workspace.
+     *
+     * <p>Used for profile headers to show the user's current level and total XP.
+     * Returns 0 if no events exist.
+     *
+     * @param workspaceId the workspace
+     * @param actorId the actor (user)
+     * @return total accumulated XP (0 if none)
+     */
+    @Query(
+        """
+        SELECT COALESCE(SUM(e.xp), 0)
+        FROM ActivityEvent e
+        WHERE e.workspace.id = :workspaceId
+        AND e.actor IS NOT NULL
+        AND e.actor.type = de.tum.in.www1.hephaestus.gitprovider.user.User$Type.USER
+        AND e.actor.id = :actorId
+        AND e.xp > 0
+        """
+    )
+    long findTotalXpByWorkspaceAndActor(
+        @Param("workspaceId") Long workspaceId,
+        @Param("actorId") Long actorId
+    );
+
+    /**
      * Fetch XP for specific target entities by their IDs and types.
+
      *
      * <p>Used by the profile module to look up pre-computed XP for individual
      * reviews/comments instead of recalculating on-the-fly.
