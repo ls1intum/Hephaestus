@@ -128,6 +128,9 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
 
     /**
      * Internal method that handles both regular and stub issue processing.
+     * <p>
+     * Uses atomic upsert to prevent race conditions when concurrent threads
+     * (e.g., multiple NATS consumers or webhook handlers) process the same issue.
      *
      * @param dto           the issue DTO
      * @param context       the processing context
@@ -143,44 +146,174 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
         }
 
         Repository repository = context.repository();
-        Optional<Issue> existingOpt = issueRepository.findById(dbId);
 
-        Issue issue;
+        // Check if this is an update (for event publishing purposes)
+        // We check by natural key (repository_id, number) to handle the case where
+        // the same issue might have different IDs from different sources
+        Optional<Issue> existingOpt = issueRepository.findByRepositoryIdAndNumber(repository.getId(), dto.number());
         boolean isNew = existingOpt.isEmpty();
 
-        if (isNew) {
-            issue = createIssue(dto, repository);
-            // Mark sync timestamp
-            issue.setLastSyncAt(Instant.now());
+        // Resolve related entities BEFORE the upsert
+        User author = dto.author() != null ? findOrCreateUser(dto.author()) : null;
+        Milestone milestone = dto.milestone() != null ? findOrCreateMilestone(dto.milestone(), repository) : null;
+        IssueType issueType = null;
+        if (dto.issueType() != null && repository.getOrganization() != null) {
+            issueType = findOrCreateIssueType(dto.issueType(), repository.getOrganization().getLogin());
+        }
+
+        // Use atomic upsert to handle concurrent inserts
+        // This uses ON CONFLICT (repository_id, number) DO UPDATE
+        Instant now = Instant.now();
+        issueRepository.upsertCore(
+            dbId,
+            dto.number(),
+            sanitize(dto.title()),
+            sanitize(dto.body()),
+            convertState(dto.state()).name(),
+            convertStateReason(dto.stateReason()) != null ? convertStateReason(dto.stateReason()).name() : null,
+            dto.htmlUrl(),
+            dto.locked(),
+            dto.closedAt(),
+            dto.commentsCount(), // int primitive, no null check needed
+            now,
+            dto.createdAt(),
+            dto.updatedAt(),
+            author != null ? author.getId() : null,
+            repository.getId(),
+            milestone != null ? milestone.getId() : null,
+            issueType != null ? issueType.getId() : null,
+            null, // parentIssueId - handled separately by dependency sync
+            null, // subIssuesTotal - populated by sub-issue sync, not from DTO
+            null, // subIssuesCompleted - populated by sub-issue sync, not from DTO
+            null // subIssuesPercentCompleted - populated by sub-issue sync, not from DTO
+        );
+
+        // Fetch the issue to get a managed entity and handle relationships
+        Issue issue = issueRepository
+            .findByRepositoryIdAndNumber(repository.getId(), dto.number())
+            .orElseThrow(() ->
+                new IllegalStateException(
+                    "Issue not found after upsert: repositoryId=" + repository.getId() + ", number=" + dto.number()
+                )
+            );
+
+        // Handle ManyToMany relationships (labels, assignees) - these can't be done in the upsert
+        boolean relationshipsChanged = updateRelationships(dto, issue, repository);
+
+        // Save relationship changes
+        if (relationshipsChanged) {
             issue = issueRepository.save(issue);
-            if (publishEvents) {
+        }
+
+        // Publish events
+        if (publishEvents) {
+            if (isNew) {
                 eventPublisher.publishEvent(
                     new DomainEvent.IssueCreated(EventPayload.IssueData.from(issue), EventContext.from(context))
                 );
                 log.debug("Created issue: issueId={}, issueNumber={}", dbId, dto.number());
             } else {
-                log.debug("Created stub issue (no event): issueId={}, issueNumber={}", dbId, dto.number());
+                // For updates, we compute changed fields by comparing with what we know changed
+                Set<String> changedFields = computeChangedFields(existingOpt.get(), issue);
+                if (!changedFields.isEmpty() || relationshipsChanged) {
+                    if (relationshipsChanged) {
+                        changedFields.add("relationships");
+                    }
+                    eventPublisher.publishEvent(
+                        new DomainEvent.IssueUpdated(
+                            EventPayload.IssueData.from(issue),
+                            changedFields,
+                            EventContext.from(context)
+                        )
+                    );
+                    log.debug("Updated issue: issueId={}, changedFields={}", dbId, changedFields);
+                }
             }
-        } else {
-            issue = existingOpt.get();
-            Set<String> changedFields = updateIssue(dto, issue, repository);
-            // Mark sync timestamp
-            issue.setLastSyncAt(Instant.now());
-            issue = issueRepository.save(issue);
-
-            if (publishEvents && !changedFields.isEmpty()) {
-                eventPublisher.publishEvent(
-                    new DomainEvent.IssueUpdated(
-                        EventPayload.IssueData.from(issue),
-                        changedFields,
-                        EventContext.from(context)
-                    )
-                );
-                log.debug("Updated issue: issueId={}, changedFields={}", dbId, changedFields);
-            }
+        } else if (isNew) {
+            log.debug("Created stub issue (no event): issueId={}, issueNumber={}", dbId, dto.number());
         }
 
         return issue;
+    }
+
+    /**
+     * Updates ManyToMany relationships (labels, assignees) that can't be handled by the atomic upsert.
+     *
+     * @return true if any relationships were changed
+     */
+    private boolean updateRelationships(GitHubIssueDTO dto, Issue issue, Repository repository) {
+        boolean changed = false;
+
+        // Update assignees
+        if (dto.assignees() != null) {
+            Set<User> newAssignees = new HashSet<>();
+            for (GitHubUserDTO assigneeDto : dto.assignees()) {
+                User assignee = findOrCreateUser(assigneeDto);
+                if (assignee != null) {
+                    newAssignees.add(assignee);
+                }
+            }
+            if (!issue.getAssignees().equals(newAssignees)) {
+                issue.getAssignees().clear();
+                issue.getAssignees().addAll(newAssignees);
+                changed = true;
+            }
+        }
+
+        // Update labels
+        if (dto.labels() != null) {
+            Set<Label> newLabels = new HashSet<>();
+            for (GitHubLabelDTO labelDto : dto.labels()) {
+                Label label = findOrCreateLabel(labelDto, repository);
+                if (label != null) {
+                    newLabels.add(label);
+                }
+            }
+            if (!issue.getLabels().equals(newLabels)) {
+                issue.getLabels().clear();
+                issue.getLabels().addAll(newLabels);
+                changed = true;
+            }
+        }
+
+        return changed;
+    }
+
+    /**
+     * Computes which fields changed between the old and new issue state.
+     */
+    private Set<String> computeChangedFields(Issue oldIssue, Issue newIssue) {
+        Set<String> changedFields = new HashSet<>();
+
+        if (!Objects.equals(oldIssue.getTitle(), newIssue.getTitle())) {
+            changedFields.add("title");
+        }
+        if (!Objects.equals(oldIssue.getBody(), newIssue.getBody())) {
+            changedFields.add("body");
+        }
+        if (oldIssue.getState() != newIssue.getState()) {
+            changedFields.add("state");
+        }
+        if (!Objects.equals(oldIssue.getStateReason(), newIssue.getStateReason())) {
+            changedFields.add("stateReason");
+        }
+        if (oldIssue.getCommentsCount() != newIssue.getCommentsCount()) {
+            changedFields.add("commentsCount");
+        }
+        if (oldIssue.isLocked() != newIssue.isLocked()) {
+            changedFields.add("locked");
+        }
+        if (!Objects.equals(oldIssue.getClosedAt(), newIssue.getClosedAt())) {
+            changedFields.add("closedAt");
+        }
+        if (!Objects.equals(oldIssue.getMilestone(), newIssue.getMilestone())) {
+            changedFields.add("milestone");
+        }
+        if (!Objects.equals(oldIssue.getIssueType(), newIssue.getIssueType())) {
+            changedFields.add("issueType");
+        }
+
+        return changedFields;
     }
 
     /**

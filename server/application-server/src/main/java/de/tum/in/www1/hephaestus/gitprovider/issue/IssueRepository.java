@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.gitprovider.issue;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Pageable;
@@ -8,6 +9,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Repository for issue entities.
@@ -73,4 +75,79 @@ public interface IssueRepository extends JpaRepository<Issue, Long> {
     @Modifying
     @Query("UPDATE Issue i SET i.milestone = null WHERE i.milestone.id = :milestoneId")
     int clearMilestoneReferences(@Param("milestoneId") Long milestoneId);
+
+    /**
+     * Atomically inserts or updates an issue's core fields (race-condition safe).
+     * <p>
+     * Uses PostgreSQL's ON CONFLICT to handle concurrent inserts on the unique constraint
+     * (repository_id, number). This eliminates the race condition where two threads both
+     * pass the findById check and try to insert the same issue.
+     * <p>
+     * <b>Note:</b> This only handles scalar fields and FK references. ManyToMany relationships
+     * (labels, assignees) must be handled separately after calling this method.
+     *
+     * @return 1 if inserted, 1 if updated (always 1 on success due to DO UPDATE)
+     */
+    @Modifying
+    @Transactional
+    @Query(
+        value = """
+        INSERT INTO issue (
+            id, number, title, body, state, state_reason, html_url, is_locked,
+            closed_at, comments_count, last_sync_at, created_at, updated_at,
+            author_id, repository_id, milestone_id, issue_type_id,
+            parent_issue_id, sub_issues_total, sub_issues_completed, sub_issues_percent_completed,
+            issue_type
+        )
+        VALUES (
+            :id, :number, :title, :body, :state, :stateReason, :htmlUrl, :isLocked,
+            :closedAt, :commentsCount, :lastSyncAt, :createdAt, :updatedAt,
+            :authorId, :repositoryId, :milestoneId, :issueTypeId,
+            :parentIssueId, :subIssuesTotal, :subIssuesCompleted, :subIssuesPercentCompleted,
+            'ISSUE'
+        )
+        ON CONFLICT (repository_id, number) DO UPDATE SET
+            title = EXCLUDED.title,
+            body = EXCLUDED.body,
+            state = EXCLUDED.state,
+            state_reason = EXCLUDED.state_reason,
+            html_url = EXCLUDED.html_url,
+            is_locked = EXCLUDED.is_locked,
+            closed_at = EXCLUDED.closed_at,
+            comments_count = EXCLUDED.comments_count,
+            last_sync_at = EXCLUDED.last_sync_at,
+            updated_at = EXCLUDED.updated_at,
+            author_id = COALESCE(EXCLUDED.author_id, issue.author_id),
+            milestone_id = EXCLUDED.milestone_id,
+            issue_type_id = EXCLUDED.issue_type_id,
+            parent_issue_id = EXCLUDED.parent_issue_id,
+            sub_issues_total = EXCLUDED.sub_issues_total,
+            sub_issues_completed = EXCLUDED.sub_issues_completed,
+            sub_issues_percent_completed = EXCLUDED.sub_issues_percent_completed
+        """,
+        nativeQuery = true
+    )
+    int upsertCore(
+        @Param("id") Long id,
+        @Param("number") int number,
+        @Param("title") String title,
+        @Param("body") String body,
+        @Param("state") String state,
+        @Param("stateReason") String stateReason,
+        @Param("htmlUrl") String htmlUrl,
+        @Param("isLocked") boolean isLocked,
+        @Param("closedAt") Instant closedAt,
+        @Param("commentsCount") int commentsCount,
+        @Param("lastSyncAt") Instant lastSyncAt,
+        @Param("createdAt") Instant createdAt,
+        @Param("updatedAt") Instant updatedAt,
+        @Param("authorId") Long authorId,
+        @Param("repositoryId") Long repositoryId,
+        @Param("milestoneId") Long milestoneId,
+        @Param("issueTypeId") String issueTypeId,
+        @Param("parentIssueId") Long parentIssueId,
+        @Param("subIssuesTotal") Integer subIssuesTotal,
+        @Param("subIssuesCompleted") Integer subIssuesCompleted,
+        @Param("subIssuesPercentCompleted") Integer subIssuesPercentCompleted
+    );
 }

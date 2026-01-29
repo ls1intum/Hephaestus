@@ -95,6 +95,9 @@ public abstract class BaseGitHubProcessor {
      * created a label with a deterministic ID, then a webhook arrives with the actual
      * GitHub databaseId. Looking up by the webhook's ID would miss the existing entity.
      * <p>
+     * Uses atomic insertIfAbsent to prevent race conditions when concurrent threads
+     * try to create the same label simultaneously.
+     * <p>
      * NEVER changes the ID of an existing (managed) entity - Hibernate will throw
      * "identifier of an instance was altered" exception.
      */
@@ -105,8 +108,6 @@ public abstract class BaseGitHubProcessor {
         }
 
         // ALWAYS check by unique key (repository_id + name) FIRST - this is the constraint we enforce.
-        // This handles the case where GraphQL sync created a label with a deterministic ID,
-        // then a webhook arrives with the actual GitHub databaseId.
         Optional<Label> existingOpt = labelRepository.findByRepositoryIdAndName(repository.getId(), dto.name());
 
         // Fall back to ID lookup if name lookup didn't find it (handles label renames)
@@ -115,19 +116,21 @@ public abstract class BaseGitHubProcessor {
         }
 
         if (existingOpt.isPresent()) {
-            // Return existing label - NEVER modify its ID
             return existingOpt.get();
         }
 
-        // Create new label
-        Label label = new Label();
-        // Use provided ID or generate deterministic one for new labels only
+        // Use atomic insert to prevent race conditions.
+        // If another thread inserted first, this returns 0 and we fetch the winner.
         Long labelId = dto.id() != null ? dto.id() : generateDeterministicLabelId(repository.getId(), dto.name());
-        label.setId(labelId);
-        label.setName(dto.name());
-        label.setColor(dto.color());
-        label.setRepository(repository);
-        return labelRepository.save(label);
+        int inserted = labelRepository.insertIfAbsent(labelId, dto.name(), dto.color(), repository.getId());
+
+        if (inserted == 0) {
+            // Another thread inserted first - fetch the winner
+            return labelRepository.findByRepositoryIdAndName(repository.getId(), dto.name()).orElse(null);
+        }
+
+        // We inserted - fetch the entity to return a managed instance
+        return labelRepository.findById(labelId).orElse(null);
     }
 
     /**
@@ -151,6 +154,9 @@ public abstract class BaseGitHubProcessor {
      * created a milestone with a deterministic ID, then a webhook arrives with the actual
      * GitHub databaseId. Looking up by the webhook's ID would miss the existing entity.
      * <p>
+     * Uses atomic insertIfAbsent to prevent race conditions when concurrent threads
+     * try to create the same milestone simultaneously.
+     * <p>
      * For GraphQL responses that don't include databaseId (id is null), we generate a
      * deterministic negative ID to avoid collision with real GitHub IDs.
      * <p>
@@ -164,8 +170,6 @@ public abstract class BaseGitHubProcessor {
         }
 
         // ALWAYS check by unique key (repository_id + number) FIRST - this is the constraint we enforce.
-        // This handles the case where GraphQL sync created a milestone with a deterministic ID,
-        // then a webhook arrives with the actual GitHub databaseId.
         Optional<Milestone> existingOpt = milestoneRepository.findByNumberAndRepositoryId(
             dto.number(),
             repository.getId()
@@ -177,37 +181,43 @@ public abstract class BaseGitHubProcessor {
         }
 
         if (existingOpt.isPresent()) {
-            // Return existing milestone - NEVER modify its ID
             return existingOpt.get();
         }
 
-        // Create new milestone
-        Milestone milestone = new Milestone();
-        // Use provided ID or generate deterministic one for new milestones only
+        // Use atomic insert to prevent race conditions.
+        // If another thread inserted first, this returns 0 and we fetch the winner.
         Long milestoneId = dto.id() != null
             ? dto.id()
             : generateDeterministicMilestoneId(repository.getId(), dto.number());
-        milestone.setId(milestoneId);
-        milestone.setNumber(dto.number());
-        milestone.setTitle(dto.title() != null ? dto.title() : "Milestone " + dto.number());
-        milestone.setHtmlUrl(dto.htmlUrl() != null ? dto.htmlUrl() : "");
-        milestone.setState(parseMilestoneState(dto.state()));
-        milestone.setDescription(dto.description());
-        milestone.setDueOn(dto.dueOn());
-        milestone.setRepository(repository);
-        if (dto.openIssuesCount() != null) {
-            milestone.setOpenIssuesCount(dto.openIssuesCount());
+
+        String title = dto.title() != null ? dto.title() : "Milestone " + dto.number();
+        String htmlUrl = dto.htmlUrl() != null ? dto.htmlUrl() : "";
+        String state = dto.state() != null ? dto.state().toUpperCase() : "OPEN";
+        int openIssuesCount = dto.openIssuesCount() != null ? dto.openIssuesCount() : 0;
+        int closedIssuesCount = dto.closedIssuesCount() != null ? dto.closedIssuesCount() : 0;
+
+        int inserted = milestoneRepository.insertIfAbsent(
+            milestoneId,
+            dto.number(),
+            title,
+            dto.description(),
+            state,
+            htmlUrl,
+            dto.dueOn(),
+            openIssuesCount,
+            closedIssuesCount,
+            repository.getId(),
+            dto.createdAt(),
+            dto.updatedAt()
+        );
+
+        if (inserted == 0) {
+            // Another thread inserted first - fetch the winner
+            return milestoneRepository.findByNumberAndRepositoryId(dto.number(), repository.getId()).orElse(null);
         }
-        if (dto.closedIssuesCount() != null) {
-            milestone.setClosedIssuesCount(dto.closedIssuesCount());
-        }
-        if (dto.createdAt() != null) {
-            milestone.setCreatedAt(dto.createdAt());
-        }
-        if (dto.updatedAt() != null) {
-            milestone.setUpdatedAt(dto.updatedAt());
-        }
-        return milestoneRepository.save(milestone);
+
+        // We inserted - fetch the entity to return a managed instance
+        return milestoneRepository.findById(milestoneId).orElse(null);
     }
 
     /**
