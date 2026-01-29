@@ -254,7 +254,7 @@ export type Profile = {
     /**
      * XP progress information for the users' profile
      */
-    xpRecord?: ProfileXpRecord;
+    xpRecord: ProfileXpRecord;
 };
 
 /**

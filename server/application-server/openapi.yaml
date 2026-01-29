@@ -2511,6 +2511,7 @@ components:
       required:
       - contributedRepositories
       - userInfo
+      - xpRecord
     ProfileActivityStats:
       type: object
       description: Aggregated activity statistics with XP scores for a user profile
