@@ -13,6 +13,7 @@ import io.micrometer.observation.annotation.Observed;
 import java.time.Instant;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.lang.Nullable;
@@ -161,7 +162,7 @@ public class ActivityEventService {
             targetId,
             roundedXp
         );
-        eventTimer.record(System.nanoTime() - startTime, java.util.concurrent.TimeUnit.NANOSECONDS);
+        eventTimer.record(System.nanoTime() - startTime, TimeUnit.NANOSECONDS);
 
         if (rowsInserted == 0) {
             eventsDuplicateCounter.increment();
