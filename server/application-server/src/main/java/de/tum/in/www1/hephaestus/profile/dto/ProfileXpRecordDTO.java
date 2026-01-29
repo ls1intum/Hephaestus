@@ -2,6 +2,7 @@ package de.tum.in.www1.hephaestus.profile.dto;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import io.swagger.v3.oas.annotations.media.Schema;
+import org.springframework.lang.NonNull;
 
 /**
  * Profile-specific DTO representing the user's XP progress and level.
@@ -17,10 +18,10 @@ import io.swagger.v3.oas.annotations.media.Schema;
 @JsonInclude(JsonInclude.Include.NON_EMPTY)
 @Schema(description = "User's XP and Level progress details")
 public record ProfileXpRecordDTO(
-    @Schema(description = "Current calculated level", example = "5") int currentLevel,
-    @Schema(description = "XP accumulated in the current level", example = "450") long currentLevelXP,
-    @Schema(description = "XP needed to reach the next level", example = "1000") long xpNeeded,
-    @Schema(description = "Overall total XP accumulated", example = "5450") long totalXP
+    @NonNull @Schema(description = "Current calculated level", example = "5") Integer currentLevel,
+    @NonNull @Schema(description = "XP accumulated in the current level", example = "450") Long currentLevelXP,
+    @NonNull @Schema(description = "XP needed to reach the next level", example = "1000") Long xpNeeded,
+    @NonNull @Schema(description = "Overall total XP accumulated", example = "5450") Long totalXP
 ) {
     /**
      * Creates a minimal XP record with zero values (Level 1).
@@ -28,6 +29,6 @@ public record ProfileXpRecordDTO(
      * @return a minimal ProfileXpRecordDTO representing 0 XP
      */
     public static ProfileXpRecordDTO empty() {
-        return new ProfileXpRecordDTO(1, 0, 0, 0);
+        return new ProfileXpRecordDTO(1, 0L, 0L, 0L);
     }
 }
