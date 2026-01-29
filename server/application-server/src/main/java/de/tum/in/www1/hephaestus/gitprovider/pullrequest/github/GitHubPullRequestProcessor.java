@@ -69,6 +69,9 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
      * Process a GitHub pull request DTO and persist it as a PullRequest entity.
      * Publishes appropriate domain events based on what changed.
      * <p>
+     * Uses atomic upsert to prevent race conditions when concurrent threads
+     * (e.g., multiple NATS consumers or webhook handlers) process the same PR.
+     * <p>
      * Uses (repository_id, number) as the canonical lookup key to ensure idempotency
      * across both GraphQL sync and webhook events, which use different ID formats.
      *
@@ -83,37 +86,98 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
         }
 
         // Check for valid database ID - required for assigned ID strategy
-        if (dto.getDatabaseId() == null) {
+        Long dbId = dto.getDatabaseId();
+        if (dbId == null) {
             log.warn("Skipped pull request processing: reason=missingDatabaseId, prNumber={}", dto.number());
             return null;
         }
 
-        // Use (repository_id, number) as the canonical key for lookup.
-        // This ensures idempotency regardless of whether the DTO came from
-        // GraphQL (with fullDatabaseId) or webhook (with REST API id).
+        // Check if this is an update (for event publishing purposes)
         Optional<PullRequest> existingOpt = pullRequestRepository.findByRepositoryIdAndNumber(
             repository.getId(),
             dto.number()
         );
-
-        PullRequest pr;
         boolean isNew = existingOpt.isEmpty();
 
-        if (isNew) {
-            pr = createPullRequest(dto, repository);
-            pr.setLastSyncAt(Instant.now());
+        // Resolve related entities BEFORE the upsert
+        User author = dto.author() != null ? findOrCreateUser(dto.author()) : null;
+        User mergedBy = dto.mergedBy() != null ? findOrCreateUser(dto.mergedBy()) : null;
+        Milestone milestone = dto.milestone() != null ? findOrCreateMilestone(dto.milestone(), repository) : null;
+
+        // Extract branch info
+        String headRefName = dto.head() != null ? dto.head().ref() : null;
+        String headRefOid = dto.head() != null ? dto.head().sha() : null;
+        String baseRefName = dto.base() != null ? dto.base().ref() : null;
+        String baseRefOid = dto.base() != null ? dto.base().sha() : null;
+
+        // Use atomic upsert to handle concurrent inserts
+        Instant now = Instant.now();
+        pullRequestRepository.upsertCore(
+            dbId,
+            dto.number(),
+            sanitize(dto.title()),
+            sanitize(dto.body()),
+            convertState(dto.state()).name(),
+            null, // stateReason not used for PRs
+            dto.htmlUrl(),
+            dto.locked(),
+            dto.closedAt(),
+            dto.commentsCount(),
+            now,
+            dto.createdAt(),
+            dto.updatedAt(),
+            author != null ? author.getId() : null,
+            repository.getId(),
+            milestone != null ? milestone.getId() : null,
+            dto.mergedAt(),
+            dto.isDraft(),
+            dto.isMerged(),
+            dto.commits(),
+            dto.additions(),
+            dto.deletions(),
+            dto.changedFiles(),
+            dto.reviewDecision() != null ? dto.reviewDecision().name() : null,
+            dto.mergeStateStatus() != null ? dto.mergeStateStatus().name() : null,
+            dto.isMergeable(),
+            headRefName,
+            baseRefName,
+            headRefOid,
+            baseRefOid,
+            mergedBy != null ? mergedBy.getId() : null
+        );
+
+        // Fetch the PR to get a managed entity and handle relationships
+        PullRequest pr = pullRequestRepository
+            .findByRepositoryIdAndNumber(repository.getId(), dto.number())
+            .orElseThrow(() ->
+                new IllegalStateException(
+                    "PullRequest not found after upsert: repositoryId=" +
+                        repository.getId() +
+                        ", number=" +
+                        dto.number()
+                )
+            );
+
+        // Handle ManyToMany relationships (labels, assignees, requestedReviewers)
+        boolean relationshipsChanged = updateRelationships(dto, pr, repository);
+
+        // Save relationship changes
+        if (relationshipsChanged) {
             pr = pullRequestRepository.save(pr);
+        }
+
+        // Publish events
+        if (isNew) {
             eventPublisher.publishEvent(
                 new DomainEvent.PullRequestCreated(EventPayload.PullRequestData.from(pr), EventContext.from(context))
             );
             log.debug("Created pull request: prId={}, prNumber={}", pr.getId(), dto.number());
         } else {
-            pr = existingOpt.get();
-            Set<String> changedFields = updatePullRequest(dto, pr, repository);
-            pr.setLastSyncAt(Instant.now());
-            pr = pullRequestRepository.save(pr);
-
-            if (!changedFields.isEmpty()) {
+            Set<String> changedFields = computeChangedFields(existingOpt.get(), pr);
+            if (!changedFields.isEmpty() || relationshipsChanged) {
+                if (relationshipsChanged) {
+                    changedFields.add("relationships");
+                }
                 eventPublisher.publishEvent(
                     new DomainEvent.PullRequestUpdated(
                         EventPayload.PullRequestData.from(pr),
@@ -126,6 +190,105 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
         }
 
         return pr;
+    }
+
+    /**
+     * Updates ManyToMany relationships that can't be handled by the atomic upsert.
+     *
+     * @return true if any relationships were changed
+     */
+    private boolean updateRelationships(GitHubPullRequestDTO dto, PullRequest pr, Repository repository) {
+        boolean changed = false;
+
+        // Update assignees
+        if (dto.assignees() != null) {
+            Set<User> newAssignees = new HashSet<>();
+            for (GitHubUserDTO assigneeDto : dto.assignees()) {
+                User assignee = findOrCreateUser(assigneeDto);
+                if (assignee != null) {
+                    newAssignees.add(assignee);
+                }
+            }
+            if (!pr.getAssignees().equals(newAssignees)) {
+                pr.getAssignees().clear();
+                pr.getAssignees().addAll(newAssignees);
+                changed = true;
+            }
+        }
+
+        // Update labels
+        if (dto.labels() != null) {
+            Set<Label> newLabels = new HashSet<>();
+            for (GitHubLabelDTO labelDto : dto.labels()) {
+                Label label = findOrCreateLabel(labelDto, repository);
+                if (label != null) {
+                    newLabels.add(label);
+                }
+            }
+            if (!pr.getLabels().equals(newLabels)) {
+                pr.getLabels().clear();
+                pr.getLabels().addAll(newLabels);
+                changed = true;
+            }
+        }
+
+        // Update requested reviewers
+        if (dto.requestedReviewers() != null) {
+            Set<User> newReviewers = new HashSet<>();
+            for (GitHubUserDTO reviewerDto : dto.requestedReviewers()) {
+                User reviewer = findOrCreateUser(reviewerDto);
+                if (reviewer != null) {
+                    newReviewers.add(reviewer);
+                }
+            }
+            if (!pr.getRequestedReviewers().equals(newReviewers)) {
+                pr.getRequestedReviewers().clear();
+                pr.getRequestedReviewers().addAll(newReviewers);
+                changed = true;
+            }
+        }
+
+        return changed;
+    }
+
+    /**
+     * Computes which fields changed between the old and new PR state.
+     */
+    private Set<String> computeChangedFields(PullRequest oldPr, PullRequest newPr) {
+        Set<String> changedFields = new HashSet<>();
+
+        if (!Objects.equals(oldPr.getTitle(), newPr.getTitle())) {
+            changedFields.add("title");
+        }
+        if (!Objects.equals(oldPr.getBody(), newPr.getBody())) {
+            changedFields.add("body");
+        }
+        if (oldPr.getState() != newPr.getState()) {
+            changedFields.add("state");
+        }
+        if (oldPr.isDraft() != newPr.isDraft()) {
+            changedFields.add("draft");
+        }
+        if (oldPr.isMerged() != newPr.isMerged()) {
+            changedFields.add("merged");
+        }
+        if (!Objects.equals(oldPr.getMergedAt(), newPr.getMergedAt())) {
+            changedFields.add("mergedAt");
+        }
+        if (oldPr.getAdditions() != newPr.getAdditions()) {
+            changedFields.add("additions");
+        }
+        if (oldPr.getDeletions() != newPr.getDeletions()) {
+            changedFields.add("deletions");
+        }
+        if (oldPr.getCommits() != newPr.getCommits()) {
+            changedFields.add("commits");
+        }
+        if (!Objects.equals(oldPr.getHeadRefOid(), newPr.getHeadRefOid())) {
+            changedFields.add("headRefOid");
+        }
+
+        return changedFields;
     }
 
     /**
