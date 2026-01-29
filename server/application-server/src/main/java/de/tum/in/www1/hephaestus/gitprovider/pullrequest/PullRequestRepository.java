@@ -129,7 +129,7 @@ public interface PullRequestRepository extends JpaRepository<PullRequest, Long> 
      *
      * @return 1 if inserted, 1 if updated (always 1 on success due to DO UPDATE)
      */
-    @Modifying
+    @Modifying(clearAutomatically = true)
     @Transactional
     @Query(
         value = """
