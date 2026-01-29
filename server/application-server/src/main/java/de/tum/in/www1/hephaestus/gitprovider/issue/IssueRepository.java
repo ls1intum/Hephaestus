@@ -120,10 +120,10 @@ public interface IssueRepository extends JpaRepository<Issue, Long> {
             author_id = COALESCE(EXCLUDED.author_id, issue.author_id),
             milestone_id = EXCLUDED.milestone_id,
             issue_type_id = EXCLUDED.issue_type_id,
-            parent_issue_id = EXCLUDED.parent_issue_id,
-            sub_issues_total = EXCLUDED.sub_issues_total,
-            sub_issues_completed = EXCLUDED.sub_issues_completed,
-            sub_issues_percent_completed = EXCLUDED.sub_issues_percent_completed
+            parent_issue_id = COALESCE(EXCLUDED.parent_issue_id, issue.parent_issue_id),
+            sub_issues_total = COALESCE(EXCLUDED.sub_issues_total, issue.sub_issues_total),
+            sub_issues_completed = COALESCE(EXCLUDED.sub_issues_completed, issue.sub_issues_completed),
+            sub_issues_percent_completed = COALESCE(EXCLUDED.sub_issues_percent_completed, issue.sub_issues_percent_completed)
         """,
         nativeQuery = true
     )
