@@ -1,5 +1,5 @@
 import { XCircleIcon } from "lucide-react";
-import type { Profile } from "@/api/types.gen";
+import type { Profile, ProfileXpRecord } from "@/api/types.gen";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import type { LeaderboardSchedule } from "@/lib/timeframe";
 import { ProfileContent } from "./ProfileContent";
@@ -17,7 +17,7 @@ interface ProfileProps {
 	onTimeframeChange?: (afterDate: string, beforeDate?: string) => void;
 	/** Leaderboard schedule for proper week calculations */
 	schedule?: LeaderboardSchedule;
-	userXPRecord?: UserXPRecord;
+	userXpRecord: ProfileXpRecord;
 }
 
 export function ProfilePage({
@@ -31,8 +31,7 @@ export function ProfilePage({
 	before,
 	onTimeframeChange,
 	schedule,
-	userXPRecord,
-
+	userXpRecord,
 }: ProfileProps) {
 	if (error) {
 		return (
@@ -47,28 +46,28 @@ export function ProfilePage({
 	}
 
 	return (
-    <div className="pt-4 flex flex-col gap-8">
-      <ProfileHeader
-        user={profileData?.userInfo}
-        firstContribution={profileData?.firstContribution}
-        contributedRepositories={profileData?.contributedRepositories}
-        leaguePoints={profileData?.userInfo?.leaguePoints}
-        userXPRecord={userXPRecord}
-        isLoading={isLoading}
-      />
-      <ProfileContent
-        reviewActivity={profileData?.reviewActivity}
-        openPullRequests={profileData?.openPullRequests}
-        isLoading={isLoading}
-        username={username}
-        displayName={profileData?.userInfo?.name}
-        currUserIsDashboardUser={currUserIsDashboardUser}
-        workspaceSlug={workspaceSlug}
-        afterDate={after}
-        beforeDate={before}
-        onTimeframeChange={onTimeframeChange}
-        schedule={schedule}
-      />
-    </div>
-  );
+		<div className="pt-4 flex flex-col gap-8">
+			<ProfileHeader
+				user={profileData?.userInfo}
+				firstContribution={profileData?.firstContribution}
+				contributedRepositories={profileData?.contributedRepositories}
+				leaguePoints={profileData?.userInfo?.leaguePoints}
+				userXpRecord={userXpRecord}
+				isLoading={isLoading}
+			/>
+			<ProfileContent
+				reviewActivity={profileData?.reviewActivity}
+				openPullRequests={profileData?.openPullRequests}
+				isLoading={isLoading}
+				username={username}
+				displayName={profileData?.userInfo?.name}
+				currUserIsDashboardUser={currUserIsDashboardUser}
+				workspaceSlug={workspaceSlug}
+				afterDate={after}
+				beforeDate={before}
+				onTimeframeChange={onTimeframeChange}
+				schedule={schedule}
+			/>
+		</div>
+	);
 }

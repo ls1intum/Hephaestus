@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 export interface XpProgressProps {
 	currentXP: number;
 	xpNeeded: number;
-	totalXP?: number;
+	totalXP: number;
 	className?: string;
 }
 

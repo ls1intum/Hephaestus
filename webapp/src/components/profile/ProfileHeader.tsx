@@ -1,6 +1,6 @@
 import { ClockIcon } from "@primer/octicons-react";
 import { format } from "date-fns";
-import type { RepositoryInfo, UserInfo } from "@/api/types.gen";
+import type { ProfileXpRecord, RepositoryInfo, UserInfo } from "@/api/types.gen";
 import { LeagueIcon } from "@/components/leaderboard/LeagueIcon";
 import { getLeagueTier } from "@/components/leaderboard/utils.ts";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -14,7 +14,7 @@ export interface ProfileHeaderProps {
 	firstContribution?: Date;
 	contributedRepositories?: RepositoryInfo[];
 	leaguePoints?: number;
-	userXPRecord: UserXPRecord;
+	userXpRecord: ProfileXpRecord;
 	isLoading: boolean;
 }
 
@@ -22,11 +22,16 @@ export function ProfileHeader({
 	user,
 	firstContribution,
 	leaguePoints = 0,
-	userXPRecord,
+	userXpRecord,
 	isLoading,
 }: ProfileHeaderProps) {
 	// unpack xp relevant data
-	const { level, currentLevelXP, xpNeeded, totalXP } = userXPRecord;
+	const {
+		currentLevel: level,
+		currentLevelXP: currentXp,
+		xpNeeded,
+		totalXP: totalXp,
+	} = userXpRecord;
 
 	// Format the first contribution date if available
 	const formattedFirstContribution = firstContribution
@@ -101,9 +106,9 @@ export function ProfileHeader({
 						{/* Level Bar - Integrated under user info */}
 						<XpProgress
 							className="max-w-sm"
-							currentXP={currentLevelXP}
+							currentXP={currentXp}
 							xpNeeded={xpNeeded}
-							totalXP={totalXP}
+							totalXP={totalXp}
 						/>
 						{/* First contribution */}
 						{formattedFirstContribution && (
