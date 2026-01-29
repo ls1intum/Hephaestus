@@ -143,6 +143,16 @@ class CodeQualityTest extends HephaestusArchitectureTest {
                 "ActivityEventService.record" // Has RecordActivityCommand overload for cleaner API
             );
 
+            // Repository native SQL methods require individual @Param annotations and cannot use
+            // parameter objects. These are atomic upsert operations that map directly to DB columns.
+            java.util.Set<String> nativeSqlRepositoryMethods = java.util.Set.of(
+                "ActivityEventRepository.insertIfAbsent",
+                "IssueRepository.upsertCore",
+                "PullRequestRepository.upsertCore",
+                "MilestoneRepository.insertIfAbsent",
+                "LabelRepository.insertIfAbsent"
+            );
+
             ArchCondition<JavaClass> haveMethodsWithLimitedParams = new ArchCondition<>(
                 "have methods with at most " + MAX_METHOD_PARAMETERS + " parameters"
             ) {
@@ -166,6 +176,10 @@ class CodeQualityTest extends HephaestusArchitectureTest {
                         )
                         // Exclude allowed overloads with command-object alternatives
                         .filter(m -> !allowedOverloads.contains(javaClass.getSimpleName() + "." + m.getName()))
+                        // Exclude native SQL repository methods (require @Param per column, no param objects)
+                        .filter(m ->
+                            !nativeSqlRepositoryMethods.contains(javaClass.getSimpleName() + "." + m.getName())
+                        )
                         .filter(m -> m.getModifiers().contains(com.tngtech.archunit.core.domain.JavaModifier.PUBLIC))
                         .forEach(method -> {
                             int paramCount = method.getRawParameterTypes().size();
