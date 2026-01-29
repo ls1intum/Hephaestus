@@ -39,6 +39,7 @@ public interface PullRequestRepository extends JpaRepository<PullRequest, Long> 
         LEFT JOIN FETCH p.author
         LEFT JOIN FETCH p.assignees
         LEFT JOIN FETCH p.repository
+        LEFT JOIN FETCH p.milestone
         WHERE p.repository.id = :repositoryId AND p.number = :number
         """
     )

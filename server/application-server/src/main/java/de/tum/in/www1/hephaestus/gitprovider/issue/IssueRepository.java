@@ -36,6 +36,7 @@ public interface IssueRepository extends JpaRepository<Issue, Long> {
         LEFT JOIN FETCH i.author
         LEFT JOIN FETCH i.assignees
         LEFT JOIN FETCH i.repository
+        LEFT JOIN FETCH i.milestone
         WHERE i.repository.id = :repositoryId AND i.number = :number
         """
     )
