@@ -2630,6 +2630,11 @@ components:
           format: int64
           description: XP needed to reach the next level
           example: 1000
+      required:
+      - currentLevel
+      - currentLevelXP
+      - totalXP
+      - xpNeeded
     PullRequestBadPractice:
       type: object
       description: A detected bad practice in a pull request

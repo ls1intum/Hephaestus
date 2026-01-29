@@ -344,19 +344,19 @@ export type ProfileXpRecord = {
     /**
      * Current calculated level
      */
-    currentLevel?: number;
+    currentLevel: number;
     /**
      * XP accumulated in the current level
      */
-    currentLevelXP?: number;
+    currentLevelXP: number;
     /**
      * Overall total XP accumulated
      */
-    totalXP?: number;
+    totalXP: number;
     /**
      * XP needed to reach the next level
      */
-    xpNeeded?: number;
+    xpNeeded: number;
 };
 
 /**
