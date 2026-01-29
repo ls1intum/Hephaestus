@@ -16,7 +16,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
  */
 @JsonInclude(JsonInclude.Include.NON_EMPTY)
 @Schema(description = "User's XP and Level progress details")
-public record UserProfileXPRecordDTO(
+public record ProfileXPRecordDTO(
     @Schema(description = "Current calculated level", example = "5") int currentLevel,
     @Schema(description = "XP accumulated in the current level", example = "450") long currentLevelXP,
     @Schema(description = "XP needed to reach the next level", example = "1000") long xpNeeded,

@@ -1,6 +1,6 @@
 package de.tum.in.www1.hephaestus.profile;
 
-import de.tum.in.www1.hephaestus.profile.dto.UserProfileXPRecordDTO;
+import de.tum.in.www1.hephaestus.profile.dto.ProfileXPRecordDTO;
 
 /**
  * Utility class for XP and Level calculations.
@@ -53,7 +53,7 @@ public final class XpSystem {
      * @param totalXP the total accumulated XP
      * @return a DTO containing level, current level XP, XP needed for next level, and total XP
      */
-    public static UserProfileXPRecordDTO getLevelProgress(long totalXP) {
+    public static ProfileXPRecordDTO getLevelProgress(long totalXP) {
         int level = getLevel(totalXP);
         long currentLevelStartXp = getXpRequiredForLevel(level);
         long nextLevelStartXp = getXpRequiredForLevel(level + 1);
@@ -61,7 +61,7 @@ public final class XpSystem {
         long xpInCurrentLevel = Math.max(0, totalXP - currentLevelStartXp);
         long xpNeededForNextLevel = nextLevelStartXp - currentLevelStartXp;
 
-        return new UserProfileXPRecordDTO(
+        return new ProfileXPRecordDTO(
             level,
             xpInCurrentLevel,
             xpNeededForNextLevel,
