@@ -40,11 +40,9 @@ export function XpProgress({ currentXP, xpNeeded, totalXP, className }: XpProgre
 							/>
 						</div>
 					</TooltipTrigger>
-					{totalXP !== undefined && (
-						<TooltipContent>
-							<p>Total XP: {totalXP}</p>
-						</TooltipContent>
-					)}
+					<TooltipContent>
+						<p>Total XP: {totalXP}</p>
+					</TooltipContent>
 				</Tooltip>
 			</div>
 		</div>
