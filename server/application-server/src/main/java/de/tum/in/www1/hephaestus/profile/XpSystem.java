@@ -1,7 +1,6 @@
 package de.tum.in.www1.hephaestus.profile;
 
 import de.tum.in.www1.hephaestus.profile.dto.ProfileXpRecordDTO;
-import jakarta.validation.Constraint;
 
 
 /**
