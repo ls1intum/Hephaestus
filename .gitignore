@@ -208,8 +208,6 @@ MISSION.md
 **/.idea/**/usage.statistics.xml
 **/.idea/**/dictionaries
 **/.idea/**/shelf
-+**/.idea/**/dataSources.xml
-+**/.idea/**/biome.xml
 
 # Generated files
 **/.idea/**/contentModel.xml
@@ -222,6 +220,8 @@ MISSION.md
 **/.idea/**/dynamic.xml
 **/.idea/**/uiDesigner.xml
 **/.idea/**/dbnavigator.xml
+**/.idea/**/dataSources.xml
+**/.idea/**/biome.xml
 
 
 # Gradle and Maven with auto-import
