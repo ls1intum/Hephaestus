@@ -31,15 +31,16 @@ const SCOPES = [
   'ai',
   'webhooks',
   'docs',
-  // Infrastructure scopes (will NOT trigger release)
+  // Infrastructure scopes that WILL trigger release (affect runtime)
+  'deps', // Production dependencies (security patches, bug fixes)
+  'security', // Security fixes are critical
+  'db', // Database migrations affect runtime
+  // Infrastructure scopes that will NOT trigger release
   'ci',
   'config',
-  'deps',
   'deps-dev',
   'docker',
   'scripts',
-  'security',
-  'db',
   'no-release',
   // Feature scopes (domain-specific)
   'gitprovider',
@@ -80,7 +81,8 @@ const helpfulErrorsPlugin = {
           : `scope "${scope}" is not allowed.\n\n` +
             `Allowed scopes:\n` +
             `  Services:       webapp, server, ai, webhooks, docs\n` +
-            `  Infrastructure: ci, config, deps, deps-dev, docker, scripts, security, db, no-release\n` +
+            `  Infra (release): deps, security, db\n` +
+            `  Infra (no release): ci, config, deps-dev, docker, scripts, no-release\n` +
             `  Features:       gitprovider, leaderboard, mentor, notifications, profile, teams, workspace\n\n` +
             `Format: <type>(<scope>): <description>\n` +
             `Example: fix(server): resolve null pointer exception`,

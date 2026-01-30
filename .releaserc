@@ -24,19 +24,11 @@
             "release": false
           },
           {
-            "scope": "deps",
-            "release": false
-          },
-          {
             "scope": "deps-dev",
             "release": false
           },
           {
             "scope": "scripts",
-            "release": false
-          },
-          {
-            "scope": "security",
             "release": false
           },
           {
