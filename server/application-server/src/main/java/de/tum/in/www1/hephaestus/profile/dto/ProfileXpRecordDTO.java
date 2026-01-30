@@ -1,6 +1,7 @@
 package de.tum.in.www1.hephaestus.profile.dto;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import de.tum.in.www1.hephaestus.profile.XpSystem;
 import io.swagger.v3.oas.annotations.media.Schema;
 import org.springframework.lang.NonNull;
 
@@ -29,6 +30,6 @@ public record ProfileXpRecordDTO(
      * @return a minimal ProfileXpRecordDTO representing 0 XP
      */
     public static ProfileXpRecordDTO empty() {
-        return new ProfileXpRecordDTO(1, 0L, 0L, 0L);
+        return XpSystem.getLevelProgress(0L);
     }
 }
