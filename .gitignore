@@ -1,7 +1,6 @@
 .DS_Store
 
 # IDE files
-*.iml
 .project
 .classpath
 .settings/
