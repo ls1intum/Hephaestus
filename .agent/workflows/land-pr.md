@@ -75,9 +75,12 @@ git commit -m "<type>(<scope>): <description>"
 
 **Scopes:**
 
-- Service: `webapp`, `server`, `ai`, `webhooks`, `docs`
-- Infra (no release): `ci`, `config`, `deps`, `deps-dev`, `docker`, `scripts`, `security`, `db`, `no-release`
-- Feature: `gitprovider`, `leaderboard`, `mentor`, `notifications`, `profile`, `teams`, `workspace`
+- Service (release): `webapp`, `server`, `ai`, `webhooks`, `docs`
+- Infra (release): `deps`, `security`, `db`, `docker`
+- Infra (NO release): `ci`, `config`, `deps-dev`, `scripts`, `no-release`
+- Feature (release): `gitprovider`, `leaderboard`, `mentor`, `notifications`, `profile`, `teams`, `workspace`
+
+⚠️ `config` = TOOLING only (.prettierrc, renovate). Use `server` for runtime config, service scope for Dockerfiles.
 
 ## 7. Push
 

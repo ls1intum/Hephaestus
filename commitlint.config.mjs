@@ -25,23 +25,28 @@ const TYPES = [
 
 // Allowed scopes (aligned with pull-request.yml)
 const SCOPES = [
-  // Service scopes (where the code lives)
-  'webapp',
-  'server',
-  'ai',
-  'webhooks',
-  'docs',
-  // Infrastructure scopes (will NOT trigger release)
-  'ci',
-  'config',
-  'deps',
-  'deps-dev',
-  'docker',
-  'scripts',
-  'security',
-  'db',
-  'no-release',
-  // Feature scopes (domain-specific)
+  // === SERVICE SCOPES (where the code lives) - WILL trigger release ===
+  'webapp', // React frontend, webapp Dockerfile
+  'server', // Java backend, server Dockerfile
+  'ai', // Intelligence service, ai Dockerfile
+  'webhooks', // Webhook ingestion, webhooks Dockerfile
+  'docs', // Documentation site
+
+  // === INFRASTRUCTURE SCOPES that WILL trigger release (affect runtime) ===
+  'deps', // Production dependencies (security patches, bug fixes)
+  'security', // Security fixes (CRITICAL - must release)
+  'db', // Database migrations (affect runtime)
+  'docker', // Dockerfiles, production compose (affect deployed containers)
+
+  // === INFRASTRUCTURE SCOPES that will NOT trigger release ===
+  'ci', // GitHub Actions, CI workflows only
+  'config', // TOOLING ONLY: .prettierrc, renovate.json, eslint, vscode
+  //          NOT for: application.yml (use 'server'), Dockerfiles (use service scope)
+  'deps-dev', // Dev dependencies only (test libs, linters)
+  'scripts', // Build/dev helper scripts
+  'no-release', // Explicit opt-out
+
+  // === FEATURE SCOPES (domain-specific) - WILL trigger release ===
   'gitprovider',
   'leaderboard',
   'mentor',
@@ -79,9 +84,12 @@ const helpfulErrorsPlugin = {
           ? ''
           : `scope "${scope}" is not allowed.\n\n` +
             `Allowed scopes:\n` +
-            `  Services:       webapp, server, ai, webhooks, docs\n` +
-            `  Infrastructure: ci, config, deps, deps-dev, docker, scripts, security, db, no-release\n` +
-            `  Features:       gitprovider, leaderboard, mentor, notifications, profile, teams, workspace\n\n` +
+            `  Services (release):    webapp, server, ai, webhooks, docs\n` +
+            `  Infra (release):       deps, security, db, docker\n` +
+            `  Infra (NO release):    ci, config, deps-dev, scripts, no-release\n` +
+            `  Features (release):    gitprovider, leaderboard, mentor, notifications, profile, teams, workspace\n\n` +
+            `⚠️  'config' is for TOOLING only (.prettierrc, renovate.json)\n` +
+            `    For runtime config use 'server', for Dockerfiles use service scope\n\n` +
             `Format: <type>(<scope>): <description>\n` +
             `Example: fix(server): resolve null pointer exception`,
       ];
