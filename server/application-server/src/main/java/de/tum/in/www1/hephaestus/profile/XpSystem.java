@@ -1,6 +1,7 @@
 package de.tum.in.www1.hephaestus.profile;
 
 import de.tum.in.www1.hephaestus.profile.dto.ProfileXpRecordDTO;
+import jakarta.validation.Constraint;
 
 
 /**
@@ -77,11 +78,11 @@ public final class XpSystem {
     /**
      * Calculates all XP related stats for a given total XP.
      *
-     * @param totalXP the total accumulated XP
+     * @param totalXP the total accumulated XP (negative values are clamped to 0)
      * @return a DTO containing level, current level XP, XP needed for next level, and total XP
      */
     public static ProfileXpRecordDTO getLevelProgress(long totalXP) {
-        int level = getLevel(totalXP);
+        int level = getLevel(Math.max(0, totalXP));
         long currentLevelStartXp = getXpRequiredForLevel(level);
         long nextLevelStartXp = getXpRequiredForLevel(level + 1);
 
