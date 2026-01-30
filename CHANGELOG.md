@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.13.1](https://github.com/ls1intum/Hephaestus/compare/v0.13.0...v0.13.1) (2026-01-30)
+
+### 🐛 Bug Fixes
+
+* **gitprovider:** atomic upsert for activity events, issues, pull requests, labels, and milestones ([#659](https://github.com/ls1intum/Hephaestus/issues/659)) ([0f616a9](https://github.com/ls1intum/Hephaestus/commit/0f616a9fcf523bdb3e2465e17ead4d5cc90edea4))
+
 ## [0.13.0](https://github.com/ls1intum/Hephaestus/compare/v0.12.4...v0.13.0) (2026-01-28)
 
 ### 🐛 Bug Fixes
