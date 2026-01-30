@@ -14,6 +14,7 @@ public final class XpSystem {
     public static final double GROWTH_EXPONENT = 1.8;
     public static final int LINEAR_WEIGHT = 50;
     public static final int ROUNDING_STEP = 50;
+    public static final int LEVEL_CAP = 100;
 
     private XpSystem() {
         // Utility class
@@ -30,6 +31,9 @@ public final class XpSystem {
         if (totalXP < 0) {
             return 1;
         }
+        if (totalXP >= 1_000_000) {
+            return LEVEL_CAP; // sanity guard as 1 mio xp is equivalent to roughly level 167 (which shouldn't be reachable anyway)
+        }
 
         // 1. Approximate level using inverse of the dominant power term to get close
         // This ignores rounding and linear parts but gives a good starting point
@@ -44,7 +48,7 @@ public final class XpSystem {
             estimatedLevel--;
         }
         // If we estimated too low (unlikely but safe), step up
-        while (getXpRequiredForLevel(estimatedLevel + 1) <= totalXP) {
+        while (estimatedLevel < LEVEL_CAP && getXpRequiredForLevel(estimatedLevel + 1) <= totalXP) {
             estimatedLevel++;
         }
 
