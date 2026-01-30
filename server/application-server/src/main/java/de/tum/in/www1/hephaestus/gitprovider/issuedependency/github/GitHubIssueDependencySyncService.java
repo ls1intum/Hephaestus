@@ -202,7 +202,7 @@ public class GitHubIssueDependencySyncService {
         int failedRepoCount = 0;
 
         for (String repoNameWithOwner : repositoryNames) {
-            Optional<Repository> repoOpt = repositoryRepository.findByNameWithOwner(repoNameWithOwner);
+            Optional<Repository> repoOpt = repositoryRepository.findByNameWithOwnerWithOrganization(repoNameWithOwner);
             if (repoOpt.isEmpty()) {
                 log.debug(
                     "Skipped dependency sync: reason=repositoryNotFound, repoName={}",
@@ -451,10 +451,7 @@ public class GitHubIssueDependencySyncService {
             return null;
         }
 
-        // Use ProcessingContext.forSync directly to avoid LazyInitializationException
-        // when accessing repository.getOrganization() in the factory
         ProcessingContext context = ProcessingContext.forSync(scopeId, repo);
-        // Use processStub() to avoid triggering IssueCreated events for placeholder issues
         return issueProcessor.processStub(dto, context);
     }
 
@@ -576,10 +573,7 @@ public class GitHubIssueDependencySyncService {
             return null;
         }
 
-        // Use ProcessingContext.forSync directly to avoid LazyInitializationException
-        // when accessing repository.getOrganization() in the factory
         ProcessingContext context = ProcessingContext.forSync(scopeId, blockerRepo);
-        // Use processStub() to avoid triggering IssueCreated events for placeholder issues
         return issueProcessor.processStub(dto, context);
     }
 
@@ -602,7 +596,7 @@ public class GitHubIssueDependencySyncService {
             return null;
         }
 
-        return repositoryRepository.findByNameWithOwner(nameWithOwner).orElse(null);
+        return repositoryRepository.findByNameWithOwnerWithOrganization(nameWithOwner).orElse(null);
     }
 
     // ═══════════════════════════════════════════════════════════════════════════

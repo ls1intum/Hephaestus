@@ -5,12 +5,11 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 import de.tum.in.www1.hephaestus.activity.scoring.ExperiencePointProperties;
-import de.tum.in.www1.hephaestus.workspace.Workspace;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceRepository;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Instant;
-import java.util.Optional;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
@@ -18,7 +17,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.dao.DataIntegrityViolationException;
 
 /**
  * Unit tests for ActivityEventService.
@@ -51,12 +49,22 @@ class ActivityEventServiceTest {
     @DisplayName("record saves event and returns true on success")
     void record_success_savesEvent() {
         // Arrange
-        Workspace workspace = new Workspace();
-        workspace.setId(1L);
-        when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
-        // Pre-check returns false = event doesn't exist yet
-        when(eventRepository.existsByWorkspaceIdAndEventKey(eq(1L), anyString())).thenReturn(false);
-        when(eventRepository.save(any(ActivityEvent.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(workspaceRepository.existsById(1L)).thenReturn(true);
+        // insertIfAbsent returns 1 = event was inserted
+        when(
+            eventRepository.insertIfAbsent(
+                any(UUID.class),
+                anyString(),
+                anyString(),
+                any(Instant.class),
+                any(),
+                eq(1L),
+                any(),
+                anyString(),
+                anyLong(),
+                anyDouble()
+            )
+        ).thenReturn(1);
 
         // Act
         boolean result = service.record(
@@ -72,69 +80,47 @@ class ActivityEventServiceTest {
 
         // Assert
         assertThat(result).isTrue();
-        verify(eventRepository).save(any(ActivityEvent.class));
+        verify(eventRepository).insertIfAbsent(
+            any(UUID.class),
+            anyString(),
+            anyString(),
+            any(Instant.class),
+            any(),
+            eq(1L),
+            any(),
+            anyString(),
+            anyLong(),
+            anyDouble()
+        );
         assertThat(meterRegistry.counter("activity.events.recorded").count()).isEqualTo(1.0);
     }
 
     @Test
-    @DisplayName("record returns false via pre-check when event already exists")
-    void record_duplicatePreCheck_returnsFalseWithoutSave() {
+    @DisplayName("record returns false when event already exists (duplicate)")
+    void record_duplicate_returnsFalse() {
         // Arrange
-        Workspace workspace = new Workspace();
-        workspace.setId(1L);
-        Instant timestamp = Instant.now();
-        String expectedEventKey = ActivityEvent.buildKey(ActivityEventType.PULL_REQUEST_OPENED, 100L, timestamp);
-
-        when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
-        // Pre-check returns true = event already exists
-        when(eventRepository.existsByWorkspaceIdAndEventKey(1L, expectedEventKey)).thenReturn(true);
+        when(workspaceRepository.existsById(1L)).thenReturn(true);
+        // insertIfAbsent returns 0 = duplicate (ON CONFLICT DO NOTHING)
+        when(
+            eventRepository.insertIfAbsent(
+                any(UUID.class),
+                anyString(),
+                anyString(),
+                any(Instant.class),
+                any(),
+                eq(1L),
+                any(),
+                anyString(),
+                anyLong(),
+                anyDouble()
+            )
+        ).thenReturn(0);
 
         // Act
         boolean result = service.record(
             1L,
             ActivityEventType.PULL_REQUEST_OPENED,
-            timestamp,
-            null,
-            null,
-            ActivityTargetType.PULL_REQUEST,
-            100L,
-            1.0
-        );
-
-        // Assert
-        assertThat(result).isFalse();
-        // save() should NEVER be called when pre-check detects duplicate
-        verify(eventRepository, never()).save(any(ActivityEvent.class));
-        assertThat(meterRegistry.counter("activity.events.recorded").count()).isEqualTo(0.0);
-        assertThat(meterRegistry.counter("activity.events.duplicate").count()).isEqualTo(1.0);
-    }
-
-    @Test
-    @DisplayName(
-        "record returns false and increments duplicate counter on DataIntegrityViolation (race condition fallback)"
-    )
-    void record_duplicate_returnsFalseAndIncrementsDuplicateCounter() {
-        // This test covers the race condition case where pre-check passes but save still fails
-        // due to concurrent insert between the check and save.
-        // Arrange
-        Workspace workspace = new Workspace();
-        workspace.setId(1L);
-        Instant timestamp = Instant.now();
-        String expectedEventKey = ActivityEvent.buildKey(ActivityEventType.PULL_REQUEST_OPENED, 100L, timestamp);
-
-        when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
-        // Pre-check returns false = event doesn't exist yet
-        when(eventRepository.existsByWorkspaceIdAndEventKey(1L, expectedEventKey)).thenReturn(false);
-        // But save throws due to race condition (another thread inserted between check and save)
-        when(eventRepository.save(any(ActivityEvent.class))).thenThrow(
-            new DataIntegrityViolationException("Unique constraint violation")
-        );
-
-        // Act
-        boolean result = service.record(
-            1L,
-            ActivityEventType.PULL_REQUEST_OPENED,
-            timestamp,
+            Instant.now(),
             null,
             null,
             ActivityTargetType.PULL_REQUEST,
@@ -152,7 +138,7 @@ class ActivityEventServiceTest {
     @DisplayName("record returns false when workspace not found")
     void record_workspaceNotFound_returnsFalse() {
         // Arrange
-        when(workspaceRepository.findById(999L)).thenReturn(Optional.empty());
+        when(workspaceRepository.existsById(999L)).thenReturn(false);
 
         // Act
         boolean result = service.record(
@@ -175,16 +161,22 @@ class ActivityEventServiceTest {
     @DisplayName("record clamps negative XP to zero")
     void record_negativeXp_clampsToZero() {
         // Arrange
-        Workspace workspace = new Workspace();
-        workspace.setId(1L);
-        when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
-        when(eventRepository.existsByWorkspaceIdAndEventKey(eq(1L), anyString())).thenReturn(false);
-        when(eventRepository.save(any(ActivityEvent.class))).thenAnswer(inv -> {
-            ActivityEvent event = inv.getArgument(0);
-            // Verify XP was clamped to 0
-            assertThat(event.getXp()).isEqualTo(0.0);
-            return event;
-        });
+        when(workspaceRepository.existsById(1L)).thenReturn(true);
+        // Capture the XP value passed to insertIfAbsent
+        when(
+            eventRepository.insertIfAbsent(
+                any(UUID.class),
+                anyString(),
+                anyString(),
+                any(Instant.class),
+                any(),
+                eq(1L),
+                any(),
+                anyString(),
+                anyLong(),
+                eq(0.0)
+            )
+        ).thenReturn(1);
 
         // Act
         boolean result = service.record(
@@ -200,23 +192,41 @@ class ActivityEventServiceTest {
 
         // Assert
         assertThat(result).isTrue();
-        verify(eventRepository).save(any(ActivityEvent.class));
+        // Verify XP was clamped to 0.0
+        verify(eventRepository).insertIfAbsent(
+            any(UUID.class),
+            anyString(),
+            anyString(),
+            any(Instant.class),
+            any(),
+            eq(1L),
+            any(),
+            anyString(),
+            anyLong(),
+            eq(0.0)
+        );
     }
 
     @Test
     @DisplayName("record clamps XP above maximum to maxXpPerEvent")
     void record_excessiveXp_clampsToMax() {
         // Arrange
-        Workspace workspace = new Workspace();
-        workspace.setId(1L);
-        when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
-        when(eventRepository.existsByWorkspaceIdAndEventKey(eq(1L), anyString())).thenReturn(false);
-        when(eventRepository.save(any(ActivityEvent.class))).thenAnswer(inv -> {
-            ActivityEvent event = inv.getArgument(0);
-            // Verify XP was clamped to max (1000.0 as configured in setUp)
-            assertThat(event.getXp()).isEqualTo(1000.0);
-            return event;
-        });
+        when(workspaceRepository.existsById(1L)).thenReturn(true);
+        // Verify XP was clamped to max (1000.0 as configured in setUp)
+        when(
+            eventRepository.insertIfAbsent(
+                any(UUID.class),
+                anyString(),
+                anyString(),
+                any(Instant.class),
+                any(),
+                eq(1L),
+                any(),
+                anyString(),
+                anyLong(),
+                eq(1000.0)
+            )
+        ).thenReturn(1);
 
         // Act
         boolean result = service.record(
@@ -232,6 +242,18 @@ class ActivityEventServiceTest {
 
         // Assert
         assertThat(result).isTrue();
-        verify(eventRepository).save(any(ActivityEvent.class));
+        // Verify XP was clamped to 1000.0
+        verify(eventRepository).insertIfAbsent(
+            any(UUID.class),
+            anyString(),
+            anyString(),
+            any(Instant.class),
+            any(),
+            eq(1L),
+            any(),
+            anyString(),
+            anyLong(),
+            eq(1000.0)
+        );
     }
 }

@@ -24,8 +24,43 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Repository
 public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UUID> {
-    /** Check for idempotent upsert */
-    boolean existsByWorkspaceIdAndEventKey(Long workspaceId, String eventKey);
+    /**
+     * Atomically inserts an activity event if absent (race-condition safe).
+     *
+     * <p>Uses PostgreSQL's ON CONFLICT DO NOTHING to handle concurrent inserts.
+     * This avoids the race condition where exists() check passes but save() fails
+     * with DataIntegrityViolationException at transaction commit time.
+     *
+     * @return 1 if inserted, 0 if duplicate (conflict on workspace_id + event_key)
+     */
+    @Modifying
+    @Transactional
+    @Query(
+        value = """
+        INSERT INTO activity_event (
+            id, event_key, event_type, occurred_at, actor_id,
+            workspace_id, repository_id, target_type, target_id, xp, ingested_at
+        )
+        VALUES (
+            :id, :eventKey, :eventType, :occurredAt, :actorId,
+            :workspaceId, :repositoryId, :targetType, :targetId, :xp, CURRENT_TIMESTAMP
+        )
+        ON CONFLICT (workspace_id, event_key) DO NOTHING
+        """,
+        nativeQuery = true
+    )
+    int insertIfAbsent(
+        @Param("id") UUID id,
+        @Param("eventKey") String eventKey,
+        @Param("eventType") String eventType,
+        @Param("occurredAt") Instant occurredAt,
+        @Param("actorId") Long actorId,
+        @Param("workspaceId") Long workspaceId,
+        @Param("repositoryId") Long repositoryId,
+        @Param("targetType") String targetType,
+        @Param("targetId") Long targetId,
+        @Param("xp") double xp
+    );
 
     // ========================================================================
     // Leaderboard Aggregation Queries

@@ -344,8 +344,7 @@ public class GitHubIssueSyncService {
                 // Process the page within its own transaction to keep transactions short
                 final Long repoId = repositoryId;
                 PageResult pageResult = transactionTemplate.execute(status -> {
-                    // Re-fetch repository within transaction to ensure it's attached to session
-                    Repository repo = repositoryRepository.findById(repoId).orElse(null);
+                    Repository repo = repositoryRepository.findByIdWithOrganization(repoId).orElse(null);
                     if (repo == null) {
                         return new PageResult(0, 0);
                     }

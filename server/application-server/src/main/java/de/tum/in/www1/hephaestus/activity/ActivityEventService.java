@@ -4,7 +4,6 @@ import de.tum.in.www1.hephaestus.activity.scoring.ExperiencePointProperties;
 import de.tum.in.www1.hephaestus.activity.scoring.XpPrecision;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
-import de.tum.in.www1.hephaestus.workspace.Workspace;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceRepository;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.DistributionSummary;
@@ -12,10 +11,11 @@ import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import io.micrometer.observation.annotation.Observed;
 import java.time.Instant;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -54,7 +54,6 @@ public class ActivityEventService {
     private final Counter eventsRecordedCounter;
     private final Counter eventsDuplicateCounter;
     private final Counter eventsFailedCounter;
-    private final Timer recordTimer;
     private final DistributionSummary xpDistribution;
     private final MeterRegistry meterRegistry;
 
@@ -78,10 +77,6 @@ public class ActivityEventService {
             .register(meterRegistry);
         this.eventsFailedCounter = Counter.builder("activity.events.failed")
             .description("Number of activity events that failed to record after retries")
-            .register(meterRegistry);
-        this.recordTimer = Timer.builder("activity.events.record.duration")
-            .description("Time to persist activity event")
-            .publishPercentiles(0.5, 0.95, 0.99)
             .register(meterRegistry);
         this.xpDistribution = DistributionSummary.builder("activity.xp.distribution")
             .description("Distribution of XP values recorded")
@@ -127,8 +122,8 @@ public class ActivityEventService {
         Long targetId,
         double xp
     ) {
-        Workspace workspace = workspaceRepository.findById(workspaceId).orElse(null);
-        if (workspace == null) {
+        // Validate workspace exists first (cheap lookup)
+        if (!workspaceRepository.existsById(workspaceId)) {
             eventsFailedCounter.increment();
             log.warn(
                 "Failed to record event, workspace not found: scopeId={}, eventType={}, targetId={}",
@@ -151,53 +146,43 @@ public class ActivityEventService {
 
         String eventKey = ActivityEvent.buildKey(eventType, targetId, occurredAt);
 
-        // Check for duplicate BEFORE attempting insert.
-        // This is critical because DataIntegrityViolationException is thrown at transaction
-        // commit time, not at save() time. When running in batch transactions (e.g., backfill),
-        // the exception would propagate past our try-catch and fail the entire batch.
-        // By checking first, we avoid the constraint violation entirely.
-        if (eventRepository.existsByWorkspaceIdAndEventKey(workspaceId, eventKey)) {
-            eventsDuplicateCounter.increment();
-            log.debug("Skipped duplicate event (pre-check): eventKey={}", eventKey);
-            return false;
-        }
+        // Use ON CONFLICT DO NOTHING to atomically handle duplicates.
+        // This eliminates the race condition between exists() check and save().
+        Timer eventTimer = getTimerForEventType(eventType);
+        long startTime = System.nanoTime();
+        int rowsInserted = eventRepository.insertIfAbsent(
+            UUID.randomUUID(),
+            eventKey,
+            eventType.name(),
+            occurredAt,
+            actor != null ? actor.getId() : null,
+            workspaceId,
+            repository != null ? repository.getId() : null,
+            targetType.getValue(),
+            targetId,
+            roundedXp
+        );
+        eventTimer.record(System.nanoTime() - startTime, TimeUnit.NANOSECONDS);
 
-        ActivityEvent event = ActivityEvent.builder()
-            .eventKey(eventKey)
-            .eventType(eventType)
-            .occurredAt(occurredAt)
-            .actor(actor)
-            .workspace(workspace)
-            .repository(repository)
-            .targetType(targetType.getValue())
-            .targetId(targetId)
-            .xp(roundedXp)
-            .build();
-
-        try {
-            // Use pre-registered timers to avoid cardinality explosion
-            Timer eventTimer = getTimerForEventType(eventType);
-            eventTimer.record(() -> eventRepository.save(event));
-            recordTimer.record(() -> {}); // Record overall duration
-
-            eventsRecordedCounter.increment();
-            xpDistribution.record(roundedXp);
-
-            // Structured logging with trace context
-            log.info(
-                "Recorded activity event: eventType={}, targetId={}, xp={}, scopeId={}, actorId={}",
-                eventType,
-                targetId,
-                roundedXp,
-                workspaceId,
-                actor != null ? actor.getId() : null
-            );
-            return true;
-        } catch (DataIntegrityViolationException e) {
+        if (rowsInserted == 0) {
             eventsDuplicateCounter.increment();
             log.debug("Skipped duplicate event: eventKey={}", eventKey);
             return false;
         }
+
+        eventsRecordedCounter.increment();
+        xpDistribution.record(roundedXp);
+
+        // Structured logging with trace context
+        log.info(
+            "Recorded activity event: eventType={}, targetId={}, xp={}, scopeId={}, actorId={}",
+            eventType,
+            targetId,
+            roundedXp,
+            workspaceId,
+            actor != null ? actor.getId() : null
+        );
+        return true;
     }
 
     /**
