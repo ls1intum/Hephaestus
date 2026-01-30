@@ -87,7 +87,7 @@ class ProcessingContextFactoryTest {
             String repoFullName = "ls1intum/Hephaestus";
             GitHubWebhookEvent event = createEventWithRepo(repoFullName);
             when(repositoryScopeFilter.isRepositoryAllowed(repoFullName)).thenReturn(true);
-            when(repositoryRepository.findByNameWithOwner(repoFullName)).thenReturn(Optional.empty());
+            when(repositoryRepository.findByNameWithOwnerWithOrganization(repoFullName)).thenReturn(Optional.empty());
 
             // Act
             Optional<ProcessingContext> result = factory.forWebhookEvent(event);
@@ -107,7 +107,9 @@ class ProcessingContextFactoryTest {
             when(repository.getNameWithOwner()).thenReturn(repoFullName);
 
             when(repositoryScopeFilter.isRepositoryAllowed(repoFullName)).thenReturn(true);
-            when(repositoryRepository.findByNameWithOwner(repoFullName)).thenReturn(Optional.of(repository));
+            when(repositoryRepository.findByNameWithOwnerWithOrganization(repoFullName)).thenReturn(
+                Optional.of(repository)
+            );
             when(scopeIdResolver.findScopeIdByRepositoryName(repoFullName)).thenReturn(Optional.of(42L));
 
             // Act
@@ -164,7 +166,9 @@ class ProcessingContextFactoryTest {
             when(repository.getNameWithOwner()).thenReturn(repoFullName);
 
             when(repositoryScopeFilter.isRepositoryAllowed(repoFullName)).thenReturn(true);
-            when(repositoryRepository.findByNameWithOwner(repoFullName)).thenReturn(Optional.of(repository));
+            when(repositoryRepository.findByNameWithOwnerWithOrganization(repoFullName)).thenReturn(
+                Optional.of(repository)
+            );
             when(scopeIdResolver.findScopeIdByOrgLogin(orgLogin)).thenReturn(Optional.of(expectedScopeId));
 
             // Act
@@ -190,7 +194,9 @@ class ProcessingContextFactoryTest {
             when(repository.getNameWithOwner()).thenReturn(repoFullName);
 
             when(repositoryScopeFilter.isRepositoryAllowed(repoFullName)).thenReturn(true);
-            when(repositoryRepository.findByNameWithOwner(repoFullName)).thenReturn(Optional.of(repository));
+            when(repositoryRepository.findByNameWithOwnerWithOrganization(repoFullName)).thenReturn(
+                Optional.of(repository)
+            );
             when(scopeIdResolver.findScopeIdByRepositoryName(repoFullName)).thenReturn(Optional.of(expectedScopeId));
 
             // Act
@@ -221,7 +227,9 @@ class ProcessingContextFactoryTest {
             when(repository.getNameWithOwner()).thenReturn(repoFullName);
 
             when(repositoryScopeFilter.isRepositoryAllowed(repoFullName)).thenReturn(true);
-            when(repositoryRepository.findByNameWithOwner(repoFullName)).thenReturn(Optional.of(repository));
+            when(repositoryRepository.findByNameWithOwnerWithOrganization(repoFullName)).thenReturn(
+                Optional.of(repository)
+            );
             // Org lookup fails
             when(scopeIdResolver.findScopeIdByOrgLogin(orgLogin)).thenReturn(Optional.empty());
             // Fallback to repo lookup succeeds
@@ -251,7 +259,9 @@ class ProcessingContextFactoryTest {
             when(repository.getNameWithOwner()).thenReturn(repoFullName);
 
             when(repositoryScopeFilter.isRepositoryAllowed(repoFullName)).thenReturn(true);
-            when(repositoryRepository.findByNameWithOwner(repoFullName)).thenReturn(Optional.of(repository));
+            when(repositoryRepository.findByNameWithOwnerWithOrganization(repoFullName)).thenReturn(
+                Optional.of(repository)
+            );
             when(scopeIdResolver.findScopeIdByRepositoryName(repoFullName)).thenReturn(Optional.empty());
 
             // Act
