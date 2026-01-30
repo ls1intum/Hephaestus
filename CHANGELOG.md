@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.13.2](https://github.com/ls1intum/Hephaestus/compare/v0.13.1...v0.13.2) (2026-01-30)
+
+### 🐛 Bug Fixes
+
+* allow deps, security, db, docker scopes to trigger releases ([#663](https://github.com/ls1intum/Hephaestus/issues/663)) ([485ccab](https://github.com/ls1intum/Hephaestus/commit/485ccab23e0d2605bbc085bc9b36269c722ea602))
+* **security:** allow unauthenticated access to actuator health and info endpoints ([#662](https://github.com/ls1intum/Hephaestus/issues/662)) ([a35cf94](https://github.com/ls1intum/Hephaestus/commit/a35cf94ef6561fcfd1ae4e45a76abd5f6fd26d7e))
+
 ## [0.13.1](https://github.com/ls1intum/Hephaestus/compare/v0.13.0...v0.13.1) (2026-01-30)
 
 ### 🐛 Bug Fixes
