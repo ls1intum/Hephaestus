@@ -1,0 +1,3 @@
+<component name="DependencyValidationManager">
+  <scope name="application-server" pattern="file[hephaestus]:*/&amp;&amp;!file:.classpath&amp;&amp;!file:.project&amp;&amp;!file:.factorypath" />
+</component>

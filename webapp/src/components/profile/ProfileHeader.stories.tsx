@@ -26,6 +26,10 @@ const meta = {
 			description: "User profile data from GitHub",
 			control: "object",
 		},
+		userXpRecord: {
+			description: "XP progression data for the user",
+			control: "object",
+		},
 		leaguePoints: {
 			description: "Total league points earned by the user",
 			control: "number",
@@ -58,6 +62,12 @@ export const Default: Story = {
 			name: "John Doe",
 			avatarUrl: "https://github.com/github.png",
 			htmlUrl: "https://github.com/johndoe",
+		},
+		userXpRecord: {
+			currentLevel: 5,
+			currentLevelXP: 450,
+			xpNeeded: 1000,
+			totalXP: 5450,
 		},
 		leaguePoints: 1450,
 		firstContribution: new Date("2022-05-15T00:00:00Z"),
@@ -184,6 +194,50 @@ export const MasterLeague: Story = {
 		},
 		leaguePoints: 2200,
 		firstContribution: new Date("2020-05-01T00:00:00Z"),
+		contributedRepositories: [],
+	},
+};
+
+export const HighLevelUser: Story = {
+	args: {
+		isLoading: false,
+		user: {
+			id: 7,
+			login: "highLevel",
+			name: "High Level User",
+			avatarUrl: "https://github.com/github.png",
+			htmlUrl: "https://github.com/highLevel",
+		},
+		userXpRecord: {
+			currentLevel: 50,
+			currentLevelXP: 25000,
+			xpNeeded: 50000,
+			totalXP: 1250000,
+		},
+		leaguePoints: 3000,
+		firstContribution: new Date("2019-01-01T00:00:00Z"),
+		contributedRepositories: [],
+	},
+};
+
+export const LevelUpReady: Story = {
+	args: {
+		isLoading: false,
+		user: {
+			id: 8,
+			login: "levelUp",
+			name: "Level Up User",
+			avatarUrl: "https://github.com/github.png",
+			htmlUrl: "https://github.com/levelUp",
+		},
+		userXpRecord: {
+			currentLevel: 9,
+			currentLevelXP: 990,
+			xpNeeded: 1000,
+			totalXP: 9990,
+		},
+		leaguePoints: 2000,
+		firstContribution: new Date("2020-01-01T00:00:00Z"),
 		contributedRepositories: [],
 	},
 };
