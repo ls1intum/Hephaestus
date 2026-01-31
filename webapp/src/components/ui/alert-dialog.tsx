@@ -1,6 +1,9 @@
+"use client";
+
 import { AlertDialog as AlertDialogPrimitive } from "@base-ui/react/alert-dialog";
 import type * as React from "react";
-import { buttonVariants } from "@/components/ui/button";
+
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 function AlertDialog({
@@ -107,29 +110,25 @@ function AlertDialogDescription({
 	);
 }
 
-// Base UI AlertDialog uses Close for both action and cancel buttons
-// We wrap them with appropriate button styles to maintain the same API
-function AlertDialogAction({
-	className,
-	...props
-}: React.ComponentProps<typeof AlertDialogPrimitive.Close>) {
-	return (
-		<AlertDialogPrimitive.Close
-			data-slot="alert-dialog-action"
-			className={cn(buttonVariants(), className)}
-			{...props}
-		/>
-	);
+// AlertDialogAction is a plain Button - it does NOT auto-close the dialog
+// This allows consumers to control when the dialog closes (e.g., after async operations)
+function AlertDialogAction({ className, ...props }: React.ComponentProps<typeof Button>) {
+	return <Button data-slot="alert-dialog-action" className={className} {...props} />;
 }
 
+// AlertDialogCancel uses Close primitive with render prop pattern for auto-close behavior
 function AlertDialogCancel({
 	className,
+	variant = "outline",
+	size = "default",
 	...props
-}: React.ComponentProps<typeof AlertDialogPrimitive.Close>) {
+}: React.ComponentProps<typeof AlertDialogPrimitive.Close> &
+	Pick<React.ComponentProps<typeof Button>, "variant" | "size">) {
 	return (
 		<AlertDialogPrimitive.Close
 			data-slot="alert-dialog-cancel"
-			className={cn(buttonVariants({ variant: "outline" }), className)}
+			className={className}
+			render={<Button variant={variant} size={size} />}
 			{...props}
 		/>
 	);

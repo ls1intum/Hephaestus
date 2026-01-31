@@ -1,7 +1,10 @@
+"use client";
+
 import { Dialog as DialogPrimitive } from "@base-ui/react/dialog";
 import { XIcon } from "lucide-react";
 import type * as React from "react";
 
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 function Dialog({
@@ -68,9 +71,15 @@ function DialogContent({
 				{showCloseButton && (
 					<DialogPrimitive.Close
 						data-slot="dialog-close"
-						className="ring-offset-background focus:ring-ring data-[open]:bg-accent data-[open]:text-muted-foreground absolute top-4 right-4 rounded-xs opacity-70 transition-opacity hover:opacity-100 focus:ring-2 focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
+						render={
+							<Button
+								variant="ghost"
+								size="icon"
+								className="absolute top-4 right-4 size-8 opacity-70 transition-opacity hover:opacity-100"
+							/>
+						}
 					>
-						<XIcon />
+						<XIcon className="size-4" />
 						<span className="sr-only">Close</span>
 					</DialogPrimitive.Close>
 				)}

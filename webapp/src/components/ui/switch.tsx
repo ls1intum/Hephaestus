@@ -1,14 +1,23 @@
+"use client";
+
 import { Switch as SwitchPrimitive } from "@base-ui/react/switch";
 import type * as React from "react";
 
 import { cn } from "@/lib/utils";
 
-function Switch({ className, ...props }: React.ComponentProps<typeof SwitchPrimitive.Root>) {
+function Switch({
+	className,
+	size = "default",
+	...props
+}: React.ComponentProps<typeof SwitchPrimitive.Root> & {
+	size?: "sm" | "default";
+}) {
 	return (
 		<SwitchPrimitive.Root
 			data-slot="switch"
+			data-size={size}
 			className={cn(
-				"peer data-[checked]:bg-primary data-[unchecked]:bg-input focus-visible:border-ring focus-visible:ring-ring/50 dark:data-[unchecked]:bg-input/80 inline-flex h-[1.15rem] w-8 shrink-0 items-center rounded-full border border-transparent shadow-xs transition-all outline-none focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50",
+				"peer group/switch relative data-[checked]:bg-primary data-[unchecked]:bg-input focus-visible:border-ring focus-visible:ring-ring/50 dark:data-[unchecked]:bg-input/80 inline-flex h-[1.15rem] w-8 shrink-0 items-center rounded-full border border-transparent shadow-xs transition-all outline-none focus-visible:ring-[3px] after:absolute after:-inset-x-3 after:-inset-y-2 data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50",
 				className,
 			)}
 			{...props}

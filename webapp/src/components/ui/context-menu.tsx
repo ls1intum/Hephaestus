@@ -76,7 +76,12 @@ function ContextMenuSubContent({
 }) {
 	return (
 		<ContextMenuPrimitive.Portal>
-			<ContextMenuPrimitive.Positioner sideOffset={sideOffset} align={align} side={side}>
+			<ContextMenuPrimitive.Positioner
+				sideOffset={sideOffset}
+				align={align}
+				side={side}
+				className="isolate z-50 outline-none"
+			>
 				<ContextMenuPrimitive.Popup
 					data-slot="context-menu-sub-content"
 					className={cn(
@@ -92,16 +97,26 @@ function ContextMenuSubContent({
 
 function ContextMenuContent({
 	className,
-	align = "center",
-	side = "bottom",
+	align = "start",
+	alignOffset = 4,
+	side = "right",
+	sideOffset = 0,
 	...props
 }: React.ComponentProps<typeof ContextMenuPrimitive.Popup> & {
 	align?: Align;
+	alignOffset?: number;
 	side?: Side;
+	sideOffset?: number;
 }) {
 	return (
 		<ContextMenuPrimitive.Portal>
-			<ContextMenuPrimitive.Positioner align={align} side={side}>
+			<ContextMenuPrimitive.Positioner
+				align={align}
+				alignOffset={alignOffset}
+				side={side}
+				sideOffset={sideOffset}
+				className="isolate z-50 outline-none"
+			>
 				<ContextMenuPrimitive.Popup
 					data-slot="context-menu-content"
 					className={cn(

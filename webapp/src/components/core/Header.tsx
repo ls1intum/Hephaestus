@@ -81,10 +81,12 @@ export default function Header({
 						<Tooltip>
 							<TooltipTrigger
 								render={
+									// biome-ignore lint/a11y/useAnchorContent: aria-label provided
 									<a
 										href={`https://github.com/ls1intum/Hephaestus/releases/tag/v${version}`}
 										target="_blank"
 										rel="noopener noreferrer"
+										aria-label={`View release v${version}`}
 										className="flex items-center gap-1 text-xs font-mono mt-1 text-muted-foreground hover:text-foreground transition-colors"
 									/>
 								}

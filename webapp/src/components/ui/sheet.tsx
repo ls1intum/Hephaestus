@@ -1,7 +1,10 @@
+"use client";
+
 import { Dialog as SheetPrimitive } from "@base-ui/react/dialog";
 import { XIcon } from "lucide-react";
 import type * as React from "react";
 
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 function Sheet({ ...props }: React.ComponentProps<typeof SheetPrimitive.Root>) {
@@ -40,15 +43,18 @@ function SheetContent({
 	className,
 	children,
 	side = "right",
+	showCloseButton = true,
 	...props
 }: React.ComponentProps<typeof SheetPrimitive.Popup> & {
 	side?: "top" | "right" | "bottom" | "left";
+	showCloseButton?: boolean;
 }) {
 	return (
 		<SheetPortal>
 			<SheetOverlay />
 			<SheetPrimitive.Popup
 				data-slot="sheet-content"
+				data-side={side}
 				className={cn(
 					"bg-background data-[open]:animate-in data-[closed]:animate-out fixed z-50 flex flex-col gap-4 shadow-lg transition ease-in-out data-[closed]:duration-300 data-[open]:duration-500",
 					side === "right" &&
@@ -64,10 +70,21 @@ function SheetContent({
 				{...props}
 			>
 				{children}
-				<SheetPrimitive.Close className="ring-offset-background focus:ring-ring data-[open]:bg-secondary absolute top-4 right-4 rounded-xs opacity-70 transition-opacity hover:opacity-100 focus:ring-2 focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none">
-					<XIcon className="size-4" />
-					<span className="sr-only">Close</span>
-				</SheetPrimitive.Close>
+				{showCloseButton && (
+					<SheetPrimitive.Close
+						data-slot="sheet-close"
+						render={
+							<Button
+								variant="ghost"
+								size="icon"
+								className="absolute top-4 right-4 size-8 opacity-70 transition-opacity hover:opacity-100"
+							/>
+						}
+					>
+						<XIcon className="size-4" />
+						<span className="sr-only">Close</span>
+					</SheetPrimitive.Close>
+				)}
 			</SheetPrimitive.Popup>
 		</SheetPortal>
 	);

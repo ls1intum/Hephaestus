@@ -1,7 +1,7 @@
 "use client";
 
-import { Menubar as MenubarPrimitive } from "@base-ui/react/menubar";
 import { Menu } from "@base-ui/react/menu";
+import { Menubar as MenubarPrimitive } from "@base-ui/react/menubar";
 import { CheckIcon, ChevronRightIcon, CircleIcon } from "lucide-react";
 import type * as React from "react";
 
@@ -67,7 +67,13 @@ function MenubarContent({
 }) {
 	return (
 		<Menu.Portal>
-			<Menu.Positioner align={align} alignOffset={alignOffset} sideOffset={sideOffset} side={side}>
+			<Menu.Positioner
+				align={align}
+				alignOffset={alignOffset}
+				sideOffset={sideOffset}
+				side={side}
+				className="isolate z-50 outline-none"
+			>
 				<Menu.Popup
 					data-slot="menubar-content"
 					className={cn(
@@ -172,10 +178,9 @@ function MenubarLabel({
 	);
 }
 
-function MenubarSeparator({ className, ...props }: React.ComponentProps<"div">) {
+function MenubarSeparator({ className, ...props }: React.ComponentProps<typeof Menu.Separator>) {
 	return (
-		<div
-			role="separator"
+		<Menu.Separator
 			data-slot="menubar-separator"
 			className={cn("bg-border -mx-1 my-1 h-px", className)}
 			{...props}
@@ -234,7 +239,12 @@ function MenubarSubContent({
 }) {
 	return (
 		<Menu.Portal>
-			<Menu.Positioner sideOffset={sideOffset} align={align} side={side}>
+			<Menu.Positioner
+				sideOffset={sideOffset}
+				align={align}
+				side={side}
+				className="isolate z-50 outline-none"
+			>
 				<Menu.Popup
 					data-slot="menubar-sub-content"
 					className={cn(

@@ -1,3 +1,5 @@
+"use client";
+
 import { Popover as PopoverPrimitive } from "@base-ui/react/popover";
 import type * as React from "react";
 
@@ -14,24 +16,25 @@ function PopoverTrigger({ ...props }: React.ComponentProps<typeof PopoverPrimiti
 function PopoverContent({
 	className,
 	align = "center",
+	alignOffset = 0,
 	side = "bottom",
 	sideOffset = 4,
-	alignOffset,
 	children,
 	...props
 }: React.ComponentProps<typeof PopoverPrimitive.Popup> & {
 	align?: "start" | "center" | "end";
+	alignOffset?: number;
 	side?: "top" | "right" | "bottom" | "left";
 	sideOffset?: number;
-	alignOffset?: number;
 }) {
 	return (
 		<PopoverPrimitive.Portal>
 			<PopoverPrimitive.Positioner
 				align={align}
+				alignOffset={alignOffset}
 				side={side}
 				sideOffset={sideOffset}
-				alignOffset={alignOffset}
+				className="isolate z-50"
 			>
 				<PopoverPrimitive.Popup
 					data-slot="popover-content"

@@ -16,24 +16,25 @@ function HoverCardTrigger({ ...props }: React.ComponentProps<typeof HoverCardPri
 function HoverCardContent({
 	className,
 	align = "center",
+	alignOffset = 4,
 	side = "bottom",
 	sideOffset = 4,
-	alignOffset,
 	children,
 	...props
 }: React.ComponentProps<typeof HoverCardPrimitive.Popup> & {
 	align?: "start" | "center" | "end";
+	alignOffset?: number;
 	side?: "top" | "right" | "bottom" | "left";
 	sideOffset?: number;
-	alignOffset?: number;
 }) {
 	return (
 		<HoverCardPrimitive.Portal data-slot="hover-card-portal">
 			<HoverCardPrimitive.Positioner
 				align={align}
+				alignOffset={alignOffset}
 				side={side}
 				sideOffset={sideOffset}
-				alignOffset={alignOffset}
+				className="isolate z-50"
 			>
 				<HoverCardPrimitive.Popup
 					data-slot="hover-card-content"
