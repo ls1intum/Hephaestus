@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.13.5](https://github.com/ls1intum/Hephaestus/compare/v0.13.4...v0.13.5) (2026-01-31)
+
+### 🐛 Bug Fixes
+
+* **server:** add cors config to production profile ([#670](https://github.com/ls1intum/Hephaestus/issues/670)) ([a163588](https://github.com/ls1intum/Hephaestus/commit/a1635887ebea61f8ccccc24c17988b1f285e8f1f))
+
 ## [0.13.4](https://github.com/ls1intum/Hephaestus/compare/v0.13.3...v0.13.4) (2026-01-31)
 
 ### 🐛 Bug Fixes
