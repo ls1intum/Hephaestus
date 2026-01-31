@@ -481,32 +481,43 @@ function SidebarMenuButton({
 } & VariantProps<typeof sidebarMenuButtonVariants>) {
 	const { isMobile, state } = useSidebar();
 
-	const button = composeRenderProps(asChild, children, "button", {
+	const buttonClassName = cn(sidebarMenuButtonVariants({ variant, size }), className);
+	const buttonProps = {
 		"data-slot": "sidebar-menu-button",
 		"data-sidebar": "menu-button",
 		"data-size": size,
 		"data-active": isActive,
-		className: cn(sidebarMenuButtonVariants({ variant, size }), className),
+		className: buttonClassName,
 		...props,
-	});
+	};
 
+	// When no tooltip needed, use composeRenderProps for asChild support
 	if (!tooltip || state !== "collapsed" || isMobile) {
-		return button;
+		return composeRenderProps(asChild, children, "button", buttonProps);
 	}
 
+	// When tooltip is needed, we need to use element-based render pattern
+	// where children flow through TooltipTrigger separately
 	const tooltipProps = typeof tooltip === "string" ? { children: tooltip } : tooltip;
+
+	// Create the element for render prop (without children - they come from TooltipTrigger)
+	const buttonElement =
+		asChild && React.isValidElement(children) ? (
+			React.cloneElement(children, {
+				...buttonProps,
+				className: cn(buttonClassName, (children.props as { className?: string }).className),
+			} as React.HTMLAttributes<HTMLElement>)
+		) : (
+			<button {...buttonProps} />
+		);
 
 	return (
 		<Tooltip>
-			<TooltipTrigger
-				render={(triggerProps) => {
-					const buttonProps = button.props as { className?: string };
-					return React.cloneElement(button, {
-						...triggerProps,
-						className: cn(buttonProps.className, triggerProps.className),
-					} as React.HTMLAttributes<HTMLElement>);
-				}}
-			/>
+			<TooltipTrigger render={buttonElement}>
+				{asChild && React.isValidElement(children)
+					? (children.props as { children?: React.ReactNode }).children
+					: children}
+			</TooltipTrigger>
 			<TooltipContent side="right" align="center" {...tooltipProps} />
 		</Tooltip>
 	);
