@@ -18,15 +18,12 @@ import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.profile.dto.ProfileActivityStatsDTO;
 import de.tum.in.www1.hephaestus.profile.dto.ProfileDTO;
 import de.tum.in.www1.hephaestus.profile.dto.ProfileReviewActivityDTO;
+import de.tum.in.www1.hephaestus.profile.dto.ProfileXpRecordDTO;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceContributionActivityService;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceMembershipService;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
@@ -108,10 +105,10 @@ public class UserProfileService {
     /**
      * Get user profile with workspace-scoped activity data.
      *
-     * @param login GitHub login
+     * @param login       GitHub login
      * @param workspaceId workspace to scope activity to (null for global view)
-     * @param after start of activity window (null for default 7 days before 'before')
-     * @param before end of activity window (null for now)
+     * @param after       start of activity window (null for default 7 days before 'before')
+     * @param before      end of activity window (null for now)
      * @return user profile with open PRs, review activity with XP, etc.
      */
     @Transactional(readOnly = true)
@@ -198,6 +195,9 @@ public class UserProfileService {
             timeRange
         );
 
+        // Aggregate the user XP and let the XpSystem calculate the level and boundaries
+        ProfileXpRecordDTO xpRecord = buildUserXpRecord(workspaceId, user.id());
+
         return Optional.of(
             new ProfileDTO(
                 user,
@@ -206,7 +206,8 @@ public class UserProfileService {
                 reviewActivity,
                 openPullRequests,
                 activityStats,
-                reviewedPullRequests
+                reviewedPullRequests,
+                xpRecord
             )
         );
     }
@@ -302,12 +303,13 @@ public class UserProfileService {
                 Collectors.toMap(
                     ActivityEvent::getTargetId,
                     ActivityEvent::getXp,
-                    (xp1, xp2) -> xp1 + xp2 // Sum if same targetId appears multiple times
+                    Double::sum // Sum if same targetId appears multiple times
                 )
             );
 
         // Assemble DTOs from activity events
-        List<ProfileReviewActivityDTO> reviewActivity = activityEvents
+
+        return activityEvents
             .stream()
             .map(event -> {
                 int xp = XpPrecision.roundToInt(xpByTargetId.getOrDefault(event.getTargetId(), 0.0));
@@ -324,7 +326,7 @@ public class UserProfileService {
                 }
                 return null;
             })
-            .filter(dto -> dto != null)
+            .filter(Objects::nonNull)
             // Deduplicate by ID (same review can have multiple events like EDITED)
             .collect(
                 Collectors.toMap(
@@ -337,8 +339,6 @@ public class UserProfileService {
             .stream()
             .sorted(Comparator.comparing(ProfileReviewActivityDTO::submittedAt).reversed())
             .toList();
-
-        return reviewActivity;
     }
 
     /**
@@ -349,8 +349,8 @@ public class UserProfileService {
      * using activity events as the source of truth for reviewed PRs.
      *
      * @param workspaceId workspace to scope to
-     * @param userId the user's ID
-     * @param timeRange the time range for activity
+     * @param userId      the user's ID
+     * @param timeRange   the time range for activity
      * @return list of distinct PRs reviewed, or empty list if no data
      */
     private List<PullRequestInfoDTO> buildReviewedPullRequestsList(Long workspaceId, Long userId, TimeRange timeRange) {
@@ -370,6 +370,14 @@ public class UserProfileService {
         }
 
         return pullRequestRepository.findAllById(prIds).stream().map(PullRequestInfoDTO::fromPullRequest).toList();
+    }
+
+    private ProfileXpRecordDTO buildUserXpRecord(Long workspaceId, Long userId) {
+        if (workspaceId == null || userId == null) {
+            return ProfileXpRecordDTO.empty();
+        }
+
+        return XpSystem.getLevelProgress(activityEventRepository.findTotalXpByWorkspaceAndActor(workspaceId, userId));
     }
 
     private record TimeRange(Instant after, Instant before) {}

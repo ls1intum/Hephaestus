@@ -50,13 +50,12 @@ export function ProfilePage({
 				firstContribution={profileData?.firstContribution}
 				contributedRepositories={profileData?.contributedRepositories}
 				leaguePoints={profileData?.userInfo?.leaguePoints}
+				userXpRecord={profileData?.xpRecord}
 				isLoading={isLoading}
 			/>
 			<ProfileContent
 				reviewActivity={profileData?.reviewActivity}
 				openPullRequests={profileData?.openPullRequests}
-				activityStats={profileData?.activityStats}
-				reviewedPullRequests={profileData?.reviewedPullRequests}
 				isLoading={isLoading}
 				username={username}
 				displayName={profileData?.userInfo?.name}

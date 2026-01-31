@@ -99,6 +99,12 @@ export const Default: Story = {
 				htmlUrl: "https://github.com/johndoe",
 				leaguePoints: 150,
 			},
+			xpRecord: {
+				currentLevel: 5,
+				currentLevelXP: 450,
+				xpNeeded: 1000,
+				totalXP: 5450,
+			},
 			firstContribution: new Date("2022-05-15T00:00:00Z"),
 			contributedRepositories: [
 				{
@@ -304,6 +310,12 @@ export const Empty: Story = {
 				avatarUrl: "https://github.com/octocat.png",
 				htmlUrl: "https://github.com/emptydoe",
 				leaguePoints: 0,
+			},
+			xpRecord: {
+				currentLevel: 1,
+				currentLevelXP: 0,
+				xpNeeded: 150,
+				totalXP: 0,
 			},
 			firstContribution: new Date("2023-10-15T00:00:00Z"),
 			contributedRepositories: [],

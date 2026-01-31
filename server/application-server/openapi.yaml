@@ -2505,9 +2505,13 @@ components:
         userInfo:
           $ref: "#/components/schemas/UserInfo"
           description: Basic information about the user
+        xpRecord:
+          $ref: "#/components/schemas/ProfileXpRecord"
+          description: XP progress information for the users' profile
       required:
       - contributedRepositories
       - userInfo
+      - xpRecord
     ProfileActivityStats:
       type: object
       description: Aggregated activity statistics with XP scores for a user profile
@@ -2603,6 +2607,35 @@ components:
       - id
       - isDismissed
       - state
+    ProfileXpRecord:
+      type: object
+      description: User's XP and Level progress details
+      properties:
+        currentLevel:
+          type: integer
+          format: int32
+          description: Current calculated level
+          example: 5
+        currentLevelXP:
+          type: integer
+          format: int64
+          description: XP accumulated in the current level
+          example: 450
+        totalXP:
+          type: integer
+          format: int64
+          description: Overall total XP accumulated
+          example: 5450
+        xpNeeded:
+          type: integer
+          format: int64
+          description: XP needed to reach the next level
+          example: 1000
+      required:
+      - currentLevel
+      - currentLevelXP
+      - totalXP
+      - xpNeeded
     PullRequestBadPractice:
       type: object
       description: A detected bad practice in a pull request

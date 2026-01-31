@@ -1,132 +1,132 @@
-import { ClockIcon } from "@primer/octicons-react";
 import { format } from "date-fns";
-import type { RepositoryInfo, UserInfo } from "@/api/types.gen";
+import type { ProfileXpRecord, RepositoryInfo, UserInfo } from "@/api/types.gen";
 import { LeagueIcon } from "@/components/leaderboard/LeagueIcon";
+import { getLeagueTier } from "@/components/leaderboard/utils.ts";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-
-// Repository images for known repositories
-const REPO_IMAGES: Record<string, string> = {
-	"ls1intum/Hephaestus":
-		"https://github.com/ls1intum/Hephaestus/raw/refs/heads/develop/docs/images/hammer_bg.svg",
-	"ls1intum/Artemis": "https://artemis.tum.de/public/images/logo.png",
-	"ls1intum/Athena":
-		"https://raw.githubusercontent.com/ls1intum/Athena/develop/playground/public/logo.png",
-};
+import { cn } from "@/lib/utils.ts";
+import { XpProgress } from "./XpProgress";
 
 export interface ProfileHeaderProps {
 	user?: UserInfo;
 	firstContribution?: Date;
 	contributedRepositories?: RepositoryInfo[];
 	leaguePoints?: number;
+	userXpRecord?: ProfileXpRecord;
 	isLoading: boolean;
 }
 
 export function ProfileHeader({
 	user,
 	firstContribution,
-	contributedRepositories = [],
 	leaguePoints = 0,
+	userXpRecord = { currentLevel: 1, currentLevelXP: 0, totalXP: 0, xpNeeded: 150 },
 	isLoading,
 }: ProfileHeaderProps) {
+	// Unpack XP data
+	const { currentLevel: level, currentLevelXP: currentXp, xpNeeded, totalXP } = userXpRecord;
+
 	// Format the first contribution date if available
 	const formattedFirstContribution = firstContribution
-		? format(firstContribution, "MMMM do, yyyy")
+		? format(firstContribution, "MMMM yyyy")
 		: undefined;
 
-	// Function to get repository image based on nameWithOwner
-	const getRepositoryImage = (nameWithOwner: string) => {
-		return REPO_IMAGES[nameWithOwner] || `https://github.com/${nameWithOwner.split("/")[0]}.png`;
-	};
-	return (
-		<div className="flex items-center justify-between mx-8">
-			<div className="flex gap-8 items-center">
-				{/* Avatar with loading skeleton */}
-				{isLoading ? (
-					<Avatar className="w-24 h-24 ring-2 ring-neutral-100 dark:ring-neutral-800">
-						<Skeleton className="h-full w-full rounded-full" />
-					</Avatar>
-				) : (
-					<Avatar className="w-24 h-24 ring-2 ring-neutral-100 dark:ring-neutral-800">
-						<AvatarImage src={user?.avatarUrl} alt={`${user?.login}'s avatar`} />
-						<AvatarFallback>{user?.login?.slice(0, 2)?.toUpperCase()}</AvatarFallback>
-					</Avatar>
-				)}
+	const rawTier = getLeagueTier(leaguePoints);
+	const leagueTier = rawTier === "none" ? "bronze" : rawTier;
 
-				{/* User information with loading skeletons */}
+	return (
+		<div className="flex items-start justify-between gap-6 mx-8">
+			{/* Left section: Avatar + User Info + XP */}
+			<div className="flex flex-col gap-4 w-full max-w-xl">
+				{/* Row 1: Avatar + Name + GitHub Link */}
+				<div className="flex items-center gap-4">
+					{/* Avatar with Level Badge */}
+					<div className="relative shrink-0">
+						{isLoading ? (
+							<Avatar className="size-16">
+								<Skeleton className="h-full w-full rounded-full" />
+							</Avatar>
+						) : (
+							<Avatar className="size-16 border-2 border-background shadow-sm">
+								<AvatarImage src={user?.avatarUrl} alt={`${user?.login}'s avatar`} />
+								<AvatarFallback>{user?.login?.slice(0, 2)?.toUpperCase()}</AvatarFallback>
+							</Avatar>
+						)}
+
+						{/* Level Badge */}
+						{isLoading ? (
+							<Skeleton className="absolute -bottom-1 -right-1 size-7 rounded-full" />
+						) : (
+							<Tooltip>
+								<TooltipTrigger asChild>
+									<div
+										className={cn(
+											"absolute -bottom-1 -right-1 flex size-7 items-center justify-center rounded-full border-2 border-background text-primary-foreground font-bold text-xs",
+											`bg-league-${leagueTier}`,
+										)}
+									>
+										{level}
+									</div>
+								</TooltipTrigger>
+								<TooltipContent side="bottom">
+									<p>Level {level}</p>
+								</TooltipContent>
+							</Tooltip>
+						)}
+					</div>
+
+					{/* Name + GitHub Link */}
+					{isLoading ? (
+						<div className="flex flex-col gap-1.5">
+							<Skeleton className="h-7 w-40" />
+							<Skeleton className="h-5 w-48" />
+						</div>
+					) : user ? (
+						<div className="flex flex-col gap-0.5">
+							<h1 className="text-xl md:text-2xl font-bold leading-tight">{user.name}</h1>
+							<a
+								className="text-sm md:text-base text-muted-foreground hover:text-primary transition-colors"
+								href={user.htmlUrl}
+								target="_blank"
+								rel="noopener noreferrer"
+							>
+								github.com/{user.login}
+							</a>
+						</div>
+					) : null}
+				</div>
+
+				{/* Row 2: XP Progress Bar with Contributing Since */}
 				{isLoading ? (
 					<div className="flex flex-col gap-2">
-						<Skeleton className="h-8 w-48" />
-						<Skeleton className="h-5 w-64" />
-						<Skeleton className="h-5 w-80" />
-						<div className="flex items-center gap-2">
-							<Skeleton className="size-10" />
-							<Skeleton className="size-10" />
-						</div>
+						<Skeleton className="h-4 w-48" />
+						<Skeleton className="h-2.5 w-full max-w-sm" />
+						<Skeleton className="h-4 w-40" />
 					</div>
-				) : user ? (
-					<div className="flex flex-col gap-1">
-						{/* User name */}
-						<h1 className="text-2xl md:text-3xl font-bold leading-6">{user.name}</h1>
-
-						{/* GitHub profile link */}
-						<a
-							className="md:text-lg font-medium text-muted-foreground mb-1 hover:text-github-accent-foreground"
-							href={user.htmlUrl}
-							target="_blank"
-							rel="noopener noreferrer"
-						>
-							github.com/{user.login}
-						</a>
-
-						{/* First contribution */}
-						{formattedFirstContribution && (
-							<div className="flex items-center gap-1 md:gap-2 text-muted-foreground font-medium text-sm md:text-base">
-								<ClockIcon size={16} className="overflow-visible" />
-								<span>Contributing since {formattedFirstContribution}</span>
-							</div>
-						)}
-
-						{/* Contributed repositories */}
-						{contributedRepositories.length > 0 && (
-							<div className="flex items-center gap-2 mt-1">
-								{contributedRepositories.map((repository) => (
-									<Tooltip key={repository.id}>
-										<TooltipTrigger asChild>
-											<Button variant="outline" size="icon" className="size-10 p-1" asChild>
-												<a href={repository.htmlUrl} target="_blank" rel="noopener noreferrer">
-													<img
-														src={getRepositoryImage(repository.nameWithOwner)}
-														alt={repository.name}
-														className="size-full object-contain"
-													/>
-												</a>
-											</Button>
-										</TooltipTrigger>
-										<TooltipContent>{repository.nameWithOwner}</TooltipContent>
-									</Tooltip>
-								))}
-							</div>
-						)}
-					</div>
-				) : null}
+				) : (
+					<XpProgress
+						className="max-w-sm"
+						currentXP={currentXp}
+						xpNeeded={xpNeeded}
+						nextLevel={level + 1}
+						totalXP={totalXP}
+						contributingSince={formattedFirstContribution}
+					/>
+				)}
 			</div>
 
-			{/* League information */}
-			<div className="flex flex-col justify-center items-center gap-2">
+			{/* Right section: League Icon + Points */}
+			<div className="flex flex-col items-center gap-1 shrink-0">
 				{isLoading ? (
 					<>
-						<Skeleton className="size-28 rounded-full" />
-						<Skeleton className="h-8 w-16" />
+						<Skeleton className="size-16 rounded-full" />
+						<Skeleton className="h-5 w-12" />
 					</>
 				) : (
 					<>
-						<LeagueIcon leaguePoints={leaguePoints} size="max" />
-						<span className="text-muted-foreground text-xl md:text-2xl font-bold leading-6">
-							{leaguePoints}
-						</span>
+						<LeagueIcon leaguePoints={leaguePoints} size="lg" />
+						<span className="text-muted-foreground text-base font-semibold">{leaguePoints}</span>
 					</>
 				)}
 			</div>

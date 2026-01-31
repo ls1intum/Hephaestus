@@ -36,7 +36,7 @@
         <maven.test.failure.ignore>false</maven.test.failure.ignore>
         <maven.test.skip>false</maven.test.skip>
         <hephaestus.surefire.timeout>180</hephaestus.surefire.timeout>
-        
+
         <!-- Tag filtering: unit tests by default, exclude live tests -->
         <surefire.excludedGroups>live</surefire.excludedGroups>
         <surefire.includedGroups>unit</surefire.includedGroups>
@@ -93,11 +93,11 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
-		<dependency>
-			<groupId>com.auth0</groupId>
-			<artifactId>java-jwt</artifactId>
-			<version>4.5.0</version>
-		</dependency>
+        <dependency>
+            <groupId>com.auth0</groupId>
+            <artifactId>java-jwt</artifactId>
+            <version>4.5.0</version>
+        </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-webflux</artifactId>
@@ -486,19 +486,21 @@
                             <graphqlSchemas>
                                 <rootDir>${project.basedir}/src/main/resources/graphql/github</rootDir>
                             </graphqlSchemas>
-                            
+
                             <!-- Output configuration -->
                             <outputDir>${project.build.directory}/generated-sources/graphql</outputDir>
                             <packageName>de.tum.in.www1.hephaestus.gitprovider.graphql.github</packageName>
                             <apiPackageName>de.tum.in.www1.hephaestus.gitprovider.graphql.github.api</apiPackageName>
-                            <modelPackageName>de.tum.in.www1.hephaestus.gitprovider.graphql.github.model</modelPackageName>
+                            <modelPackageName>de.tum.in.www1.hephaestus.gitprovider.graphql.github.model
+                            </modelPackageName>
                             <modelNamePrefix>GH</modelNamePrefix>
 
                             <!-- Client-side code generation (for consuming GitHub API) -->
                             <generateClient>true</generateClient>
                             <generateApis>false</generateApis>
-                            <generateDataFetchingEnvironmentArgumentInApis>false</generateDataFetchingEnvironmentArgumentInApis>
-                            
+                            <generateDataFetchingEnvironmentArgumentInApis>false
+                            </generateDataFetchingEnvironmentArgumentInApis>
+
                             <!-- Model generation options -->
                             <generateBuilder>true</generateBuilder>
                             <generateEqualsAndHashCode>true</generateEqualsAndHashCode>
@@ -506,21 +508,22 @@
                             <generateParameterizedFieldsResolvers>false</generateParameterizedFieldsResolvers>
                             <generateModelsForRootTypes>false</generateModelsForRootTypes>
                             <generateAllMethodInProjection>true</generateAllMethodInProjection>
-                            
+
                             <!-- Skip Relay types that reference missing Query root type -->
                             <fieldsWithoutResolvers>
                                 <fieldWithoutResolver>node</fieldWithoutResolver>
                                 <fieldWithoutResolver>nodes</fieldWithoutResolver>
                                 <fieldWithoutResolver>relay</fieldWithoutResolver>
                             </fieldsWithoutResolvers>
-                            
+
                             <!-- Java config -->
                             <generatedLanguage>JAVA</generatedLanguage>
                             <!-- Use @Generated annotation with @SuppressWarnings to silence IDE warnings on generated code -->
                             <addGeneratedAnnotation>true</addGeneratedAnnotation>
                             <generatedAnnotation>jakarta.annotation.Generated</generatedAnnotation>
-                            <modelValidationAnnotation>@jakarta.annotation.Generated("graphql-codegen")</modelValidationAnnotation>
-                            
+                            <modelValidationAnnotation>@jakarta.annotation.Generated("graphql-codegen")
+                            </modelValidationAnnotation>
+
                             <!-- GitHub-specific scalar mappings -->
                             <customTypesMapping>
                                 <DateTime>java.time.OffsetDateTime</DateTime>
@@ -535,17 +538,18 @@
                                 <Base64String>java.lang.String</Base64String>
                                 <BigInt>java.math.BigInteger</BigInt>
                             </customTypesMapping>
-                            
+
                             <!-- Naming conventions -->
                             <modelNameSuffix></modelNameSuffix>
                             <requestSuffix>Request</requestSuffix>
                             <responseSuffix>Response</responseSuffix>
                             <responseProjectionSuffix>ResponseProjection</responseProjectionSuffix>
-                            
+
                             <!-- Use custom template for ResponseProjection to add @SuppressWarnings("unused") -->
                             <!-- This suppresses false positive warnings for the projectionDepthOnFields field -->
                             <!-- which is used internally by the all$() method -->
-                            <customTemplatesRoot>${project.basedir}/src/main/resources/graphql/templates</customTemplatesRoot>
+                            <customTemplatesRoot>${project.basedir}/src/main/resources/graphql/templates
+                            </customTemplatesRoot>
                             <customTemplates>
                                 <RESPONSE_PROJECTION>response_projection.ftl</RESPONSE_PROJECTION>
                             </customTemplates>
@@ -572,7 +576,8 @@
                             <target>
                                 <!-- Delete Relay files that depend on missing Query root type -->
                                 <delete failonerror="false">
-                                    <fileset dir="${project.build.directory}/generated-sources/graphql/de/tum/in/www1/hephaestus/gitprovider/graphql/github/model">
+                                    <fileset
+                                            dir="${project.build.directory}/generated-sources/graphql/de/tum/in/www1/hephaestus/gitprovider/graphql/github/model">
                                         <include name="RelayQueryRequest.java"/>
                                         <include name="RelayQueryResponse.java"/>
                                     </fileset>
@@ -581,8 +586,10 @@
                                 <!-- flags="gm": g=global, m=multiline (^ matches start of each line) -->
                                 <replaceregexp flags="gm" byline="false">
                                     <regexp pattern="^(public class (ProjectPendingCardsParametrizedInput|IssueProjectCardsParametrizedInput|PullRequestProjectCardsParametrizedInput|ProjectColumnCardsParametrizedInput))"/>
-                                    <substitution expression="@SuppressWarnings(&quot;deprecation&quot;)${line.separator}\1"/>
-                                    <fileset dir="${project.build.directory}/generated-sources/graphql/de/tum/in/www1/hephaestus/gitprovider/graphql/github/model">
+                                    <substitution
+                                            expression="@SuppressWarnings(&quot;deprecation&quot;)${line.separator}\1"/>
+                                    <fileset
+                                            dir="${project.build.directory}/generated-sources/graphql/de/tum/in/www1/hephaestus/gitprovider/graphql/github/model">
                                         <include name="ProjectPendingCardsParametrizedInput.java"/>
                                         <include name="IssueProjectCardsParametrizedInput.java"/>
                                         <include name="PullRequestProjectCardsParametrizedInput.java"/>
@@ -699,7 +706,9 @@
                 <configuration>
                     <!-- Default configuration for spring-boot:run -->
                     <profiles>${app.profiles}</profiles>
-                    <jvmArguments>-Dspring.application.admin.enabled=true -XX:+EnableDynamicAgentLoading --enable-native-access=ALL-UNNAMED</jvmArguments>
+                    <jvmArguments>-Dspring.application.admin.enabled=true -XX:+EnableDynamicAgentLoading
+                        --enable-native-access=ALL-UNNAMED
+                    </jvmArguments>
                     <excludes>
                         <exclude>
                             <groupId>org.projectlombok</groupId>
@@ -720,7 +729,9 @@
                         <configuration>
                             <!-- Use 'specs' profile for OpenAPI generation - disables WorkspaceStartupListener -->
                             <profiles>specs</profiles>
-                            <jvmArguments>-Dspring.application.admin.enabled=true -XX:+EnableDynamicAgentLoading --enable-native-access=ALL-UNNAMED -Dspring.devtools.restart.enabled=false</jvmArguments>
+                            <jvmArguments>-Dspring.application.admin.enabled=true -XX:+EnableDynamicAgentLoading
+                                --enable-native-access=ALL-UNNAMED -Dspring.devtools.restart.enabled=false
+                            </jvmArguments>
                         </configuration>
                     </execution>
                     <execution>
@@ -827,25 +838,25 @@
                 <hephaestus.surefire.timeout>180</hephaestus.surefire.timeout>
             </properties>
         </profile>
-        
+
         <!--
             Live Tests Profile
-            
+
             Runs ONLY live GitHub API tests that require real GitHub App credentials
             and make actual network calls. These tests are tagged with 'live' and
             protected by Maven tag filtering (this profile) and by runtime credential
             checks using assumeGitHubCredentialsConfigured() with JUnit Assumptions.
-            
+
             Usage:
               ./mvnw test -Plive-tests
-            
+
             Required configuration (via environment variables or application-live-local.yml):
               - GH_APP_ID: GitHub App ID
               - GH_APP_INSTALLATION_ID: GitHub App installation ID
               - GH_APP_PRIVATE_KEY: GitHub App private key (PEM format)
               - GH_APP_PAT: Personal access token (optional, for certain operations)
               - GH_APP_ORGANIZATION: Test organization name (default: HephaestusTest)
-            
+
             This profile is completely opt-in and will NOT run during:
             - mvn test (runs only @Tag("unit") tests)
             - mvn verify (runs @Tag("unit") + @Tag("integration") tests)
@@ -861,16 +872,16 @@
                 <failsafe.includedGroups></failsafe.includedGroups>
             </properties>
         </profile>
-        
+
         <!--
             Architecture Tests Profile
-            
+
             Runs ONLY architecture tests that verify structural constraints using ArchUnit.
             These tests scan all compiled classes and can be memory-intensive.
-            
+
             Usage:
               ./mvnw test -Parchitecture-tests
-            
+
             These tests verify:
             - Module boundaries (gitprovider isolation, SPI patterns)
             - SOLID principles (SRP, DIP, ISP)
