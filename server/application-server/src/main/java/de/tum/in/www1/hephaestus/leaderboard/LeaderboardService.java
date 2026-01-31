@@ -308,13 +308,14 @@ public class LeaderboardService {
         Map<Long, List<Team>> teamHierarchy = teamPathResolver.buildHierarchy(workspace);
         // Use workspace-scoped hidden settings instead of deprecated Team.hidden field
         Set<Long> hiddenTeamIds = workspaceTeamSettingsService.getHiddenTeamIds(workspace.getId());
-        List<Team> targetTeams = workspace.getAccountLogin() == null
-            ? List.of()
-            : teamRepository
-                  .findAllByOrganizationIgnoreCase(workspace.getAccountLogin())
-                  .stream()
-                  .filter(team -> team.getId() != null && !hiddenTeamIds.contains(team.getId()))
-                  .toList();
+        List<Team> targetTeams =
+            workspace.getAccountLogin() == null
+                ? List.of()
+                : teamRepository
+                      .findAllByOrganizationIgnoreCase(workspace.getAccountLogin())
+                      .stream()
+                      .filter(team -> team.getId() != null && !hiddenTeamIds.contains(team.getId()))
+                      .toList();
 
         if (targetTeams.isEmpty()) {
             log.debug("Found no teams for team leaderboard: workspaceId={}", workspace.getId());
@@ -400,7 +401,7 @@ public class LeaderboardService {
     }
 
     @Transactional(readOnly = true)
-    public LeagueChangeDTO getUserLeagueStats(Workspace workspace, String login, LeaderboardEntryDTO entry) {
+    public LeagueChangeDTO computeUserLeagueStats(Workspace workspace, String login, LeaderboardEntryDTO entry) {
         User user = userRepository.findByLogin(login).orElseThrow(() -> new EntityNotFoundException("User", login));
 
         if (workspace == null || workspace.getId() == null) {

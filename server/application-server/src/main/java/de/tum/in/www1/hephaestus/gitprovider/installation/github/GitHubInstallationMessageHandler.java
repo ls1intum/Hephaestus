@@ -100,19 +100,21 @@ public class GitHubInstallationMessageHandler extends GitHubMessageHandler<GitHu
         String repositorySelection = installation.repositorySelection();
         String avatarUrl = account != null ? account.avatarUrl() : null;
         Long accountId = account != null ? account.id() : null;
-        AccountType accountType = account != null && "Organization".equalsIgnoreCase(account.type())
-            ? AccountType.ORGANIZATION
-            : AccountType.USER;
+        AccountType accountType =
+            account != null && "Organization".equalsIgnoreCase(account.type())
+                ? AccountType.ORGANIZATION
+                : AccountType.USER;
 
         // Extract repository snapshots from the installation event payload
         // These are provided for "created" events with "selected" repository selection
-        List<RepositorySnapshot> repositories = event.repositories() != null
-            ? event
-                  .repositories()
-                  .stream()
-                  .map(ref -> new RepositorySnapshot(ref.id(), ref.fullName(), ref.name(), ref.isPrivate()))
-                  .toList()
-            : Collections.emptyList();
+        List<RepositorySnapshot> repositories =
+            event.repositories() != null
+                ? event
+                      .repositories()
+                      .stream()
+                      .map(ref -> new RepositorySnapshot(ref.id(), ref.fullName(), ref.name(), ref.isPrivate()))
+                      .toList()
+                : Collections.emptyList();
 
         InstallationData installationData = new InstallationData(
             installationId,

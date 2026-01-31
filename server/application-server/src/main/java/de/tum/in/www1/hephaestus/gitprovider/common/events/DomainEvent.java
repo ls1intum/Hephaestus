@@ -79,14 +79,18 @@ public final class DomainEvent {
             IssueLabeled,
             IssueUnlabeled,
             IssueTyped,
-            IssueUntyped {
+            IssueUntyped
+    {
         EventPayload.IssueData issue();
     }
 
     public record IssueCreated(EventPayload.IssueData issue, EventContext context) implements IssueEvent {}
 
-    public record IssueUpdated(EventPayload.IssueData issue, Set<String> changedFields, EventContext context) implements
-        IssueEvent {}
+    public record IssueUpdated(
+        EventPayload.IssueData issue,
+        Set<String> changedFields,
+        EventContext context
+    ) implements IssueEvent {}
 
     public record IssueClosed(
         EventPayload.IssueData issue,
@@ -145,12 +149,15 @@ public final class DomainEvent {
             PullRequestUnlabeled,
             PullRequestReady,
             PullRequestDrafted,
-            PullRequestSynchronized {
+            PullRequestSynchronized
+    {
         EventPayload.PullRequestData pullRequest();
     }
 
-    public record PullRequestCreated(EventPayload.PullRequestData pullRequest, EventContext context) implements
-        PullRequestEvent {}
+    public record PullRequestCreated(
+        EventPayload.PullRequestData pullRequest,
+        EventContext context
+    ) implements PullRequestEvent {}
 
     public record PullRequestUpdated(
         EventPayload.PullRequestData pullRequest,
@@ -164,11 +171,15 @@ public final class DomainEvent {
         EventContext context
     ) implements PullRequestEvent {}
 
-    public record PullRequestMerged(EventPayload.PullRequestData pullRequest, EventContext context) implements
-        PullRequestEvent {}
+    public record PullRequestMerged(
+        EventPayload.PullRequestData pullRequest,
+        EventContext context
+    ) implements PullRequestEvent {}
 
-    public record PullRequestReopened(EventPayload.PullRequestData pullRequest, EventContext context) implements
-        PullRequestEvent {}
+    public record PullRequestReopened(
+        EventPayload.PullRequestData pullRequest,
+        EventContext context
+    ) implements PullRequestEvent {}
 
     public record PullRequestLabeled(
         EventPayload.PullRequestData pullRequest,
@@ -182,14 +193,20 @@ public final class DomainEvent {
         EventContext context
     ) implements PullRequestEvent {}
 
-    public record PullRequestReady(EventPayload.PullRequestData pullRequest, EventContext context) implements
-        PullRequestEvent {}
+    public record PullRequestReady(
+        EventPayload.PullRequestData pullRequest,
+        EventContext context
+    ) implements PullRequestEvent {}
 
-    public record PullRequestDrafted(EventPayload.PullRequestData pullRequest, EventContext context) implements
-        PullRequestEvent {}
+    public record PullRequestDrafted(
+        EventPayload.PullRequestData pullRequest,
+        EventContext context
+    ) implements PullRequestEvent {}
 
-    public record PullRequestSynchronized(EventPayload.PullRequestData pullRequest, EventContext context) implements
-        PullRequestEvent {}
+    public record PullRequestSynchronized(
+        EventPayload.PullRequestData pullRequest,
+        EventContext context
+    ) implements PullRequestEvent {}
 
     // ========================================================================
     // Label Events
@@ -215,11 +232,15 @@ public final class DomainEvent {
         extends Event, ContextualEvent
         permits MilestoneCreated, MilestoneUpdated, MilestoneDeleted {}
 
-    public record MilestoneCreated(EventPayload.MilestoneData milestone, EventContext context) implements
-        MilestoneEvent {}
+    public record MilestoneCreated(
+        EventPayload.MilestoneData milestone,
+        EventContext context
+    ) implements MilestoneEvent {}
 
-    public record MilestoneUpdated(EventPayload.MilestoneData milestone, EventContext context) implements
-        MilestoneEvent {}
+    public record MilestoneUpdated(
+        EventPayload.MilestoneData milestone,
+        EventContext context
+    ) implements MilestoneEvent {}
 
     public record MilestoneDeleted(Long milestoneId, String title, EventContext context) implements MilestoneEvent {}
 
@@ -230,12 +251,16 @@ public final class DomainEvent {
     /** All comment-related events. */
     public sealed interface CommentEvent
         extends Event, ContextualEvent
-        permits CommentCreated, CommentUpdated, CommentDeleted {
+        permits CommentCreated, CommentUpdated, CommentDeleted
+    {
         Long issueId();
     }
 
-    public record CommentCreated(EventPayload.CommentData comment, Long issueId, EventContext context) implements
-        CommentEvent {}
+    public record CommentCreated(
+        EventPayload.CommentData comment,
+        Long issueId,
+        EventContext context
+    ) implements CommentEvent {}
 
     public record CommentUpdated(
         EventPayload.CommentData comment,
@@ -252,7 +277,8 @@ public final class DomainEvent {
 
     public sealed interface ReviewEvent
         extends Event, ContextualEvent
-        permits ReviewSubmitted, ReviewEdited, ReviewDismissed {
+        permits ReviewSubmitted, ReviewEdited, ReviewDismissed
+    {
         EventPayload.ReviewData review();
     }
 
@@ -272,7 +298,8 @@ public final class DomainEvent {
 
     public sealed interface ReviewCommentEvent
         extends Event, ContextualEvent
-        permits ReviewCommentCreated, ReviewCommentEdited, ReviewCommentDeleted {
+        permits ReviewCommentCreated, ReviewCommentEdited, ReviewCommentDeleted
+    {
         Long pullRequestId();
     }
 
@@ -289,8 +316,11 @@ public final class DomainEvent {
         EventContext context
     ) implements ReviewCommentEvent {}
 
-    public record ReviewCommentDeleted(Long commentId, Long pullRequestId, EventContext context) implements
-        ReviewCommentEvent {}
+    public record ReviewCommentDeleted(
+        Long commentId,
+        Long pullRequestId,
+        EventContext context
+    ) implements ReviewCommentEvent {}
 
     // ========================================================================
     // Pull Request Review Thread Events
@@ -298,15 +328,20 @@ public final class DomainEvent {
 
     public sealed interface ReviewThreadEvent
         extends Event, ContextualEvent
-        permits ReviewThreadResolved, ReviewThreadUnresolved {
+        permits ReviewThreadResolved, ReviewThreadUnresolved
+    {
         EventPayload.ReviewThreadData thread();
     }
 
-    public record ReviewThreadResolved(EventPayload.ReviewThreadData thread, EventContext context) implements
-        ReviewThreadEvent {}
+    public record ReviewThreadResolved(
+        EventPayload.ReviewThreadData thread,
+        EventContext context
+    ) implements ReviewThreadEvent {}
 
-    public record ReviewThreadUnresolved(EventPayload.ReviewThreadData thread, EventContext context) implements
-        ReviewThreadEvent {}
+    public record ReviewThreadUnresolved(
+        EventPayload.ReviewThreadData thread,
+        EventContext context
+    ) implements ReviewThreadEvent {}
 
     // ========================================================================
     // Team Events
@@ -323,8 +358,11 @@ public final class DomainEvent {
         }
     }
 
-    public record TeamUpdated(EventPayload.TeamData team, Set<String> changedFields, EventContext context) implements
-        TeamEvent {
+    public record TeamUpdated(
+        EventPayload.TeamData team,
+        Set<String> changedFields,
+        EventContext context
+    ) implements TeamEvent {
         @Override
         public Long teamId() {
             return team.id();

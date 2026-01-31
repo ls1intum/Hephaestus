@@ -242,7 +242,7 @@ paths:
     post:
       description: Computes projected league point changes for a specific user based
         on their leaderboard entry
-      operationId: getUserLeagueStats
+      operationId: computeUserLeagueStats
       parameters:
       - description: Workspace slug
         in: path
@@ -449,8 +449,6 @@ paths:
       - workspace-membership
   /workspaces/{workspaceSlug}/mentor/chat:
     post:
-      x-hephaestus:
-        export: true
       operationId: mentorChat
       parameters:
       - description: Workspace slug
@@ -544,10 +542,10 @@ paths:
       tags:
       - mentor
       - exported
-  /workspaces/{workspaceSlug}/mentor/documents:
-    get:
       x-hephaestus:
         export: true
+  /workspaces/{workspaceSlug}/mentor/documents:
+    get:
       operationId: listDocuments
       parameters:
       - description: Workspace slug
@@ -603,9 +601,9 @@ paths:
       tags:
       - documents
       - exported
-    post:
       x-hephaestus:
         export: true
+    post:
       operationId: createDocument
       parameters:
       - description: Workspace slug
@@ -645,10 +643,10 @@ paths:
       tags:
       - documents
       - exported
-  /workspaces/{workspaceSlug}/mentor/documents/{id}:
-    delete:
       x-hephaestus:
         export: true
+  /workspaces/{workspaceSlug}/mentor/documents/{id}:
+    delete:
       operationId: deleteDocument
       parameters:
       - description: Workspace slug
@@ -691,9 +689,9 @@ paths:
       tags:
       - documents
       - exported
-    get:
       x-hephaestus:
         export: true
+    get:
       operationId: getDocument
       parameters:
       - description: Workspace slug
@@ -740,9 +738,9 @@ paths:
       tags:
       - documents
       - exported
-    put:
       x-hephaestus:
         export: true
+    put:
       operationId: updateDocument
       parameters:
       - description: Workspace slug
@@ -796,10 +794,10 @@ paths:
       tags:
       - documents
       - exported
-  /workspaces/{workspaceSlug}/mentor/documents/{id}/versions:
-    delete:
       x-hephaestus:
         export: true
+  /workspaces/{workspaceSlug}/mentor/documents/{id}/versions:
+    delete:
       operationId: deleteDocumentVersionsAfter
       parameters:
       - description: Workspace slug
@@ -856,9 +854,9 @@ paths:
       tags:
       - documents
       - exported
-    get:
       x-hephaestus:
         export: true
+    get:
       operationId: listVersions
       parameters:
       - description: Workspace slug
@@ -928,10 +926,10 @@ paths:
       tags:
       - documents
       - exported
-  /workspaces/{workspaceSlug}/mentor/documents/{id}/versions/{versionNumber}:
-    get:
       x-hephaestus:
         export: true
+  /workspaces/{workspaceSlug}/mentor/documents/{id}/versions/{versionNumber}:
+    get:
       operationId: getVersion
       parameters:
       - description: Workspace slug
@@ -987,10 +985,10 @@ paths:
       tags:
       - documents
       - exported
-  /workspaces/{workspaceSlug}/mentor/messages/{messageId}/vote:
-    put:
       x-hephaestus:
         export: true
+  /workspaces/{workspaceSlug}/mentor/messages/{messageId}/vote:
+    put:
       operationId: voteMessage
       parameters:
       - description: Workspace slug
@@ -1044,10 +1042,10 @@ paths:
       tags:
       - vote
       - exported
-  /workspaces/{workspaceSlug}/mentor/threads/grouped:
-    get:
       x-hephaestus:
         export: true
+  /workspaces/{workspaceSlug}/mentor/threads/grouped:
+    get:
       operationId: getGroupedThreads
       parameters:
       - description: Workspace slug
@@ -1082,10 +1080,10 @@ paths:
       tags:
       - mentor
       - exported
-  /workspaces/{workspaceSlug}/mentor/threads/{threadId}:
-    get:
       x-hephaestus:
         export: true
+  /workspaces/{workspaceSlug}/mentor/threads/{threadId}:
+    get:
       operationId: getThread
       parameters:
       - description: Workspace slug
@@ -1138,6 +1136,8 @@ paths:
       tags:
       - mentor
       - exported
+      x-hephaestus:
+        export: true
   /workspaces/{workspaceSlug}/notifications:
     patch:
       operationId: updateNotifications
@@ -2164,7 +2164,6 @@ components:
       - type
     ChatMessageVote:
       type: object
-      x-hephaestus: a1
       properties:
         createdAt:
           type: string
@@ -2182,9 +2181,10 @@ components:
       - isUpvoted
       - messageId
       - updatedAt
+      x-hephaestus:
+        export: true
     ChatThreadGroup:
       type: object
-      x-hephaestus: a1
       properties:
         groupName:
           type: string
@@ -2195,9 +2195,10 @@ components:
       required:
       - groupName
       - threads
+      x-hephaestus:
+        export: true
     ChatThreadSummary:
       type: object
-      x-hephaestus: a1
       properties:
         createdAt:
           type: string
@@ -2210,6 +2211,8 @@ components:
       required:
       - id
       - title
+      x-hephaestus:
+        export: true
     Contributor:
       type: object
       description: Information about a contributor to the Hephaestus project
@@ -2243,7 +2246,6 @@ components:
       - name
     CreateDocumentRequest:
       type: object
-      x-hephaestus: a1
       properties:
         content:
           type: string
@@ -2258,6 +2260,8 @@ components:
       - content
       - kind
       - title
+      x-hephaestus:
+        export: true
     CreateWorkspaceRequest:
       type: object
       description: Request to create a new workspace
@@ -2303,7 +2307,6 @@ components:
           - ERROR_NO_UPDATE_ON_PULLREQUEST
     Document:
       type: object
-      x-hephaestus: a1
       properties:
         content:
           type: string
@@ -2329,14 +2332,16 @@ components:
       - title
       - userId
       - versionNumber
+      x-hephaestus:
+        export: true
     DocumentKind:
       type: string
       enum:
       - text
-      x-hephaestus: a1
+      x-hephaestus:
+        export: true
     DocumentSummary:
       type: object
-      x-hephaestus: a1
       properties:
         createdAt:
           type: string
@@ -2356,16 +2361,18 @@ components:
       - kind
       - title
       - userId
-    ErrorResponse:
-      type: object
       x-hephaestus:
         export: true
+    ErrorResponse:
+      type: object
       properties:
         error:
           type: string
           description: Human-readable error message
       required:
       - error
+      x-hephaestus:
+        export: true
     LabelInfo:
       type: object
       description: Information about a label from a repository
@@ -2897,12 +2904,13 @@ components:
     StreamPart:
       type: object
       additionalProperties: {}
-      x-hephaestus: a1
       properties:
         type:
           type: string
       required:
       - type
+      x-hephaestus:
+        export: true
     TeamInfo:
       type: object
       description: "Detailed information about a team including members, repositories,\
@@ -3008,7 +3016,6 @@ components:
       - name
     ThreadDetail:
       type: object
-      x-hephaestus: a1
       properties:
         id:
           type: string
@@ -3061,6 +3068,8 @@ components:
       required:
       - id
       - messages
+      x-hephaestus:
+        export: true
     UpdateRepositorySettingsRequest:
       type: object
       description: Request to update repository contribution visibility settings in
@@ -3243,12 +3252,13 @@ components:
       - url
     VoteMessageRequest:
       type: object
-      x-hephaestus: a1
       properties:
         isUpvoted:
           type: boolean
       required:
       - isUpvoted
+      x-hephaestus:
+        export: true
     Workspace:
       type: object
       description: Complete workspace information including configuration and settings

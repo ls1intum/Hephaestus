@@ -21,7 +21,8 @@ import org.springframework.transaction.support.TransactionTemplate;
  */
 @Component
 public class GitHubInstallationRepositoriesMessageHandler
-    extends GitHubMessageHandler<GitHubInstallationRepositoriesEventDTO> {
+    extends GitHubMessageHandler<GitHubInstallationRepositoriesEventDTO>
+{
 
     private static final Logger log = LoggerFactory.getLogger(GitHubInstallationRepositoriesMessageHandler.class);
 
@@ -56,9 +57,8 @@ public class GitHubInstallationRepositoriesMessageHandler
         }
 
         List<GitHubRepositoryRefDTO> added = event.repositoriesAdded() != null ? event.repositoriesAdded() : List.of();
-        List<GitHubRepositoryRefDTO> removed = event.repositoriesRemoved() != null
-            ? event.repositoriesRemoved()
-            : List.of();
+        List<GitHubRepositoryRefDTO> removed =
+            event.repositoriesRemoved() != null ? event.repositoriesRemoved() : List.of();
 
         log.info(
             "Received installation_repositories event: action={}, installationId={}, addedCount={}, removedCount={}",

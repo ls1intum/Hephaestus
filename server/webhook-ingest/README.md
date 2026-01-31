@@ -27,7 +27,7 @@ For GitLab events, the full group path (including subgroups) is flattened using 
 
 ### Prerequisites
 
-- Node.js >= 22.10.0 (see `.node-version` at repo root)
+- Node.js >= 22.22.0 (see `.node-version` at repo root)
 - NATS server (use `docker run -d -p 4222:4222 nats:latest -js`)
 
 ### Setup

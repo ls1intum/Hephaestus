@@ -96,7 +96,7 @@ public class LeaderboardController {
         summary = "Calculate user league stats",
         description = "Computes projected league point changes for a specific user based on their leaderboard entry"
     )
-    public ResponseEntity<LeagueChangeDTO> getUserLeagueStats(
+    public ResponseEntity<LeagueChangeDTO> computeUserLeagueStats(
         WorkspaceContext workspaceContext,
         @PathVariable String login,
         @RequestBody LeaderboardEntryDTO entry
@@ -107,6 +107,6 @@ public class LeaderboardController {
             workspace.getId(),
             LoggingUtils.sanitizeForLog(login)
         );
-        return ResponseEntity.ok(leaderboardService.getUserLeagueStats(workspace, login, entry));
+        return ResponseEntity.ok(leaderboardService.computeUserLeagueStats(workspace, login, entry));
     }
 }
