@@ -1,3 +1,5 @@
+# syntax=docker/dockerfile:1.4
+
 FROM node:22-alpine AS base
 
 FROM base AS builder
@@ -10,12 +12,13 @@ WORKDIR /app
 COPY package.json tsconfig.json ./
 COPY src ./src
 
-# Install deps, build, and prune dev deps for smaller runtime
+# Install deps with BuildKit cache mount, build, and prune dev deps for smaller runtime
 # Note: Using npm install instead of npm ci because this is a workspace package
 # and the package-lock.json is at the monorepo root, not in this folder
-RUN npm install --ignore-scripts \
-	&& npm run build \
-	&& npm prune --production
+RUN --mount=type=cache,target=/root/.npm \
+    npm install --ignore-scripts --prefer-offline \
+    && npm run build \
+    && npm prune --production
 
 FROM base AS runner
 ENV NODE_ENV=production
