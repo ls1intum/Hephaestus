@@ -91,6 +91,9 @@ public class SecurityConfig {
         );
 
         http.authorizeHttpRequests(requests -> {
+            // CORS preflight requests must be permitted for cross-origin requests to work.
+            // Without this, OPTIONS requests are rejected with 403 before CORS headers can be added.
+            requests.requestMatchers(HttpMethod.OPTIONS, "/**").permitAll();
             // Actuator endpoints for Docker/K8s health checks and basic info
             requests.requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/info").permitAll();
             // OpenAPI documentation endpoints (public for spec generation and dev access)
