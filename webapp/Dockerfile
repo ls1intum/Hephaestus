@@ -1,3 +1,5 @@
+# syntax=docker/dockerfile:1.4
+
 # Stage 1: Build
 FROM node:22-alpine AS build
 WORKDIR /app
@@ -5,10 +7,11 @@ WORKDIR /app
 # Copy package.json for dependency installation
 COPY webapp/package.json /app/
 
-# Install dependencies
+# Install dependencies with BuildKit cache mount for npm
 # Note: Using npm install instead of npm ci because this is a workspace package
 # and the package-lock.json is at the monorepo root, not in this folder
-RUN npm install --ignore-scripts
+RUN --mount=type=cache,target=/root/.npm \
+    npm install --ignore-scripts --prefer-offline
 
 # Copy the webapp application code
 COPY webapp/ /app/
