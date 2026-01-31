@@ -1,21 +1,10 @@
 /**
  * Update GitLab GraphQL schema via introspection
  *
- * Usage: npm run gitlab:update-schema -- --url <gitlab-url> [--token <pat>]
+ * Usage: npm run gitlab:update-schema [-- --url <other-gitlab-url>]
  *
- * This script fetches the GitLab GraphQL schema via introspection and converts it to SDL format.
- * Unlike GitHub (which provides a public schema file), GitLab requires introspection queries.
- *
- * Examples:
- *   npm run gitlab:update-schema -- --url https://gitlab.example.com
- *   npm run gitlab:update-schema -- --url https://gitlab.example.com --token glpat-xxx
- *
- * Authentication can be provided via:
- *   - CLI argument: --token <pat>
- *   - Environment variable: GITLAB_TOKEN
- *
- * Note: GitLab's GraphQL introspection is typically accessible without authentication,
- * but some self-hosted instances may require a Personal Access Token.
+ * Fetches the GitLab GraphQL schema via introspection and converts it to SDL format.
+ * Default instance: https://gitlab.lrz.de (public introspection, no auth needed)
  */
 
 import { mkdirSync, statSync, unlinkSync, writeFileSync, renameSync } from "node:fs";
@@ -31,11 +20,12 @@ const SCHEMA_DIR = resolve(
 	"../server/application-server/src/main/resources/graphql/gitlab",
 );
 const SCHEMA_FILE = join(SCHEMA_DIR, "schema.gitlab.graphql");
+const DEFAULT_GITLAB_URL = "https://gitlab.lrz.de";
 
-// Validation constants - GitLab schema is typically ~2-5MB
+// Validation constants
 const MIN_SIZE_BYTES = 500_000; // 500KB minimum
 const MAX_SIZE_BYTES = 50_000_000; // 50MB maximum
-const REQUEST_TIMEOUT_MS = 60_000; // 60 second timeout
+const REQUEST_TIMEOUT_MS = 60_000; // 60 seconds
 
 // GraphQL schema validation patterns
 const HAS_TYPE = /^type\s+\w+/m;
@@ -47,32 +37,24 @@ interface IntrospectionResponse {
 	errors?: Array<{ message: string; locations?: unknown }>;
 }
 
-function showHelp(): void {
-	console.log(`Update GitLab GraphQL schema via introspection
-
-Usage: npm run gitlab:update-schema -- --url <gitlab-url> [--token <pat>]
-
-Options:
-  --url <url>      GitLab instance URL (required)
-  --token <pat>    Personal Access Token (optional, or use GITLAB_TOKEN env var)
-  --help, -h       Show this help message
-
-Examples:
-  npm run gitlab:update-schema -- --url https://gitlab.example.com
-  npm run gitlab:update-schema -- --url https://gitlab.example.com --token glpat-xxx
-  GITLAB_TOKEN=glpat-xxx npm run gitlab:update-schema -- --url https://gitlab.example.com
-`);
-}
-
 function parseArgs(): { url: string; token?: string } {
 	const args = process.argv.slice(2);
 
 	if (args.includes("--help") || args.includes("-h")) {
-		showHelp();
+		console.log(`Update GitLab GraphQL schema via introspection
+
+Usage: npm run gitlab:update-schema [-- --url <gitlab-url>] [-- --token <pat>]
+
+Default: ${DEFAULT_GITLAB_URL} (public introspection)
+
+Options:
+  --url <url>    GitLab instance URL (default: ${DEFAULT_GITLAB_URL})
+  --token <pat>  Personal Access Token (rarely needed)
+`);
 		process.exit(0);
 	}
 
-	let url: string | undefined;
+	let url = DEFAULT_GITLAB_URL;
 	let token: string | undefined = process.env.GITLAB_TOKEN?.trim() || undefined;
 
 	for (let i = 0; i < args.length; i++) {
@@ -86,18 +68,9 @@ function parseArgs(): { url: string; token?: string } {
 		}
 	}
 
-	if (!url) {
-		console.error("Error: --url is required\n");
-		showHelp();
-		process.exit(1);
-	}
-
 	return { url, token };
 }
 
-/**
- * Validates that the content appears to be a valid GraphQL schema.
- */
 function validateGraphQLSchema(content: string): { valid: boolean; reason?: string } {
 	if (content.length < MIN_SIZE_BYTES) {
 		return { valid: false, reason: `Content too small (${content.length} bytes, minimum ${MIN_SIZE_BYTES})` };
@@ -119,7 +92,6 @@ function validateGraphQLSchema(content: string): { valid: boolean; reason?: stri
 		return { valid: false, reason: "Content missing Query type definition" };
 	}
 
-	// Ensure content is valid UTF-8 text (no binary data or null bytes)
 	if (content.includes("\0")) {
 		return { valid: false, reason: "Content contains null bytes (possible binary data)" };
 	}
@@ -130,19 +102,14 @@ function validateGraphQLSchema(content: string): { valid: boolean; reason?: stri
 async function main(): Promise<void> {
 	const { url, token } = parseArgs();
 
-	// Normalize URL to ensure it ends with /api/graphql
+	// Normalize URL
 	let graphqlEndpoint = url.replace(/\/+$/, "");
 	if (!graphqlEndpoint.endsWith("/api/graphql")) {
 		graphqlEndpoint = `${graphqlEndpoint}/api/graphql`;
 	}
 
-	console.log("Downloading GitLab GraphQL schema via introspection...");
-	console.log(`Endpoint: ${graphqlEndpoint}`);
-	console.log(`Authentication: ${token ? "Using Personal Access Token" : "None (public introspection)"}`);
-
-	if (graphqlEndpoint.startsWith("http://")) {
-		console.warn("Warning: Using unencrypted HTTP. Token will be transmitted in plaintext.");
-	}
+	console.log("Downloading GitLab GraphQL schema...");
+	console.log(`Source: ${graphqlEndpoint}`);
 
 	const headers: Record<string, string> = {
 		"Content-Type": "application/json",
@@ -152,9 +119,6 @@ async function main(): Promise<void> {
 		headers["Authorization"] = `Bearer ${token}`;
 	}
 
-	const introspectionQuery = getIntrospectionQuery();
-
-	// Set up request timeout
 	const controller = new AbortController();
 	const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
@@ -163,14 +127,14 @@ async function main(): Promise<void> {
 		response = await fetch(graphqlEndpoint, {
 			method: "POST",
 			headers,
-			body: JSON.stringify({ query: introspectionQuery }),
+			body: JSON.stringify({ query: getIntrospectionQuery() }),
 			signal: controller.signal,
 		});
 	} catch (error) {
 		if (error instanceof Error && error.name === "AbortError") {
 			console.error(`Request timed out after ${REQUEST_TIMEOUT_MS / 1000} seconds`);
 		} else {
-			console.error("Failed to connect to GitLab:", error instanceof Error ? error.message : error);
+			console.error("Failed to connect:", error instanceof Error ? error.message : error);
 		}
 		process.exit(1);
 	} finally {
@@ -179,85 +143,63 @@ async function main(): Promise<void> {
 
 	if (!response.ok) {
 		console.error(`Failed to fetch schema: ${response.status} ${response.statusText}`);
-		const body = await response.text();
-		if (body) {
-			console.error(`Response body: ${body.substring(0, 500)}`);
-		}
 		process.exit(1);
 	}
 
-	// Parse JSON response with explicit error handling
 	const responseText = await response.text();
 	let result: IntrospectionResponse;
 	try {
 		result = JSON.parse(responseText) as IntrospectionResponse;
 	} catch {
-		console.error("Failed to parse response as JSON. Server may have returned an error page.");
-		console.error(`Response preview: ${responseText.substring(0, 500)}`);
+		console.error("Failed to parse response as JSON");
+		console.error(`Response preview: ${responseText.substring(0, 200)}`);
 		process.exit(1);
 	}
 
 	if (result.errors) {
-		console.error("GraphQL introspection returned errors:");
-		console.error(JSON.stringify(result.errors, null, 2));
+		console.error("GraphQL errors:", JSON.stringify(result.errors, null, 2));
 		process.exit(1);
 	}
 
 	if (!result.data?.__schema) {
-		console.error("Invalid introspection response: missing __schema");
+		console.error("Invalid response: missing __schema");
 		process.exit(1);
 	}
 
-	console.log("Converting introspection result to SDL format...");
+	console.log("Converting to SDL...");
 
-	// Build schema from introspection result and convert to SDL
 	let sdlContent: string;
 	try {
 		const schema = buildClientSchema(result.data);
 		sdlContent = printSchema(schema);
 	} catch (error) {
-		console.error("Failed to convert introspection result to SDL:", error);
+		console.error("Failed to convert to SDL:", error);
 		process.exit(1);
 	}
 
-	// Validate the SDL content
-	console.log("Validating schema content...");
+	console.log("Validating schema...");
 	const validation = validateGraphQLSchema(sdlContent);
-
 	if (!validation.valid) {
-		console.error(`Schema validation failed: ${validation.reason}`);
+		console.error(`Validation failed: ${validation.reason}`);
 		process.exit(1);
 	}
 
-	// Ensure schema directory exists
 	mkdirSync(SCHEMA_DIR, { recursive: true });
 
-	// Write to temp file first for atomic update
 	const tempFile = `${SCHEMA_FILE}.tmp`;
-
 	try {
 		writeFileSync(tempFile, sdlContent, "utf-8");
-
 		const stats = statSync(tempFile);
 		console.log(`Downloaded ${Math.round(stats.size / 1_048_576)}MB`);
-
-		// Atomic rename
 		renameSync(tempFile, SCHEMA_FILE);
-
-		console.log(`Schema updated successfully: ${SCHEMA_FILE}`);
-		console.log("\nTo regenerate types: cd server/application-server && ./mvnw compile -DskipTests");
+		console.log(`Schema updated: ${SCHEMA_FILE}`);
 	} catch (error) {
-		// Clean up temp file on error
-		try {
-			unlinkSync(tempFile);
-		} catch {
-			// Ignore cleanup errors
-		}
+		try { unlinkSync(tempFile); } catch { /* ignore */ }
 		throw error;
 	}
 }
 
 main().catch((error) => {
-	console.error("Error updating schema:", error);
+	console.error("Error:", error);
 	process.exit(1);
 });
