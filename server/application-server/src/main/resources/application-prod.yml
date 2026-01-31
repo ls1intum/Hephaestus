@@ -31,6 +31,10 @@ spring:
 hephaestus:
     host-url: ${APPLICATION_HOST_URL}
 
+    cors:
+        allowed-origins:
+            - ${APPLICATION_HOST_URL}
+
     webapp:
         url: ${APPLICATION_HOST_URL}
 
