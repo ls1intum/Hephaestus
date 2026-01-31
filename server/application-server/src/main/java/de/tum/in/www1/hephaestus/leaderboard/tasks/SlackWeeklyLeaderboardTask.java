@@ -11,6 +11,7 @@ import static com.slack.api.model.block.composition.BlockCompositions.plainText;
 import com.slack.api.methods.SlackApiException;
 import com.slack.api.model.User;
 import com.slack.api.model.block.LayoutBlock;
+import de.tum.in.www1.hephaestus.config.ApplicationProperties;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserInfoDTO;
 import de.tum.in.www1.hephaestus.leaderboard.*;
 import de.tum.in.www1.hephaestus.workspace.Workspace;
@@ -32,7 +33,6 @@ import org.apache.commons.text.similarity.LevenshteinDistance;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
@@ -47,33 +47,21 @@ public class SlackWeeklyLeaderboardTask implements Runnable {
 
     private static final Logger log = LoggerFactory.getLogger(SlackWeeklyLeaderboardTask.class);
 
-    private final String team;
-    private final String channelId;
-    private final boolean runScheduledMessage;
-    private final String hephaestusUrl;
-    private final String scheduledDay;
-    private final String scheduledTime;
+    private final LeaderboardProperties leaderboardProperties;
+    private final ApplicationProperties applicationProperties;
     private final SlackMessageService slackMessageService;
     private final LeaderboardService leaderboardService;
     private final WorkspaceRepository workspaceRepository;
 
     public SlackWeeklyLeaderboardTask(
-        @Value("${hephaestus.leaderboard.notification.team}") String team,
-        @Value("${hephaestus.leaderboard.notification.channel-id}") String channelId,
-        @Value("${hephaestus.leaderboard.notification.enabled}") boolean runScheduledMessage,
-        @Value("${hephaestus.host-url:localhost:8080}") String hephaestusUrl,
-        @Value("${hephaestus.leaderboard.schedule.day}") String scheduledDay,
-        @Value("${hephaestus.leaderboard.schedule.time}") String scheduledTime,
+        LeaderboardProperties leaderboardProperties,
+        ApplicationProperties applicationProperties,
         @Autowired(required = false) SlackMessageService slackMessageService,
         LeaderboardService leaderboardService,
         WorkspaceRepository workspaceRepository
     ) {
-        this.team = team;
-        this.channelId = channelId;
-        this.runScheduledMessage = runScheduledMessage;
-        this.hephaestusUrl = hephaestusUrl;
-        this.scheduledDay = scheduledDay;
-        this.scheduledTime = scheduledTime;
+        this.leaderboardProperties = leaderboardProperties;
+        this.applicationProperties = applicationProperties;
         this.slackMessageService = slackMessageService;
         this.leaderboardService = leaderboardService;
         this.workspaceRepository = workspaceRepository;
@@ -85,7 +73,11 @@ public class SlackWeeklyLeaderboardTask implements Runnable {
      * @return {@code true} if the connection is valid, {@code false} otherwise.
      */
     public boolean testSlackConnection() {
-        return runScheduledMessage && slackMessageService != null && slackMessageService.initTest();
+        return (
+            leaderboardProperties.notification().enabled() &&
+            slackMessageService != null &&
+            slackMessageService.initTest()
+        );
     }
 
     /**
@@ -185,16 +177,19 @@ public class SlackWeeklyLeaderboardTask implements Runnable {
         }
 
         long currentDate = Instant.now().getEpochSecond();
-        String[] timeParts = scheduledTime.split(":");
+        String[] timeParts = leaderboardProperties.schedule().time().split(":");
         ZonedDateTime zonedNow = ZonedDateTime.now(ZoneId.systemDefault());
         ZonedDateTime zonedBefore = zonedNow
-            .with(TemporalAdjusters.previousOrSame(DayOfWeek.of(Integer.parseInt(scheduledDay))))
+            .with(TemporalAdjusters.previousOrSame(DayOfWeek.of(leaderboardProperties.schedule().day())))
             .withHour(Integer.parseInt(timeParts[0]))
             .withMinute(timeParts.length > 1 ? Integer.parseInt(timeParts[1]) : 0)
             .withSecond(0)
             .withNano(0);
         Instant before = zonedBefore.toInstant();
         Instant after = zonedBefore.minusWeeks(1).toInstant();
+
+        String team = leaderboardProperties.notification().team();
+        String channelId = leaderboardProperties.notification().channelId();
 
         for (Workspace workspace : workspaces) {
             var topReviewers = getTop3SlackReviewers(workspace, after, before, Optional.ofNullable(team));
@@ -203,7 +198,7 @@ public class SlackWeeklyLeaderboardTask implements Runnable {
                 continue;
             }
 
-            List<LayoutBlock> blocks = buildBlocks(workspace, topReviewers, currentDate, after, before);
+            List<LayoutBlock> blocks = buildBlocks(workspace, topReviewers, currentDate, after, before, team);
             try {
                 slackMessageService.sendMessage(channelId, blocks, "Weekly review highlights");
             } catch (IOException | SlackApiException e) {
@@ -217,9 +212,10 @@ public class SlackWeeklyLeaderboardTask implements Runnable {
         List<User> topReviewers,
         long currentDate,
         Instant after,
-        Instant before
+        Instant before,
+        String team
     ) {
-        final String baseUrl = normalizeBaseUrl(hephaestusUrl);
+        final String baseUrl = normalizeBaseUrl(applicationProperties.hostUrl());
         final String workspaceBase = baseUrl + "/w/" + workspace.getWorkspaceSlug();
         String teamFilter = team == null ? "all" : team;
         return asBlocks(

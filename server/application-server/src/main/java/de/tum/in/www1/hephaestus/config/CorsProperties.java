@@ -1,0 +1,30 @@
+package de.tum.in.www1.hephaestus.config;
+
+import jakarta.validation.constraints.NotEmpty;
+import java.util.List;
+import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.validation.annotation.Validated;
+
+/**
+ * Type-safe configuration properties for CORS settings.
+ *
+ * <p>Binds to the {@code hephaestus.cors} prefix in application configuration.
+ * Uses Spring Boot's {@link ConfigurationProperties} for proper binding and validation,
+ * avoiding the pitfalls of {@code @Value} annotations with environment variable placeholders.
+ *
+ * <h2>Configuration Example</h2>
+ * <pre>{@code
+ * hephaestus:
+ *   cors:
+ *     allowed-origins:
+ *       - https://hephaestus.example.com
+ *       - https://app.example.com
+ * }</pre>
+ *
+ * @param allowedOrigins list of origins allowed to make cross-origin requests
+ */
+@Validated
+@ConfigurationProperties(prefix = "hephaestus.cors")
+public record CorsProperties(
+    @NotEmpty(message = "CORS allowed origins must not be empty") List<String> allowedOrigins
+) {}

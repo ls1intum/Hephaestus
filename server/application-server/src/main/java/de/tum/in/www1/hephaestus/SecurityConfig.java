@@ -1,11 +1,11 @@
 package de.tum.in.www1.hephaestus;
 
+import de.tum.in.www1.hephaestus.config.CorsProperties;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Stream;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.convert.converter.Converter;
@@ -29,12 +29,10 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 @EnableMethodSecurity(prePostEnabled = true)
 public class SecurityConfig {
 
-    private final List<String> allowedOrigins;
+    private final CorsProperties corsProperties;
 
-    public SecurityConfig(
-        @Value("${hephaestus.cors.allowed-origins:http://localhost:4200}") List<String> allowedOrigins
-    ) {
-        this.allowedOrigins = allowedOrigins;
+    public SecurityConfig(CorsProperties corsProperties) {
+        this.corsProperties = corsProperties;
     }
 
     interface AuthoritiesConverter extends Converter<Map<String, Object>, Collection<GrantedAuthority>> {}
@@ -91,6 +89,11 @@ public class SecurityConfig {
         );
 
         http.authorizeHttpRequests(requests -> {
+            // CORS preflight requests must be permitted for cross-origin requests to work.
+            // Without this, OPTIONS requests are rejected with 403 before CORS headers can be added.
+            requests.requestMatchers(HttpMethod.OPTIONS, "/**").permitAll();
+            // Actuator endpoints for Docker/K8s health checks and basic info
+            requests.requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/info").permitAll();
             // OpenAPI documentation endpoints (public for spec generation and dev access)
             requests
                 .requestMatchers("/v3/api-docs/**", "/v3/api-docs.yaml", "/swagger-ui/**", "/swagger-ui.html")
@@ -116,7 +119,7 @@ public class SecurityConfig {
     @Bean
     CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(allowedOrigins);
+        configuration.setAllowedOrigins(corsProperties.allowedOrigins());
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD", "PATCH"));
         configuration.setAllowedHeaders(
             List.of("Authorization", "Content-Type", "Accept", "X-Requested-With", "Origin")

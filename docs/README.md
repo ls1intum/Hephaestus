@@ -22,7 +22,7 @@ cd docs && npm start
 
 ## Prerequisites
 
-- Node.js ≥ 22.10 (matches `.node-version`)
+- Node.js ≥ 22.22 (matches `.node-version`)
 - npm ≥ 10.8
 
 Install dependencies:

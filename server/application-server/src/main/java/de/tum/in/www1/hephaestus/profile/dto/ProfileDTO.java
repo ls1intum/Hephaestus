@@ -5,10 +5,9 @@ import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestInfoDTO;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryInfoDTO;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserInfoDTO;
 import io.swagger.v3.oas.annotations.media.Schema;
-import org.springframework.lang.NonNull;
-
 import java.time.Instant;
 import java.util.List;
+import org.springframework.lang.NonNull;
 
 /**
  * Profile-specific DTO representing a user's complete profile view.
@@ -38,5 +37,4 @@ public record ProfileDTO(
     ProfileActivityStatsDTO activityStats,
     @Schema(description = "Distinct pull requests reviewed by this user") List<PullRequestInfoDTO> reviewedPullRequests,
     @NonNull @Schema(description = "XP progress information for the users' profile") ProfileXpRecordDTO xpRecord
-) {
-}
+) {}

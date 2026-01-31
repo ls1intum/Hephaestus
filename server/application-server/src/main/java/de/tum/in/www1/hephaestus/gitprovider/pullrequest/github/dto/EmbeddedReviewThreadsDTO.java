@@ -31,14 +31,15 @@ public record EmbeddedReviewThreadsDTO(
             return empty();
         }
 
-        List<GitHubReviewThreadDTO> threads = connection.getNodes() != null
-            ? connection
-                  .getNodes()
-                  .stream()
-                  .map(GitHubReviewThreadDTO::fromReviewThread)
-                  .filter(Objects::nonNull)
-                  .toList()
-            : Collections.emptyList();
+        List<GitHubReviewThreadDTO> threads =
+            connection.getNodes() != null
+                ? connection
+                      .getNodes()
+                      .stream()
+                      .map(GitHubReviewThreadDTO::fromReviewThread)
+                      .filter(Objects::nonNull)
+                      .toList()
+                : Collections.emptyList();
 
         boolean hasNextPage =
             connection.getPageInfo() != null && Boolean.TRUE.equals(connection.getPageInfo().getHasNextPage());

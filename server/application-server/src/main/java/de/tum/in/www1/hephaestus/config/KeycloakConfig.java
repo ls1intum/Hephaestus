@@ -20,7 +20,7 @@ public class KeycloakConfig {
     @Bean
     public Keycloak keycloakClient() {
         return KeycloakBuilder.builder()
-            .serverUrl(keycloakProperties.url())
+            .serverUrl(keycloakProperties.effectiveInternalUrl())
             .realm(keycloakProperties.realm())
             .grantType(OAuth2Constants.CLIENT_CREDENTIALS)
             .clientId(keycloakProperties.clientId())

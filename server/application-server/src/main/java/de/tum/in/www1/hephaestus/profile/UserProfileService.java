@@ -21,16 +21,15 @@ import de.tum.in.www1.hephaestus.profile.dto.ProfileReviewActivityDTO;
 import de.tum.in.www1.hephaestus.profile.dto.ProfileXpRecordDTO;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceContributionActivityService;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceMembershipService;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
 import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Service for user profile data aggregation.
@@ -138,28 +137,31 @@ public class UserProfileService {
         UserInfoDTO user = UserInfoDTO.fromUser(userEntity, leaguePoints);
 
         // First contribution is workspace-scoped to only show activity in monitored repositories
-        var firstContribution = workspaceId == null
-            ? null
-            : workspaceContributionActivityService
-            .findFirstContributionInstant(workspaceId, userEntity.getId())
-            .orElse(null);
+        var firstContribution =
+            workspaceId == null
+                ? null
+                : workspaceContributionActivityService
+                      .findFirstContributionInstant(workspaceId, userEntity.getId())
+                      .orElse(null);
 
-        List<PullRequestInfoDTO> openPullRequests = workspaceId == null
-            ? List.of()
-            : profilePullRequestQueryRepository
-            .findAssignedByLoginAndStates(login, Set.of(Issue.State.OPEN), workspaceId)
-            .stream()
-            .map(PullRequestInfoDTO::fromPullRequest)
-            .toList();
+        List<PullRequestInfoDTO> openPullRequests =
+            workspaceId == null
+                ? List.of()
+                : profilePullRequestQueryRepository
+                      .findAssignedByLoginAndStates(login, Set.of(Issue.State.OPEN), workspaceId)
+                      .stream()
+                      .map(PullRequestInfoDTO::fromPullRequest)
+                      .toList();
 
-        List<RepositoryInfoDTO> contributedRepositories = workspaceId == null
-            ? List.of()
-            : profileRepositoryQueryRepository
-            .findContributedByLogin(login, workspaceId)
-            .stream()
-            .map(RepositoryInfoDTO::fromRepository)
-            .sorted(Comparator.comparing(RepositoryInfoDTO::name))
-            .toList();
+        List<RepositoryInfoDTO> contributedRepositories =
+            workspaceId == null
+                ? List.of()
+                : profileRepositoryQueryRepository
+                      .findContributedByLogin(login, workspaceId)
+                      .stream()
+                      .map(RepositoryInfoDTO::fromRepository)
+                      .sorted(Comparator.comparing(RepositoryInfoDTO::name))
+                      .toList();
 
         // Review activity: query PullRequestReview and IssueComment directly
         // This ensures all reviews are shown, regardless of ActivityEvent records
@@ -283,16 +285,16 @@ public class UserProfileService {
         Map<Long, PullRequestReview> reviewsById = reviewIds.isEmpty()
             ? Map.of()
             : pullRequestReviewRepository
-            .findAllByIdWithRelations(reviewIds)
-            .stream()
-            .collect(Collectors.toMap(PullRequestReview::getId, Function.identity()));
+                  .findAllByIdWithRelations(reviewIds)
+                  .stream()
+                  .collect(Collectors.toMap(PullRequestReview::getId, Function.identity()));
 
         Map<Long, IssueComment> commentsById = commentIds.isEmpty()
             ? Map.of()
             : issueCommentRepository
-            .findAllByIdWithRelations(commentIds)
-            .stream()
-            .collect(Collectors.toMap(IssueComment::getId, Function.identity()));
+                  .findAllByIdWithRelations(commentIds)
+                  .stream()
+                  .collect(Collectors.toMap(IssueComment::getId, Function.identity()));
 
         // Build XP lookup map from activity events
         Map<Long, Double> xpByTargetId = activityEvents
@@ -378,6 +380,5 @@ public class UserProfileService {
         return XpSystem.getLevelProgress(activityEventRepository.findTotalXpByWorkspaceAndActor(workspaceId, userId));
     }
 
-    private record TimeRange(Instant after, Instant before) {
-    }
+    private record TimeRange(Instant after, Instant before) {}
 }

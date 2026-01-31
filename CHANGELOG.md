@@ -1,5 +1,63 @@
 # Changelog
 
+## [0.13.8](https://github.com/ls1intum/Hephaestus/compare/v0.13.7...v0.13.8) (2026-01-31)
+
+### 🐛 Bug Fixes
+
+* **server:** accept hour-only schedule time format for backward compatibility ([#682](https://github.com/ls1intum/Hephaestus/issues/682)) ([64b62ea](https://github.com/ls1intum/Hephaestus/commit/64b62ea4427ce203ca48178d96a1a078a7663bff))
+
+### ♻️ Code Refactoring
+
+* **server:** consolidate @Value annotations into type-safe ConfigurationProperties ([#679](https://github.com/ls1intum/Hephaestus/issues/679)) ([cdcabda](https://github.com/ls1intum/Hephaestus/commit/cdcabda76dfb6cb67e9f256a18486d4fb77350d6))
+
+## [0.13.7](https://github.com/ls1intum/Hephaestus/compare/v0.13.6...v0.13.7) (2026-01-31)
+
+### 🐛 Bug Fixes
+
+* **server:** use consistent APPLICATION_HOST_URL env var for CORS ([#677](https://github.com/ls1intum/Hephaestus/issues/677)) ([a90e4f0](https://github.com/ls1intum/Hephaestus/commit/a90e4f06e9e5e99af70c32d5de12f34daaa7deb3))
+
+### ⚡ Performance Improvements
+
+* add BuildKit cache mounts to all Dockerfiles ([#676](https://github.com/ls1intum/Hephaestus/issues/676)) ([6a74892](https://github.com/ls1intum/Hephaestus/commit/6a748929fa21b51bb1ecf260673dc8a8b96e1ecb))
+
+## [0.13.6](https://github.com/ls1intum/Hephaestus/compare/v0.13.5...v0.13.6) (2026-01-31)
+
+### 🐛 Bug Fixes
+
+* **server:** permit OPTIONS requests for CORS preflight ([#673](https://github.com/ls1intum/Hephaestus/issues/673)) ([8057dfe](https://github.com/ls1intum/Hephaestus/commit/8057dfe6e63271caaa191a09c2f65ebad96ef276))
+
+## [0.13.5](https://github.com/ls1intum/Hephaestus/compare/v0.13.4...v0.13.5) (2026-01-31)
+
+### 🐛 Bug Fixes
+
+* **server:** add cors config to production profile ([#670](https://github.com/ls1intum/Hephaestus/issues/670)) ([a163588](https://github.com/ls1intum/Hephaestus/commit/a1635887ebea61f8ccccc24c17988b1f285e8f1f))
+
+## [0.13.4](https://github.com/ls1intum/Hephaestus/compare/v0.13.3...v0.13.4) (2026-01-31)
+
+### 🐛 Bug Fixes
+
+* **server:** use internal url for keycloak admin client ([#668](https://github.com/ls1intum/Hephaestus/issues/668)) ([35a4869](https://github.com/ls1intum/Hephaestus/commit/35a4869f15c4ff27d6b54356fcad01bcf2146d10))
+
+## [0.13.3](https://github.com/ls1intum/Hephaestus/compare/v0.13.2...v0.13.3) (2026-01-31)
+
+### 🐛 Bug Fixes
+
+* **server:** improve database cleanup retry logic for flaky tests ([#666](https://github.com/ls1intum/Hephaestus/issues/666)) ([5ca8804](https://github.com/ls1intum/Hephaestus/commit/5ca880487d6c24a062354b585c663e2b0a0986f9))
+* **config:** resolve prettier and biome formatter conflicts in ide ([#665](https://github.com/ls1intum/Hephaestus/issues/665)) ([ddfd9bd](https://github.com/ls1intum/Hephaestus/commit/ddfd9bd76251af320a9a9afaccef36e131018080))
+
+## [0.13.2](https://github.com/ls1intum/Hephaestus/compare/v0.13.1...v0.13.2) (2026-01-30)
+
+### 🐛 Bug Fixes
+
+* allow deps, security, db, docker scopes to trigger releases ([#663](https://github.com/ls1intum/Hephaestus/issues/663)) ([485ccab](https://github.com/ls1intum/Hephaestus/commit/485ccab23e0d2605bbc085bc9b36269c722ea602))
+* **security:** allow unauthenticated access to actuator health and info endpoints ([#662](https://github.com/ls1intum/Hephaestus/issues/662)) ([a35cf94](https://github.com/ls1intum/Hephaestus/commit/a35cf94ef6561fcfd1ae4e45a76abd5f6fd26d7e))
+
+## [0.13.1](https://github.com/ls1intum/Hephaestus/compare/v0.13.0...v0.13.1) (2026-01-30)
+
+### 🐛 Bug Fixes
+
+* **gitprovider:** atomic upsert for activity events, issues, pull requests, labels, and milestones ([#659](https://github.com/ls1intum/Hephaestus/issues/659)) ([0f616a9](https://github.com/ls1intum/Hephaestus/commit/0f616a9fcf523bdb3e2465e17ead4d5cc90edea4))
+
 ## [0.13.0](https://github.com/ls1intum/Hephaestus/compare/v0.12.4...v0.13.0) (2026-01-28)
 
 ### 🐛 Bug Fixes

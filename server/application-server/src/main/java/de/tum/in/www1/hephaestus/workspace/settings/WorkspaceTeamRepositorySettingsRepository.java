@@ -23,7 +23,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Repository
 @WorkspaceAgnostic("Queried by explicit workspace ID - settings queries always workspace-scoped")
 public interface WorkspaceTeamRepositorySettingsRepository
-    extends JpaRepository<WorkspaceTeamRepositorySettings, WorkspaceTeamRepositorySettings.Id> {
+    extends JpaRepository<WorkspaceTeamRepositorySettings, WorkspaceTeamRepositorySettings.Id>
+{
     /**
      * Finds all team repository settings for a given workspace.
      *

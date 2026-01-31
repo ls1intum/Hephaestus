@@ -2,7 +2,6 @@ package de.tum.in.www1.hephaestus.profile;
 
 import de.tum.in.www1.hephaestus.profile.dto.ProfileXpRecordDTO;
 
-
 /**
  * Utility class for XP and Level calculations.
  *
@@ -88,11 +87,6 @@ public final class XpSystem {
         long xpInCurrentLevel = Math.max(0, totalXP - currentLevelStartXp);
         long xpNeededForNextLevel = nextLevelStartXp - currentLevelStartXp;
 
-        return new ProfileXpRecordDTO(
-            level,
-            xpInCurrentLevel,
-            xpNeededForNextLevel,
-            totalXP
-        );
+        return new ProfileXpRecordDTO(level, xpInCurrentLevel, xpNeededForNextLevel, totalXP);
     }
 }

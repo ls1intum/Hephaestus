@@ -350,10 +350,7 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
         AND e.xp > 0
         """
     )
-    long findTotalXpByWorkspaceAndActor(
-        @Param("workspaceId") Long workspaceId,
-        @Param("actorId") Long actorId
-    );
+    long findTotalXpByWorkspaceAndActor(@Param("workspaceId") Long workspaceId, @Param("actorId") Long actorId);
 
     /**
      * Fetch XP for specific target entities by their IDs and types.

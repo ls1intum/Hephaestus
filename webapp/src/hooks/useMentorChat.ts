@@ -17,7 +17,13 @@ import {
 	getThreadQueryKey,
 	voteMessageMutation,
 } from "@/api/@tanstack/react-query.gen";
-import type { ChatMessageVote, ChatThreadGroup, Document, ThreadDetail } from "@/api/types.gen";
+import type {
+	ChatMessageVote,
+	ChatThreadGroup,
+	Document,
+	GetThreadError,
+	ThreadDetail,
+} from "@/api/types.gen";
 import environment from "@/environment";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 import { keycloakService } from "@/integrations/auth";
@@ -60,7 +66,7 @@ interface UseMentorChatReturn extends Omit<UseChatHelpers<ChatMessage>, "sendMes
 	triggerGreeting: () => Promise<void>; // Manually trigger a greeting
 	threadDetail: ThreadDetail | undefined;
 	isThreadLoading: boolean;
-	threadError: Error | null;
+	threadError: GetThreadError | null;
 	groupedThreads: ChatThreadGroup[] | undefined;
 	isGroupedThreadsLoading: boolean;
 	isLoading: boolean;

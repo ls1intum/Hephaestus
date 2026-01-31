@@ -97,7 +97,7 @@ jobs:
 
       - name: Checkout repository
         if: steps.should_run.outputs.run == 'true'
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           # Full history needed only for Chromatic TurboSnap (webapp-visual)
           # Other tests only need HEAD for faster checkout
@@ -105,7 +105,7 @@ jobs:
 
       - name: Setup Node.js
         if: steps.should_run.outputs.run == 'true'
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version-file: ".node-version"
           cache: "npm"
@@ -184,7 +184,7 @@ jobs:
       - name: "Chromatic Visual Testing"
         if: steps.should_run.outputs.run == 'true' && matrix.test-type == 'webapp-visual'
         id: chromatic
-        uses: chromaui/action@v11
+        uses: chromaui/action@1cfa065cbdab28f6ca3afaeb3d761383076a35aa # v11
         with:
           projectToken: ${{ secrets.CHROMATIC_PROJECT_TOKEN }}
           workingDir: webapp
@@ -204,7 +204,7 @@ jobs:
       # We must use the PR head SHA for the status to appear on the PR checks page.
       - name: "Create Storybook status check"
         if: steps.should_run.outputs.run == 'true' && matrix.test-type == 'webapp-visual' && always() && startsWith(steps.chromatic.outputs.storybookUrl, 'http')
-        uses: actions/github-script@v7
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
         with:
           script: |
             // Use PR head SHA for pull_request events, otherwise use context.sha
@@ -225,7 +225,7 @@ jobs:
       # Test result aggregation
       - name: Upload application-server test results
         if: steps.should_run.outputs.run == 'true' && always() && startsWith(matrix.test-type, 'application-server-')
-        uses: dorny/test-reporter@v2
+        uses: dorny/test-reporter@b082adf0eced0765477756c2a610396589b8c637 # v2
         with:
           name: "Test Results - ${{ matrix.test-type }}"
           path: "server/application-server/target/surefire-reports/TEST-*.xml"
@@ -234,7 +234,7 @@ jobs:
 
       - name: Upload webapp test results
         if: steps.should_run.outputs.run == 'true' && always() && matrix.test-type == 'webapp-unit'
-        uses: dorny/test-reporter@v2
+        uses: dorny/test-reporter@b082adf0eced0765477756c2a610396589b8c637 # v2
         with:
           name: "Test Results - ${{ matrix.test-type }}"
           path: "webapp/test-results/junit-*.xml"
@@ -243,7 +243,7 @@ jobs:
 
       - name: Upload webapp-storybook test results
         if: steps.should_run.outputs.run == 'true' && always() && matrix.test-type == 'webapp-storybook'
-        uses: dorny/test-reporter@v2
+        uses: dorny/test-reporter@b082adf0eced0765477756c2a610396589b8c637 # v2
         with:
           name: "Test Results - ${{ matrix.test-type }}"
           path: "webapp/test-results/junit-storybook.xml"
@@ -252,7 +252,7 @@ jobs:
 
       - name: Upload Chromatic test results
         if: steps.should_run.outputs.run == 'true' && always() && matrix.test-type == 'webapp-visual' && startsWith(steps.chromatic.outputs.storybookUrl, 'http')
-        uses: dorny/test-reporter@v2
+        uses: dorny/test-reporter@b082adf0eced0765477756c2a610396589b8c637 # v2
         with:
           name: "Test Results - ${{ matrix.test-type }}"
           path: "webapp/chromatic-build-*.xml"
@@ -261,7 +261,7 @@ jobs:
 
       - name: Upload intelligence-service test results
         if: steps.should_run.outputs.run == 'true' && always() && startsWith(matrix.test-type, 'intelligence-service-')
-        uses: dorny/test-reporter@v2
+        uses: dorny/test-reporter@b082adf0eced0765477756c2a610396589b8c637 # v2
         with:
           name: "Test Results - ${{ matrix.test-type }}"
           path: "server/intelligence-service/test-results/junit-*.xml"
@@ -270,7 +270,7 @@ jobs:
 
       - name: Upload webhook-ingest test results
         if: steps.should_run.outputs.run == 'true' && always() && matrix.test-type == 'webhook-ingest-unit'
-        uses: dorny/test-reporter@v2
+        uses: dorny/test-reporter@b082adf0eced0765477756c2a610396589b8c637 # v2
         with:
           name: "Test Results - ${{ matrix.test-type }}"
           path: "server/webhook-ingest/test-results/junit-*.xml"

@@ -31,13 +31,13 @@ jobs:
       security-events: write
       contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           fetch-depth: ${{ matrix.scan-type == 'secrets' && 0 || 1 }}
 
       - name: Trivy dependency scan
         if: matrix.scan-type == 'dependencies'
-        uses: aquasecurity/trivy-action@0.31.0
+        uses: aquasecurity/trivy-action@b6643a29fecd7f34b3597bc6acb0a98b03d33ff8 # 0.33.1
         with:
           scan-type: "fs"
           scan-ref: "."
@@ -46,13 +46,13 @@ jobs:
 
       - name: Upload Trivy results
         if: matrix.scan-type == 'dependencies'
-        uses: github/codeql-action/upload-sarif@v4
+        uses: github/codeql-action/upload-sarif@b20883b0cd1f46c72ae0ba6d1090936928f9fa30 # v4
         with:
           sarif_file: "trivy-results.sarif"
 
       - name: Secret detection
         if: matrix.scan-type == 'secrets'
-        uses: trufflesecurity/trufflehog@v3.88.35
+        uses: trufflesecurity/trufflehog@116e7171542d2f1dad8810f00dcfacbe0b809183 # v3.92.5
         with:
           path: ./
           base: ${{ github.event_name == 'pull_request' && github.base_ref || '' }}

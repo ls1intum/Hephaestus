@@ -26,11 +26,11 @@ public class DatabaseTestUtils {
     /** Cached truncate statement to avoid schema metadata queries on every test. */
     private static volatile String cachedTruncateStatement = null;
 
-    /** Maximum retries for transient deadlock errors during cleanup. */
-    private static final int MAX_RETRIES = 3;
+    /** Maximum retries for transient errors during cleanup. */
+    private static final int MAX_RETRIES = 5;
 
     /** Base delay in milliseconds between retries (doubles with each retry). */
-    private static final long RETRY_DELAY_MS = 50;
+    private static final long RETRY_DELAY_MS = 100;
 
     /**
      * Truncates all tables in the test database.
@@ -51,8 +51,8 @@ public class DatabaseTestUtils {
             } catch (Exception e) {
                 lastException = e;
 
-                // Check if this is a transient deadlock error
-                if (isDeadlockException(e) && attempt < MAX_RETRIES) {
+                // Check if this is a transient error that may resolve on retry
+                if (isTransientException(e) && attempt < MAX_RETRIES) {
                     try {
                         Thread.sleep(RETRY_DELAY_MS * (1L << (attempt - 1))); // Exponential backoff
                     } catch (InterruptedException ie) {
@@ -87,14 +87,29 @@ public class DatabaseTestUtils {
     }
 
     /**
-     * Checks if the exception is a transient PostgreSQL deadlock.
+     * Checks if the exception is a transient PostgreSQL error that may resolve on retry.
+     * Includes deadlocks, serialization failures, lock timeouts, and connection issues.
      */
-    private boolean isDeadlockException(Exception e) {
+    private boolean isTransientException(Exception e) {
         Throwable current = e;
         while (current != null) {
             String message = current.getMessage();
-            if (message != null && (message.contains("deadlock detected") || message.contains("40P01"))) {
-                return true;
+            if (message != null) {
+                String lowerMessage = message.toLowerCase(Locale.ROOT);
+                // PostgreSQL error codes and messages for transient failures
+                if (
+                    lowerMessage.contains("deadlock detected") || // Deadlock
+                    message.contains("40P01") || // Deadlock error code
+                    message.contains("40001") || // Serialization failure
+                    lowerMessage.contains("could not serialize access") ||
+                    lowerMessage.contains("lock timeout") ||
+                    lowerMessage.contains("canceling statement due to lock") ||
+                    lowerMessage.contains("connection is closed") ||
+                    lowerMessage.contains("connection reset") ||
+                    lowerMessage.contains("unable to acquire jdbc connection")
+                ) {
+                    return true;
+                }
             }
             current = current.getCause();
         }

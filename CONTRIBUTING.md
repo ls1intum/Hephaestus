@@ -47,13 +47,16 @@ We use **Semantic Release** to automatically version and release our application
 
 | Pattern | Example | Why |
 |---------|---------|-----|
-| `*(ci):` | `fix(ci): update workflow` | `ci` scope blocks release |
-| `*(config):` | `chore(config): update renovate.json` | `config` scope blocks release |
-| `*(deps):` | `fix(deps): update library` | `deps` scope blocks release |
-| `*(docker):` | `fix(docker): update base image` | `docker` scope blocks release |
-| `*(scripts):` | `fix(scripts): fix db backup` | `scripts` scope blocks release |
-| `*(security):` | `chore(security): update policy` | `security` scope blocks release |
-| `*(no-release):`| `feat(no-release): internal feature` | Explicit block |
+| `*(ci):` | `fix(ci): update workflow` | CI/GitHub Actions only |
+| `*(config):` | `chore(config): update renovate.json` | **TOOLING only** (see warning below) |
+| `*(deps-dev):` | `chore(deps-dev): update test lib` | Dev dependencies only |
+| `*(scripts):` | `fix(scripts): fix build script` | Build/dev scripts only |
+| `*(no-release):`| `feat(no-release): internal feature` | Explicit opt-out |
+
+> ⚠️ **`config` scope warning:** Only use for tooling config files like `.prettierrc`, `renovate.json`, `eslint.config.js`. Do NOT use for:
+> - Runtime config (`application.yml`) → use `server`
+> - Dockerfiles → use service scope (`webapp`, `server`, etc.)
+> - Production compose files → use `docker`
 
 **✅ WILL Trigger Release**:
 
@@ -92,16 +95,19 @@ We use **Semantic Release** to automatically version and release our application
 - `webhooks`: Webhook ingestion service
 - `docs`: Documentation
 
-**Infrastructure scopes** (⚠️ These prevent releases):
+**Infrastructure scopes that WILL trigger releases** (affect runtime):
+
+- `deps`: Production dependencies (security patches, bug fixes)
+- `security`: Security fixes are critical
+- `db`: Database migrations affect runtime
+
+**Infrastructure scopes that will NOT trigger releases**:
 
 - `ci`: CI/CD workflows
 - `config`: Tooling configuration (renovate, eslint, tsconfig, etc.)
-- `deps`: Dependencies
-- `deps-dev`: Dev dependencies
-- `docker`: Container configuration
+- `deps-dev`: Dev dependencies only
+- `docker`: Container dev configuration
 - `scripts`: Helper scripts
-- `security`: Security policies and config
-- `db`: Database/Liquibase changes
 - `no-release`: Explicit release prevention
 
 **Feature scopes** (domain-specific):
@@ -124,8 +130,10 @@ We use **Semantic Release** to automatically version and release our application
 - `feat(server): add user profile endpoint`
 - `docs: update installation instructions`
 - `refactor(ai): improve code analysis performance`
-- `chore(deps): update dependencies to latest versions`
-- `fix(db): add missing index for performance`
+- `fix(deps): update vulnerable dependency` (triggers patch release)
+- `fix(security): patch authentication bypass` (triggers patch release)
+- `fix(db): add missing index for performance` (triggers patch release)
+- `chore(deps-dev): update test dependencies` (no release)
 
 **Draft Pull Requests:**
 

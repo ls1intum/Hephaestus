@@ -30,14 +30,15 @@ public record EmbeddedReviewsDTO(
             return empty();
         }
 
-        List<GitHubReviewDTO> reviews = connection.getNodes() != null
-            ? connection
-                  .getNodes()
-                  .stream()
-                  .map(GitHubReviewDTO::fromPullRequestReview)
-                  .filter(Objects::nonNull)
-                  .toList()
-            : Collections.emptyList();
+        List<GitHubReviewDTO> reviews =
+            connection.getNodes() != null
+                ? connection
+                      .getNodes()
+                      .stream()
+                      .map(GitHubReviewDTO::fromPullRequestReview)
+                      .filter(Objects::nonNull)
+                      .toList()
+                : Collections.emptyList();
 
         boolean hasNextPage =
             connection.getPageInfo() != null && Boolean.TRUE.equals(connection.getPageInfo().getHasNextPage());

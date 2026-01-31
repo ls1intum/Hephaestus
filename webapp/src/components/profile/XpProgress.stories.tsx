@@ -1,6 +1,5 @@
-// biome-ignore assist/source/organizeImports: <explanation>
-import { XpProgress } from "@/components/profile/XpProgress";
 import type { Meta, StoryObj } from "@storybook/react";
+import { XpProgress } from "@/components/profile/XpProgress";
 
 const meta = {
 	component: XpProgress,

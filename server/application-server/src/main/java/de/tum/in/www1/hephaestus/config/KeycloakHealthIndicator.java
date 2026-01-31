@@ -48,7 +48,7 @@ public class KeycloakHealthIndicator implements HealthIndicator {
 
     @Override
     public Health health() {
-        String url = keycloakProperties.url();
+        String internalUrl = keycloakProperties.effectiveInternalUrl();
         String realm = keycloakProperties.realm();
         CircuitBreaker.State circuitState = circuitBreaker.getState();
 
@@ -56,7 +56,7 @@ public class KeycloakHealthIndicator implements HealthIndicator {
         if (circuitState == CircuitBreaker.State.OPEN) {
             log.debug("Keycloak health check skipped: circuit breaker is OPEN");
             return Health.down()
-                .withDetail("url", url)
+                .withDetail("url", internalUrl)
                 .withDetail("realm", realm)
                 .withDetail("circuitBreaker", circuitState.name())
                 .withDetail("error", "Circuit breaker is OPEN - Keycloak unavailable")
@@ -69,14 +69,14 @@ public class KeycloakHealthIndicator implements HealthIndicator {
 
             log.debug("Keycloak health check succeeded: realm={}", realm);
             return Health.up()
-                .withDetail("url", url)
+                .withDetail("url", internalUrl)
                 .withDetail("realm", realm)
                 .withDetail("circuitBreaker", circuitState.name())
                 .build();
         } catch (Exception e) {
             log.warn("Keycloak health check failed: realm={}, error={}", realm, e.getMessage());
             return Health.down()
-                .withDetail("url", url)
+                .withDetail("url", internalUrl)
                 .withDetail("realm", realm)
                 .withDetail("circuitBreaker", circuitState.name())
                 .withDetail("error", e.getMessage())
