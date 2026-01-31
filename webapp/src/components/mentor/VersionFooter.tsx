@@ -3,7 +3,7 @@ import { useWindowSize } from "usehooks-ts";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 
-interface VersionFooterProps {
+export interface VersionFooterProps {
 	/** Handler for version navigation */
 	handleVersionChange: (type: "next" | "prev" | "toggle" | "latest") => void;
 	/** Current version index being viewed */
