@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.13.3](https://github.com/ls1intum/Hephaestus/compare/v0.13.2...v0.13.3) (2026-01-31)
+
+### 🐛 Bug Fixes
+
+* **server:** improve database cleanup retry logic for flaky tests ([#666](https://github.com/ls1intum/Hephaestus/issues/666)) ([5ca8804](https://github.com/ls1intum/Hephaestus/commit/5ca880487d6c24a062354b585c663e2b0a0986f9))
+* **config:** resolve prettier and biome formatter conflicts in ide ([#665](https://github.com/ls1intum/Hephaestus/issues/665)) ([ddfd9bd](https://github.com/ls1intum/Hephaestus/commit/ddfd9bd76251af320a9a9afaccef36e131018080))
+
 ## [0.13.2](https://github.com/ls1intum/Hephaestus/compare/v0.13.1...v0.13.2) (2026-01-30)
 
 ### 🐛 Bug Fixes
