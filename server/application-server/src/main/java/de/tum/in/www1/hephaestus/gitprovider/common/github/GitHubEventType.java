@@ -29,6 +29,10 @@ public enum GitHubEventType {
     MILESTONE("milestone"),
     MEMBER("member"),
 
+    // Discussion events
+    DISCUSSION("discussion"),
+    DISCUSSION_COMMENT("discussion_comment"),
+
     // Issue hierarchy events
     /** Available for subscription - test fixtures exist. */
     SUB_ISSUES("sub_issues"),

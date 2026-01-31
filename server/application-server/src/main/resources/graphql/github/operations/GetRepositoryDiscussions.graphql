@@ -1,0 +1,236 @@
+# GraphQL query for fetching repository discussions with all fields
+# Used by GitHubDiscussionSyncService for GraphQL-based sync
+# Comments are embedded inline (first 10) to avoid N+1 queries - pagination handles discussions with more
+# Supports incremental sync via since parameter (but GitHub may not support direct filtering)
+
+query GetRepositoryDiscussions($owner: String!, $name: String!, $first: Int!, $after: String, $categoryId: ID) {
+    rateLimit {
+        cost
+        limit
+        remaining
+        resetAt
+    }
+    repository(owner: $owner, name: $name) {
+        discussions(
+            first: $first
+            after: $after
+            categoryId: $categoryId
+            orderBy: { field: UPDATED_AT, direction: DESC }
+        ) {
+            pageInfo {
+                hasNextPage
+                endCursor
+            }
+            totalCount
+            nodes {
+                id
+                databaseId
+                number
+                title
+                body
+                url
+                createdAt
+                updatedAt
+                closedAt
+                locked
+                activeLockReason
+                stateReason
+
+                # Answer information (for Q&A discussions)
+                answerChosenAt
+                answerChosenBy {
+                    __typename
+                    ... on User {
+                        id
+                        databaseId
+                        login
+                        avatarUrl
+                        name
+                        email
+                        createdAt
+                        updatedAt
+                    }
+                    ... on Bot {
+                        id
+                        databaseId
+                        login
+                        avatarUrl
+                    }
+                    ... on Mannequin {
+                        id
+                        databaseId
+                        login
+                        avatarUrl
+                    }
+                    ... on Organization {
+                        id
+                        databaseId
+                        login
+                        avatarUrl
+                    }
+                }
+
+                # The accepted answer comment
+                answer {
+                    id
+                    databaseId
+                    body
+                    url
+                    createdAt
+                    updatedAt
+                    isAnswer
+                    isMinimized
+                    minimizedReason
+                    authorAssociation
+
+                    author {
+                        __typename
+                        ... on User {
+                            id
+                            databaseId
+                            login
+                            avatarUrl
+                            name
+                            email
+                            createdAt
+                            updatedAt
+                        }
+                        ... on Bot {
+                            id
+                            databaseId
+                            login
+                            avatarUrl
+                        }
+                        ... on Mannequin {
+                            id
+                            databaseId
+                            login
+                            avatarUrl
+                        }
+                        ... on Organization {
+                            id
+                            databaseId
+                            login
+                            avatarUrl
+                        }
+                    }
+                }
+
+                # Category
+                category {
+                    id
+                    name
+                    slug
+                    emoji
+                    emojiHTML
+                    description
+                    isAnswerable
+                    createdAt
+                    updatedAt
+                }
+
+                # Author
+                author {
+                    __typename
+                    ... on User {
+                        id
+                        databaseId
+                        login
+                        avatarUrl
+                        name
+                        email
+                        createdAt
+                        updatedAt
+                    }
+                    ... on Bot {
+                        id
+                        databaseId
+                        login
+                        avatarUrl
+                    }
+                    ... on Mannequin {
+                        id
+                        databaseId
+                        login
+                        avatarUrl
+                    }
+                    ... on Organization {
+                        id
+                        databaseId
+                        login
+                        avatarUrl
+                    }
+                }
+
+                # Labels
+                labels(first: 50) {
+                    nodes {
+                        id
+                        name
+                        description
+                        color
+                    }
+                }
+
+                # Comments (first 10, embedded to avoid N+1)
+                comments(first: 10) {
+                    totalCount
+                    pageInfo {
+                        hasNextPage
+                        endCursor
+                    }
+                    nodes {
+                        id
+                        databaseId
+                        body
+                        url
+                        createdAt
+                        updatedAt
+                        isAnswer
+                        isMinimized
+                        minimizedReason
+                        authorAssociation
+
+                        # Comment author
+                        author {
+                            __typename
+                            ... on User {
+                                id
+                                databaseId
+                                login
+                                avatarUrl
+                                name
+                                email
+                                createdAt
+                                updatedAt
+                            }
+                            ... on Bot {
+                                id
+                                databaseId
+                                login
+                                avatarUrl
+                            }
+                            ... on Mannequin {
+                                id
+                                databaseId
+                                login
+                                avatarUrl
+                            }
+                            ... on Organization {
+                                id
+                                databaseId
+                                login
+                                avatarUrl
+                            }
+                        }
+
+                        # Reply to (for threading)
+                        replyTo {
+                            id
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
