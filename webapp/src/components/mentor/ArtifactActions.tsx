@@ -54,12 +54,12 @@ export function ArtifactActions({
 								size={action.label ? "default" : "icon"}
 								onClick={action.onClick}
 								disabled={isLoading || isStreaming || action.disabled}
-							>
-								{action.icon}
-								{action.label}
-							</Button>
+							/>
 						}
-					/>
+					>
+						{action.icon}
+						{action.label}
+					</TooltipTrigger>
 					<TooltipContent>{action.description}</TooltipContent>
 				</Tooltip>
 			))}

@@ -74,11 +74,11 @@ export function MessageActions({
 								variant="ghost"
 								size="icon"
 								onClick={() => onCopy(messageContentToCopy)}
-							>
-								<Copy />
-							</Button>
+							/>
 						}
-					/>
+					>
+						<Copy />
+					</TooltipTrigger>
 					<TooltipContent side={isAssistantMessage ? "top" : "bottom"}>Copy</TooltipContent>
 				</Tooltip>
 
@@ -87,11 +87,11 @@ export function MessageActions({
 					<Tooltip>
 						<TooltipTrigger
 							render={
-								<Button className={buttonClasses} variant="ghost" size="icon" onClick={onEdit}>
-									<PencilIcon size={14} />
-								</Button>
+								<Button className={buttonClasses} variant="ghost" size="icon" onClick={onEdit} />
 							}
-						/>
+						>
+							<PencilIcon size={14} />
+						</TooltipTrigger>
 						<TooltipContent side="bottom">Edit message</TooltipContent>
 					</Tooltip>
 				)}
@@ -114,11 +114,11 @@ export function MessageActions({
 										variant="ghost"
 										size="icon"
 										onClick={() => onVote(true)}
-									>
-										<ThumbsUp size={14} />
-									</Button>
+									/>
 								}
-							/>
+							>
+								<ThumbsUp size={14} />
+							</TooltipTrigger>
 							<TooltipContent side="top">Good response</TooltipContent>
 						</Tooltip>
 
@@ -137,11 +137,11 @@ export function MessageActions({
 										variant="ghost"
 										size="icon"
 										onClick={() => onVote(false)}
-									>
-										<ThumbsDown size={14} />
-									</Button>
+									/>
 								}
-							/>
+							>
+								<ThumbsDown size={14} />
+							</TooltipTrigger>
 							<TooltipContent side="top">Bad response</TooltipContent>
 						</Tooltip>
 					</>

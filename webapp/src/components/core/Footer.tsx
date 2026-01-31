@@ -98,12 +98,12 @@ export default function Footer({ className, buildInfo }: FooterProps) {
 												target="_blank"
 												rel="noopener noreferrer"
 												className="flex items-center gap-1 hover:text-foreground transition-colors"
-											>
-												<GitBranchIcon size={12} />
-												<span className="max-w-20 truncate">{buildInfo.branch}</span>
-											</a>
+											/>
 										}
-									/>
+									>
+										<GitBranchIcon size={12} />
+										<span className="max-w-20 truncate">{buildInfo.branch}</span>
+									</TooltipTrigger>
 									<TooltipContent>{buildInfo.branch}</TooltipContent>
 								</Tooltip>
 							)}
@@ -117,12 +117,12 @@ export default function Footer({ className, buildInfo }: FooterProps) {
 												target="_blank"
 												rel="noopener noreferrer"
 												className="flex items-center gap-1 hover:text-foreground transition-colors"
-											>
-												<GitCommitIcon size={12} />
-												<span>{buildInfo.commit.substring(0, 7)}</span>
-											</a>
+											/>
 										}
-									/>
+									>
+										<GitCommitIcon size={12} />
+										<span>{buildInfo.commit.substring(0, 7)}</span>
+									</TooltipTrigger>
 									<TooltipContent>{buildInfo.commit}</TooltipContent>
 								</Tooltip>
 							)}

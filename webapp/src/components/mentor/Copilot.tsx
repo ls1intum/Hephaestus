@@ -145,11 +145,11 @@ export function Copilot({
 														onClick={onOpenFullChat}
 														aria-label="Open in mentor view"
 														disabled={!hasMessages}
-													>
-														<SquareArrowOutUpRight />
-													</Button>
+													/>
 												}
-											/>
+											>
+												<SquareArrowOutUpRight />
+											</TooltipTrigger>
 											<TooltipContent>Open in full screen</TooltipContent>
 										</Tooltip>
 									)}
@@ -163,11 +163,11 @@ export function Copilot({
 														onClick={onNewChat}
 														aria-label="Start new chat"
 														disabled={!hasMessages}
-													>
-														<SquarePen />
-													</Button>
+													/>
 												}
-											/>
+											>
+												<SquarePen />
+											</TooltipTrigger>
 											<TooltipContent>New chat</TooltipContent>
 										</Tooltip>
 									)}
@@ -179,11 +179,11 @@ export function Copilot({
 													size="icon"
 													onClick={handleClose}
 													aria-label="Close Heph - AI Mentor"
-												>
-													<X />
-												</Button>
+												/>
 											}
-										/>
+										>
+											<X />
+										</TooltipTrigger>
 										<TooltipContent>Close</TooltipContent>
 									</Tooltip>
 								</div>

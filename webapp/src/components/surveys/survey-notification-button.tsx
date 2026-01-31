@@ -41,12 +41,12 @@ export function SurveyNotificationButton() {
 								className="relative"
 								style={{ overflow: "visible" }}
 								aria-label={`Open survey: ${survey.name}`}
-							>
-								<ClipboardList className="h-[1.2rem] w-[1.2rem]" />
-								<Badge animated={!prefersReducedMotion} />
-							</Button>
+							/>
 						}
-					/>
+					>
+						<ClipboardList className="h-[1.2rem] w-[1.2rem]" />
+						<Badge animated={!prefersReducedMotion} />
+					</TooltipTrigger>
 					<TooltipContent>
 						<p className="font-medium">Survey pending</p>
 						<p className="text-xs text-muted-foreground">{survey.name}</p>

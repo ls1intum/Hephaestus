@@ -66,11 +66,11 @@ export function ProfileHeader({
 												"absolute -bottom-1 -right-1 flex size-7 items-center justify-center rounded-full border-2 border-background text-primary-foreground font-bold text-xs",
 												`bg-league-${leagueTier}`,
 											)}
-										>
-											{level}
-										</div>
+										/>
 									}
-								/>
+								>
+									{level}
+								</TooltipTrigger>
 								<TooltipContent side="bottom">
 									<p>Level {level}</p>
 								</TooltipContent>

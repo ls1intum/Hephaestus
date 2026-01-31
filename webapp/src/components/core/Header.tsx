@@ -86,12 +86,12 @@ export default function Header({
 										target="_blank"
 										rel="noopener noreferrer"
 										className="flex items-center gap-1 text-xs font-mono mt-1 text-muted-foreground hover:text-foreground transition-colors"
-									>
-										<TagIcon size={12} />
-										<span>v{version}</span>
-									</a>
+									/>
 								}
-							/>
+							>
+								<TagIcon size={12} />
+								<span>v{version}</span>
+							</TooltipTrigger>
 							<TooltipContent>View release notes</TooltipContent>
 						</Tooltip>
 					) : (
