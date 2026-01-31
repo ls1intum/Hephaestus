@@ -250,7 +250,7 @@ export function PullRequestBadPracticeCard({
 					{/* Accordion for current analysis */}
 					{hasCurrentAnalysis && (
 						<Accordion
-							type="multiple"
+							multiple
 							value={openAccordions}
 							onValueChange={handleAccordionValueChange}
 							className="w-full"
@@ -307,7 +307,7 @@ export function PullRequestBadPracticeCard({
 					{/* Accordion for previous analysis */}
 					{hasPreviousAnalysis && (
 						<Accordion
-							type="multiple"
+							multiple
 							value={openAccordions}
 							onValueChange={handleAccordionValueChange}
 							className={`w-full ${hasCurrentAnalysis ? "border-t" : ""}`}

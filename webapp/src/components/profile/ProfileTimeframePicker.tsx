@@ -221,18 +221,20 @@ export function ProfileTimeframePicker({
 
 			{selectedPreset === "custom" && (
 				<Popover>
-					<PopoverTrigger asChild>
-						<Button
-							variant="outline"
-							className={cn(
-								"justify-start text-left font-normal",
-								!customRange?.from && "text-muted-foreground",
-							)}
-						>
-							<CalendarIcon className="mr-2 h-4 w-4" />
-							{formatCustomRangeLabel()}
-						</Button>
-					</PopoverTrigger>
+					<PopoverTrigger
+						render={
+							<Button
+								variant="outline"
+								className={cn(
+									"justify-start text-left font-normal",
+									!customRange?.from && "text-muted-foreground",
+								)}
+							>
+								<CalendarIcon className="mr-2 h-4 w-4" />
+								{formatCustomRangeLabel()}
+							</Button>
+						}
+					/>
 					<PopoverContent className="w-auto p-0" align="start">
 						<Calendar
 							initialFocus

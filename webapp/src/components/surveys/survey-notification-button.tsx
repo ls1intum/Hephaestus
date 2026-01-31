@@ -32,19 +32,21 @@ export function SurveyNotificationButton() {
 				transition={{ delay: 0.1, ...spring }}
 			>
 				<Tooltip>
-					<TooltipTrigger asChild>
-						<Button
-							variant="outline"
-							size="icon"
-							onClick={reopen}
-							className="relative"
-							style={{ overflow: "visible" }}
-							aria-label={`Open survey: ${survey.name}`}
-						>
-							<ClipboardList className="h-[1.2rem] w-[1.2rem]" />
-							<Badge animated={!prefersReducedMotion} />
-						</Button>
-					</TooltipTrigger>
+					<TooltipTrigger
+						render={
+							<Button
+								variant="outline"
+								size="icon"
+								onClick={reopen}
+								className="relative"
+								style={{ overflow: "visible" }}
+								aria-label={`Open survey: ${survey.name}`}
+							>
+								<ClipboardList className="h-[1.2rem] w-[1.2rem]" />
+								<Badge animated={!prefersReducedMotion} />
+							</Button>
+						}
+					/>
 					<TooltipContent>
 						<p className="font-medium">Survey pending</p>
 						<p className="text-xs text-muted-foreground">{survey.name}</p>

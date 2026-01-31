@@ -39,14 +39,16 @@ export function LeagueIcon({
 
 	return (
 		<Tooltip>
-			<TooltipTrigger asChild>
-				<div className={cn("flex flex-col items-center justify-center", className)}>
-					<IconComponent size={size} aria-label={`${label} tier`} />
-					{showPoints && (
-						<span className="text-xs font-semibold text-muted-foreground">{leaguePoints}</span>
-					)}
-				</div>
-			</TooltipTrigger>
+			<TooltipTrigger
+				render={
+					<div className={cn("flex flex-col items-center justify-center", className)}>
+						<IconComponent size={size} aria-label={`${label} tier`} />
+						{showPoints && (
+							<span className="text-xs font-semibold text-muted-foreground">{leaguePoints}</span>
+						)}
+					</div>
+				}
+			/>
 			<TooltipContent>
 				<p>{label} League</p>
 			</TooltipContent>

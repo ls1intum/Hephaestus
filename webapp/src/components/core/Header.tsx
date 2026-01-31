@@ -79,17 +79,19 @@ export default function Header({
 					{/* Version badge - clickable for production releases */}
 					{version !== "DEV" && version !== "preview" ? (
 						<Tooltip>
-							<TooltipTrigger asChild>
-								<a
-									href={`https://github.com/ls1intum/Hephaestus/releases/tag/v${version}`}
-									target="_blank"
-									rel="noopener noreferrer"
-									className="flex items-center gap-1 text-xs font-mono mt-1 text-muted-foreground hover:text-foreground transition-colors"
-								>
-									<TagIcon size={12} />
-									<span>v{version}</span>
-								</a>
-							</TooltipTrigger>
+							<TooltipTrigger
+								render={
+									<a
+										href={`https://github.com/ls1intum/Hephaestus/releases/tag/v${version}`}
+										target="_blank"
+										rel="noopener noreferrer"
+										className="flex items-center gap-1 text-xs font-mono mt-1 text-muted-foreground hover:text-foreground transition-colors"
+									>
+										<TagIcon size={12} />
+										<span>v{version}</span>
+									</a>
+								}
+							/>
 							<TooltipContent>View release notes</TooltipContent>
 						</Tooltip>
 					) : (
@@ -108,18 +110,16 @@ export default function Header({
 					) : (
 						<div className="flex items-center gap-2">
 							<DropdownMenu>
-								<DropdownMenuTrigger asChild>
-									<Button variant="ghost" size="icon" className="rounded-full">
-										<Avatar className="hover:brightness-90">
-											<AvatarImage
-												src={`https://github.com/${username}.png`}
-												alt={`${username}'s avatar`}
-											/>
-											<AvatarFallback>{username?.slice(0, 2)?.toUpperCase() || "?"}</AvatarFallback>
-										</Avatar>
-									</Button>
+								<DropdownMenuTrigger render={<Button variant="ghost" size="icon" className="rounded-full" />}>
+									<Avatar className="hover:brightness-90">
+										<AvatarImage
+											src={`https://github.com/${username}.png`}
+											alt={`${username}'s avatar`}
+										/>
+										<AvatarFallback>{username?.slice(0, 2)?.toUpperCase() || "?"}</AvatarFallback>
+									</Avatar>
 								</DropdownMenuTrigger>
-								<DropdownMenuContent className="w-56" align="end" forceMount>
+								<DropdownMenuContent className="w-56" align="end">
 									<DropdownMenuLabel className="font-normal">
 										<div className="flex flex-col space-y-1">
 											<p className="text-sm font-medium leading-none">{name}</p>
@@ -128,17 +128,19 @@ export default function Header({
 									<DropdownMenuSeparator />
 									<DropdownMenuGroup>
 										{hasWorkspace && hasUsername ? (
-											<DropdownMenuItem asChild>
-												<Link
-													to="/w/$workspaceSlug/user/$username"
-													params={{
-														workspaceSlug: workspaceSlug ?? "",
-														username: username ?? "",
-													}}
-												>
-													<User />
-													<span>My Profile</span>
-												</Link>
+											<DropdownMenuItem
+												render={
+													<Link
+														to="/w/$workspaceSlug/user/$username"
+														params={{
+															workspaceSlug: workspaceSlug ?? "",
+															username: username ?? "",
+														}}
+													/>
+												}
+											>
+												<User />
+												<span>My Profile</span>
 											</DropdownMenuItem>
 										) : (
 											<DropdownMenuItem disabled title="Join a workspace to view your profile">
@@ -146,11 +148,9 @@ export default function Header({
 												<span>My Profile</span>
 											</DropdownMenuItem>
 										)}
-										<DropdownMenuItem asChild>
-											<Link to="/settings" search={{}}>
-												<Settings />
-												<span>Settings</span>
-											</Link>
+										<DropdownMenuItem render={<Link to="/settings" search={{}} />}>
+											<Settings />
+											<span>Settings</span>
 										</DropdownMenuItem>
 									</DropdownMenuGroup>
 									<DropdownMenuSeparator />

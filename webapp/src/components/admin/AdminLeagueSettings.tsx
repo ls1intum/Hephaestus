@@ -34,9 +34,9 @@ export function AdminLeagueSettings({ isResetting, onResetLeagues }: AdminLeague
 							</p>
 
 							<AlertDialog>
-								<AlertDialogTrigger asChild>
-									<Button variant="destructive">Reset and Recalculate Leagues</Button>
-								</AlertDialogTrigger>
+								<AlertDialogTrigger
+									render={<Button variant="destructive">Reset and Recalculate Leagues</Button>}
+								/>
 								<AlertDialogContent>
 									<AlertDialogHeader>
 										<AlertDialogTitle>Reset and recalculate leagues?</AlertDialogTitle>

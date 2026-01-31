@@ -81,15 +81,17 @@ export function AdminRepositoriesSettings({
 									<div key={repo.nameWithOwner} className="flex items-center gap-2">
 										{!isReadOnly && (
 											<AlertDialog>
-												<AlertDialogTrigger asChild>
-													<Button
-														variant="outline"
-														size="icon"
-														aria-label={`Remove ${repo.nameWithOwner}`}
-													>
-														<Trash2 className="h-4 w-4" />
-													</Button>
-												</AlertDialogTrigger>
+												<AlertDialogTrigger
+													render={
+														<Button
+															variant="outline"
+															size="icon"
+															aria-label={`Remove ${repo.nameWithOwner}`}
+														>
+															<Trash2 className="h-4 w-4" />
+														</Button>
+													}
+												/>
 												<AlertDialogContent>
 													<AlertDialogHeader>
 														<AlertDialogTitle>

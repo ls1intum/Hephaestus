@@ -91,34 +91,38 @@ export default function Footer({ className, buildInfo }: FooterProps) {
 						<div className="hidden sm:flex items-center gap-2 border-l border-sidebar-border pl-4 text-xs text-muted-foreground/60 font-mono">
 							{buildInfo?.branch && (
 								<Tooltip>
-									<TooltipTrigger asChild>
-										<a
-											href={`https://github.com/ls1intum/Hephaestus/tree/${buildInfo.branch}`}
-											target="_blank"
-											rel="noopener noreferrer"
-											className="flex items-center gap-1 hover:text-foreground transition-colors"
-										>
-											<GitBranchIcon size={12} />
-											<span className="max-w-20 truncate">{buildInfo.branch}</span>
-										</a>
-									</TooltipTrigger>
+									<TooltipTrigger
+										render={
+											<a
+												href={`https://github.com/ls1intum/Hephaestus/tree/${buildInfo.branch}`}
+												target="_blank"
+												rel="noopener noreferrer"
+												className="flex items-center gap-1 hover:text-foreground transition-colors"
+											>
+												<GitBranchIcon size={12} />
+												<span className="max-w-20 truncate">{buildInfo.branch}</span>
+											</a>
+										}
+									/>
 									<TooltipContent>{buildInfo.branch}</TooltipContent>
 								</Tooltip>
 							)}
 
 							{buildInfo?.commit && (
 								<Tooltip>
-									<TooltipTrigger asChild>
-										<a
-											href={`https://github.com/ls1intum/Hephaestus/commit/${buildInfo.commit}`}
-											target="_blank"
-											rel="noopener noreferrer"
-											className="flex items-center gap-1 hover:text-foreground transition-colors"
-										>
-											<GitCommitIcon size={12} />
-											<span>{buildInfo.commit.substring(0, 7)}</span>
-										</a>
-									</TooltipTrigger>
+									<TooltipTrigger
+										render={
+											<a
+												href={`https://github.com/ls1intum/Hephaestus/commit/${buildInfo.commit}`}
+												target="_blank"
+												rel="noopener noreferrer"
+												className="flex items-center gap-1 hover:text-foreground transition-colors"
+											>
+												<GitCommitIcon size={12} />
+												<span>{buildInfo.commit.substring(0, 7)}</span>
+											</a>
+										}
+									/>
 									<TooltipContent>{buildInfo.commit}</TooltipContent>
 								</Tooltip>
 							)}

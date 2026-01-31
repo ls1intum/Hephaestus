@@ -108,8 +108,8 @@ export function BadPracticeCard({
 				<div className="justify-self-end">
 					<Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
 						<DropdownMenu>
-							<DropdownMenuTrigger asChild>
-								<Button variant="outline">Resolve</Button>
+							<DropdownMenuTrigger render={<Button variant="outline" />}>
+								Resolve
 							</DropdownMenuTrigger>
 							<DropdownMenuContent className="w-56">
 								<DropdownMenuGroup>

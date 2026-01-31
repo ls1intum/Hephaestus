@@ -291,19 +291,21 @@ export function TimeframeFilter({
 				<div className="pt-2">
 					<div className="grid gap-2">
 						<Popover>
-							<PopoverTrigger asChild>
-								<Button
-									id="date"
-									variant="outline"
-									className={cn(
-										"w-full justify-start text-left font-normal",
-										!customRange && "text-muted-foreground",
-									)}
-								>
-									<CalendarIcon className="mr-2 h-4 w-4" />
-									{formatCustomRangeLabel()}
-								</Button>
-							</PopoverTrigger>
+							<PopoverTrigger
+								render={
+									<Button
+										id="date"
+										variant="outline"
+										className={cn(
+											"w-full justify-start text-left font-normal",
+											!customRange && "text-muted-foreground",
+										)}
+									>
+										<CalendarIcon className="mr-2 h-4 w-4" />
+										{formatCustomRangeLabel()}
+									</Button>
+								}
+							/>
 							<PopoverContent className="w-auto p-0" align="start">
 								<Calendar
 									initialFocus

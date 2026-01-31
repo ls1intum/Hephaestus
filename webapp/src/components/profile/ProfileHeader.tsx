@@ -59,16 +59,18 @@ export function ProfileHeader({
 							<Skeleton className="absolute -bottom-1 -right-1 size-7 rounded-full" />
 						) : (
 							<Tooltip>
-								<TooltipTrigger asChild>
-									<div
-										className={cn(
-											"absolute -bottom-1 -right-1 flex size-7 items-center justify-center rounded-full border-2 border-background text-primary-foreground font-bold text-xs",
-											`bg-league-${leagueTier}`,
-										)}
-									>
-										{level}
-									</div>
-								</TooltipTrigger>
+								<TooltipTrigger
+									render={
+										<div
+											className={cn(
+												"absolute -bottom-1 -right-1 flex size-7 items-center justify-center rounded-full border-2 border-background text-primary-foreground font-bold text-xs",
+												`bg-league-${leagueTier}`,
+											)}
+										>
+											{level}
+										</div>
+									}
+								/>
 								<TooltipContent side="bottom">
 									<p>Level {level}</p>
 								</TooltipContent>

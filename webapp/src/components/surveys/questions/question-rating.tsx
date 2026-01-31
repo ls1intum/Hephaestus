@@ -60,12 +60,14 @@ export function QuestionRating({
 
 	const ratings = Array.from({ length: ratingScale }, (_, index) => index + 1);
 
-	const handleNumericChange = (nextValue: string) => {
-		if (!nextValue) {
+	const handleNumericChange = (nextValue: string | string[]) => {
+		// For single selection, we receive a string; for multiple, an array
+		const value = Array.isArray(nextValue) ? nextValue[0] : nextValue;
+		if (!value) {
 			return;
 		}
 
-		const parsed = Number(nextValue);
+		const parsed = Number(value);
 		if (!Number.isNaN(parsed)) {
 			onChange(parsed);
 		}
@@ -123,7 +125,6 @@ export function QuestionRating({
 				) : (
 					<div className="mx-auto mt-3 space-y-2">
 						<ToggleGroup
-							type="single"
 							value={numericValue !== null ? String(numericValue) : undefined}
 							onValueChange={handleNumericChange}
 							variant="outline"

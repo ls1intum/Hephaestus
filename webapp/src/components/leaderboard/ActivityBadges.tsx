@@ -63,45 +63,53 @@ export function ActivityBadges({
 			)}
 			{changeRequests > 0 && (
 				<Tooltip>
-					<TooltipTrigger asChild>
-						<div className="flex items-center gap-1 text-github-danger-foreground">
-							<FileDiffIcon className="h-4 w-4" />
-							<span>{changeRequests}</span>
-						</div>
-					</TooltipTrigger>
+					<TooltipTrigger
+						render={
+							<div className="flex items-center gap-1 text-github-danger-foreground">
+								<FileDiffIcon className="h-4 w-4" />
+								<span>{changeRequests}</span>
+							</div>
+						}
+					/>
 					<TooltipContent>Changes Requested</TooltipContent>
 				</Tooltip>
 			)}
 			{approvals > 0 && (
 				<Tooltip>
-					<TooltipTrigger asChild>
-						<div className="flex items-center gap-1 text-github-success-foreground">
-							<CheckIcon className="h-4 w-4" />
-							<span>{approvals}</span>
-						</div>
-					</TooltipTrigger>
+					<TooltipTrigger
+						render={
+							<div className="flex items-center gap-1 text-github-success-foreground">
+								<CheckIcon className="h-4 w-4" />
+								<span>{approvals}</span>
+							</div>
+						}
+					/>
 					<TooltipContent>Approvals</TooltipContent>
 				</Tooltip>
 			)}
 			{comments > 0 && (
 				<Tooltip>
-					<TooltipTrigger asChild>
-						<div className="flex items-center gap-1 text-github-muted-foreground">
-							<CommentIcon className="h-4 w-4" />
-							<span>{comments}</span>
-						</div>
-					</TooltipTrigger>
+					<TooltipTrigger
+						render={
+							<div className="flex items-center gap-1 text-github-muted-foreground">
+								<CommentIcon className="h-4 w-4" />
+								<span>{comments}</span>
+							</div>
+						}
+					/>
 					<TooltipContent>Comments</TooltipContent>
 				</Tooltip>
 			)}
 			{codeComments > 0 && (
 				<Tooltip>
-					<TooltipTrigger asChild>
-						<div className="flex items-center gap-1 text-github-muted-foreground">
-							<CommentDiscussionIcon className="h-4 w-4" />
-							<span>{codeComments}</span>
-						</div>
-					</TooltipTrigger>
+					<TooltipTrigger
+						render={
+							<div className="flex items-center gap-1 text-github-muted-foreground">
+								<CommentDiscussionIcon className="h-4 w-4" />
+								<span>{codeComments}</span>
+							</div>
+						}
+					/>
 					<TooltipContent>Code comments</TooltipContent>
 				</Tooltip>
 			)}

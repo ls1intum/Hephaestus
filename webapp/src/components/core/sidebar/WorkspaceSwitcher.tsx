@@ -116,41 +116,43 @@ export function WorkspaceSwitcher({
 		<SidebarMenu>
 			<SidebarMenuItem>
 				<DropdownMenu open={isDropdownOpen} onOpenChange={setIsDropdownOpen}>
-					<DropdownMenuTrigger asChild>
-						<SidebarMenuButton
-							size="lg"
-							className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
-						>
-							<div className="flex aspect-square size-8 items-center justify-center rounded-lg text-sidebar-primary-foreground">
-								<Avatar className="size-8 rounded-lg">
-									<AvatarImage
-										src={
-											activeWorkspace
-												? `https://github.com/${activeWorkspace.accountLogin}.png`
-												: undefined
-										}
-										alt={activeWorkspace?.displayName}
-									/>
-									<AvatarFallback className="rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-										{(activeWorkspace?.displayName || activeWorkspace?.workspaceSlug || "WS")
-											.slice(0, 2)
-											.toUpperCase()}
-									</AvatarFallback>
-								</Avatar>
-							</div>
-							<div className="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
-								<span className="truncate font-semibold">
-									{activeWorkspace?.displayName ?? "No workspace"}
-								</span>
-								<span className="truncate text-xs text-muted-foreground">
-									{activeWorkspace?.accountLogin ?? "Select a workspace"}
-								</span>
-							</div>
-							<ChevronsUpDown className="ml-auto group-data-[collapsible=icon]:hidden" />
-						</SidebarMenuButton>
+					<DropdownMenuTrigger
+						render={
+							<SidebarMenuButton
+								size="lg"
+								className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+							/>
+						}
+					>
+						<div className="flex aspect-square size-8 items-center justify-center rounded-lg text-sidebar-primary-foreground">
+							<Avatar className="size-8 rounded-lg">
+								<AvatarImage
+									src={
+										activeWorkspace
+											? `https://github.com/${activeWorkspace.accountLogin}.png`
+											: undefined
+									}
+									alt={activeWorkspace?.displayName}
+								/>
+								<AvatarFallback className="rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
+									{(activeWorkspace?.displayName || activeWorkspace?.workspaceSlug || "WS")
+										.slice(0, 2)
+										.toUpperCase()}
+								</AvatarFallback>
+							</Avatar>
+						</div>
+						<div className="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
+							<span className="truncate font-semibold">
+								{activeWorkspace?.displayName ?? "No workspace"}
+							</span>
+							<span className="truncate text-xs text-muted-foreground">
+								{activeWorkspace?.accountLogin ?? "Select a workspace"}
+							</span>
+						</div>
+						<ChevronsUpDown className="ml-auto group-data-[collapsible=icon]:hidden" />
 					</DropdownMenuTrigger>
 					<DropdownMenuContent
-						className="w-[--radix-dropdown-menu-trigger-width] min-w-56 rounded-lg"
+						className="w-[--anchor-width] min-w-56 rounded-lg"
 						align="start"
 						side={isMobile ? "bottom" : "right"}
 						sideOffset={4}
