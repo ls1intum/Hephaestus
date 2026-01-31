@@ -4,6 +4,15 @@ info:
   title: Hephaestus Intelligence Service API
 components:
   schemas:
+    DetectorResponse:
+      allOf:
+        - $ref: "#/components/schemas/BadPracticeResult"
+        - type: object
+          properties:
+            traceId:
+              type: string
+          required:
+            - traceId
     BadPractice:
       type: object
       properties:
@@ -37,15 +46,6 @@ components:
       required:
         - badPracticeSummary
         - badPractices
-    DetectorResponse:
-      allOf:
-        - $ref: "#/components/schemas/BadPracticeResult"
-        - type: object
-          properties:
-            traceId:
-              type: string
-          required:
-            - traceId
     ErrorResponse:
       type: object
       properties:
@@ -86,6 +86,19 @@ components:
         - badPracticeSummary
         - badPractices
         - pullRequestTemplate
+    ChatThreadGroup:
+      type: object
+      properties:
+        groupName:
+          type: string
+        threads:
+          type: array
+          items:
+            $ref: "#/components/schemas/ChatThreadSummary"
+      required:
+        - groupName
+        - threads
+      x-hephaestus: *a1
     ChatThreadSummary:
       type: object
       properties:
@@ -100,19 +113,6 @@ components:
       required:
         - id
         - title
-      x-hephaestus: *a1
-    ChatThreadGroup:
-      type: object
-      properties:
-        groupName:
-          type: string
-        threads:
-          type: array
-          items:
-            $ref: "#/components/schemas/ChatThreadSummary"
-      required:
-        - groupName
-        - threads
       x-hephaestus: *a1
     ThreadDetail:
       type: object
@@ -169,11 +169,6 @@ components:
         - id
         - messages
       x-hephaestus: *a1
-    DocumentKind:
-      type: string
-      enum:
-        - text
-      x-hephaestus: *a1
     Document:
       type: object
       properties:
@@ -201,6 +196,11 @@ components:
         - content
         - kind
         - userId
+      x-hephaestus: *a1
+    DocumentKind:
+      type: string
+      enum:
+        - text
       x-hephaestus: *a1
     CreateDocumentRequest:
       type: object
