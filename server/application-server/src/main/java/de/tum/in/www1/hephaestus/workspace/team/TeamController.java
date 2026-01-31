@@ -102,9 +102,8 @@ public class TeamController {
         );
         Workspace workspace = workspaceResolver.requireWorkspace(workspaceContext);
 
-        Boolean resolvedHidden = hiddenFromContributions != null
-            ? hiddenFromContributions
-            : hiddenFromContributionsParam;
+        Boolean resolvedHidden =
+            hiddenFromContributions != null ? hiddenFromContributions : hiddenFromContributionsParam;
         if (resolvedHidden == null) {
             return ResponseEntity.badRequest().build();
         }

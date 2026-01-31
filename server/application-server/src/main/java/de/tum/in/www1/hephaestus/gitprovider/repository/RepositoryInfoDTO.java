@@ -45,13 +45,14 @@ public record RepositoryInfoDTO(
             return null;
         }
         // Avoid circular references by setting the nested repository reference in LabelInfoDTO to null
-        final List<LabelInfoDTO> labelDtos = repository.getLabels() != null
-            ? repository
-                  .getLabels()
-                  .stream()
-                  .map(l -> new LabelInfoDTO(l.getId(), l.getName(), l.getColor(), null))
-                  .toList()
-            : List.of();
+        final List<LabelInfoDTO> labelDtos =
+            repository.getLabels() != null
+                ? repository
+                      .getLabels()
+                      .stream()
+                      .map(l -> new LabelInfoDTO(l.getId(), l.getName(), l.getColor(), null))
+                      .toList()
+                : List.of();
 
         return new RepositoryInfoDTO(
             repository.getId(),
@@ -87,13 +88,14 @@ public record RepositoryInfoDTO(
             return null;
         }
         // Avoid circular references by setting the nested repository reference in LabelInfoDTO to null
-        final List<LabelInfoDTO> labelDtos = repository.getLabels() != null
-            ? repository
-                  .getLabels()
-                  .stream()
-                  .map(l -> new LabelInfoDTO(l.getId(), l.getName(), l.getColor(), null))
-                  .toList()
-            : List.of();
+        final List<LabelInfoDTO> labelDtos =
+            repository.getLabels() != null
+                ? repository
+                      .getLabels()
+                      .stream()
+                      .map(l -> new LabelInfoDTO(l.getId(), l.getName(), l.getColor(), null))
+                      .toList()
+                : List.of();
 
         return new RepositoryInfoDTO(
             repository.getId(),

@@ -192,9 +192,8 @@ public abstract class BaseGitHubProcessor {
 
         // Use atomic insert to prevent race conditions.
         // If another thread inserted first, this returns 0 and we fetch the winner.
-        Long milestoneId = dto.id() != null
-            ? dto.id()
-            : generateDeterministicMilestoneId(repository.getId(), dto.number());
+        Long milestoneId =
+            dto.id() != null ? dto.id() : generateDeterministicMilestoneId(repository.getId(), dto.number());
 
         String title = dto.title() != null ? dto.title() : "Milestone " + dto.number();
         String htmlUrl = dto.htmlUrl() != null ? dto.htmlUrl() : "";
