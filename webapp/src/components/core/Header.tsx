@@ -132,30 +132,31 @@ export default function Header({
 									<DropdownMenuSeparator />
 									<DropdownMenuGroup>
 										{hasWorkspace && hasUsername ? (
-											<DropdownMenuItem
-												render={
-													<Link
-														to="/w/$workspaceSlug/user/$username"
-														params={{
-															workspaceSlug: workspaceSlug ?? "",
-															username: username ?? "",
-														}}
-													/>
-												}
+											<Link
+												to="/w/$workspaceSlug/user/$username"
+												params={{
+													workspaceSlug: workspaceSlug ?? "",
+													username: username ?? "",
+												}}
+												className="[&]:no-underline"
 											>
-												<User />
-												<span>My Profile</span>
-											</DropdownMenuItem>
+												<DropdownMenuItem>
+													<User />
+													<span>My Profile</span>
+												</DropdownMenuItem>
+											</Link>
 										) : (
 											<DropdownMenuItem disabled title="Join a workspace to view your profile">
 												<User />
 												<span>My Profile</span>
 											</DropdownMenuItem>
 										)}
-										<DropdownMenuItem render={<Link to="/settings" search={{}} />}>
-											<Settings />
-											<span>Settings</span>
-										</DropdownMenuItem>
+										<Link to="/settings" className="[&]:no-underline">
+											<DropdownMenuItem>
+												<Settings />
+												<span>Settings</span>
+											</DropdownMenuItem>
+										</Link>
 									</DropdownMenuGroup>
 									<DropdownMenuSeparator />
 									<DropdownMenuItem onClick={onLogout}>
