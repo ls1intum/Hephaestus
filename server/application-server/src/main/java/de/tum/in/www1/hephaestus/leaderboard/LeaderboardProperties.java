@@ -1,6 +1,7 @@
 package de.tum.in.www1.hephaestus.leaderboard;
 
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -78,5 +79,10 @@ public record LeaderboardProperties(@Valid Schedule schedule, @Valid Notificatio
         @DefaultValue("false") boolean enabled,
         @Nullable String team,
         @Nullable String channelId
-    ) {}
+    ) {
+        @AssertTrue(message = "channelId must be provided when notifications are enabled")
+        private boolean isChannelIdValid() {
+            return !enabled || (channelId != null && !channelId.isBlank());
+        }
+    }
 }

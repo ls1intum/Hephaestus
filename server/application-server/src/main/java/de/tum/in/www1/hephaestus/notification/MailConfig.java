@@ -36,7 +36,13 @@ public class MailConfig {
         try {
             senderAddress = mailProperties.senderAddress();
         } catch (AddressException e) {
-            log.error("Invalid mail sender address: sender={}", mailProperties.sender(), e);
+            if (this.enabled) {
+                throw new IllegalStateException(
+                    "Mail is enabled but sender address is invalid: " + mailProperties.sender(),
+                    e
+                );
+            }
+            log.warn("Invalid mail sender address (mail disabled): sender={}", mailProperties.sender());
         }
         this.sender = senderAddress;
     }

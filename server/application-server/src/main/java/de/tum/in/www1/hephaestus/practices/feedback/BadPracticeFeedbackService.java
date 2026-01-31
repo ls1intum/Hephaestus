@@ -52,7 +52,15 @@ public class BadPracticeFeedbackService {
 
         // Initialize Langfuse client once if tracing is enabled (connection reuse)
         var tracing = detectionProperties.tracing();
-        if (tracing.enabled() && tracing.host() != null && !tracing.host().isBlank() && tracing.publicKey() != null) {
+        if (
+            tracing.enabled() &&
+            tracing.host() != null &&
+            !tracing.host().isBlank() &&
+            tracing.publicKey() != null &&
+            !tracing.publicKey().isBlank() &&
+            tracing.secretKey() != null &&
+            !tracing.secretKey().isBlank()
+        ) {
             this.langfuseClient = LangfuseClient.builder()
                 .url(tracing.host())
                 .credentials(tracing.publicKey(), tracing.secretKey())
