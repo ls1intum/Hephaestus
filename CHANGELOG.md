@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.13.6](https://github.com/ls1intum/Hephaestus/compare/v0.13.5...v0.13.6) (2026-01-31)
+
+### 🐛 Bug Fixes
+
+* **server:** permit OPTIONS requests for CORS preflight ([#673](https://github.com/ls1intum/Hephaestus/issues/673)) ([8057dfe](https://github.com/ls1intum/Hephaestus/commit/8057dfe6e63271caaa191a09c2f65ebad96ef276))
+
 ## [0.13.5](https://github.com/ls1intum/Hephaestus/compare/v0.13.4...v0.13.5) (2026-01-31)
 
 ### 🐛 Bug Fixes

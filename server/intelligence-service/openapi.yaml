@@ -1,6 +1,6 @@
 openapi: 3.1.0
 info:
-  version: 0.13.5
+  version: 0.13.6
   title: Hephaestus Intelligence Service API
 components:
   schemas:
