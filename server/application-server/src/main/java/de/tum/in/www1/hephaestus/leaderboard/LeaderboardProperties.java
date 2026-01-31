@@ -52,10 +52,10 @@ public record LeaderboardProperties(@Valid Schedule schedule, @Valid Notificatio
      * Schedule configuration for leaderboard cycle timing.
      *
      * <p>Defines when the leaderboard cycle ends and scheduled tasks run.
-     * Uses a day-of-week (1=Monday to 7=Sunday) and time (HH:mm format).
+     * Uses a day-of-week (1=Monday to 7=Sunday) and time (H, HH, H:mm, or HH:mm format).
      *
      * @param day  day of week (1-7, where 1=Monday, 7=Sunday)
-     * @param time time in HH:mm format (24-hour clock)
+     * @param time time in H, HH, H:mm, or HH:mm format (24-hour clock, minutes default to 00)
      */
     public record Schedule(
         @Min(value = 1, message = "Schedule day must be between 1 (Monday) and 7 (Sunday)") @Max(
@@ -63,8 +63,8 @@ public record LeaderboardProperties(@Valid Schedule schedule, @Valid Notificatio
             message = "Schedule day must be between 1 (Monday) and 7 (Sunday)"
         ) @DefaultValue("1") int day,
         @NotBlank(message = "Schedule time must not be blank") @Pattern(
-            regexp = "^([01]?[0-9]|2[0-3]):[0-5][0-9]$",
-            message = "Schedule time must be in HH:mm format"
+            regexp = "^([01]?[0-9]|2[0-3])(:[0-5][0-9])?$",
+            message = "Schedule time must be in H, HH, H:mm, or HH:mm format"
         ) @DefaultValue("09:00") String time
     ) {}
 
