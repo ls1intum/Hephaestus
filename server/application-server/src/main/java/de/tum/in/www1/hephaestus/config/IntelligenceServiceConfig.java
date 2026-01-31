@@ -2,7 +2,6 @@ package de.tum.in.www1.hephaestus.config;
 
 import de.tum.in.www1.hephaestus.intelligenceservice.ApiClient;
 import de.tum.in.www1.hephaestus.intelligenceservice.api.DetectorApi;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -15,15 +14,15 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class IntelligenceServiceConfig {
 
-    private final String intelligenceServiceUrl;
+    private final IntelligenceServiceProperties intelligenceServiceProperties;
 
-    public IntelligenceServiceConfig(@Value("${hephaestus.intelligence-service.url}") String intelligenceServiceUrl) {
-        this.intelligenceServiceUrl = intelligenceServiceUrl;
+    public IntelligenceServiceConfig(IntelligenceServiceProperties intelligenceServiceProperties) {
+        this.intelligenceServiceProperties = intelligenceServiceProperties;
     }
 
     @Bean
     public ApiClient intelligenceApiClient() {
-        return new ApiClient().setBasePath(intelligenceServiceUrl);
+        return new ApiClient().setBasePath(intelligenceServiceProperties.url());
     }
 
     /**

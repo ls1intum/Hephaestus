@@ -8,7 +8,6 @@ import java.util.Objects;
 import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
@@ -25,29 +24,26 @@ public class PosthogClient {
     private final boolean enabled;
     private final String projectId;
 
-    public PosthogClient(
-        @Value("${hephaestus.posthog.enabled:false}") boolean enabled,
-        @Value("${hephaestus.posthog.api-host:https://app.posthog.com}") String apiHost,
-        @Value("${hephaestus.posthog.project-id:}") String projectId,
-        @Value("${hephaestus.posthog.personal-api-key:}") String personalApiKey
-    ) {
-        boolean hasCredentials = StringUtils.hasText(projectId) && StringUtils.hasText(personalApiKey);
-        if (enabled && !hasCredentials) {
+    public PosthogClient(PosthogProperties posthogProperties) {
+        boolean hasCredentials =
+            StringUtils.hasText(posthogProperties.projectId()) &&
+            StringUtils.hasText(posthogProperties.personalApiKey());
+        if (posthogProperties.enabled() && !hasCredentials) {
             log.error("Failed to initialize PostHog client: reason=missing_credentials");
             throw new PosthogClientException("PostHog configuration requires project ID and personal API key");
         }
-        this.enabled = enabled && hasCredentials;
-        this.projectId = projectId;
+        this.enabled = posthogProperties.enabled() && hasCredentials;
+        this.projectId = posthogProperties.projectId();
         if (this.enabled) {
-            String resolvedHost = normalizeHost(apiHost);
+            String resolvedHost = normalizeHost(posthogProperties.apiHost());
             this.restClient = RestClient.builder()
                 .baseUrl(resolvedHost)
-                .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + personalApiKey)
+                .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + posthogProperties.personalApiKey())
                 .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                 .build();
             log.info("Activated PostHog client: projectId={}, host={}", projectId, resolvedHost);
         } else {
-            if (enabled) {
+            if (posthogProperties.enabled()) {
                 log.warn("Disabled PostHog integration: reason=missing_credentials");
             } else {
                 log.debug("Disabled PostHog integration: reason=configuration_flag");

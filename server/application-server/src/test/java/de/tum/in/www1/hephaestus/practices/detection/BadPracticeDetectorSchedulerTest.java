@@ -5,6 +5,7 @@ import static org.mockito.Mockito.*;
 
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
+import de.tum.in.www1.hephaestus.practices.DetectionProperties;
 import de.tum.in.www1.hephaestus.practices.spi.BadPracticeNotificationSender;
 import de.tum.in.www1.hephaestus.practices.spi.UserRoleChecker;
 import de.tum.in.www1.hephaestus.workspace.RepositoryToMonitorRepository;
@@ -57,6 +58,7 @@ class BadPracticeDetectorSchedulerTest {
 
     @BeforeEach
     void setUp() {
+        var detectionProperties = new DetectionProperties(true, null);
         scheduler = new BadPracticeDetectorScheduler(
             taskScheduler,
             pullRequestBadPracticeDetector,
@@ -64,7 +66,7 @@ class BadPracticeDetectorSchedulerTest {
             userRoleChecker,
             repositoryToMonitorRepository,
             workspaceRepository,
-            true
+            detectionProperties
         );
     }
 
