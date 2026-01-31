@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.13.4](https://github.com/ls1intum/Hephaestus/compare/v0.13.3...v0.13.4) (2026-01-31)
+
+### 🐛 Bug Fixes
+
+* **server:** use internal url for keycloak admin client ([#668](https://github.com/ls1intum/Hephaestus/issues/668)) ([35a4869](https://github.com/ls1intum/Hephaestus/commit/35a4869f15c4ff27d6b54356fcad01bcf2146d10))
+
 ## [0.13.3](https://github.com/ls1intum/Hephaestus/compare/v0.13.2...v0.13.3) (2026-01-31)
 
 ### 🐛 Bug Fixes
