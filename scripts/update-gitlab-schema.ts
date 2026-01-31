@@ -116,7 +116,8 @@ async function main(): Promise<void> {
 	};
 
 	if (token) {
-		headers["Authorization"] = `Bearer ${token}`;
+		// GitLab uses PRIVATE-TOKEN header for Personal Access Tokens
+		headers["PRIVATE-TOKEN"] = token;
 	}
 
 	const controller = new AbortController();
@@ -192,7 +193,8 @@ async function main(): Promise<void> {
 		const stats = statSync(tempFile);
 		console.log(`Downloaded ${Math.round(stats.size / 1_048_576)}MB`);
 		renameSync(tempFile, SCHEMA_FILE);
-		console.log(`Schema updated: ${SCHEMA_FILE}`);
+		console.log(`Schema updated successfully: ${SCHEMA_FILE}`);
+		console.log("\nTo regenerate types: cd server/application-server && ./mvnw compile -DskipTests");
 	} catch (error) {
 		try { unlinkSync(tempFile); } catch { /* ignore */ }
 		throw error;
@@ -200,6 +202,6 @@ async function main(): Promise<void> {
 }
 
 main().catch((error) => {
-	console.error("Error:", error);
+	console.error("Error updating schema:", error);
 	process.exit(1);
 });
