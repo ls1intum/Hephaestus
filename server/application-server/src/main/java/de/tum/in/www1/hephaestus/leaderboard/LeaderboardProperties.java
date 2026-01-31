@@ -81,7 +81,7 @@ public record LeaderboardProperties(@Valid Schedule schedule, @Valid Notificatio
         @Nullable String channelId
     ) {
         @AssertTrue(message = "channelId must be provided when notifications are enabled")
-        private boolean isChannelIdValid() {
+        public boolean isChannelIdValid() {
             return !enabled || (channelId != null && !channelId.isBlank());
         }
     }
