@@ -109,8 +109,7 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
                         case ISSUES_AND_PULL_REQUESTS -> rtm.setIssuesAndPullRequestsSyncedAt(syncedAt);
                         case COLLABORATORS -> rtm.setCollaboratorsSyncedAt(syncedAt);
                         case FULL_REPOSITORY -> rtm.setRepositorySyncedAt(syncedAt);
-                        default -> {
-                        }
+                        default -> {}
                     }
                     repositoryToMonitorRepository.save(rtm);
                 },
@@ -136,8 +135,7 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
                         case ISSUE_TYPES -> ws.setIssueTypesSyncedAt(syncedAt);
                         case ISSUE_DEPENDENCIES -> ws.setIssueDependenciesSyncedAt(syncedAt);
                         case SUB_ISSUES -> ws.setSubIssuesSyncedAt(syncedAt);
-                        default -> {
-                        }
+                        default -> {}
                     }
                     workspaceRepository.save(ws);
                 },
@@ -151,8 +149,9 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
         // The accountLogin is always the GitHub account (org or user) that owns the repositories,
         // so it's safe to use for organization-level operations like team sync.
         // For user accounts, the team sync will simply find no teams (which is expected).
-        String orgLogin =
-            workspace.getOrganization() != null ? workspace.getOrganization().getLogin() : workspace.getAccountLogin();
+        String orgLogin = workspace.getOrganization() != null
+            ? workspace.getOrganization().getLogin()
+            : workspace.getAccountLogin();
 
         return new SyncMetadata(
             workspace.getId(),

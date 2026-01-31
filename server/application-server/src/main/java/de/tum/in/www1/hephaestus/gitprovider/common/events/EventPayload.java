@@ -255,8 +255,9 @@ public final class EventPayload {
         @Nullable Long repositoryId
     ) {
         public static ReviewCommentData from(PullRequestReviewComment comment) {
-            PullRequest pr =
-                comment.getReview() != null ? comment.getReview().getPullRequest() : comment.getPullRequest();
+            PullRequest pr = comment.getReview() != null
+                ? comment.getReview().getPullRequest()
+                : comment.getPullRequest();
             return new ReviewCommentData(
                 comment.getId(),
                 comment.getBody(),

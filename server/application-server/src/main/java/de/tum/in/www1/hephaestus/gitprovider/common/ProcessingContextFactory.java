@@ -75,7 +75,7 @@ public class ProcessingContextFactory {
             return Optional.empty();
         }
 
-        Repository repository = repositoryRepository.findByNameWithOwner(repoFullName).orElse(null);
+        Repository repository = repositoryRepository.findByNameWithOwnerWithOrganization(repoFullName).orElse(null);
 
         if (repository == null) {
             log.debug(

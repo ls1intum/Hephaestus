@@ -39,4 +39,10 @@ public interface RepositoryRepository extends JpaRepository<Repository, Long> {
      * Used during installation operations for org login renames.
      */
     List<Repository> findByNameWithOwnerStartingWithIgnoreCase(String prefix);
+
+    /**
+     * Finds a repository by its full name with the organization eagerly fetched.
+     */
+    @Query("SELECT r FROM Repository r LEFT JOIN FETCH r.organization WHERE r.nameWithOwner = :nameWithOwner")
+    Optional<Repository> findByNameWithOwnerWithOrganization(@Param("nameWithOwner") String nameWithOwner);
 }

@@ -1,7 +1,7 @@
 spring:
     application:
         name: Hephaestus
-        version: "0.13.0"
+        version: "0.13.3"
 
     config:
         import: optional:file:.env[.properties]

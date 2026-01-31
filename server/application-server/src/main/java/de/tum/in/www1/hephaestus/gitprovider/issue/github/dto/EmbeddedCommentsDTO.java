@@ -30,15 +30,9 @@ public record EmbeddedCommentsDTO(
             return empty();
         }
 
-        List<GitHubCommentDTO> comments =
-            connection.getNodes() != null
-                ? connection
-                      .getNodes()
-                      .stream()
-                      .map(GitHubCommentDTO::fromIssueComment)
-                      .filter(Objects::nonNull)
-                      .toList()
-                : Collections.emptyList();
+        List<GitHubCommentDTO> comments = connection.getNodes() != null
+            ? connection.getNodes().stream().map(GitHubCommentDTO::fromIssueComment).filter(Objects::nonNull).toList()
+            : Collections.emptyList();
 
         boolean hasNextPage =
             connection.getPageInfo() != null && Boolean.TRUE.equals(connection.getPageInfo().getHasNextPage());

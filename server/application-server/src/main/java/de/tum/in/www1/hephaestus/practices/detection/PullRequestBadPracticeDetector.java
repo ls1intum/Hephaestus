@@ -158,8 +158,9 @@ public class PullRequestBadPracticeDetector {
             pullRequest.getId()
         );
 
-        List<PullRequestBadPractice> existingBadPractices =
-            lastDetection != null ? lastDetection.getBadPractices() : List.of();
+        List<PullRequestBadPractice> existingBadPractices = lastDetection != null
+            ? lastDetection.getBadPractices()
+            : List.of();
 
         PullRequestLifecycleState lifecycleState = this.getLifecycleStateOfPullRequest(pullRequest);
         String template = pullRequestTemplateGetter.getPullRequestTemplate(

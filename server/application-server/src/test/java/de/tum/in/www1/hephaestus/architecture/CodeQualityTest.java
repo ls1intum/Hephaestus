@@ -11,6 +11,7 @@ import com.tngtech.archunit.lang.ArchCondition;
 import com.tngtech.archunit.lang.ArchRule;
 import com.tngtech.archunit.lang.ConditionEvents;
 import com.tngtech.archunit.lang.SimpleConditionEvent;
+import java.util.Set;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -55,7 +56,7 @@ class CodeQualityTest extends HephaestusArchitectureTest {
         @DisplayName("Services have max 12 constructor dependencies")
         void servicesHaveLimitedConstructorParams() {
             // Orchestrator services that coordinate many sub-services are allowed more dependencies
-            java.util.Set<String> orchestratorExceptions = java.util.Set.of(
+            Set<String> orchestratorExceptions = Set.of(
                 "GitHubDataSyncService", // Coordinates 15 entity-specific sync services
                 "HistoricalBackfillService" // Coordinates multiple sync services for historical data backfill
             );
@@ -139,8 +140,18 @@ class CodeQualityTest extends HephaestusArchitectureTest {
         @DisplayName("Methods have limited parameters (max 6)")
         void methodsHaveLimitedParameters() {
             // Methods that have command-object overloads but need many params for internal processing
-            java.util.Set<String> allowedOverloads = java.util.Set.of(
+            Set<String> allowedOverloads = Set.of(
                 "ActivityEventService.record" // Has RecordActivityCommand overload for cleaner API
+            );
+
+            // Repository native SQL methods require individual @Param annotations and cannot use
+            // parameter objects. These are atomic upsert operations that map directly to DB columns.
+            Set<String> nativeSqlRepositoryMethods = Set.of(
+                "ActivityEventRepository.insertIfAbsent",
+                "IssueRepository.upsertCore",
+                "PullRequestRepository.upsertCore",
+                "MilestoneRepository.insertIfAbsent",
+                "LabelRepository.insertIfAbsent"
             );
 
             ArchCondition<JavaClass> haveMethodsWithLimitedParams = new ArchCondition<>(
@@ -166,6 +177,10 @@ class CodeQualityTest extends HephaestusArchitectureTest {
                         )
                         // Exclude allowed overloads with command-object alternatives
                         .filter(m -> !allowedOverloads.contains(javaClass.getSimpleName() + "." + m.getName()))
+                        // Exclude native SQL repository methods (require @Param per column, no param objects)
+                        .filter(m ->
+                            !nativeSqlRepositoryMethods.contains(javaClass.getSimpleName() + "." + m.getName())
+                        )
                         .filter(m -> m.getModifiers().contains(com.tngtech.archunit.core.domain.JavaModifier.PUBLIC))
                         .forEach(method -> {
                             int paramCount = method.getRawParameterTypes().size();
@@ -447,7 +462,7 @@ class CodeQualityTest extends HephaestusArchitectureTest {
         @Test
         @DisplayName("ObjectProvider usage is limited to known cases")
         void objectProviderUsageIsLimited() {
-            java.util.Set<String> knownCycleBreakers = java.util.Set.of(
+            Set<String> knownCycleBreakers = Set.of(
                 "WorkspaceActivationService",
                 "WorkspaceProvisioningAdapter", // Lazy-loaded to break circular reference with GitHubDataSyncService
                 "WorkspaceRepositoryMonitorService"

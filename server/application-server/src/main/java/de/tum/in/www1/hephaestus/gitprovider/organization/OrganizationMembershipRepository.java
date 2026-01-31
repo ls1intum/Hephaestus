@@ -15,8 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
  * through the Organization relationship.
  */
 public interface OrganizationMembershipRepository
-    extends JpaRepository<OrganizationMembership, OrganizationMembershipId>
-{
+    extends JpaRepository<OrganizationMembership, OrganizationMembershipId> {
     @Query("SELECT m.userId FROM OrganizationMembership m WHERE m.organizationId = :orgId")
     List<Long> findUserIdsByOrganizationId(@Param("orgId") Long organizationId);
 

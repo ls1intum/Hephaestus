@@ -308,14 +308,13 @@ public class LeaderboardService {
         Map<Long, List<Team>> teamHierarchy = teamPathResolver.buildHierarchy(workspace);
         // Use workspace-scoped hidden settings instead of deprecated Team.hidden field
         Set<Long> hiddenTeamIds = workspaceTeamSettingsService.getHiddenTeamIds(workspace.getId());
-        List<Team> targetTeams =
-            workspace.getAccountLogin() == null
-                ? List.of()
-                : teamRepository
-                      .findAllByOrganizationIgnoreCase(workspace.getAccountLogin())
-                      .stream()
-                      .filter(team -> team.getId() != null && !hiddenTeamIds.contains(team.getId()))
-                      .toList();
+        List<Team> targetTeams = workspace.getAccountLogin() == null
+            ? List.of()
+            : teamRepository
+                  .findAllByOrganizationIgnoreCase(workspace.getAccountLogin())
+                  .stream()
+                  .filter(team -> team.getId() != null && !hiddenTeamIds.contains(team.getId()))
+                  .toList();
 
         if (targetTeams.isEmpty()) {
             log.debug("Found no teams for team leaderboard: workspaceId={}", workspace.getId());

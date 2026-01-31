@@ -53,9 +53,40 @@
 			"*.graphql": "graphql",
 			"*.graphqls": "graphql"
 		},
+		"[java]": {
+			"editor.defaultFormatter": "esbenp.prettier-vscode",
+			"editor.formatOnSave": true
+		},
+		"[typescript]": {
+			"editor.defaultFormatter": "biomejs.biome",
+			"editor.formatOnSave": true
+		},
+		"[typescriptreact]": {
+			"editor.defaultFormatter": "biomejs.biome",
+			"editor.formatOnSave": true
+		},
+		"[javascript]": {
+			"editor.defaultFormatter": "biomejs.biome",
+			"editor.formatOnSave": true
+		},
+		"[javascriptreact]": {
+			"editor.defaultFormatter": "biomejs.biome",
+			"editor.formatOnSave": true
+		},
+		"[json]": {
+			"editor.defaultFormatter": "biomejs.biome",
+			"editor.formatOnSave": true
+		},
+		"[jsonc]": {
+			"editor.defaultFormatter": "biomejs.biome",
+			"editor.formatOnSave": true
+		},
 		"[graphql]": {
 			"editor.formatOnSave": true,
 			"editor.tabSize": 2
+		},
+		"editor.codeActionsOnSave": {
+			"source.organizeImports.biome": "explicit"
 		},
 		"yaml.validate": true,
 		"yaml.schemas": {
@@ -64,17 +95,18 @@
 	},
 	"extensions": {
 		"recommendations": [
+			"biomejs.biome",
+			"esbenp.prettier-vscode",
+			"editorconfig.editorconfig",
 			"github.copilot",
 			"github.copilot-chat",
 			"vscjava.vscode-java-pack",
 			"redhat.java",
 			"vscjava.vscode-maven",
 			"bradlc.vscode-tailwindcss",
-			"dbaeumer.vscode-eslint",
 			"github.vscode-pull-request-github",
 			"davidanson.vscode-markdownlint",
 			"streetsidesoftware.code-spell-checker",
-			"njpwerner.autodocstring",
 			"formulahendry.auto-rename-tag",
 			"GraphQL.vscode-graphql",
 			"GraphQL.vscode-graphql-syntax"

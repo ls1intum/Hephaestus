@@ -13,8 +13,7 @@ import org.springframework.data.repository.query.Param;
  * through the Repository -> Organization relationship chain.
  */
 public interface RepositoryCollaboratorRepository
-    extends JpaRepository<RepositoryCollaborator, RepositoryCollaborator.Id>
-{
+    extends JpaRepository<RepositoryCollaborator, RepositoryCollaborator.Id> {
     @Query("SELECT c FROM RepositoryCollaborator c WHERE c.repository.id = :repositoryId AND c.user.id = :userId")
     Optional<RepositoryCollaborator> findByRepositoryIdAndUserId(
         @Param("repositoryId") Long repositoryId,

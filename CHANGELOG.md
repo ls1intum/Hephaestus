@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.13.3](https://github.com/ls1intum/Hephaestus/compare/v0.13.2...v0.13.3) (2026-01-31)
+
+### 🐛 Bug Fixes
+
+* **server:** improve database cleanup retry logic for flaky tests ([#666](https://github.com/ls1intum/Hephaestus/issues/666)) ([5ca8804](https://github.com/ls1intum/Hephaestus/commit/5ca880487d6c24a062354b585c663e2b0a0986f9))
+* **config:** resolve prettier and biome formatter conflicts in ide ([#665](https://github.com/ls1intum/Hephaestus/issues/665)) ([ddfd9bd](https://github.com/ls1intum/Hephaestus/commit/ddfd9bd76251af320a9a9afaccef36e131018080))
+
+## [0.13.2](https://github.com/ls1intum/Hephaestus/compare/v0.13.1...v0.13.2) (2026-01-30)
+
+### 🐛 Bug Fixes
+
+* allow deps, security, db, docker scopes to trigger releases ([#663](https://github.com/ls1intum/Hephaestus/issues/663)) ([485ccab](https://github.com/ls1intum/Hephaestus/commit/485ccab23e0d2605bbc085bc9b36269c722ea602))
+* **security:** allow unauthenticated access to actuator health and info endpoints ([#662](https://github.com/ls1intum/Hephaestus/issues/662)) ([a35cf94](https://github.com/ls1intum/Hephaestus/commit/a35cf94ef6561fcfd1ae4e45a76abd5f6fd26d7e))
+
+## [0.13.1](https://github.com/ls1intum/Hephaestus/compare/v0.13.0...v0.13.1) (2026-01-30)
+
+### 🐛 Bug Fixes
+
+* **gitprovider:** atomic upsert for activity events, issues, pull requests, labels, and milestones ([#659](https://github.com/ls1intum/Hephaestus/issues/659)) ([0f616a9](https://github.com/ls1intum/Hephaestus/commit/0f616a9fcf523bdb3e2465e17ead4d5cc90edea4))
+
 ## [0.13.0](https://github.com/ls1intum/Hephaestus/compare/v0.12.4...v0.13.0) (2026-01-28)
 
 ### 🐛 Bug Fixes

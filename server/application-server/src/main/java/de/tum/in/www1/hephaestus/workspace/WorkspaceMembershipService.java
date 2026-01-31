@@ -172,8 +172,9 @@ public class WorkspaceMembershipService {
             return;
         }
 
-        Map<Long, WorkspaceMembership.WorkspaceRole> normalizedRoles =
-            desiredRoles == null ? Collections.<Long, WorkspaceMembership.WorkspaceRole>emptyMap() : desiredRoles;
+        Map<Long, WorkspaceMembership.WorkspaceRole> normalizedRoles = desiredRoles == null
+            ? Collections.<Long, WorkspaceMembership.WorkspaceRole>emptyMap()
+            : desiredRoles;
 
         List<WorkspaceMembership> existingMembers = workspaceMembershipRepository.findByWorkspace_Id(workspace.getId());
         Map<Long, WorkspaceMembership> existingByUserId = existingMembers

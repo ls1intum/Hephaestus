@@ -21,10 +21,9 @@ public final class SyncTargetFactory {
      * @return a SyncTarget instance for use with sync services
      */
     public static SyncTarget create(Workspace workspace, RepositoryToMonitor rtm) {
-        AuthMode authMode =
-            workspace.getGitProviderMode() == Workspace.GitProviderMode.GITHUB_APP_INSTALLATION
-                ? AuthMode.GITHUB_APP
-                : AuthMode.PERSONAL_ACCESS_TOKEN;
+        AuthMode authMode = workspace.getGitProviderMode() == Workspace.GitProviderMode.GITHUB_APP_INSTALLATION
+            ? AuthMode.GITHUB_APP
+            : AuthMode.PERSONAL_ACCESS_TOKEN;
 
         return new SyncTarget(
             rtm.getId(),

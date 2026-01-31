@@ -13,8 +13,7 @@ import org.springframework.stereotype.Repository;
  */
 @Repository
 public interface TeamRepositoryPermissionRepository
-    extends JpaRepository<TeamRepositoryPermission, TeamRepositoryPermission.Id>
-{
+    extends JpaRepository<TeamRepositoryPermission, TeamRepositoryPermission.Id> {
     Optional<TeamRepositoryPermission> findByTeam_IdAndRepository_Id(Long teamId, Long repositoryId);
 
     /**

@@ -140,31 +140,28 @@ public class UserProfileService {
         UserInfoDTO user = UserInfoDTO.fromUser(userEntity, leaguePoints);
 
         // First contribution is workspace-scoped to only show activity in monitored repositories
-        var firstContribution =
-            workspaceId == null
-                ? null
-                : workspaceContributionActivityService
-                      .findFirstContributionInstant(workspaceId, userEntity.getId())
-                      .orElse(null);
+        var firstContribution = workspaceId == null
+            ? null
+            : workspaceContributionActivityService
+                  .findFirstContributionInstant(workspaceId, userEntity.getId())
+                  .orElse(null);
 
-        List<PullRequestInfoDTO> openPullRequests =
-            workspaceId == null
-                ? List.of()
-                : profilePullRequestQueryRepository
-                      .findAssignedByLoginAndStates(login, Set.of(Issue.State.OPEN), workspaceId)
-                      .stream()
-                      .map(PullRequestInfoDTO::fromPullRequest)
-                      .toList();
+        List<PullRequestInfoDTO> openPullRequests = workspaceId == null
+            ? List.of()
+            : profilePullRequestQueryRepository
+                  .findAssignedByLoginAndStates(login, Set.of(Issue.State.OPEN), workspaceId)
+                  .stream()
+                  .map(PullRequestInfoDTO::fromPullRequest)
+                  .toList();
 
-        List<RepositoryInfoDTO> contributedRepositories =
-            workspaceId == null
-                ? List.of()
-                : profileRepositoryQueryRepository
-                      .findContributedByLogin(login, workspaceId)
-                      .stream()
-                      .map(RepositoryInfoDTO::fromRepository)
-                      .sorted(Comparator.comparing(RepositoryInfoDTO::name))
-                      .toList();
+        List<RepositoryInfoDTO> contributedRepositories = workspaceId == null
+            ? List.of()
+            : profileRepositoryQueryRepository
+                  .findContributedByLogin(login, workspaceId)
+                  .stream()
+                  .map(RepositoryInfoDTO::fromRepository)
+                  .sorted(Comparator.comparing(RepositoryInfoDTO::name))
+                  .toList();
 
         // Review activity: query PullRequestReview and IssueComment directly
         // This ensures all reviews are shown, regardless of ActivityEvent records

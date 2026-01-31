@@ -495,8 +495,9 @@ public class HistoricalBackfillService {
         // This gives admin visibility into issue backfill progress.
         if (issueResult.itemsSynced() > 0) {
             Integer issueCheckpoint = issueResult.minNumber() > 0 ? issueResult.minNumber() : null;
-            Integer issueHighWaterMark =
-                isIssueFirstBatch && issueResult.maxNumber() > 0 ? issueResult.maxNumber() : null;
+            Integer issueHighWaterMark = isIssueFirstBatch && issueResult.maxNumber() > 0
+                ? issueResult.maxNumber()
+                : null;
 
             // Mark issue backfill complete if no more pages
             if (!issueResult.hasMore()) {
@@ -581,14 +582,12 @@ public class HistoricalBackfillService {
             );
         } else {
             // Log progress (sync goes newest to oldest by CREATED_AT DESC)
-            String issueProgress =
-                issueResult.itemsSynced() > 0
-                    ? String.format("issues=#%d..#%d", issueResult.minNumber(), issueResult.maxNumber())
-                    : "issues=0";
-            String prProgress =
-                prResult.itemsSynced() > 0
-                    ? String.format("pullRequests=#%d..#%d", prResult.minNumber(), prResult.maxNumber())
-                    : "pullRequests=0";
+            String issueProgress = issueResult.itemsSynced() > 0
+                ? String.format("issues=#%d..#%d", issueResult.minNumber(), issueResult.maxNumber())
+                : "issues=0";
+            String prProgress = prResult.itemsSynced() > 0
+                ? String.format("pullRequests=#%d..#%d", prResult.minNumber(), prResult.maxNumber())
+                : "pullRequests=0";
             log.info(
                 "Backfill batch: repo={}, {}, {}, issuesComplete={}, pullRequestsComplete={}",
                 safeRepoName,

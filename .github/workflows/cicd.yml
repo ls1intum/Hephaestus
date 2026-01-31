@@ -317,10 +317,10 @@ jobs:
             echo "### ⚡ Performance" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
             SKIPPED_COUNT=0
-            [[ "${{ needs.Quality.result }}" == "skipped" ]] && ((SKIPPED_COUNT++))
-            [[ "${{ needs.Test.result }}" == "skipped" ]] && ((SKIPPED_COUNT++))
-            [[ "${{ needs.Security.result }}" == "skipped" ]] && ((SKIPPED_COUNT++))
-            [[ "${{ needs.Docker.result }}" == "skipped" ]] && ((SKIPPED_COUNT++))
+            [[ "${{ needs.Quality.result }}" == "skipped" ]] && SKIPPED_COUNT=$((SKIPPED_COUNT + 1)) || true
+            [[ "${{ needs.Test.result }}" == "skipped" ]] && SKIPPED_COUNT=$((SKIPPED_COUNT + 1)) || true
+            [[ "${{ needs.Security.result }}" == "skipped" ]] && SKIPPED_COUNT=$((SKIPPED_COUNT + 1)) || true
+            [[ "${{ needs.Docker.result }}" == "skipped" ]] && SKIPPED_COUNT=$((SKIPPED_COUNT + 1)) || true
             if [[ $SKIPPED_COUNT -gt 0 ]]; then
               echo "🚀 **Path-based filtering saved time!** $SKIPPED_COUNT workflow(s) skipped because no relevant files changed." >> $GITHUB_STEP_SUMMARY
             else

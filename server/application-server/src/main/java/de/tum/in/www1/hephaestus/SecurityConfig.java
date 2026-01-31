@@ -91,6 +91,8 @@ public class SecurityConfig {
         );
 
         http.authorizeHttpRequests(requests -> {
+            // Actuator endpoints for Docker/K8s health checks and basic info
+            requests.requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/info").permitAll();
             // OpenAPI documentation endpoints (public for spec generation and dev access)
             requests
                 .requestMatchers("/v3/api-docs/**", "/v3/api-docs.yaml", "/swagger-ui/**", "/swagger-ui.html")

@@ -69,6 +69,9 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
      * Process a GitHub pull request DTO and persist it as a PullRequest entity.
      * Publishes appropriate domain events based on what changed.
      * <p>
+     * Uses atomic upsert to prevent race conditions when concurrent threads
+     * (e.g., multiple NATS consumers or webhook handlers) process the same PR.
+     * <p>
      * Uses (repository_id, number) as the canonical lookup key to ensure idempotency
      * across both GraphQL sync and webhook events, which use different ID formats.
      *
@@ -83,37 +86,116 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
         }
 
         // Check for valid database ID - required for assigned ID strategy
-        if (dto.getDatabaseId() == null) {
+        Long dbId = dto.getDatabaseId();
+        if (dbId == null) {
             log.warn("Skipped pull request processing: reason=missingDatabaseId, prNumber={}", dto.number());
             return null;
         }
 
-        // Use (repository_id, number) as the canonical key for lookup.
-        // This ensures idempotency regardless of whether the DTO came from
-        // GraphQL (with fullDatabaseId) or webhook (with REST API id).
+        // Check if this is an update (for event publishing purposes)
         Optional<PullRequest> existingOpt = pullRequestRepository.findByRepositoryIdAndNumber(
             repository.getId(),
             dto.number()
         );
-
-        PullRequest pr;
         boolean isNew = existingOpt.isEmpty();
 
-        if (isNew) {
-            pr = createPullRequest(dto, repository);
-            pr.setLastSyncAt(Instant.now());
+        // Skip update if existing data is newer (prevents stale webhooks from overwriting)
+        if (!isNew) {
+            PullRequest existing = existingOpt.get();
+            if (
+                existing.getUpdatedAt() != null &&
+                dto.updatedAt() != null &&
+                !dto.updatedAt().isAfter(existing.getUpdatedAt())
+            ) {
+                log.debug(
+                    "Skipped stale PR update: prId={}, existingUpdatedAt={}, dtoUpdatedAt={}",
+                    existing.getId(),
+                    existing.getUpdatedAt(),
+                    dto.updatedAt()
+                );
+                return existing;
+            }
+        }
+
+        // Resolve related entities BEFORE the upsert
+        User author = dto.author() != null ? findOrCreateUser(dto.author()) : null;
+        User mergedBy = dto.mergedBy() != null ? findOrCreateUser(dto.mergedBy()) : null;
+        Milestone milestone = dto.milestone() != null ? findOrCreateMilestone(dto.milestone(), repository) : null;
+
+        // Extract branch info
+        String headRefName = dto.head() != null ? dto.head().ref() : null;
+        String headRefOid = dto.head() != null ? dto.head().sha() : null;
+        String baseRefName = dto.base() != null ? dto.base().ref() : null;
+        String baseRefOid = dto.base() != null ? dto.base().sha() : null;
+
+        // Use atomic upsert to handle concurrent inserts
+        Instant now = Instant.now();
+        pullRequestRepository.upsertCore(
+            dbId,
+            dto.number(),
+            sanitize(dto.title()),
+            sanitize(dto.body()),
+            convertState(dto.state()).name(),
+            null, // stateReason not used for PRs
+            dto.htmlUrl(),
+            dto.locked(),
+            dto.closedAt(),
+            dto.commentsCount(),
+            now,
+            dto.createdAt(),
+            dto.updatedAt(),
+            author != null ? author.getId() : null,
+            repository.getId(),
+            milestone != null ? milestone.getId() : null,
+            dto.mergedAt(),
+            dto.isDraft(),
+            dto.isMerged(),
+            dto.commits(),
+            dto.additions(),
+            dto.deletions(),
+            dto.changedFiles(),
+            dto.reviewDecision() != null ? dto.reviewDecision().name() : null,
+            dto.mergeStateStatus() != null ? dto.mergeStateStatus().name() : null,
+            dto.isMergeable(),
+            headRefName,
+            baseRefName,
+            headRefOid,
+            baseRefOid,
+            mergedBy != null ? mergedBy.getId() : null
+        );
+
+        // Fetch the PR to get a managed entity and handle relationships
+        PullRequest pr = pullRequestRepository
+            .findByRepositoryIdAndNumber(repository.getId(), dto.number())
+            .orElseThrow(() ->
+                new IllegalStateException(
+                    "PullRequest not found after upsert: repositoryId=" +
+                        repository.getId() +
+                        ", number=" +
+                        dto.number()
+                )
+            );
+
+        // Handle ManyToMany relationships (labels, assignees, requestedReviewers)
+        boolean relationshipsChanged = updateRelationships(dto, pr, repository);
+
+        // Save relationship changes
+        if (relationshipsChanged) {
             pr = pullRequestRepository.save(pr);
+        }
+
+        // Publish events
+        if (isNew) {
             eventPublisher.publishEvent(
                 new DomainEvent.PullRequestCreated(EventPayload.PullRequestData.from(pr), EventContext.from(context))
             );
             log.debug("Created pull request: prId={}, prNumber={}", pr.getId(), dto.number());
         } else {
-            pr = existingOpt.get();
-            Set<String> changedFields = updatePullRequest(dto, pr, repository);
-            pr.setLastSyncAt(Instant.now());
-            pr = pullRequestRepository.save(pr);
-
-            if (!changedFields.isEmpty()) {
+            Set<String> changedFields = computeChangedFields(existingOpt.get(), pr);
+            if (!changedFields.isEmpty() || relationshipsChanged) {
+                if (relationshipsChanged) {
+                    changedFields.add("relationships");
+                }
                 eventPublisher.publishEvent(
                     new DomainEvent.PullRequestUpdated(
                         EventPayload.PullRequestData.from(pr),
@@ -126,6 +208,58 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
         }
 
         return pr;
+    }
+
+    /**
+     * Updates ManyToMany relationships that can't be handled by the atomic upsert.
+     *
+     * @return true if any relationships were changed
+     */
+    private boolean updateRelationships(GitHubPullRequestDTO dto, PullRequest pr, Repository repository) {
+        boolean assigneesChanged = updateAssignees(dto.assignees(), pr.getAssignees());
+        boolean labelsChanged = updateLabels(dto.labels(), pr.getLabels(), repository);
+        boolean reviewersChanged = updateRequestedReviewers(dto.requestedReviewers(), pr.getRequestedReviewers());
+        return assigneesChanged || labelsChanged || reviewersChanged;
+    }
+
+    /**
+     * Computes which fields changed between the old and new PR state.
+     */
+    private Set<String> computeChangedFields(PullRequest oldPr, PullRequest newPr) {
+        Set<String> changedFields = new HashSet<>();
+
+        if (!Objects.equals(oldPr.getTitle(), newPr.getTitle())) {
+            changedFields.add("title");
+        }
+        if (!Objects.equals(oldPr.getBody(), newPr.getBody())) {
+            changedFields.add("body");
+        }
+        if (oldPr.getState() != newPr.getState()) {
+            changedFields.add("state");
+        }
+        if (oldPr.isDraft() != newPr.isDraft()) {
+            changedFields.add("draft");
+        }
+        if (oldPr.isMerged() != newPr.isMerged()) {
+            changedFields.add("merged");
+        }
+        if (!Objects.equals(oldPr.getMergedAt(), newPr.getMergedAt())) {
+            changedFields.add("mergedAt");
+        }
+        if (oldPr.getAdditions() != newPr.getAdditions()) {
+            changedFields.add("additions");
+        }
+        if (oldPr.getDeletions() != newPr.getDeletions()) {
+            changedFields.add("deletions");
+        }
+        if (oldPr.getCommits() != newPr.getCommits()) {
+            changedFields.add("commits");
+        }
+        if (!Objects.equals(oldPr.getHeadRefOid(), newPr.getHeadRefOid())) {
+            changedFields.add("headRefOid");
+        }
+
+        return changedFields;
     }
 
     /**
@@ -240,241 +374,6 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
             log.debug("Unlabeled pull request: prId={}, labelName={}", pr.getId(), label.getName());
         }
         return pr;
-    }
-
-    // ==================== Private helper methods ====================
-
-    private PullRequest createPullRequest(GitHubPullRequestDTO dto, Repository repository) {
-        PullRequest pr = new PullRequest();
-        pr.setId(dto.getDatabaseId());
-        pr.setNumber(dto.number());
-        pr.setTitle(sanitize(dto.title()));
-        pr.setBody(sanitize(dto.body()));
-        pr.setState(convertState(dto.state()));
-        pr.setHtmlUrl(dto.htmlUrl());
-        pr.setCreatedAt(dto.createdAt());
-        pr.setUpdatedAt(dto.updatedAt());
-        pr.setClosedAt(dto.closedAt());
-        pr.setMergedAt(dto.mergedAt());
-        pr.setDraft(dto.isDraft());
-        pr.setMerged(dto.isMerged());
-        pr.setLocked(dto.locked());
-        pr.setAdditions(dto.additions());
-        pr.setDeletions(dto.deletions());
-        pr.setChangedFiles(dto.changedFiles());
-        pr.setCommits(dto.commits());
-        pr.setCommentsCount(dto.commentsCount());
-        pr.setRepository(repository);
-
-        // GraphQL-only fields
-        pr.setReviewDecision(dto.reviewDecision());
-        pr.setMergeStateStatus(dto.mergeStateStatus());
-        pr.setMergeable(dto.isMergeable());
-
-        // Head/base branch references
-        if (dto.head() != null) {
-            pr.setHeadRefName(dto.head().ref());
-            pr.setHeadRefOid(dto.head().sha());
-        }
-        if (dto.base() != null) {
-            pr.setBaseRefName(dto.base().ref());
-            pr.setBaseRefOid(dto.base().sha());
-        }
-
-        // Link author
-        if (dto.author() != null) {
-            User author = findOrCreateUser(dto.author());
-            pr.setAuthor(author);
-        }
-
-        // Link merged by user
-        if (dto.mergedBy() != null) {
-            User mergedBy = findOrCreateUser(dto.mergedBy());
-            pr.setMergedBy(mergedBy);
-        }
-
-        // Link assignees
-        if (dto.assignees() != null) {
-            Set<User> assignees = new HashSet<>();
-            for (GitHubUserDTO assigneeDto : dto.assignees()) {
-                User assignee = findOrCreateUser(assigneeDto);
-                if (assignee != null) {
-                    assignees.add(assignee);
-                }
-            }
-            pr.setAssignees(assignees);
-        }
-
-        // Link requested reviewers
-        if (dto.requestedReviewers() != null) {
-            Set<User> reviewers = new HashSet<>();
-            for (GitHubUserDTO reviewerDto : dto.requestedReviewers()) {
-                User reviewer = findOrCreateUser(reviewerDto);
-                if (reviewer != null) {
-                    reviewers.add(reviewer);
-                }
-            }
-            pr.setRequestedReviewers(reviewers);
-        }
-
-        // Link labels
-        if (dto.labels() != null) {
-            Set<Label> labels = new HashSet<>();
-            for (GitHubLabelDTO labelDto : dto.labels()) {
-                Label label = findOrCreateLabel(labelDto, repository);
-                if (label != null) {
-                    labels.add(label);
-                }
-            }
-            pr.setLabels(labels);
-        }
-
-        // Link milestone
-        if (dto.milestone() != null) {
-            Milestone milestone = findOrCreateMilestone(dto.milestone(), repository);
-            pr.setMilestone(milestone);
-        }
-
-        return pr;
-    }
-
-    private Set<String> updatePullRequest(GitHubPullRequestDTO dto, PullRequest pr, Repository repository) {
-        Set<String> changedFields = new HashSet<>();
-
-        // Only update if newer
-        if (pr.getUpdatedAt() != null && dto.updatedAt() != null && !dto.updatedAt().isAfter(pr.getUpdatedAt())) {
-            return changedFields;
-        }
-
-        if (!Objects.equals(pr.getTitle(), sanitize(dto.title()))) {
-            pr.setTitle(sanitize(dto.title()));
-            changedFields.add("title");
-        }
-
-        if (!Objects.equals(pr.getBody(), sanitize(dto.body()))) {
-            pr.setBody(sanitize(dto.body()));
-            changedFields.add("body");
-        }
-
-        var newState = convertState(dto.state());
-        if (pr.getState() != newState) {
-            pr.setState(newState);
-            changedFields.add("state");
-        }
-
-        if (pr.isDraft() != dto.isDraft()) {
-            pr.setDraft(dto.isDraft());
-            changedFields.add("draft");
-        }
-
-        if (pr.isMerged() != dto.isMerged()) {
-            pr.setMerged(dto.isMerged());
-            changedFields.add("merged");
-        }
-
-        if (!Objects.equals(pr.getMergedAt(), dto.mergedAt())) {
-            pr.setMergedAt(dto.mergedAt());
-            changedFields.add("mergedAt");
-        }
-
-        // Update mergedBy
-        if (dto.mergedBy() != null && pr.getMergedBy() == null) {
-            User mergedBy = findOrCreateUser(dto.mergedBy());
-            pr.setMergedBy(mergedBy);
-            changedFields.add("mergedBy");
-        }
-
-        if (pr.getAdditions() != dto.additions()) {
-            pr.setAdditions(dto.additions());
-            changedFields.add("additions");
-        }
-
-        if (pr.getDeletions() != dto.deletions()) {
-            pr.setDeletions(dto.deletions());
-            changedFields.add("deletions");
-        }
-
-        if (pr.getCommits() != dto.commits()) {
-            pr.setCommits(dto.commits());
-            changedFields.add("commits");
-        }
-
-        if (pr.isLocked() != dto.locked()) {
-            pr.setLocked(dto.locked());
-            changedFields.add("locked");
-        }
-
-        // Update GraphQL-only fields (only if provided, null means not fetched)
-        if (dto.reviewDecision() != null && !Objects.equals(pr.getReviewDecision(), dto.reviewDecision())) {
-            pr.setReviewDecision(dto.reviewDecision());
-            changedFields.add("reviewDecision");
-        }
-        if (dto.mergeStateStatus() != null && !Objects.equals(pr.getMergeStateStatus(), dto.mergeStateStatus())) {
-            pr.setMergeStateStatus(dto.mergeStateStatus());
-            changedFields.add("mergeStateStatus");
-        }
-        if (dto.isMergeable() != null && !Objects.equals(pr.getMergeable(), dto.isMergeable())) {
-            pr.setMergeable(dto.isMergeable());
-            changedFields.add("isMergeable");
-        }
-
-        // Update head/base branch references
-        if (dto.head() != null) {
-            if (!Objects.equals(pr.getHeadRefName(), dto.head().ref())) {
-                pr.setHeadRefName(dto.head().ref());
-                changedFields.add("headRefName");
-            }
-            if (!Objects.equals(pr.getHeadRefOid(), dto.head().sha())) {
-                pr.setHeadRefOid(dto.head().sha());
-                changedFields.add("headRefOid");
-            }
-        }
-        if (dto.base() != null) {
-            if (!Objects.equals(pr.getBaseRefName(), dto.base().ref())) {
-                pr.setBaseRefName(dto.base().ref());
-                changedFields.add("baseRefName");
-            }
-            if (!Objects.equals(pr.getBaseRefOid(), dto.base().sha())) {
-                pr.setBaseRefOid(dto.base().sha());
-                changedFields.add("baseRefOid");
-            }
-        }
-
-        pr.setUpdatedAt(dto.updatedAt());
-
-        // Update labels
-        if (dto.labels() != null) {
-            Set<Label> newLabels = new HashSet<>();
-            for (GitHubLabelDTO labelDto : dto.labels()) {
-                Label label = findOrCreateLabel(labelDto, repository);
-                if (label != null) {
-                    newLabels.add(label);
-                }
-            }
-            if (!pr.getLabels().equals(newLabels)) {
-                pr.getLabels().clear();
-                pr.getLabels().addAll(newLabels);
-                changedFields.add("labels");
-            }
-        }
-
-        // Update requested reviewers
-        if (dto.requestedReviewers() != null) {
-            Set<User> newReviewers = new HashSet<>();
-            for (GitHubUserDTO reviewerDto : dto.requestedReviewers()) {
-                User reviewer = findOrCreateUser(reviewerDto);
-                if (reviewer != null) {
-                    newReviewers.add(reviewer);
-                }
-            }
-            if (!pr.getRequestedReviewers().equals(newReviewers)) {
-                pr.getRequestedReviewers().clear();
-                pr.getRequestedReviewers().addAll(newReviewers);
-                changedFields.add("requestedReviewers");
-            }
-        }
-
-        return changedFields;
     }
 
     private Issue.State convertState(String state) {

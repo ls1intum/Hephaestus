@@ -11,7 +11,10 @@ import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.github.dto.GitHubUserDTO;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.lang.Nullable;
@@ -95,6 +98,9 @@ public abstract class BaseGitHubProcessor {
      * created a label with a deterministic ID, then a webhook arrives with the actual
      * GitHub databaseId. Looking up by the webhook's ID would miss the existing entity.
      * <p>
+     * Uses atomic insertIfAbsent to prevent race conditions when concurrent threads
+     * try to create the same label simultaneously.
+     * <p>
      * NEVER changes the ID of an existing (managed) entity - Hibernate will throw
      * "identifier of an instance was altered" exception.
      */
@@ -105,8 +111,6 @@ public abstract class BaseGitHubProcessor {
         }
 
         // ALWAYS check by unique key (repository_id + name) FIRST - this is the constraint we enforce.
-        // This handles the case where GraphQL sync created a label with a deterministic ID,
-        // then a webhook arrives with the actual GitHub databaseId.
         Optional<Label> existingOpt = labelRepository.findByRepositoryIdAndName(repository.getId(), dto.name());
 
         // Fall back to ID lookup if name lookup didn't find it (handles label renames)
@@ -115,19 +119,24 @@ public abstract class BaseGitHubProcessor {
         }
 
         if (existingOpt.isPresent()) {
-            // Return existing label - NEVER modify its ID
             return existingOpt.get();
         }
 
-        // Create new label
-        Label label = new Label();
-        // Use provided ID or generate deterministic one for new labels only
+        // Use atomic insert to prevent race conditions.
+        // If another thread inserted first, this returns 0 and we fetch the winner.
         Long labelId = dto.id() != null ? dto.id() : generateDeterministicLabelId(repository.getId(), dto.name());
-        label.setId(labelId);
-        label.setName(dto.name());
-        label.setColor(dto.color());
-        label.setRepository(repository);
-        return labelRepository.save(label);
+        int inserted = labelRepository.insertIfAbsent(labelId, dto.name(), dto.color(), repository.getId());
+
+        if (inserted == 0) {
+            // Another thread inserted first - fetch the winner
+            // Note: orElse(null) is safe here - if conflict occurred, the row exists.
+            // The only failure case is concurrent DELETE which is not a supported operation.
+            return labelRepository.findByRepositoryIdAndName(repository.getId(), dto.name()).orElse(null);
+        }
+
+        // We inserted - fetch the entity to return a managed instance
+        // Note: Same transaction guarantees visibility (PostgreSQL MVCC).
+        return labelRepository.findById(labelId).orElse(null);
     }
 
     /**
@@ -151,6 +160,9 @@ public abstract class BaseGitHubProcessor {
      * created a milestone with a deterministic ID, then a webhook arrives with the actual
      * GitHub databaseId. Looking up by the webhook's ID would miss the existing entity.
      * <p>
+     * Uses atomic insertIfAbsent to prevent race conditions when concurrent threads
+     * try to create the same milestone simultaneously.
+     * <p>
      * For GraphQL responses that don't include databaseId (id is null), we generate a
      * deterministic negative ID to avoid collision with real GitHub IDs.
      * <p>
@@ -164,8 +176,6 @@ public abstract class BaseGitHubProcessor {
         }
 
         // ALWAYS check by unique key (repository_id + number) FIRST - this is the constraint we enforce.
-        // This handles the case where GraphQL sync created a milestone with a deterministic ID,
-        // then a webhook arrives with the actual GitHub databaseId.
         Optional<Milestone> existingOpt = milestoneRepository.findByNumberAndRepositoryId(
             dto.number(),
             repository.getId()
@@ -177,36 +187,43 @@ public abstract class BaseGitHubProcessor {
         }
 
         if (existingOpt.isPresent()) {
-            // Return existing milestone - NEVER modify its ID
             return existingOpt.get();
         }
 
-        // Create new milestone
-        Milestone milestone = new Milestone();
-        // Use provided ID or generate deterministic one for new milestones only
-        Long milestoneId =
-            dto.id() != null ? dto.id() : generateDeterministicMilestoneId(repository.getId(), dto.number());
-        milestone.setId(milestoneId);
-        milestone.setNumber(dto.number());
-        milestone.setTitle(dto.title() != null ? dto.title() : "Milestone " + dto.number());
-        milestone.setHtmlUrl(dto.htmlUrl() != null ? dto.htmlUrl() : "");
-        milestone.setState(parseMilestoneState(dto.state()));
-        milestone.setDescription(dto.description());
-        milestone.setDueOn(dto.dueOn());
-        milestone.setRepository(repository);
-        if (dto.openIssuesCount() != null) {
-            milestone.setOpenIssuesCount(dto.openIssuesCount());
+        // Use atomic insert to prevent race conditions.
+        // If another thread inserted first, this returns 0 and we fetch the winner.
+        Long milestoneId = dto.id() != null
+            ? dto.id()
+            : generateDeterministicMilestoneId(repository.getId(), dto.number());
+
+        String title = dto.title() != null ? dto.title() : "Milestone " + dto.number();
+        String htmlUrl = dto.htmlUrl() != null ? dto.htmlUrl() : "";
+        String state = parseMilestoneState(dto.state()).name();
+        int openIssuesCount = dto.openIssuesCount() != null ? dto.openIssuesCount() : 0;
+        int closedIssuesCount = dto.closedIssuesCount() != null ? dto.closedIssuesCount() : 0;
+
+        int inserted = milestoneRepository.insertIfAbsent(
+            milestoneId,
+            dto.number(),
+            title,
+            dto.description(),
+            state,
+            htmlUrl,
+            dto.dueOn(),
+            openIssuesCount,
+            closedIssuesCount,
+            repository.getId(),
+            dto.createdAt(),
+            dto.updatedAt()
+        );
+
+        if (inserted == 0) {
+            // Another thread inserted first - fetch the winner
+            return milestoneRepository.findByNumberAndRepositoryId(dto.number(), repository.getId()).orElse(null);
         }
-        if (dto.closedIssuesCount() != null) {
-            milestone.setClosedIssuesCount(dto.closedIssuesCount());
-        }
-        if (dto.createdAt() != null) {
-            milestone.setCreatedAt(dto.createdAt());
-        }
-        if (dto.updatedAt() != null) {
-            milestone.setUpdatedAt(dto.updatedAt());
-        }
-        return milestoneRepository.save(milestone);
+
+        // We inserted - fetch the entity to return a managed instance
+        return milestoneRepository.findById(milestoneId).orElse(null);
     }
 
     /**
@@ -249,5 +266,101 @@ public abstract class BaseGitHubProcessor {
     @Nullable
     protected String sanitize(@Nullable String input) {
         return PostgresStringUtils.sanitize(input);
+    }
+
+    // ========================================================================
+    // Shared relationship update helpers (used by Issue and PR processors)
+    // ========================================================================
+
+    /**
+     * Updates assignees collection from DTO list.
+     * Shared between Issue and PullRequest processors to avoid code duplication.
+     *
+     * @param assigneeDtos the assignee DTOs from GitHub (null means don't update)
+     * @param currentAssignees the current assignee set to update (modified in place)
+     * @return true if assignments changed, false otherwise
+     */
+    protected boolean updateAssignees(@Nullable List<GitHubUserDTO> assigneeDtos, Set<User> currentAssignees) {
+        if (assigneeDtos == null) {
+            return false;
+        }
+
+        Set<User> newAssignees = new HashSet<>();
+        for (GitHubUserDTO assigneeDto : assigneeDtos) {
+            User assignee = findOrCreateUser(assigneeDto);
+            if (assignee != null) {
+                newAssignees.add(assignee);
+            }
+        }
+
+        if (!currentAssignees.equals(newAssignees)) {
+            currentAssignees.clear();
+            currentAssignees.addAll(newAssignees);
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Updates labels collection from DTO list.
+     * Shared between Issue and PullRequest processors to avoid code duplication.
+     *
+     * @param labelDtos the label DTOs from GitHub (null means don't update)
+     * @param currentLabels the current label set to update (modified in place)
+     * @param repository the repository context for label lookup/creation
+     * @return true if labels changed, false otherwise
+     */
+    protected boolean updateLabels(
+        @Nullable List<GitHubLabelDTO> labelDtos,
+        Set<Label> currentLabels,
+        Repository repository
+    ) {
+        if (labelDtos == null) {
+            return false;
+        }
+
+        Set<Label> newLabels = new HashSet<>();
+        for (GitHubLabelDTO labelDto : labelDtos) {
+            Label label = findOrCreateLabel(labelDto, repository);
+            if (label != null) {
+                newLabels.add(label);
+            }
+        }
+
+        if (!currentLabels.equals(newLabels)) {
+            currentLabels.clear();
+            currentLabels.addAll(newLabels);
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Updates requested reviewers collection from DTO list.
+     * Specific to PullRequest but provided here for consistency.
+     *
+     * @param reviewerDtos the reviewer DTOs from GitHub (null means don't update)
+     * @param currentReviewers the current reviewer set to update (modified in place)
+     * @return true if reviewers changed, false otherwise
+     */
+    protected boolean updateRequestedReviewers(@Nullable List<GitHubUserDTO> reviewerDtos, Set<User> currentReviewers) {
+        if (reviewerDtos == null) {
+            return false;
+        }
+
+        Set<User> newReviewers = new HashSet<>();
+        for (GitHubUserDTO reviewerDto : reviewerDtos) {
+            User reviewer = findOrCreateUser(reviewerDto);
+            if (reviewer != null) {
+                newReviewers.add(reviewer);
+            }
+        }
+
+        if (!currentReviewers.equals(newReviewers)) {
+            currentReviewers.clear();
+            currentReviewers.addAll(newReviewers);
+            return true;
+        }
+        return false;
     }
 }

@@ -232,14 +232,13 @@ public class PracticesService {
         BadPracticeDetection lastDetection,
         List<PullRequestBadPractice> allBadPractices
     ) {
-        List<PullRequestBadPracticeDTO> badPractices =
-            lastDetection == null
-                ? List.of()
-                : lastDetection
-                      .getBadPractices()
-                      .stream()
-                      .map(PullRequestBadPracticeDTO::fromPullRequestBadPractice)
-                      .toList();
+        List<PullRequestBadPracticeDTO> badPractices = lastDetection == null
+            ? List.of()
+            : lastDetection
+                  .getBadPractices()
+                  .stream()
+                  .map(PullRequestBadPracticeDTO::fromPullRequestBadPractice)
+                  .toList();
 
         List<String> badPracticeTitles = badPractices.stream().map(PullRequestBadPracticeDTO::title).toList();
 

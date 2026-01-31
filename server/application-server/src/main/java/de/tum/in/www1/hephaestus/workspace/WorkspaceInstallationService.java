@@ -202,8 +202,9 @@ public class WorkspaceInstallationService {
                 return null;
             }
 
-            AccountType wsAccountType =
-                accountType == ProvisioningListener.AccountType.ORGANIZATION ? AccountType.ORG : AccountType.USER;
+            AccountType wsAccountType = accountType == ProvisioningListener.AccountType.ORGANIZATION
+                ? AccountType.ORG
+                : AccountType.USER;
 
             String desiredSlug = workspaceSlugService.normalize(accountLogin);
             String availableSlug = workspaceSlugService.allocate(

@@ -24,8 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Repository
 @WorkspaceAgnostic("Queried by explicit workspace ID - settings queries always workspace-scoped")
 public interface WorkspaceTeamLabelFilterRepository
-    extends JpaRepository<WorkspaceTeamLabelFilter, WorkspaceTeamLabelFilter.Id>
-{
+    extends JpaRepository<WorkspaceTeamLabelFilter, WorkspaceTeamLabelFilter.Id> {
     /**
      * Finds all label filters for a given workspace.
      *

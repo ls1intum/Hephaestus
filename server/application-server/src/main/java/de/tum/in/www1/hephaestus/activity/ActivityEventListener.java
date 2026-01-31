@@ -789,10 +789,9 @@ public class ActivityEventListener {
             return;
         }
         // The resolver might be different from the PR author - use resolvedBy if available
-        Long resolverId =
-            thread.getResolvedBy() != null
-                ? thread.getResolvedBy().getId()
-                : (thread.getPullRequest().getAuthor() != null ? thread.getPullRequest().getAuthor().getId() : null);
+        Long resolverId = thread.getResolvedBy() != null
+            ? thread.getResolvedBy().getId()
+            : (thread.getPullRequest().getAuthor() != null ? thread.getPullRequest().getAuthor().getId() : null);
         if (resolverId == null) {
             log.debug("Skipping review thread resolved event (no resolver found): threadId={}", threadData.id());
             return;
