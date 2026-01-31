@@ -1,0 +1,17 @@
+{
+  "event_name": "project_create",
+  "created_at": "2026-01-31T20:12:43+01:00",
+  "updated_at": "2026-01-31T20:12:43+01:00",
+  "name": "test-webhook-project",
+  "path": "test-webhook-project",
+  "path_with_namespace": "hephaestustest/test-webhook-project",
+  "project_id": 246766,
+  "project_namespace_id": 319719,
+  "owners": [
+    {
+      "name": "Dietrich, Felix (Timotheus Johannes)",
+      "email": "[REDACTED]"
+    }
+  ],
+  "project_visibility": "private"
+}

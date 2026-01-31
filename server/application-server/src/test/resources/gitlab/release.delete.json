@@ -1,0 +1,62 @@
+{
+  "id": 5912,
+  "created_at": "2026-01-31 19:28:13 +0100",
+  "description": "This will be deleted",
+  "name": "Test Release",
+  "released_at": "2026-01-31 19:28:13 +0100",
+  "tag": "v0.0.1-delete-test",
+  "object_kind": "release",
+  "project": {
+    "id": 246765,
+    "name": "demo-repository",
+    "description": "Demo repository for testing GitLab webhooks and generating fixture data",
+    "web_url": "https://gitlab.lrz.de/hephaestustest/demo-repository",
+    "avatar_url": null,
+    "git_ssh_url": "git@gitlab.lrz.de:hephaestustest/demo-repository.git",
+    "git_http_url": "https://gitlab.lrz.de/hephaestustest/demo-repository.git",
+    "namespace": "HephaestusTest",
+    "visibility_level": 0,
+    "path_with_namespace": "hephaestustest/demo-repository",
+    "default_branch": "main",
+    "ci_config_path": "",
+    "homepage": "https://gitlab.lrz.de/hephaestustest/demo-repository",
+    "url": "git@gitlab.lrz.de:hephaestustest/demo-repository.git",
+    "ssh_url": "git@gitlab.lrz.de:hephaestustest/demo-repository.git",
+    "http_url": "https://gitlab.lrz.de/hephaestustest/demo-repository.git"
+  },
+  "url": "https://gitlab.lrz.de/hephaestustest/demo-repository/-/releases/v0.0.1-delete-test",
+  "action": "delete",
+  "assets": {
+    "count": 4,
+    "links": [],
+    "sources": [
+      {
+        "format": "zip",
+        "url": "https://gitlab.lrz.de/hephaestustest/demo-repository/-/archive/v0.0.1-delete-test/demo-repository-v0.0.1-delete-test.zip"
+      },
+      {
+        "format": "tar.gz",
+        "url": "https://gitlab.lrz.de/hephaestustest/demo-repository/-/archive/v0.0.1-delete-test/demo-repository-v0.0.1-delete-test.tar.gz"
+      },
+      {
+        "format": "tar.bz2",
+        "url": "https://gitlab.lrz.de/hephaestustest/demo-repository/-/archive/v0.0.1-delete-test/demo-repository-v0.0.1-delete-test.tar.bz2"
+      },
+      {
+        "format": "tar",
+        "url": "https://gitlab.lrz.de/hephaestustest/demo-repository/-/archive/v0.0.1-delete-test/demo-repository-v0.0.1-delete-test.tar"
+      }
+    ]
+  },
+  "commit": {
+    "id": "bf2ed694fe584ab7add3147e5bee4a72bdb5147f",
+    "message": "Add CI/CD configuration",
+    "title": "Add CI/CD configuration",
+    "timestamp": "2026-01-31T19:28:01+01:00",
+    "url": "https://gitlab.lrz.de/hephaestustest/demo-repository/-/commit/bf2ed694fe584ab7add3147e5bee4a72bdb5147f",
+    "author": {
+      "name": "Dietrich, Felix (Timotheus Johannes)",
+      "email": "felixtj.dietrich@tum.de"
+    }
+  }
+}
