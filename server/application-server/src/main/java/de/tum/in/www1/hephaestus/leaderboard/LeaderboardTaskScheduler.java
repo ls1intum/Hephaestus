@@ -6,7 +6,6 @@ import java.util.concurrent.ScheduledThreadPoolExecutor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.core.Ordered;
@@ -27,24 +26,18 @@ public class LeaderboardTaskScheduler {
 
     private static final Logger log = LoggerFactory.getLogger(LeaderboardTaskScheduler.class);
 
-    private final boolean runScheduledMessage;
-    private final String scheduledDay;
-    private final String scheduledTime;
+    private final LeaderboardProperties leaderboardProperties;
     private final ThreadPoolTaskScheduler taskScheduler;
     private final SlackWeeklyLeaderboardTask slackWeeklyLeaderboardTask;
     private final LeaguePointsUpdateTask leaguePointsUpdateTask;
 
     public LeaderboardTaskScheduler(
-        @Value("${hephaestus.leaderboard.notification.enabled}") boolean runScheduledMessage,
-        @Value("${hephaestus.leaderboard.schedule.day}") String scheduledDay,
-        @Value("${hephaestus.leaderboard.schedule.time}") String scheduledTime,
+        LeaderboardProperties leaderboardProperties,
         ThreadPoolTaskScheduler taskScheduler,
         @Autowired(required = false) SlackWeeklyLeaderboardTask slackWeeklyLeaderboardTask,
         LeaguePointsUpdateTask leaguePointsUpdateTask
     ) {
-        this.runScheduledMessage = runScheduledMessage;
-        this.scheduledDay = scheduledDay;
-        this.scheduledTime = scheduledTime;
+        this.leaderboardProperties = leaderboardProperties;
         this.taskScheduler = taskScheduler;
         this.slackWeeklyLeaderboardTask = slackWeeklyLeaderboardTask;
         this.leaguePointsUpdateTask = leaguePointsUpdateTask;
@@ -53,14 +46,14 @@ public class LeaderboardTaskScheduler {
     @EventListener(ApplicationReadyEvent.class)
     public void activateTaskScheduler() {
         // Schedule always on app ready; guard per-task below
-        var timeParts = scheduledTime.split(":");
+        var timeParts = leaderboardProperties.schedule().time().split(":");
 
         // CRON for the end of every leaderboard cycle
         String cron = String.format(
             "0 %s %s ? * %s",
             timeParts.length > 1 ? timeParts[1] : 0,
             timeParts[0],
-            scheduledDay
+            leaderboardProperties.schedule().day()
         );
 
         if (!CronExpression.isValidExpression(cron)) {
@@ -76,7 +69,7 @@ public class LeaderboardTaskScheduler {
      * Schedule a Slack message to be sent at the end of every leaderboard cycle.
      */
     private void scheduleSlackMessage(String cron) {
-        if (!runScheduledMessage) {
+        if (!leaderboardProperties.notification().enabled()) {
             log.info("Skipped Slack message scheduling: reason=notificationsDisabled");
             return;
         }

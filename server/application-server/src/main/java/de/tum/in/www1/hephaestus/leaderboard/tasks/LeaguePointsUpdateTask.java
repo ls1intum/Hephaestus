@@ -16,7 +16,6 @@ import java.util.List;
 import java.util.function.Consumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -24,8 +23,7 @@ public class LeaguePointsUpdateTask implements Runnable {
 
     private static final Logger log = LoggerFactory.getLogger(LeaguePointsUpdateTask.class);
 
-    private final String scheduledDay;
-    private final String scheduledTime;
+    private final LeaderboardProperties leaderboardProperties;
     private final UserRepository userRepository;
     private final LeaderboardService leaderboardService;
     private final LeaguePointsService leaguePointsService;
@@ -33,16 +31,14 @@ public class LeaguePointsUpdateTask implements Runnable {
     private final WorkspaceRepository workspaceRepository;
 
     public LeaguePointsUpdateTask(
-        @Value("${hephaestus.leaderboard.schedule.day}") String scheduledDay,
-        @Value("${hephaestus.leaderboard.schedule.time}") String scheduledTime,
+        LeaderboardProperties leaderboardProperties,
         UserRepository userRepository,
         LeaderboardService leaderboardService,
         LeaguePointsService leaguePointsService,
         WorkspaceMembershipService workspaceMembershipService,
         WorkspaceRepository workspaceRepository
     ) {
-        this.scheduledDay = scheduledDay;
-        this.scheduledTime = scheduledTime;
+        this.leaderboardProperties = leaderboardProperties;
         this.userRepository = userRepository;
         this.leaderboardService = leaderboardService;
         this.leaguePointsService = leaguePointsService;
@@ -117,10 +113,10 @@ public class LeaguePointsUpdateTask implements Runnable {
      * @return List of {@code LeaderboardEntryDTO} representing the latest leaderboard
      */
     private List<LeaderboardEntryDTO> getLatestLeaderboard(Workspace workspace) {
-        String[] timeParts = scheduledTime.split(":");
+        String[] timeParts = leaderboardProperties.schedule().time().split(":");
         ZonedDateTime zonedNow = ZonedDateTime.now(ZoneId.systemDefault());
         ZonedDateTime zonedBefore = zonedNow
-            .with(TemporalAdjusters.previousOrSame(DayOfWeek.of(Integer.parseInt(scheduledDay))))
+            .with(TemporalAdjusters.previousOrSame(DayOfWeek.of(leaderboardProperties.schedule().day())))
             .withHour(Integer.parseInt(timeParts[0]))
             .withMinute(timeParts.length > 1 ? Integer.parseInt(timeParts[1]) : 0)
             .withSecond(0)

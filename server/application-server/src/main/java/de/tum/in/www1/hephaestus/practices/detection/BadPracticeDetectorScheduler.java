@@ -7,6 +7,7 @@ import static de.tum.in.www1.hephaestus.practices.model.PullRequestLabels.READY_
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
+import de.tum.in.www1.hephaestus.practices.DetectionProperties;
 import de.tum.in.www1.hephaestus.practices.spi.BadPracticeNotificationSender;
 import de.tum.in.www1.hephaestus.practices.spi.UserRoleChecker;
 import de.tum.in.www1.hephaestus.workspace.RepositoryToMonitorRepository;
@@ -22,7 +23,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.TaskScheduler;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -57,7 +57,7 @@ public class BadPracticeDetectorScheduler {
         UserRoleChecker userRoleChecker,
         RepositoryToMonitorRepository repositoryToMonitorRepository,
         WorkspaceRepository workspaceRepository,
-        @Value("${hephaestus.detection.run-automatic-detection-for-all}") boolean runAutomaticDetectionForAll
+        DetectionProperties detectionProperties
     ) {
         this.taskScheduler = taskScheduler;
         this.pullRequestBadPracticeDetector = pullRequestBadPracticeDetector;
@@ -65,7 +65,7 @@ public class BadPracticeDetectorScheduler {
         this.userRoleChecker = userRoleChecker;
         this.repositoryToMonitorRepository = repositoryToMonitorRepository;
         this.workspaceRepository = workspaceRepository;
-        this.runAutomaticDetectionForAll = runAutomaticDetectionForAll;
+        this.runAutomaticDetectionForAll = detectionProperties.runAutomaticDetectionForAll();
     }
 
     public void detectBadPracticeForPrWhenOpenedOrReadyForReviewEvent(PullRequest pullRequest) {

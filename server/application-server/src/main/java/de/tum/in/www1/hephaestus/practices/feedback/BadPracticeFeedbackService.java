@@ -4,6 +4,7 @@ import com.langfuse.client.LangfuseClient;
 import com.langfuse.client.resources.commons.types.CreateScoreValue;
 import com.langfuse.client.resources.score.types.CreateScoreRequest;
 import com.langfuse.client.resources.score.types.CreateScoreResponse;
+import de.tum.in.www1.hephaestus.practices.DetectionProperties;
 import de.tum.in.www1.hephaestus.practices.dto.BadPracticeFeedbackDTO;
 import de.tum.in.www1.hephaestus.practices.model.BadPracticeFeedback;
 import de.tum.in.www1.hephaestus.practices.model.PullRequestBadPractice;
@@ -11,7 +12,6 @@ import de.tum.in.www1.hephaestus.workspace.Workspace;
 import java.time.Instant;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -45,19 +45,25 @@ public class BadPracticeFeedbackService {
 
     public BadPracticeFeedbackService(
         BadPracticeFeedbackRepository badPracticeFeedbackRepository,
-        @Value("${hephaestus.detection.tracing.enabled}") boolean tracingEnabled,
-        @Value("${hephaestus.detection.tracing.host}") String tracingHost,
-        @Value("${hephaestus.detection.tracing.public-key}") String tracingPublicKey,
-        @Value("${hephaestus.detection.tracing.secret-key}") String tracingSecretKey
+        DetectionProperties detectionProperties
     ) {
         this.badPracticeFeedbackRepository = badPracticeFeedbackRepository;
-        this.tracingEnabled = tracingEnabled;
+        this.tracingEnabled = detectionProperties.tracing().enabled();
 
         // Initialize Langfuse client once if tracing is enabled (connection reuse)
-        if (tracingEnabled && !tracingHost.isBlank() && !tracingPublicKey.isBlank()) {
+        var tracing = detectionProperties.tracing();
+        if (
+            tracing.enabled() &&
+            tracing.host() != null &&
+            !tracing.host().isBlank() &&
+            tracing.publicKey() != null &&
+            !tracing.publicKey().isBlank() &&
+            tracing.secretKey() != null &&
+            !tracing.secretKey().isBlank()
+        ) {
             this.langfuseClient = LangfuseClient.builder()
-                .url(tracingHost)
-                .credentials(tracingPublicKey, tracingSecretKey)
+                .url(tracing.host())
+                .credentials(tracing.publicKey(), tracing.secretKey())
                 .build();
         } else {
             this.langfuseClient = null;

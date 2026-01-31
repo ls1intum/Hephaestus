@@ -1,6 +1,7 @@
 package de.tum.in.www1.hephaestus.mentor;
 
 import de.tum.in.www1.hephaestus.SecurityUtils;
+import de.tum.in.www1.hephaestus.config.IntelligenceServiceProperties;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContext;
@@ -16,7 +17,6 @@ import java.util.Map;
 import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.core.io.buffer.DataBufferUtils;
 import org.springframework.http.HttpHeaders;
@@ -85,11 +85,11 @@ public class MentorProxyController {
 
     public MentorProxyController(
         WebClient mentorWebClient,
-        @Value("${hephaestus.intelligence-service.url}") String intelligenceServiceBaseUrl,
+        IntelligenceServiceProperties intelligenceServiceProperties,
         UserRepository userRepository
     ) {
         this.mentorWebClient = mentorWebClient;
-        this.intelligenceServiceBaseUrl = intelligenceServiceBaseUrl;
+        this.intelligenceServiceBaseUrl = intelligenceServiceProperties.url();
         this.userRepository = userRepository;
     }
 
