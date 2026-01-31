@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.14.0](https://github.com/ls1intum/Hephaestus/compare/v0.13.8...v0.14.0) (2026-01-31)
+
+### 🚀 Features
+
+* **profile:** xp profile ui and backend total user xp aggregation ([#660](https://github.com/ls1intum/Hephaestus/issues/660)) ([2ba8d98](https://github.com/ls1intum/Hephaestus/commit/2ba8d98649dcf5c428aafa5675b7a4490578de98))
+
 ## [0.13.8](https://github.com/ls1intum/Hephaestus/compare/v0.13.7...v0.13.8) (2026-01-31)
 
 ### 🐛 Bug Fixes
