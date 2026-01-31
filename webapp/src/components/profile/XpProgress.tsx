@@ -1,49 +1,62 @@
+import { ClockIcon } from "@primer/octicons-react";
 import { Progress } from "@/components/ui/progress";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
 export interface XpProgressProps {
+	/** XP earned within the current level */
 	currentXP: number;
+	/** XP needed to reach the next level */
 	xpNeeded: number;
+	/** Next level number (current level + 1) */
+	nextLevel: number;
+	/** Total lifetime XP accumulated */
 	totalXP: number;
+	/** Date when user started contributing (optional) */
+	contributingSince?: string;
 	className?: string;
 }
 
-export function XpProgress({ currentXP, xpNeeded, totalXP, className }: XpProgressProps) {
+export function XpProgress({
+	currentXP,
+	xpNeeded,
+	nextLevel,
+	totalXP,
+	contributingSince,
+	className,
+}: XpProgressProps) {
 	// Calculate percentage, guarding against division by zero
 	const percentage = xpNeeded > 0 ? Math.min(100, Math.max(0, (currentXP / xpNeeded) * 100)) : 0;
 
 	return (
 		<div className={cn("w-full", className)}>
-			{/* Game-style Status Bar */}
-			<div className="flex flex-col gap-1">
-				<div className="flex justify-between items-end px-1">
-					<span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-						Developer
+			<div className="flex flex-col gap-1.5">
+				{/* XP Progress Label */}
+				<div className="flex justify-between items-baseline px-0.5">
+					<span className="text-xs font-semibold text-muted-foreground">
+						{currentXP.toLocaleString()} / {xpNeeded.toLocaleString()} XP to Level {nextLevel}
 					</span>
-					<span className="text-xs text-muted-foreground">
-						{currentXP} / {xpNeeded} XP
-					</span>
+					<span className="text-xs text-muted-foreground">{totalXP.toLocaleString()} XP total</span>
 				</div>
 
-				{/* Bar Container with "metallic" look */}
-				<Tooltip>
-					<TooltipTrigger asChild>
-						<div className="relative h-5 w-full bg-secondary/80 rounded-sm border border-border/50 shadow-inner overflow-hidden cursor-help">
-							{/* Animated Gloss Effect */}
-							<div className="absolute inset-0 z-10 bg-linear-to-b from-white/10 to-transparent pointer-events-none" />
+				{/* Progress Bar */}
+				<div className="relative h-2.5 w-full bg-secondary/80 rounded-full overflow-hidden">
+					{/* Subtle gloss effect */}
+					<div className="absolute inset-0 z-10 bg-gradient-to-b from-white/10 to-transparent pointer-events-none rounded-full" />
 
-							<Progress
-								className="h-full w-full rounded-none bg-transparent"
-								indicatorClassName="bg-gradient-to-r from-primary/80 to-primary rounded-none transition-all duration-500"
-								value={percentage}
-							/>
-						</div>
-					</TooltipTrigger>
-					<TooltipContent>
-						<p>Total XP: {totalXP}</p>
-					</TooltipContent>
-				</Tooltip>
+					<Progress
+						className="h-full w-full rounded-full bg-transparent"
+						indicatorClassName="bg-gradient-to-r from-primary/90 to-primary rounded-full transition-all duration-500"
+						value={percentage}
+					/>
+				</div>
+
+				{/* Contributing since (optional) */}
+				{contributingSince && (
+					<div className="flex items-center gap-1.5 text-muted-foreground text-xs mt-0.5">
+						<ClockIcon size={12} className="shrink-0" />
+						<span>Contributing since {contributingSince}</span>
+					</div>
+				)}
 			</div>
 		</div>
 	);

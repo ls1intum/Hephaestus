@@ -10,15 +10,23 @@ const meta = {
 	argTypes: {
 		currentXP: {
 			control: { type: "number", min: 0 },
-			description: "Current XP earned in the current level",
+			description: "XP earned within the current level",
 		},
 		xpNeeded: {
 			control: { type: "number", min: 1 },
-			description: "Total XP needed to reach the next level",
+			description: "XP needed to reach the next level",
+		},
+		nextLevel: {
+			control: { type: "number", min: 2 },
+			description: "The next level number",
 		},
 		totalXP: {
 			control: { type: "number", min: 0 },
 			description: "Total lifetime XP accumulated",
+		},
+		contributingSince: {
+			control: "text",
+			description: "Formatted date string showing when user started contributing",
 		},
 	},
 } satisfies Meta<typeof XpProgress>;
@@ -30,8 +38,10 @@ export const Default: Story = {
 	args: {
 		currentXP: 450,
 		xpNeeded: 1000,
+		nextLevel: 6,
 		totalXP: 5450,
-		className: "w-[300px]",
+		contributingSince: "May 2022",
+		className: "w-[320px]",
 	},
 };
 
@@ -39,8 +49,10 @@ export const JustStarted: Story = {
 	args: {
 		currentXP: 0,
 		xpNeeded: 150,
+		nextLevel: 2,
 		totalXP: 0,
-		className: "w-[300px]",
+		contributingSince: "January 2026",
+		className: "w-[320px]",
 	},
 };
 
@@ -48,8 +60,10 @@ export const AlmostLevelUp: Story = {
 	args: {
 		currentXP: 950,
 		xpNeeded: 1000,
-		totalXP: 10950,
-		className: "w-[300px]",
+		nextLevel: 10,
+		totalXP: 9950,
+		contributingSince: "March 2023",
+		className: "w-[320px]",
 	},
 };
 
@@ -57,7 +71,30 @@ export const HighLevel: Story = {
 	args: {
 		currentXP: 25000,
 		xpNeeded: 50000,
+		nextLevel: 51,
 		totalXP: 1250000,
-		className: "w-[300px]",
+		contributingSince: "January 2019",
+		className: "w-[320px]",
+	},
+};
+
+export const WithoutContributingSince: Story = {
+	args: {
+		currentXP: 200,
+		xpNeeded: 400,
+		nextLevel: 4,
+		totalXP: 950,
+		className: "w-[320px]",
+	},
+};
+
+export const Level3Example: Story = {
+	args: {
+		currentXP: 45,
+		xpNeeded: 400,
+		nextLevel: 4,
+		totalXP: 495,
+		contributingSince: "October 2024",
+		className: "w-[320px]",
 	},
 };
