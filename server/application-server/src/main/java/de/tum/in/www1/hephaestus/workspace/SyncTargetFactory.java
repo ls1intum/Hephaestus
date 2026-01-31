@@ -44,7 +44,8 @@ public final class SyncTargetFactory {
             rtm.getPullRequestBackfillCheckpoint(),
             rtm.getBackfillLastRunAt(),
             rtm.getIssueSyncCursor(),
-            rtm.getPullRequestSyncCursor()
+            rtm.getPullRequestSyncCursor(),
+            rtm.getDiscussionSyncCursor()
         );
     }
 }
