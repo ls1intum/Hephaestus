@@ -1,10 +1,23 @@
 ---
-description: Validate, branch, commit, and create PR following Hephaestus conventions
+name: land-pr
+description: |
+  Validate, branch, commit, and create PR following Hephaestus conventions.
+  Use when ready to ship changes, create a pull request, or push work.
+disable-model-invocation: true
+allowed-tools:
+  - Bash(gh *)
+  - Bash(git *)
+  - Bash(npm *)
+  - Bash(bd *)
+  - Read
+  - Grep
+  - Glob
+metadata:
+  source: internal
+  version: "1.0.0"
 ---
 
 # Land PR
-
-// turbo-all
 
 ## 1. Check for Changes
 
@@ -75,12 +88,9 @@ git commit -m "<type>(<scope>): <description>"
 
 **Scopes:**
 
-- Service (release): `webapp`, `server`, `ai`, `webhooks`, `docs`
-- Infra (release): `deps`, `security`, `db`, `docker`
-- Infra (NO release): `ci`, `config`, `deps-dev`, `scripts`, `no-release`
-- Feature (release): `gitprovider`, `leaderboard`, `mentor`, `notifications`, `profile`, `teams`, `workspace`
-
-⚠️ `config` = TOOLING only (.prettierrc, renovate). Use `server` for runtime config, service scope for Dockerfiles.
+- Service: `webapp`, `server`, `ai`, `webhooks`, `docs`
+- Infra (no release): `ci`, `config`, `deps`, `deps-dev`, `docker`, `scripts`, `security`, `db`, `no-release`
+- Feature: `gitprovider`, `leaderboard`, `mentor`, `notifications`, `profile`, `teams`, `workspace`
 
 ## 7. Push
 

@@ -1,10 +1,23 @@
 ---
-description: Diagnose and fix failing CI checks on the current PR
+name: fix-ci
+description: |
+  Diagnose and fix failing CI checks on the current PR. Use when CI is failing,
+  tests are broken, GitHub Actions report errors, or PR checks show red.
+disable-model-invocation: true
+allowed-tools:
+  - Bash(gh *)
+  - Bash(git *)
+  - Bash(npm *)
+  - Bash(./mvnw *)
+  - Read
+  - Grep
+  - Glob
+metadata:
+  source: internal
+  version: "1.0.0"
 ---
 
 # Fix CI
-
-// turbo-all
 
 Diagnose and fix failing CI checks on the current PR.
 
