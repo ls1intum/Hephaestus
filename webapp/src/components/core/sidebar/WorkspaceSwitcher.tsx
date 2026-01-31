@@ -5,6 +5,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
 	DropdownMenu,
 	DropdownMenuContent,
+	DropdownMenuGroup,
 	DropdownMenuItem,
 	DropdownMenuLabel,
 	DropdownMenuSeparator,
@@ -157,9 +158,11 @@ export function WorkspaceSwitcher({
 						side={isMobile ? "bottom" : "right"}
 						sideOffset={4}
 					>
-						<DropdownMenuLabel className="text-xs text-muted-foreground">
-							Workspaces
-						</DropdownMenuLabel>
+						<DropdownMenuGroup>
+							<DropdownMenuLabel className="text-xs text-muted-foreground">
+								Workspaces
+							</DropdownMenuLabel>
+						</DropdownMenuGroup>
 						{workspaces.map((workspace, index) => (
 							<DropdownMenuItem
 								key={workspace.workspaceSlug}

@@ -124,11 +124,13 @@ export default function Header({
 									</Avatar>
 								</DropdownMenuTrigger>
 								<DropdownMenuContent className="w-56" align="end">
-									<DropdownMenuLabel className="font-normal">
-										<div className="flex flex-col space-y-1">
-											<p className="text-sm font-medium leading-none">{name}</p>
-										</div>
-									</DropdownMenuLabel>
+									<DropdownMenuGroup>
+										<DropdownMenuLabel className="font-normal">
+											<div className="flex flex-col space-y-1">
+												<p className="text-sm font-medium leading-none">{name}</p>
+											</div>
+										</DropdownMenuLabel>
+									</DropdownMenuGroup>
 									<DropdownMenuSeparator />
 									<DropdownMenuGroup>
 										{hasWorkspace && hasUsername ? (
