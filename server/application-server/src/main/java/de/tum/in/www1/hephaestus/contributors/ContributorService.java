@@ -3,6 +3,7 @@ package de.tum.in.www1.hephaestus.contributors;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import de.tum.in.www1.hephaestus.core.WorkspaceAgnostic;
+import de.tum.in.www1.hephaestus.gitprovider.github.GitHubProperties;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -11,7 +12,6 @@ import java.util.Map;
 import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.HttpHeaders;
@@ -36,16 +36,13 @@ public class ContributorService {
     private final WebClient webClient;
     private final String githubAuthToken;
 
-    public ContributorService(
-        WebClient.Builder webClientBuilder,
-        @Value("${github.meta.auth-token:}") String githubAuthToken
-    ) {
+    public ContributorService(WebClient.Builder webClientBuilder, GitHubProperties gitHubProperties) {
         this.webClient = webClientBuilder
             .baseUrl(GITHUB_API_BASE)
             .defaultHeader(HttpHeaders.ACCEPT, "application/vnd.github+json")
             .defaultHeader("X-GitHub-Api-Version", "2022-11-28")
             .build();
-        this.githubAuthToken = githubAuthToken;
+        this.githubAuthToken = gitHubProperties.meta().authToken();
     }
 
     /**
@@ -59,7 +56,7 @@ public class ContributorService {
         log.info("Fetching global contributors from GitHub.");
 
         if (githubAuthToken == null || githubAuthToken.isBlank()) {
-            log.warn("Contributor endpoint requires github.meta.auth-token to be configured.");
+            log.warn("Contributor endpoint requires hephaestus.github.meta.auth-token to be configured.");
             return new ArrayList<>();
         }
 

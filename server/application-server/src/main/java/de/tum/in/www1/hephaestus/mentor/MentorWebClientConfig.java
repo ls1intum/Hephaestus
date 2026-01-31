@@ -1,10 +1,10 @@
 package de.tum.in.www1.hephaestus.mentor;
 
+import de.tum.in.www1.hephaestus.config.IntelligenceServiceProperties;
 import io.netty.channel.ChannelOption;
 import io.netty.handler.timeout.ReadTimeoutHandler;
 import io.netty.handler.timeout.WriteTimeoutHandler;
 import java.time.Duration;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.client.reactive.ReactorClientHttpConnector;
@@ -20,7 +20,7 @@ import reactor.netty.resources.ConnectionProvider;
 public class MentorWebClientConfig {
 
     @Bean
-    public WebClient mentorWebClient(@Value("${hephaestus.intelligence-service.url}") String intelligenceServiceUrl) {
+    public WebClient mentorWebClient(IntelligenceServiceProperties intelligenceServiceProperties) {
         // Configure a pooled, timeout-enabled WebClient
         var provider = ConnectionProvider.builder("mentor-proxy-pool")
             .maxConnections(200)
@@ -39,7 +39,7 @@ public class MentorWebClientConfig {
             .build();
 
         return WebClient.builder()
-            .baseUrl(intelligenceServiceUrl)
+            .baseUrl(intelligenceServiceProperties.url())
             .clientConnector(new ReactorClientHttpConnector(httpClient))
             .exchangeStrategies(strategies)
             .build();

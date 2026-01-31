@@ -1,5 +1,33 @@
 # Changelog
 
+## [0.13.7](https://github.com/ls1intum/Hephaestus/compare/v0.13.6...v0.13.7) (2026-01-31)
+
+### 🐛 Bug Fixes
+
+* **server:** use consistent APPLICATION_HOST_URL env var for CORS ([#677](https://github.com/ls1intum/Hephaestus/issues/677)) ([a90e4f0](https://github.com/ls1intum/Hephaestus/commit/a90e4f06e9e5e99af70c32d5de12f34daaa7deb3))
+
+### ⚡ Performance Improvements
+
+* add BuildKit cache mounts to all Dockerfiles ([#676](https://github.com/ls1intum/Hephaestus/issues/676)) ([6a74892](https://github.com/ls1intum/Hephaestus/commit/6a748929fa21b51bb1ecf260673dc8a8b96e1ecb))
+
+## [0.13.6](https://github.com/ls1intum/Hephaestus/compare/v0.13.5...v0.13.6) (2026-01-31)
+
+### 🐛 Bug Fixes
+
+* **server:** permit OPTIONS requests for CORS preflight ([#673](https://github.com/ls1intum/Hephaestus/issues/673)) ([8057dfe](https://github.com/ls1intum/Hephaestus/commit/8057dfe6e63271caaa191a09c2f65ebad96ef276))
+
+## [0.13.5](https://github.com/ls1intum/Hephaestus/compare/v0.13.4...v0.13.5) (2026-01-31)
+
+### 🐛 Bug Fixes
+
+* **server:** add cors config to production profile ([#670](https://github.com/ls1intum/Hephaestus/issues/670)) ([a163588](https://github.com/ls1intum/Hephaestus/commit/a1635887ebea61f8ccccc24c17988b1f285e8f1f))
+
+## [0.13.4](https://github.com/ls1intum/Hephaestus/compare/v0.13.3...v0.13.4) (2026-01-31)
+
+### 🐛 Bug Fixes
+
+* **server:** use internal url for keycloak admin client ([#668](https://github.com/ls1intum/Hephaestus/issues/668)) ([35a4869](https://github.com/ls1intum/Hephaestus/commit/35a4869f15c4ff27d6b54356fcad01bcf2146d10))
+
 ## [0.13.3](https://github.com/ls1intum/Hephaestus/compare/v0.13.2...v0.13.3) (2026-01-31)
 
 ### 🐛 Bug Fixes

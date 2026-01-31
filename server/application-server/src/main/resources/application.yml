@@ -1,7 +1,7 @@
 spring:
     application:
         name: Hephaestus
-        version: "0.13.3"
+        version: "0.13.7"
 
     config:
         import: optional:file:.env[.properties]
@@ -249,10 +249,10 @@ hephaestus:
 
     cors:
         allowed-origins:
-            - ${CLIENT_HOST:http://localhost:4200}
+            - ${APPLICATION_HOST_URL:http://localhost:4200}
 
     webapp:
-        url: ${CLIENT_HOST:http://localhost:4200}
+        url: ${APPLICATION_HOST_URL:http://localhost:4200}
 
     leaderboard:
         schedule:
