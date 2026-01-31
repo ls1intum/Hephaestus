@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.13.8](https://github.com/ls1intum/Hephaestus/compare/v0.13.7...v0.13.8) (2026-01-31)
+
+### 🐛 Bug Fixes
+
+* **server:** accept hour-only schedule time format for backward compatibility ([#682](https://github.com/ls1intum/Hephaestus/issues/682)) ([64b62ea](https://github.com/ls1intum/Hephaestus/commit/64b62ea4427ce203ca48178d96a1a078a7663bff))
+
+### ♻️ Code Refactoring
+
+* **server:** consolidate @Value annotations into type-safe ConfigurationProperties ([#679](https://github.com/ls1intum/Hephaestus/issues/679)) ([cdcabda](https://github.com/ls1intum/Hephaestus/commit/cdcabda76dfb6cb67e9f256a18486d4fb77350d6))
+
 ## [0.13.7](https://github.com/ls1intum/Hephaestus/compare/v0.13.6...v0.13.7) (2026-01-31)
 
 ### 🐛 Bug Fixes
