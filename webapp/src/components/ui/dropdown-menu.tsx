@@ -4,18 +4,15 @@ import type * as React from "react";
 
 import { cn } from "@/lib/utils";
 
-type Align = "start" | "center" | "end";
-type Side = "top" | "bottom" | "left" | "right";
-
-function DropdownMenu({ ...props }: React.ComponentProps<typeof Menu.Root>) {
+function DropdownMenu({ ...props }: Menu.Root.Props) {
 	return <Menu.Root data-slot="dropdown-menu" {...props} />;
 }
 
-function DropdownMenuTrigger({ ...props }: React.ComponentProps<typeof Menu.Trigger>) {
+function DropdownMenuTrigger({ ...props }: Menu.Trigger.Props) {
 	return <Menu.Trigger data-slot="dropdown-menu-trigger" {...props} />;
 }
 
-function DropdownMenuPortal({ ...props }: React.ComponentProps<typeof Menu.Portal>) {
+function DropdownMenuPortal({ ...props }: Menu.Portal.Props) {
 	return <Menu.Portal data-slot="dropdown-menu-portal" {...props} />;
 }
 
@@ -26,12 +23,8 @@ function DropdownMenuContent({
 	align = "start",
 	side = "bottom",
 	...props
-}: React.ComponentProps<typeof Menu.Popup> & {
-	sideOffset?: number;
-	alignOffset?: number;
-	align?: Align;
-	side?: Side;
-}) {
+}: Menu.Popup.Props &
+	Pick<Menu.Positioner.Props, "align" | "alignOffset" | "side" | "sideOffset">) {
 	return (
 		<Menu.Portal>
 			<Menu.Positioner
@@ -54,7 +47,7 @@ function DropdownMenuContent({
 	);
 }
 
-function DropdownMenuGroup({ ...props }: React.ComponentProps<typeof Menu.Group>) {
+function DropdownMenuGroup({ ...props }: Menu.Group.Props) {
 	return <Menu.Group data-slot="dropdown-menu-group" {...props} />;
 }
 
@@ -63,7 +56,7 @@ function DropdownMenuItem({
 	inset,
 	variant = "default",
 	...props
-}: React.ComponentProps<typeof Menu.Item> & {
+}: Menu.Item.Props & {
 	inset?: boolean;
 	variant?: "default" | "destructive";
 }) {
@@ -85,12 +78,8 @@ function DropdownMenuCheckboxItem({
 	className,
 	children,
 	checked,
-	onCheckedChange,
 	...props
-}: Omit<React.ComponentProps<typeof Menu.CheckboxItem>, "checked" | "onCheckedChange"> & {
-	checked?: boolean;
-	onCheckedChange?: (checked: boolean) => void;
-}) {
+}: Menu.CheckboxItem.Props) {
 	return (
 		<Menu.CheckboxItem
 			data-slot="dropdown-menu-checkbox-item"
@@ -99,26 +88,26 @@ function DropdownMenuCheckboxItem({
 				className,
 			)}
 			checked={checked}
-			onCheckedChange={onCheckedChange}
 			{...props}
 		>
-			<Menu.CheckboxItemIndicator className="pointer-events-none absolute left-2 flex size-3.5 items-center justify-center">
-				<CheckIcon className="size-4" />
-			</Menu.CheckboxItemIndicator>
+			<span
+				className="pointer-events-none absolute left-2 flex size-3.5 items-center justify-center"
+				data-slot="dropdown-menu-checkbox-item-indicator"
+			>
+				<Menu.CheckboxItemIndicator>
+					<CheckIcon className="size-4" />
+				</Menu.CheckboxItemIndicator>
+			</span>
 			{children}
 		</Menu.CheckboxItem>
 	);
 }
 
-function DropdownMenuRadioGroup({ ...props }: React.ComponentProps<typeof Menu.RadioGroup>) {
+function DropdownMenuRadioGroup({ ...props }: Menu.RadioGroup.Props) {
 	return <Menu.RadioGroup data-slot="dropdown-menu-radio-group" {...props} />;
 }
 
-function DropdownMenuRadioItem({
-	className,
-	children,
-	...props
-}: React.ComponentProps<typeof Menu.RadioItem>) {
+function DropdownMenuRadioItem({ className, children, ...props }: Menu.RadioItem.Props) {
 	return (
 		<Menu.RadioItem
 			data-slot="dropdown-menu-radio-item"
@@ -128,9 +117,14 @@ function DropdownMenuRadioItem({
 			)}
 			{...props}
 		>
-			<Menu.RadioItemIndicator className="pointer-events-none absolute left-2 flex size-3.5 items-center justify-center">
-				<CircleIcon className="size-2 fill-current" />
-			</Menu.RadioItemIndicator>
+			<span
+				className="pointer-events-none absolute left-2 flex size-3.5 items-center justify-center"
+				data-slot="dropdown-menu-radio-item-indicator"
+			>
+				<Menu.RadioItemIndicator>
+					<CircleIcon className="size-2 fill-current" />
+				</Menu.RadioItemIndicator>
+			</span>
 			{children}
 		</Menu.RadioItem>
 	);
@@ -140,7 +134,7 @@ function DropdownMenuLabel({
 	className,
 	inset,
 	...props
-}: React.ComponentProps<typeof Menu.GroupLabel> & {
+}: Menu.GroupLabel.Props & {
 	inset?: boolean;
 }) {
 	return (
@@ -153,10 +147,7 @@ function DropdownMenuLabel({
 	);
 }
 
-function DropdownMenuSeparator({
-	className,
-	...props
-}: React.ComponentProps<typeof Menu.Separator>) {
+function DropdownMenuSeparator({ className, ...props }: Menu.Separator.Props) {
 	return (
 		<Menu.Separator
 			data-slot="dropdown-menu-separator"
@@ -176,7 +167,7 @@ function DropdownMenuShortcut({ className, ...props }: React.ComponentProps<"spa
 	);
 }
 
-function DropdownMenuSub({ ...props }: React.ComponentProps<typeof Menu.SubmenuRoot>) {
+function DropdownMenuSub({ ...props }: Menu.SubmenuRoot.Props) {
 	return <Menu.SubmenuRoot data-slot="dropdown-menu-sub" {...props} />;
 }
 
@@ -185,7 +176,7 @@ function DropdownMenuSubTrigger({
 	inset,
 	children,
 	...props
-}: React.ComponentProps<typeof Menu.SubmenuTrigger> & {
+}: Menu.SubmenuTrigger.Props & {
 	inset?: boolean;
 }) {
 	return (
@@ -211,31 +202,17 @@ function DropdownMenuSubContent({
 	align = "start",
 	side = "right",
 	...props
-}: React.ComponentProps<typeof Menu.Popup> & {
-	sideOffset?: number;
-	alignOffset?: number;
-	align?: Align;
-	side?: Side;
-}) {
+}: React.ComponentProps<typeof DropdownMenuContent>) {
 	return (
-		<Menu.Portal>
-			<Menu.Positioner
-				className="isolate z-50 outline-none"
-				sideOffset={sideOffset}
-				alignOffset={alignOffset}
-				align={align}
-				side={side}
-			>
-				<Menu.Popup
-					data-slot="dropdown-menu-sub-content"
-					className={cn(
-						"bg-popover text-popover-foreground ring-foreground/10 data-[open]:animate-in data-[closed]:animate-out data-[closed]:fade-out-0 data-[open]:fade-in-0 data-[closed]:zoom-out-95 data-[open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 z-50 min-w-24 w-auto origin-(--transform-origin) overflow-hidden rounded-md p-1 shadow-lg ring-1",
-						className,
-					)}
-					{...props}
-				/>
-			</Menu.Positioner>
-		</Menu.Portal>
+		<DropdownMenuContent
+			data-slot="dropdown-menu-sub-content"
+			className={cn("min-w-24 w-auto", className)}
+			align={align}
+			alignOffset={alignOffset}
+			side={side}
+			sideOffset={sideOffset}
+			{...props}
+		/>
 	);
 }
 

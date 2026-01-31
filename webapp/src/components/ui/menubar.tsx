@@ -5,10 +5,7 @@ import type * as React from "react";
 
 import { cn } from "@/lib/utils";
 
-type Align = "start" | "center" | "end";
-type Side = "top" | "bottom" | "left" | "right";
-
-function Menubar({ className, ...props }: React.ComponentProps<typeof MenubarPrimitive>) {
+function Menubar({ className, ...props }: MenubarPrimitive.Props) {
 	return (
 		<MenubarPrimitive
 			data-slot="menubar"
@@ -21,23 +18,23 @@ function Menubar({ className, ...props }: React.ComponentProps<typeof MenubarPri
 	);
 }
 
-function MenubarMenu({ ...props }: React.ComponentProps<typeof Menu.Root>) {
+function MenubarMenu({ ...props }: Menu.Root.Props) {
 	return <Menu.Root data-slot="menubar-menu" {...props} />;
 }
 
-function MenubarGroup({ ...props }: React.ComponentProps<typeof Menu.Group>) {
+function MenubarGroup({ ...props }: Menu.Group.Props) {
 	return <Menu.Group data-slot="menubar-group" {...props} />;
 }
 
-function MenubarPortal({ ...props }: React.ComponentProps<typeof Menu.Portal>) {
+function MenubarPortal({ ...props }: Menu.Portal.Props) {
 	return <Menu.Portal data-slot="menubar-portal" {...props} />;
 }
 
-function MenubarRadioGroup({ ...props }: React.ComponentProps<typeof Menu.RadioGroup>) {
+function MenubarRadioGroup({ ...props }: Menu.RadioGroup.Props) {
 	return <Menu.RadioGroup data-slot="menubar-radio-group" {...props} />;
 }
 
-function MenubarTrigger({ className, ...props }: React.ComponentProps<typeof Menu.Trigger>) {
+function MenubarTrigger({ className, ...props }: Menu.Trigger.Props) {
 	return (
 		<Menu.Trigger
 			data-slot="menubar-trigger"
@@ -57,12 +54,8 @@ function MenubarContent({
 	sideOffset = 8,
 	side = "bottom",
 	...props
-}: React.ComponentProps<typeof Menu.Popup> & {
-	align?: Align;
-	alignOffset?: number;
-	sideOffset?: number;
-	side?: Side;
-}) {
+}: Menu.Popup.Props &
+	Pick<Menu.Positioner.Props, "align" | "alignOffset" | "sideOffset" | "side">) {
 	return (
 		<Menu.Portal>
 			<Menu.Positioner
@@ -90,7 +83,7 @@ function MenubarItem({
 	inset,
 	variant = "default",
 	...props
-}: React.ComponentProps<typeof Menu.Item> & {
+}: Menu.Item.Props & {
 	inset?: boolean;
 	variant?: "default" | "destructive";
 }) {
@@ -108,16 +101,7 @@ function MenubarItem({
 	);
 }
 
-function MenubarCheckboxItem({
-	className,
-	children,
-	checked,
-	onCheckedChange,
-	...props
-}: Omit<React.ComponentProps<typeof Menu.CheckboxItem>, "checked" | "onCheckedChange"> & {
-	checked?: boolean;
-	onCheckedChange?: (checked: boolean) => void;
-}) {
+function MenubarCheckboxItem({ className, children, checked, ...props }: Menu.CheckboxItem.Props) {
 	return (
 		<Menu.CheckboxItem
 			data-slot="menubar-checkbox-item"
@@ -126,22 +110,22 @@ function MenubarCheckboxItem({
 				className,
 			)}
 			checked={checked}
-			onCheckedChange={onCheckedChange}
 			{...props}
 		>
-			<Menu.CheckboxItemIndicator className="pointer-events-none absolute left-2 flex size-3.5 items-center justify-center">
-				<CheckIcon className="size-4" />
-			</Menu.CheckboxItemIndicator>
+			<span
+				className="pointer-events-none absolute left-2 flex size-3.5 items-center justify-center"
+				data-slot="menubar-checkbox-item-indicator"
+			>
+				<Menu.CheckboxItemIndicator>
+					<CheckIcon className="size-4" />
+				</Menu.CheckboxItemIndicator>
+			</span>
 			{children}
 		</Menu.CheckboxItem>
 	);
 }
 
-function MenubarRadioItem({
-	className,
-	children,
-	...props
-}: React.ComponentProps<typeof Menu.RadioItem>) {
+function MenubarRadioItem({ className, children, ...props }: Menu.RadioItem.Props) {
 	return (
 		<Menu.RadioItem
 			data-slot="menubar-radio-item"
@@ -151,9 +135,14 @@ function MenubarRadioItem({
 			)}
 			{...props}
 		>
-			<Menu.RadioItemIndicator className="pointer-events-none absolute left-2 flex size-3.5 items-center justify-center">
-				<CircleIcon className="size-2 fill-current" />
-			</Menu.RadioItemIndicator>
+			<span
+				className="pointer-events-none absolute left-2 flex size-3.5 items-center justify-center"
+				data-slot="menubar-radio-item-indicator"
+			>
+				<Menu.RadioItemIndicator>
+					<CircleIcon className="size-2 fill-current" />
+				</Menu.RadioItemIndicator>
+			</span>
 			{children}
 		</Menu.RadioItem>
 	);
@@ -163,7 +152,7 @@ function MenubarLabel({
 	className,
 	inset,
 	...props
-}: React.ComponentProps<typeof Menu.GroupLabel> & {
+}: Menu.GroupLabel.Props & {
 	inset?: boolean;
 }) {
 	return (
@@ -176,7 +165,7 @@ function MenubarLabel({
 	);
 }
 
-function MenubarSeparator({ className, ...props }: React.ComponentProps<typeof Menu.Separator>) {
+function MenubarSeparator({ className, ...props }: Menu.Separator.Props) {
 	return (
 		<Menu.Separator
 			data-slot="menubar-separator"
@@ -196,7 +185,7 @@ function MenubarShortcut({ className, ...props }: React.ComponentProps<"span">) 
 	);
 }
 
-function MenubarSub({ ...props }: React.ComponentProps<typeof Menu.SubmenuRoot>) {
+function MenubarSub({ ...props }: Menu.SubmenuRoot.Props) {
 	return <Menu.SubmenuRoot data-slot="menubar-sub" {...props} />;
 }
 
@@ -205,7 +194,7 @@ function MenubarSubTrigger({
 	inset,
 	children,
 	...props
-}: React.ComponentProps<typeof Menu.SubmenuTrigger> & {
+}: Menu.SubmenuTrigger.Props & {
 	inset?: boolean;
 }) {
 	return (
@@ -230,29 +219,16 @@ function MenubarSubContent({
 	align = "start",
 	side = "right",
 	...props
-}: React.ComponentProps<typeof Menu.Popup> & {
-	sideOffset?: number;
-	align?: Align;
-	side?: Side;
-}) {
+}: React.ComponentProps<typeof MenubarContent>) {
 	return (
-		<Menu.Portal>
-			<Menu.Positioner
-				sideOffset={sideOffset}
-				align={align}
-				side={side}
-				className="isolate z-50 outline-none"
-			>
-				<Menu.Popup
-					data-slot="menubar-sub-content"
-					className={cn(
-						"bg-popover text-popover-foreground data-[open]:animate-in data-[closed]:animate-out data-[closed]:fade-out-0 data-[open]:fade-in-0 data-[closed]:zoom-out-95 data-[open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 z-50 min-w-[8rem] origin-(--transform-origin) overflow-hidden rounded-md border p-1 shadow-lg",
-						className,
-					)}
-					{...props}
-				/>
-			</Menu.Positioner>
-		</Menu.Portal>
+		<MenubarContent
+			data-slot="menubar-sub-content"
+			className={cn("min-w-[8rem] w-auto", className)}
+			sideOffset={sideOffset}
+			align={align}
+			side={side}
+			{...props}
+		/>
 	);
 }
 
