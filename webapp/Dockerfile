@@ -1,3 +1,5 @@
+# syntax=docker/dockerfile:1.4
+
 # Stage 1: Build the React application
 FROM node:22-alpine AS build
 
@@ -6,7 +8,9 @@ WORKDIR /app
 # Copy and install dependencies early to leverage Docker layer caching
 COPY package.json package-lock.json* /app/
 
-RUN npm ci
+# Use BuildKit cache mount for npm cache to speed up rebuilds
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci --prefer-offline
 
 # Copy the rest of the application code
 COPY ./ /app/

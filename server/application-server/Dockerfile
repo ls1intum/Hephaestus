@@ -1,15 +1,21 @@
+# syntax=docker/dockerfile:1.4
+
 FROM maven:3.9.8-eclipse-temurin-21 AS build
 
 WORKDIR /app
 
 COPY pom.xml .
 
-# This step is to cache dependencies, avoiding re-downloading them every time
-RUN mvn -B -U dependency:go-offline
+# Use BuildKit cache mount for Maven repository to speed up rebuilds
+# Remove -U flag to allow offline resolution from cache
+RUN --mount=type=cache,target=/root/.m2 \
+    mvn -B dependency:go-offline
 
 COPY src ./src
 
-RUN mvn clean package -DskipTests
+# Use BuildKit cache mount for Maven repository during build
+RUN --mount=type=cache,target=/root/.m2 \
+    mvn clean package -DskipTests
 
 FROM eclipse-temurin:21
 
