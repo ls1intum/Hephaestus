@@ -9,9 +9,7 @@ import { cn } from "@/lib/utils";
 type Align = "start" | "center" | "end";
 type Side = "top" | "bottom" | "left" | "right";
 
-function ContextMenu({
-	...props
-}: React.ComponentProps<typeof ContextMenuPrimitive.Root>) {
+function ContextMenu({ ...props }: React.ComponentProps<typeof ContextMenuPrimitive.Root>) {
 	return <ContextMenuPrimitive.Root data-slot="context-menu" {...props} />;
 }
 
@@ -21,15 +19,11 @@ function ContextMenuTrigger({
 	return <ContextMenuPrimitive.Trigger data-slot="context-menu-trigger" {...props} />;
 }
 
-function ContextMenuGroup({
-	...props
-}: React.ComponentProps<typeof ContextMenuPrimitive.Group>) {
+function ContextMenuGroup({ ...props }: React.ComponentProps<typeof ContextMenuPrimitive.Group>) {
 	return <ContextMenuPrimitive.Group data-slot="context-menu-group" {...props} />;
 }
 
-function ContextMenuPortal({
-	...props
-}: React.ComponentProps<typeof ContextMenuPrimitive.Portal>) {
+function ContextMenuPortal({ ...props }: React.ComponentProps<typeof ContextMenuPrimitive.Portal>) {
 	return <ContextMenuPrimitive.Portal data-slot="context-menu-portal" {...props} />;
 }
 
@@ -150,7 +144,10 @@ function ContextMenuCheckboxItem({
 	checked,
 	onCheckedChange,
 	...props
-}: Omit<React.ComponentProps<typeof ContextMenuPrimitive.CheckboxItem>, "checked" | "onCheckedChange"> & {
+}: Omit<
+	React.ComponentProps<typeof ContextMenuPrimitive.CheckboxItem>,
+	"checked" | "onCheckedChange"
+> & {
 	checked?: boolean;
 	onCheckedChange?: (checked: boolean) => void;
 }) {

@@ -201,7 +201,9 @@ export function UsersTable({ users, teams, isLoading = false }: UsersTableProps)
 						</Button>
 					)}
 					<DropdownMenu>
-						<DropdownMenuTrigger render={<Button variant="outline" size="sm" className="ml-auto" />}>
+						<DropdownMenuTrigger
+							render={<Button variant="outline" size="sm" className="ml-auto" />}
+						>
 							Columns <ChevronDown className="ml-2 h-4 w-4" />
 						</DropdownMenuTrigger>
 						<DropdownMenuContent align="end">

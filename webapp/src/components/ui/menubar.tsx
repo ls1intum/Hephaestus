@@ -10,10 +10,7 @@ import { cn } from "@/lib/utils";
 type Align = "start" | "center" | "end";
 type Side = "top" | "bottom" | "left" | "right";
 
-function Menubar({
-	className,
-	...props
-}: React.ComponentProps<typeof MenubarPrimitive>) {
+function Menubar({ className, ...props }: React.ComponentProps<typeof MenubarPrimitive>) {
 	return (
 		<MenubarPrimitive
 			data-slot="menubar"
@@ -42,10 +39,7 @@ function MenubarRadioGroup({ ...props }: React.ComponentProps<typeof Menu.RadioG
 	return <Menu.RadioGroup data-slot="menubar-radio-group" {...props} />;
 }
 
-function MenubarTrigger({
-	className,
-	...props
-}: React.ComponentProps<typeof Menu.Trigger>) {
+function MenubarTrigger({ className, ...props }: React.ComponentProps<typeof Menu.Trigger>) {
 	return (
 		<Menu.Trigger
 			data-slot="menubar-trigger"
@@ -73,12 +67,7 @@ function MenubarContent({
 }) {
 	return (
 		<Menu.Portal>
-			<Menu.Positioner
-				align={align}
-				alignOffset={alignOffset}
-				sideOffset={sideOffset}
-				side={side}
-			>
+			<Menu.Positioner align={align} alignOffset={alignOffset} sideOffset={sideOffset} side={side}>
 				<Menu.Popup
 					data-slot="menubar-content"
 					className={cn(
@@ -183,10 +172,7 @@ function MenubarLabel({
 	);
 }
 
-function MenubarSeparator({
-	className,
-	...props
-}: React.ComponentProps<"div">) {
+function MenubarSeparator({ className, ...props }: React.ComponentProps<"div">) {
 	return (
 		<div
 			role="separator"

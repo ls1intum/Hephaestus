@@ -27,7 +27,12 @@ function PopoverContent({
 }) {
 	return (
 		<PopoverPrimitive.Portal>
-			<PopoverPrimitive.Positioner align={align} side={side} sideOffset={sideOffset} alignOffset={alignOffset}>
+			<PopoverPrimitive.Positioner
+				align={align}
+				side={side}
+				sideOffset={sideOffset}
+				alignOffset={alignOffset}
+			>
 				<PopoverPrimitive.Popup
 					data-slot="popover-content"
 					className={cn(
@@ -43,10 +48,7 @@ function PopoverContent({
 	);
 }
 
-function PopoverAnchor({
-	className,
-	...props
-}: React.ComponentProps<"div">) {
+function PopoverAnchor({ className, ...props }: React.ComponentProps<"div">) {
 	return <div data-slot="popover-anchor" className={className} {...props} />;
 }
 

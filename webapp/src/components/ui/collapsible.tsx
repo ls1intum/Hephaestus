@@ -10,9 +10,7 @@ function CollapsibleTrigger({
 	return <CollapsiblePrimitive.Trigger data-slot="collapsible-trigger" {...props} />;
 }
 
-function CollapsibleContent({
-	...props
-}: React.ComponentProps<typeof CollapsiblePrimitive.Panel>) {
+function CollapsibleContent({ ...props }: React.ComponentProps<typeof CollapsiblePrimitive.Panel>) {
 	return <CollapsiblePrimitive.Panel data-slot="collapsible-content" {...props} />;
 }
 

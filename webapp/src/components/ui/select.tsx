@@ -19,13 +19,7 @@ function Select({
 		},
 		[onValueChange],
 	);
-	return (
-		<SelectPrimitive.Root
-			data-slot="select"
-			onValueChange={handleValueChange}
-			{...props}
-		/>
-	);
+	return <SelectPrimitive.Root data-slot="select" onValueChange={handleValueChange} {...props} />;
 }
 
 function SelectGroup({ ...props }: React.ComponentProps<typeof SelectPrimitive.Group>) {
@@ -86,9 +80,7 @@ function SelectContent({
 					{...props}
 				>
 					<SelectScrollUpArrow />
-					<SelectPrimitive.List
-						className="h-[var(--anchor-height)] w-full min-w-[var(--anchor-width)] scroll-my-1 p-1"
-					>
+					<SelectPrimitive.List className="h-[var(--anchor-height)] w-full min-w-[var(--anchor-width)] scroll-my-1 p-1">
 						{children}
 					</SelectPrimitive.List>
 					<SelectScrollDownArrow />
@@ -98,7 +90,10 @@ function SelectContent({
 	);
 }
 
-function SelectLabel({ className, ...props }: React.ComponentProps<typeof SelectPrimitive.GroupLabel>) {
+function SelectLabel({
+	className,
+	...props
+}: React.ComponentProps<typeof SelectPrimitive.GroupLabel>) {
 	return (
 		<SelectPrimitive.GroupLabel
 			data-slot="select-label"
@@ -132,10 +127,7 @@ function SelectItem({
 	);
 }
 
-function SelectSeparator({
-	className,
-	...props
-}: React.ComponentProps<"div">) {
+function SelectSeparator({ className, ...props }: React.ComponentProps<"div">) {
 	return (
 		<div
 			data-slot="select-separator"

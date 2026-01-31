@@ -140,10 +140,7 @@ function NavigationMenuLink({
 	);
 }
 
-function NavigationMenuIndicator({
-	className,
-	...props
-}: React.ComponentProps<"div">) {
+function NavigationMenuIndicator({ className, ...props }: React.ComponentProps<"div">) {
 	// Base UI doesn't have an Indicator component, so we create a styled div
 	// This is typically used to show an arrow pointing at the viewport
 	return (

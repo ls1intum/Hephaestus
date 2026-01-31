@@ -110,7 +110,9 @@ export default function Header({
 					) : (
 						<div className="flex items-center gap-2">
 							<DropdownMenu>
-								<DropdownMenuTrigger render={<Button variant="ghost" size="icon" className="rounded-full" />}>
+								<DropdownMenuTrigger
+									render={<Button variant="ghost" size="icon" className="rounded-full" />}
+								>
 									<Avatar className="hover:brightness-90">
 										<AvatarImage
 											src={`https://github.com/${username}.png`}

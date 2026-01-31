@@ -9,21 +9,15 @@ import { cn } from "@/lib/utils";
 type Align = "start" | "center" | "end";
 type Side = "top" | "bottom" | "left" | "right";
 
-function DropdownMenu({
-	...props
-}: React.ComponentProps<typeof Menu.Root>) {
+function DropdownMenu({ ...props }: React.ComponentProps<typeof Menu.Root>) {
 	return <Menu.Root data-slot="dropdown-menu" {...props} />;
 }
 
-function DropdownMenuTrigger({
-	...props
-}: React.ComponentProps<typeof Menu.Trigger>) {
+function DropdownMenuTrigger({ ...props }: React.ComponentProps<typeof Menu.Trigger>) {
 	return <Menu.Trigger data-slot="dropdown-menu-trigger" {...props} />;
 }
 
-function DropdownMenuPortal({
-	...props
-}: React.ComponentProps<typeof Menu.Portal>) {
+function DropdownMenuPortal({ ...props }: React.ComponentProps<typeof Menu.Portal>) {
 	return <Menu.Portal data-slot="dropdown-menu-portal" {...props} />;
 }
 
@@ -54,9 +48,7 @@ function DropdownMenuContent({
 	);
 }
 
-function DropdownMenuGroup({
-	...props
-}: React.ComponentProps<typeof Menu.Group>) {
+function DropdownMenuGroup({ ...props }: React.ComponentProps<typeof Menu.Group>) {
 	return <Menu.Group data-slot="dropdown-menu-group" {...props} />;
 }
 
@@ -112,9 +104,7 @@ function DropdownMenuCheckboxItem({
 	);
 }
 
-function DropdownMenuRadioGroup({
-	...props
-}: React.ComponentProps<typeof Menu.RadioGroup>) {
+function DropdownMenuRadioGroup({ ...props }: React.ComponentProps<typeof Menu.RadioGroup>) {
 	return <Menu.RadioGroup data-slot="dropdown-menu-radio-group" {...props} />;
 }
 
@@ -180,9 +170,7 @@ function DropdownMenuShortcut({ className, ...props }: React.ComponentProps<"spa
 	);
 }
 
-function DropdownMenuSub({
-	...props
-}: React.ComponentProps<typeof Menu.SubmenuRoot>) {
+function DropdownMenuSub({ ...props }: React.ComponentProps<typeof Menu.SubmenuRoot>) {
 	return <Menu.SubmenuRoot data-slot="dropdown-menu-sub" {...props} />;
 }
 
