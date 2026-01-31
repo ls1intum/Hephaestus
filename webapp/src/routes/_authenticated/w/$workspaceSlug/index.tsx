@@ -5,9 +5,9 @@ import { formatISO } from "date-fns";
 import { useEffect } from "react";
 import { z } from "zod";
 import {
+	computeUserLeagueStatsMutation,
 	getAllTeamsOptions,
 	getLeaderboardOptions,
-	getUserLeagueStatsMutation,
 	getUserProfileOptions,
 	getWorkspaceOptions,
 } from "@/api/@tanstack/react-query.gen";
@@ -238,7 +238,7 @@ function LeaderboardContainer() {
 
 	// Mutation for league points change data (POST endpoint used to compute stats)
 	const leagueStatsMutation = useMutation({
-		...getUserLeagueStatsMutation({
+		...computeUserLeagueStatsMutation({
 			path: { workspaceSlug: slug, login: username || "" },
 		}),
 	});

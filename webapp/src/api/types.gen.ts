@@ -1248,7 +1248,7 @@ export type GetLeaderboardResponses = {
 
 export type GetLeaderboardResponse = GetLeaderboardResponses[keyof GetLeaderboardResponses];
 
-export type GetUserLeagueStatsData = {
+export type ComputeUserLeagueStatsData = {
     /**
      * the user's current leaderboard entry for comparison
      */
@@ -1267,14 +1267,14 @@ export type GetUserLeagueStatsData = {
     url: '/workspaces/{workspaceSlug}/leaderboard/users/{login}/league-stats';
 };
 
-export type GetUserLeagueStatsResponses = {
+export type ComputeUserLeagueStatsResponses = {
     /**
      * league change statistics including projected point delta
      */
     200: LeagueChange;
 };
 
-export type GetUserLeagueStatsResponse = GetUserLeagueStatsResponses[keyof GetUserLeagueStatsResponses];
+export type ComputeUserLeagueStatsResponse = ComputeUserLeagueStatsResponses[keyof ComputeUserLeagueStatsResponses];
 
 export type ResetAndRecalculateLeaguesData = {
     body?: never;
